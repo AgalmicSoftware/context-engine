@@ -1,4 +1,4 @@
-import { exportDraftText, syncDraftText } from './sessionInterviewDraftText';
+import { exportDraftText, planDraftTextSync, syncDraftText } from './sessionInterviewDraftText';
 import { keepConsentWithdrawals, resolveConsentFlags, summarizeInterviewConsent } from './sessionInterviewConsent';
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 
@@ -28,6 +28,22 @@ describe('syncDraftText', () => {
       syncDraftText({ put: [{ questionId: 'q2', aiComment: 'Text' }], remove: ['q1'] }, context),
     ).rejects.toThrow('Refused.');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends in batches the Worker accepts', async () => {
+    fetchMock.mockResolvedValue(reply({ ok: true }));
+    const ids = Array.from({ length: 450 }, (_, index) => `q${index}`);
+    await syncDraftText(
+      { put: ids.slice(0, 30).map((questionId) => ({ questionId, aiComment: 'x' })), remove: ids },
+      context,
+    );
+    expect(calls().map(([url, body]) => [url.split('/').pop(), (body.questionIds || body.items).length])).toEqual([
+      ['delete', 200],
+      ['delete', 200],
+      ['delete', 50],
+      ['put', 25],
+      ['put', 5],
+    ]);
   });
 
   it('sends nothing when there is nothing to change', async () => {
@@ -84,5 +100,17 @@ describe('draft text consent', () => {
     });
     expect(choices.draftTextChoice).toEqual({ checked: false, mixed: true });
     expect(choices.comparisonChoice).toEqual({ checked: true, mixed: false });
+  });
+});
+
+describe('planDraftTextSync', () => {
+  it('finds earlier consent saved under a lowercased question id', () => {
+    const uploaded = [{ questionID: 'ceq_AbC', interviewProvenance: {} }];
+    expect(
+      planDraftTextSync({ sessionConfig: {}, uploaded, drafts: {}, earlier: { ceq_abc: { draftTextConsent: true } } }),
+    ).toEqual({
+      put: [],
+      remove: ['ceq_AbC'],
+    });
   });
 });

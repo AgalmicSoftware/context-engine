@@ -92,7 +92,10 @@ Worker" on an older one, and save the key only while it is on.
   consent (unticked, research unticked, or now encrypted), then stores the
   text for the rest. A consent change on saved answers is uploaded as a
   resubmission, so it deletes at that submit. Deleting works even after the
-  setting is turned off or the session has ended.
+  setting is turned off or the session has ended. If a deletion fails, the
+  person is told their answers were saved but the text could not be updated,
+  and the report script ignores any stored text whose latest saved response no
+  longer carries `draftTextConsent`.
 - **Turning it off** stops collecting; stored text stays until each person
   withdraws it. Session backups leave the prefix out, so an admin must download
   it before deleting the session or restoring it from a backup.

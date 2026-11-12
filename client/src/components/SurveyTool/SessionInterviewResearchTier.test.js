@@ -138,3 +138,27 @@ it('withdrawing research consent removes the tier and origin with the rest of th
     expect(kept).not.toHaveProperty(key);
   expect(kept).not.toHaveProperty('predictionComparison');
 });
+
+describe('AI draft text for admins', () => {
+  const keeping = { slug: 'demo', interviewMode: { keepDraftTextForAdmins: true } };
+  const recordWith = async (sessionConfig, consentOverrides, comparison = true) => {
+    const engine = fakeEngine(sessionConfig);
+    await recordInterviewProvenance(engine, drafts, SOURCE, PACKET, true, comparison, '', review, consentOverrides);
+    return engine.state.surveysResponseState[0].interviewProvenance.q1;
+  };
+
+  it('keeps it by default under research sharing where the session keeps it', async () => {
+    expect(await recordWith(keeping, {})).toMatchObject({ includeDraftText: true });
+    expect(await recordWith({ slug: 'demo' }, {})).not.toHaveProperty('includeDraftText');
+  });
+
+  it('follows the choice the panel forwards, including one made before signing in', async () => {
+    expect(await recordWith(keeping, { includeDraftText: false })).not.toHaveProperty('includeDraftText');
+  });
+
+  it('keeps none without research sharing or at full detail', async () => {
+    expect(await recordWith(keeping, { includePredictionComparison: false })).not.toHaveProperty('includeDraftText');
+    const full = { slug: 'demo', interviewMode: { keepDraftTextForAdmins: true, researchDetail: 'full' } };
+    expect(await recordWith(full, {})).not.toHaveProperty('includeDraftText');
+  });
+});

@@ -9,6 +9,11 @@ type UnknownRecord = Record<string, unknown>;
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+// Saved answers are keyed by lowercased question id, drafts by the id as written.
+const byQuestion = (records: Record<string, unknown>) => {
+  const found = new Map(Object.entries(records).map(([id, value]) => [id.toLowerCase(), value]));
+  return (questionId: string) => asRecord(records[questionId] ?? found.get(questionId.toLowerCase()));
+};
 
 export type DraftTextItem = {
   questionId: string;
@@ -38,6 +43,8 @@ export const planDraftTextSync = ({
   earlier: Record<string, unknown>;
 }): DraftTextPlan => {
   const keeps = normalizeInterviewSettings(asRecord(sessionConfig).interviewMode).keepDraftTextForAdmins;
+  const draftFor = byQuestion(drafts);
+  const earlierFor = byQuestion(earlier);
   const plan: DraftTextPlan = { put: [], remove: [] };
   for (const value of uploaded) {
     const response = asRecord(value);
@@ -49,9 +56,9 @@ export const planDraftTextSync = ({
       asRecord(response.additional).encrypted === true ||
       (Array.isArray(provenance.redactedFields) && provenance.redactedFields.length > 0);
     if (provenance.draftTextConsent === true && !encrypted) {
-      // With the setting off the Worker takes no new text; what is stored stays until withdrawn.
+      // Only an older saved record keeps its consent with the setting off; the Worker takes no new text.
       if (!keeps) continue;
-      const original = asRecord(asRecord(drafts[questionId]).originalPrediction);
+      const original = asRecord(draftFor(questionId).originalPrediction);
       const aiAnswer = isTextInterviewQuestion(response) ? text(original.answer) : '';
       const aiComment = text(original.additionalComments);
       if (!aiAnswer && !aiComment) continue;
@@ -64,7 +71,7 @@ export const planDraftTextSync = ({
         ...(origin ? { origin } : {}),
         ...(condition === 'shown' || condition === 'blind' ? { condition } : {}),
       });
-    } else if (keeps || asRecord(earlier[questionId]).draftTextConsent === true) {
+    } else if (keeps || earlierFor(questionId).draftTextConsent === true) {
       plan.remove.push(questionId);
     }
   }
@@ -88,10 +95,16 @@ const post = async (action: 'put' | 'delete' | 'export', body: unknown, context:
   return result;
 };
 
-/** Removes first, so a failure part way never leaves text whose consent was withdrawn. */
+const batches = <T>(items: T[], size: number): T[][] =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, (index + 1) * size));
+
+/**
+ * Removes first, so a failure part way never leaves text whose consent was withdrawn. Batches stay within
+ * the Worker's limits: 200 items a request, and puts well under its 2 MiB body cap at 16,000 characters each.
+ */
 export const syncDraftText = async (plan: DraftTextPlan, context: WorkerContext): Promise<void> => {
-  if (plan.remove.length) await post('delete', { questionIds: plan.remove }, context);
-  if (plan.put.length) await post('put', { items: plan.put }, context);
+  for (const questionIds of batches(plan.remove, 200)) await post('delete', { questionIds }, context);
+  for (const items of batches(plan.put, 25)) await post('put', { items }, context);
 };
 
 /** Every page of the admin export, as one file; the Worker answers only config admins. */
@@ -108,5 +121,11 @@ export const exportDraftText = async (context: WorkerContext): Promise<UnknownRe
     rows.push(...page.rows);
     cursor = typeof page.cursor === 'string' ? page.cursor : '';
   } while (cursor);
-  return { type: 'ce_draft_text_export', version: 1, sessionSlug: first?.sessionSlug, exportedAt: first?.exportedAt, rows };
+  return {
+    type: 'ce_draft_text_export',
+    version: 1,
+    sessionSlug: first?.sessionSlug,
+    exportedAt: first?.exportedAt,
+    rows,
+  };
 };

@@ -202,7 +202,7 @@ describe('AI draft text for admins', () => {
     expect(screen.getByText(/Includes the AI’s predicted answers/)).not.toHaveTextContent(/admins can read/);
     rerender(<SessionInterviewResearchShare included disabled={false} draftTextOffered onChange={jest.fn()} />);
     expect(screen.getByText(/Includes the AI’s predicted answers/)).toHaveTextContent(
-      /the session’s admins can read the AI’s drafted text, and nobody else can/,
+      /lets the session’s admins, and nobody else, read the AI’s drafted text; you can turn that off on its own/,
     );
   });
 });

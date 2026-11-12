@@ -267,6 +267,20 @@ it('retains an explicit decline through login and uses the next session’s own 
   expect(comparison).toBeChecked();
 });
 
+it('keeps a declined AI draft text choice through login', async () => {
+  const props = researchReviewProps();
+  const sessionConfig = { interviewMode: { shareDraftChangesByDefault: true, keepDraftTextForAdmins: true } };
+  const { rerender } = render(
+    <SessionVoiceModeModal {...props} account="" loginComplete={false} sessionConfig={sessionConfig} />,
+  );
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const draftText = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_DRAFT_TEXT);
+  expect(draftText).toBeChecked();
+  fireEvent.click(draftText);
+  rerender(<SessionVoiceModeModal {...props} sessionConfig={sessionConfig} />);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_DRAFT_TEXT)).not.toBeChecked();
+});
+
 it('keeps provenance and the name inside AI submission info, before its metadata, and sharing on its bar', async () => {
   render(
     <SessionVoiceModeModal

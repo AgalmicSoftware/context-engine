@@ -227,7 +227,7 @@ export function SessionInterviewResearchShare({
   const minimal = researchDetail === 'minimal';
   const draftTextNote =
     minimal && draftTextOffered
-      ? ' If you also agree in the details, the session’s admins can read the AI’s drafted text, and nobody else can.'
+      ? ' It also lets the session’s admins, and nobody else, read the AI’s drafted text; you can turn that off on its own in the details.'
       : '';
   return (
     <span className={[styles.researchConsent, className].filter(Boolean).join(' ')}>

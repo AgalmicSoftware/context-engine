@@ -235,7 +235,8 @@ latest saved text differs, that text as a `user` message, with `participant`
 (the same pseudonym as `--predictions` in the same run), `question_id`,
 `field`, `origin`, `condition` and `changed` in `metadata`. Every time is the
 download's date at midnight UTC, and no address appears. A field whose latest
-answer or comment is encrypted gets no line. The shape suits
+answer or comment is encrypted gets no line, and nor does a draft whose latest
+response no longer carries draft-text consent. The shape suits
 conversation-clustering tools: OpenClio reads it with
 `getConversationFunc=lambda r: r["messages"]`, and Kura reads each line as a
 `Conversation`. They are examples, not dependencies. Neither enforces a

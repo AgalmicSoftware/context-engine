@@ -231,6 +231,8 @@ export default function SessionInterviewPanel({
     included: boolean;
   } | null>(null);
   const [includeResponderName, setIncludeResponderName] = useState(false);
+  // Like research sharing, kept across signing in to submit, which resets consentOverrides.
+  const [draftTextKept, setDraftTextKept] = useState<{ contextToken: string; included: boolean } | null>(null);
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
   const [submissionInfoOpen, setSubmissionInfoOpen] = useState(false);
   const sessionResearchDetail = normalizeInterviewSettings(sessionConfig?.interviewMode).researchDetail;
@@ -455,11 +457,13 @@ export default function SessionInterviewPanel({
   const selectedDrafts = drafts.filter((draft) => selected[draft.questionId]);
   const visibleDrafts = drafts.filter((draft) => !removedDraftIds[draft.questionId]);
   const consentDrafts = selectedDrafts.length ? selectedDrafts : drafts;
+  const draftTextOverride = draftTextKept?.contextToken === baseSubmitContextToken ? draftTextKept.included : undefined;
+  const draftTextForwarded = keepDraftTextForAdmins ? draftTextOverride : undefined;
   const { aiChoice, comparisonChoice, nameChoice, draftTextChoice, hasSavedName, hasSavedAi } =
     summarizeInterviewConsent({
       drafts: consentDrafts,
       saved: savedConsent,
-      overrides: consentOverrides,
+      overrides: { ...consentOverrides, includeDraftText: draftTextOverride },
       defaults: {
         ai: hasAiPrefill && includeProvenance,
         comparison: includePredictionComparison,
@@ -1006,10 +1010,11 @@ export default function SessionInterviewPanel({
       includeProvenance,
       includeResponderName,
       // Forward the shown detail only when it is narrower than the session's current one.
-      consentOverrides:
-        shownResearchDetail === sessionResearchDetail
-          ? consentOverrides
-          : { ...consentOverrides, researchDetail: shownResearchDetail },
+      consentOverrides: {
+        ...consentOverrides,
+        ...(draftTextForwarded === undefined ? {} : { includeDraftText: draftTextForwarded }),
+        ...(shownResearchDetail === sessionResearchDetail ? {} : { researchDetail: shownResearchDetail }),
+      },
       isInterviewBusy,
       researchAvailable,
       responderContext,
@@ -1053,6 +1058,7 @@ export default function SessionInterviewPanel({
     activeSubmitContextToken,
     authenticatedForSubmit,
     baseSubmitContextToken,
+    draftTextForwarded,
     drafts,
     hasAiPrefill,
     includePredictionComparison,
@@ -1463,7 +1469,7 @@ export default function SessionInterviewPanel({
                           researchDetail={shownResearchDetail}
                           draftText={keepDraftTextForAdmins ? draftTextChoice : null}
                           onDraftTextChange={(included) =>
-                            setConsentOverrides((prev) => ({ ...prev, includeDraftText: included }))
+                            setDraftTextKept({ contextToken: baseSubmitContextToken, included })
                           }
                         >
                           {nameOption}

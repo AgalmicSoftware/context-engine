@@ -373,6 +373,8 @@ test('conversations name people as the predictions file does, on the export day,
       const payload = JSON.parse(row.response);
       payload.responses.forEach((entry) => {
         entry.interviewProvenance.source.modelId = `model-${index}`;
+        // The fifth person later withdrew draft-text consent, but their stored text wasn't deleted.
+        if (index !== 4) entry.interviewProvenance.draftTextConsent = true;
       });
       row.response = JSON.stringify(payload);
     });
@@ -403,8 +405,8 @@ test('conversations name people as the predictions file does, on the export day,
     assert.equal(run.status, 0, run.stderr);
 
     const conversations = readJsonl(clio);
-    assert.equal(conversations.length, 5, "the excluded person's draft is left out");
-    assert.ok(!conversations.some((line) => line.messages[0].content === 'Draft 5'));
+    assert.equal(conversations.length, 4, "the excluded person's and the withdrawn draft are left out");
+    assert.ok(!conversations.some((line) => ['Draft 4', 'Draft 5'].includes(line.messages[0].content)));
     const csvPerson = new Map(
       readFileSync(csv, 'utf8').trim().split('\n').slice(1).map((line) => {
         const cells = line.split(',').map((cell) => cell.replaceAll('"', ''));
@@ -441,7 +443,9 @@ test('conversations add the final text only when it changed, and skip encrypted 
     survey.filteredQuestions.push({ id: 'qf', type: 'freeform', prompt: 'Why?' });
     const freeform = (index, answer, additional) => ({
       responder: addressOf(index),
-      response: JSON.stringify({ responses: [{ questionID: 'qf', answer, additional }] }),
+      response: JSON.stringify({
+        responses: [{ questionID: 'qf', answer, additional, interviewProvenance: { draftTextConsent: true } }],
+      }),
     });
     survey.filteredResponses.push(
       freeform(0, { value: 'Keep it simple', encrypted: false }, { value: 'My own note', encrypted: false }),

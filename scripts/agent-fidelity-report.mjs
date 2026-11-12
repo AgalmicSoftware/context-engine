@@ -408,13 +408,14 @@ const commentField = (entry) => entry.additional ?? entry.additionalComment ?? e
 
 /**
  * Pairs each AI draft with the person's latest saved text for that question and field. Fields whose final
- * text is encrypted, and drafts with no saved response, are left out.
+ * text is encrypted, drafts with no saved response, and drafts whose latest response no longer carries
+ * draft-text consent (a withdrawal whose deletion failed) are left out.
  */
 export const draftTextRecords = ({ drafts, entries }) => {
   const entryOf = new Map(entries.map((record) => [`${record.participantId}|${record.questionId}`, record]));
   return drafts.flatMap((draft) => {
     const record = entryOf.get(`${draft.participantId}|${draft.questionId}`);
-    if (!record) return [];
+    if (!record || record.entry.interviewProvenance?.draftTextConsent !== true) return [];
     const isAgent = record.entry.participant?.kind === 'agent' || record.payload.participant?.kind === 'agent';
     return [
       ['answer', draft.aiAnswer, record.entry.answer],

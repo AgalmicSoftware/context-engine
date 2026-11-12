@@ -648,6 +648,10 @@ export const createSurveyQuestionsSubmitRuntime = (
           ),
         );
       }
+      if (!isSubmitContextCurrent(submitContext)) {
+        handleStaleSubmitContext(submitContext);
+        return { status: 'stale', message: 'Submission context changed before upload completed.' };
+      }
 
       // 1. STOP any pending draft saves immediately
       if (inst._persistTimer) {
