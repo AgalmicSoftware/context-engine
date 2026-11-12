@@ -136,32 +136,61 @@ it('saves a choice at once, and submits nothing until a choice that failed to sa
   expect(screen.queryByText('Not saved. Try again.')).not.toBeInTheDocument();
 });
 
-it('holds a choice made before sign-in and saves it once signed in, ahead of the answers', async () => {
-  readStatus.mockResolvedValue(status());
-  const { result, rerender } = renderHook(
-    ({ account }) => useSessionAgentUse({ sessionSlug: 'demo', sessionConfig: AGENT_ON, account }),
-    { initialProps: { account: '' } },
+const OTHER = '0x0000000000000000000000000000000000000002';
+const renderUse = (account = '') =>
+  renderHook(
+    (props: { account: string; active: boolean }) =>
+      useSessionAgentUse({ sessionSlug: 'demo', sessionConfig: AGENT_ON, ...props }),
+    { initialProps: { account, active: true } },
   );
+
+it('holds a choice made before sign-in and saves it as soon as they sign in, however answers are then submitted', async () => {
+  readStatus.mockResolvedValue(status());
+  const { result, rerender } = renderUse();
   expect(result.current.shown).toBe(true);
   act(() => result.current.change(false));
   expect(result.current.allowed).toBe(false);
   expect(setOptOut).not.toHaveBeenCalled();
-  expect(await result.current.settle()).toBe(true);
+  expect(result.current.settle()).toBe(true);
 
-  rerender({ account: ACCOUNT });
-  // The Worker still has them in; their choice here stands.
-  await waitFor(() => expect(readStatus).toHaveBeenCalledTimes(1));
-  expect(result.current.allowed).toBe(false);
+  // Signing in saves it without the dialog's own Submit; the Worker still having them in doesn't undo it.
   setOptOut.mockResolvedValueOnce(true);
-  let settled = false;
-  await act(async () => {
-    settled = await result.current.settle();
-  });
-  expect(settled).toBe(true);
-  expect(setOptOut).toHaveBeenCalledWith(true, expect.objectContaining({ account: ACCOUNT }));
-  // Saved, so a second submit saves nothing again.
-  await act(async () => {
-    await result.current.settle();
-  });
+  rerender({ account: ACCOUNT, active: true });
+  await waitFor(() => expect(setOptOut).toHaveBeenCalledWith(true, expect.objectContaining({ account: ACCOUNT })));
+  await waitFor(() => expect(result.current.saving).toBe(false));
+  expect(result.current.allowed).toBe(false);
+  // Saved, so a submit saves nothing again.
+  expect(result.current.settle()).toBe(true);
   expect(setOptOut).toHaveBeenCalledTimes(1);
+});
+
+it('starts another person from their own stored choice, never the last person’s', async () => {
+  readStatus.mockResolvedValue(status());
+  const { result, rerender } = renderUse(ACCOUNT);
+  await waitFor(() => expect(readStatus).toHaveBeenCalledTimes(1));
+  // The first person's save is still on its way when someone else signs in.
+  let finish: (optedOut: boolean) => void = () => {};
+  setOptOut.mockReturnValueOnce(new Promise<boolean>((resolve) => (finish = resolve)));
+  act(() => result.current.change(false));
+  rerender({ account: OTHER, active: true });
+  await waitFor(() => expect(readStatus).toHaveBeenCalledTimes(2));
+  await act(async () => finish(true));
+  expect(result.current.allowed).toBe(true);
+  // Nothing of the first person's is saved for the second, on sign-in or on submit.
+  expect(result.current.settle()).toBe(true);
+  expect(setOptOut).toHaveBeenCalledTimes(1);
+  expect(setOptOut).toHaveBeenCalledWith(true, expect.objectContaining({ account: ACCOUNT }));
+});
+
+it('reads the stored choice again each time the dialog opens', async () => {
+  readStatus.mockResolvedValueOnce(status());
+  const { result, rerender } = renderUse(ACCOUNT);
+  await waitFor(() => expect(readStatus).toHaveBeenCalledTimes(1));
+  expect(result.current.allowed).toBe(true);
+  rerender({ account: ACCOUNT, active: false });
+  // Meanwhile they turned it off in the Session Agent's own dialog.
+  readStatus.mockResolvedValueOnce(status(true));
+  rerender({ account: ACCOUNT, active: true });
+  await waitFor(() => expect(result.current.allowed).toBe(false));
+  expect(setOptOut).not.toHaveBeenCalled();
 });

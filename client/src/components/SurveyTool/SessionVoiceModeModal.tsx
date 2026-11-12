@@ -149,6 +149,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
     sessionSlug: props.sessionSlug || '',
     sessionConfig: props.sessionConfig || null,
     account: props.loginComplete ? String(props.account || '').trim() : '',
+    active: isOpen && mode === 'interview',
   });
   // Their Session Agent choice is saved before any answer is stored, so an answer they kept out is never read.
   // With nothing to save this adds no wait.
