@@ -4,7 +4,8 @@ import {
   readStoredCloudflarePayloadBytes,
   readStoredCloudflarePayloadsBulk,
 } from './storageRouteExecution.js';
-import { listHiddenStorageResourceIds, selectCanonicalStorageVersions } from './storageResourceOwnership.js';
+import { decryptPayloadWithStorageEnvelope } from './storageEnvelopeEncryption.js';
+import { selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 import { createResultsAnalysisScanBudget } from './storageScanBudget.js';
 import { countAgentProposedQuestions, readAgentProposedQuestion } from './agent/agentQuestionProposals.mjs';
 import { createAgentStorage } from './agent/storage.mjs';
@@ -43,10 +44,10 @@ const isMaskedQuestion = (question) => question.locked === true || question.prom
 
 // The session's questions from stored metadata alone: every id ever stored
 // (hidden ones too) and each id's current version, chosen as readers choose it.
+// An answer to a hidden question is still an answer to a question the session has.
 const readQuestionVersions = async ({ env, index, slug }) => {
   const budget = createResultsAnalysisScanBudget();
   const rows = await listCloudflareMetadataRows({ index, slug, resource: 'questions', budget, strict: true });
-  const hiddenIds = await listHiddenStorageResourceIds({ index, slug, resource: 'questions', budget });
   const candidates = [];
   const untrusted = [];
   for (const { metadata } of rows) {
@@ -65,17 +66,30 @@ const readQuestionVersions = async ({ env, index, slug }) => {
     });
   }
   const current = new Map(selectCanonicalStorageVersions(candidates).map((candidate) => [candidate.resourceId, candidate]));
-  const visible = [...current.keys()].filter((id) => !hiddenIds.has(id) && current.get(id).metadata.hidden !== true);
-  return { budget, current, hiddenIds, untrusted, visibleCount: visible.length };
+  // Every stored question counts, hidden ones too, so hiding a question
+  // people have answered never shrinks what they may still save.
+  return { budget, current, untrusted, storedCount: current.size };
 };
 
-const readQuestionPayloads = async ({ env, index, slug, budget, metadataList }) => {
-  const readable = metadataList.filter((metadata) => metadata.encrypted !== true && metadata.payloadEncrypted !== true);
+// A question the Worker encrypted at rest (its storage envelope) is read here
+// like a plain one; one the client encrypted is not readable.
+const readQuestionPayloads = async ({ env, config, index, slug, budget, metadataList, deps }) => {
+  const readable = metadataList.filter((metadata) => metadata.payloadEncrypted !== true &&
+    (metadata.encrypted !== true || isObj(metadata.envelope)));
   const bulk = await readStoredCloudflarePayloadsBulk({ env, index, slug, metadataList: readable, budget });
   const payloads = new Map();
   for (const metadata of readable) {
     const id = trim(metadata.id);
-    const bytes = bulk.has(id) ? bulk.get(id) : await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
+    let bytes = bulk.has(id) ? bulk.get(id) : await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
+    if (bytes && isObj(metadata.envelope)) {
+      try {
+        bytes = await decryptPayloadWithStorageEnvelope({
+          env, config, slug, payloadId: id, ciphertextBytes: bytes, envelope: metadata.envelope, deps,
+        });
+      } catch {
+        bytes = null;
+      }
+    }
     const payload = parseJson(bytes);
     if (isObj(payload)) payloads.set(id, payload);
   }
@@ -101,10 +115,10 @@ const countProposedQuestions = async ({ env, config, slug }) => {
   return kv ? countAgentProposedQuestions({ AGENT_ACTION_KV: kv }, slug) : 0;
 };
 
-// The questions the session shows, its own and agents' proposed ones. Bounds
+// The session's stored questions, its own and agents' proposed ones. Bounds
 // how many rows one person may store.
 export const countSessionQuestions = async ({ env, config, index, slug }) =>
-  (await readQuestionVersions({ env, index, slug })).visibleCount + await countProposedQuestions({ env, config, slug });
+  (await readQuestionVersions({ env, index, slug })).storedCount + await countProposedQuestions({ env, config, slug });
 
 /**
  * Checks each answer an upload carries against its stored question. Refuses
@@ -112,19 +126,19 @@ export const countSessionQuestions = async ({ env, config, index, slug }) =>
  * encrypted values, blank answers (a comment alone) and locked or encrypted
  * questions are not checked. Returns the session's question count.
  */
-export const checkUploadedAnswers = async ({ env, config, index, slug, payload }) => {
+export const checkUploadedAnswers = async ({ env, config, index, slug, payload, deps }) => {
   const answers = listUploadedAnswers(payload);
-  const { budget, current, untrusted, visibleCount } = await readQuestionVersions({ env, index, slug });
+  const { budget, current, untrusted, storedCount } = await readQuestionVersions({ env, index, slug });
   const questions = new Map();
   const wanted = answers.map((answer) => current.get(answer.questionId)?.metadata).filter(Boolean);
-  const wantedPayloads = await readQuestionPayloads({ env, index, slug, budget, metadataList: wanted });
+  const wantedPayloads = await readQuestionPayloads({ env, config, index, slug, budget, metadataList: wanted, deps });
   for (const answer of answers) {
     const candidate = current.get(answer.questionId);
     if (candidate) questions.set(answer.questionId, wantedPayloads.get(trim(candidate.metadata.id)) || null);
   }
   // Questions stored before uploads recorded their id name it only in the payload.
   if (answers.some((answer) => !questions.has(answer.questionId)) && untrusted.length) {
-    for (const [, question] of await readQuestionPayloads({ env, index, slug, budget, metadataList: untrusted })) {
+    for (const [, question] of await readQuestionPayloads({ env, config, index, slug, budget, metadataList: untrusted, deps })) {
       const id = lower(question.id || question.questionId || question.questionID);
       if (id && !questions.has(id)) questions.set(id, question);
     }
@@ -146,5 +160,5 @@ export const checkUploadedAnswers = async ({ env, config, index, slug, payload }
     const checked = normalizeAnswerValue({ ...question, type }, answer.value, { maxFreeformLength: Infinity });
     if (!checked.ok) return refusal(422, `This answer can't be saved: ${checked.error}`, 'response_answer_invalid');
   }
-  return { ok: true, questionCount: visibleCount + await countProposedQuestions({ env, config, slug }) };
+  return { ok: true, questionCount: storedCount + await countProposedQuestions({ env, config, slug }) };
 };

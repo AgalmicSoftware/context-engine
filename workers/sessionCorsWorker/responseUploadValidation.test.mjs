@@ -73,6 +73,37 @@ test('the Worker refuses answers to unknown questions and values a question does
   }
 });
 
+test('an answer naming two different questions is refused', async () => {
+  const { env, token } = await setup();
+  const two = await uploadJson({ env, token, resource: 'responses', data: { questionID: 'q-bin', questionId: 'q-rate', answer: 'Agree', ...session } });
+  assert.equal(two.status, 400, JSON.stringify(two.body));
+  assert.match(two.body.error, /two different questions/);
+  // The same question under both spellings is one question.
+  const same = await uploadJson({ env, token, resource: 'responses', data: { questionID: 'q-bin', questionId: 'Q-BIN', answer: 'Agree', ...session } });
+  assert.equal(same.status, 200, JSON.stringify(same.body));
+});
+
+test('a session the Worker encrypts at rest still checks each answer against its question', async () => {
+  const access = { gate: 'role_gate', encryption: 'worker_envelope', accessConditions: { match: 'any', conditions: [
+    { kind: 'worker_role', role: 'admin' }, { kind: 'agent_grant_scope', scope: 'storage' },
+  ] } };
+  const base = createSessionEnv().config;
+  const { admin, env } = createSessionEnv({ configOverrides: {
+    sessionModeProfile: { ...base.sessionModeProfile, storage: { backend: 'cloudflare', payloadAccessControl: access },
+      encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' } },
+    storageProfile: { ...base.storageProfile, payloadAccessControl: access },
+  } });
+  env.CE_STORAGE_ENVELOPE_KEK = `envelope-kek-${'fixture'.repeat(4)}`;
+  const adminToken = await login({ env, wallet: admin });
+  const stored = await uploadJson({ env, token: adminToken, resource: 'questions', data: { id: 'q-rate', type: 'rating', prompt: 'How much?', min: 1, max: 5, ...session } });
+  assert.equal(stored.status, 200, JSON.stringify(stored.body));
+  const token = await login({ env, wallet: Wallet.createRandom() });
+  const refused = await uploadJson({ env, token, resource: 'responses', data: { questionID: 'q-rate', answer: 9000, ...session } });
+  assert.equal(refused.status, 422, JSON.stringify(refused.body));
+  assert.equal(refused.body.reason, 'response_answer_invalid');
+  assert.equal((await uploadJson({ env, token, resource: 'responses', data: { questionID: 'q-rate', answer: 4, ...session } })).status, 200);
+});
+
 test('every answer shape the app uploads is still accepted', async () => {
   const { env, participant, token } = await setup();
   const longText = 'Because '.repeat(2000);

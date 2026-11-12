@@ -462,8 +462,8 @@ export const readSessionStorageBatch = async ({
   return Promise.all(
     ids.map(async (id) => {
       const item = items.get(id);
-      // An item stored without a text type is read on its own, as before batches.
-      if (item?.status === 415) {
+      // An item stored without a text type, or left out of a full batch, is read on its own.
+      if (item?.status === 415 || item?.status === 413) {
         const single = await readSessionStorageBlob({
           storageRef: { id, backend: STORAGE_BACKENDS.CLOUDFLARE },
           sessionSlug,

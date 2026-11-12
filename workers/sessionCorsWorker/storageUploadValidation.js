@@ -49,6 +49,12 @@ const validateResponseItem = (item, label) => {
   if (!isObj(item) || !isText(item.questionID || item.questionId)) {
     return invalid('responses', `${label} needs a questionID`);
   }
+  // Readers take either spelling, so one answer naming two questions would be
+  // checked against one and counted under the other.
+  if (isText(item.questionID) && isText(item.questionId) &&
+      item.questionID.trim().toLowerCase() !== item.questionId.trim().toLowerCase()) {
+    return invalid('responses', `${label} names two different questions`);
+  }
   if (jsonBytes(item) > MAX_RESPONSE_ITEM_BYTES) {
     return {
       ok: false,

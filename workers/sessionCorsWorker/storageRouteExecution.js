@@ -1473,7 +1473,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     }, 422, baseHeaders);
   }
   const answerCheck = !canonicalAnswers ? null
-    : parsedPayload && !answersChecked ? await checkUploadedAnswers({ env, config, index, slug, payload: parsedPayload })
+    : parsedPayload && !answersChecked ? await checkUploadedAnswers({ env, config, index, slug, payload: parsedPayload, deps })
       : { ok: true, questionCount: await countQuestionsOnce(answersChecked, () => countSessionQuestions({ env, config, index, slug })) };
   if (answerCheck && !answerCheck.ok) {
     return responseJson(deps, { error: answerCheck.error, reason: answerCheck.reason }, answerCheck.status, baseHeaders);
@@ -1683,6 +1683,10 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (resource === 'responses' && uploader) {
     const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256', payload.bytes || new Uint8Array());
     const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    // A survey submit stores its bundle and then each answer on its own. The
+    // bundle is checked against the limits but counted apart, so its answers
+    // are not counted twice.
+    const bundle = Array.isArray(parsedPayload?.responses) && !!trim(parsedPayload.surveyID || parsedPayload.surveyId);
     // Only answers checked against the session's questions count per question,
     // so made-up ids cannot grow the coordinator's counters.
     const questionIds = answerCheck?.ok && parsedPayload
@@ -1691,7 +1695,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     // A person may store at most five rows per question the session shows.
     const maxRows = answerCheck?.ok ? RESPONSE_ROWS_PER_QUESTION * Math.max(answerCheck.questionCount, 1) : 0;
     uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve',
-      payload: { requestId, payloadDigest, storageId: id, createdAt, questionIds, maxRows } });
+      payload: { requestId, payloadDigest, storageId: id, createdAt, questionIds, maxRows, bundle } });
     if (uploadReceipt?.kind === 'replay') {
       await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
       return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
@@ -1980,6 +1984,11 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
 };
 
 export const MAX_READ_BATCH_IDS = 100;
+// A batch is read a few items at a time and stops once it holds this much
+// text, so a page of the largest items cannot exhaust the Worker's memory.
+// The rest answer 413, and the client reads each of those on its own.
+export const MAX_READ_BATCH_BYTES = 8 * 1024 * 1024;
+const READ_BATCH_CONCURRENCY = 5;
 
 // Up to one list page of payloads in one request. Each id is read exactly as
 // /storage/read reads it, with its own access check, so a batch never shows
@@ -1995,7 +2004,7 @@ const handleCloudflareReadBatch = async ({ request, baseHeaders, deps, ...read }
   }
   const origin = new URL(request.url).origin;
   let privateItem = false;
-  const items = await Promise.all(ids.map(async (id) => {
+  const readItem = async (id) => {
     const response = await handleCloudflareRead({
       ...read, baseHeaders: {}, deps, request: new Request(`${origin}/storage/read?id=${encodeURIComponent(id)}`),
     });
@@ -2010,7 +2019,17 @@ const handleCloudflareReadBatch = async ({ request, baseHeaders, deps, ...read }
       return { id, status: 415, error: 'This item is not text; read it on its own.' };
     }
     return { id, status: 200, contentType, text: await response.text() };
-  }));
+  };
+  const items = [];
+  let textBytes = 0;
+  for (let offset = 0; offset < ids.length; offset += READ_BATCH_CONCURRENCY) {
+    const chunk = ids.slice(offset, offset + READ_BATCH_CONCURRENCY);
+    const read = textBytes < MAX_READ_BATCH_BYTES
+      ? await Promise.all(chunk.map(readItem))
+      : chunk.map((id) => ({ id, status: 413, error: 'This batch is full; read this item on its own.' }));
+    for (const item of read) textBytes += item.text?.length || 0;
+    items.push(...read);
+  }
   const headers = new Headers(baseHeaders || {});
   headers.set('Content-Type', 'application/json');
   headers.set('X-Content-Type-Options', 'nosniff');

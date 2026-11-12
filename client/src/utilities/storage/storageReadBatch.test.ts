@@ -80,6 +80,19 @@ describe('readSessionStorageBatch', () => {
     await expect(refused([{ id: 'a', status: 200, text: '{}' }])).resolves.toBe(false);
   });
 
+  it('reads an item a full batch left out on its own', async () => {
+    reply([
+      { id: 'cf_ans_a', status: 200, text: '{"answer":"A"}' },
+      { id: 'cf_ans_b', status: 413, error: 'This batch is full; read this item on its own.' },
+    ]);
+    fetchMock.mockResolvedValueOnce(new Response('{"answer":"B"}'));
+    await expect(readSessionStorageBatch({ ...options, ids: ['cf_ans_a', 'cf_ans_b'] })).resolves.toEqual([
+      { answer: 'A' },
+      { answer: 'B' },
+    ]);
+    expect(fetchMock.mock.calls[1][0]).toBe('https://worker.example.test/storage/read?id=cf_ans_b');
+  });
+
   it('takes 1 to 100 ids', async () => {
     await expect(readSessionStorageBatch({ ...options, ids: [] })).rejects.toThrow();
     await expect(

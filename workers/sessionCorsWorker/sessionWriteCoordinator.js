@@ -104,7 +104,9 @@ const uploadReceiptExpiresAt = record => record.state === 'settled'
 const MAX_UPLOAD_RECEIPTS = 2000;
 // Stored-answer counts for one person in one session, kept apart from the receipts,
 // which expire: every row stored, and every version of each question's answer.
-const uploadCountKey = (person, questionKey = '') => `upload-count-v1:${person}:${questionKey ? `question:${questionKey}` : 'total'}`;
+// One person's stored answers: in all, per question, and survey bundles apart.
+const uploadCountKey = (person, questionKey = '', bundle = false) =>
+  `upload-count-v1:${person}:${questionKey ? `question:${questionKey}` : bundle ? 'bundles' : 'total'}`;
 export const MAX_ANSWER_VERSIONS = 20;
 const MAX_UPLOAD_QUESTION_IDS = 1000;
 const MAX_PRIOR_UPLOAD_TARGETS = 8;
@@ -498,6 +500,7 @@ export class SessionWriteCoordinator {
     }
     const questionIds = reserve ? payload?.questionIds ?? [] : [];
     const maxRows = reserve ? payload?.maxRows ?? 0 : 0;
+    const bundle = reserve && payload?.bundle === true;
     if (!Array.isArray(questionIds) || questionIds.length > MAX_UPLOAD_QUESTION_IDS ||
         questionIds.some((id) => typeof id !== 'string' || !id || id.length > 256) ||
         !Number.isSafeInteger(maxRows) || maxRows < 0) {
@@ -559,7 +562,8 @@ export class SessionWriteCoordinator {
           return { status: 409, error: 'Upload target does not match this receipt.', reason: 'upload_receipt_target_mismatch' };
         }
         await transaction.put(key, { state: 'settled', payloadDigest: record.payloadDigest, storageRef, settledAt: nowMs });
-        const countKeys = record.person ? [uploadCountKey(record.person), ...(record.questionKeys || []).map((questionKey) => uploadCountKey(record.person, questionKey))] : [];
+        const countKeys = record.person ? [uploadCountKey(record.person, '', record.bundle === true),
+          ...(record.questionKeys || []).map((questionKey) => uploadCountKey(record.person, questionKey))] : [];
         for (const countKey of countKeys) await transaction.put(countKey, (await transaction.get(countKey) || 0) + 1);
         await this.pruneUploadReceipts(transaction, nowMs);
         return { status: 200, ok: true };
@@ -584,8 +588,11 @@ export class SessionWriteCoordinator {
       }
       // Uploads still in flight count, so parallel requests cannot pass a limit together.
       const ownInFlight = inFlight.filter((other) => other.person === person);
-      if (maxRows && (await transaction.get(uploadCountKey(person)) || 0) + ownInFlight.length >= maxRows) {
-        return { status: 422, error: `You have saved ${maxRows} answers in this session, the most one person can.`, reason: 'response_limit_rows' };
+      const sameKindInFlight = ownInFlight.filter((other) => (other.bundle === true) === bundle).length;
+      if (maxRows && (await transaction.get(uploadCountKey(person, '', bundle)) || 0) + sameKindInFlight >= maxRows) {
+        return { status: 422, error: bundle
+          ? `You have submitted surveys in this session ${maxRows} times, the most one person can.`
+          : `You have saved ${maxRows} answers in this session, the most one person can.`, reason: 'response_limit_rows' };
       }
       for (const questionKey of questionKeys) {
         const stored = await transaction.get(uploadCountKey(person, questionKey)) || 0;
@@ -600,7 +607,10 @@ export class SessionWriteCoordinator {
         priorStorageIds: [...(record.priorStorageIds || []), record.storageId].slice(-MAX_PRIOR_UPLOAD_TARGETS) }
         : { storageId, createdAt, reservedAt: nowMs };
       const attemptId = createAttemptId(this.crypto);
-      await transaction.put(key, { state: 'pending', attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, person, questionKeys, ...target });
+      // A bundle is refused when one of its answers is at its limit, but adds
+      // to no answer's count: each answer is stored, and counted, on its own.
+      await transaction.put(key, { state: 'pending', attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, person,
+        ...(bundle ? { bundle, questionKeys: [] } : { questionKeys }), ...target });
       await this.pruneUploadReceipts(transaction, nowMs);
       return { status: 200, kind: 'execute', attemptId, storageId: target.storageId, createdAt: target.createdAt,
         priorStorageIds: target.priorStorageIds || [], resumed };

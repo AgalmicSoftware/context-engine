@@ -119,6 +119,29 @@ test('on a members-only session a batch refuses visitors with the reason, and se
   assert.deepEqual(member.body.items.map((item) => item.status), [200, 200, 200, 200]);
 });
 
+test('a batch stops reading once it holds 8 MiB and leaves the rest to single reads', async () => {
+  const { admin, env } = createSessionEnv();
+  const adminToken = await login({ env, wallet: admin });
+  const questionIds = Array.from({ length: 40 }, (_, index) => `q-long-${index}`);
+  for (const id of questionIds) {
+    assert.equal((await uploadJson({ env, token: adminToken, resource: 'questions', data: { id, type: 'freeform', prompt: `Why ${id}?`, ...session } })).status, 200);
+  }
+  // Seven survey bundles of about 1.7 MiB each: the first five read together pass 8 MiB.
+  const token = await login({ env, wallet: Wallet.createRandom() });
+  const ids = [];
+  for (let bundle = 0; bundle < 7; bundle += 1) {
+    const responses = questionIds.map((questionID) => ({ questionID, answer: { value: `${bundle}`.repeat(42_000), encrypted: false }, ...session }));
+    const stored = await uploadJson({ env, token, resource: 'responses', data: { surveyID: 's-long', ...session, responses } });
+    assert.equal(stored.status, 200, JSON.stringify(stored.body).slice(0, 200));
+    ids.push(stored.body.storageRef.id);
+  }
+  const { call } = signedOut(env);
+  const batch = await call('/storage/read-batch', { method: 'POST', body: { ids } });
+  assert.deepEqual(batch.body.items.map((item) => item.status), [200, 200, 200, 200, 200, 413, 413]);
+  // What the batch left out is still there to read on its own.
+  assert.equal((await call(`/storage/read?id=${ids[6]}`)).status, 200);
+});
+
 test('a batch takes 1 to 100 distinct valid ids, and reports a missing one on its own', async () => {
   const { env } = await seed({ people: 1, questions: 1 });
   const { call } = signedOut(env);

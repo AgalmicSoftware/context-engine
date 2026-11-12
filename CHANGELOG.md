@@ -29,12 +29,12 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
-- A Worker-hosted session refuses an answer to a question it doesn't have, or a value the question can't take (a 9000 on a 1–5 rating, two picks on a pick-one question), with a message saying why. An answer sent as a whole encrypted payload is refused unless the session uses Lit encryption.
-- One person can keep at most 20 versions of an answer, and five saved answers per question in the session, agents' answers included; past that the upload is refused with a message. Answers stored before this release don't count.
+- A Worker-hosted session refuses an answer to a question it doesn't have, or a value the question can't take (a 9000 on a 1–5 rating, two picks on a pick-one question), with a message saying why. An answer sent as a whole encrypted payload is refused unless the session uses Lit encryption. An answer that names two different questions is refused.
+- One person can keep at most 20 versions of an answer, and five saved answers per question the session has (hidden questions included), agents' answers included; past that the upload is refused with a message. A survey's bundle is counted apart from its answers, under the same allowance. Answers stored before this release don't count.
 - Sign-in trusts only `contextengine.sh` and `www.contextengine.sh` by default. The retired `.xyz` addresses and local development servers are no longer trusted unless a Worker is set up for them (`ADMIN_TRUSTED_ORIGINS`, or `CE_ALLOW_LOCAL_ORIGINS=true` for local servers). The deploy helper's default allowed origins are the `.sh` site only.
 - `POST /auth/logout` ends a sign-in at the Worker.
 - Admin actions must be signed within ten minutes of use.
-- `POST /storage/read-batch` reads up to 100 stored items in one request; the Worker reports it as the `storage_read_batch_v1` feature.
+- `POST /storage/read-batch` reads up to 100 stored items in one request, each under the access check a single read gets, and stops at 8 MiB of text; an item it refuses carries the reason, and one it leaves out answers 413. The Worker reports it as the `storage_read_batch_v1` feature.
 
 ### Agents and MCP
 
