@@ -93,12 +93,30 @@ test('a batch shows exactly what single reads show, item by item', async () => {
     const single = await call(`/storage/read?id=${item.id}`);
     assert.equal(item.status, single.status);
     assert.equal(item.status, 403);
+    // The reason tells a signed-out reader that signing in may lift the refusal.
+    assert.equal(item.reason, single.body.reason);
+    assert.equal(item.reason, 'private_response_owner_required');
   }
 
   const owner = await call('/storage/read-batch', { method: 'POST', token: first.token, body: { ids: ownIds } });
   assert.deepEqual(owner.body.items.map((item) => item.status), [200, 200]);
   const other = await call('/storage/read-batch', { method: 'POST', token: participants[1].token, body: { ids: ownIds } });
   assert.deepEqual(other.body.items.map((item) => item.status), [403, 403]);
+});
+
+test('on a members-only session a batch refuses visitors with the reason, and serves members', async () => {
+  const { env, participants } = await seed({
+    people: 2,
+    questions: 2,
+    configOverrides: { sessionModeProfile: { ...createSessionEnv().config.sessionModeProfile, results: { visibility: 'session_member_full' } } },
+  });
+  const { call } = signedOut(env);
+  const ids = (await listAll(call, participants[0].token)).flat();
+  assert.equal(ids.length, 4, 'a member lists everyone\'s answers');
+  const visitor = await call('/storage/read-batch', { method: 'POST', body: { ids } });
+  assert.deepEqual(visitor.body.items.map((item) => [item.status, item.reason]), ids.map(() => [403, 'private_response_owner_required']));
+  const member = await call('/storage/read-batch', { method: 'POST', token: participants[1].token, body: { ids } });
+  assert.deepEqual(member.body.items.map((item) => item.status), [200, 200, 200, 200]);
 });
 
 test('a batch takes 1 to 100 distinct valid ids, and reports a missing one on its own', async () => {

@@ -1956,6 +1956,39 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(new Headers(global.fetch.mock.calls[3][1].headers).get('Authorization')).toBe('Bearer token-1');
   });
 
+  it('asks again signed in when the caller says a signed-out reply was refused for want of a sign-in', async () => {
+    const refused = { items: [{ id: 'cf_a', status: 403, reason: 'private_response_owner_required' }] };
+    const served = { items: [{ id: 'cf_a', status: 200, text: '{}' }] };
+    const anonymousRefused = jest.fn(async (reply) => (await reply.json()).items.some((item) => item.status === 403));
+    const read = () =>
+      fetchWorkerWithAuth(
+        'https://worker.example/storage/read-batch',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: ['cf_a'] }) },
+        {
+          sessionSlug: 'alpha',
+          preferAnonymous: true,
+          anonymousRefused,
+          context: { account: TEST_ADDRESS, providerLike: 'wagmi', chainId: 84532 },
+        },
+      );
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, refused)) // signed-out batch, each item refused
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' })) // auth/nonce
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 })) // auth/login
+      .mockResolvedValueOnce(jsonResp(200, served)); // signed-in batch
+
+    expect(await (await read()).json()).toEqual(served);
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+    expect(new Headers(global.fetch.mock.calls[0][1].headers).get('Authorization')).toBeNull();
+    expect(new Headers(global.fetch.mock.calls[3][1].headers).get('Authorization')).toBe('Bearer token-1');
+
+    // A signed-out reply the caller accepts is returned as it is.
+    global.fetch = jest.fn().mockResolvedValueOnce(jsonResp(200, served));
+    expect(await (await read()).json()).toEqual(served);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('does not initiate sign-in for a storage condition failure with an existing principal', async () => {
     global.fetch = jest.fn().mockResolvedValueOnce(
       jsonResp(403, {

@@ -5,7 +5,7 @@ jest.mock('../worker/workerAuth.js', () => ({ fetchWorkerWithAuth: jest.fn() }))
 
 const fetchMock = fetchWorkerWithAuth as unknown as jest.Mock<
   Promise<Response>,
-  [string, { method: string; body: string }]
+  [string, { method: string; body: string }, { anonymousRefused: (reply: Response) => Promise<boolean> }]
 >;
 const options = { workerUrl: 'https://worker.example.test', sessionSlug: 'sample' };
 const reply = (items: unknown[], status = 200) =>
@@ -55,6 +55,29 @@ describe('readSessionStorageBatch', () => {
       { answer: 'B' },
     ]);
     expect(fetchMock.mock.calls[1][0]).toBe('https://worker.example.test/storage/read?id=cf_ans_b');
+  });
+
+  it('asks for a signed-in retry only when the signed-out batch refused an item for want of a sign-in', async () => {
+    reply([{ id: 'a', status: 200, text: '{}' }]);
+    await readSessionStorageBatch({ ...options, ids: ['a'] });
+    const { anonymousRefused } = fetchMock.mock.calls[0][2];
+    const refused = (items: unknown[]) => anonymousRefused(new Response(JSON.stringify({ items })));
+    const membersOnly = {
+      id: 'a',
+      status: 403,
+      error: 'Access denied: answers are visible to signed-in session members.',
+      reason: 'private_response_owner_required',
+    };
+    await expect(refused([{ id: 'b', status: 200, text: '{}' }, membersOnly])).resolves.toBe(true);
+    await expect(
+      refused([{ id: 'a', status: 403, error: 'Access denied.', reason: 'missing_principal' }]),
+    ).resolves.toBe(true);
+    // Refusals that signing in would not lift, and items that are fine, ask for nothing.
+    await expect(
+      refused([{ id: 'a', status: 403, error: 'Access denied: Cloudflare worker SBT gate failed.' }]),
+    ).resolves.toBe(false);
+    await expect(refused([{ id: 'a', status: 404, error: 'Not found.' }])).resolves.toBe(false);
+    await expect(refused([{ id: 'a', status: 200, text: '{}' }])).resolves.toBe(false);
   });
 
   it('takes 1 to 100 ids', async () => {

@@ -3,6 +3,7 @@
 import { arweaveClient } from '../arweave/arweaveClient.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { shouldFallbackToAuthenticatedFlow } from '../worker/workerAuthFallbackPolicy.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { describeWorkerUnavailable, readWorkerCapabilities } from '../worker/workerCapabilities';
 import { toStr } from '../shared/primitives.js';
@@ -395,6 +396,20 @@ export const readSessionStorageBlob = async ({
 
 export const STORAGE_READ_BATCH_MAX_IDS = 100;
 
+// A batch answers 200 and refuses each item on its own. When the signed-out
+// try has an item refused for want of a sign-in, the batch is asked again
+// signed in, under the rule a refused single read follows.
+const batchNeedsSignIn = async (reply: Response): Promise<boolean> => {
+  const body = (await reply.json().catch(() => null)) as UnknownRecord | null;
+  for (const item of Array.isArray(body?.items) ? body.items : []) {
+    const { status, error, reason } = (item || {}) as UnknownRecord;
+    if (status !== 401 && status !== 403) continue;
+    if (await shouldFallbackToAuthenticatedFlow(new Response(JSON.stringify({ error, reason }), { status })))
+      return true;
+  }
+  return false;
+};
+
 /**
  * Reads up to 100 stored JSON payloads in one request (Workers that advertise
  * `storage_read_batch_v1`). Returns each payload in the order asked, or null
@@ -427,6 +442,7 @@ export const readSessionStorageBatch = async ({
       workerUrl: baseUrl,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
       preferAnonymous,
+      anonymousRefused: batchNeedsSignIn,
     },
   );
   const body = (await response.json().catch(() => ({}))) as UnknownRecord;

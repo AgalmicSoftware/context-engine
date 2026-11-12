@@ -1101,10 +1101,12 @@ export const fetchWorkerWithAuth = async (
     // Explicitly anonymous-only callers (such as background suggestions) must
     // never turn a denial into an interactive wallet or passkey signing prompt.
     if (anonymousOnly) return anonymousResponse;
-    const shouldFallback = await shouldFallbackToAuthenticatedFlow(anonymousResponse, {
-      requestApiKey,
-      fallbackOnGateUnavailable: opts.fallbackOnGateUnavailable === true,
-    });
+    const shouldFallback =
+      (await shouldFallbackToAuthenticatedFlow(anonymousResponse, {
+        requestApiKey,
+        fallbackOnGateUnavailable: opts.fallbackOnGateUnavailable === true,
+      })) ||
+      (anonymousResponse.ok && (await opts.anonymousRefused?.(anonymousResponse.clone())) === true);
     if (!shouldFallback) {
       return anonymousResponse;
     }

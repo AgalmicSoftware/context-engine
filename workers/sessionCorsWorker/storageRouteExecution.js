@@ -2001,7 +2001,8 @@ const handleCloudflareReadBatch = async ({ request, baseHeaders, deps, ...read }
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      return { id, status: response.status, error: trim(body?.error) || 'Storage read failed.' };
+      // The reason lets a signed-out reader tell a refusal that signing in lifts, as a single read's does.
+      return { id, status: response.status, error: trim(body?.error) || 'Storage read failed.', ...(trim(body?.reason) ? { reason: trim(body.reason) } : {}) };
     }
     if ((response.headers.get('Cache-Control') || '').includes('private')) privateItem = true;
     const contentType = response.headers.get('Content-Type') || '';
