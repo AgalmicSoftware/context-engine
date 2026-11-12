@@ -166,9 +166,10 @@ What users can do:
   stylesheets, or CSS.
 
 What the system does:
-- Starts a new draft on Hosted & Fast with public results and unencrypted
-  answers. Choosing encryption or another results visibility keeps them private;
-  `Runs on` under Hosting and storage switches to Trustless & Slower.
+- Starts a new draft on Hosted & Fast with unencrypted answers that the
+  session's signed-in members see. Choosing encryption or another results
+  visibility changes who sees them; `Runs on` under Hosting and storage switches
+  to Trustless & Slower.
 - In Hosted & Fast, stores canonical signed session config, secrets,
   Worker-native group/gate state, and Cloudflare payload indexes in the
   per-session Worker; publication does not perform an EVM transaction or
