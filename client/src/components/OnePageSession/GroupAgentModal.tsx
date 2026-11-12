@@ -30,7 +30,8 @@ const STYLE_HELP = {
 
 const errorText = (error: unknown) => (error instanceof Error && error.message) || 'Something went wrong. Try again.';
 
-const count = (value: number, one: string, many: string) => `${value} ${value === 1 ? one : many}`;
+const count = (value: number, one: string, many: string) =>
+  `${value.toLocaleString('en-US')} ${value === 1 ? one : many}`;
 
 // What the Worker read for the answer, so a reader can tell General from Detailed.
 const drewOn = ({ context, results, answers }: GroupAgentReply['read']) => {

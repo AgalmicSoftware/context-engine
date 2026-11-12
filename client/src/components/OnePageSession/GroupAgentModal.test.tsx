@@ -67,12 +67,12 @@ describe('GroupAgentModal', () => {
     expect(dialog.getByText('Drew on 2 items of context and the results.')).toBeInTheDocument();
 
     ask.mockResolvedValueOnce(
-      reply('Second answer.', { context: 1, results: false, answers: 12 }, 'Members’ answers couldn’t be read.'),
+      reply('Second answer.', { context: 1, results: false, answers: 2000 }, 'Members’ answers couldn’t be read.'),
     );
     fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
     expect(await dialog.findByText('Second answer.')).toBeInTheDocument();
     expect(dialog.queryByText('First answer.')).not.toBeInTheDocument();
-    expect(dialog.getByText('Drew on 1 item of context and 12 answers from members.')).toBeInTheDocument();
+    expect(dialog.getByText('Drew on 1 item of context and 2,000 answers from members.')).toBeInTheDocument();
     expect(dialog.getByText('Members’ answers couldn’t be read.')).toBeInTheDocument();
   });
 
