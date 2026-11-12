@@ -57,6 +57,12 @@ import { buildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.
 import { buildRiskMatrix, RISK_MATRIX_BUILD_ACTION } from './riskMatrixBuild.js';
 import { canBuildResults } from './resultsBuild.js';
 
+const RESULTS_BUILDER_ACTIONS = new Set([
+  DEBATE_ATLAS_BUILD_ACTION,
+  RISK_MATRIX_BUILD_ACTION,
+  'results-analysis/generate',
+]);
+
 const toTrimmedString = (value) => (
   typeof value === 'string'
     ? value.trim()
@@ -177,8 +183,9 @@ export const dispatchAdminRequest = async ({
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
       consumeNonce: deps?.consumeNonce,
       validateBootstrapAdmin: deps?.validateBootstrapAdmin,
-      // Co-admins and results admins may build atlases and risk matrices and do nothing else here.
-      validateAdmin: action === DEBATE_ATLAS_BUILD_ACTION || action === RISK_MATRIX_BUILD_ACTION
+      // Co-admins and results admins may build atlases, risk matrices and AI
+      // Views, and do nothing else here.
+      validateAdmin: RESULTS_BUILDER_ACTIONS.has(action)
         ? (args) => canBuildResults({ ...args, validateAdmin: deps?.validateAdmin })
         : deps?.validateAdmin,
       MISSING_SLUG_ERROR: deps?.MISSING_SLUG_ERROR,

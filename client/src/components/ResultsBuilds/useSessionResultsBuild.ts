@@ -9,7 +9,7 @@ import {
   type ResultsBuildNextBuild,
   type ResultsBuildSummary,
 } from '../../domains/resultsBuilds/resultsBuildWorkerClient';
-import { isConfiguredAdmin } from '../../utilities/storage/storageClient';
+import { mayStartResultsBuilds } from '../../domains/sessionResults/resultsBuilders';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 
@@ -65,18 +65,6 @@ const toRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 const lower = (value: unknown): string => (typeof value === 'string' ? value.trim().toLowerCase() : '');
 
-// Admins, co-admins and results admins; on a hat session any signed-in account
-// is offered the button, and the Worker decides, as for AI Views.
-const mayOfferBuild = (config: UnknownRecord, account: unknown): boolean => {
-  const address = lower(account);
-  if (!address) return false;
-  const resultsAdmins = Array.isArray(config.resultsAdminAddresses) ? config.resultsAdminAddresses.map(lower) : [];
-  return (
-    isConfiguredAdmin(config, { account: address }) ||
-    resultsAdmins.includes(address) ||
-    (!!lower(config.adminHatId) && !!lower(config.hatsAddress))
-  );
-};
 
 // A session's builds of one kind, as the open Results show them: the newest or
 // a picked one, the list of those kept, and a build this reader starts.
@@ -267,7 +255,7 @@ export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({
     supported,
     builds: data.builds,
     build: data.build,
-    canBuild: supported && (data.serverCanBuild || mayOfferBuild(config, account)),
+    canBuild: supported && (data.serverCanBuild || mayStartResultsBuilds(config, account)),
     building,
     loading,
     activeSinceMs: data.activeSinceMs,

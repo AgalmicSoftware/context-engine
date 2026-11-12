@@ -463,5 +463,5 @@ test('results admins and co-admins may build atlases and nothing else; strangers
   }
   assert.deepEqual(await dispatchAs({ action: DEBATE_ATLAS_BUILD_ACTION, signer: address(6), config }), { status: 403, built: false });
   assert.equal((await dispatchAs({ action: 'set-config', signer: RESULTS_ADMIN, config })).status, 403);
-  assert.equal((await dispatchAs({ action: 'results-analysis/generate', signer: RESULTS_ADMIN, config })).status, 403);
+  assert.equal((await dispatchAs({ action: 'set-secrets', signer: RESULTS_ADMIN, config })).status, 403);
 });

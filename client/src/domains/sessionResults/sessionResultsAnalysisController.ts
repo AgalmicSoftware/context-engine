@@ -3,6 +3,7 @@ import {
   SESSION_GENERATED_RESULTS_VIEW_KEYS,
   type SessionGeneratedResultsViewKey,
 } from './sessionResultsGeneratedViewTypes';
+import { mayStartResultsBuilds } from './resultsBuilders';
 import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
 
 export type GeneratedResultsViewOption = {
@@ -156,13 +157,10 @@ export const shouldOfferGeneratedResultsAuthorization = ({
   sessionConfig?: unknown;
 } = {}): boolean => {
   const config = toRecord(sessionConfig);
-  const accountLower = toText(account).toLowerCase();
-  const adminAddress = toText(config.adminAddress || toRecord(config.__registry).adminAddress).toLowerCase();
-  const hasHatAuthority = !!toText(config.adminHatId) && !!toText(config.hatsAddress);
-  if (!accountLower || !Object.values(normalizeResultsAnalysisSettings(config.resultsAnalysis).views).some(Boolean)) {
-    return false;
-  }
-  return hasHatAuthority || (!!adminAddress && adminAddress === accountLower);
+  return (
+    Object.values(normalizeResultsAnalysisSettings(config.resultsAnalysis).views).some(Boolean) &&
+    mayStartResultsBuilds(config, account)
+  );
 };
 
 export const resolveGeneratedResultsControllerState = ({
