@@ -1,14 +1,10 @@
 import os from 'node:os';
 import path from 'node:path';
+import { SITE_ORIGINS } from '../../shared/workerTrustedOrigins.mjs';
 
 export const DEFAULT_APP_ORIGIN = 'https://contextengine.sh';
-// Web origins the agent will sign in as. Session Workers trust these by default.
-export const KNOWN_APP_ORIGINS = Object.freeze([
-  'https://contextengine.sh',
-  'https://www.contextengine.sh',
-  'https://contextengine.xyz',
-  'https://www.contextengine.xyz',
-]);
+// Web origins the agent will sign in as: the site's own, which Session Workers trust by default.
+export const KNOWN_APP_ORIGINS = SITE_ORIGINS;
 const LOCAL_APP_ORIGINS = Object.freeze(['http://localhost:3000', 'http://127.0.0.1:3000']);
 
 const SETTINGS = Object.freeze({

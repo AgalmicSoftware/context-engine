@@ -46,6 +46,12 @@ starts the server. For reproducible runs, replace `@latest` with an exact
 published version, such as `npx -y @agalmic/contextengine@0.2.0`. A running
 server does not update itself.
 
+## Upgrading to 0.3.2
+
+- The server signs in only as `contextengine.sh` (with or without `www`) or
+  `CE_MCP_APP_ORIGIN`. The retired `contextengine.xyz` site is no longer
+  trusted, as Session Workers no longer trust it by default.
+
 ## Upgrading to 0.3.1
 
 - `get_results` also reads a session that shows results to its signed-in
@@ -181,9 +187,8 @@ unknown `CE_MCP_*` name.
 - **Sign-in uses a trusted Context Engine origin.** Session Workers only
   accept sign-ins bound to a web app they trust, so the server signs in as
   that app with the agent's own key, just as a browser would. It only ever
-  signs as `contextengine.sh` or `contextengine.xyz` (with or without `www`)
-  or `CE_MCP_APP_ORIGIN`, whatever a link or Worker suggests, and it does not
-  follow redirects.
+  signs as `contextengine.sh` (with or without `www`) or `CE_MCP_APP_ORIGIN`,
+  whatever a link or Worker suggests, and it does not follow redirects.
 - **Check `testEth` before paying gas.** `join_session`, `get_session` and each
   joined session in `whoami` show whether the session offers test ETH. Hosted
   offers require a configured faucet and the participant faucet permission;
