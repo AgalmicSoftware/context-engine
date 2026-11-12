@@ -278,6 +278,32 @@ test('everyone who sees full Results reads risk matrices; elsewhere only those w
   assert.equal(hatWearer.body.canBuild, true);
 });
 
+// The real storage access check, with no stub: it is what holds a members-only
+// session's builds to signed-in members.
+test('on a members-only session, signed-in members read builds and visitors do not', async () => {
+  const access = { gate: 'role_gate', encryption: 'none', accessConditions: { match: 'any', conditions: [
+    { kind: 'worker_role', role: 'admin' }, { kind: 'agent_grant_scope', scope: 'storage' },
+  ] } };
+  const config = {
+    adminAddress: ADMIN,
+    storageProfile: { backend: 'cloudflare', payloadAccessControl: access },
+    sessionModeProfile: {
+      authority: { mode: 'worker_canonical' },
+      storage: { backend: 'cloudflare', payloadAccessControl: access },
+      results: { visibility: 'session_member_full', exposure: { aggregateResultsEnabled: true } },
+    },
+  };
+  const env = installSessionCoordinatorBinding({});
+  const readAs = async (requester, scopes) => (await dispatchRiskMatrixReadRequest({
+    request: new Request('https://worker.example/risk-matrix?sessionSlug=matrix-session'),
+    env, config, slug: 'matrix-session', address: requester, scopes, headers: {},
+    deps: { json, validateAdmin: async () => false },
+  })).status;
+  assert.equal(await readAs('', {}), 403);
+  assert.equal(await readAs(address(7), {}), 403);
+  assert.equal(await readAs(address(7), { storage: true }), 200);
+});
+
 test('the next build is described with the session model and a placeholder prompt', () => {
   const next = describeNextRiskMatrixBuild({ sessionName: 'Salon', ai: { models: { thinking: 'deep-model' } } });
   assert.equal(next.model, 'deep-model');
