@@ -5,6 +5,7 @@ import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as storageClient from '../../utilities/storage/storageClient';
+import * as workerCapabilities from '../../utilities/worker/workerCapabilities';
 import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionReadsPort.js';
 import { cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { hydrateWorkerCanonicalQuestionCache } from '../../utilities/survey/workerCanonicalCacheHydration';
@@ -132,6 +133,8 @@ const fixture = async () => {
   jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected network access'));
   jest.spyOn(storageClient, 'listSessionStorageRefsPage').mockImplementation(listPage);
   jest.spyOn(storageClient, 'readSessionStorageBlob').mockImplementation(readBlob);
+  // A Worker without batch reads, so answers are read one at a time through readBlob.
+  jest.spyOn(workerCapabilities, 'readWorkerCapabilities').mockResolvedValue({ legacy: false, features: [] });
   jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(CONFIG);
   jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
   const encrypt = (value, audience = 'self') => {

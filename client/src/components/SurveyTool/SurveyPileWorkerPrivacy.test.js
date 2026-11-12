@@ -33,6 +33,13 @@ jest.mock('./SessionListeningPanel', () => {
 });
 jest.mock('./SessionVoiceModeModal', () => ({ __esModule: true, default: () => null }));
 
+// A Worker without batch reads, so answers are read one at a time through the
+// fake transport. A plain function: a read still settling when a test ends
+// must not reach the network after that test's spies are restored.
+jest.mock('../../utilities/worker/workerCapabilities', () => ({
+  ...jest.requireActual('../../utilities/worker/workerCapabilities'),
+  readWorkerCapabilities: async () => ({ legacy: false, features: [] }),
+}));
 const { cryptoUtils } = require('../../utilities/crypto/cryptography.js');
 
 const blockedNetwork = [];
