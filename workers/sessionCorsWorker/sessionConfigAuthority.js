@@ -59,19 +59,44 @@ export const callSessionConfigCoordinator = async ({ env, slug, path, ...payload
   return callCoordinator({ env, slug, path, ...payload });
 };
 
+// Logs why the coordinator could not answer: Cloudflare's own error text and
+// its retryable/overloaded flags, never the slug, addresses or payload. At
+// most one line a second per isolate, with a count of the ones held back.
+let lastFailureLogAt = 0;
+let heldFailureLogs = 0;
+export const logCoordinatorFailure = (where, error, extra = {}) => {
+  const now = Date.now();
+  if (now - lastFailureLogAt < 1000) {
+    heldFailureLogs += 1;
+    return;
+  }
+  lastFailureLogAt = now;
+  console.warn('[session-coordinator] unavailable', JSON.stringify({
+    where,
+    error: `${error?.name || 'Error'}: ${String(error?.message || '').slice(0, 200)}`,
+    ...(typeof error?.retryable === 'boolean' ? { retryable: error.retryable } : {}),
+    ...(typeof error?.overloaded === 'boolean' ? { overloaded: error.overloaded } : {}),
+    ...extra,
+    heldBack: heldFailureLogs,
+  }));
+  heldFailureLogs = 0;
+};
+
 const callCoordinator = async ({ env, slug, path, ...payload }) => {
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const binding = env?.CE_SESSION_COORDINATOR;
+  let response = null;
   try {
-    if (!normalizedSlug || !binding?.idFromName || !binding?.get) throw new Error();
+    if (!normalizedSlug || !binding?.idFromName || !binding?.get) throw new Error('No session coordinator binding.');
     const name = await sha256Hex(`session-config:${normalizedSlug}`);
-    const response = await binding.get(binding.idFromName(name)).fetch(
+    response = await binding.get(binding.idFromName(name)).fetch(
       `https://session-coordinator.internal/session-config/${path}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: normalizedSlug, ...payload }) },
     );
     const body = await response.json();
     return { ok: response.ok && body?.ok === true, status: response.status, body };
-  } catch {
+  } catch (error) {
+    logCoordinatorFailure(`session-config/${path}`, error, response ? { status: response.status } : {});
     return { ok: false, status: 503, body: { error: SESSION_CONFIG_COORDINATION_ERROR } };
   }
 };
