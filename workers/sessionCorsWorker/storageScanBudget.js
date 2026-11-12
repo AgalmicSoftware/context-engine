@@ -2,11 +2,12 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 // Application budgets leave room for authentication, provider work, and parsed
-// JSON copies. They are not claims about a deployment's platform limits.
+// JSON copies. They are not claims about a deployment's platform limits. A
+// results scan reads KV in bulk, 100 rows an operation, so rows bind first.
 export const RESULTS_ANALYSIS_SCAN_LIMITS = Object.freeze({
   operations: 800,
-  rows: 1000,
-  metadataBytes: 2 * 1024 * 1024,
+  rows: 10_000,
+  metadataBytes: 8 * 1024 * 1024,
   payloadBytes: 8 * 1024 * 1024,
 });
 export const STORAGE_EXPORT_PAGE_LIMITS = Object.freeze({

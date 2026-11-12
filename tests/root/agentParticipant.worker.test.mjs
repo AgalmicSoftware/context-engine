@@ -69,7 +69,9 @@ const memoryKv = (seed = {}) => {
   const store = new Map(Object.entries(seed));
   return {
     store,
+    // A key list is a bulk get, as in KV.
     async get(key) {
+      if (Array.isArray(key)) return new Map(key.map((name) => [name, store.has(name) ? store.get(name) : null]));
       return store.has(key) ? store.get(key) : null;
     },
     async put(key, value) {

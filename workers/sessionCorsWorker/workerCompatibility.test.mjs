@@ -10,7 +10,7 @@ for (const upgraded of [false, true]) {
   test(`results and interview readers agree on previous-format history (upgraded=${upgraded})`, async () => {
     const values = new Map();
     const index = {
-      get: async (key) => values.get(key) ?? null,
+      get: async (key) => (Array.isArray(key) ? new Map(key.map((name) => [name, values.get(name) ?? null])) : values.get(key) ?? null),
       list: async ({ prefix }) => ({ keys: [...values.keys()].filter((key) => key.startsWith(prefix)).sort().map((name) => ({ name })), list_complete: true }),
     };
     const { config } = fixture;

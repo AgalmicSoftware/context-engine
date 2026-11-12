@@ -35,7 +35,8 @@ const createKv = () => {
     listMetadata,
     lagging,
     deletes,
-    get: async (key) => store.get(key) ?? null,
+    // A key list is a bulk get, as in KV.
+    get: async (key) => (Array.isArray(key) ? new Map(key.map((name) => [name, store.get(name) ?? null])) : store.get(key) ?? null),
     put: async (key, value, options) => {
       store.set(key, value);
       if (options?.metadata) listMetadata.set(key, options.metadata);

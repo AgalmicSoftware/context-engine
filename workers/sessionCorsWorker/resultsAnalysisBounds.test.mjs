@@ -2,24 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 import { generateResultsAnalysisDraft, loadWorkerCanonicalResultsAnalysisSource, maybeTriggerAutomaticResultsAnalysis, readResultsAnalysisAdminStatus, runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
-import { buildIndexKey, buildPayloadKey } from './storageRouteExecution.js';
+import { buildIndexKey, buildPayloadKey, readStoredCloudflarePayloadsBulk } from './storageRouteExecution.js';
+import { RESULTS_ANALYSIS_SCAN_LIMITS } from './storageScanBudget.js';
 
 const config = {
   sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   sessionModeProfile: { authority: { mode: 'worker_canonical' }, storage: { backend: 'cloudflare' } },
   resultsAnalysis: { version: 1, generationMode: 'both', views: { circles: false, breakdown: true, riskMatrix: false }, autoAfter: { threshold: 2, unit: 'distinctParticipants' }, inputScope: 'submitted', publication: 'latest_success_visible' },
 };
+// More rows than one scan may read, so only the row cap can stop it.
+const OVERSIZED_ROWS = RESULTS_ANALYSIS_SCAN_LIMITS.rows + 100;
 const oversizedHistory = () => {
   let operations = 0;
+  const row = (key) => JSON.stringify({ id: key.split(':').at(-1), encrypted: true });
   const index = {
     list: async ({ prefix, cursor = '', limit = 1000 }) => {
       operations += 1;
       if (!prefix.startsWith('ce-storage:session-a:responses:')) return { keys: [], list_complete: true };
       const offset = Number(cursor || 0);
-      const end = Math.min(offset + limit, 1100);
-      return { keys: Array.from({ length: end - offset }, (_, i) => ({ name: `${prefix}${offset + i}` })), list_complete: end === 1100, cursor: String(end) };
+      const end = Math.min(offset + limit, OVERSIZED_ROWS);
+      return { keys: Array.from({ length: end - offset }, (_, i) => ({ name: `${prefix}${offset + i}` })), list_complete: end === OVERSIZED_ROWS, cursor: String(end) };
     },
-    get: async (key) => { operations += 1; return JSON.stringify({ id: key.split(':').at(-1), encrypted: true }); },
+    get: async (key) => { operations += 1; return Array.isArray(key) ? new Map(key.map((name) => [name, row(name)])) : row(key); },
   };
   return { index, get operations() { return operations; } };
 };
@@ -59,14 +63,14 @@ test('an oversized canonical source neither calls AI nor replaces the last good 
 });
 
 for (const [label, raw] of [
-  ['metadata bytes', JSON.stringify({ id: 'question-1', padding: 'x'.repeat(2 * 1024 * 1024) })],
-  ['payload bytes', JSON.stringify({ id: 'question-1', size: 9 * 1024 * 1024 })],
+  ['metadata bytes', JSON.stringify({ id: 'question-1', padding: 'x'.repeat(RESULTS_ANALYSIS_SCAN_LIMITS.metadataBytes) })],
+  ['payload bytes', JSON.stringify({ id: 'question-1', size: RESULTS_ANALYSIS_SCAN_LIMITS.payloadBytes + 1 })],
 ]) {
   test(`canonical analysis bounds ${label} before reading a large payload`, async () => {
     let payloadReads = 0;
     const env = { CE_STORAGE_INDEX_KV: {
       list: async ({ prefix }) => ({ keys: prefix.startsWith('ce-storage:session-a:questions:') ? [{ name: `${prefix}question-1` }] : [], list_complete: true }),
-      get: async () => raw,
+      get: async (key) => (Array.isArray(key) ? new Map(key.map((name) => [name, raw])) : raw),
     }, CE_STORAGE_R2: { get: async () => { payloadReads += 1; throw new Error('must not read payload'); } } };
     const source = await loadWorkerCanonicalResultsAnalysisSource({ env, config, slug: 'session-a' });
     assert.equal(source.status, 503);
@@ -78,7 +82,7 @@ for (const [label, raw] of [
 test('committed responses cannot bypass the canonical snapshot row budget', async () => {
   const env = { CE_STORAGE_INDEX_KV: { list: async () => ({ keys: [], list_complete: true }), get: async () => null } };
   const source = await loadWorkerCanonicalResultsAnalysisSource({ env, config, slug: 'session-a',
-    committedResponses: Array.from({ length: 1001 }, () => ({ metadata: {}, payload: {} })) });
+    committedResponses: Array.from({ length: RESULTS_ANALYSIS_SCAN_LIMITS.rows + 1 }, () => ({ metadata: {}, payload: {} })) });
   assert.equal(source.status, 503);
   assert.equal(source.snapshot, undefined);
 });
@@ -96,7 +100,13 @@ const readableHistory = (count = 3) => {
   for (let i = 0; i < count; i += 1) put('responses', `response-${String(i).padStart(4, '0')}`,
     { ...identity, questionId: 'q1', answer: `View ${i}` }, { responder: `0x${String(i + 1).padStart(40, '0')}` });
   const index = {
-    get: async (key) => { operations += 1; return values.get(key) ?? null; },
+    // A key list is Cloudflare's bulk get: one operation, at most 100 keys.
+    get: async (key) => {
+      operations += 1;
+      if (!Array.isArray(key)) return values.get(key) ?? null;
+      assert.ok(key.length <= 100, `bulk get of ${key.length} keys`);
+      return new Map(key.map((name) => [name, values.get(name) ?? null]));
+    },
     list: async ({ prefix, cursor = '', limit = 1000 }) => {
       operations += 1;
       const keys = [...values.keys()].filter((key) => key.startsWith(prefix)).sort();
@@ -129,6 +139,57 @@ test('automatic analysis reuses one complete source and one scan budget through 
   assert.equal(result.ok, true);
   assert.equal(operationsAtProvider, singleScanOperations);
   assert.ok(operationsAtProvider <= 800);
+});
+
+// About 80 people answering 30 questions, as at a salon, with a fifth of the
+// answers changed once: each changed answer is stored twice.
+test('a salon-sized session is read whole, in bulk, well inside the scan budget', async () => {
+  const history = readableHistory(0);
+  for (let question = 2; question <= 30; question += 1) {
+    history.put('questions', `qmeta-${question}`, { ...history.identity, questionId: `q${question}`, prompt: `Question ${question}?`, type: 'text' });
+  }
+  let stored = 0;
+  for (let person = 1; person <= 80; person += 1) {
+    for (let question = 1; question <= 30; question += 1) {
+      const versions = (person + question) % 5 === 0 ? 2 : 1;
+      for (let version = 0; version < versions; version += 1) {
+        stored += 1;
+        history.put('responses', `answer-${String(stored).padStart(5, '0')}`,
+          { ...history.identity, questionId: `q${question}`, answer: version ? 'Changed view.' : 'First view.' },
+          { responder: `0x${person.toString(16).padStart(40, '0')}`, createdAt: `2026-11-24T1${version}:00:00.000Z` });
+      }
+    }
+  }
+  assert.equal(stored, 2880);
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a', config });
+  assert.equal(source.ok, true, source.error);
+  assert.equal(source.counts.responseCount, 2400);
+  assert.equal(source.counts.participantCount, 80);
+  assert.equal(source.snapshot.responses.filter((response) => response.answer === 'Changed view.').length, 480);
+  assert.ok(history.operations <= 100, `${history.operations} operations`);
+});
+
+test('bulk payload reads keep each reply under the bulk limit, and leave R2 to single reads', async () => {
+  const gets = [];
+  const index = { get: async (keys) => { gets.push(keys); return new Map(keys.map((key) => [key, null])); } };
+  // A 7 MiB payload is about 9.3 MiB of base64url, so a bulk reply holds one beside small ones.
+  const metadataList = [
+    ...[0, 1, 2].map((i) => ({ id: `large-${i}`, size: 7 * 1024 * 1024 })),
+    ...Array.from({ length: 150 }, (_, i) => ({ id: `small-${i}`, size: 120 })),
+  ];
+  const payloads = await readStoredCloudflarePayloadsBulk({ env: {}, index, slug: 'session-a', metadataList });
+  assert.deepEqual(gets.map((keys) => keys.length), [1, 1, 100, 51]);
+  assert.deepEqual(gets[0], [buildPayloadKey({ slug: 'session-a', id: 'large-0' })]);
+  assert.equal(payloads.size, 153);
+  assert.ok([...payloads.values()].every((bytes) => bytes === null));
+
+  gets.length = 0;
+  assert.equal((await readStoredCloudflarePayloadsBulk({ env: { CE_STORAGE_R2: {} }, index, slug: 'session-a', metadataList })).size, 0);
+  // A payload larger than the scan may still read fails before any read.
+  const budget = { operation: () => {}, payload: () => {}, remainingPayloadBytes: 1024 };
+  await assert.rejects(readStoredCloudflarePayloadsBulk({ env: {}, index, slug: 'session-a', metadataList: [{ id: 'big', size: 1025 }], budget }),
+    /synchronous read limit/);
+  assert.deepEqual(gets, []);
 });
 
 test('automatic analysis checks its pause state before any storage scan', async () => {
@@ -181,16 +242,33 @@ test('unreadable latest answer metadata cannot silently select the participant o
       responder: `0x${'1'.padStart(40, '0')}`, createdAt: '2026-09-18T00:00:00.000Z',
     });
     const get = history.index.get;
+    const newest = buildIndexKey({ slug: 'session-a', resource: 'responses', id: 'newest' });
     history.index.get = async (key) => {
-      if (key === buildIndexKey({ slug: 'session-a', resource: 'responses', id: 'newest' })) {
-        if (failure === 'throw') throw new Error('temporary read failure');
-        return failure === 'missing' ? null : '{broken';
-      }
-      return get(key);
+      if (![key].flat().includes(newest)) return get(key);
+      if (failure === 'throw') throw new Error('temporary read failure');
+      const value = failure === 'missing' ? null : '{broken';
+      return Array.isArray(key) ? new Map([...(await get(key))].map(([name, raw]) => [name, name === newest ? value : raw])) : value;
     };
     const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a', config });
     assert.equal(source.ok, false, failure);
     assert.equal(source.status, 503);
+    assert.equal(source.snapshot, undefined);
+  }
+});
+
+// With R2 bound, a payload R2 lacks is read from KV, where it was kept before.
+test('a failed answer read fails the snapshot rather than dropping the answer', async () => {
+  for (const storage of [{}, { CE_STORAGE_R2: { get: async () => null } }]) {
+    const history = readableHistory();
+    const get = history.index.get;
+    const payload = buildPayloadKey({ slug: 'session-a', id: 'response-0001' });
+    history.index.get = async (key) => {
+      if ([key].flat().includes(payload)) throw new Error('temporary read failure');
+      return get(key);
+    };
+    const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: history.index, ...storage }, slug: 'session-a', config });
+    assert.equal(source.ok, false, Object.keys(storage).join() || 'KV only');
+    assert.equal(source.reason, 'results_analysis_snapshot_unavailable');
     assert.equal(source.snapshot, undefined);
   }
 });

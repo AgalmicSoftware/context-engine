@@ -21,6 +21,7 @@ const createMemoryKv = (seed = {}) => {
 	return {
 		values,
 		async get(key, typeOrOptions) {
+			if (Array.isArray(key)) return new Map(await Promise.all(key.map(async (name) => [name, await this.get(name, typeOrOptions)])));
 			const value = values.has(key) ? values.get(key) : null;
 			const type = typeof typeOrOptions === 'string' ? typeOrOptions : typeOrOptions?.type;
 			if (value == null || !type || type === 'text') return value;

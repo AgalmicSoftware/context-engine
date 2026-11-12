@@ -52,7 +52,8 @@ const createKv = () => {
   return {
     store,
     async put(key, value) { store.set(key, value); },
-    async get(key) { return store.get(key) || null; },
+    // A key list is Cloudflare's bulk get.
+    async get(key) { return Array.isArray(key) ? new Map(key.map((name) => [name, store.get(name) || null])) : store.get(key) || null; },
     async list({ prefix = '' } = {}) {
       return {
         keys: [...store.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })),

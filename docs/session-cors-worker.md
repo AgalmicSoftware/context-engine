@@ -692,18 +692,23 @@ Admin test panel:
   between the generated wording and its evidence. Invalid sections are withheld;
   an artifact with no valid requested section fails generation.
 - Worker-canonical analysis scans share a synchronous safety budget: 800 storage
-  operations, 1,000 metadata/hidden-marker/committed-response rows, 2 MiB of
-  metadata, and 8 MiB of readable payload data. R2 reads, KV fallback reads, and
-  supplied committed responses count against the same budget. Exceeding a budget
-  returns `503` before AI generation or publication and preserves the last good
-  artifact; the Worker never publishes an apparently complete truncated snapshot.
-  Missing, invalid, or unreadable listed metadata also returns `503`, rather
-  than silently selecting an older answer. Automatic threshold evaluation and
-  provider generation reuse the same complete snapshot and its single scan budget.
-  These application limits leave room for authentication and JSON processing;
-  they are not a claim about a universal platform request ceiling. Large histories
-  require a future bounded background snapshot/current-version index. This guard
-  covers Worker storage history, not the separate existing admin-snapshot contract.
+  operations, 10,000 metadata/hidden-marker/committed-response rows, 8 MiB of
+  metadata, and 8 MiB of readable payload data. KV metadata and payloads are
+  read in bulk gets of up to 100 keys, each one operation, so about 80 people
+  answering 30 questions, with some answers changed, read whole in under 100
+  operations. R2 has no bulk read, so with R2 bound each payload is one
+  operation. R2 reads, KV reads, and supplied committed responses count against
+  the same budget. Exceeding a budget returns `503` before AI generation or
+  publication and preserves the last good artifact; the Worker never publishes
+  an apparently complete truncated snapshot. Missing, invalid, or unreadable
+  listed metadata also returns `503`, rather than silently selecting an older
+  answer, and so does a failed payload read. Automatic threshold evaluation and
+  provider generation reuse the same complete snapshot and its single scan
+  budget. These application limits leave room for authentication and JSON
+  processing; they are not a claim about a universal platform request ceiling.
+  Larger histories require a future bounded background snapshot/current-version
+  index. This guard covers Worker storage history, not the separate existing
+  admin-snapshot contract.
 - Only each participant's latest readable row per question is analysed,
   ordered by Worker time and then storage id, as the client orders them. A
   newer answer that is locked field by field, cleared, or invalid therefore
