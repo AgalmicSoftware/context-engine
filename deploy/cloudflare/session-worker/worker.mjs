@@ -72531,7 +72531,8 @@ var init_storageRouteExecution = __esm({
       }
       const payloadConditions = normalizeAccessConditionDocument(metadata.accessConditions || metadata.envelope?.accessConditions);
       if (!payloadConditions?.conditions?.length || JSON.stringify(payloadConditions) === JSON.stringify(resolvePayloadAccessControl(config).conditions)) return sessionAccess;
-      return authorizeCloudflareStorageGate({ ...args, metadata });
+      const ownAccess = await authorizeCloudflareStorageGate({ ...args, metadata });
+      return ownAccess.ok ? ownAccess : { ...ownAccess, ownRule: true };
     };
     authorizeCloudflareStorageGate = async ({
       env,
@@ -72567,6 +72568,8 @@ var init_storageRouteExecution = __esm({
         }
         return {
           ok: false,
+          // An SBT rule the chain can't answer, as opposed to a membership outage.
+          ...conditionResult.outcome === "unavailable" && conditionResult.condition?.kind === "sbt_onchain" ? { chainUnavailable: true } : {},
           response: responseJson(deps, {
             error: "Access denied: Cloudflare storage conditions failed.",
             reason: conditionResult.reason,
@@ -73599,7 +73602,8 @@ var init_storageRouteExecution = __esm({
           deps
         });
         if (!itemAccess.ok) {
-          if (mine || itemAccess.response.status >= 500) return itemAccess.response;
+          const ownChainRule = itemAccess.ownRule === true && itemAccess.chainUnavailable === true;
+          if (mine || itemAccess.response.status >= 500 && !ownChainRule) return itemAccess.response;
           continue;
         }
         const owned = isOwnedStorageResource(storageRef.resource);
@@ -108664,7 +108668,8 @@ var scaleText = ({ scale } = {}) => {
   const end = (value, label) => trim26(label) && trim26(label) !== String(value) ? `${value} (${trim26(label)})` : `${value}`;
   return `${end(scale.min, scale.minLabel)} to ${end(scale.max, scale.maxLabel)}`;
 };
-var readMemberAnswers = async ({ env, slug, config, optedOut, deps }) => {
+var GROUP_AGENT_MIN_ANSWERS = 3;
+var readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
   if (!source?.ok) return null;
   const byQuestion = new Map(source.snapshot.questions.map((question) => [
@@ -108680,7 +108685,7 @@ var readMemberAnswers = async ({ env, slug, config, optedOut, deps }) => {
     const answer = group.counted ? { choices: given, text: comment } : { choices: [], text: [given.join("; "), comment].filter(Boolean).join(" \u2014 ") };
     if (answer.choices.length || answer.text) group.answers.push(answer);
   });
-  return [...byQuestion.values()].filter((group) => group.answers.length).map(({ question, scale, answers }) => ({ question, ...scale ? { scale } : {}, answers }));
+  return [...byQuestion.values()].filter((group) => group.answers.length >= minAnswers).map(({ question, scale, answers }) => ({ question, ...scale ? { scale } : {}, answers }));
 };
 var gatherMaterial = async ({ env, slug, config, address: address2, scopes, asker, access, optedOut, deps }) => {
   const detailed = asker.answers === "detailed";
@@ -108692,10 +108697,19 @@ var gatherMaterial = async ({ env, slug, config, address: address2, scopes, aske
       deps,
       principal: lower11(address2),
       leaveOutUploaders: optedOut,
-      ...detailed ? { readable: access.canRead } : {}
+      // A General asker reads the files open to everyone the session admits,
+      // and must be someone it admits: the session's own gate is checked too.
+      readable: detailed ? access.canRead : async (row) => forEveryone(row, config) && access.canRead(row)
     }),
     readVisibleResults({ env, slug, config, address: address2, scopes, deps }),
-    detailed ? readMemberAnswers({ env, slug, config, optedOut, deps }) : []
+    detailed ? readMemberAnswers({
+      env,
+      slug,
+      config,
+      optedOut,
+      deps,
+      minAnswers: asker.audience === "admin" ? 1 : GROUP_AGENT_MIN_ANSWERS
+    }) : []
   ]);
   return { material: { sessionContext: config?.sessionContext, sources, results, answers: answers || [] }, answersUnavailable: answers === null };
 };
