@@ -20,7 +20,8 @@
       "cecc-and-node"
     ],
     "release": [
-      "release"
+      "release",
+      "recording-durability"
     ]
   },
   "gates": {
@@ -478,6 +479,18 @@
           "args": [
             "run",
             "client:bundle-budget:check"
+          ]
+        }
+      ]
+    },
+    "recording-durability": {
+      "commands": [
+        {
+          "label": "Run the 30-minute breakout recording durability smoke",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:e2e:recording-durability"
           ]
         }
       ]

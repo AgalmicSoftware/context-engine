@@ -226,11 +226,14 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('dead-exports:check', 'scripts/check-dead-exports-advisory.mjs --check');
   expectScriptContains('verify:release', 'scripts/run-ci-gates.mjs --profile release');
   expectScriptOmits('verify:release', 'NODE_OPTIONS=--openssl-legacy-provider');
+  expectScriptContains('test:e2e:recording-durability', 'scripts/breakout-recording-durability-smoke.mjs');
 
   expectProfileContains('ci', 'wiring-and-release');
   expectProfileContains('hosted', 'wiring-and-release');
   expectProfileContains('hosted', 'public-text');
   expectProfileContains('release', 'release');
+  expectProfileContains('release', 'recording-durability');
+  expectGateContains('recording-durability', 'npm run test:e2e:recording-durability');
 
   [
     'npm run type-debt:check',

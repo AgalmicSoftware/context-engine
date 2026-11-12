@@ -7,14 +7,16 @@
 // chunk must be Transcribed, every byte must have reached the Worker apart from the tail a reload or closed tab can
 // lose by design (bounded below), and the transcript must hold each chunk's text once, in order.
 //
-// Start a local Vite server from client/ first:
-//   PUBLIC_URL=/ npx vite --host 127.0.0.1 --port 4192 --strictPort
-// then run: BASE_URL=http://127.0.0.1:4192 node scripts/breakout-recording-durability-smoke.mjs
+// Run: npm run test:e2e:recording-durability. With no BASE_URL it starts the client's Vite dev server on
+// 127.0.0.1:4192 and stops it at the end; BASE_URL=http://127.0.0.1:<port> uses one already running from client/
+// (PUBLIC_URL=/ npx vite --host 127.0.0.1 --port <port> --strictPort).
 //
 // https://worker.example is answered in this process by the checkout's Session Worker runtime, whose OpenAI calls
 // are faked. Every other request that isn't to the local server gets an empty stub.
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { Wallet } from 'ethers';
 import { createWorkerRuntime } from '../workers/sessionCorsWorker/worker.js';
@@ -91,7 +93,7 @@ async function createFakeWorker() {
     adminAddress: Wallet.createRandom().address, allowOrigins: [BASE], corsWorkerUrl: WORKER, authzEpoch: 1,
     scopes: { ai: true, transcribe: true, storage: true },
     ai: { mode: 'openai', models: { ...DEFAULT_AI_MODELS, transcription: { provider: 'openai', model: DEFAULT_TRANSCRIPTION_MODEL } } },
-    workerAuthority: { version: 1, participantScopes: ['ai', 'transcribe', 'storage'], anonymousScopes: ['ai', 'transcribe'] },
+    workerAuthority: { version: 1, participantScopes: ['ai', 'transcribe', 'storage', 'groups'], anonymousScopes: ['ai', 'transcribe'] },
     sessionModeProfile: { profileVersion: 1, preset: 'custom', authority: { mode: 'worker_canonical' }, evm: { registryChainId: null },
       storage: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
       identity: { default: 'passkey', enabled: ['passkey'] }, authorization: { mechanisms: ['worker_roles'] }, encryption: { mode: 'none' },
@@ -329,7 +331,26 @@ function assertRetention(records, { recorderClosed = false } = {}) {
   assert.deepEqual(records.flatMap((record) => record.voiceSamples), [], 'No voice samples are left once the recorder closes with every chunk transcribed');
 }
 
+// The client's Vite dev server, started here when no BASE_URL names one.
+async function startViteServer() {
+  const client = fileURLToPath(new URL('../client/', import.meta.url));
+  const { port } = new URL(BASE);
+  const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', port, '--strictPort'],
+    { cwd: client, env: { ...process.env, PUBLIC_URL: '/' }, stdio: 'ignore' });
+  for (let attempt = 0; attempt < 240; attempt += 1) {
+    assert.equal(server.exitCode, null, `The Vite server exited with code ${server.exitCode}`);
+    if (await fetch(BASE).then((response) => response.ok, () => false)) {
+      process.once('exit', () => server.kill());
+      return server;
+    }
+    await settle(500);
+  }
+  server.kill();
+  throw new Error(`The Vite server did not answer at ${BASE} within two minutes`);
+}
+
 const started = performance.now();
+const vite = process.env.BASE_URL ? null : await startViteServer();
 const fake = await createFakeWorker();
 const html = probeHtml(fake);
 const originalFetch = globalThis.fetch;
@@ -588,5 +609,6 @@ try {
   fake.release();
   if (failed) console.log({ uploads: ledger.uploads, consoleErrors: consoleErrors.slice(-20), errors, dialogs });
   await browser.close();
+  vite?.kill();
   globalThis.fetch = originalFetch;
 }
