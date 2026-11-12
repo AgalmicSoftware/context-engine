@@ -716,7 +716,9 @@ test('sync-public-history replays public commits, skips private-only commits, an
       '--reverse',
       '--format=%s|%aI|%cI|%an <%ae>|%cn <%ce>',
       'origin/main..release-staging',
-    ]).trim().split('\n');
+    ]).trim().split('\n')
+      // git versions differ in printing UTC as Z or +00:00.
+      .map((line) => line.replace(/\+00:00(?=\|)/g, 'Z'));
 
     assert.deepEqual(historyLines.slice(0, 2), [
       'Public commit title|2025-01-02T03:04:05Z|2025-01-02T03:04:05Z|Agalmic <agalmicsoftware@protonmail.com>|Agalmic <agalmicsoftware@protonmail.com>',
