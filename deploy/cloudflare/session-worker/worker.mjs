@@ -30129,7 +30129,7 @@ var init_sessionConfigSecretsStore = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigAuthority.js
-var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, configReadsInFlight, SHARED_READ_JOIN_MS, STALLED, shareConfigRead, callSessionConfigCoordinator, lastFailureLogAt, heldFailureLogs, logCoordinatorFailure, callCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication, executeCoordinatedContextSourceOperation;
+var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, SESSION_CONFIG_CACHE_MS, SHARED_READ_JOIN_MS, STALLED, configReads, readState, shareConfigRead, forgetSessionConfig, KEEPS_CONFIG, KEEPS_CONFIG_PREFIXES, keepsConfig, callSessionConfigCoordinator, lastFailureLogAt, heldFailureLogs, logCoordinatorFailure, callCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication, executeCoordinatedContextSourceOperation;
 var init_sessionConfigAuthority = __esm({
   "workers/sessionCorsWorker/sessionConfigAuthority.js"() {
     init_sessionCoordinatorBusy();
@@ -30144,18 +30144,30 @@ var init_sessionConfigAuthority = __esm({
         throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
       }
     };
-    configReadsInFlight = /* @__PURE__ */ new WeakMap();
+    SESSION_CONFIG_CACHE_MS = 1e3;
     SHARED_READ_JOIN_MS = 1e4;
     STALLED = Symbol("stalled");
-    shareConfigRead = (binding, slug, read) => {
-      let reads = configReadsInFlight.get(binding);
-      if (!reads) configReadsInFlight.set(binding, reads = /* @__PURE__ */ new Map());
-      const joined = reads.get(slug);
+    configReads = /* @__PURE__ */ new WeakMap();
+    readState = (binding, slug) => {
+      let slugs = configReads.get(binding);
+      if (!slugs) configReads.set(binding, slugs = /* @__PURE__ */ new Map());
+      let state = slugs.get(slug);
+      if (!state) slugs.set(slug, state = { generation: 0, cached: null, inFlight: null });
+      return state;
+    };
+    shareConfigRead = (state, read) => {
+      const joined = state.inFlight;
       if (!joined) {
-        const pending = read().finally(() => {
-          if (reads.get(slug) === pending) reads.delete(slug);
+        const generation = state.generation;
+        const pending = read().then((result) => {
+          if (result.ok && state.generation === generation) {
+            state.cached = { result, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
+          }
+          return result;
+        }).finally(() => {
+          if (state.inFlight === pending) state.inFlight = null;
         });
-        reads.set(slug, pending);
+        state.inFlight = pending;
         return pending.then((result) => structuredClone(result));
       }
       let timer;
@@ -30164,17 +30176,38 @@ var init_sessionConfigAuthority = __esm({
       });
       return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
         if (result !== STALLED) return structuredClone(result);
-        if (reads.get(slug) === joined) reads.delete(slug);
-        return shareConfigRead(binding, slug, read);
+        if (state.inFlight === joined) {
+          state.inFlight = null;
+          state.generation += 1;
+        }
+        return shareConfigRead(state, read);
       });
     };
-    callSessionConfigCoordinator = async ({ env, slug, path, ...payload }) => {
+    forgetSessionConfig = (env, slug) => {
+      const binding = env?.CE_SESSION_COORDINATOR;
+      const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+      const state = binding && normalizedSlug ? configReads.get(binding)?.get(normalizedSlug) : null;
+      if (!state) return;
+      state.generation += 1;
+      state.cached = null;
+      state.inFlight = null;
+    };
+    KEEPS_CONFIG = /* @__PURE__ */ new Set(["current", "backup/write-revision", "backup/export", "diagnostics", "storage/publish"]);
+    KEEPS_CONFIG_PREFIXES = ["agent-submit/", "debate-atlas/", "risk-matrix/"];
+    keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
+    callSessionConfigCoordinator = async ({ env, slug, path, cache = false, ...payload }) => {
       const binding = env?.CE_SESSION_COORDINATOR;
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
       if (path === "current" && normalizedSlug && binding && !Object.keys(payload).length) {
-        return shareConfigRead(binding, normalizedSlug, () => callCoordinator({ env, slug, path }));
+        const state = readState(binding, normalizedSlug);
+        if (cache && state.cached && Date.now() < state.cached.expiresAt) return structuredClone(state.cached.result);
+        return shareConfigRead(state, () => callCoordinator({ env, slug, path }));
       }
-      return callCoordinator({ env, slug, path, ...payload });
+      try {
+        return await callCoordinator({ env, slug, path, ...payload });
+      } finally {
+        if (!keepsConfig(path)) forgetSessionConfig(env, slug);
+      }
     };
     lastFailureLogAt = 0;
     heldFailureLogs = 0;
@@ -30213,8 +30246,8 @@ var init_sessionConfigAuthority = __esm({
         return { ok: false, status: 503, body: { error: SESSION_CONFIG_COORDINATION_ERROR } };
       }
     };
-    readCurrentSessionConfig = async ({ env, slug }) => {
-      const result = await callSessionConfigCoordinator({ env, slug, path: "current" });
+    readCurrentSessionConfig = async ({ env, slug, cache = false }) => {
+      const result = await callSessionConfigCoordinator({ env, slug, path: "current", cache });
       if (!result.ok && result.status === 503 && result.body?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
         throw legacySessionConfigMigrationError();
       }
@@ -80200,6 +80233,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     init_sessionSecretsEnvelope();
     init_sessionSecretsAuthority();
     init_sessionSlugResolution();
+    init_sessionConfigAuthority();
     SIGNER_RECORD = "session-lit-authorization-signer-v1";
     SETUP_RECORD = "session-lit-authorization-pending-v1";
     PROVISIONING_RECORD = "session-lit-provisioning-v1";
@@ -80500,6 +80534,8 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         return { ok: response3.ok && body?.ok === true, status: response3.status, body };
       } catch {
         return { ok: false, status: 503, body: { error: COORDINATION_ERROR } };
+      } finally {
+        forgetSessionConfig(env, slug);
       }
     };
     ensureSessionLitAuthorizationSigner = async (args) => {
@@ -83759,6 +83795,7 @@ ${expiry}`);
       if (!response3.ok || result?.ok !== true) {
         throw new Error(response3.status === 503 ? "Session config projection is pending; retry." : "Session config coordination failed.");
       }
+      if (result.created) forgetSessionConfig(env, slug);
       return result;
     };
     executeCoordinatedSessionConfigMutation = async ({
@@ -83795,6 +83832,8 @@ ${expiry}`);
           status: 503,
           body: { error: "Session config coordination failed; retry." }
         };
+      } finally {
+        forgetSessionConfig(env, slug);
       }
       const result = await response3.json().catch(() => ({}));
       return response3.ok && result?.ok === true ? { ok: true, status: 200, body: { ok: true } } : {
@@ -93387,6 +93426,28 @@ var resolveAdminRequestAuthority = async ({
 init_sessionConfigAuthority();
 init_authorizationScopeFreshness();
 init_sessionConfigMutation();
+var CACHEABLE_READS = /* @__PURE__ */ new Set(["/storage/list", "/storage/read", "/storage/read-batch"]);
+var requestPath = (request) => {
+  try {
+    return new URL(request?.url || "").pathname;
+  } catch {
+    return "";
+  }
+};
+var mayUseCachedConfig = async (request) => {
+  const path = requestPath(request);
+  if (path !== "/storage/upload") return CACHEABLE_READS.has(path);
+  if (!/application\/json/i.test(request.headers?.get?.("content-type") || "")) return false;
+  try {
+    return (await request.clone().json())?.resource === "responses";
+  } catch {
+    return false;
+  }
+};
+var namedInConfig = (config, address3) => {
+  const normalized = String(address3 || "").trim().toLowerCase();
+  return !normalized || JSON.stringify(config ?? null).toLowerCase().includes(normalized);
+};
 var isWorkerGroupsRequest = (request) => {
   try {
     return new URL(request?.url || "").pathname.startsWith("/groups/");
@@ -93402,10 +93463,13 @@ var resolveAuthenticatedRouteContext = async ({
   deps
 } = {}) => {
   const slug = auth?.slug;
+  const read = deps?.readCurrentSessionConfig || readCurrentSessionConfig;
   let config;
   let revision;
   try {
-    ({ config, revision } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug }));
+    const cache = await mayUseCachedConfig(request);
+    ({ config, revision } = await read({ env, slug, cache }));
+    if (cache && namedInConfig(config, auth?.payload?.sub)) ({ config, revision } = await read({ env, slug }));
   } catch (error) {
     return { ok: false, response: deps?.json?.({ error: error.message }, 503, baseHeaders) };
   }
@@ -103821,7 +103885,7 @@ var dispatchAnonymousRouteEntry = async ({
   const slug = slugResolution?.slug;
   let config;
   try {
-    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug }));
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug, cache: true }));
   } catch (error) {
     return deps?.json?.({ error: error.message }, 503, baseHeaders);
   }
