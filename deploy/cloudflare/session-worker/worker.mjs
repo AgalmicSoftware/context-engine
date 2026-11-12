@@ -69255,7 +69255,11 @@ var init_storageBackupRevision = __esm({
     markStorageBackupWrite = async (env, slug) => {
       if (!env?.CE_SESSION_COORDINATOR) return;
       const result = await callSessionConfigCoordinator({ env, slug, path: "backup/write-revision" });
-      if (!result.ok) throw new Error("Storage write tracking is unavailable; retry.");
+      if (result.ok) return;
+      if (result.status === 503 && result.body?.error === SESSION_CONFIG_COORDINATION_ERROR) {
+        throw Object.assign(new Error(SESSION_CONFIG_COORDINATION_ERROR), { status: 503 });
+      }
+      throw new Error("Storage write tracking is unavailable; retry.");
     };
   }
 });
@@ -73525,6 +73529,12 @@ var init_storageRouteExecution = __esm({
       };
       let prepared = await prepareStorageWrite(id2, createdAt);
       if (prepared.response) return prepared.response;
+      try {
+        await markStorageBackupWrite(env, slug);
+      } catch (error) {
+        if (error?.status === 503) return responseJson(deps, { error: error.message }, 503, baseHeaders);
+        throw error;
+      }
       const callerRequestId = trim14(payload.requestId);
       const requestId = callerRequestId && callerRequestId.length <= 200 ? callerRequestId : `server:${id2}`;
       let uploadReceipt = null;
@@ -73604,7 +73614,6 @@ var init_storageRouteExecution = __esm({
         if (!storageRef) return responseJson(deps, { error: "Stored upload metadata is unavailable; retry." }, 503, baseHeaders);
         return finishUpload(storageRef, void 0, void 0, true);
       }
-      await markStorageBackupWrite(env, slug);
       if (canWriteR2) {
         await r2.put(objectKey, bytesToStore, {
           httpMetadata: { contentType: metadata.contentType },
@@ -73627,7 +73636,8 @@ var init_storageRouteExecution = __esm({
       } else if (index && typeof index.put === "function") {
         await index.put(buildIndexKey({ slug, resource, id: id2 }), serializedMetadata, storageIndexPutOptions(metadata));
       }
-      await markStorageBackupWrite(env, slug);
+      await markStorageBackupWrite(env, slug).catch(() => {
+      });
       return finishUpload(normalizeStorageRef(metadata), metadata, bytesToStore);
     };
     readRequestId = async ({ request, url }) => {
