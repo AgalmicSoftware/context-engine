@@ -94,6 +94,8 @@ const RESULTS_ANALYSIS_DRAFT_KEY = 'results-analysis-draft-v1';
 const RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX = 'results-analysis-draft-v1:chunk:';
 const RESULTS_ANALYSIS_AUTO_JOB_KEY = 'results-analysis-auto-job-v1';
 const RESULTS_ANALYSIS_UPLOAD_PREFIX = 'results-analysis-upload-v1:';
+const RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY = 'results-analysis-upload-prune-cursor-v1';
+const RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE = 500;
 const UPLOAD_RECEIPT_PREFIX = 'upload-receipt-v1:';
 const UPLOAD_RECEIPT_LEASE_MS = 120_000;
 const UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -487,7 +489,11 @@ export class SessionWriteCoordinator {
   async scheduleUploadReceiptCleanup() {
     const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
     const nextAlarm = Math.min(nextExpiry, await readUploadReceiptRegistrationRetryAt(this), await nextAgentSubmitProjectionAt(this));
-    if (Number.isFinite(nextAlarm) && typeof this.state.storage.setAlarm === 'function') await this.state.storage.setAlarm(nextAlarm);
+    if (!Number.isFinite(nextAlarm) || typeof this.state.storage.setAlarm !== 'function') return;
+    // Keep an earlier alarm another queue set, such as the next page of AI Views receipts.
+    const scheduled = await this.state.storage.getAlarm?.();
+    if (scheduled > (Number(this.now()) || Date.now()) && scheduled <= nextAlarm) return;
+    await this.state.storage.setAlarm(nextAlarm);
   }
 
   async executeUploadReceipt(payload, operation = 'reserve') {
@@ -926,19 +932,29 @@ export class SessionWriteCoordinator {
     return { ...result, scheduled };
   }
 
+  // Each alarm checks one page of receipts and resumes after it next time, so
+  // a session holding thousands of answers never lists them all at once.
   async pruneResultsAnalysisUploadReceipts() {
     const nowMs = Number(this.now()) || Date.now();
-    const nextExpiry = await this.state.storage.transaction(async (transaction) => {
-      let next = Infinity;
-      for (const [key, record] of await transaction.list({ prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX })) {
+    const { nextExpiry, more } = await this.state.storage.transaction(async (transaction) => {
+      const cursor = await transaction.get(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY);
+      const page = await transaction.list({ prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX,
+        ...(cursor?.after ? { startAfter: cursor.after } : {}), limit: RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE });
+      let next = Number(cursor?.next) || Infinity;
+      for (const [key, record] of page) {
         if (record.expiresAt <= nowMs) await transaction.delete(key);
         else next = Math.min(next, record.expiresAt);
       }
-      return next;
+      if (page.size >= RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE) {
+        await transaction.put(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, { after: [...page.keys()].at(-1), next });
+        return { nextExpiry: next, more: true };
+      }
+      if (cursor) await transaction.delete(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY);
+      return { nextExpiry: next, more: false };
     });
-    if (Number.isFinite(nextExpiry) && !await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY)) {
-      await this.scheduleResultsAnalysisAlarm(nextExpiry - nowMs);
-    }
+    if (await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY)) return;
+    if (more) await this.scheduleResultsAnalysisAlarm(1_000);
+    else if (Number.isFinite(nextExpiry)) await this.scheduleResultsAnalysisAlarm(nextExpiry - nowMs);
   }
 
   async recordResultsAnalysisQueueFailure(error, job) {
