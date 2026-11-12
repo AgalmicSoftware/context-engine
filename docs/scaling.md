@@ -5,21 +5,11 @@ session is public or private, which infrastructure profile owns the session, and
 which scaling techniques that profile uses. Hosting the static client does not determine the
 session's authority, storage, access policy, or settlement path.
 
-## Current Implemented Profiles
+## Profiles
 
-`/new` starts on **Hosted & Fast**, shown as `Centralized` under `Runs on`.
-**Trustless & Slower**, shown as `Decentralized`, is an implemented opt-in
-path.
-
-| Profile | Availability | Canonical authority and storage | Creator setup | Chain requirement |
-| --- | --- | --- | --- | --- |
-| Hosted & Fast | Implemented; default path | Creator-owned per-session Cloudflare Worker, Worker KV/Cloudflare payload storage, and `worker_canonical` authority; new sessions show every answer to signed-in members, unencrypted, and `worker_envelope` encryption is optional | Cloudflare account; an AI-provider key (OpenAI by default); a Cloudflare API token or the token-free dashboard handoff | None by default; the passkey-derived EOA signs worker config without submitting a transaction |
-| Trustless & Slower | Implemented; opt-in | Public EVM registry/contracts and Arweave | Compatible Session Worker, wallet transaction, gas, the 0.0001 ETH creation fee, RPC access, Arweave JWK, and an AI-provider key (OpenAI by default) | Required; Lit credentials are required only when Lit encryption is selected |
-| Company-Operated | Planned; not generally available | Intended organizational IAM, key-release/KMS, storage, AI gateway, networking, and observability adapters | To be defined by the operator's environment | Not required by the architecture; an entirely off-chain deployment is a target, while a private EVM could only be an optional future adapter |
-
-Creators need deployment credentials only while provisioning infrastructure.
-Participants joining or using an existing session never need the creator's
-Cloudflare token, AI key, Arweave key, or other deployer credentials.
+[Session Infrastructure Profiles](run-modes.md#session-infrastructure-profiles)
+describes the profiles, what each needs, and who can read its data. This guide
+covers how each one scales.
 
 ## Write Path
 

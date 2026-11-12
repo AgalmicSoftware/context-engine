@@ -41,7 +41,7 @@ deliberation and coordination, centered on:
 - Optional Agent HTTP inside that Worker, which exposes scoped `/api/agent/*`
   requests and Session Wrapped without replacing session authority.
 
-Primary storage and authority split:
+Primary storage and authority split ([profiles](docs/run-modes.md#session-infrastructure-profiles)):
 - Hosted & Fast: the creator-owned Session Worker is canonical for config,
   authentication, Worker-native groups/gates, and Cloudflare payload/index
   storage; it does not require EVM or Arweave.

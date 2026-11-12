@@ -8,9 +8,10 @@
 
 App hosting, public/private session access, and session infrastructure are
 separate choices. A publicly hosted web app can open either a private
-worker-canonical session or a public decentralized session. `/new` is one page
-that starts on Hosted & Fast; the `Runs on` toggle at the top switches to
-Trustless & Slower.
+worker-canonical session or a public decentralized session. [Session
+Infrastructure Profiles](docs/run-modes.md#session-infrastructure-profiles)
+describes each profile, what it needs, and who can read its data. The diagrams
+below show how their parts connect.
 
 ### Implemented Profiles
 
@@ -34,19 +35,6 @@ flowchart LR
   Trustless -.->|Lit encryption selected| Lit["Lit Protocol"]
 ```
 
-Hosted & Fast needs a Cloudflare account, an AI-provider key (OpenAI by
-default), and either a Cloudflare API token, sent once through the deploy helper
-and never saved, or the token-free dashboard handoff. The helper's operator can
-see that token, the session secrets sent with it, and the Worker secrets it
-generates. The passkey-derived EOA signs canonical Worker config without an EVM
-transaction, so public EVM, registry, RPC, gas, Arweave, and Lit are not default
-dependencies. Trustless & Slower adds public EVM contracts, Arweave, wallet
-transactions, gas, and a 0.0001 ETH creation fee, and still needs a Session
-Worker. Lit credentials are required only when Lit encryption is selected.
-
-Participants use session identity and authorization. They never need the
-creator's Cloudflare token, AI key, Arweave key, or other deployer API keys.
-
 ### Company-Operated (planned)
 
 ```mermaid
@@ -60,12 +48,6 @@ flowchart LR
   Boundary --> Observability["Observability"]
   Boundary -.->|possible future optional adapter| PrivateEVM["Private EVM"]
 ```
-
-Company-Operated is a target for existing hardware, private clouds, and internal
-networks; these adapters and a packaged corporate edition are not generally
-available. The target can be entirely off-chain. A private EVM may be explored
-as an optional compatibility adapter, but it is not required by this
-architecture.
 
 ## Layer Descriptions
 
