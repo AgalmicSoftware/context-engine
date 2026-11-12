@@ -30,6 +30,10 @@ test('a stored answer reference may hold a storage id shaped like an API key', (
   const record = { storageId: id, storageRef: { backend: 'cloudflare', id, uri: `/storage/read?id=${id}` } };
   assert.equal(hasSecretShape(record), false);
   assert.deepEqual(redactSecrets(record), record);
+  // Arweave transaction ids have the same shape.
+  for (const uri of [`ar://${id}`, `lit-arweave://${id}`]) {
+    assert.equal(hasSecretShape({ arweaveTxId: id, storageRef: { backend: 'arweave', id, uri } }), false, uri);
+  }
   assert.equal(hasSecretShape({ note: id }), true);
   assert.equal(hasSecretShape({ storageRef: { note: id } }), true);
   const key = `sk-${'A'.repeat(48)}`;
@@ -39,6 +43,8 @@ test('a stored answer reference may hold a storage id shaped like an API key', (
     { storageRef: { uri: `/storage/read?id=${key}` } },
     { storageRef: { uri: `https://example.test/?id=${id}` } },
     { storageId: 'Bearer abcdef123456' },
+    { arweaveTxId: key },
+    { storageRef: { uri: `ar://${key}` } },
   ]) {
     assert.equal(hasSecretShape(leak), true, JSON.stringify(leak));
     assert.notDeepEqual(redactSecrets(leak), leak);

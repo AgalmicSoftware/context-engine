@@ -26,7 +26,7 @@ const SAFE_AUTHORITY_METADATA_KEYS = new Set([
 
 const QUESTION_ID_RE = /^0x[0-9a-f]{64}$/i;
 const STORAGE_ID_RE = /^[A-Za-z0-9_-]{43}$/;
-const STORAGE_URI_RE = /^\/storage\/read\?id=[A-Za-z0-9_-]{43}$/;
+const STORAGE_URI_RE = /^(?:\/storage\/read\?id=|ar:\/\/|lit-arweave:\/\/)[A-Za-z0-9_-]{43}$/;
 
 // Question ids are public bytes32 hashes, the same shape as a private key, so
 // fields named for them (lastQuestionId, servedQuestionIds) may hold exactly
@@ -35,10 +35,11 @@ function isSafeHashValue(value, path = []) {
   const key = lower(path[path.length - 1]);
   const parentKey = lower(path[path.length - 2]);
   if (SAFE_HASH_VALUE_KEYS.has(key) || SAFE_HASH_VALUE_CONTAINER_KEYS.has(parentKey)) return true;
-  // A storage id is 32 random bytes in base64url, which now and then spell
-  // `sk-` and 20 more characters, an API key's shape. A stored answer's
-  // reference may hold exactly that id, which is shorter than such a key.
-  if (key === 'storageid' || (parentKey === 'storageref' && key === 'id')) return STORAGE_ID_RE.test(value);
+  // A storage id, like an Arweave transaction id, is 32 random bytes in
+  // base64url, which now and then spell `sk-` and 20 more characters, an API
+  // key's shape. A stored answer's reference may hold exactly that id, which
+  // is shorter than such a key.
+  if (key === 'storageid' || key === 'arweavetxid' || (parentKey === 'storageref' && key === 'id')) return STORAGE_ID_RE.test(value);
   if (parentKey === 'storageref' && key === 'uri') return STORAGE_URI_RE.test(value);
   return (key.endsWith('questionid') || parentKey.endsWith('questionids')) && QUESTION_ID_RE.test(value);
 }
