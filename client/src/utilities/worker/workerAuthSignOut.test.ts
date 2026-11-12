@@ -6,7 +6,10 @@ const SESSION_ID = '0x0123456789abcdef0123456789abcdef';
 
 const hold = (workerUrl: string, slug: string, token: string, exp = Math.floor(Date.now() / 1000) + 3600) => {
   const key = buildTokenCacheKey({ workerUrl, slug, sessionId: SESSION_ID, address: ADDRESS });
-  writeTokenCache(key, buildTokenCacheEnvelope({ token, exp, workerUrl, sessionId: SESSION_ID, sessionSlug: slug, address: ADDRESS }));
+  writeTokenCache(
+    key,
+    buildTokenCacheEnvelope({ token, exp, workerUrl, sessionId: SESSION_ID, sessionSlug: slug, address: ADDRESS }),
+  );
   return key;
 };
 
@@ -26,7 +29,10 @@ describe('signing out of Session Workers', () => {
     clearAllWorkerSessionTokens();
 
     const calls = fetchMock.mock.calls as unknown as Array<[string, RequestInit]>;
-    expect(calls.map(([url]) => url).sort()).toEqual(['https://worker-a.example/auth/logout', 'https://worker-b.example/auth/logout']);
+    expect(calls.map(([url]) => url).sort()).toEqual([
+      'https://worker-a.example/auth/logout',
+      'https://worker-b.example/auth/logout',
+    ]);
     for (const [url, init] of calls) {
       expect(init.method).toBe('POST');
       expect(init.keepalive).toBe(true);

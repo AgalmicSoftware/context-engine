@@ -7,23 +7,35 @@ const sessionConfig = {
   sessionId: SESSION_ID,
   corsWorkerUrl: 'https://demo-sh-worker.example.test/',
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-  storageProfile: { backend: 'cloudflare', resources: { responses: 'active' }, payloadAccessControl: { gate: 'none', encryption: 'none' } },
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: { responses: 'active' },
+    payloadAccessControl: { gate: 'none', encryption: 'none' },
+  },
 };
 const ANSWERS = 250;
-const answer = (id: string) => ({ sessionSlug: 'demo-sh', sessionId: SESSION_ID, questionId: `q-${id}`, answer: { value: 'Agree' } });
+const answer = (id: string) => ({
+  sessionSlug: 'demo-sh',
+  sessionId: SESSION_ID,
+  questionId: `q-${id}`,
+  answer: { value: 'Agree' },
+});
 
 const fakeWorker = (features: string[]) => {
   const calls = { list: 0, batch: 0, single: 0, batchSizes: [] as number[], batchIds: [] as string[] };
   const deps = {
     readWorkerCapabilities: async () => ({ legacy: false, features }),
-    listSessionStorageRefsPage: async ({ cursor }: { cursor?: string | null }) => {
+    listSessionStorageRefsPage: async (options: Record<string, unknown>) => {
       calls.list += 1;
-      const start = Number(cursor || 0);
+      const start = Number(options.cursor || 0);
       const end = Math.min(start + 100, ANSWERS);
       return {
         items: Array.from({ length: end - start }, (_, index) => ({
           storageRef: { id: `ref-${start + index}` },
-          metadata: { responder: `0x${(start + index).toString(16).padStart(40, '0')}`, createdAt: '2026-11-12T00:00:00.000Z' },
+          metadata: {
+            responder: `0x${(start + index).toString(16).padStart(40, '0')}`,
+            createdAt: '2026-11-12T00:00:00.000Z',
+          },
         })),
         cursor: end < ANSWERS ? String(end) : null,
         listComplete: end >= ANSWERS,
@@ -35,9 +47,9 @@ const fakeWorker = (features: string[]) => {
       calls.batchIds.push(...ids);
       return ids.map(answer);
     },
-    readSessionStorageBlob: async ({ storageRef }: { storageRef: { id: string } }) => {
+    readSessionStorageBlob: async (options: Record<string, unknown>) => {
       calls.single += 1;
-      return new Response(JSON.stringify(answer(storageRef.id)));
+      return new Response(JSON.stringify(answer((options.storageRef as { id: string }).id)));
     },
   };
   return { calls, deps };
@@ -57,7 +69,10 @@ describe('loading Worker answers in batches', () => {
   it('asks only for answers it has not read before', async () => {
     const { calls, deps } = fakeWorker(['storage_read_batch_v1']);
     const cached = new Set(Array.from({ length: 200 }, (_, index) => `ref-${index}`));
-    const rows = await loadWorkerResponses({ sessionSlug: 'demo-sh', sessionConfig, cachedStorageRefIds: cached }, deps);
+    const rows = await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig, cachedStorageRefIds: cached },
+      deps,
+    );
     expect(rows).toHaveLength(50);
     expect(calls.batchIds.every((id) => !cached.has(id))).toBe(true);
     expect(calls.batch).toBe(1);

@@ -170,7 +170,8 @@ export const loadWorkerResponses = async (
     }
     const questionId = readString(payload.questionID || payload.questionId).toLowerCase();
     if (!questionId) {
-      if (ownResponses && !isSurveyResponseContainer(payload)) throw new Error('A saved answer has no question identity.');
+      if (ownResponses && !isSurveyResponseContainer(payload))
+        throw new Error('A saved answer has no question identity.');
       return null;
     }
     // The Worker derives this value from the authenticated uploader. Payload claims
@@ -200,8 +201,9 @@ export const loadWorkerResponses = async (
   };
   const batched =
     !!wanted.length &&
-    (await (deps.readWorkerCapabilities || readWorkerCapabilities)(readString(target.workerUrl), target.sessionSlug))
-      .features.includes('storage_read_batch_v1');
+    (
+      await (deps.readWorkerCapabilities || readWorkerCapabilities)(readString(target.workerUrl), target.sessionSlug)
+    ).features.includes('storage_read_batch_v1');
   const readBatch = deps.readSessionStorageBatch || readSessionStorageBatch;
   const step = batched ? STORAGE_READ_BATCH_MAX_IDS : RESPONSE_READ_CONCURRENCY;
   const rows: WorkerCanonicalResponseRow[] = [];
@@ -211,9 +213,7 @@ export const loadWorkerResponses = async (
     const payloads = batched
       ? await readBatch({ ...readTarget, ids: chunk.map((read) => read.storageRefId) })
       : await Promise.all(
-          chunk.map(async ({ storageRef }) =>
-            (await readBlob({ ...readTarget, storageRef })).json().catch(() => null),
-          ),
+          chunk.map(async ({ storageRef }) => (await readBlob({ ...readTarget, storageRef })).json().catch(() => null)),
         );
     chunk.forEach((read, index) => {
       const row = toRow(read, payloads[index]);

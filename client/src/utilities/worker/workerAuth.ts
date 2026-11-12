@@ -989,11 +989,13 @@ export const clearAllWorkerSessionTokens = () => {
   // Signing out ends each sign-in at its Worker too, so a copied token stops working.
   // A Worker that can't be reached keeps the sign-in until it expires.
   listHeldTokens().forEach(({ workerUrl, sessionSlug, token }) => {
-    globalThis.fetch?.(`${workerUrl}/auth/logout`, {
-      method: 'POST',
-      headers: buildWorkerAuthHeadersForToken({ token, slug: sessionSlug }),
-      keepalive: true,
-    })?.catch?.(() => undefined);
+    globalThis
+      .fetch?.(`${workerUrl}/auth/logout`, {
+        method: 'POST',
+        headers: buildWorkerAuthHeadersForToken({ token, slug: sessionSlug }),
+        keepalive: true,
+      })
+      ?.catch?.(() => undefined);
   });
   invalidateWorkerAuthState({ nextAddress: '' });
 };

@@ -251,7 +251,9 @@ export const clearAllTokenCaches = (): void => {
 };
 
 /** This page's unexpired sign-ins, so a sign-out can end each one at its Worker. */
-export const listHeldTokens = (nowSeconds = Math.floor(Date.now() / 1000)): Array<{ sessionSlug: string; token: string; workerUrl: string }> => {
+export const listHeldTokens = (
+  nowSeconds = Math.floor(Date.now() / 1000),
+): Array<{ sessionSlug: string; token: string; workerUrl: string }> => {
   const keys = new Set(tokenMemoryCache.keys());
   forEachTabTokenKey((key) => keys.add(key));
   const held: Array<{ sessionSlug: string; token: string; workerUrl: string }> = [];

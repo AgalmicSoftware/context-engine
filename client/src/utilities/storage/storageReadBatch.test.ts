@@ -3,13 +3,18 @@ import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 
 jest.mock('../worker/workerAuth.js', () => ({ fetchWorkerWithAuth: jest.fn() }));
 
-const fetchMock = fetchWorkerWithAuth as unknown as jest.Mock;
+const fetchMock = fetchWorkerWithAuth as unknown as jest.Mock<
+  Promise<Response>,
+  [string, { method: string; body: string }]
+>;
 const options = { workerUrl: 'https://worker.example.test', sessionSlug: 'sample' };
 const reply = (items: unknown[], status = 200) =>
   fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ items }), { status }));
 
 describe('readSessionStorageBatch', () => {
-  beforeEach(() => fetchMock.mockReset());
+  beforeEach(() => {
+    fetchMock.mockReset();
+  });
 
   it('posts the ids and returns each payload in the order asked', async () => {
     reply([
