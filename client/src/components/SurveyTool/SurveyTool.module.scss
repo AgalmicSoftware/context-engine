@@ -3415,6 +3415,12 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   background: var(--ce-text-inverse);
   font-weight: 700;
   cursor: pointer;
+
+  // Waiting for transcription: the text keeps its contrast, and a dashed edge shows it can't open yet.
+  &[aria-disabled='true'] {
+    border-style: dashed !important;
+    cursor: progress;
+  }
 }
 
 // A finger holds the button to drag it, which mustn't select its label or open a callout. Safari reads only the

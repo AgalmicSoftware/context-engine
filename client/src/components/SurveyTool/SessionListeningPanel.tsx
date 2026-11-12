@@ -788,6 +788,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           onPersonChange={setClaimPerson}
           speakerMerges={recorder.speakerMerges}
           onSpeakerMergesChange={recorder.saveSpeakerMerges}
+          waiting={isRecorderSessionActive || hasPendingTranscription}
+          failedParts={failedCount}
         />
       ) : null}
 

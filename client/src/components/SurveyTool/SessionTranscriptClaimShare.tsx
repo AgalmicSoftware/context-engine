@@ -232,6 +232,10 @@ type Props = {
   // place to keep them, people can't be merged.
   speakerMerges?: SpeakerMerges;
   onSpeakerMergesChange?: (merges: SpeakerMerges) => void;
+  // Some audio is still being recorded or transcribed: a code now would miss its words, so none opens yet.
+  waiting?: boolean;
+  // Parts of the recording that failed to transcribe, whose words no code holds.
+  failedParts?: number;
 };
 
 /**
@@ -246,6 +250,8 @@ export default function SessionTranscriptClaimShare({
   onPersonChange,
   speakerMerges = NO_MERGES,
   onSpeakerMergesChange,
+  waiting = false,
+  failedParts = 0,
 }: Props) {
   const helpId = `ce-claim-help-${useId().replace(/:/g, '')}`;
   const people = useMemo(() => claimablePeople(transcript), [transcript]);
@@ -280,6 +286,10 @@ export default function SessionTranscriptClaimShare({
     return () => row.removeEventListener('touchmove', hold);
   }, [row]);
   useEffect(() => () => clearTimeout(pressRef.current?.timer), []);
+  // A speaker chosen from the transcript meanwhile doesn't open a code later, unasked.
+  useEffect(() => {
+    if (waiting && person) onPersonChange('');
+  }, [waiting, person, onPersonChange]);
   if (!people.length) return null;
   const labelFor = (name: string) => mergedSpeakerLabel(speakerMerges, name);
   const merge = onSpeakerMergesChange
@@ -335,6 +345,8 @@ export default function SessionTranscriptClaimShare({
               <button
                 type="button"
                 data-claim-person={name}
+                // Still a drag source while waiting, so only opening its code is held back.
+                aria-disabled={waiting || undefined}
                 className={[
                   styles.sessionClaimPersonButton,
                   merge ? styles.sessionClaimPersonDraggable : '',
@@ -411,7 +423,7 @@ export default function SessionTranscriptClaimShare({
                     draggedRef.current = '';
                     return;
                   }
-                  onPersonChange(name);
+                  if (!waiting) onPersonChange(name);
                 }}
               >
                 {label}
@@ -435,8 +447,18 @@ export default function SessionTranscriptClaimShare({
       <span className={styles.sessionListeningSrOnly} role="status">
         {announcement}
       </span>
+      {waiting ? (
+        <p className={styles.sessionRecordingWakeNotice} role="status">
+          Codes open once every part is transcribed.
+        </p>
+      ) : failedParts ? (
+        <p className={styles.sessionRecordingWakeNotice} role="status">
+          {failedParts === 1 ? '1 part' : `${failedParts} parts`} failed to transcribe, so codes miss those words. Retry
+          above first.
+        </p>
+      ) : null}
       {/* Only a speaker with a button: a blank label has no part. A new person gets codes of their own. */}
-      {people.includes(person) ? (
+      {people.includes(person) && !waiting ? (
         <ClaimCodeDialog
           key={person}
           transcript={transcript}

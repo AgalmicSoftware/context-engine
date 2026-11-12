@@ -1034,6 +1034,28 @@ describe('SessionListeningPanel', () => {
       expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
     });
 
+    it('holds codes back while a recording runs or a part is still transcribing', async () => {
+      const labelled =
+        'Person 1: Enough words here for a whole part of the talk.\nPerson 2: And quite a lot more from another person.';
+      const panel = () => <SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />;
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: labelled, pendingSegmentCount: 1 }),
+      );
+      const { rerender } = render(panel());
+      fireEvent.click(screen.getByRole('button', { name: 'Person 2' }));
+      expect(screen.getByText('Codes open once every part is transcribed.')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: labelled, isRecording: true }),
+      );
+      rerender(panel());
+      expect(screen.getByText('Codes open once every part is transcribed.')).toBeInTheDocument();
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
+      rerender(panel());
+      fireEvent.click(screen.getByRole('button', { name: 'Person 2' }));
+      expect(await screen.findByRole('dialog')).toHaveTextContent('Person 2');
+    });
+
     it('shows merged speakers under the label they joined, and keeps a split with the recording', () => {
       const labelled =
         'Person 1: Enough words here for a whole part of the talk.\nPerson 3: And a little more from the same voice.';
