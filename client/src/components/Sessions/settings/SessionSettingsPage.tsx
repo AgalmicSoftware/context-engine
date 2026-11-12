@@ -37,8 +37,8 @@ import {
   resolveWorkerCanonicalSessionIdHex,
 } from '../../../utilities/session/sessionWorkerDiscovery';
 import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/session/sessionWorkerConfigCache';
-import { readWorkerCapabilities } from '../../../utilities/worker/workerCapabilities';
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
+import { readWorkerReleaseLabel } from '../../../domains/worker/workerRelease';
 import {
   applyTemplateToSessionSettingsDraft,
   buildSessionSettingsDraft,
@@ -210,11 +210,9 @@ const SessionSettingsPage = ({
   useEffect(() => {
     let stale = false;
     setWorkerRelease('');
-    if (workerOrigin) {
-      void readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {}).then((found) => {
-        if (!stale && !found.unavailable) setWorkerRelease(found.release || 'before 0.9.3');
-      });
-    }
+    void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
+      if (!stale) setWorkerRelease(release);
+    });
     return () => {
       stale = true;
     };
