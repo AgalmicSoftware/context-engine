@@ -139,21 +139,14 @@ test('the question answered state uses the same revision and request-id ordering
   assert.equal([...state.answeredByRef.values()][0].myAnswer.value, 'Disagree');
 });
 
-test('duplicate request copies prefer later timestamps regardless of answer revision', () => {
-  const older = answer({ answerRevision: 9 });
-  const newer = answer({ answerRevision: 1, createdAt: '2026-10-28T00:00:01.000Z', label: 'Disagree' });
-  assert.deepEqual(submitted.dedupeSubmitRecords([older, newer]), [newer]);
-  assert.deepEqual(submitted.dedupeSubmitRecords([newer, older]), [newer]);
-});
-
-test('a later-listed canonical copy survives a tied stale submission index', async () => {
+test('results read the permanent answer copies, not the 30-day submission index', async () => {
   const f = fixture();
   const indexed = answer({ status: 'submit_queued', answer: { label: 'Disagree', value: 'Disagree' } });
   const canonical = { ...indexed, status: 'direct_submitted' };
+  const indexOnly = answer({ telegramUserId: 'index-only', requestId: 'index-only', status: 'direct_submitted' });
   await f.agentEnv.AGENT_ACTION_KV.put(submitRequestSessionKvKey(indexed), JSON.stringify(indexed));
+  await f.agentEnv.AGENT_ACTION_KV.put(submitRequestSessionKvKey(indexOnly), JSON.stringify(indexOnly));
   await f.agentEnv.AGENT_ACTION_KV.put(canonicalAnswerSessionKvKey(canonical), JSON.stringify(canonical));
   const rows = await submitted.loadSubmittedResultRecords(f.agentEnv, 'fixture');
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].requestId, canonical.requestId);
-  assert.equal(rows[0].label, 'Disagree');
+  assert.deepEqual(rows.map(row => [row.requestId, row.label]), [[canonical.requestId, 'Disagree']]);
 });

@@ -77,8 +77,10 @@ zero), then `createdAt`, then `requestId`, with deterministic content tie-breaki
 Selected answers are ordered chronologically by `createdAt`, then `requestId`;
 revisions do not order different participants or questions. Consensus, difference,
 groups, Polis and topic maps use this same selection; submission records retain history.
-Duplicate copies of one request prefer the later `createdAt`; on a timestamp tie,
-the canonical copy loaded after the submission index wins before status filtering.
+Results read only the permanent answer index, which every save writes before the
+30-day submission index, 100 records per KV read. Cloudflare counts each read as
+one of an invocation's 1,000 KV operations, so a salon of 80 people answering 30
+questions stays well under it.
 
 `/preferences` saves drafts unless an explicitly authorized submit is requested.
 The coordinator retains an answer head per session, principal and question.

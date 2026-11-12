@@ -10,7 +10,6 @@ import { loadSessionPolicy } from './sessionPolicyLoader.mjs';
 import { buildQueuedSubmitRecord, enqueueAgentSubmitRecord, queueAgentSubmitRecord, submitRequestKvKey, agentSubmitQueueEnabled } from './agentSubmitQueue.mjs';
 import { questionId, shortQuestionId } from './runtimeCore.mjs';
 import { onChainAnswerFromDraft } from './draftAnswerEncoding.mjs';
-import { loadQuestionsForSession } from './sessionQuestionLoading.mjs';
 import { answerDraftFingerprint, writeDraftLifecycleEvent, buildDraftProvenance, readAnswerDraftFirstViewedAt } from './answerDrafts.mjs';
 
 const activeSubmissions = new Map();
@@ -45,6 +44,7 @@ async function executeAgentSubmitRequest({
   draft = {},
   sessionSlug = '',
   selectedQuestionId = '',
+  question = null,
   createdAt = null,
 } = {}) {
   if (!env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function' || typeof env.AGENT_ACTION_KV.get !== 'function') {
@@ -103,10 +103,10 @@ async function executeAgentSubmitRequest({
   }
   // The coordinator retains this first submission time across isolates/retries.
   createdAt = existing?.createdAt || createdAt || nowIso();
-  // A draft is evidence, not current question authority. Reload its canonical
-  // schema before an effect so every answer type retains options and limits.
-  const loaded = await loadQuestionsForSession(env, slug, { preferredQuestionIds: [qid] });
-  const canonicalQuestion = (loaded.questions || []).find(entry => questionId(entry) === qid);
+  // A draft is evidence, not current question authority. The caller passes the
+  // canonical question it loaded for this request, so every answer type keeps
+  // its options and limits without reloading every question for each answer.
+  const canonicalQuestion = question && questionId(question) === qid ? question : null;
   if (!canonicalQuestion || canonicalQuestion.locked || canonicalQuestion.encrypted ||
       canonicalQuestion.answerable === false || !['public', ''].includes(canonicalQuestion.visibility || '')) {
     return { ok: false, reason: 'submission_question_unavailable', retryable: true };

@@ -32,10 +32,12 @@ class MemoryKv {
     };
   }
 
-  async get(key) {
-    this.getCalls.push(key);
-    if (this.rejectGetKeys.has(key)) throw new Error('get failed');
-    return this.store.get(key) || null;
+  // Like the KV binding, an array of up to 100 keys is one bulk read.
+  async get(keys) {
+    this.getCalls.push(keys);
+    if (!Array.isArray(keys) || keys.length > 100) throw new Error('expected a bulk read');
+    if (keys.some((key) => this.rejectGetKeys.has(key))) throw new Error('get failed');
+    return new Map(keys.map((key) => [key, this.store.get(key) ?? null]));
   }
 }
 
@@ -70,13 +72,28 @@ test('listKvRecordsByPrefix skips malformed values but rejects unavailable KV re
   ], { rejectGetKeys: ['record:missing'] });
 
   await assert.rejects(listKvRecordsByPrefix({ AGENT_ACTION_KV: kv }, 'record:', { limit: Infinity }), /get failed/);
-  assert.deepEqual(kv.getCalls, [
+  assert.deepEqual(kv.getCalls, [[
     'record:valid',
     'record:broken',
     'record:array',
     'record:string',
     'record:missing',
-  ]);
+  ]]);
+});
+
+test('listKvRecordsByPrefix reads each listed page 100 keys at a time and keeps selected rows', async () => {
+  const kv = new MemoryKv(Array.from({ length: 1001 }, (_, index) => [
+    `record:${String(index).padStart(4, '0')}`, JSON.stringify({ index }),
+  ]));
+
+  const records = await listKvRecordsByPrefix({ AGENT_ACTION_KV: kv }, 'record:', {
+    select: (record) => (record.index % 2 ? null : { index: record.index }),
+  });
+
+  assert.equal(records.length, 501);
+  assert.deepEqual(records.at(-1), { index: 1000 });
+  assert.equal(kv.listCalls.length, 2);
+  assert.deepEqual(kv.getCalls.map((keys) => keys.length), [...Array(10).fill(100), 1]);
 });
 
 test('listKvRecordsByPrefix respects finite limits and caps infinite page reads at 1000', async () => {

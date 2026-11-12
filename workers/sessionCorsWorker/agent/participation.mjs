@@ -268,6 +268,7 @@ export async function handlePreferencesRequest({ env = {}, context = {}, input =
         draft: draftRecord,
         sessionSlug: context.session.sessionSlug,
         selectedQuestionId: questionId,
+        question,
         createdAt: null,
       });
       if (!submit.ok) {
