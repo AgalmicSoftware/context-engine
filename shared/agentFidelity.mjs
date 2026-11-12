@@ -537,12 +537,12 @@ const estimate = (values, options) => {
  * does, the smallest key behind a set that is too small is withheld.
  * `keysByPerson` lists each person's keys.
  */
-export const reportableKeys = (keysByPerson, min) => {
+export const reportableKeys = (keysByPerson, min, total = []) => {
   if (keysByPerson.length < min) return [];
   const kept = new Set(keysByPerson.flat());
   const sizeOf = (key) => keysByPerson.filter((keys) => keys.includes(key)).length;
-  // A key everyone has describes the same people as the total, so it divides no one.
-  const everyone = new Set([...kept].filter((key) => sizeOf(key) === keysByPerson.length));
+  // `total` lists keys whose row is the total itself (on every draft of every person), so they divide no one.
+  const everyone = new Set(total);
   for (;;) {
     const sets = new Map();
     for (const keys of keysByPerson) {
@@ -820,18 +820,34 @@ const peopleBreakdown = (people, keyOf, valueOf, options, reportable = null) => 
   );
 };
 // Origin, platform, model and context each divide the same people, and a model sits inside its platform, so
-// subtracting one table's row from another's could reveal a few people's score. Their rows are withheld together.
+// subtracting one table's row from another's could reveal a few people's score. Each person counts whole, under the
+// key that made most of their drafts, so the rows split people (not drafts) and are withheld together.
 const DIVIDING = {
   byOrigin: (pair) => pair.origin,
   byPlatform: (pair) => pair.platform,
   byModel: (pair) => pair.modelId ?? 'unknown',
   byContext: (pair) => pair.context ?? 'not reported',
 };
+const mainKey = (pairs, keyOf) => {
+  const counts = new Map();
+  for (const pair of pairs) counts.set(keyOf(pair), (counts.get(keyOf(pair)) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
+};
 const dividingBreakdowns = (people, settings) => {
-  const keysOf = (pair) => Object.entries(DIVIDING).map(([name, keyOf]) => JSON.stringify([name, keyOf(pair)]));
-  const kept = reportableKeys(people.map((person) => person.pairs.flatMap(keysOf)), settings.minParticipants).map((key) => JSON.parse(key));
-  return Object.fromEntries(
+  const keyOfPerson = Object.fromEntries(
     Object.entries(DIVIDING).map(([name, keyOf]) => {
+      const main = new Map(people.map((person) => [person.participantId, mainKey(person.pairs, keyOf)]));
+      return [name, (pair) => main.get(pair.participantId)];
+    }),
+  );
+  const keysByPerson = people.map((person) =>
+    Object.entries(keyOfPerson).map(([name, keyOf]) => JSON.stringify([name, keyOf(person.pairs[0])])),
+  );
+  // A row everyone is in is the total itself, so it divides no one.
+  const total = [...new Set(keysByPerson.flat())].filter((key) => keysByPerson.every((keys) => keys.includes(key)));
+  const kept = reportableKeys(keysByPerson, settings.minParticipants, total).map((key) => JSON.parse(key));
+  return Object.fromEntries(
+    Object.entries(keyOfPerson).map(([name, keyOf]) => {
       const reportable = new Set(kept.filter(([of]) => of === name).map(([, key]) => key));
       return [name, peopleBreakdown(people, keyOf, meanSimilarity, settings, reportable)];
     }),

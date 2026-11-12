@@ -1018,3 +1018,35 @@ test('a model or context row is withheld when another table would let it be subt
   assert.ok(uncovered === 0 || uncovered >= 5, `${uncovered} people left over`);
   assert.equal(mirrorScore.byPlatform.chatgpt.value, 1);
 });
+
+test('each person counts whole under their main model, so a row everyone is in is the total', () => {
+  // All six used model-a, but two had half their drafts from model-b: the total minus model-a's row would be
+  // those two people's model-b score.
+  const six = people.slice(0, 6);
+  const pairsOf = (mixed) =>
+    six.flatMap((person, index) =>
+      statements.map((questionId, at) => {
+        const other = mixed && index < 2 && at < 2;
+        return {
+          participantId: person.id,
+          questionId,
+          condition: 'shown',
+          origin: 'external_prefill',
+          platform: 'claude',
+          modelId: other ? 'model-b' : 'model-a',
+          prediction: other ? 'Disagree' : 'Agree',
+          actual: 'Agree',
+          confidence: 0.9,
+        };
+      }),
+    );
+  const options = { bootstrapSamples: 50, minParticipants: 5 };
+  // Each person counts whole under the model that wrote most of their drafts; the two mixed people had two of
+  // each, and the tie goes to model-a, so its row is everyone, the same as the total.
+  const mixed = scoreAgentFidelity({ questions, pairs: pairsOf(true), options }).mirrorScore;
+  assert.deepEqual(Object.keys(mixed.byModel), ['model-a']);
+  assert.equal(mixed.byModel['model-a'].value, mixed.byPlatform.claude.value);
+  const single = scoreAgentFidelity({ questions, pairs: pairsOf(false), options }).mirrorScore;
+  assert.equal(single.byModel['model-a'].value, 1, 'one model for every draft is the total, so it is shown');
+  assert.equal(single.byPlatform.claude.value, 1);
+});

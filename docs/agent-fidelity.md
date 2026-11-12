@@ -74,7 +74,9 @@ Similarity between a prediction and an answer runs from 0 to 1:
   (`source.researchCoverage`): none, 1–9, 10–49 or 50 or more. A count the AI
   left out (`null`) adds nothing, and a draft with no counts at all, or no
   coverage, is "not reported". Both are AI-prefill breakdowns, withheld like
-  platforms.
+  platforms. In these tables (and by platform and origin) each person counts
+  whole, with all their drafts, under the key that made most of them, so the
+  rows split people rather than drafts.
 - **Cohen's kappa:** exact agreement on choice predictions beyond what chance
   would give. Chance comes from each question's answer shares among the
   predictions and among the answers, and questions are pooled by their number
