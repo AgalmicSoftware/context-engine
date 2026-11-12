@@ -1023,7 +1023,9 @@ const authorizeCloudflareStorageAccess = async ({
   const payloadConditions = normalizeAccessConditionDocument(metadata.accessConditions || metadata.envelope?.accessConditions);
   if (!payloadConditions?.conditions?.length ||
       JSON.stringify(payloadConditions) === JSON.stringify(resolvePayloadAccessControl(config).conditions)) return sessionAccess;
-  return authorizeCloudflareStorageGate({ ...args, metadata });
+  // The row's own rule, which its uploader wrote: a list tells it apart from the session's gate.
+  const ownAccess = await authorizeCloudflareStorageGate({ ...args, metadata });
+  return ownAccess.ok ? ownAccess : { ...ownAccess, ownRule: true };
 };
 
 const authorizeCloudflareStorageGate = async ({
@@ -1060,6 +1062,8 @@ const authorizeCloudflareStorageGate = async ({
     }
     return {
       ok: false,
+      // An SBT rule the chain can't answer, as opposed to a membership outage.
+      ...(conditionResult.outcome === 'unavailable' && conditionResult.condition?.kind === 'sbt_onchain' ? { chainUnavailable: true } : {}),
       response: responseJson(deps, {
         error: 'Access denied: Cloudflare storage conditions failed.',
         reason: conditionResult.reason,
@@ -2161,9 +2165,14 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
       baseHeaders,
       deps,
     });
-    // A denied own answer is not evidence of an empty answer history.
+    // A denied own answer is not evidence of an empty answer history. An outage
+    // of the session's gate or of group membership fails the page. A row whose
+    // own SBT rule the chain can't answer hides only that row: its uploader
+    // wrote the rule, and could otherwise fail the list for everyone by naming
+    // a chain or contract that never answers.
     if (!itemAccess.ok) {
-      if (mine || itemAccess.response.status >= 500) return itemAccess.response;
+      const ownChainRule = itemAccess.ownRule === true && itemAccess.chainUnavailable === true;
+      if (mine || (itemAccess.response.status >= 500 && !ownChainRule)) return itemAccess.response;
       continue;
     }
     const owned = isOwnedStorageResource(storageRef.resource);
