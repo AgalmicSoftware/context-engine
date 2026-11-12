@@ -2805,7 +2805,8 @@ Signed login/bootstrap requests:
     drafts an answer to every question in one reply, allows 32,000 on a model
     whose provider documents room for it (GPT-5, GPT-6, the o-series, GPT-4.1
     and Claude from 4.5 on, by `interviewMapOutputTokens` in
-    `shared/aiModelFamily.mjs`) and 8,000 on any other model. The smallest
+    `shared/aiModelFamily.mjs`) and 8,000 on any other model and on every
+    custom-endpoint model. The smallest
     valid requested value among `max_tokens`, `max_completion_tokens`,
     `max_output_tokens`, `max_tokens_to_sample`, and `maxTokens` is used, bounded
     by that ceiling. Invalid values cannot remove the ceiling. Task labels can

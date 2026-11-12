@@ -59,7 +59,11 @@ export const buildAiWorkerRequestPlan = ({
   const maxTokens =
     opts.max_tokens ??
     opts.maxTokens ??
-    (taskType === 'interview-map' ? interviewMapOutputTokens(model) : provider === 'anthropic' ? 32768 : 16384);
+    (taskType === 'interview-map'
+      ? interviewMapOutputTokens(model, provider)
+      : provider === 'anthropic'
+        ? 32768
+        : 16384);
   const maxOutputTokens = opts.max_output_tokens ?? (usesResponsesApi ? maxTokens : undefined);
   const maxCompletionTokens = opts.max_completion_tokens ?? (usesCompletionTokens ? maxTokens : undefined);
   // A JSON schema goes only to OpenAI and Claude; other providers rely on the prompt's description.
@@ -152,12 +156,16 @@ export const resolveAiWorkerEndpoint = (corsWorkerUrl: unknown): AiWorkerEndpoin
   };
 };
 
+export const AI_REPLY_EMPTY = 'The AI returned an empty reply; it may have run out of room. Try again.';
+
 export const parseAiWorkerCompletion = (data: unknown): string => {
   const record = asRecord(data);
   if (record.completion) return record.completion as string;
   const content = Array.isArray(record.content) ? record.content : [];
   const first = asRecord(content[0]);
   if (first.text) return first.text as string;
+  // A model that reasons can spend its whole reply limit before writing anything.
+  if (record.completion === '') throw new Error(AI_REPLY_EMPTY);
   throw new Error('Unexpected AI response format');
 };
 

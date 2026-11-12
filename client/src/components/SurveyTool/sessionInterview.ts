@@ -628,7 +628,7 @@ ${reconsideration.ownContext || '(none)'}`
 
 // Shown in place of a JSON parser's message; the person can generate the drafts again.
 export const INTERVIEW_REPLY_UNREADABLE =
-  'The AI’s reply was cut off or unreadable, so no drafts were made. Try generating them again.';
+  'The AI’s reply was cut off or unreadable, so no drafts were made. Try generating them again; if it keeps happening, tell the session’s host.';
 
 export const parseInterviewDraftResponses = (
   raw: unknown,

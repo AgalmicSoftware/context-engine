@@ -86,7 +86,7 @@ export const boundSessionAiRequest = ({ payload = {}, provider, config, requestK
     (models.thinking.provider === provider && models.thinking.model === model);
   const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
   const ceiling = task === 'interview-map'
-    ? interviewMapOutputTokens(model)
+    ? interviewMapOutputTokens(model, provider)
     : operationCeilings[task] || (reasoning || responses ? 16000 : 2048);
   const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {
     const value = payload[key];
