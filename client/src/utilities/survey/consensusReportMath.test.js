@@ -155,6 +155,26 @@ describe('computePolisConversationMath', () => {
     expect(Number.isInteger(result.clusterAssignments[5])).toBe(true);
   });
 
+  it('picks the number of opinion groups that separates them best', () => {
+    // Three blocs of twelve people, each agreeing with its own three questions and
+    // disagreeing with the rest; one unsure answer each keeps people distinct, so
+    // there are enough base clusters to try two, three and four groups.
+    const people = Array.from({ length: 36 }, (_, person) => person);
+    const blocMatrix = Array.from({ length: 9 }, (_, question) =>
+      people.map((person) => {
+        if (question === person % 9) return 0;
+        return Math.floor(question / 3) === Math.floor(person / 12) ? 1 : -1;
+      }),
+    );
+    const questions = blocMatrix.map((_, index) => `q${index}`);
+    const result = computePolisConversationMath(blocMatrix, {}, questions, { randomSeed: 42 });
+
+    expect(result.groupClusters.length).toBe(3);
+    const blocs = [0, 12, 24].map((start) => new Set(result.clusterAssignments.slice(start, start + 12)));
+    blocs.forEach((bloc) => expect(bloc.size).toBe(1));
+    expect(new Set(blocs.map((bloc) => [...bloc][0])).size).toBe(3);
+  });
+
   it('builds base clusters by participant index, not participantCoords array position', () => {
     const participantCoords = [
       { index: 4, x: 10, y: 20 },
