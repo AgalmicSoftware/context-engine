@@ -76,6 +76,8 @@ describe('sessionWizardResourceConfig', () => {
 
   it('exposes resource labels and tooltips', () => {
     expect(RESOURCE_LABELS.ai).toBe('AI');
+    // Card titles are words, not resource codes.
+    expect(RESOURCE_LABELS.txGas).toBe('Test gas faucet');
     expect(RESOURCE_SECTION_TOOLTIPS.ai).toMatch(/provider key/i);
     expect(RESOURCE_SECTION_TOOLTIPS.rpc).toMatch(/Authenticated RPC endpoint/i);
     expect(RESOURCE_SECTION_TOOLTIPS.lit).toMatch(/Paste one Lit API key/i);

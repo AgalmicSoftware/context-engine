@@ -38,7 +38,7 @@ export const RESOURCE_LABELS: Record<string, string> = {
   ai: 'AI',
   arweave: 'ARWEAVE',
   rpc: 'RPC',
-  txGas: 'TXGAS',
+  txGas: 'Test gas faucet',
   lit: 'LIT',
 };
 
