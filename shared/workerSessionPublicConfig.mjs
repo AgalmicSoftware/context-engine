@@ -73,3 +73,7 @@ export const RISK_MATRIX_FIELD = 'riskMatrix';
 // Set the same way: this Worker shows every answer to signed-in members under
 // the session_member_full results visibility, which older Workers refuse.
 export const MEMBER_RESULTS_FIELD = 'memberResults';
+
+// Set the same way: this Worker answers the Group Agent and accepts its
+// `groupAgent` setting, which older Workers refuse.
+export const GROUP_AGENT_READY_FIELD = 'groupAgentReady';

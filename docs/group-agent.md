@@ -40,7 +40,12 @@ session's Settings:
   AI access (the `ai` scope), as on the `/ai` route.
 - **No audiences** means only admins may ask.
 - **Off** is no setting. The page then shows no Group Agent. Saving it off sends
-  `groupAgent: null`, which the Worker stores as no setting.
+  `groupAgent: null`, which the Worker stores as no setting. `/new` leaves an
+  off Group Agent out altogether, and clears a stored one only where the Worker
+  already has it, since Workers from earlier releases refuse the field.
+- **Older Workers.** A Worker that answers the Group Agent sets
+  `groupAgentReady: true` in its public config. Settings offers the Group Agent
+  only on such a Worker, and on an older one says to update it first.
 
 Each audience's `who` is an access-condition document, which the Worker judges
 as it does a file's **Visible to**. `match` is `any` or `all` of its rules:

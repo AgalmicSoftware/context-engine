@@ -129,6 +129,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     debateAtlas: false,
     riskMatrix: false,
     memberResults: false,
+    groupAgentReady: false,
   });
 
   assert.deepEqual(projected, {
@@ -143,6 +144,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     debateAtlas: true,
     riskMatrix: true,
     memberResults: true,
+    groupAgentReady: true,
   });
 });
 

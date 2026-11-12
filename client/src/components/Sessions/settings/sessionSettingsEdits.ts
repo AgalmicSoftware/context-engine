@@ -18,6 +18,7 @@ import {
 } from '@ce-shared/sessionConfigEdits.mjs';
 import {
   DEBATE_ATLAS_FIELD,
+  GROUP_AGENT_READY_FIELD,
   MEMBER_RESULTS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   SET_CONFIG_MERGES_AI_FIELD,
@@ -56,6 +57,9 @@ export const workerTakesResultsAdmins = (config: unknown): boolean => asRecord(c
 
 /** True when the session's Worker shows every answer to signed-in members; older ones refuse that visibility. */
 export const workerShowsMemberResults = (config: unknown): boolean => asRecord(config)[MEMBER_RESULTS_FIELD] === true;
+
+/** True when the session's Worker answers the Group Agent; older ones refuse its setting. */
+export const workerAnswersGroupAgent = (config: unknown): boolean => asRecord(config)[GROUP_AGENT_READY_FIELD] === true;
 
 const storedResultsAdmins = (value: unknown): string[] =>
   Array.isArray(value) ? value.map((address) => text(address).trim().toLowerCase()).filter(Boolean) : [];

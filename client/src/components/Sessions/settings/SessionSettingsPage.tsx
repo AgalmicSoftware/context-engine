@@ -49,6 +49,7 @@ import {
   rebaseSessionSettingsDraft,
   usesSbtDefaults,
   workerMergesAi,
+  workerAnswersGroupAgent,
   workerShowsMemberResults,
   workerTakesResultsAdmins,
   type SessionSettingsSave,
@@ -94,6 +95,8 @@ const CLOSED: Record<SetupSectionKey, boolean> = {
 
 const AI_LOCKED_REASON =
   'They are read-only here: this Session Worker is older and would drop the AI settings this page can’t see. Update the Worker to edit them.';
+const GROUP_AGENT_LOCKED_REASON =
+  'The Group Agent can’t be turned on here yet: this Session Worker is older and refuses it. Update the Worker to use it.';
 const LISTS_LOCKED_REASON =
   'The ID lists are read-only here: this Session Worker is older and refuses them. Update the Worker to edit them.';
 
@@ -611,13 +614,17 @@ const SessionSettingsPage = ({
           onToggle={() => setOpenSections((prev) => ({ ...prev, ai: !prev.ai }))}
           lockedReason={onChain || workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
           groupAgent={
-            onChain ? null : (
+            onChain ? null : workerAnswersGroupAgent(saved) ? (
               <SetupGroupAgent
                 value={draft.groupAgent}
                 onChange={(next) => updateDraft(['groupAgent'], next)}
                 groups={groups}
                 sbtChainId={usesSbtDefaults(draft) ? Number(saved?.networkChainId) || 0 : 0}
               />
+            ) : (
+              <p className={styles.hint} data-testid="ce-settings-group-agent-locked">
+                {GROUP_AGENT_LOCKED_REASON}
+              </p>
             )
           }
           keys={

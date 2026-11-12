@@ -191,6 +191,7 @@ test('projectPublicWorkerSessionConfig returns canonical fields and recursively 
     debateAtlas: true,
     riskMatrix: true,
     memberResults: true,
+    groupAgentReady: true,
   });
   for (const secret of [
     'sk-never-public',
@@ -247,6 +248,7 @@ test('projectPublicWorkerSessionConfig cannot expose the non-enumerable runtime 
     debateAtlas: true,
     riskMatrix: true,
     memberResults: true,
+    groupAgentReady: true,
   });
   assert.equal(JSON.stringify(projected).includes(secretRpcUrl), false);
 });
@@ -296,6 +298,7 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
     debateAtlas: true,
     riskMatrix: true,
     memberResults: true,
+    groupAgentReady: true,
   });
 });
 
@@ -328,6 +331,7 @@ test('projectPublicWorkerSessionConfig publishes only the versioned Agent Sessio
     debateAtlas: true,
     riskMatrix: true,
     memberResults: true,
+    groupAgentReady: true,
   });
   assert.equal(JSON.stringify(projected).includes('must-not-publish'), false);
 });
@@ -427,6 +431,7 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
       debateAtlas: true,
       riskMatrix: true,
       memberResults: true,
+      groupAgentReady: true,
     },
   );
   assert.equal(findForbiddenWorkerConfigSecretPath({ keyProvider: 'worker_secret' }), '');
