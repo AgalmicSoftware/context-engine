@@ -129,3 +129,28 @@ it.each([false, true])(
     );
   },
 );
+
+it('reads a private session’s questions with the signed-in person’s ticket', async () => {
+  const append = jest.fn<boolean, [string]>(() => true);
+  global.fetch = jest.fn(async (url: string) =>
+    new URL(url).searchParams.get('ticket') === 'ic1.fixture'
+      ? { ok: true, json: async () => ({ questions: [...questions, { id: 'group', prompt: 'Group question?' }] }) }
+      : { ok: false, status: 401, json: async () => ({}) },
+  ) as unknown as typeof fetch;
+  const ticket = jest.fn(async () => 'ic1.fixture');
+  const { result } = renderHook(() =>
+    useInterviewQuestionUpdates({
+      initialQuestions: questions,
+      config: { interviewMode: { followNewQuestions: true } },
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'demo',
+      active: true,
+      append,
+      ticket,
+    }),
+  );
+  await act(async () => jest.advanceTimersByTimeAsync(30000));
+  expect(ticket).toHaveBeenCalledWith({ fresh: false });
+  expect(append).toHaveBeenCalledWith(expect.stringContaining('Group question?'));
+  expect(result.current.notice).toBe('');
+});
