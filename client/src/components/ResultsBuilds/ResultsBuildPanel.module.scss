@@ -46,6 +46,9 @@
 }
 
 .picker {
+  // The theme draws every select as a field in its page text, which is dim on
+  // a dark panel; here it takes the panel's text.
+  --ce-text: var(--ce-panel-text);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -55,10 +58,6 @@
     min-width: 0;
     max-width: min(100%, 22rem);
     padding: 4px 8px;
-    border: 1px solid var(--ce-card-border);
-    border-radius: 8px;
-    background: var(--ce-surface-sunken);
-    color: var(--ce-panel-text);
   }
 }
 
