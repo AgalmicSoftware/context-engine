@@ -170,7 +170,11 @@ button.cell {
     0 12px 24px color-mix(in srgb, var(--ce-compat-dark) 14%, transparent);
 }
 
+// On its own surface, so the figure stays readable on the strongest fill.
 .cellValue {
+  padding: 2px 8px;
+  border-radius: var(--ce-radius-pill);
+  background: $surface;
   color: $text;
   font-size: 1.2rem;
   font-weight: 700;
@@ -287,7 +291,7 @@ button.cell {
 .diagonalCell {
   cursor: default;
   background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 35%, transparent);
+  color: $muted-text;
   font-size: 1.35rem;
 }
 
@@ -357,7 +361,8 @@ button.cell {
 
   &:disabled {
     cursor: not-allowed;
-    opacity: 0.55;
+    border-style: dashed;
+    color: $muted-text;
     transform: none;
   }
 }
@@ -1278,7 +1283,7 @@ button.cell {
   }
 }
 
-@container ce-theme style(--ce-layout-profile: minimal-app) {
+@container ce-theme style(--ce-layout-profile: minimal-app) or style(--ce-layout-profile: desktop-window) {
   .container {
     // Keep the full heatmap intensity range readable with dark labels.
     --ce-risk-opportunity-color: color-mix(in srgb, var(--ce-status-success) 60%, var(--ce-surface));
@@ -1332,7 +1337,10 @@ button.cell {
   .commentReferenceLine,
   .commentReferenceLink,
   .commentReferenceLink:hover,
-  .commentReferenceLink:focus {
+  .commentReferenceLink:focus,
+  .commentSectionChevron,
+  .commentSectionHeader:hover .commentSectionTitle,
+  .commentSectionHeader:focus-visible .commentSectionTitle {
     color: var(--ce-link);
   }
 }
