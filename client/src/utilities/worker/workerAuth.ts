@@ -1,4 +1,5 @@
 import { getClientAuthGeneration, invalidateClientAuthGeneration } from '../session/clientAuthGeneration';
+import { withCoordinatorRetry } from './coordinatorRetry';
 import { buildSiweMessage as buildSharedSiweMessage } from '@ce-shared/auth/siweMessage.mjs';
 /**
  * @file workerAuth.ts
@@ -1071,6 +1072,7 @@ export const fetchWorkerWithAuth = async (
   const slug = resolvedSession.sessionSlug;
   const workerUrl = normalizeWorkerUrl(opts.workerUrl || url);
   const bodyIsStream = isStreamBody(options?.body);
+  const send = withCoordinatorRetry((input, init) => fetch(input, init));
   const anonymousOnly = opts.anonymousOnly === true;
   const startedSignedOut = !getCurrentWorkerAuthStoreAddress();
   const startingAuthEpoch = getClientAuthGeneration();
@@ -1083,7 +1085,7 @@ export const fetchWorkerWithAuth = async (
       slug,
     });
     try {
-      anonymousResponse = await fetch(url, { ...options, headers: anonymousHeaders });
+      anonymousResponse = await send(url, { ...options, headers: anonymousHeaders });
     } catch (anonymousError) {
       if (bodyIsStream) throw anonymousError;
       // Backward compatibility: older workers may reject preflight when this header is unknown.
@@ -1096,7 +1098,7 @@ export const fetchWorkerWithAuth = async (
       });
       if (!canRetryWithoutRateId) throw anonymousError;
       const fallbackAnonymousHeaders = stripAnonymousRateIdHeader(anonymousHeaders);
-      anonymousResponse = await fetch(url, { ...options, headers: fallbackAnonymousHeaders });
+      anonymousResponse = await send(url, { ...options, headers: fallbackAnonymousHeaders });
     }
     // Explicitly anonymous-only callers (such as background suggestions) must
     // never turn a denial into an interactive wallet or passkey signing prompt.
@@ -1148,7 +1150,7 @@ export const fetchWorkerWithAuth = async (
     throw err;
   }
   const headers = mergeHeaders(options.headers, authHeaders);
-  const response = await fetch(url, { ...options, headers });
+  const response = await send(url, { ...options, headers });
   if ((response.status !== 401 && response.status !== 403) || opts.retry === false) return response;
   const tokenRefused = await shouldRetryAuthenticatedResponse(response);
   const scopeOutdated =
@@ -1182,7 +1184,7 @@ export const fetchWorkerWithAuth = async (
       slug: authRequestContext?.slug || slug,
     });
     const retryHeaders = mergeHeaders(options.headers, retryAuth);
-    return fetch(url, { ...options, headers: retryHeaders });
+    return send(url, { ...options, headers: retryHeaders });
   }
   return response;
 };
