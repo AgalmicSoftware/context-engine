@@ -874,7 +874,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const sessionConfig = await ensureReady(ctx);
       const endsAt = Date.parse(text(sessionConfig.sessionEndsAt));
       if (Number.isFinite(endsAt) && endsAt <= now()) throw new Error('This session has ended and no longer accepts answers.');
-      const questions = new Map((await loadQuestions(ctx)).map((question) => [question.id, question]));
+      const loaded = await loadQuestions(ctx);
+      const questions = new Map(loaded.map((question) => [question.id, question]));
       const recruitmentSource = text(sessionState(ctx).recruitmentSource);
       const results = [];
       const answered = [];
@@ -892,7 +893,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         seen.add(questionId);
         const question = questions.get(questionId);
         if (!question) {
-          results.push({ questionId, ok: false, error: 'Unknown question id, or a question locked to certain members; call list_questions.' });
+          // Some questions could not be read just now (a busy session), so this one may exist.
+          results.push({ questionId, ok: false, error: loaded.complete === false
+            ? 'This question could not be read just now; the session may be busy. Retry in a few seconds.'
+            : 'Unknown question id, or a question locked to certain members; call list_questions.' });
           continue;
         }
         let built;
