@@ -1,9 +1,10 @@
-// A session Worker answers this 503 when its session coordinator is briefly
-// overloaded, before the request has any effect. Requests that are safe to
-// send again wait a moment and retry instead of failing.
-export const SESSION_COORDINATOR_UNAVAILABLE = 'Session config coordination is unavailable; retry.';
+import { COORDINATOR_RETRY_DELAYS_MS, SESSION_COORDINATOR_UNAVAILABLE } from '@ce-shared/sessionCoordinatorBusy.mjs';
 
-const RETRY_DELAYS_MS = [400, 1000, 2000];
+export { SESSION_COORDINATOR_UNAVAILABLE };
+
+// Requests that are safe to send again wait a moment and retry the Worker's
+// busy-coordinator 503 instead of failing.
+const RETRY_DELAYS_MS = COORDINATOR_RETRY_DELAYS_MS;
 const READ_PATHS = /\/(capabilities|storage\/(list|read|read-batch)|realtime\/call)$/;
 
 const wait = (ms: number, signal?: AbortSignal | null) =>

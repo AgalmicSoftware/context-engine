@@ -8,7 +8,7 @@ import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispa
 import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
-import { assertExpectedSessionAuthority, logCoordinatorFailure } from './sessionConfigAuthority.js';
+import { SESSION_CONFIG_COORDINATION_ERROR, assertExpectedSessionAuthority, logCoordinatorFailure } from './sessionConfigAuthority.js';
 import { exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup, controlWorkerGroupBackupImport, BACKUP_GROUP_IMPORT_ACTIVE_KEY } from './sessionBackupCoordinator.js';
 import { importCoordinatorBackupPage } from './sessionBackupImport.js';
 import { normalizeStorageRef, isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
@@ -2308,7 +2308,7 @@ export class SessionWriteCoordinator {
         return jsonResponse({ error: safeError.message, reason: safeError.reason }, 503);
       }
       logCoordinatorFailure('coordinator/session-config/current', error);
-      return jsonResponse({ error: 'Session config coordination is unavailable; retry.' }, 503);
+      return jsonResponse({ error: SESSION_CONFIG_COORDINATION_ERROR }, 503);
     }
   }
 

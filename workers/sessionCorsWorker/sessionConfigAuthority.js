@@ -1,3 +1,4 @@
+import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
 import { resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
 import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
@@ -6,7 +7,7 @@ import {
   legacySessionConfigMigrationError,
 } from './sessionConfigSecretsStore.js';
 
-export const SESSION_CONFIG_COORDINATION_ERROR = 'Session config coordination is unavailable; retry.';
+export const SESSION_CONFIG_COORDINATION_ERROR = SESSION_COORDINATOR_UNAVAILABLE;
 export const SUPERSEDED_AUTHORITY_ERROR = 'Session authorization changed; retry with current authority.';
 
 // Only Worker-verified actors reach this internal boundary. Preserve that proof
