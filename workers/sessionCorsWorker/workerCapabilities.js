@@ -19,10 +19,16 @@ export const FEATURES = Object.freeze([
   'worker_groups',
 ]);
 
+/* global __CE_RELEASE_VERSION__ */
+// scripts/worker-bundle.mjs sets this from package.json; unbundled source reports null.
+const workerRelease = () => (
+  typeof __CE_RELEASE_VERSION__ === 'string' && __CE_RELEASE_VERSION__ ? __CE_RELEASE_VERSION__ : null
+);
+
 export const dispatchWorkerCapabilities = async ({ request, env = {}, headers = {} }) => {
   const body = {
     type: 'ce_worker_capabilities', version: 1, apiVersion: 1,
-    bundle: env.CE_BUNDLE_SHA256 || null, features: FEATURES.filter((feature) => feature !== 'recovery_key_export'),
+    bundle: env.CE_BUNDLE_SHA256 || null, release: workerRelease(), features: FEATURES.filter((feature) => feature !== 'recovery_key_export'),
   };
   const responseHeaders = new Headers(headers);
   responseHeaders.set('Cache-Control', 'public, max-age=30');

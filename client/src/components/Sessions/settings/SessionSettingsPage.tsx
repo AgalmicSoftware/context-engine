@@ -37,6 +37,7 @@ import {
   resolveWorkerCanonicalSessionIdHex,
 } from '../../../utilities/session/sessionWorkerDiscovery';
 import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/session/sessionWorkerConfigCache';
+import { readWorkerCapabilities } from '../../../utilities/worker/workerCapabilities';
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
 import {
   applyTemplateToSessionSettingsDraft,
@@ -203,6 +204,21 @@ const SessionSettingsPage = ({
       stale = true;
     };
   }, [refresh]);
+
+  // Which release the Session Worker runs; Workers before 0.9.3 don't say.
+  const [workerRelease, setWorkerRelease] = useState('');
+  useEffect(() => {
+    let stale = false;
+    setWorkerRelease('');
+    if (workerOrigin) {
+      void readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {}).then((found) => {
+        if (!stale && !found.unavailable) setWorkerRelease(found.release || 'before 0.9.3');
+      });
+    }
+    return () => {
+      stale = true;
+    };
+  }, [fetchImpl, sessionSlug, workerOrigin]);
 
   // An on-chain session's config arrives through the registry cache.
   useEffect(() => {
@@ -450,6 +466,15 @@ const SessionSettingsPage = ({
           link={
             <p className={styles.hint}>
               Link: <span className={styles.readOnlyValue}>{sessionUrl}</span>
+              {workerRelease ? (
+                <>
+                  <br />
+                  Session Worker release:{' '}
+                  <span className={styles.readOnlyValue} data-testid="ce-settings-worker-release">
+                    {workerRelease}
+                  </span>
+                </>
+              ) : null}
             </p>
           }
         />

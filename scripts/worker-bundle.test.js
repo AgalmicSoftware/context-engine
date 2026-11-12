@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
+const readStub = (bundle) => (file) => (file.endsWith('package.json') ? '{"version":"0.0.0"}' : bundle);
+
 const loadModule = async () => {
   const moduleUrl = pathToFileURL(path.join(__dirname, 'worker-bundle.mjs')).href;
   return import(moduleUrl);
@@ -35,7 +37,7 @@ test('buildWorkerBundles validates guarded worker deps without installing them',
     mkdirSyncImpl: (...args) => {
       mkdirCalls.push(args);
     },
-    readFileSyncImpl: () => 'const worker = true;\n',
+    readFileSyncImpl: readStub('const worker = true;\n'),
     writeFileSyncImpl: (...args) => {
       writeCalls.push(args);
     },
@@ -70,7 +72,7 @@ test('buildWorkerBundles skips Worker dependency validation for unguarded bundle
     },
     esbuildImpl: async () => ({ metafile: { inputs: {} } }),
     mkdirSyncImpl: () => {},
-    readFileSyncImpl: () => 'const worker = true;\n',
+    readFileSyncImpl: readStub('const worker = true;\n'),
     writeFileSyncImpl: () => {},
   });
 
@@ -87,7 +89,7 @@ test('buildWorkerBundles removes trailing horizontal whitespace from generated o
     esbuildImpl: async () => ({ metafile: { inputs: {} } }),
     mkdirSyncImpl: () => {},
     buildNoticesImpl: () => 'Synthetic notices',
-    readFileSyncImpl: () => 'const worker = true;  \n// comment\t\n',
+    readFileSyncImpl: readStub('const worker = true;  \n// comment\t\n'),
     writeFileSyncImpl: (...args) => {
       writes.push(args);
     },
@@ -113,6 +115,7 @@ test('every released bundle carries complete deterministic notices inside a safe
   const { buildWorkerBundles } = await loadModule();
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-release-notice-fixture-'));
   t.after(() => fs.rmSync(rootDir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(rootDir, 'package.json'), '{"version":"0.0.0"}');
   const inputs = {};
   for (const [directory, name, version] of [
     ['node_modules/synthetic-root', 'synthetic-root', '1.0.0'],
