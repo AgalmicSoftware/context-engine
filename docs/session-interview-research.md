@@ -94,7 +94,11 @@ Worker" on an older one, and save the key only while it is on.
   resubmission, so it deletes at that submit. Deleting works even after the
   setting is turned off or the session has ended, and it runs even if the
   person moves to another session while the upload finishes (but not if
-  someone else signs in meanwhile: rows belong to the signer). If a deletion
+  someone else signs in meanwhile: rows belong to the signer). The Worker also
+  takes a delete from someone removed from the session's gate, since it needs
+  only a sign-in, but the app deletes only after a submit, which they can no
+  longer make; they can still call `POST /storage/draft-text/delete` with
+  `{"all": true}` while signed in. If a deletion
   fails, the person is told their answers were saved but the text could not be
   updated; the text stays in the admin download until they next submit that
   question while the session keeps draft text. The report script's `--clio`

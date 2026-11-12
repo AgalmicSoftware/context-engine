@@ -123,6 +123,28 @@ test('put requires the session gate a response upload needs', async () => {
   assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
 });
 
+test('someone removed from the session gate can still withdraw their draft text', async () => {
+  const member = Wallet.createRandom();
+  const base = buildPublicSessionConfig({ admin: member.address });
+  const gated = { gate: 'role_gate', encryption: 'none', accessConditions: { version: 1, match: 'any', conditions: [
+    { kind: 'worker_role', role: 'member' }, { kind: 'worker_role', role: 'admin' },
+  ] } };
+  const gatedSession = (members) => setup({ configOverrides: {
+    roles: { member: members },
+    sessionModeProfile: { ...base.sessionModeProfile, storage: { backend: 'cloudflare', payloadAccessControl: gated } },
+    storageProfile: { ...base.storageProfile, payloadAccessControl: gated },
+  } });
+  const before = await gatedSession([member.address.toLowerCase()]);
+  assert.equal((await before.call('put', { items: [draft('q-one')] }, member)).status, 200);
+  // The same session after an admin removed them: their stored row carries over.
+  const after = await gatedSession([]);
+  for (const key of before.rows()) after.env.CE_STORAGE_INDEX_KV.values.set(key, before.env.CE_STORAGE_INDEX_KV.values.get(key));
+  assert.equal((await after.call('put', { items: [draft('q-two')] }, member)).status, 403, 'no longer a member');
+  const withdrawn = await after.call('delete', { all: true }, member);
+  assert.equal(withdrawn.status, 200, JSON.stringify(withdrawn.body));
+  assert.deepEqual(after.rows(), []);
+});
+
 test('only a config admin exports draft text; members, co-admins and results admins may not', async () => {
   const s = await setup();
   assert.equal((await s.call('put', { items: [draft('q-one')] }, s.alice)).status, 200);
@@ -209,19 +231,25 @@ test('response listing and reading never return draft text', async () => {
   assert.equal(JSON.stringify(batch.body).includes(SECRET), false);
 });
 
-test('the route itself refuses a caller without an address or a storage scope', async () => {
+test('the route itself refuses a caller without an address, or without a storage scope except to delete', async () => {
   const s = await setup();
+  const routeCall = (action, uploaderAddress, authScopes, body) => storageRoute({
+    path: `/storage/draft-text/${action}`, method: 'POST', env: s.env, config: s.config, slug: SLUG, uploaderAddress, authScopes,
+    request: new Request(`https://worker.example/storage/draft-text/${action}`, { method: 'POST', body: JSON.stringify(body) }),
+    deps: { validateAdmin: async () => true },
+  });
   for (const [uploaderAddress, authScopes] of [['', { storage: true }], [s.alice.address, {}], ['not-an-address', { storage: true }]]) {
-    for (const action of ['put', 'delete', 'export']) {
-      const response = await storageRoute({
-        path: `/storage/draft-text/${action}`, method: 'POST', env: s.env, config: s.config, slug: SLUG, uploaderAddress, authScopes,
-        request: new Request(`https://worker.example/storage/draft-text/${action}`, { method: 'POST', body: JSON.stringify({ items: [draft('q-one')], all: true }) }),
-        deps: { validateAdmin: async () => true },
-      });
-      assert.equal(response.status, 401, `${action} ${uploaderAddress}`);
+    for (const [action, body] of [['put', { items: [draft('q-one')] }], ['delete', { all: true }], ['export', {}]]) {
+      const allowed = action === 'delete' && uploaderAddress === s.alice.address;
+      assert.equal((await routeCall(action, uploaderAddress, authScopes, body)).status, allowed ? 200 : 401, `${action} ${uploaderAddress}`);
     }
   }
   assert.deepEqual(s.rows(), []);
+  // Without a scope, delete still removes only the caller's own rows.
+  assert.equal((await s.call('put', { items: [draft('q-one')] }, s.alice)).status, 200);
+  assert.equal((await s.call('put', { items: [draft('q-one')] }, s.bob)).status, 200);
+  assert.equal((await routeCall('delete', s.alice.address, {}, { questionIds: ['q-one'] })).status, 200);
+  assert.deepEqual(s.rows().map((key) => JSON.parse(s.env.CE_STORAGE_INDEX_KV.values.get(key)).responder), [s.bob.address.toLowerCase()]);
 });
 
 test('the Worker advertises draft_text_v1', () => {

@@ -161,7 +161,9 @@ const exportRows = async ({ request, slug, principal, index, isConfigAdmin, head
 
 export const draftTextRoute = async ({ path, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, authorizeSession, isConfigAdmin }) => {
   const principal = address(uploaderAddress);
-  if (!principal || (authScopes?.storage !== true && authScopes?.arweave !== true)) return response({ error: 'Authentication required.' }, 401, baseHeaders);
+  // Deleting touches only the caller's own rows, so it needs a sign-in but no storage scope.
+  const scoped = authScopes?.storage === true || authScopes?.arweave === true;
+  if (!principal || (!scoped && path !== '/storage/draft-text/delete')) return response({ error: 'Authentication required.' }, 401, baseHeaders);
   const index = getStorageIndexBinding(env);
   if (!index?.get || !index?.put || !index?.delete || !index?.list) return response({ error: 'Draft text storage is unavailable.' }, 503, baseHeaders);
   const args = { request, env, config, slug, principal, index, deps, headers: baseHeaders };

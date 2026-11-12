@@ -73,10 +73,13 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     ? 'transcribe'
     : ((isStorageRoute || isAgentQuestionsRoute) ? 'storage' : (isWorkerGroupsRoute ? 'groups' : 'arweave'));
   const scope = route === 'storage' && scopes?.storage !== true ? 'arweave' : route;
+  // Withdrawing your own AI draft text needs only a sign-in, so someone who lost the session's gate can still do it.
+  const allowWithoutScope = path === '/storage/draft-text/delete';
   const preflightFor = (preflightScope, preflightRoute) => deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
     scope: preflightScope,
     route: preflightRoute,
+    allowWithoutScope,
     config,
     env,
     slug,
