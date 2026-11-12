@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import RiskMatrix, { type RiskMatrixRestoreState } from './RiskMatrix';
 import debateMapDemoData from '../../variables/demo/debate_map_demo_data.json';
@@ -457,5 +457,78 @@ describe('RiskMatrix', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByTestId(subcellTestId)).toHaveTextContent('-1');
+  });
+
+  // A built matrix may name its areas as the demo does; its notes are still its own.
+  it("shows the notes it is given as they are, with none of the demo's figures, sources or scenarios", () => {
+    render(
+      <RiskMatrix
+        categories={[
+          { name: 'Safety', subcategories: ['Alignment', 'Evaluations'] },
+          { name: 'Capabilities', subcategories: ['Scaling'] },
+          { name: 'Labor', subcategories: ['Automation'] },
+        ]}
+        commentEyebrow="AI note"
+        initialComments={[
+          {
+            cell: 'Safety.Alignment.Capabilities.Scaling',
+            comment: 'Several worry that scaling outpaces alignment checks.',
+            intensity: 7,
+            valence: 'risk',
+          },
+          {
+            cell: 'Safety.Evaluations.Capabilities.Scaling',
+            comment: 'One sees evaluations steering what gets scaled.',
+            intensity: 4,
+            valence: 'opportunity',
+          },
+        ]}
+        readOnly
+      />,
+    );
+
+    const cell = screen.getByTestId('ce-risk-matrix-cell-safety-vs-capabilities');
+    expect(cell).toHaveTextContent('-3');
+    expect(cell).not.toHaveClass('gridCellLinked');
+    expect(screen.getByTestId('ce-risk-matrix-cell-labor-vs-safety')).toHaveAccessibleName(
+      'Labor versus Safety, no notes. Open aggregated notes.',
+    );
+    fireEvent.click(cell);
+    expect(screen.getByText('Several worry that scaling outpaces alignment checks.')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-risk-matrix-atlas-scenario-card')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sources?:/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Alan Turing')).not.toBeInTheDocument();
+    expect(screen.getByText('2 notes')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Close'));
+    fireEvent.click(screen.getByTestId('ce-risk-matrix-subcell-safety-alignment-vs-capabilities-scaling'));
+    expect(screen.getByText('AI note')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-risk-matrix-subgrid')).toHaveTextContent(
+      'Refine to sub-overlaps and compare the notes in each detail cell.',
+    );
+  });
+
+  it("gives a pair only the notes that join its two areas, though a subarea bears another area's name", () => {
+    render(
+      <RiskMatrix
+        categories={[
+          { name: 'Trust', subcategories: ['Labor'] },
+          { name: 'Labor', subcategories: ['Jobs'] },
+          { name: 'Energy', subcategories: ['Grid'] },
+        ]}
+        initialComments={[
+          { cell: 'Trust.Labor.Energy.Grid', comment: 'Strain on the grid.', intensity: 4, valence: 'risk' },
+          { cell: 'Trust.Labor.Labor.Jobs', comment: 'Trusted hiring.', intensity: 6, valence: 'opportunity' },
+        ]}
+        readOnly
+      />,
+    );
+
+    const cell = screen.getByTestId('ce-risk-matrix-cell-trust-vs-labor');
+    expect(cell).toHaveTextContent('+6');
+    fireEvent.click(cell);
+    expect(within(screen.getByTestId('ce-risk-matrix-comment-list')).getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getByText('Trusted hiring.')).toBeInTheDocument();
+    expect(screen.queryByText('Strain on the grid.')).not.toBeInTheDocument();
   });
 });

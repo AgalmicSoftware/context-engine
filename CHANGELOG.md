@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.3]
 
+### Client — available when the site deploys
+
+- The Risk Matrix shows AI Views' notes as written: it no longer adds the demo's historical figures, sources and atlas scenarios when their areas share the demo's names. A cell between two areas now lists only their notes, where a note could also show up when one of its subareas had an area's name.
+
 ### Workers — requires redeployment
 
 - Admins, co-admins and results admins can build a session's risk matrix with AI, as they build its debate atlas (`POST /admin/risk-matrix/build`, read at `GET /risk-matrix`). One call names the areas the responses discuss, each with a few subareas, and writes notes on where two areas meet, each an opportunity or a risk with an intensity from 1 to 10. A note is kept only when it cites someone who answered a question it cites. The session's context reaches the AI as untrusted material. Builds are kept and read like atlas builds: the newest 8, each stamped with its time and response count, under the same viewer rule. The public config reports `riskMatrix: true`.
