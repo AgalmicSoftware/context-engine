@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.6] - 2026-11-12
+
+### Client — available when the site deploys
+
+- A session's interview settings can turn on **Keep AI draft text for admins**, off by default. With it on, the text of the AI's drafted freeform answers and drafted comments is kept where only the session's config admins can read it, for research into how people change what an AI drafted for them. It needs the session's Worker on this release; on an older Worker the setting says "Needs a newer Session Worker".
+- People see their own choice for it inside **AI submission info**, under the research details: **Let admins read the AI's draft text**, ticked for new drafts, which they can turn off while still sharing the rest. Unticking it, or unticking **Share for research**, deletes their stored text at the next submit. If the text can't be updated, they are told their answers were saved and the text was not.
+- The Admin page gives a session's config admin **Download AI draft text**. Co-admins without config rights, results admins and members are not offered it.
+- The API that outside AI agents use to take part is called Agent HTTP throughout the docs; four places said "Session Agent HTTP". The agent page's test ids now start `ce-agent-http-`. Routes, credentials and stored values are unchanged.
+
+### Workers — requires redeployment
+
+- Session Workers keep AI draft text at `/storage/draft-text/put`, `/storage/draft-text/delete` and `/storage/draft-text/export`, and report `draft_text_v1` in `/capabilities`. A person writes only their own row, only while the setting is on, only for a question the session has, with each field capped at 8,000 characters; deleting works after the setting is turned off or the session has ended. Only the session's admin address or admin hat can export. No response list or read, backup, AI feature, Session Agent, MCP tool or Results view reads it, and the public record carries only that the person agreed.
+
+### Local tooling
+
+- The agent fidelity report scores interview, typed-note and group-recording drafts on their own rows, never in the AI-prefill score, and adds breakdowns by model and by context used. `--predictions` writes an optional pseudonymous per-draft CSV with whether each answer and comment changed.
+- The same script turns an admin's AI draft text download into pseudonymous input for clustering tools (`--draft-text` with `--clio`), leaving out text whose latest saved response no longer carries the person's agreement.
+
 ## [0.9.5] - 2026-11-12
 
 ### Client — available when the site deploys

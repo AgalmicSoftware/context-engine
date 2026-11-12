@@ -1455,18 +1455,18 @@ var init_fetch = __esm({
       if (scheme in Gateways) {
         const result = await Gateways[scheme](req.url, checkSignal(__privateGet(_request3, _signal)));
         if (result instanceof FetchResponse) {
-          let response3 = result;
+          let response4 = result;
           if (this.processFunc) {
             checkSignal(__privateGet(_request3, _signal));
             try {
-              response3 = await this.processFunc(req, response3);
+              response4 = await this.processFunc(req, response4);
             } catch (error) {
               if (error.throttle == null || typeof error.stall !== "number") {
-                response3.makeServerError("error in post-processing function", error).assertOk();
+                response4.makeServerError("error in post-processing function", error).assertOk();
               }
             }
           }
-          return response3;
+          return response4;
         }
         req = result;
       }
@@ -1474,41 +1474,41 @@ var init_fetch = __esm({
         req = await this.preflightFunc(req);
       }
       const resp = await this.getUrlFunc(req, checkSignal(__privateGet(_request3, _signal)));
-      let response2 = new FetchResponse(resp.statusCode, resp.statusMessage, resp.headers, resp.body, _request3);
-      if (response2.statusCode === 301 || response2.statusCode === 302) {
+      let response3 = new FetchResponse(resp.statusCode, resp.statusMessage, resp.headers, resp.body, _request3);
+      if (response3.statusCode === 301 || response3.statusCode === 302) {
         try {
-          const location2 = response2.headers.location || "";
-          return __privateMethod(_a2 = req.redirect(location2), _FetchRequest_instances, send_fn).call(_a2, attempt + 1, expires, 0, _request3, response2);
+          const location2 = response3.headers.location || "";
+          return __privateMethod(_a2 = req.redirect(location2), _FetchRequest_instances, send_fn).call(_a2, attempt + 1, expires, 0, _request3, response3);
         } catch (error) {
         }
-        return response2;
-      } else if (response2.statusCode === 429) {
-        if (this.retryFunc == null || await this.retryFunc(req, response2, attempt)) {
-          const retryAfter = response2.headers["retry-after"];
+        return response3;
+      } else if (response3.statusCode === 429) {
+        if (this.retryFunc == null || await this.retryFunc(req, response3, attempt)) {
+          const retryAfter = response3.headers["retry-after"];
           let delay2 = __privateGet(this, _throttle).slotInterval * Math.trunc(Math.random() * Math.pow(2, attempt));
           if (typeof retryAfter === "string" && retryAfter.match(/^[1-9][0-9]*$/)) {
             delay2 = parseInt(retryAfter);
           }
-          return __privateMethod(_b = req.clone(), _FetchRequest_instances, send_fn).call(_b, attempt + 1, expires, delay2, _request3, response2);
+          return __privateMethod(_b = req.clone(), _FetchRequest_instances, send_fn).call(_b, attempt + 1, expires, delay2, _request3, response3);
         }
       }
       if (this.processFunc) {
         checkSignal(__privateGet(_request3, _signal));
         try {
-          response2 = await this.processFunc(req, response2);
+          response3 = await this.processFunc(req, response3);
         } catch (error) {
           if (error.throttle == null || typeof error.stall !== "number") {
-            response2.makeServerError("error in post-processing function", error).assertOk();
+            response3.makeServerError("error in post-processing function", error).assertOk();
           }
           let delay2 = __privateGet(this, _throttle).slotInterval * Math.trunc(Math.random() * Math.pow(2, attempt));
           ;
           if (error.stall >= 0) {
             delay2 = error.stall;
           }
-          return __privateMethod(_c = req.clone(), _FetchRequest_instances, send_fn).call(_c, attempt + 1, expires, delay2, _request3, response2);
+          return __privateMethod(_c = req.clone(), _FetchRequest_instances, send_fn).call(_c, attempt + 1, expires, delay2, _request3, response3);
         }
       }
-      return response2;
+      return response3;
     };
     FetchRequest = _FetchRequest;
     _FetchResponse = class _FetchResponse {
@@ -1618,9 +1618,9 @@ var init_fetch = __esm({
         } else {
           statusMessage = `CLIENT ESCALATED SERVER ERROR (${this.statusCode} ${this.statusMessage}; ${message})`;
         }
-        const response2 = new _FetchResponse(599, statusMessage, this.headers, this.body, __privateGet(this, _request) || void 0);
-        __privateSet(response2, _error, { message, error });
-        return response2;
+        const response3 = new _FetchResponse(599, statusMessage, this.headers, this.body, __privateGet(this, _request) || void 0);
+        __privateSet(response3, _error, { message, error });
+        return response3;
       }
       /**
        *  If called within a [request.processFunc](FetchRequest-processFunc)
@@ -6530,9 +6530,9 @@ var init_crypto2 = __esm({
 });
 
 // workers/sessionCorsWorker/node_modules/ethers/lib.esm/address/address.js
-function getChecksumAddress(address2) {
-  address2 = address2.toLowerCase();
-  const chars = address2.substring(2).split("");
+function getChecksumAddress(address3) {
+  address3 = address3.toLowerCase();
+  const chars = address3.substring(2).split("");
   const expanded = new Uint8Array(40);
   for (let i = 0; i < 40; i++) {
     expanded[i] = chars[i].charCodeAt(0);
@@ -6548,10 +6548,10 @@ function getChecksumAddress(address2) {
   }
   return "0x" + chars.join("");
 }
-function ibanChecksum(address2) {
-  address2 = address2.toUpperCase();
-  address2 = address2.substring(4) + address2.substring(0, 2) + "00";
-  let expanded = address2.split("").map((c) => {
+function ibanChecksum(address3) {
+  address3 = address3.toUpperCase();
+  address3 = address3.substring(4) + address3.substring(0, 2) + "00";
+  let expanded = address3.split("").map((c) => {
     return ibanLookup[c];
   }).join("");
   while (expanded.length >= safeDigits) {
@@ -6572,28 +6572,28 @@ function fromBase36(value) {
   }
   return result;
 }
-function getAddress(address2) {
-  assertArgument(typeof address2 === "string", "invalid address", "address", address2);
-  if (address2.match(/^(0x)?[0-9a-fA-F]{40}$/)) {
-    if (!address2.startsWith("0x")) {
-      address2 = "0x" + address2;
+function getAddress(address3) {
+  assertArgument(typeof address3 === "string", "invalid address", "address", address3);
+  if (address3.match(/^(0x)?[0-9a-fA-F]{40}$/)) {
+    if (!address3.startsWith("0x")) {
+      address3 = "0x" + address3;
     }
-    const result = getChecksumAddress(address2);
-    assertArgument(!address2.match(/([A-F].*[a-f])|([a-f].*[A-F])/) || result === address2, "bad address checksum", "address", address2);
+    const result = getChecksumAddress(address3);
+    assertArgument(!address3.match(/([A-F].*[a-f])|([a-f].*[A-F])/) || result === address3, "bad address checksum", "address", address3);
     return result;
   }
-  if (address2.match(/^XE[0-9]{2}[0-9A-Za-z]{30,31}$/)) {
-    assertArgument(address2.substring(2, 4) === ibanChecksum(address2), "bad icap checksum", "address", address2);
-    let result = fromBase36(address2.substring(4)).toString(16);
+  if (address3.match(/^XE[0-9]{2}[0-9A-Za-z]{30,31}$/)) {
+    assertArgument(address3.substring(2, 4) === ibanChecksum(address3), "bad icap checksum", "address", address3);
+    let result = fromBase36(address3.substring(4)).toString(16);
     while (result.length < 40) {
       result = "0" + result;
     }
     return getChecksumAddress("0x" + result);
   }
-  assertArgument(false, "invalid address", "address", address2);
+  assertArgument(false, "invalid address", "address", address3);
 }
-function getIcapAddress(address2) {
-  let base36 = BigInt(getAddress(address2)).toString(36).toUpperCase();
+function getIcapAddress(address3) {
+  let base36 = BigInt(getAddress(address3)).toString(36).toUpperCase();
   while (base36.length < 30) {
     base36 = "0" + base36;
   }
@@ -13677,10 +13677,10 @@ var init_provider = __esm({
        *  Returns a JSON-compatible object.
        */
       toJSON() {
-        const { address: address2, blockHash, blockNumber, data, index, removed, topics, transactionHash, transactionIndex } = this;
+        const { address: address3, blockHash, blockNumber, data, index, removed, topics, transactionHash, transactionIndex } = this;
         return {
           _type: "log",
-          address: address2,
+          address: address3,
           blockHash,
           blockNumber,
           data,
@@ -14951,8 +14951,8 @@ async function getSub(contract, operation, event) {
   const { addr, subs } = getInternal(contract);
   let sub = subs.get(tag);
   if (!sub) {
-    const address2 = addr ? addr : contract;
-    const filter = { address: address2, topics };
+    const address3 = addr ? addr : contract;
+    const filter = { address: address3, topics };
     const listener = (log2) => {
       let foundFragment = fragment;
       if (foundFragment == null) {
@@ -15339,9 +15339,9 @@ var init_contract = __esm({
           toBlock = "latest";
         }
         const { addr, addrPromise } = getInternal(this);
-        const address2 = addr ? addr : await addrPromise;
+        const address3 = addr ? addr : await addrPromise;
         const { fragment, topics } = await getSubInfo(this, event);
-        const filter = { address: address2, topics, fromBlock, toBlock };
+        const filter = { address: address3, topics, fromBlock, toBlock };
         const provider = getProvider(this.runner);
         assert(provider, "contract runner does not have a provider", "UNSUPPORTED_OPERATION", { operation: "queryFilter" });
         return (await provider.getLogs(filter)).map((log2) => {
@@ -15486,8 +15486,8 @@ var init_contract = __esm({
        */
       static buildClass(abi) {
         class CustomContract extends _BaseContract {
-          constructor(address2, runner = null) {
-            super(address2, abi, runner);
+          constructor(address3, runner = null) {
+            super(address3, abi, runner);
           }
         }
         return CustomContract;
@@ -15590,8 +15590,8 @@ var init_factory = __esm({
           operation: "sendTransaction"
         });
         const sentTx = await this.runner.sendTransaction(tx);
-        const address2 = getCreateAddress(sentTx);
-        return new BaseContract(address2, this.interface, this.runner, sentTx);
+        const address3 = getCreateAddress(sentTx);
+        return new BaseContract(address3, this.interface, this.runner, sentTx);
       }
       /**
        *  Return a new **ContractFactory** with the same ABI and bytecode,
@@ -15672,7 +15672,7 @@ var init_ens_resolver = __esm({
       /**
        *  Resolves to the encoded %%address%% for %%coinType%%.
        */
-      async encodeAddress(coinType, address2) {
+      async encodeAddress(coinType, address3) {
         throw new Error("unsupported coin");
       }
       /**
@@ -15690,7 +15690,7 @@ var init_ens_resolver = __esm({
       new RegExp("^eip155:[0-9]+/(erc[0-9]+):(.*)$", "i")
     ];
     _EnsResolver = class _EnsResolver {
-      constructor(provider, address2, name) {
+      constructor(provider, address3, name) {
         __privateAdd(this, _EnsResolver_instances);
         /**
          *  The connected provider.
@@ -15707,9 +15707,9 @@ var init_ens_resolver = __esm({
         // For EIP-2544 names, the ancestor that provided the resolver
         __privateAdd(this, _supports2544);
         __privateAdd(this, _resolver);
-        defineProperties(this, { provider, address: address2, name });
+        defineProperties(this, { provider, address: address3, name });
         __privateSet(this, _supports2544, null);
-        __privateSet(this, _resolver, new Contract(address2, [
+        __privateSet(this, _resolver, new Contract(address3, [
           "function supportsInterface(bytes4) view returns (bool)",
           "function resolve(bytes, bytes) view returns (bytes)",
           "function addr(bytes32) view returns (address)",
@@ -15783,9 +15783,9 @@ var init_ens_resolver = __esm({
         if (data == null || data === "0x") {
           return null;
         }
-        const address2 = await coinPlugin.decodeAddress(coinType, data);
-        if (address2 != null) {
-          return address2;
+        const address3 = await coinPlugin.decodeAddress(coinType, data);
+        if (address3 != null) {
+          return address3;
         }
         assert(false, `invalid coin data`, "UNSUPPORTED_OPERATION", {
           operation: `getAddress(${coinType})`,
@@ -15927,15 +15927,15 @@ var init_ens_resolver = __esm({
                 }
                 linkage.push({ type: "metadata-url", value: metadataUrl });
                 let metadata = {};
-                const response2 = await new FetchRequest(metadataUrl).send();
-                response2.assertOk();
+                const response3 = await new FetchRequest(metadataUrl).send();
+                response3.assertOk();
                 try {
-                  metadata = response2.bodyJson;
+                  metadata = response3.bodyJson;
                 } catch (error) {
                   try {
-                    linkage.push({ type: "!metadata", value: response2.bodyText });
+                    linkage.push({ type: "!metadata", value: response3.bodyText });
                   } catch (error2) {
-                    const bytes3 = response2.body;
+                    const bytes3 = response3.body;
                     if (bytes3) {
                       linkage.push({ type: "!metadata", value: hexlify(bytes3) });
                     }
@@ -16408,7 +16408,7 @@ var init_plugins_network = __esm({
        *  %%targetNetwork%%. The default ENS address and mainnet is used
        *  if unspecified.
        */
-      constructor(address2, targetNetwork) {
+      constructor(address3, targetNetwork) {
         super("org.ethers.plugins.network.Ens");
         /**
          *  The ENS Registrty Contract address.
@@ -16419,7 +16419,7 @@ var init_plugins_network = __esm({
          */
         __publicField(this, "targetNetwork");
         defineProperties(this, {
-          address: address2 || EnsAddress,
+          address: address3 || EnsAddress,
           targetNetwork: targetNetwork == null ? 1 : targetNetwork
         });
       }
@@ -16516,14 +16516,14 @@ function parseUnits2(_value2, decimals) {
 function getGasStationPlugin(url) {
   return new FetchUrlFeeDataNetworkPlugin(url, async (fetchFeeData, provider, request) => {
     request.setHeader("User-Agent", "ethers");
-    let response2;
+    let response3;
     try {
       const [_response, _feeData] = await Promise.all([
         request.send(),
         fetchFeeData()
       ]);
-      response2 = _response;
-      const payload = response2.bodyJson.standard;
+      response3 = _response;
+      const payload = response3.bodyJson.standard;
       const feeData = {
         gasPrice: _feeData.gasPrice,
         maxFeePerGas: parseUnits2(payload.maxFee, 9),
@@ -16531,7 +16531,7 @@ function getGasStationPlugin(url) {
       };
       return feeData;
     } catch (error) {
-      assert(false, `error encountered with polygon gas station (${JSON.stringify(request.url)})`, "SERVER_ERROR", { request, response: response2, error });
+      assert(false, `error encountered with polygon gas station (${JSON.stringify(request.url)})`, "SERVER_ERROR", { request, response: response3, error });
     }
   });
 }
@@ -17552,8 +17552,8 @@ var init_abstract_provider = __esm({
        *  names and [[Addressable]] objects and returning if already an
        *  address.
        */
-      _getAddress(address2) {
-        return resolveAddress(address2, this);
+      _getAddress(address3) {
+        return resolveAddress(address3, this);
       }
       /**
        *  Returns or resolves to a valid block tag for %%blockTag%%, resolving
@@ -17609,16 +17609,16 @@ var init_abstract_provider = __esm({
         });
         const blockHash = "blockHash" in filter ? filter.blockHash : void 0;
         const resolve = (_address, fromBlock2, toBlock2) => {
-          let address3 = void 0;
+          let address4 = void 0;
           switch (_address.length) {
             case 0:
               break;
             case 1:
-              address3 = _address[0];
+              address4 = _address[0];
               break;
             default:
               _address.sort();
-              address3 = _address;
+              address4 = _address;
           }
           if (blockHash) {
             if (fromBlock2 != null || toBlock2 != null) {
@@ -17626,8 +17626,8 @@ var init_abstract_provider = __esm({
             }
           }
           const filter2 = {};
-          if (address3) {
-            filter2.address = address3;
+          if (address4) {
+            filter2.address = address4;
           }
           if (topics.length) {
             filter2.topics = topics;
@@ -17643,14 +17643,14 @@ var init_abstract_provider = __esm({
           }
           return filter2;
         };
-        let address2 = [];
+        let address3 = [];
         if (filter.address) {
           if (Array.isArray(filter.address)) {
             for (const addr of filter.address) {
-              address2.push(this._getAddress(addr));
+              address3.push(this._getAddress(addr));
             }
           } else {
-            address2.push(this._getAddress(filter.address));
+            address3.push(this._getAddress(filter.address));
           }
         }
         let fromBlock = void 0;
@@ -17661,12 +17661,12 @@ var init_abstract_provider = __esm({
         if ("toBlock" in filter) {
           toBlock = this._getBlockTag(filter.toBlock);
         }
-        if (address2.filter((a) => typeof a !== "string").length || fromBlock != null && typeof fromBlock !== "string" || toBlock != null && typeof toBlock !== "string") {
-          return Promise.all([Promise.all(address2), fromBlock, toBlock]).then((result) => {
+        if (address3.filter((a) => typeof a !== "string").length || fromBlock != null && typeof fromBlock !== "string" || toBlock != null && typeof toBlock !== "string") {
+          return Promise.all([Promise.all(address3), fromBlock, toBlock]).then((result) => {
             return resolve(result[0], result[1], result[2]);
           });
         }
-        return resolve(address2, fromBlock, toBlock);
+        return resolve(address3, fromBlock, toBlock);
       }
       /**
        *  Returns or resolves to a transaction for %%request%%, resolving
@@ -17800,18 +17800,18 @@ var init_abstract_provider = __esm({
         });
         return await __privateMethod(this, _AbstractProvider_instances, checkNetwork_fn).call(this, __privateMethod(this, _AbstractProvider_instances, call_fn).call(this, tx, blockTag, _tx.enableCcipRead ? 0 : -1));
       }
-      async getBalance(address2, blockTag) {
-        return getBigInt(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getBalance" }, address2, blockTag), "%response");
+      async getBalance(address3, blockTag) {
+        return getBigInt(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getBalance" }, address3, blockTag), "%response");
       }
-      async getTransactionCount(address2, blockTag) {
-        return getNumber(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getTransactionCount" }, address2, blockTag), "%response");
+      async getTransactionCount(address3, blockTag) {
+        return getNumber(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getTransactionCount" }, address3, blockTag), "%response");
       }
-      async getCode(address2, blockTag) {
-        return hexlify(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getCode" }, address2, blockTag));
+      async getCode(address3, blockTag) {
+        return hexlify(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getCode" }, address3, blockTag));
       }
-      async getStorage(address2, _position, blockTag) {
+      async getStorage(address3, _position, blockTag) {
         const position = getBigInt(_position, "position");
-        return hexlify(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getStorage", position }, address2, blockTag));
+        return hexlify(await __privateMethod(this, _AbstractProvider_instances, getAccountValue_fn).call(this, { method: "getStorage", position }, address3, blockTag));
       }
       // Write
       async broadcastTransaction(signedTx) {
@@ -17912,9 +17912,9 @@ var init_abstract_provider = __esm({
         }
         return null;
       }
-      async lookupAddress(address2) {
-        address2 = getAddress(address2);
-        const node = namehash(address2.substring(2).toLowerCase() + ".addr.reverse");
+      async lookupAddress(address3) {
+        address3 = getAddress(address3);
+        const node = namehash(address3.substring(2).toLowerCase() + ".addr.reverse");
         try {
           const ensAddr = await EnsResolver.getEnsAddress(this);
           const ensContract = new Contract(ensAddr, [
@@ -17929,7 +17929,7 @@ var init_abstract_provider = __esm({
           ], this);
           const name = await resolverContract.name(node);
           const check = await this.resolveName(name);
-          if (check !== address2) {
+          if (check !== address3) {
             return null;
           }
           return name;
@@ -18391,12 +18391,12 @@ var init_abstract_provider = __esm({
       return value;
     };
     getAccountValue_fn = async function(request, _address, _blockTag) {
-      let address2 = this._getAddress(_address);
+      let address3 = this._getAddress(_address);
       let blockTag = this._getBlockTag(_blockTag);
-      if (typeof address2 !== "string" || typeof blockTag !== "string") {
-        [address2, blockTag] = await Promise.all([address2, blockTag]);
+      if (typeof address3 !== "string" || typeof blockTag !== "string") {
+        [address3, blockTag] = await Promise.all([address3, blockTag]);
       }
-      return await __privateMethod(this, _AbstractProvider_instances, checkNetwork_fn).call(this, __privateMethod(this, _AbstractProvider_instances, perform_fn).call(this, Object.assign(request, { address: address2, blockTag })));
+      return await __privateMethod(this, _AbstractProvider_instances, checkNetwork_fn).call(this, __privateMethod(this, _AbstractProvider_instances, perform_fn).call(this, Object.assign(request, { address: address3, blockTag })));
     };
     getBlock_fn = async function(block2, includeTransactions) {
       if (isHexString(block2, 32)) {
@@ -18458,9 +18458,9 @@ async function populate(signer, tx) {
     pop.from = Promise.all([
       signer.getAddress(),
       resolveAddress(from, signer)
-    ]).then(([address2, from2]) => {
-      assertArgument(address2.toLowerCase() === from2.toLowerCase(), "transaction from mismatch", "tx.from", from2);
-      return address2;
+    ]).then(([address3, from2]) => {
+      assertArgument(address3.toLowerCase() === from2.toLowerCase(), "transaction from mismatch", "tx.from", from2);
+      return address3;
     });
   } else {
     pop.from = signer.getAddress();
@@ -18607,14 +18607,14 @@ var init_abstract_signer = __esm({
        *  Creates a new **VoidSigner** with %%address%% attached to
        *  %%provider%%.
        */
-      constructor(address2, provider) {
+      constructor(address3, provider) {
         super(provider);
         __privateAdd(this, _VoidSigner_instances);
         /**
          *  The signer address.
          */
         __publicField(this, "address");
-        defineProperties(this, { address: address2 });
+        defineProperties(this, { address: address3 });
       }
       async getAddress() {
         return this.address;
@@ -18936,11 +18936,11 @@ var init_provider_jsonrpc = __esm({
       pollingInterval: 4e3
     };
     JsonRpcSigner = class extends AbstractSigner {
-      constructor(provider, address2) {
+      constructor(provider, address3) {
         super(provider);
         __publicField(this, "address");
-        address2 = getAddress(address2);
-        defineProperties(this, { address: address2 });
+        address3 = getAddress(address3);
+        defineProperties(this, { address: address3 });
       }
       connect(provider) {
         assert(false, "cannot reconnect JsonRpcSigner", "UNSUPPORTED_OPERATION", {
@@ -19050,9 +19050,9 @@ var init_provider_jsonrpc = __esm({
       async signTypedData(domain, types, _value2) {
         const value = deepCopy(_value2);
         const populated = await TypedDataEncoder.resolveNames(domain, types, value, async (value2) => {
-          const address2 = await resolveAddress(value2);
-          assertArgument(address2 != null, "TypedData does not support null address", "value", value2);
-          return address2;
+          const address3 = await resolveAddress(value2);
+          assertArgument(address3 != null, "TypedData does not support null address", "value", value2);
+          return address3;
         });
         return await this.provider.send("eth_signTypedData_v4", [
           this.address.toLowerCase(),
@@ -19534,26 +19534,26 @@ var init_provider_jsonrpc = __esm({
        *
        *  Throws if the account doesn't exist.
        */
-      async getSigner(address2) {
-        if (address2 == null) {
-          address2 = 0;
+      async getSigner(address3) {
+        if (address3 == null) {
+          address3 = 0;
         }
         const accountsPromise = this.send("eth_accounts", []);
-        if (typeof address2 === "number") {
+        if (typeof address3 === "number") {
           const accounts2 = await accountsPromise;
-          if (address2 >= accounts2.length) {
+          if (address3 >= accounts2.length) {
             throw new Error("no such account");
           }
-          return new JsonRpcSigner(this, accounts2[address2]);
+          return new JsonRpcSigner(this, accounts2[address3]);
         }
         const { accounts } = await resolveProperties({
           network: this.getNetwork(),
           accounts: accountsPromise
         });
-        address2 = getAddress(address2);
+        address3 = getAddress(address3);
         for (const account of accounts) {
-          if (getAddress(account) === address2) {
-            return new JsonRpcSigner(this, address2);
+          if (getAddress(account) === address3) {
+            return new JsonRpcSigner(this, address3);
           }
         }
         throw new Error("invalid account");
@@ -19701,9 +19701,9 @@ var init_provider_jsonrpc = __esm({
         const request = this._getConnection();
         request.body = JSON.stringify(payload);
         request.setHeader("content-type", "application/json");
-        const response2 = await request.send();
-        response2.assertOk();
-        let resp = response2.bodyJson;
+        const response3 = await request.send();
+        response3.assertOk();
+        let resp = response3.bodyJson;
         if (!Array.isArray(resp)) {
           resp = [resp];
         }
@@ -19798,7 +19798,7 @@ var init_provider_ankr = __esm({
         const request = new FetchRequest(`https://${getHost(network.name)}/${apiKey}`);
         request.allowGzip = true;
         if (apiKey === defaultApiKey) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             showThrottleMessage("AnkrProvider");
             return true;
           };
@@ -19927,7 +19927,7 @@ var init_provider_alchemy = __esm({
         const request = new FetchRequest(`https://${getHost2(network.name)}/v2/${apiKey}`);
         request.allowGzip = true;
         if (apiKey === defaultApiKey2) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             showThrottleMessage("alchemy");
             return true;
           };
@@ -20013,7 +20013,7 @@ var init_provider_chainstack = __esm({
         const request = new FetchRequest(`https://${getHost3(network.name)}/${apiKey}`);
         request.allowGzip = true;
         if (apiKey === getApiKey(network.name)) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             showThrottleMessage("ChainstackProvider");
             return true;
           };
@@ -20203,46 +20203,46 @@ var init_provider_etherscan = __esm({
           }
           return Promise.resolve(true);
         };
-        request.processFunc = async (request2, response3) => {
-          const result2 = response3.hasBody() ? JSON.parse(toUtf8String(response3.body)) : {};
+        request.processFunc = async (request2, response4) => {
+          const result2 = response4.hasBody() ? JSON.parse(toUtf8String(response4.body)) : {};
           const throttle = (typeof result2.result === "string" ? result2.result : "").toLowerCase().indexOf("rate limit") >= 0;
           if (module === "proxy") {
             if (result2 && result2.status == 0 && result2.message == "NOTOK" && throttle) {
               this.emit("debug", { action: "receiveError", id: id2, reason: "proxy-NOTOK", error: result2 });
-              response3.throwThrottleError(result2.result, THROTTLE);
+              response4.throwThrottleError(result2.result, THROTTLE);
             }
           } else {
             if (throttle) {
               this.emit("debug", { action: "receiveError", id: id2, reason: "null result", error: result2.result });
-              response3.throwThrottleError(result2.result, THROTTLE);
+              response4.throwThrottleError(result2.result, THROTTLE);
             }
           }
-          return response3;
+          return response4;
         };
         if (payload) {
           request.setHeader("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
           request.body = Object.keys(payload).map((k) => `${k}=${payload[k]}`).join("&");
         }
-        const response2 = await request.send();
+        const response3 = await request.send();
         try {
-          response2.assertOk();
+          response3.assertOk();
         } catch (error) {
           this.emit("debug", { action: "receiveError", id: id2, error, reason: "assertOk" });
-          assert(false, "response error", "SERVER_ERROR", { request, response: response2 });
+          assert(false, "response error", "SERVER_ERROR", { request, response: response3 });
         }
-        if (!response2.hasBody()) {
+        if (!response3.hasBody()) {
           this.emit("debug", { action: "receiveError", id: id2, error: "missing body", reason: "null body" });
-          assert(false, "missing response", "SERVER_ERROR", { request, response: response2 });
+          assert(false, "missing response", "SERVER_ERROR", { request, response: response3 });
         }
-        const result = JSON.parse(toUtf8String(response2.body));
+        const result = JSON.parse(toUtf8String(response3.body));
         if (module === "proxy") {
           if (result.jsonrpc != "2.0") {
             this.emit("debug", { action: "receiveError", id: id2, result, reason: "invalid JSON-RPC" });
-            assert(false, "invalid JSON-RPC response (missing jsonrpc='2.0')", "SERVER_ERROR", { request, response: response2, info: { result } });
+            assert(false, "invalid JSON-RPC response (missing jsonrpc='2.0')", "SERVER_ERROR", { request, response: response3, info: { result } });
           }
           if (result.error) {
             this.emit("debug", { action: "receiveError", id: id2, result, reason: "JSON-RPC error" });
-            assert(false, "error response", "SERVER_ERROR", { request, response: response2, info: { result } });
+            assert(false, "error response", "SERVER_ERROR", { request, response: response3, info: { result } });
           }
           this.emit("debug", { action: "receiveRequest", id: id2, result });
           return result.result;
@@ -20253,7 +20253,7 @@ var init_provider_etherscan = __esm({
           }
           if (result.status != 1 || typeof result.message === "string" && !result.message.match(/^OK/)) {
             this.emit("debug", { action: "receiveError", id: id2, result });
-            assert(false, "error response", "SERVER_ERROR", { request, response: response2, info: { result } });
+            assert(false, "error response", "SERVER_ERROR", { request, response: response3, info: { result } });
           }
           this.emit("debug", { action: "receiveRequest", id: id2, result });
           return result.result;
@@ -20556,17 +20556,17 @@ var init_provider_etherscan = __esm({
        *  Etherscan API to retreive the Contract ABI.
        */
       async getContract(_address) {
-        let address2 = this._getAddress(_address);
-        if (isPromise2(address2)) {
-          address2 = await address2;
+        let address3 = this._getAddress(_address);
+        if (isPromise2(address3)) {
+          address3 = await address3;
         }
         try {
           const resp = await this.fetch("contract", {
             action: "getabi",
-            address: address2
+            address: address3
           });
           const abi = JSON.parse(resp);
-          return new Contract(address2, abi, this);
+          return new Contract(address3, abi, this);
         } catch (error) {
           return null;
         }
@@ -21078,7 +21078,7 @@ var init_provider_infura = __esm({
           request.setCredentials("", projectSecret);
         }
         if (projectId === defaultProjectId) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             showThrottleMessage("InfuraProvider");
             return true;
           };
@@ -21180,7 +21180,7 @@ var init_provider_quicknode = __esm({
         const request = new FetchRequest(`https://${getHost5(network.name)}/${token}`);
         request.allowGzip = true;
         if (token === defaultToken) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             showThrottleMessage("QuickNodeProvider");
             return true;
           };
@@ -22026,22 +22026,22 @@ var init_provider_browser = __esm({
       /**
        *  Resolves to ``true`` if the provider manages the %%address%%.
        */
-      async hasSigner(address2) {
-        if (address2 == null) {
-          address2 = 0;
+      async hasSigner(address3) {
+        if (address3 == null) {
+          address3 = 0;
         }
         const accounts = await this.send("eth_accounts", []);
-        if (typeof address2 === "number") {
-          return accounts.length > address2;
+        if (typeof address3 === "number") {
+          return accounts.length > address3;
         }
-        address2 = address2.toLowerCase();
-        return accounts.filter((a) => a.toLowerCase() === address2).length !== 0;
+        address3 = address3.toLowerCase();
+        return accounts.filter((a) => a.toLowerCase() === address3).length !== 0;
       }
-      async getSigner(address2) {
-        if (address2 == null) {
-          address2 = 0;
+      async getSigner(address3) {
+        if (address3 == null) {
+          address3 = 0;
         }
-        if (!await this.hasSigner(address2)) {
+        if (!await this.hasSigner(address3)) {
           try {
             await __privateGet(this, _request2).call(this, "eth_requestAccounts", []);
           } catch (error) {
@@ -22049,7 +22049,7 @@ var init_provider_browser = __esm({
             throw this.getRpcError(payload, { id: payload.id, error });
           }
         }
-        return await super.getSigner(address2);
+        return await super.getSigner(address3);
       }
       /**
        *  Discover and connect to a Provider in the Browser using the
@@ -22324,7 +22324,7 @@ var init_provider_pocket = __esm({
           request.setCredentials("", applicationSecret);
         }
         if (applicationId === defaultApplicationId) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             showThrottleMessage("PocketProvider");
             return true;
           };
@@ -22403,8 +22403,8 @@ var init_base_wallet = __esm({
         __privateAdd(this, _signingKey);
         assertArgument(privateKey && typeof privateKey.sign === "function", "invalid private key", "privateKey", "[ REDACTED ]");
         __privateSet(this, _signingKey, privateKey);
-        const address2 = computeAddress(this.signingKey.publicKey);
-        defineProperties(this, { address: address2 });
+        const address3 = computeAddress(this.signingKey.publicKey);
+        defineProperties(this, { address: address3 });
       }
       // Store private values behind getters to reduce visibility
       // in console.log
@@ -22484,11 +22484,11 @@ var init_base_wallet = __esm({
             operation: "resolveName",
             info: { name }
           });
-          const address2 = await this.provider.resolveName(name);
-          assert(address2 != null, "unconfigured ENS name", "UNCONFIGURED_NAME", {
+          const address3 = await this.provider.resolveName(name);
+          assert(address3 != null, "unconfigured ENS name", "UNCONFIGURED_NAME", {
             value: name
           });
-          return address2;
+          return address3;
         });
         return this.signingKey.sign(TypedDataEncoder.hash(populated.domain, types, populated.value)).serialized;
       }
@@ -23360,15 +23360,15 @@ function getAccount(data, _key) {
   const computedMAC = hexlify(keccak256(concat([key.slice(16, 32), ciphertext]))).substring(2);
   assertArgument(computedMAC === spelunk(data, "crypto.mac:string!").toLowerCase(), "incorrect password", "password", "[ REDACTED ]");
   const privateKey = decrypt(data, key.slice(0, 16), ciphertext);
-  const address2 = computeAddress(privateKey);
+  const address3 = computeAddress(privateKey);
   if (data.address) {
     let check = data.address.toLowerCase();
     if (!check.startsWith("0x")) {
       check = "0x" + check;
     }
-    assertArgument(getAddress(check) === address2, "keystore address/privateKey mismatch", "address", data.address);
+    assertArgument(getAddress(check) === address3, "keystore address/privateKey mismatch", "address", data.address);
   }
-  const account = { address: address2, privateKey };
+  const account = { address: address3, privateKey };
   const version2 = spelunk(data, "x-ethers.version:string");
   if (version2 === "0.1") {
     const mnemonicKey = key.slice(32, 64);
@@ -23905,8 +23905,8 @@ var init_hdwallet = __esm({
       /**
        *  @private
        */
-      constructor(guard, address2, publicKey, parentFingerprint, chainCode, path, index, depth, provider) {
-        super(address2, provider);
+      constructor(guard, address3, publicKey, parentFingerprint, chainCode, path, index, depth, provider) {
+        super(address3, provider);
         /**
          *  The compressed public key.
          */
@@ -24001,8 +24001,8 @@ var init_hdwallet = __esm({
         }
         const { IR, IL } = ser_I(index, this.chainCode, this.publicKey, null);
         const Ki = SigningKey.addPoints(IL, this.publicKey, true);
-        const address2 = computeAddress(Ki);
-        return new _HDNodeVoidWallet(_guard6, address2, Ki, this.fingerprint, hexlify(IR), path, index, this.depth + 1, this.provider);
+        const address3 = computeAddress(Ki);
+        return new _HDNodeVoidWallet(_guard6, address3, Ki, this.fingerprint, hexlify(IR), path, index, this.depth + 1, this.provider);
       }
       /**
        *  Return the signer for %%path%% from this node.
@@ -24028,7 +24028,7 @@ function isCrowdsaleJson(json8) {
 function decryptCrowdsaleJson(json8, _password) {
   const data = JSON.parse(json8);
   const password = getPassword(_password);
-  const address2 = getAddress(spelunk(data, "ethaddr:string!"));
+  const address3 = getAddress(spelunk(data, "ethaddr:string!"));
   const encseed = looseArrayify(spelunk(data, "encseed:string!"));
   assertArgument(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json8);
   const key = getBytes(pbkdf22(password, password, 2e3, 32, "sha256")).slice(0, 16);
@@ -24040,7 +24040,7 @@ function decryptCrowdsaleJson(json8, _password) {
   for (let i = 0; i < seed.length; i++) {
     seedHex += String.fromCharCode(seed[i]);
   }
-  return { address: address2, privateKey: id(seedHex) };
+  return { address: address3, privateKey: id(seedHex) };
 }
 var init_json_crowdsale = __esm({
   "workers/sessionCorsWorker/node_modules/ethers/lib.esm/wallet/json-crowdsale.js"() {
@@ -25023,11 +25023,11 @@ var init_outboundUrlSafetyBinding = __esm({
         let target = url;
         const maxRedirects = outboundUrlPolicy === PUBLIC_HTTPS_ARTIFACT_POLICY ? 5 : 1;
         for (let redirects = 0; ; redirects += 1) {
-          const response2 = await fetchImpl(target, requestOptions);
-          if (response2.status < 300 || response2.status >= 400) return response2;
-          await response2.body?.cancel?.();
+          const response3 = await fetchImpl(target, requestOptions);
+          if (response3.status < 300 || response3.status >= 400) return response3;
+          await response3.body?.cancel?.();
           if (redirects >= maxRedirects) return { ok: false, error: "Too many redirects", status: 403 };
-          const location2 = toStr4(response2.headers.get("location"), deps).trim();
+          const location2 = toStr4(response3.headers.get("location"), deps).trim();
           let redirectUrl = "";
           if (location2) {
             try {
@@ -25322,7 +25322,7 @@ var init_sessionConfigEdits = __esm({
     validCuratedIdList = (value) => Array.isArray(value) && value.length <= MAX_CURATED_IDS && value.every((id2) => typeof id2 === "string" && CURATED_ID.test(id2));
     MAX_RESULTS_ADMINS = 20;
     ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-    validResultsAdminAddresses = (value) => Array.isArray(value) && value.length <= MAX_RESULTS_ADMINS && value.every((address2) => typeof address2 === "string" && ADDRESS.test(address2)) && new Set(value.map((address2) => address2.toLowerCase())).size === value.length;
+    validResultsAdminAddresses = (value) => Array.isArray(value) && value.length <= MAX_RESULTS_ADMINS && value.every((address3) => typeof address3 === "string" && ADDRESS.test(address3)) && new Set(value.map((address3) => address3.toLowerCase())).size === value.length;
     MAX_AGENT_INSTRUCTIONS_CHARS = 8e3;
     validAgentInstructions = (value) => typeof value === "string" && value.length <= MAX_AGENT_INSTRUCTIONS_CHARS;
     CONTENT_FIELDS = /* @__PURE__ */ new Set([
@@ -25467,18 +25467,18 @@ var init_artifactFetch = __esm({
       accept = "application/javascript"
     } = {}) => {
       const { safeFetch } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: fetchImpl } });
-      const response2 = await safeFetch(url, {
+      const response3 = await safeFetch(url, {
         method: "GET",
         headers: { Accept: accept },
         outboundUrlPolicy: PUBLIC_HTTPS_ARTIFACT_POLICY
       });
-      if (!response2.ok) {
-        await response2.body?.cancel?.();
-        const error = new Error(response2.error || `Artifact fetch failed (${response2.status}).`);
-        error.status = response2.status;
+      if (!response3.ok) {
+        await response3.body?.cancel?.();
+        const error = new Error(response3.error || `Artifact fetch failed (${response3.status}).`);
+        error.status = response3.status;
         throw error;
       }
-      return readBodyText(response2, maxBytes);
+      return readBodyText(response3, maxBytes);
     };
   }
 });
@@ -29367,9 +29367,9 @@ var init_deployHelperCore = __esm({
         }
         const coordinatorName = await sha256Hex(`direct-deploy:${context.deploymentId}`);
         const stub = coordinator2.get(coordinator2.idFromName(coordinatorName));
-        let response2;
+        let response3;
         try {
-          response2 = await stub.fetch("https://session-coordinator.internal/deploy-helper", {
+          response3 = await stub.fetch("https://session-coordinator.internal/deploy-helper", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -29386,7 +29386,7 @@ var init_deployHelperCore = __esm({
             deploymentRequestPending: true
           }, { fallbackEligible: true });
         }
-        const result2 = await response2.json().catch(() => ({}));
+        const result2 = await response3.json().catch(() => ({}));
         if (isObj4(result2?.body) && Number(result2?.status || 0)) {
           return {
             ok: result2.ok === true,
@@ -29395,7 +29395,7 @@ var init_deployHelperCore = __esm({
             fallbackEligible: result2.fallbackEligible === true
           };
         }
-        return buildFailure(Number(response2.status || 0) || 502, isObj4(result2) ? result2 : {
+        return buildFailure(Number(response3.status || 0) || 502, isObj4(result2) ? result2 : {
           error: "Deployment coordinator returned an invalid response."
         });
       }
@@ -30140,12 +30140,12 @@ var init_sessionConfigAuthority = __esm({
       try {
         if (!normalizedSlug || !binding?.idFromName || !binding?.get) throw new Error();
         const name = await sha256Hex(`session-config:${normalizedSlug}`);
-        const response2 = await binding.get(binding.idFromName(name)).fetch(
+        const response3 = await binding.get(binding.idFromName(name)).fetch(
           `https://session-coordinator.internal/session-config/${path}`,
           { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: normalizedSlug, ...payload }) }
         );
-        const body = await response2.json();
-        return { ok: response2.ok && body?.ok === true, status: response2.status, body };
+        const body = await response3.json();
+        return { ok: response3.ok && body?.ok === true, status: response3.status, body };
       } catch {
         return { ok: false, status: 503, body: { error: SESSION_CONFIG_COORDINATION_ERROR } };
       }
@@ -30206,6 +30206,7 @@ var init_interviewSettings = __esm({
       allowManualRefresh: true,
       shareDraftChangesByDefault: true,
       researchDetail: "minimal",
+      keepDraftTextForAdmins: false,
       hiddenDraftShare: 0,
       showFidelityScore: false,
       suggestGroups: false,
@@ -30231,6 +30232,8 @@ var init_interviewSettings = __esm({
         shareDraftChangesByDefault: typeof source.shareDraftChangesByDefault === "boolean" ? source.shareDraftChangesByDefault : DEFAULT_INTERVIEW_SETTINGS.shareDraftChangesByDefault,
         // How much an AI draft comparison saves: 'minimal' keeps no AI notes or drafted text.
         researchDetail: source.researchDetail === "full" ? "full" : "minimal",
+        // At minimal detail, also keep the AI's drafted text where only config admins can read it.
+        keepDraftTextForAdmins: source.keepDraftTextForAdmins === true,
         // Share of a person's AI prefill drafts hidden until they answer, which measures anchoring.
         hiddenDraftShare: Number.isFinite(source.hiddenDraftShare) ? Math.max(0, Math.min(MAX_HIDDEN_DRAFT_SHARE, source.hiddenDraftShare)) : 0,
         // After submitting, show the person how well their AI predicted them (private, in the browser).
@@ -30273,6 +30276,7 @@ var init_interviewSettings = __esm({
         "suggestQuestions",
         "allowManualRefresh",
         "shareDraftChangesByDefault",
+        "keepDraftTextForAdmins",
         "showFidelityScore",
         "suggestGroups",
         "joinMatchingGroups",
@@ -31478,18 +31482,18 @@ var init_workerGroups = __esm({
       return { ok: true, value: new Date(timestamp).toISOString() };
     };
     normalizeEvmAddress = (value, deps = {}) => {
-      const address2 = trim2(value);
-      if (typeof deps.isAddress === "function" && !deps.isAddress(address2)) return "";
-      if (!/^0x[0-9a-fA-F]{40}$/.test(address2)) return "";
+      const address3 = trim2(value);
+      if (typeof deps.isAddress === "function" && !deps.isAddress(address3)) return "";
+      if (!/^0x[0-9a-fA-F]{40}$/.test(address3)) return "";
       if (typeof deps.getAddress === "function") {
         try {
-          const normalized = trim2(deps.getAddress(address2));
+          const normalized = trim2(deps.getAddress(address3));
           if (/^0x[0-9a-fA-F]{40}$/.test(normalized)) return normalized;
         } catch {
           return "";
         }
       }
-      return address2.toLowerCase();
+      return address3.toLowerCase();
     };
     normalizePrincipalId = (value) => {
       const id2 = trim2(value);
@@ -31504,23 +31508,23 @@ var init_workerGroups = __esm({
     };
     normalizeWorkerGroupPrincipal = (input, deps = {}) => {
       if (typeof input === "string") {
-        const address2 = normalizeEvmAddress(input, deps);
-        if (!address2) return { ok: false, reason: "invalid_principal" };
+        const address3 = normalizeEvmAddress(input, deps);
+        if (!address3) return { ok: false, reason: "invalid_principal" };
         return {
           ok: true,
-          principal: { kind: "evm_address", address: address2 },
-          key: principalKeyFor("evm_address", address2)
+          principal: { kind: "evm_address", address: address3 },
+          key: principalKeyFor("evm_address", address3)
         };
       }
       if (!isObj7(input)) return { ok: false, reason: "invalid_principal" };
       const kind = trim2(input.kind || input.type).toLowerCase();
       if (kind === "passkey_account" || kind === "evm_address") {
-        const address2 = normalizeEvmAddress(input.address || input.account || input.id, deps);
-        if (!address2) return { ok: false, reason: "invalid_principal_address" };
+        const address3 = normalizeEvmAddress(input.address || input.account || input.id, deps);
+        if (!address3) return { ok: false, reason: "invalid_principal_address" };
         return {
           ok: true,
-          principal: { kind, address: address2 },
-          key: principalKeyFor(kind, address2)
+          principal: { kind, address: address3 },
+          key: principalKeyFor(kind, address3)
         };
       }
       if (kind === "telegram") {
@@ -32610,16 +32614,16 @@ var init_workerGroups = __esm({
       }
       if (!stub?.fetch) return workerGroupCoordinationUnavailable();
       try {
-        const response2 = await stub.fetch(`https://session-coordinator.internal${path}`, {
+        const response3 = await stub.fetch(`https://session-coordinator.internal${path}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, slug: sessionSlug, sessionId: canonicalSessionId })
         });
-        const result = await response2.json().catch(() => null);
+        const result = await response3.json().catch(() => null);
         if (!result || typeof result !== "object") return workerGroupCoordinationUnavailable();
         return {
           ...result,
-          status: Number(result.status || 0) || response2.status
+          status: Number(result.status || 0) || response3.status
         };
       } catch {
         return workerGroupCoordinationUnavailable();
@@ -32794,10 +32798,10 @@ var init_workerGroups = __esm({
         return [];
       }
     };
-    listSelfJoinableWorkerGroupsForMember = async ({ env, config, slug, address: address2, deps = {} } = {}) => {
+    listSelfJoinableWorkerGroupsForMember = async ({ env, config, slug, address: address3, deps = {} } = {}) => {
       try {
         const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
-        const actor = resolveWorkerGroupPrincipal({ requesterAddress: address2, deps });
+        const actor = resolveWorkerGroupPrincipal({ requesterAddress: address3, deps });
         if (!sessionIdentity.ok || !actor.ok) return [];
         const { sessionId } = sessionIdentity;
         const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({ env, slug, sessionId });
@@ -33360,18 +33364,18 @@ var init_workerCanonicalAuthority = __esm({
     listAddresses = (value) => {
       if (Array.isArray(value)) return value.flatMap(listAddresses);
       if (isObj8(value)) return listAddresses(value.addresses || value.members || []);
-      const address2 = lower(value);
-      return /^0x[0-9a-f]{40}$/.test(address2) ? [address2] : [];
+      const address3 = lower(value);
+      return /^0x[0-9a-f]{40}$/.test(address3) ? [address3] : [];
     };
     resolveRoleAddressSet = ({ config, role }) => {
       const normalizedRole = lower(role || "admin") || "admin";
       const addresses = /* @__PURE__ */ new Set();
       if (normalizedRole === "admin") {
-        listAddresses(config?.adminAddress).forEach((address2) => addresses.add(address2));
-        listAddresses(config?.adminAddresses).forEach((address2) => addresses.add(address2));
-        listAddresses(config?.admin?.addresses).forEach((address2) => addresses.add(address2));
+        listAddresses(config?.adminAddress).forEach((address3) => addresses.add(address3));
+        listAddresses(config?.adminAddresses).forEach((address3) => addresses.add(address3));
+        listAddresses(config?.admin?.addresses).forEach((address3) => addresses.add(address3));
       }
-      [config?.workerRoles, config?.roles, config?.authorization?.roles].filter(isObj8).forEach((roles) => listAddresses(roles[normalizedRole]).forEach((address2) => addresses.add(address2)));
+      [config?.workerRoles, config?.roles, config?.authorization?.roles].filter(isObj8).forEach((roles) => listAddresses(roles[normalizedRole]).forEach((address3) => addresses.add(address3)));
       return addresses;
     };
     resolveAuthorityPolicy = (config) => {
@@ -33386,11 +33390,11 @@ var init_workerCanonicalAuthority = __esm({
         conditions: Array.isArray(gate.conditions) ? gate.conditions.filter(isObj8) : []
       };
     };
-    evaluateLoginCondition = async ({ condition, address: address2, config, env, slug, deps }) => {
+    evaluateLoginCondition = async ({ condition, address: address3, config, env, slug, deps }) => {
       const kind = lower(condition?.kind);
       if (kind === "worker_role") {
         const role = lower(condition?.role || "admin") || "admin";
-        return resolveRoleAddressSet({ config, role }).has(lower(address2));
+        return resolveRoleAddressSet({ config, role }).has(lower(address3));
       }
       if (kind === "worker_group") {
         const groupId = trim3(condition?.groupId);
@@ -33401,24 +33405,24 @@ var init_workerCanonicalAuthority = __esm({
           slug,
           sessionId: resolveCanonicalWorkerSessionIdHex(config),
           groupId,
-          requesterAddress: address2
+          requesterAddress: address3
         });
         return result?.ok === true;
       }
       return false;
     };
-    passesLoginGate = async ({ address: address2, config, env, slug, policy, deps }) => {
+    passesLoginGate = async ({ address: address3, config, env, slug, policy, deps }) => {
       const gate = resolveLoginConditions(policy);
       if (!gate.conditions.length) return true;
       const results = [];
       for (const condition of gate.conditions) {
-        results.push(await evaluateLoginCondition({ condition, address: address2, config, env, slug, deps }));
+        results.push(await evaluateLoginCondition({ condition, address: address3, config, env, slug, deps }));
       }
       return gate.match === "all" ? results.every(Boolean) : results.some(Boolean);
     };
     isWorkerCanonicalSessionConfig = (config) => lower(config?.sessionModeProfile?.authority?.mode) === "worker_canonical";
     resolveWorkerCanonicalLoginScopes = async ({
-      address: address2,
+      address: address3,
       config,
       env,
       slug,
@@ -33431,9 +33435,9 @@ var init_workerCanonicalAuthority = __esm({
       if (!policy) {
         throw new Error("Access denied: worker-canonical authority policy missing.");
       }
-      const normalizedAddress = lower(address2);
+      const normalizedAddress = lower(address3);
       const isAdmin = resolveRoleAddressSet({ config, role: "admin" }).has(normalizedAddress);
-      if (!isAdmin && !await passesLoginGate({ address: address2, config, env, slug, policy, deps })) {
+      if (!isAdmin && !await passesLoginGate({ address: address3, config, env, slug, policy, deps })) {
         throw new Error("Access denied: worker-canonical login gate failed.");
       }
       const configuredScopes = normalizeScopeList(policy.participantScopes);
@@ -36449,18 +36453,18 @@ var require_fetch = __commonJS({
       if (scheme in Gateways2) {
         const result = await Gateways2[scheme](req.url, checkSignal2(__privateGet(_request4, _signal2)));
         if (result instanceof FetchResponse2) {
-          let response3 = result;
+          let response4 = result;
           if (this.processFunc) {
             checkSignal2(__privateGet(_request4, _signal2));
             try {
-              response3 = await this.processFunc(req, response3);
+              response4 = await this.processFunc(req, response4);
             } catch (error) {
               if (error.throttle == null || typeof error.stall !== "number") {
-                response3.makeServerError("error in post-processing function", error).assertOk();
+                response4.makeServerError("error in post-processing function", error).assertOk();
               }
             }
           }
-          return response3;
+          return response4;
         }
         req = result;
       }
@@ -36468,41 +36472,41 @@ var require_fetch = __commonJS({
         req = await this.preflightFunc(req);
       }
       const resp = await this.getUrlFunc(req, checkSignal2(__privateGet(_request4, _signal2)));
-      let response2 = new FetchResponse2(resp.statusCode, resp.statusMessage, resp.headers, resp.body, _request4);
-      if (response2.statusCode === 301 || response2.statusCode === 302) {
+      let response3 = new FetchResponse2(resp.statusCode, resp.statusMessage, resp.headers, resp.body, _request4);
+      if (response3.statusCode === 301 || response3.statusCode === 302) {
         try {
-          const location2 = response2.headers.location || "";
-          return __privateMethod(_a2 = req.redirect(location2), _FetchRequest_instances2, send_fn2).call(_a2, attempt + 1, expires, 0, _request4, response2);
+          const location2 = response3.headers.location || "";
+          return __privateMethod(_a2 = req.redirect(location2), _FetchRequest_instances2, send_fn2).call(_a2, attempt + 1, expires, 0, _request4, response3);
         } catch (error) {
         }
-        return response2;
-      } else if (response2.statusCode === 429) {
-        if (this.retryFunc == null || await this.retryFunc(req, response2, attempt)) {
-          const retryAfter = response2.headers["retry-after"];
+        return response3;
+      } else if (response3.statusCode === 429) {
+        if (this.retryFunc == null || await this.retryFunc(req, response3, attempt)) {
+          const retryAfter = response3.headers["retry-after"];
           let delay2 = __privateGet(this, _throttle2).slotInterval * Math.trunc(Math.random() * Math.pow(2, attempt));
           if (typeof retryAfter === "string" && retryAfter.match(/^[1-9][0-9]*$/)) {
             delay2 = parseInt(retryAfter);
           }
-          return __privateMethod(_b = req.clone(), _FetchRequest_instances2, send_fn2).call(_b, attempt + 1, expires, delay2, _request4, response2);
+          return __privateMethod(_b = req.clone(), _FetchRequest_instances2, send_fn2).call(_b, attempt + 1, expires, delay2, _request4, response3);
         }
       }
       if (this.processFunc) {
         checkSignal2(__privateGet(_request4, _signal2));
         try {
-          response2 = await this.processFunc(req, response2);
+          response3 = await this.processFunc(req, response3);
         } catch (error) {
           if (error.throttle == null || typeof error.stall !== "number") {
-            response2.makeServerError("error in post-processing function", error).assertOk();
+            response3.makeServerError("error in post-processing function", error).assertOk();
           }
           let delay2 = __privateGet(this, _throttle2).slotInterval * Math.trunc(Math.random() * Math.pow(2, attempt));
           ;
           if (error.stall >= 0) {
             delay2 = error.stall;
           }
-          return __privateMethod(_c = req.clone(), _FetchRequest_instances2, send_fn2).call(_c, attempt + 1, expires, delay2, _request4, response2);
+          return __privateMethod(_c = req.clone(), _FetchRequest_instances2, send_fn2).call(_c, attempt + 1, expires, delay2, _request4, response3);
         }
       }
-      return response2;
+      return response3;
     };
     var FetchRequest2 = _FetchRequest2;
     exports.FetchRequest = FetchRequest2;
@@ -36614,9 +36618,9 @@ var require_fetch = __commonJS({
         } else {
           statusMessage = `CLIENT ESCALATED SERVER ERROR (${this.statusCode} ${this.statusMessage}; ${message})`;
         }
-        const response2 = new _FetchResponse2(599, statusMessage, this.headers, this.body, __privateGet(this, _request3) || void 0);
-        __privateSet(response2, _error2, { message, error });
-        return response2;
+        const response3 = new _FetchResponse2(599, statusMessage, this.headers, this.body, __privateGet(this, _request3) || void 0);
+        __privateSet(response3, _error2, { message, error });
+        return response3;
       }
       /**
        *  If called within a [request.processFunc](FetchRequest-processFunc)
@@ -42549,9 +42553,9 @@ var require_address = __commonJS({
     var index_js_2 = require_utils();
     var BN_012 = BigInt(0);
     var BN_362 = BigInt(36);
-    function getChecksumAddress2(address2) {
-      address2 = address2.toLowerCase();
-      const chars = address2.substring(2).split("");
+    function getChecksumAddress2(address3) {
+      address3 = address3.toLowerCase();
+      const chars = address3.substring(2).split("");
       const expanded = new Uint8Array(40);
       for (let i = 0; i < 40; i++) {
         expanded[i] = chars[i].charCodeAt(0);
@@ -42575,10 +42579,10 @@ var require_address = __commonJS({
       ibanLookup2[String.fromCharCode(65 + i)] = String(10 + i);
     }
     var safeDigits2 = 15;
-    function ibanChecksum2(address2) {
-      address2 = address2.toUpperCase();
-      address2 = address2.substring(4) + address2.substring(0, 2) + "00";
-      let expanded = address2.split("").map((c) => {
+    function ibanChecksum2(address3) {
+      address3 = address3.toUpperCase();
+      address3 = address3.substring(4) + address3.substring(0, 2) + "00";
+      let expanded = address3.split("").map((c) => {
         return ibanLookup2[c];
       }).join("");
       while (expanded.length >= safeDigits2) {
@@ -42608,29 +42612,29 @@ var require_address = __commonJS({
       }
       return result;
     }
-    function getAddress2(address2) {
-      (0, index_js_2.assertArgument)(typeof address2 === "string", "invalid address", "address", address2);
-      if (address2.match(/^(0x)?[0-9a-fA-F]{40}$/)) {
-        if (!address2.startsWith("0x")) {
-          address2 = "0x" + address2;
+    function getAddress2(address3) {
+      (0, index_js_2.assertArgument)(typeof address3 === "string", "invalid address", "address", address3);
+      if (address3.match(/^(0x)?[0-9a-fA-F]{40}$/)) {
+        if (!address3.startsWith("0x")) {
+          address3 = "0x" + address3;
         }
-        const result = getChecksumAddress2(address2);
-        (0, index_js_2.assertArgument)(!address2.match(/([A-F].*[a-f])|([a-f].*[A-F])/) || result === address2, "bad address checksum", "address", address2);
+        const result = getChecksumAddress2(address3);
+        (0, index_js_2.assertArgument)(!address3.match(/([A-F].*[a-f])|([a-f].*[A-F])/) || result === address3, "bad address checksum", "address", address3);
         return result;
       }
-      if (address2.match(/^XE[0-9]{2}[0-9A-Za-z]{30,31}$/)) {
-        (0, index_js_2.assertArgument)(address2.substring(2, 4) === ibanChecksum2(address2), "bad icap checksum", "address", address2);
-        let result = fromBase362(address2.substring(4)).toString(16);
+      if (address3.match(/^XE[0-9]{2}[0-9A-Za-z]{30,31}$/)) {
+        (0, index_js_2.assertArgument)(address3.substring(2, 4) === ibanChecksum2(address3), "bad icap checksum", "address", address3);
+        let result = fromBase362(address3.substring(4)).toString(16);
         while (result.length < 40) {
           result = "0" + result;
         }
         return getChecksumAddress2("0x" + result);
       }
-      (0, index_js_2.assertArgument)(false, "invalid address", "address", address2);
+      (0, index_js_2.assertArgument)(false, "invalid address", "address", address3);
     }
     exports.getAddress = getAddress2;
-    function getIcapAddress2(address2) {
-      let base36 = BigInt(getAddress2(address2)).toString(36).toUpperCase();
+    function getIcapAddress2(address3) {
+      let base36 = BigInt(getAddress2(address3)).toString(36).toUpperCase();
       while (base36.length < 30) {
         base36 = "0" + base36;
       }
@@ -50118,10 +50122,10 @@ var require_provider = __commonJS({
        *  Returns a JSON-compatible object.
        */
       toJSON() {
-        const { address: address2, blockHash, blockNumber, data, index, removed, topics, transactionHash, transactionIndex } = this;
+        const { address: address3, blockHash, blockNumber, data, index, removed, topics, transactionHash, transactionIndex } = this;
         return {
           _type: "log",
-          address: address2,
+          address: address3,
           blockHash,
           blockNumber,
           data,
@@ -51477,8 +51481,8 @@ var require_contract = __commonJS({
       const { addr, subs } = getInternal2(contract);
       let sub = subs.get(tag);
       if (!sub) {
-        const address2 = addr ? addr : contract;
-        const filter = { address: address2, topics };
+        const address3 = addr ? addr : contract;
+        const filter = { address: address3, topics };
         const listener = (log2) => {
           let foundFragment = fragment;
           if (foundFragment == null) {
@@ -51818,9 +51822,9 @@ var require_contract = __commonJS({
           toBlock = "latest";
         }
         const { addr, addrPromise } = getInternal2(this);
-        const address2 = addr ? addr : await addrPromise;
+        const address3 = addr ? addr : await addrPromise;
         const { fragment, topics } = await getSubInfo2(this, event);
-        const filter = { address: address2, topics, fromBlock, toBlock };
+        const filter = { address: address3, topics, fromBlock, toBlock };
         const provider = getProvider2(this.runner);
         (0, index_js_3.assert)(provider, "contract runner does not have a provider", "UNSUPPORTED_OPERATION", { operation: "queryFilter" });
         return (await provider.getLogs(filter)).map((log2) => {
@@ -51965,8 +51969,8 @@ var require_contract = __commonJS({
        */
       static buildClass(abi) {
         class CustomContract extends _BaseContract2 {
-          constructor(address2, runner = null) {
-            super(address2, abi, runner);
+          constructor(address3, runner = null) {
+            super(address3, abi, runner);
           }
         }
         return CustomContract;
@@ -52076,8 +52080,8 @@ var require_factory = __commonJS({
           operation: "sendTransaction"
         });
         const sentTx = await this.runner.sendTransaction(tx);
-        const address2 = (0, index_js_2.getCreateAddress)(sentTx);
-        return new contract_js_1.BaseContract(address2, this.interface, this.runner, sentTx);
+        const address3 = (0, index_js_2.getCreateAddress)(sentTx);
+        return new contract_js_1.BaseContract(address3, this.interface, this.runner, sentTx);
       }
       /**
        *  Return a new **ContractFactory** with the same ABI and bytecode,
@@ -52191,7 +52195,7 @@ var require_ens_resolver = __commonJS({
       /**
        *  Resolves to the encoded %%address%% for %%coinType%%.
        */
-      async encodeAddress(coinType, address2) {
+      async encodeAddress(coinType, address3) {
         throw new Error("unsupported coin");
       }
       /**
@@ -52221,7 +52225,7 @@ var require_ens_resolver = __commonJS({
     ];
     var _supports25442, _resolver2, _EnsResolver_instances2, fetch_fn2, _EnsResolver_static2, getResolver_fn2;
     var _EnsResolver2 = class _EnsResolver2 {
-      constructor(provider, address2, name) {
+      constructor(provider, address3, name) {
         __privateAdd(this, _EnsResolver_instances2);
         /**
          *  The connected provider.
@@ -52238,9 +52242,9 @@ var require_ens_resolver = __commonJS({
         // For EIP-2544 names, the ancestor that provided the resolver
         __privateAdd(this, _supports25442);
         __privateAdd(this, _resolver2);
-        (0, index_js_5.defineProperties)(this, { provider, address: address2, name });
+        (0, index_js_5.defineProperties)(this, { provider, address: address3, name });
         __privateSet(this, _supports25442, null);
-        __privateSet(this, _resolver2, new index_js_3.Contract(address2, [
+        __privateSet(this, _resolver2, new index_js_3.Contract(address3, [
           "function supportsInterface(bytes4) view returns (bool)",
           "function resolve(bytes, bytes) view returns (bytes)",
           "function addr(bytes32) view returns (address)",
@@ -52314,9 +52318,9 @@ var require_ens_resolver = __commonJS({
         if (data == null || data === "0x") {
           return null;
         }
-        const address2 = await coinPlugin.decodeAddress(coinType, data);
-        if (address2 != null) {
-          return address2;
+        const address3 = await coinPlugin.decodeAddress(coinType, data);
+        if (address3 != null) {
+          return address3;
         }
         (0, index_js_5.assert)(false, `invalid coin data`, "UNSUPPORTED_OPERATION", {
           operation: `getAddress(${coinType})`,
@@ -52458,15 +52462,15 @@ var require_ens_resolver = __commonJS({
                 }
                 linkage.push({ type: "metadata-url", value: metadataUrl });
                 let metadata = {};
-                const response2 = await new index_js_5.FetchRequest(metadataUrl).send();
-                response2.assertOk();
+                const response3 = await new index_js_5.FetchRequest(metadataUrl).send();
+                response3.assertOk();
                 try {
-                  metadata = response2.bodyJson;
+                  metadata = response3.bodyJson;
                 } catch (error) {
                   try {
-                    linkage.push({ type: "!metadata", value: response2.bodyText });
+                    linkage.push({ type: "!metadata", value: response3.bodyText });
                   } catch (error2) {
-                    const bytes3 = response2.body;
+                    const bytes3 = response3.body;
                     if (bytes3) {
                       linkage.push({ type: "!metadata", value: (0, index_js_5.hexlify)(bytes3) });
                     }
@@ -52964,7 +52968,7 @@ var require_plugins_network = __commonJS({
        *  %%targetNetwork%%. The default ENS address and mainnet is used
        *  if unspecified.
        */
-      constructor(address2, targetNetwork) {
+      constructor(address3, targetNetwork) {
         super("org.ethers.plugins.network.Ens");
         /**
          *  The ENS Registrty Contract address.
@@ -52975,7 +52979,7 @@ var require_plugins_network = __commonJS({
          */
         __publicField(this, "targetNetwork");
         (0, properties_js_1.defineProperties)(this, {
-          address: address2 || EnsAddress2,
+          address: address3 || EnsAddress2,
           targetNetwork: targetNetwork == null ? 1 : targetNetwork
         });
       }
@@ -53292,14 +53296,14 @@ var require_network = __commonJS({
     function getGasStationPlugin2(url) {
       return new plugins_network_js_1.FetchUrlFeeDataNetworkPlugin(url, async (fetchFeeData, provider, request) => {
         request.setHeader("User-Agent", "ethers");
-        let response2;
+        let response3;
         try {
           const [_response, _feeData] = await Promise.all([
             request.send(),
             fetchFeeData()
           ]);
-          response2 = _response;
-          const payload = response2.bodyJson.standard;
+          response3 = _response;
+          const payload = response3.bodyJson.standard;
           const feeData = {
             gasPrice: _feeData.gasPrice,
             maxFeePerGas: parseUnits3(payload.maxFee, 9),
@@ -53307,7 +53311,7 @@ var require_network = __commonJS({
           };
           return feeData;
         } catch (error) {
-          (0, index_js_2.assert)(false, `error encountered with polygon gas station (${JSON.stringify(request.url)})`, "SERVER_ERROR", { request, response: response2, error });
+          (0, index_js_2.assert)(false, `error encountered with polygon gas station (${JSON.stringify(request.url)})`, "SERVER_ERROR", { request, response: response3, error });
         }
       });
     }
@@ -54030,8 +54034,8 @@ var require_abstract_provider = __commonJS({
        *  names and [[Addressable]] objects and returning if already an
        *  address.
        */
-      _getAddress(address2) {
-        return (0, index_js_1.resolveAddress)(address2, this);
+      _getAddress(address3) {
+        return (0, index_js_1.resolveAddress)(address3, this);
       }
       /**
        *  Returns or resolves to a valid block tag for %%blockTag%%, resolving
@@ -54087,16 +54091,16 @@ var require_abstract_provider = __commonJS({
         });
         const blockHash = "blockHash" in filter ? filter.blockHash : void 0;
         const resolve = (_address, fromBlock2, toBlock2) => {
-          let address3 = void 0;
+          let address4 = void 0;
           switch (_address.length) {
             case 0:
               break;
             case 1:
-              address3 = _address[0];
+              address4 = _address[0];
               break;
             default:
               _address.sort();
-              address3 = _address;
+              address4 = _address;
           }
           if (blockHash) {
             if (fromBlock2 != null || toBlock2 != null) {
@@ -54104,8 +54108,8 @@ var require_abstract_provider = __commonJS({
             }
           }
           const filter2 = {};
-          if (address3) {
-            filter2.address = address3;
+          if (address4) {
+            filter2.address = address4;
           }
           if (topics.length) {
             filter2.topics = topics;
@@ -54121,14 +54125,14 @@ var require_abstract_provider = __commonJS({
           }
           return filter2;
         };
-        let address2 = [];
+        let address3 = [];
         if (filter.address) {
           if (Array.isArray(filter.address)) {
             for (const addr of filter.address) {
-              address2.push(this._getAddress(addr));
+              address3.push(this._getAddress(addr));
             }
           } else {
-            address2.push(this._getAddress(filter.address));
+            address3.push(this._getAddress(filter.address));
           }
         }
         let fromBlock = void 0;
@@ -54139,12 +54143,12 @@ var require_abstract_provider = __commonJS({
         if ("toBlock" in filter) {
           toBlock = this._getBlockTag(filter.toBlock);
         }
-        if (address2.filter((a) => typeof a !== "string").length || fromBlock != null && typeof fromBlock !== "string" || toBlock != null && typeof toBlock !== "string") {
-          return Promise.all([Promise.all(address2), fromBlock, toBlock]).then((result) => {
+        if (address3.filter((a) => typeof a !== "string").length || fromBlock != null && typeof fromBlock !== "string" || toBlock != null && typeof toBlock !== "string") {
+          return Promise.all([Promise.all(address3), fromBlock, toBlock]).then((result) => {
             return resolve(result[0], result[1], result[2]);
           });
         }
-        return resolve(address2, fromBlock, toBlock);
+        return resolve(address3, fromBlock, toBlock);
       }
       /**
        *  Returns or resolves to a transaction for %%request%%, resolving
@@ -54278,18 +54282,18 @@ var require_abstract_provider = __commonJS({
         });
         return await __privateMethod(this, _AbstractProvider_instances2, checkNetwork_fn2).call(this, __privateMethod(this, _AbstractProvider_instances2, call_fn2).call(this, tx, blockTag, _tx.enableCcipRead ? 0 : -1));
       }
-      async getBalance(address2, blockTag) {
-        return (0, index_js_6.getBigInt)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getBalance" }, address2, blockTag), "%response");
+      async getBalance(address3, blockTag) {
+        return (0, index_js_6.getBigInt)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getBalance" }, address3, blockTag), "%response");
       }
-      async getTransactionCount(address2, blockTag) {
-        return (0, index_js_6.getNumber)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getTransactionCount" }, address2, blockTag), "%response");
+      async getTransactionCount(address3, blockTag) {
+        return (0, index_js_6.getNumber)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getTransactionCount" }, address3, blockTag), "%response");
       }
-      async getCode(address2, blockTag) {
-        return (0, index_js_6.hexlify)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getCode" }, address2, blockTag));
+      async getCode(address3, blockTag) {
+        return (0, index_js_6.hexlify)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getCode" }, address3, blockTag));
       }
-      async getStorage(address2, _position, blockTag) {
+      async getStorage(address3, _position, blockTag) {
         const position = (0, index_js_6.getBigInt)(_position, "position");
-        return (0, index_js_6.hexlify)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getStorage", position }, address2, blockTag));
+        return (0, index_js_6.hexlify)(await __privateMethod(this, _AbstractProvider_instances2, getAccountValue_fn2).call(this, { method: "getStorage", position }, address3, blockTag));
       }
       // Write
       async broadcastTransaction(signedTx) {
@@ -54390,9 +54394,9 @@ var require_abstract_provider = __commonJS({
         }
         return null;
       }
-      async lookupAddress(address2) {
-        address2 = (0, index_js_1.getAddress)(address2);
-        const node = (0, index_js_4.namehash)(address2.substring(2).toLowerCase() + ".addr.reverse");
+      async lookupAddress(address3) {
+        address3 = (0, index_js_1.getAddress)(address3);
+        const node = (0, index_js_4.namehash)(address3.substring(2).toLowerCase() + ".addr.reverse");
         try {
           const ensAddr = await ens_resolver_js_1.EnsResolver.getEnsAddress(this);
           const ensContract = new index_js_3.Contract(ensAddr, [
@@ -54407,7 +54411,7 @@ var require_abstract_provider = __commonJS({
           ], this);
           const name = await resolverContract.name(node);
           const check = await this.resolveName(name);
-          if (check !== address2) {
+          if (check !== address3) {
             return null;
           }
           return name;
@@ -54869,12 +54873,12 @@ var require_abstract_provider = __commonJS({
       return value;
     };
     getAccountValue_fn2 = async function(request, _address, _blockTag) {
-      let address2 = this._getAddress(_address);
+      let address3 = this._getAddress(_address);
       let blockTag = this._getBlockTag(_blockTag);
-      if (typeof address2 !== "string" || typeof blockTag !== "string") {
-        [address2, blockTag] = await Promise.all([address2, blockTag]);
+      if (typeof address3 !== "string" || typeof blockTag !== "string") {
+        [address3, blockTag] = await Promise.all([address3, blockTag]);
       }
-      return await __privateMethod(this, _AbstractProvider_instances2, checkNetwork_fn2).call(this, __privateMethod(this, _AbstractProvider_instances2, perform_fn2).call(this, Object.assign(request, { address: address2, blockTag })));
+      return await __privateMethod(this, _AbstractProvider_instances2, checkNetwork_fn2).call(this, __privateMethod(this, _AbstractProvider_instances2, perform_fn2).call(this, Object.assign(request, { address: address3, blockTag })));
     };
     getBlock_fn2 = async function(block2, includeTransactions) {
       if ((0, index_js_6.isHexString)(block2, 32)) {
@@ -55065,9 +55069,9 @@ var require_abstract_signer = __commonJS({
         pop.from = Promise.all([
           signer.getAddress(),
           (0, index_js_1.resolveAddress)(from, signer)
-        ]).then(([address2, from2]) => {
-          (0, index_js_3.assertArgument)(address2.toLowerCase() === from2.toLowerCase(), "transaction from mismatch", "tx.from", from2);
-          return address2;
+        ]).then(([address3, from2]) => {
+          (0, index_js_3.assertArgument)(address3.toLowerCase() === from2.toLowerCase(), "transaction from mismatch", "tx.from", from2);
+          return address3;
         });
       } else {
         pop.from = signer.getAddress();
@@ -55209,14 +55213,14 @@ var require_abstract_signer = __commonJS({
        *  Creates a new **VoidSigner** with %%address%% attached to
        *  %%provider%%.
        */
-      constructor(address2, provider) {
+      constructor(address3, provider) {
         super(provider);
         __privateAdd(this, _VoidSigner_instances2);
         /**
          *  The signer address.
          */
         __publicField(this, "address");
-        (0, index_js_3.defineProperties)(this, { address: address2 });
+        (0, index_js_3.defineProperties)(this, { address: address3 });
       }
       async getAddress() {
         return this.address;
@@ -55503,11 +55507,11 @@ var require_provider_jsonrpc = __commonJS({
       pollingInterval: 4e3
     };
     var JsonRpcSigner2 = class extends abstract_signer_js_1.AbstractSigner {
-      constructor(provider, address2) {
+      constructor(provider, address3) {
         super(provider);
         __publicField(this, "address");
-        address2 = (0, index_js_2.getAddress)(address2);
-        (0, index_js_5.defineProperties)(this, { address: address2 });
+        address3 = (0, index_js_2.getAddress)(address3);
+        (0, index_js_5.defineProperties)(this, { address: address3 });
       }
       connect(provider) {
         (0, index_js_5.assert)(false, "cannot reconnect JsonRpcSigner", "UNSUPPORTED_OPERATION", {
@@ -55617,9 +55621,9 @@ var require_provider_jsonrpc = __commonJS({
       async signTypedData(domain, types, _value2) {
         const value = deepCopy2(_value2);
         const populated = await index_js_3.TypedDataEncoder.resolveNames(domain, types, value, async (value2) => {
-          const address2 = await (0, index_js_2.resolveAddress)(value2);
-          (0, index_js_5.assertArgument)(address2 != null, "TypedData does not support null address", "value", value2);
-          return address2;
+          const address3 = await (0, index_js_2.resolveAddress)(value2);
+          (0, index_js_5.assertArgument)(address3 != null, "TypedData does not support null address", "value", value2);
+          return address3;
         });
         return await this.provider.send("eth_signTypedData_v4", [
           this.address.toLowerCase(),
@@ -56103,26 +56107,26 @@ var require_provider_jsonrpc = __commonJS({
        *
        *  Throws if the account doesn't exist.
        */
-      async getSigner(address2) {
-        if (address2 == null) {
-          address2 = 0;
+      async getSigner(address3) {
+        if (address3 == null) {
+          address3 = 0;
         }
         const accountsPromise = this.send("eth_accounts", []);
-        if (typeof address2 === "number") {
+        if (typeof address3 === "number") {
           const accounts2 = await accountsPromise;
-          if (address2 >= accounts2.length) {
+          if (address3 >= accounts2.length) {
             throw new Error("no such account");
           }
-          return new JsonRpcSigner2(this, accounts2[address2]);
+          return new JsonRpcSigner2(this, accounts2[address3]);
         }
         const { accounts } = await (0, index_js_5.resolveProperties)({
           network: this.getNetwork(),
           accounts: accountsPromise
         });
-        address2 = (0, index_js_2.getAddress)(address2);
+        address3 = (0, index_js_2.getAddress)(address3);
         for (const account of accounts) {
-          if ((0, index_js_2.getAddress)(account) === address2) {
-            return new JsonRpcSigner2(this, address2);
+          if ((0, index_js_2.getAddress)(account) === address3) {
+            return new JsonRpcSigner2(this, address3);
           }
         }
         throw new Error("invalid account");
@@ -56274,9 +56278,9 @@ var require_provider_jsonrpc = __commonJS({
         const request = this._getConnection();
         request.body = JSON.stringify(payload);
         request.setHeader("content-type", "application/json");
-        const response2 = await request.send();
-        response2.assertOk();
-        let resp = response2.bodyJson;
+        const response3 = await request.send();
+        response3.assertOk();
+        let resp = response3.bodyJson;
         if (!Array.isArray(resp)) {
           resp = [resp];
         }
@@ -56422,7 +56426,7 @@ var require_provider_ankr = __commonJS({
         const request = new index_js_1.FetchRequest(`https://${getHost7(network.name)}/${apiKey}`);
         request.allowGzip = true;
         if (apiKey === defaultApiKey3) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("AnkrProvider");
             return true;
           };
@@ -56554,7 +56558,7 @@ var require_provider_alchemy = __commonJS({
         const request = new index_js_1.FetchRequest(`https://${getHost7(network.name)}/v2/${apiKey}`);
         request.allowGzip = true;
         if (apiKey === defaultApiKey3) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("alchemy");
             return true;
           };
@@ -56643,7 +56647,7 @@ var require_provider_chainstack = __commonJS({
         const request = new index_js_1.FetchRequest(`https://${getHost7(network.name)}/${apiKey}`);
         request.allowGzip = true;
         if (apiKey === getApiKey2(network.name)) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("ChainstackProvider");
             return true;
           };
@@ -56841,46 +56845,46 @@ var require_provider_etherscan = __commonJS({
           }
           return Promise.resolve(true);
         };
-        request.processFunc = async (request2, response3) => {
-          const result2 = response3.hasBody() ? JSON.parse((0, index_js_4.toUtf8String)(response3.body)) : {};
+        request.processFunc = async (request2, response4) => {
+          const result2 = response4.hasBody() ? JSON.parse((0, index_js_4.toUtf8String)(response4.body)) : {};
           const throttle = (typeof result2.result === "string" ? result2.result : "").toLowerCase().indexOf("rate limit") >= 0;
           if (module2 === "proxy") {
             if (result2 && result2.status == 0 && result2.message == "NOTOK" && throttle) {
               this.emit("debug", { action: "receiveError", id: id2, reason: "proxy-NOTOK", error: result2 });
-              response3.throwThrottleError(result2.result, THROTTLE2);
+              response4.throwThrottleError(result2.result, THROTTLE2);
             }
           } else {
             if (throttle) {
               this.emit("debug", { action: "receiveError", id: id2, reason: "null result", error: result2.result });
-              response3.throwThrottleError(result2.result, THROTTLE2);
+              response4.throwThrottleError(result2.result, THROTTLE2);
             }
           }
-          return response3;
+          return response4;
         };
         if (payload) {
           request.setHeader("content-type", "application/x-www-form-urlencoded; charset=UTF-8");
           request.body = Object.keys(payload).map((k) => `${k}=${payload[k]}`).join("&");
         }
-        const response2 = await request.send();
+        const response3 = await request.send();
         try {
-          response2.assertOk();
+          response3.assertOk();
         } catch (error) {
           this.emit("debug", { action: "receiveError", id: id2, error, reason: "assertOk" });
-          (0, index_js_4.assert)(false, "response error", "SERVER_ERROR", { request, response: response2 });
+          (0, index_js_4.assert)(false, "response error", "SERVER_ERROR", { request, response: response3 });
         }
-        if (!response2.hasBody()) {
+        if (!response3.hasBody()) {
           this.emit("debug", { action: "receiveError", id: id2, error: "missing body", reason: "null body" });
-          (0, index_js_4.assert)(false, "missing response", "SERVER_ERROR", { request, response: response2 });
+          (0, index_js_4.assert)(false, "missing response", "SERVER_ERROR", { request, response: response3 });
         }
-        const result = JSON.parse((0, index_js_4.toUtf8String)(response2.body));
+        const result = JSON.parse((0, index_js_4.toUtf8String)(response3.body));
         if (module2 === "proxy") {
           if (result.jsonrpc != "2.0") {
             this.emit("debug", { action: "receiveError", id: id2, result, reason: "invalid JSON-RPC" });
-            (0, index_js_4.assert)(false, "invalid JSON-RPC response (missing jsonrpc='2.0')", "SERVER_ERROR", { request, response: response2, info: { result } });
+            (0, index_js_4.assert)(false, "invalid JSON-RPC response (missing jsonrpc='2.0')", "SERVER_ERROR", { request, response: response3, info: { result } });
           }
           if (result.error) {
             this.emit("debug", { action: "receiveError", id: id2, result, reason: "JSON-RPC error" });
-            (0, index_js_4.assert)(false, "error response", "SERVER_ERROR", { request, response: response2, info: { result } });
+            (0, index_js_4.assert)(false, "error response", "SERVER_ERROR", { request, response: response3, info: { result } });
           }
           this.emit("debug", { action: "receiveRequest", id: id2, result });
           return result.result;
@@ -56891,7 +56895,7 @@ var require_provider_etherscan = __commonJS({
           }
           if (result.status != 1 || typeof result.message === "string" && !result.message.match(/^OK/)) {
             this.emit("debug", { action: "receiveError", id: id2, result });
-            (0, index_js_4.assert)(false, "error response", "SERVER_ERROR", { request, response: response2, info: { result } });
+            (0, index_js_4.assert)(false, "error response", "SERVER_ERROR", { request, response: response3, info: { result } });
           }
           this.emit("debug", { action: "receiveRequest", id: id2, result });
           return result.result;
@@ -57194,17 +57198,17 @@ var require_provider_etherscan = __commonJS({
        *  Etherscan API to retreive the Contract ABI.
        */
       async getContract(_address) {
-        let address2 = this._getAddress(_address);
-        if (isPromise3(address2)) {
-          address2 = await address2;
+        let address3 = this._getAddress(_address);
+        if (isPromise3(address3)) {
+          address3 = await address3;
         }
         try {
           const resp = await this.fetch("contract", {
             action: "getabi",
-            address: address2
+            address: address3
           });
           const abi = JSON.parse(resp);
-          return new index_js_2.Contract(address2, abi, this);
+          return new index_js_2.Contract(address3, abi, this);
         } catch (error) {
           return null;
         }
@@ -57737,7 +57741,7 @@ var require_provider_infura = __commonJS({
           request.setCredentials("", projectSecret);
         }
         if (projectId === defaultProjectId2) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("InfuraProvider");
             return true;
           };
@@ -57842,7 +57846,7 @@ var require_provider_quicknode = __commonJS({
         const request = new index_js_1.FetchRequest(`https://${getHost7(network.name)}/${token}`);
         request.allowGzip = true;
         if (token === defaultToken2) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("QuickNodeProvider");
             return true;
           };
@@ -58703,22 +58707,22 @@ var require_provider_browser = __commonJS({
       /**
        *  Resolves to ``true`` if the provider manages the %%address%%.
        */
-      async hasSigner(address2) {
-        if (address2 == null) {
-          address2 = 0;
+      async hasSigner(address3) {
+        if (address3 == null) {
+          address3 = 0;
         }
         const accounts = await this.send("eth_accounts", []);
-        if (typeof address2 === "number") {
-          return accounts.length > address2;
+        if (typeof address3 === "number") {
+          return accounts.length > address3;
         }
-        address2 = address2.toLowerCase();
-        return accounts.filter((a) => a.toLowerCase() === address2).length !== 0;
+        address3 = address3.toLowerCase();
+        return accounts.filter((a) => a.toLowerCase() === address3).length !== 0;
       }
-      async getSigner(address2) {
-        if (address2 == null) {
-          address2 = 0;
+      async getSigner(address3) {
+        if (address3 == null) {
+          address3 = 0;
         }
-        if (!await this.hasSigner(address2)) {
+        if (!await this.hasSigner(address3)) {
           try {
             await __privateGet(this, _request3).call(this, "eth_requestAccounts", []);
           } catch (error) {
@@ -58726,7 +58730,7 @@ var require_provider_browser = __commonJS({
             throw this.getRpcError(payload, { id: payload.id, error });
           }
         }
-        return await super.getSigner(address2);
+        return await super.getSigner(address3);
       }
       /**
        *  Discover and connect to a Provider in the Browser using the
@@ -59007,7 +59011,7 @@ var require_provider_pocket = __commonJS({
           request.setCredentials("", applicationSecret);
         }
         if (applicationId === defaultApplicationId2) {
-          request.retryFunc = async (request2, response2, attempt) => {
+          request.retryFunc = async (request2, response3, attempt) => {
             (0, community_js_1.showThrottleMessage)("PocketProvider");
             return true;
           };
@@ -59228,8 +59232,8 @@ var require_base_wallet = __commonJS({
         __privateAdd(this, _signingKey2);
         (0, index_js_5.assertArgument)(privateKey && typeof privateKey.sign === "function", "invalid private key", "privateKey", "[ REDACTED ]");
         __privateSet(this, _signingKey2, privateKey);
-        const address2 = (0, index_js_4.computeAddress)(this.signingKey.publicKey);
-        (0, index_js_5.defineProperties)(this, { address: address2 });
+        const address3 = (0, index_js_4.computeAddress)(this.signingKey.publicKey);
+        (0, index_js_5.defineProperties)(this, { address: address3 });
       }
       // Store private values behind getters to reduce visibility
       // in console.log
@@ -59309,11 +59313,11 @@ var require_base_wallet = __commonJS({
             operation: "resolveName",
             info: { name }
           });
-          const address2 = await this.provider.resolveName(name);
-          (0, index_js_5.assert)(address2 != null, "unconfigured ENS name", "UNCONFIGURED_NAME", {
+          const address3 = await this.provider.resolveName(name);
+          (0, index_js_5.assert)(address3 != null, "unconfigured ENS name", "UNCONFIGURED_NAME", {
             value: name
           });
-          return address2;
+          return address3;
         });
         return this.signingKey.sign(index_js_2.TypedDataEncoder.hash(populated.domain, types, populated.value)).serialized;
       }
@@ -60445,15 +60449,15 @@ var require_json_keystore = __commonJS({
       const computedMAC = (0, index_js_4.hexlify)((0, index_js_2.keccak256)((0, index_js_4.concat)([key.slice(16, 32), ciphertext]))).substring(2);
       (0, index_js_4.assertArgument)(computedMAC === (0, utils_js_1.spelunk)(data, "crypto.mac:string!").toLowerCase(), "incorrect password", "password", "[ REDACTED ]");
       const privateKey = decrypt2(data, key.slice(0, 16), ciphertext);
-      const address2 = (0, index_js_3.computeAddress)(privateKey);
+      const address3 = (0, index_js_3.computeAddress)(privateKey);
       if (data.address) {
         let check = data.address.toLowerCase();
         if (!check.startsWith("0x")) {
           check = "0x" + check;
         }
-        (0, index_js_4.assertArgument)((0, index_js_1.getAddress)(check) === address2, "keystore address/privateKey mismatch", "address", data.address);
+        (0, index_js_4.assertArgument)((0, index_js_1.getAddress)(check) === address3, "keystore address/privateKey mismatch", "address", data.address);
       }
-      const account = { address: address2, privateKey };
+      const account = { address: address3, privateKey };
       const version2 = (0, utils_js_1.spelunk)(data, "x-ethers.version:string");
       if (version2 === "0.1") {
         const mnemonicKey = key.slice(32, 64);
@@ -60977,8 +60981,8 @@ var require_hdwallet = __commonJS({
       /**
        *  @private
        */
-      constructor(guard, address2, publicKey, parentFingerprint, chainCode, path, index, depth, provider) {
-        super(address2, provider);
+      constructor(guard, address3, publicKey, parentFingerprint, chainCode, path, index, depth, provider) {
+        super(address3, provider);
         /**
          *  The compressed public key.
          */
@@ -61073,8 +61077,8 @@ var require_hdwallet = __commonJS({
         }
         const { IR, IL } = ser_I2(index, this.chainCode, this.publicKey, null);
         const Ki = index_js_1.SigningKey.addPoints(IL, this.publicKey, true);
-        const address2 = (0, index_js_3.computeAddress)(Ki);
-        return new _HDNodeVoidWallet(_guard7, address2, Ki, this.fingerprint, (0, index_js_4.hexlify)(IR), path, index, this.depth + 1, this.provider);
+        const address3 = (0, index_js_3.computeAddress)(Ki);
+        return new _HDNodeVoidWallet(_guard7, address3, Ki, this.fingerprint, (0, index_js_4.hexlify)(IR), path, index, this.depth + 1, this.provider);
       }
       /**
        *  Return the signer for %%path%% from this node.
@@ -61125,7 +61129,7 @@ var require_json_crowdsale = __commonJS({
     function decryptCrowdsaleJson2(json8, _password) {
       const data = JSON.parse(json8);
       const password = (0, utils_js_1.getPassword)(_password);
-      const address2 = (0, index_js_1.getAddress)((0, utils_js_1.spelunk)(data, "ethaddr:string!"));
+      const address3 = (0, index_js_1.getAddress)((0, utils_js_1.spelunk)(data, "ethaddr:string!"));
       const encseed = (0, utils_js_1.looseArrayify)((0, utils_js_1.spelunk)(data, "encseed:string!"));
       (0, index_js_4.assertArgument)(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json8);
       const key = (0, index_js_4.getBytes)((0, index_js_2.pbkdf2)(password, password, 2e3, 32, "sha256")).slice(0, 16);
@@ -61137,7 +61141,7 @@ var require_json_crowdsale = __commonJS({
       for (let i = 0; i < seed.length; i++) {
         seedHex += String.fromCharCode(seed[i]);
       }
-      return { address: address2, privateKey: (0, index_js_3.id)(seedHex) };
+      return { address: address3, privateKey: (0, index_js_3.id)(seedHex) };
     }
     exports.decryptCrowdsaleJson = decryptCrowdsaleJson2;
   }
@@ -62332,9 +62336,9 @@ var init_transport = __esm({
         }, timeoutMs);
       });
       const execute = async () => {
-        const response2 = await fetchImpl(url, { ...init2, signal: controller.signal });
-        if (!response2.body) return response2;
-        reader = response2.body.getReader();
+        const response3 = await fetchImpl(url, { ...init2, signal: controller.signal });
+        if (!response3.body) return response3;
+        reader = response3.body.getReader();
         const chunks = [];
         let length = 0;
         for (; ; ) {
@@ -62350,7 +62354,7 @@ var init_transport = __esm({
           bytes3.set(chunk2, offset);
           offset += chunk2.byteLength;
         }
-        return new Response(bytes3, response2);
+        return new Response(bytes3, response3);
       };
       try {
         return await Promise.race([execute(), deadline]);
@@ -62613,12 +62617,12 @@ function resolveSessionWorkerUrl(env) {
   return env.AGENT_CONTEXT.origin;
 }
 function resolveSurveysAddress(env = {}, session = {}) {
-  const address2 = safeString(
+  const address3 = safeString(
     session.surveysAddress
   );
-  if (!ADDRESS_RE.test(address2)) return "";
+  if (!ADDRESS_RE.test(address3)) return "";
   try {
-    return ethers_exports.getAddress(address2);
+    return ethers_exports.getAddress(address3);
   } catch {
     return "";
   }
@@ -62662,7 +62666,7 @@ function rpcQuantity(value, ethersLib = ethers_exports) {
   return ethersLib.toQuantity(BigInt(value));
 }
 async function rpcJsonFetch(fetchImpl, rpcUrl = "", method = "", params = []) {
-  const response2 = await boundedAgentFetch(fetchImpl)(rpcUrl, {
+  const response3 = await boundedAgentFetch(fetchImpl)(rpcUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -62672,8 +62676,8 @@ async function rpcJsonFetch(fetchImpl, rpcUrl = "", method = "", params = []) {
       params
     })
   });
-  const body = await parseJsonResponse(response2);
-  if (!response2?.ok || body?.error) {
+  const body = await parseJsonResponse(response3);
+  if (!response3?.ok || body?.error) {
     throw new Error("agent_rpc_request_failed");
   }
   return body?.result;
@@ -62709,12 +62713,12 @@ async function waitForAccountBalance({
 } = {}) {
   if (!attempts) return { ok: false, skipped: true, reason: "balance_wait_disabled" };
   const rpcUrl = await selectReadyRpcUrl({ rpcUrls, chainId, fetchImpl, ethersLib });
-  const address2 = ethersLib.getAddress(accountAddress);
+  const address3 = ethersLib.getAddress(accountAddress);
   let lastBalance = BigInt(0);
   let lastError = null;
   for (let i = 0; i < attempts; i += 1) {
     try {
-      lastBalance = BigInt(await rpcJsonFetch(fetchImpl, rpcUrl, "eth_getBalance", [address2, "latest"]));
+      lastBalance = BigInt(await rpcJsonFetch(fetchImpl, rpcUrl, "eth_getBalance", [address3, "latest"]));
       if (lastBalance > 0n) {
         return {
           ok: true,
@@ -62791,16 +62795,16 @@ async function broadcastSubmitResponsesWithRpc({
     gasPrice: rpcQuantity(gasPrice, ethersLib)
   };
 }
-async function parseJsonResponse(response2) {
-  if (!response2 || typeof response2.json !== "function") return {};
+async function parseJsonResponse(response3) {
+  if (!response3 || typeof response3.json !== "function") return {};
   try {
-    return await response2.json();
+    return await response3.json();
   } catch {
     return {};
   }
 }
-function retryAfterSeconds(response2) {
-  const value = safeString(response2?.headers?.get?.("Retry-After"));
+function retryAfterSeconds(response3) {
+  const value = safeString(response3?.headers?.get?.("Retry-After"));
   if (!value) return 0;
   const seconds = /^\d+$/.test(value) ? Number(value) : Math.ceil((Date.parse(value) - Date.now()) / 1e3);
   return Number.isFinite(seconds) && seconds > 0 ? Math.min(86400, Math.ceil(seconds)) : 0;
@@ -62925,9 +62929,9 @@ function buildAgentResponsePayload({
   return payload;
 }
 async function uploadResponsePayload({ env, payload, idempotencyKey } = {}) {
-  let response2;
+  let response3;
   try {
-    response2 = await env.AGENT_SERVICES.storage("/storage/upload", { method: "POST", body: {
+    response3 = await env.AGENT_SERVICES.storage("/storage/upload", { method: "POST", body: {
       data: payload,
       contentType: "application/json",
       resource: "responses",
@@ -62940,15 +62944,15 @@ async function uploadResponsePayload({ env, payload, idempotencyKey } = {}) {
     }
     throw error;
   }
-  const body = await parseJsonResponse(response2);
-  if (!response2?.ok) {
-    const error = new Error(`storage_upload_failed: ${safeString(body?.error || response2?.status)}`);
-    error.status = Number(response2?.status) || 0;
+  const body = await parseJsonResponse(response3);
+  if (!response3?.ok) {
+    const error = new Error(`storage_upload_failed: ${safeString(body?.error || response3?.status)}`);
+    error.status = Number(response3?.status) || 0;
     const knownId = safeString(body?.storageRef?.id || body?.id || body?.txId || body?.transactionId);
     if (knownId) error.storageUpload = { id: knownId, storageRef: body?.storageRef || null, backend: safeString(body?.storageRef?.backend || body?.backend) };
     error.uploadRejected = !knownId && [400, 401, 403, 404, 405, 410, 413, 415, 422, 429].includes(error.status);
     error.retryable = error.status === 429;
-    error.retryAfterSeconds = retryAfterSeconds(response2);
+    error.retryAfterSeconds = retryAfterSeconds(response3);
     throw error;
   }
   const id2 = safeString(body?.storageRef?.id || body?.id || body?.txId || body?.transactionId);
@@ -64588,8 +64592,8 @@ function resolveRegistryRpcUrls2(env = {}) {
   return [...new Set([env.DEFAULT_RPC_URL, env.ADDITIONAL_RPC_URL].flatMap((value) => safeString(value).split(/[\s,]+/)))].filter((url) => /^https:\/\/[^/\s]+(?:\/.*)?$/i.test(url));
 }
 function resolveSessionRegistryAddress(env = {}) {
-  const address2 = safeString(env.SESSION_REGISTRY_ADDRESS);
-  return /^0x[0-9a-fA-F]{40}$/.test(address2) ? address2 : "";
+  const address3 = safeString(env.SESSION_REGISTRY_ADDRESS);
+  return /^0x[0-9a-fA-F]{40}$/.test(address3) ? address3 : "";
 }
 async function listCurrentAgentSession({ env = {} } = {}) {
   const policy = await loadSessionPolicy(env);
@@ -64611,13 +64615,13 @@ async function rpcRequest({
   timeoutMs = DEFAULT_RPC_TIMEOUT_MS
 } = {}) {
   if (typeof fetchImpl !== "function") throw new Error("fetch unavailable");
-  const response2 = await boundedAgentFetch(fetchImpl, { timeoutMs, maxBytes: 2 * 1024 * 1024 })(rpcUrl, {
+  const response3 = await boundedAgentFetch(fetchImpl, { timeoutMs, maxBytes: 2 * 1024 * 1024 })(rpcUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
   });
-  const body = await response2.json().catch(() => ({}));
-  if (!response2.ok || body?.error) throw new Error("registry_rpc_request_failed");
+  const body = await response3.json().catch(() => ({}));
+  if (!response3.ok || body?.error) throw new Error("registry_rpc_request_failed");
   return body?.result;
 }
 async function rpcWithFallback({
@@ -64682,13 +64686,13 @@ async function fetchArweaveJson(pointerId = "", {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(new Error("Arweave fetch timed out")), timeoutMs);
       try {
-        const response2 = await fetchImpl(`${gateway}/${pathPrefix}${id2}`, {
+        const response3 = await fetchImpl(`${gateway}/${pathPrefix}${id2}`, {
           method: "GET",
           signal: controller.signal,
           headers: { accept: "application/json" }
         });
-        if (!response2?.ok) continue;
-        const payload = await response2.json().catch(() => null);
+        if (!response3?.ok) continue;
+        const payload = await response3.json().catch(() => null);
         if (payload && typeof payload === "object" && !Array.isArray(payload)) {
           return payload;
         }
@@ -64706,8 +64710,8 @@ async function buildCloudflareQuestionStorageAuth({ env } = {}) {
 }
 async function fetchCloudflareStorageJson(pointerId = "", { env = {} } = {}) {
   if (!pointerId) return null;
-  const response2 = await env.AGENT_SERVICES.storage(`/storage/read?id=${encodeURIComponent(pointerId)}`);
-  return response2.ok ? response2.json() : null;
+  const response3 = await env.AGENT_SERVICES.storage(`/storage/read?id=${encodeURIComponent(pointerId)}`);
+  return response3.ok ? response3.json() : null;
 }
 async function fetchSessionConfigForQuestions({ env, sessionSlug, rpcUrls = [], fetchImpl = globalThis.fetch } = {}) {
   await env.AGENT_SERVICES.current();
@@ -64832,12 +64836,12 @@ function normalizeSbtAddresses(values = []) {
   const seen = /* @__PURE__ */ new Set();
   const out = [];
   raw.forEach((value) => {
-    const address2 = normalizeHexAddress(value);
-    if (!address2) return;
-    const key = lower2(address2);
+    const address3 = normalizeHexAddress(value);
+    if (!address3) return;
+    const key = lower2(address3);
     if (seen.has(key)) return;
     seen.add(key);
-    out.push(address2);
+    out.push(address3);
   });
   return out;
 }
@@ -65307,13 +65311,13 @@ async function authorizeCachedIndex(env, index) {
       pointerBackend: STORAGE_BACKENDS2.CLOUDFLARE,
       sessionSlug: env.AGENT_CONTEXT.slug
     };
-    const response2 = await env.AGENT_SERVICES.storage(`/storage/read?id=${encodeURIComponent(ref.id)}`);
-    if (!response2.ok) {
-      if (![401, 403, 404].includes(response2.status)) throw new Error("question_authority_unavailable");
+    const response3 = await env.AGENT_SERVICES.storage(`/storage/read?id=${encodeURIComponent(ref.id)}`);
+    if (!response3.ok) {
+      if (![401, 403, 404].includes(response3.status)) throw new Error("question_authority_unavailable");
       questions.push(lockedQuestionPlaceholder(args));
       continue;
     }
-    const fresh = normalizeQuestionPayload(await response2.json(), args);
+    const fresh = normalizeQuestionPayload(await response3.json(), args);
     questions.push(fresh?.sessionSlug === env.AGENT_CONTEXT.slug ? fresh : lockedQuestionPlaceholder(args));
   }
   return { ...index, questions, questionCount: questions.length };
@@ -65589,8 +65593,8 @@ function cacheKey(sessionSlug = "") {
   return `${QUESTION_CACHE_PREFIX}${lower2(sessionSlug) || "general"}`;
 }
 function sessionQuestionCacheKey(env, sessionSlug) {
-  const { sessionId, revision, address: address2 } = env.AGENT_CONTEXT;
-  return cacheKey(`${sessionId}:${revision}:${address2}:${lower2(sessionSlug)}`);
+  const { sessionId, revision, address: address3 } = env.AGENT_CONTEXT;
+  return cacheKey(`${sessionId}:${revision}:${address3}:${lower2(sessionSlug)}`);
 }
 function mergeQuestionRanges(ranges = []) {
   const sorted = ranges.map((range) => ({
@@ -66649,9 +66653,9 @@ async function buildWorkerStorageAuth({ env }) {
   return { ok: true, internal: true, workerUrl: env.AGENT_CONTEXT.origin };
 }
 async function fetchWorkerCloudflareJson({ env, path }) {
-  const response2 = await env.AGENT_SERVICES.storage(path);
-  const body = await response2.json().catch(() => null);
-  return response2.ok ? { ok: true, body } : { ok: false, status: response2.status, reason: "agent_storage_read_denied" };
+  const response3 = await env.AGENT_SERVICES.storage(path);
+  const body = await response3.json().catch(() => null);
+  return response3.ok ? { ok: true, body } : { ok: false, status: response3.status, reason: "agent_storage_read_denied" };
 }
 async function loadWorkerCloudflareQuestions({
   env = {},
@@ -70299,6 +70303,190 @@ var init_responseFieldKeyRoute = __esm({
   }
 });
 
+// workers/sessionCorsWorker/draftTextRoute.js
+var DRAFT_TEXT_PATHS, draftTextPrefix, MAX_BODY_CHARS, MAX_ITEMS, MAX_TEXT_CHARS, EXPORT_PAGE_ROWS, KV_BULK_GET_KEYS, ORIGINS, CONDITIONS, ITEM_KEYS, isObj16, address2, response2, rowKey, readBody, optionalText, hasText, checkItems, put, ownsRow, remove, exportRows, draftTextRoute;
+var init_draftTextRoute = __esm({
+  "workers/sessionCorsWorker/draftTextRoute.js"() {
+    init_interviewSettings();
+    init_deployHelperCore();
+    init_responseAnswerValidation();
+    init_sessionSlugResolution();
+    init_storageKvBindings();
+    DRAFT_TEXT_PATHS = Object.freeze(["/storage/draft-text/put", "/storage/draft-text/delete", "/storage/draft-text/export"]);
+    draftTextPrefix = (slug) => `ce-draft-text:${sessionSlugStorageKey(slug)}:`;
+    MAX_BODY_CHARS = 2 * 1024 * 1024;
+    MAX_ITEMS = 200;
+    MAX_TEXT_CHARS = 8e3;
+    EXPORT_PAGE_ROWS = 250;
+    KV_BULK_GET_KEYS = 100;
+    ORIGINS = /* @__PURE__ */ new Set(["external_prefill", "voice_interview", "typed_context", "group_recording", "wrapped_agent", "unknown"]);
+    CONDITIONS = /* @__PURE__ */ new Set(["shown", "blind"]);
+    ITEM_KEYS = /* @__PURE__ */ new Set(["questionId", "aiAnswer", "aiComment", "origin", "condition"]);
+    isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    address2 = (value) => /^0x[0-9a-f]{40}$/i.test(String(value || "")) ? String(value).toLowerCase() : "";
+    response2 = (body, status, headers2) => new Response(JSON.stringify(body), {
+      status,
+      headers: { ...Object.fromEntries(new Headers(headers2 || {})), "Content-Type": "application/json", "Cache-Control": "private, no-store" }
+    });
+    rowKey = async (slug, principal, questionId4) => `${draftTextPrefix(slug)}${await sha256Hex(`${principal}|${questionId4.toLowerCase()}`)}`;
+    readBody = async (request, maxChars) => {
+      if (Number(request.headers.get("content-length") || 0) > maxChars) return { status: 413 };
+      try {
+        const text6 = await request.text();
+        if (text6.length > maxChars) return { status: 413 };
+        const body = JSON.parse(text6);
+        return isObj16(body) ? { body } : { status: 400 };
+      } catch {
+        return { status: 400 };
+      }
+    };
+    optionalText = (value) => value === void 0 || value === null || typeof value === "string" && value.length <= MAX_TEXT_CHARS;
+    hasText = (value) => typeof value === "string" && !!value.trim();
+    checkItems = (body) => {
+      const { items } = body;
+      if (Object.keys(body).some((key) => key !== "items") || !Array.isArray(items) || !items.length) return "Send items: a list of drafts.";
+      if (items.length > MAX_ITEMS) return `Send at most ${MAX_ITEMS} drafts at once.`;
+      const seen = /* @__PURE__ */ new Set();
+      for (const item of items) {
+        if (!isObj16(item) || Object.keys(item).some((key) => !ITEM_KEYS.has(key))) return "A draft has a field this route does not accept.";
+        const questionId4 = typeof item.questionId === "string" ? item.questionId.trim() : "";
+        if (!questionId4 || questionId4.length > 256) return "Each draft needs a questionId.";
+        if (seen.has(questionId4.toLowerCase())) return "Each question may appear once.";
+        seen.add(questionId4.toLowerCase());
+        if (!optionalText(item.aiAnswer) || !optionalText(item.aiComment)) return `Draft text is limited to ${MAX_TEXT_CHARS} characters a field.`;
+        if (!hasText(item.aiAnswer) && !hasText(item.aiComment)) return "Each draft needs an aiAnswer or aiComment.";
+        if (item.origin !== void 0 && !ORIGINS.has(item.origin)) return "Unknown draft origin.";
+        if (item.condition !== void 0 && !CONDITIONS.has(item.condition)) return "Unknown draft condition.";
+      }
+      return "";
+    };
+    put = async ({ request, env, config, slug, principal, index, authorizeSession, deps, headers: headers2 }) => {
+      if (normalizeInterviewSettings(config?.interviewMode).keepDraftTextForAdmins !== true) {
+        return response2({ error: "This session does not keep draft text.", reason: "draft_text_disabled" }, 403, headers2);
+      }
+      const read = await readBody(request, MAX_BODY_CHARS);
+      if (!read.body) return response2({ error: read.status === 413 ? "Draft text request too large." : "Invalid draft text request." }, read.status, headers2);
+      const invalid3 = checkItems(read.body);
+      if (invalid3) return response2({ error: invalid3 }, 400, headers2);
+      const access = await authorizeSession();
+      if (!access?.ok) return access?.response || response2({ error: "Session access required." }, 403, headers2);
+      const items = read.body.items.map((item) => ({ ...item, questionId: item.questionId.trim() }));
+      const known = await checkUploadedAnswers({
+        env,
+        config,
+        index,
+        slug,
+        deps,
+        payload: { responses: items.map((item) => ({ questionID: item.questionId })) }
+      });
+      if (!known.ok) return response2({ error: known.error, reason: known.reason }, known.status || 422, headers2);
+      const savedAt = (/* @__PURE__ */ new Date()).toISOString();
+      for (const item of items) {
+        const row = {
+          responder: principal,
+          questionId: item.questionId,
+          aiAnswer: typeof item.aiAnswer === "string" ? item.aiAnswer : null,
+          aiComment: typeof item.aiComment === "string" ? item.aiComment : null,
+          origin: item.origin || null,
+          condition: item.condition || null,
+          savedAt
+        };
+        await index.put(await rowKey(slug, principal, item.questionId), JSON.stringify(row), { metadata: { responder: principal } });
+      }
+      return response2({ ok: true, saved: items.length }, 200, headers2);
+    };
+    ownsRow = async (index, entry2, principal) => {
+      if (entry2.metadata?.responder) return entry2.metadata.responder === principal;
+      try {
+        return JSON.parse(await index.get(entry2.name))?.responder === principal;
+      } catch {
+        return false;
+      }
+    };
+    remove = async ({ request, slug, principal, index, headers: headers2 }) => {
+      const read = await readBody(request, MAX_BODY_CHARS);
+      if (!read.body) return response2({ error: read.status === 413 ? "Delete request too large." : "Invalid delete request." }, read.status, headers2);
+      const { questionIds, all } = read.body;
+      const keys = Object.keys(read.body);
+      const byIds = keys.length === 1 && Array.isArray(questionIds) && questionIds.length <= MAX_ITEMS && questionIds.every((id2) => typeof id2 === "string" && id2.trim() && id2.trim().length <= 256);
+      if (!byIds && !(keys.length === 1 && all === true)) {
+        return response2({ error: `Send questionIds (at most ${MAX_ITEMS}) or all: true.` }, 400, headers2);
+      }
+      if (byIds) {
+        for (const id2 of questionIds) await index.delete(await rowKey(slug, principal, id2.trim()));
+        return response2({ ok: true }, 200, headers2);
+      }
+      const owned = [];
+      let cursor = "";
+      do {
+        const listed = await index.list({ prefix: draftTextPrefix(slug), ...cursor ? { cursor } : {} });
+        for (const entry2 of listed?.keys || []) if (await ownsRow(index, entry2, principal)) owned.push(entry2.name);
+        const next = listed?.list_complete === false ? String(listed.cursor || "") : "";
+        if (listed?.list_complete === false && (!next || next === cursor)) throw new Error("Draft text list cursor did not advance.");
+        cursor = next;
+      } while (cursor);
+      for (const name of owned) await index.delete(name);
+      return response2({ ok: true }, 200, headers2);
+    };
+    exportRows = async ({ request, slug, principal, index, isConfigAdmin, headers: headers2 }) => {
+      if (typeof isConfigAdmin !== "function" || await isConfigAdmin(principal) !== true) return response2({ error: "Draft text export requires a session config admin." }, 403, headers2);
+      const read = await readBody(request, 8192);
+      if (!read.body) return response2({ error: read.status === 413 ? "Export request too large." : "Invalid export request." }, read.status, headers2);
+      const { cursor = "" } = read.body;
+      if (Object.keys(read.body).some((key) => key !== "cursor") || typeof cursor !== "string" || cursor.length > 2048) {
+        return response2({ error: "Invalid export request." }, 400, headers2);
+      }
+      let listed;
+      try {
+        listed = await index.list({ prefix: draftTextPrefix(slug), limit: EXPORT_PAGE_ROWS, ...cursor ? { cursor } : {} });
+      } catch {
+        return response2({ error: "Invalid export cursor. Restart the export." }, 400, headers2);
+      }
+      const names2 = (listed?.keys || []).map((entry2) => entry2.name);
+      const rows = [];
+      for (let start = 0; start < names2.length; start += KV_BULK_GET_KEYS) {
+        const values = await index.get(names2.slice(start, start + KV_BULK_GET_KEYS));
+        for (const name of names2.slice(start, start + KV_BULK_GET_KEYS)) {
+          let row = null;
+          try {
+            row = JSON.parse(values.get(name));
+          } catch {
+            row = null;
+          }
+          if (!isObj16(row) || !address2(row.responder)) continue;
+          rows.push({
+            responder: row.responder,
+            questionId: row.questionId,
+            aiAnswer: row.aiAnswer ?? null,
+            aiComment: row.aiComment ?? null,
+            origin: row.origin ?? null,
+            condition: row.condition ?? null,
+            savedAt: row.savedAt ?? null
+          });
+        }
+      }
+      return response2({
+        type: "ce_draft_text_export",
+        version: 1,
+        sessionSlug: slug,
+        exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        rows,
+        cursor: listed?.list_complete === false ? String(listed.cursor || "") || null : null
+      }, 200, headers2);
+    };
+    draftTextRoute = async ({ path, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, authorizeSession, isConfigAdmin }) => {
+      const principal = address2(uploaderAddress);
+      if (!principal || authScopes?.storage !== true && authScopes?.arweave !== true) return response2({ error: "Authentication required." }, 401, baseHeaders);
+      const index = getStorageIndexBinding(env);
+      if (!index?.get || !index?.put || !index?.delete || !index?.list) return response2({ error: "Draft text storage is unavailable." }, 503, baseHeaders);
+      const args = { request, env, config, slug, principal, index, deps, headers: baseHeaders };
+      if (path === "/storage/draft-text/put") return put({ ...args, authorizeSession });
+      if (path === "/storage/draft-text/delete") return remove(args);
+      return exportRows({ ...args, isConfigAdmin });
+    };
+  }
+});
+
 // workers/sessionCorsWorker/contextSourcePolicy.js
 var fail4, POLICY_ERROR, MIB, checkContextSourceUpload, contextSourceListFields;
 var init_contextSourcePolicy = __esm({
@@ -70677,7 +70865,7 @@ var init_aiProviderExecution = __esm({
       };
       const outputConfig = claudeOutputConfig({ model: claudeModel, effort: reasoning_effort, responseFormat: response_format });
       if (outputConfig) body.output_config = outputConfig;
-      const response2 = await fetchImpl(constants?.anthropicUrl || ANTHROPIC_URL, {
+      const response3 = await fetchImpl(constants?.anthropicUrl || ANTHROPIC_URL, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -70686,14 +70874,14 @@ var init_aiProviderExecution = __esm({
         },
         body: JSON.stringify(body)
       });
-      const data = await response2.json().catch(() => ({}));
-      if (!response2.ok) {
-        const retryAfter = response2.headers?.get?.("retry-after");
+      const data = await response3.json().catch(() => ({}));
+      if (!response3.ok) {
+        const retryAfter = response3.headers?.get?.("retry-after");
         const responseHeaders = new Headers(baseHeaders);
         if (retryAfter) responseHeaders.set("retry-after", retryAfter);
         return json8(
           { error: data?.error?.message || "Anthropic error", details: data },
-          response2.status,
+          response3.status,
           retryAfter ? responseHeaders : baseHeaders
         );
       }
@@ -70779,7 +70967,7 @@ var init_aiProviderExecution = __esm({
           temperature
         });
       }
-      const response2 = await fetchImpl(
+      const response3 = await fetchImpl(
         useResponses ? constants?.openAiResponsesUrl || OPENAI_RESPONSES_URL : constants?.openAiChatUrl || OPENAI_CHAT_URL,
         {
           method: "POST",
@@ -70787,14 +70975,14 @@ var init_aiProviderExecution = __esm({
           body: JSON.stringify(body)
         }
       );
-      const data = await response2.json().catch(() => ({}));
-      if (!response2.ok) {
-        const retryAfter = response2.headers?.get?.("retry-after");
+      const data = await response3.json().catch(() => ({}));
+      if (!response3.ok) {
+        const retryAfter = response3.headers?.get?.("retry-after");
         const responseHeaders = new Headers(baseHeaders);
         if (retryAfter) responseHeaders.set("retry-after", retryAfter);
         return json8(
           { error: data?.error?.message || "OpenAI error", details: data },
-          response2.status,
+          response3.status,
           retryAfter ? responseHeaders : baseHeaders
         );
       }
@@ -70854,19 +71042,19 @@ var init_aiProviderExecution = __esm({
       const title = payload?.appName || payload?.title;
       if (ref) headers2["HTTP-Referer"] = ref;
       if (title) headers2["X-Title"] = title;
-      const response2 = await fetchImpl(constants?.openRouterChatUrl || OPENROUTER_CHAT_URL, {
+      const response3 = await fetchImpl(constants?.openRouterChatUrl || OPENROUTER_CHAT_URL, {
         method: "POST",
         headers: headers2,
         body: JSON.stringify(body)
       });
-      const data = await response2.json().catch(() => ({}));
-      if (!response2.ok) {
-        const retryAfter = response2.headers?.get?.("retry-after");
+      const data = await response3.json().catch(() => ({}));
+      if (!response3.ok) {
+        const retryAfter = response3.headers?.get?.("retry-after");
         const responseHeaders = new Headers(baseHeaders);
         if (retryAfter) responseHeaders.set("retry-after", retryAfter);
         return json8(
           { error: data?.error?.message || "OpenRouter error", details: data },
-          response2.status,
+          response3.status,
           retryAfter ? responseHeaders : baseHeaders
         );
       }
@@ -70957,23 +71145,23 @@ var init_aiProviderExecution = __esm({
       if (typeof safeFetch !== "function") {
         return json8({ error: "Custom provider outbound checks are unavailable." }, 503, baseHeaders);
       }
-      const response2 = await safeFetch(rpcUrl, {
+      const response3 = await safeFetch(rpcUrl, {
         outboundUrlPolicy: STRICT_HTTPS_NO_CREDENTIALS_POLICY,
         method: "POST",
         headers: headers2,
         body: JSON.stringify(body)
       });
-      if (!(response2 instanceof Response)) {
-        return json8({ error: response2?.error }, response2?.status, baseHeaders);
+      if (!(response3 instanceof Response)) {
+        return json8({ error: response3?.error }, response3?.status, baseHeaders);
       }
-      const data = await response2.json().catch(() => ({}));
-      if (!response2.ok) {
-        const retryAfter = response2.headers?.get?.("retry-after");
+      const data = await response3.json().catch(() => ({}));
+      if (!response3.ok) {
+        const retryAfter = response3.headers?.get?.("retry-after");
         const responseHeaders = new Headers(baseHeaders);
         if (retryAfter) responseHeaders.set("retry-after", retryAfter);
         return json8(
           { error: data?.error?.message || "Custom RPC error", details: data },
-          response2.status,
+          response3.status,
           retryAfter ? responseHeaders : baseHeaders
         );
       }
@@ -71100,9 +71288,9 @@ var init_contextDocumentRead = __esm({
         filename
       });
       const headers2 = provider === "anthropic" ? { "content-type": "application/json", "anthropic-version": "2023-06-01", "x-api-key": key } : { "content-type": "application/json", authorization: `Bearer ${key}` };
-      let response2;
+      let response3;
       try {
-        response2 = await (deps.fetch || fetch)(request.url, {
+        response3 = await (deps.fetch || fetch)(request.url, {
           method: "POST",
           headers: headers2,
           body: request.body,
@@ -71111,8 +71299,8 @@ var init_contextDocumentRead = __esm({
       } catch (error) {
         return error?.name === "TimeoutError" || error?.name === "AbortError" ? fail5(504, "The session\u2019s AI took too long to read this PDF.", "context_pdf_timeout") : fail5(502, "The session\u2019s AI could not be reached.", "context_pdf_unreachable");
       }
-      const data = await response2.json().catch(() => ({}));
-      if (!response2.ok) {
+      const data = await response3.json().catch(() => ({}));
+      if (!response3.ok) {
         const detail = trim12(data?.error?.message).slice(0, 300);
         return fail5(502, `The session\u2019s AI could not read this PDF${detail ? `: ${detail}` : "."}`, "context_pdf_provider_error");
       }
@@ -71199,8 +71387,8 @@ var init_fetchExecution = __esm({
       "text/x-markdown"
     ]);
     HTML_MEDIA_TYPES = /* @__PURE__ */ new Set(["text/html", "application/xhtml+xml"]);
-    discardBody = (response2) => {
-      response2.body?.cancel?.()?.catch?.(() => {
+    discardBody = (response3) => {
+      response3.body?.cancel?.()?.catch?.(() => {
       });
     };
     isTimeout = (error) => error?.name === "TimeoutError" || error?.name === "AbortError";
@@ -71234,9 +71422,9 @@ var init_fetchExecution = __esm({
           response: json8({ error: normalized?.error }, normalized?.status || 400, baseHeaders)
         };
       }
-      let response2;
+      let response3;
       try {
-        response2 = await deps?.safeFetch?.(normalized.targetUrl, {
+        response3 = await deps?.safeFetch?.(normalized.targetUrl, {
           outboundUrlPolicy: PUBLIC_HTTPS_ARTIFACT_POLICY,
           headers: { "user-agent": FETCH_USER_AGENT },
           ...cacheTtl ? { cf: { cacheTtl } } : {},
@@ -71252,21 +71440,21 @@ var init_fetchExecution = __esm({
           )
         };
       }
-      if (!(response2 instanceof Response)) {
+      if (!(response3 instanceof Response)) {
         return {
           ok: false,
-          response: json8({ error: response2?.error }, response2?.status, baseHeaders)
+          response: json8({ error: response3?.error }, response3?.status, baseHeaders)
         };
       }
       return {
         ok: true,
-        response: response2,
+        response: response3,
         json: json8
       };
     };
-    readFetchBytes = async (response2, maxBytes = MAX_RESPONSE_BYTES) => {
+    readFetchBytes = async (response3, maxBytes = MAX_RESPONSE_BYTES) => {
       try {
-        return await readBodyBytes(response2, maxBytes);
+        return await readBodyBytes(response3, maxBytes);
       } catch (error) {
         if (error instanceof BodyByteLimitError) return null;
         throw error;
@@ -71317,17 +71505,17 @@ var init_fetchExecution = __esm({
     } = {}) => {
       const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
       if (!fetchResult?.ok) return fetchResult?.response;
-      const { response: response2, json: json8 } = fetchResult;
-      if (!response2.ok) {
-        return json8({ error: `HTTP ${response2.status}` }, 400, baseHeaders);
+      const { response: response3, json: json8 } = fetchResult;
+      if (!response3.ok) {
+        return json8({ error: `HTTP ${response3.status}` }, 400, baseHeaders);
       }
-      const type = response2.headers.get("content-type") || "";
+      const type = response3.headers.get("content-type") || "";
       if (!type.startsWith("image/")) {
         return json8({ error: "URL must return an image" }, 400, baseHeaders);
       }
       let bytes3;
       try {
-        bytes3 = await readFetchBytes(response2);
+        bytes3 = await readFetchBytes(response3);
       } catch (error) {
         if (isTimeout(error)) return json8({ error: TIMEOUT_ERROR }, 504, baseHeaders);
         throw error;
@@ -71345,20 +71533,20 @@ var init_fetchExecution = __esm({
         cacheTtl
       });
       if (!fetchResult?.ok) return failure4(fetchResult?.response?.body?.error, fetchResult?.response?.status);
-      const { response: response2 } = fetchResult;
-      if (!response2.ok) {
-        discardBody(response2);
-        return failure4(`HTTP ${response2.status}`, 400);
+      const { response: response3 } = fetchResult;
+      if (!response3.ok) {
+        discardBody(response3);
+        return failure4(`HTTP ${response3.status}`, 400);
       }
-      const contentType = response2.headers.get("content-type") || "";
+      const contentType = response3.headers.get("content-type") || "";
       const mediaType = mediaTypeOf(contentType);
       if (!TEXT_MEDIA_TYPES.has(mediaType)) {
-        discardBody(response2);
+        discardBody(response3);
         return failure4("URL must return a web page, JSON or plain text", 400);
       }
       let bytes3;
       try {
-        bytes3 = await readFetchBytes(response2, maxBytes);
+        bytes3 = await readFetchBytes(response3, maxBytes);
       } catch (error) {
         if (isTimeout(error)) return failure4(TIMEOUT_ERROR, 504);
         throw error;
@@ -71395,7 +71583,7 @@ var init_fetchExecution = __esm({
 });
 
 // workers/sessionCorsWorker/contextSourceRoute.js
-var encoder6, trim13, isObj16, clip3, commonTags, isReadingOf, readingsOf, storeRecord, adderTagsOf, addLink, coordinate, readAtOf, finishContextPdfReading, readAndStorePdf, readPdf, removeContextSource, remove, ACTIONS, contextSourceRoute;
+var encoder6, trim13, isObj17, clip3, commonTags, isReadingOf, readingsOf, storeRecord, adderTagsOf, addLink, coordinate, readAtOf, finishContextPdfReading, readAndStorePdf, readPdf, removeContextSource, remove2, ACTIONS, contextSourceRoute;
 var init_contextSourceRoute = __esm({
   "workers/sessionCorsWorker/contextSourceRoute.js"() {
     init_sessionContextSources();
@@ -71407,7 +71595,7 @@ var init_contextSourceRoute = __esm({
     init_sessionConfigAuthority();
     encoder6 = new TextEncoder();
     trim13 = (value) => typeof value === "string" ? value.trim() : "";
-    isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     clip3 = (value, max) => trim13(value).replace(/\s+/g, " ").slice(0, max);
     commonTags = (kind) => [
       { name: "CE-DocLibrary", value: "1" },
@@ -71425,10 +71613,10 @@ var init_contextSourceRoute = __esm({
       return [...found.values()];
     };
     storeRecord = async (store, payload) => {
-      const response2 = await store(payload);
-      if (!response2?.ok) return { response: response2 };
-      const body = await response2.clone().json().catch(() => ({}));
-      return trim13(body?.id) ? { id: trim13(body.id) } : { response: response2 };
+      const response3 = await store(payload);
+      if (!response3?.ok) return { response: response3 };
+      const body = await response3.clone().json().catch(() => ({}));
+      return trim13(body?.id) ? { id: trim13(body.id) } : { response: response3 };
     };
     adderTagsOf = (body) => [
       { name: CONTEXT_TAGS.adderKind, value: trim13(body.adder) },
@@ -71611,11 +71799,11 @@ var init_contextSourceRoute = __esm({
       await removeCloudflareStorageRecords({ env, slug, rows, markWrite });
       return { status: 200, body: { ok: true, removed: rows.map((entry2) => entry2.id) } };
     };
-    remove = async ({ body, env, slug, deps, json: json8 }) => {
+    remove2 = async ({ body, env, slug, deps, json: json8 }) => {
       const removed = await coordinate(deps, { env, slug, operation: "remove", id: trim13(body.id), readingIds: body.readingIds });
       return json8(removed.body, removed.status);
     };
-    ACTIONS = Object.freeze({ "add-link": addLink, "read-pdf": readPdf, remove });
+    ACTIONS = Object.freeze({ "add-link": addLink, "read-pdf": readPdf, remove: remove2 });
     contextSourceRoute = async ({
       request,
       env,
@@ -71640,10 +71828,10 @@ var init_contextSourceRoute = __esm({
       } catch {
         body = null;
       }
-      const name = isObj16(body) ? trim13(body.action) : "";
+      const name = isObj17(body) ? trim13(body.action) : "";
       const participantMay = name === "remove" || name === "add-link" && !trim13(body.replaces);
       if (!isAdmin && !participantMay) return refused();
-      if (!isObj16(body)) return json8({ error: "Invalid JSON." }, 400);
+      if (!isObj17(body)) return json8({ error: "Invalid JSON." }, 400);
       if (!Object.hasOwn(ACTIONS, name)) return json8({ error: "Unknown context action." }, 400);
       if (name === "add-link") {
         if (!isAdmin && !participantsMayAddContext(config)) {
@@ -71678,7 +71866,7 @@ var init_contextSourceRoute = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim14, isObj17, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS, KV_BULK_REPLY_BYTES, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
+var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim14, isObj18, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, KV_BULK_REPLY_BYTES, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_sessionContextSources();
@@ -71700,6 +71888,7 @@ var init_storageRouteExecution = __esm({
     init_sessionSlugResolution();
     init_storageKvBindings();
     init_responseFieldKeyRoute();
+    init_draftTextRoute();
     init_contextSourcePolicy();
     init_contextSourceRoute();
     init_stringCoercion();
@@ -71710,7 +71899,7 @@ var init_storageRouteExecution = __esm({
     STORAGE_GROUP_MEMBERSHIP_CACHE = Symbol("storage-group-membership-cache");
     STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol("storage-rpc-chain-attestation-cache");
     trim14 = (value) => toStr6(value).trim();
-    isObj17 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     isJsonContentType = (contentType) => {
       const mediaType = trim14(contentType).split(";", 1)[0].trim().toLowerCase();
       return mediaType === "application/json" || mediaType.endsWith("+json");
@@ -71789,7 +71978,7 @@ var init_storageRouteExecution = __esm({
       }
       try {
         const envelope = JSON.parse(raw || "null");
-        return envelope && isObj17(envelope?.metadata) ? envelope : null;
+        return envelope && isObj18(envelope?.metadata) ? envelope : null;
       } catch {
         return null;
       }
@@ -71814,9 +72003,9 @@ var init_storageRouteExecution = __esm({
           raw = null;
         }
       }
-      if (!isObj17(raw)) return null;
+      if (!isObj18(raw)) return null;
       const match = trim14(raw.match).toLowerCase() === "all" ? "all" : "any";
-      const conditions = (Array.isArray(raw.conditions) ? raw.conditions : []).filter(isObj17).map((condition) => ({ ...condition, kind: trim14(condition.kind).toLowerCase() })).filter((condition) => condition.kind);
+      const conditions = (Array.isArray(raw.conditions) ? raw.conditions : []).filter(isObj18).map((condition) => ({ ...condition, kind: trim14(condition.kind).toLowerCase() })).filter((condition) => condition.kind);
       return { match, conditions };
     };
     invalidUploadPolicy = (field, detail) => {
@@ -71862,7 +72051,7 @@ var init_storageRouteExecution = __esm({
         }
       }
       if (raw === null) return null;
-      if (!isObj17(raw)) return invalidUploadPolicy("accessConditions", "expected an object");
+      if (!isObj18(raw)) return invalidUploadPolicy("accessConditions", "expected an object");
       if (raw.match !== void 0 && (typeof raw.match !== "string" || !["any", "all"].includes(raw.match.trim().toLowerCase()))) {
         return invalidUploadPolicy("accessConditions.match", "expected any or all");
       }
@@ -71878,7 +72067,7 @@ var init_storageRouteExecution = __esm({
         return fields2.some((field) => typeof condition[field] === "string" && condition[field].trim());
       };
       const conditions = raw.conditions.map((condition) => {
-        if (!isObj17(condition) || typeof condition.kind !== "string") {
+        if (!isObj18(condition) || typeof condition.kind !== "string") {
           return invalidUploadPolicy("accessConditions.conditions", "expected a rule with a kind");
         }
         const kind = condition.kind.trim().toLowerCase();
@@ -71926,7 +72115,7 @@ var init_storageRouteExecution = __esm({
           raw = { mode: raw };
         }
       }
-      if (!isObj17(raw)) return null;
+      if (!isObj18(raw)) return null;
       const mode = trim14(raw.mode || raw.kind || raw.type).toLowerCase();
       if (!mode) return null;
       return {
@@ -71965,7 +72154,7 @@ var init_storageRouteExecution = __esm({
             }
           }
           if (raw === null) return null;
-          if (!isObj17(raw)) return invalidUploadPolicy("uploadPolicy", "expected an object");
+          if (!isObj18(raw)) return invalidUploadPolicy("uploadPolicy", "expected an object");
           for (const field of ["mode", "kind", "type"]) {
             if (raw[field] !== void 0 && (typeof raw[field] !== "string" || !["group_allowlist", "sbt_allowlist"].includes(raw[field].trim().toLowerCase()))) {
               return invalidUploadPolicy(`uploadPolicy.${field}`, "expected group_allowlist or sbt_allowlist");
@@ -71991,7 +72180,7 @@ var init_storageRouteExecution = __esm({
       } catch {
         return { ok: false, error: "Invalid JSON." };
       }
-      if (!isObj17(raw)) return { ok: false, error: "Invalid JSON." };
+      if (!isObj18(raw)) return { ok: false, error: "Invalid JSON." };
       const data = Object.prototype.hasOwnProperty.call(raw, "data") ? raw.data : "";
       const contentType = trim14(raw.contentType) || (typeof data === "string" ? "text/plain" : "application/json");
       const serialized = isJsonContentType(contentType) && typeof data !== "string" ? JSON.stringify(data) : toStr6(data);
@@ -72070,8 +72259,8 @@ var init_storageRouteExecution = __esm({
       return { ok: false, error: "Unsupported Content-Type." };
     };
     readConfiguredStorageBackendCandidate = (config = {}) => {
-      const storageProfile = isObj17(config?.storageProfile) ? config.storageProfile : {};
-      const docLibrary = isObj17(config?.docLibrary) ? config.docLibrary : {};
+      const storageProfile = isObj18(config?.storageProfile) ? config.storageProfile : {};
+      const docLibrary = isObj18(config?.docLibrary) ? config.docLibrary : {};
       return storageProfile.backend || config?.storageBackend || docLibrary.provider || docLibrary.backend || docLibrary.storageBackend;
     };
     resolveConfiguredStorageBackend = ({ config, requestedBackend, payloadEncrypted } = {}) => {
@@ -72081,14 +72270,14 @@ var init_storageRouteExecution = __esm({
       return normalizeStorageBackend(requestedBackend, configured);
     };
     resolvePayloadAccessControl = (config = {}) => {
-      const profile = isObj17(config?.storageProfile) ? config.storageProfile : {};
-      const cloudflare = isObj17(profile.cloudflare) ? profile.cloudflare : {};
-      const payloadAccessControl = isObj17(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
+      const profile = isObj18(config?.storageProfile) ? config.storageProfile : {};
+      const cloudflare = isObj18(profile.cloudflare) ? profile.cloudflare : {};
+      const payloadAccessControl = isObj18(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
       const legacyMode = normalizeLegacyPayloadAccessMode(
         payloadAccessControl.mode || cloudflare.payloadAccessMode || profile.payloadAccessMode || profile.accessControlMode
       );
       const accessControl = Object.prototype.hasOwnProperty.call(payloadAccessControl, "gate") || Object.prototype.hasOwnProperty.call(payloadAccessControl, "encryption") ? normalizePayloadAccessControl2(payloadAccessControl, legacyMode) : normalizePayloadAccessControl2(legacyMode);
-      const resourceGates = isObj17(payloadAccessControl.resources) ? payloadAccessControl.resources : {};
+      const resourceGates = isObj18(payloadAccessControl.resources) ? payloadAccessControl.resources : {};
       const conditions = normalizeAccessConditionDocument(
         payloadAccessControl.accessConditions || payloadAccessControl.conditions || cloudflare.accessConditions || profile.accessConditions
       );
@@ -72106,7 +72295,7 @@ var init_storageRouteExecution = __esm({
     };
     normalizeGateMode2 = (mode) => mode === 1 || trim14(mode).toLowerCase() === "1" || trim14(mode).toLowerCase() === "all" ? "all" : "any";
     normalizeDirectGate = (gate) => {
-      if (!isObj17(gate)) return null;
+      if (!isObj18(gate)) return null;
       const sbtAddresses = Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses.filter(Boolean) : [];
       return {
         sbtAddresses,
@@ -72145,40 +72334,40 @@ var init_storageRouteExecution = __esm({
     normalizeAddress = (value) => trim14(value).toLowerCase();
     listRoleAddresses = (value) => {
       if (Array.isArray(value)) return value.map(normalizeAddress).filter(Boolean);
-      if (isObj17(value)) {
+      if (isObj18(value)) {
         if (Array.isArray(value.addresses)) return value.addresses.map(normalizeAddress).filter(Boolean);
         if (Array.isArray(value.members)) return value.members.map(normalizeAddress).filter(Boolean);
       }
-      const address2 = normalizeAddress(value);
-      return address2 ? [address2] : [];
+      const address3 = normalizeAddress(value);
+      return address3 ? [address3] : [];
     };
     resolveRoleAddressSet2 = ({ config = {}, role }) => {
       const normalizedRole = trim14(role || "admin").toLowerCase();
       const addresses = /* @__PURE__ */ new Set();
       if (normalizedRole === "admin") {
-        listRoleAddresses(config.adminAddress).forEach((address2) => addresses.add(address2));
-        listRoleAddresses(config.adminAddresses).forEach((address2) => addresses.add(address2));
-        listRoleAddresses(config.admin?.addresses).forEach((address2) => addresses.add(address2));
+        listRoleAddresses(config.adminAddress).forEach((address3) => addresses.add(address3));
+        listRoleAddresses(config.adminAddresses).forEach((address3) => addresses.add(address3));
+        listRoleAddresses(config.admin?.addresses).forEach((address3) => addresses.add(address3));
       }
-      const roleMaps = [config.workerRoles, config.roles, config.authorization?.roles].filter(isObj17);
+      const roleMaps = [config.workerRoles, config.roles, config.authorization?.roles].filter(isObj18);
       roleMaps.forEach((roles) => {
-        listRoleAddresses(roles[normalizedRole]).forEach((address2) => addresses.add(address2));
+        listRoleAddresses(roles[normalizedRole]).forEach((address3) => addresses.add(address3));
       });
       return addresses;
     };
     resolveSessionAdminAddresses = (config = {}) => resolveRoleAddressSet2({ config, role: "admin" });
     isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
-      if (isObj17(authScopes) && authScopes.admin === true) return true;
-      const address2 = normalizeAddress(requesterAddress);
-      if (!address2) return false;
-      return resolveSessionAdminAddresses(config).has(address2);
+      if (isObj18(authScopes) && authScopes.admin === true) return true;
+      const address3 = normalizeAddress(requesterAddress);
+      if (!address3) return false;
+      return resolveSessionAdminAddresses(config).has(address3);
     };
     evaluateWorkerRoleCondition = ({ condition, config, requesterAddress }) => {
       const role = trim14(condition.role || condition.name || "admin").toLowerCase();
-      const address2 = normalizeAddress(requesterAddress);
-      if (!address2) return { ok: false, reason: "missing_principal" };
+      const address3 = normalizeAddress(requesterAddress);
+      if (!address3) return { ok: false, reason: "missing_principal" };
       const roleAddresses = resolveRoleAddressSet2({ config, role });
-      if (roleAddresses.has(address2)) {
+      if (roleAddresses.has(address3)) {
         return { ok: true, matchedCondition: { kind: "worker_role", role } };
       }
       return { ok: false, reason: "worker_role_denied", condition: { kind: "worker_role", role } };
@@ -72186,13 +72375,13 @@ var init_storageRouteExecution = __esm({
     evaluateAgentGrantScopeCondition = ({ condition, authScopes }) => {
       const scope = trim14(condition.scope || condition.value);
       if (!scope) return { ok: false, reason: "missing_agent_grant_scope" };
-      const scopes = isObj17(authScopes) ? authScopes : {};
+      const scopes = isObj18(authScopes) ? authScopes : {};
       return scopes[scope] === true ? { ok: true, matchedCondition: { kind: "agent_grant_scope", scope } } : { ok: false, reason: "agent_grant_scope_denied", condition: { kind: "agent_grant_scope", scope } };
     };
     sbtUnavailable = (reason, condition) => ({ ok: false, outcome: "unavailable", status: 503, reason, condition });
     evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress, deps }) => {
-      const address2 = normalizeAddress(requesterAddress);
-      if (!address2) return { ok: false, reason: "missing_principal" };
+      const address3 = normalizeAddress(requesterAddress);
+      if (!address3) return { ok: false, reason: "missing_principal" };
       const sbtAddresses = [
         ...Array.isArray(condition.sbtAddresses) ? condition.sbtAddresses : [],
         condition.contract,
@@ -72225,7 +72414,7 @@ var init_storageRouteExecution = __esm({
       for (const rpcUrl of rpcUrls) {
         const ok = await deps.checkSbtGate({
           sbtAddresses,
-          address: address2,
+          address: address3,
           rpcUrl,
           mode,
           chainId,
@@ -72468,9 +72657,9 @@ var init_storageRouteExecution = __esm({
       };
     };
     resolveBareRoleGateCondition = (config = {}) => {
-      const profile = isObj17(config?.storageProfile) ? config.storageProfile : {};
-      const cloudflare = isObj17(profile.cloudflare) ? profile.cloudflare : {};
-      const payloadAccessControl = isObj17(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
+      const profile = isObj18(config?.storageProfile) ? config.storageProfile : {};
+      const cloudflare = isObj18(profile.cloudflare) ? profile.cloudflare : {};
+      const payloadAccessControl = isObj18(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
       return {
         kind: "worker_role",
         role: trim14(
@@ -72508,12 +72697,12 @@ var init_storageRouteExecution = __esm({
     membersSeeAllResponses = (config) => config?.sessionModeProfile?.results?.visibility === "session_member_full";
     canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
       if (operation === "upload" || !hasPrivateResponsePolicy({ config, resource })) return true;
-      const scopes = isObj17(authScopes) ? authScopes : {};
-      const address2 = normalizeAddress(requesterAddress);
-      if (address2 && resolveRoleAddressSet2({ config, role: "admin" }).has(address2)) return true;
-      if (!address2 || scopes.storage !== true && scopes.arweave !== true) return false;
+      const scopes = isObj18(authScopes) ? authScopes : {};
+      const address3 = normalizeAddress(requesterAddress);
+      if (address3 && resolveRoleAddressSet2({ config, role: "admin" }).has(address3)) return true;
+      if (!address3 || scopes.storage !== true && scopes.arweave !== true) return false;
       if (operation === "list" || membersSeeAllResponses(config)) return true;
-      return !!trim14(metadata?.responder) && normalizeAddress(metadata.responder) === address2;
+      return !!trim14(metadata?.responder) && normalizeAddress(metadata.responder) === address3;
     };
     authorizeCloudflareStorageAccess = async ({
       env,
@@ -72640,8 +72829,8 @@ var init_storageRouteExecution = __esm({
           response: responseJson(deps, { error: "Access denied: unsupported Cloudflare storage gate." }, 403, baseHeaders)
         };
       }
-      const address2 = trim14(requesterAddress);
-      if (!address2) {
+      const address3 = trim14(requesterAddress);
+      if (!address3) {
         return {
           ok: false,
           response: responseJson(deps, { error: "Missing requester address for worker SBT gate." }, 401, baseHeaders)
@@ -72695,7 +72884,7 @@ var init_storageRouteExecution = __esm({
       for (const rpcUrl of rpcUrls) {
         const ok = await deps.checkSbtGate({
           sbtAddresses: gate.sbtAddresses,
-          address: address2,
+          address: address3,
           rpcUrl,
           mode: gate.mode,
           chainId: gate.chainId,
@@ -72797,8 +72986,8 @@ var init_storageRouteExecution = __esm({
         return { ok: true, conditionMatched: groupAccess.conditionMatched, groupIds };
       }
       if (policy.mode === "sbt_allowlist") {
-        const address2 = normalizeAddress(requesterAddress);
-        if (!address2) {
+        const address3 = normalizeAddress(requesterAddress);
+        if (!address3) {
           return {
             ok: false,
             response: responseJson(deps, { error: "Missing requester address for SBT upload policy." }, 401, baseHeaders)
@@ -72842,7 +73031,7 @@ var init_storageRouteExecution = __esm({
         for (const rpcUrl of rpcUrls) {
           const ok = await deps.checkSbtGate({
             sbtAddresses: policy.sbtAddresses,
-            address: address2,
+            address: address3,
             rpcUrl,
             mode: policy.anyOrAll,
             chainId,
@@ -72899,10 +73088,10 @@ var init_storageRouteExecution = __esm({
       });
       return routeDeps;
     };
-    parseArweaveUploadResponse = async (response2) => {
+    parseArweaveUploadResponse = async (response3) => {
       let body = {};
       try {
-        body = await response2.clone().json();
+        body = await response3.clone().json();
       } catch {
         body = {};
       }
@@ -72911,7 +73100,7 @@ var init_storageRouteExecution = __esm({
     };
     handleArweaveStorageUpload = async ({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps }) => {
       const secrets = await deps?.getSessionSecrets?.(env, slug) || {};
-      const response2 = await deps?.arweaveUpload?.({
+      const response3 = await deps?.arweaveUpload?.({
         request,
         env,
         secrets,
@@ -72920,8 +73109,8 @@ var init_storageRouteExecution = __esm({
         slug,
         uploaderAddress
       });
-      if (!response2?.ok) return response2;
-      const parsed = await parseArweaveUploadResponse(response2);
+      if (!response3?.ok) return response3;
+      const parsed = await parseArweaveUploadResponse(response3);
       if (!parsed.id) return responseJson(deps, { error: "Storage upload succeeded but no id was returned." }, 502, baseHeaders);
       const compatible = attachStorageRefCompatibilityFields({
         backend,
@@ -72967,7 +73156,7 @@ var init_storageRouteExecution = __esm({
     };
     RESPONSE_ROWS_PER_QUESTION = 5;
     countQuestionsOnce = async (memo, count) => {
-      if (!isObj17(memo)) return count();
+      if (!isObj18(memo)) return count();
       memo.questionCount ?? (memo.questionCount = await count());
       return memo.questionCount;
     };
@@ -73356,7 +73545,7 @@ var init_storageRouteExecution = __esm({
       } catch {
         return { ok: false, error: "Invalid JSON." };
       }
-      if (!isObj17(body)) return { ok: false, error: "Invalid JSON." };
+      if (!isObj18(body)) return { ok: false, error: "Invalid JSON." };
       return {
         ok: true,
         resource: queryResource || trim14(body.resource) || "docsContext",
@@ -73409,7 +73598,7 @@ var init_storageRouteExecution = __esm({
               baseHeaders
             );
           }
-          if (!isObj17(metadata) || trim14(metadata.id) !== id2 || (trim14(metadata.resource) || "docsContext") !== indexedResource) {
+          if (!isObj18(metadata) || trim14(metadata.id) !== id2 || (trim14(metadata.resource) || "docsContext") !== indexedResource) {
             return responseJson(
               deps,
               { error: "Cloudflare storage index metadata is unavailable." },
@@ -73421,7 +73610,7 @@ var init_storageRouteExecution = __esm({
       }
       if (!object4 && canReadKvPayload) {
         const envelope = await readKvPayloadEnvelope({ index, slug, id: id2 });
-        if (!envelope || !isObj17(envelope?.metadata)) {
+        if (!envelope || !isObj18(envelope?.metadata)) {
           return responseJson(deps, { error: "Storage object not found." }, 404, baseHeaders);
         }
         metadata = envelope.metadata;
@@ -73509,22 +73698,22 @@ var init_storageRouteExecution = __esm({
       const origin = new URL(request.url).origin;
       let privateItem = false;
       const readItem = async (id2) => {
-        const response2 = await handleCloudflareRead({
+        const response3 = await handleCloudflareRead({
           ...read,
           baseHeaders: {},
           deps,
           request: new Request(`${origin}/storage/read?id=${encodeURIComponent(id2)}`)
         });
-        if (!response2.ok) {
-          const body = await response2.json().catch(() => ({}));
-          return { id: id2, status: response2.status, error: trim14(body?.error) || "Storage read failed.", ...trim14(body?.reason) ? { reason: trim14(body.reason) } : {} };
+        if (!response3.ok) {
+          const body = await response3.json().catch(() => ({}));
+          return { id: id2, status: response3.status, error: trim14(body?.error) || "Storage read failed.", ...trim14(body?.reason) ? { reason: trim14(body.reason) } : {} };
         }
-        if ((response2.headers.get("Cache-Control") || "").includes("private")) privateItem = true;
-        const contentType = response2.headers.get("Content-Type") || "";
+        if ((response3.headers.get("Cache-Control") || "").includes("private")) privateItem = true;
+        const contentType = response3.headers.get("Content-Type") || "";
         if (!/json|^text\//i.test(contentType)) {
           return { id: id2, status: 415, error: "This item is not text; read it on its own." };
         }
-        return { id: id2, status: 200, contentType, text: await response2.text() };
+        return { id: id2, status: 200, contentType, text: await response3.text() };
       };
       const items = [];
       let textBytes = 0;
@@ -73678,7 +73867,7 @@ var init_storageRouteExecution = __esm({
         ...mine ? { responder, sessionId: resolveCanonicalWorkerSessionIdHex(config) } : {}
       }, 200, mine || hasPrivateResponsePolicy({ config, resource }) ? { ...Object.fromEntries(new Headers(baseHeaders || {})), "Cache-Control": "private, no-store" } : baseHeaders);
     };
-    KV_BULK_GET_KEYS = 100;
+    KV_BULK_GET_KEYS2 = 100;
     KV_BULK_REPLY_BYTES = 16 * 1024 * 1024;
     listCloudflareMetadataRows = async ({ index, slug, resource = "", budget, strict = false, skipKey }) => {
       const rows = [];
@@ -73690,7 +73879,7 @@ var init_storageRouteExecution = __esm({
         const listed = await index.list({
           prefix,
           ...cursor ? { cursor } : {},
-          ...budget ? { limit: KV_BULK_GET_KEYS } : {}
+          ...budget ? { limit: KV_BULK_GET_KEYS2 } : {}
         });
         const keys = (Array.isArray(listed?.keys) ? listed.keys : []).filter((keyEntry) => trim14(keyEntry?.name || keyEntry) && typeof index.get === "function" && !skipKey?.(keyEntry)).map((keyEntry) => trim14(keyEntry?.name || keyEntry));
         let bulk = null;
@@ -73704,7 +73893,7 @@ var init_storageRouteExecution = __esm({
             const raw = bulk ? (await bulk).get(key) : await index.get(key);
             if (raw != null) budget?.metadata(raw);
             const metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
-            if (isObj17(metadata) && trim14(metadata.id)) rows.push({ key, metadata });
+            if (isObj18(metadata) && trim14(metadata.id)) rows.push({ key, metadata });
             else if (strict) throw new Error("Storage metadata is missing or invalid.");
           } catch (error) {
             if (strict || isStorageReadLimitError(error)) throw error;
@@ -73724,7 +73913,7 @@ var init_storageRouteExecution = __esm({
       } catch {
         return null;
       }
-      if (!isObj17(envelope?.metadata) || typeof envelope.payloadBase64url !== "string") return null;
+      if (!isObj18(envelope?.metadata) || typeof envelope.payloadBase64url !== "string") return null;
       const limit = budget?.remainingPayloadBytes ?? Infinity;
       if (Math.floor(envelope.payloadBase64url.length * 3 / 4) > limit) throw new StorageReadLimitError("payloadBytes");
       const bytes3 = base64urlToBytes2(envelope.payloadBase64url);
@@ -73752,7 +73941,7 @@ var init_storageRouteExecution = __esm({
         const size = Number(metadata.size) || 0;
         if (size > (budget?.remainingPayloadBytes ?? Infinity)) throw new StorageReadLimitError("payloadBytes");
         const replyBytes = Math.ceil(size * 4 / 3) + jsonByteLength(metadata);
-        if (chunk2.length === KV_BULK_GET_KEYS || chunk2.length && chunkBytes + replyBytes > KV_BULK_REPLY_BYTES) await flush();
+        if (chunk2.length === KV_BULK_GET_KEYS2 || chunk2.length && chunkBytes + replyBytes > KV_BULK_REPLY_BYTES) await flush();
         chunk2.push(id2);
         chunkBytes += replyBytes;
       }
@@ -73792,7 +73981,7 @@ var init_storageRouteExecution = __esm({
       try {
         let bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata });
         if (!bytes3) return null;
-        if (isObj17(metadata?.envelope)) {
+        if (isObj18(metadata?.envelope)) {
           bytes3 = await decryptPayloadWithStorageEnvelope({
             env,
             config,
@@ -73804,7 +73993,7 @@ var init_storageRouteExecution = __esm({
           });
         }
         const payload = JSON.parse(decoder6.decode(await toUint8Array(bytes3)));
-        return isObj17(payload) ? payload : null;
+        return isObj18(payload) ? payload : null;
       } catch {
         return null;
       }
@@ -73820,11 +74009,11 @@ var init_storageRouteExecution = __esm({
     readLegacyRowResourceId = async ({ env, index, slug, config, resource, metadata, deps }) => {
       const recorded = normalizeAddress(metadata.resourceId);
       if (recorded) return recorded;
-      if (metadata.encrypted === true && !isObj17(metadata.envelope)) return "";
+      if (metadata.encrypted === true && !isObj18(metadata.envelope)) return "";
       let bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
       if (!bytes3) return "";
       try {
-        if (isObj17(metadata.envelope)) {
+        if (isObj18(metadata.envelope)) {
           bytes3 = await decryptPayloadWithStorageEnvelope({
             env,
             config,
@@ -73836,7 +74025,7 @@ var init_storageRouteExecution = __esm({
           });
         }
         const payload = JSON.parse(decoder6.decode(await toUint8Array(bytes3)));
-        const resourceId = isObj17(payload) ? readStoragePayloadResourceId(resource, payload) : "";
+        const resourceId = isObj18(payload) ? readStoragePayloadResourceId(resource, payload) : "";
         return isStorageResourceId(resourceId) ? resourceId : "";
       } catch {
         return "";
@@ -73878,7 +74067,7 @@ var init_storageRouteExecution = __esm({
           } catch {
             continue;
           }
-          if (!isObj17(metadata) || !trim14(metadata.id) || normalizeAddress(metadata.uploader)) continue;
+          if (!isObj18(metadata) || !trim14(metadata.id) || normalizeAddress(metadata.uploader)) continue;
           const resourceId = await readLegacyRowResourceId({ env, index, slug, config, resource, metadata, deps });
           if (resourceId) ids.add(resourceId);
           else skippedRows += 1;
@@ -73918,7 +74107,7 @@ var init_storageRouteExecution = __esm({
             } catch {
               metadata = null;
             }
-            rows.push({ key, metadata: isObj17(metadata) && trim14(metadata.id) ? metadata : null });
+            rows.push({ key, metadata: isObj18(metadata) && trim14(metadata.id) ? metadata : null });
           }
           yield rows;
         }
@@ -74099,7 +74288,7 @@ var init_storageRouteExecution = __esm({
             metadata = null;
           }
           let deferred = false;
-          if (!isObj17(metadata) || !trim14(metadata.id)) {
+          if (!isObj18(metadata) || !trim14(metadata.id)) {
             readErrors.push({ key, error: "invalid_metadata" });
           } else {
             const metadataAccess = normalizePayloadAccessControl2(metadata.payloadAccessControl || metadata.payloadAccessMode || resolvePayloadAccessControl(config));
@@ -74134,7 +74323,7 @@ var init_storageRouteExecution = __esm({
                       payloadAccessMode: deriveLegacyPayloadAccessMode2(metadataAccess),
                       ...metadata.accessConditions ? { accessConditions: metadata.accessConditions } : {}
                     },
-                    envelope: isObj17(metadata.envelope) ? metadata.envelope : null,
+                    envelope: isObj18(metadata.envelope) ? metadata.envelope : null,
                     ciphertextBase64url: bytesToBase64url2(ciphertextBytes),
                     keyProvider: keyProvider2,
                     wrappedKeysIncluded: !!trim14(metadata.envelope?.dek?.wrappedKey)
@@ -74171,7 +74360,7 @@ var init_storageRouteExecution = __esm({
         storageListError = { reason: trim14(error?.message || "storage_list_failed").slice(0, 500) };
         nextCursor || (nextCursor = resume(position.pageCursor, position.lastKey));
       }
-      const sessionEnvelope = includeSessionEnvelope && isObj17(config?.storageEnvelope) ? JSON.parse(JSON.stringify(config.storageEnvelope)) : null;
+      const sessionEnvelope = includeSessionEnvelope && isObj18(config?.storageEnvelope) ? JSON.parse(JSON.stringify(config.storageEnvelope)) : null;
       const keyProvider = resolveEnvelopeExportManifestKeyProvider({ sessionEnvelope, payloads });
       const deploymentKekContinuityRequired = !!trim14(sessionEnvelope?.sessionKey?.wrappedKey) || payloads.some((entry2) => entry2.keyProvider === "worker_secret" || entry2.keyProvider === "mixed");
       const manifest = {
@@ -74228,13 +74417,13 @@ var init_storageRouteExecution = __esm({
       } catch {
         return null;
       }
-      return isObj17(metadata) && metadata.contextSource === true && trim14(metadata.id) === trim14(id2) ? metadata : null;
+      return isObj18(metadata) && metadata.contextSource === true && trim14(metadata.id) === trim14(id2) ? metadata : null;
     };
     readContextSourceBytes = async ({ env, config, slug, metadata, maxBytes, principal = "session-ai", deps } = {}) => {
       const index = getStorageIndexBinding(env);
       let bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes });
       if (!bytes3) return null;
-      if (isObj17(metadata?.envelope)) {
+      if (isObj18(metadata?.envelope)) {
         await writeStorageEnvelopeKeyReleaseAudit({
           env,
           slug,
@@ -74307,6 +74496,32 @@ var init_storageRouteExecution = __esm({
             baseHeaders,
             deps: routeDeps
           })
+        });
+      }
+      if (method === "POST" && DRAFT_TEXT_PATHS.includes(path)) {
+        const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+        return draftTextRoute({
+          path,
+          request,
+          env,
+          config,
+          slug,
+          uploaderAddress,
+          authScopes,
+          baseHeaders,
+          deps: routeDeps,
+          authorizeSession: () => authorizeCloudflareStorageGate({
+            env,
+            config,
+            slug,
+            resource: "responses",
+            requesterAddress: uploaderAddress,
+            authScopes,
+            baseHeaders,
+            deps: routeDeps
+          }),
+          // The check a config change passes: the creator or an admin-hat wearer.
+          isConfigAdmin: (principal) => deps?.validateAdmin?.({ env, slug, address: principal, config, body: {} })
         });
       }
       if (path === "/storage/upload" && method === "POST") {
@@ -74662,7 +74877,7 @@ var init_sessionDiagnostics = __esm({
       const controller = new AbortController();
       let timer;
       try {
-        const response2 = await Promise.race([
+        const response3 = await Promise.race([
           (async () => {
             const stub = await indexStub(coordinator.env, pending.identity.slug);
             if (!stub) throw unavailable();
@@ -74676,7 +74891,7 @@ var init_sessionDiagnostics = __esm({
             timer = setTimeout(() => reject(unavailable()), REGISTRATION_TIMEOUT_MS);
           })
         ]);
-        if (!response2.ok) throw unavailable();
+        if (!response3.ok) throw unavailable();
         await storage.transaction(async (transaction) => {
           await transaction.put(REGISTERED_KEY, now + DAY_MS);
           await transaction.delete(REGISTRATION_RETRY_KEY);
@@ -74761,19 +74976,19 @@ var init_sessionDiagnostics = __esm({
       if (cursor && !HASH.test(cursor)) throw invalidCursor();
       const totals = { pendingLeases: 0, oldestPendingAgeMs: null, settledCount: 0, cursor: null, complete: false };
       let page;
-      let response2;
+      let response3;
       try {
         const stub = await indexStub(env, slug);
-        response2 = await stub.fetch("https://session-coordinator.internal/upload-receipts/index/list", {
+        response3 = await stub.fetch("https://session-coordinator.internal/upload-receipts/index/list", {
           method: "POST",
           body: JSON.stringify({ cursor })
         });
-        page = await response2.json();
+        page = await response3.json();
       } catch {
         return totals;
       }
-      if (response2.status === 400) throw invalidCursor();
-      if (!response2.ok || !Array.isArray(page.owners)) return totals;
+      if (response3.status === 400) throw invalidCursor();
+      if (!response3.ok || !Array.isArray(page.owners)) return totals;
       totals.cursor = page.cursor;
       totals.complete = !page.cursor;
       for (const owner of page.owners) {
@@ -75919,7 +76134,7 @@ var init_sponsoredBootstrapGrantStore = __esm({
       token,
       grantRecord,
       requestDigest,
-      response: response2,
+      response: response3,
       sensitiveValues = [],
       nowMs = Date.now()
     } = {}) => {
@@ -75932,8 +76147,8 @@ var init_sponsoredBootstrapGrantStore = __esm({
           state: "redeemed"
         }),
         receipt: {
-          status: Number(response2?.status || 0) || 200,
-          body: buildSafeSponsoredReceiptBody(response2?.body, sensitiveValues)
+          status: Number(response3?.status || 0) || 200,
+          body: buildSafeSponsoredReceiptBody(response3?.body, sensitiveValues)
         }
       };
       await writeSponsoredGrantRecord(env, token, safeRecord, ttlSeconds);
@@ -76027,7 +76242,7 @@ ${contextText}` : ""}`;
 });
 
 // workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js
-var ARTIFACT_KIND, ARTIFACT_VERSION, SECTION_ORDER, SEVERITY_LEVELS, WALLET_TEXT_RE, WALLET_ID_RE, LIMITS, isObj18, toArray, hasOwn5, toPrimitiveStr, compactWhitespace, cleanText, cleanId, slugId, unique, sectionRecord, normalizeSections, unavailable2, defaultSection, buildAllowedSourceIds, normalizeParticipants, normalizeIdRefs, normalizeSourceFields, normalizeSummaryRecord, normalizeArgumentMap, hasCycle, normalizeAtlas, normalizeBreakdown, normalizeSeverity, DEFAULT_RISK_AXES, normalizeRiskAxis, normalizeRiskAxes, normalizeRiskAssessments, normalizeDynamicRiskMatrix, normalizeLegacyRiskMatrix, normalizeRiskMatrix, normalizeGeneratedAt, normalizeModel, normalizeSection, normalizeResultsAnalysisArtifact, applyResultsAnalysisExposurePolicy;
+var ARTIFACT_KIND, ARTIFACT_VERSION, SECTION_ORDER, SEVERITY_LEVELS, WALLET_TEXT_RE, WALLET_ID_RE, LIMITS, isObj19, toArray, hasOwn5, toPrimitiveStr, compactWhitespace, cleanText, cleanId, slugId, unique, sectionRecord, normalizeSections, unavailable2, defaultSection, buildAllowedSourceIds, normalizeParticipants, normalizeIdRefs, normalizeSourceFields, normalizeSummaryRecord, normalizeArgumentMap, hasCycle, normalizeAtlas, normalizeBreakdown, normalizeSeverity, DEFAULT_RISK_AXES, normalizeRiskAxis, normalizeRiskAxes, normalizeRiskAssessments, normalizeDynamicRiskMatrix, normalizeLegacyRiskMatrix, normalizeRiskMatrix, normalizeGeneratedAt, normalizeModel, normalizeSection, normalizeResultsAnalysisArtifact, applyResultsAnalysisExposurePolicy;
 var init_resultsAnalysisArtifactValidation = __esm({
   "workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js"() {
     ARTIFACT_KIND = "ce_session_results_analysis_artifact";
@@ -76056,7 +76271,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       summaryChars: 900,
       modelChars: 180
     });
-    isObj18 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj19 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     toArray = (value) => Array.isArray(value) ? value : [];
     hasOwn5 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     toPrimitiveStr = (value) => {
@@ -76086,8 +76301,8 @@ var init_resultsAnalysisArtifactValidation = __esm({
     };
     unique = (values) => [...new Set(values.filter(Boolean))];
     sectionRecord = (value) => {
-      const raw = isObj18(value?.sections) ? value.sections : value;
-      return isObj18(raw) ? raw : {};
+      const raw = isObj19(value?.sections) ? value.sections : value;
+      return isObj19(raw) ? raw : {};
     };
     normalizeSections = (sections) => {
       const requested = /* @__PURE__ */ new Set();
@@ -76128,9 +76343,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       const participants = aiSnapshotPresent ? aiParticipants : snapshotParticipants;
       const responses = aiSnapshotPresent ? aiParticipants : toArray(source?.snapshot?.responses);
       const questionsByParticipant = /* @__PURE__ */ new Map();
-      responses.forEach((response2) => {
-        const participantId = cleanId(response2?.syntheticId || response2?.participantId);
-        const questionId4 = cleanId(response2?.questionId || response2?.questionID);
+      responses.forEach((response3) => {
+        const participantId = cleanId(response3?.syntheticId || response3?.participantId);
+        const questionId4 = cleanId(response3?.questionId || response3?.questionID);
         if (!participantId || !questionId4) return;
         if (!questionsByParticipant.has(participantId)) questionsByParticipant.set(participantId, /* @__PURE__ */ new Set());
         questionsByParticipant.get(participantId).add(questionId4);
@@ -76173,10 +76388,10 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeSummaryRecord = (value) => {
-      const record4 = isObj18(value) ? value : {};
+      const record4 = isObj19(value) ? value : {};
       const overview = cleanText(record4.overview || record4.summary || record4.interpretation || record4.narrative);
       const themes = toArray(record4.themes || record4.keyFindings || record4.findings).slice(0, LIMITS.breakdownThemes).map((entry2, index) => {
-        const item = isObj18(entry2) ? entry2 : { summary: entry2 };
+        const item = isObj19(entry2) ? entry2 : { summary: entry2 };
         const label = cleanText(item.label || item.name || item.title || `Theme ${index + 1}`, LIMITS.labelChars);
         const summary = cleanText(item.summary || item.description || item.finding || item.body);
         if (!label && !summary) return null;
@@ -76192,14 +76407,14 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeArgumentMap = (rawSection, allowed) => {
-      if (!isObj18(rawSection)) return defaultSection("argumentMap", "AI generation did not return argument-map data.");
+      if (!isObj19(rawSection)) return defaultSection("argumentMap", "AI generation did not return argument-map data.");
       const errors = [];
       const debates = toArray(rawSection.debates).slice(0, LIMITS.debates).map((debate, debateIndex) => {
-        if (!isObj18(debate)) return null;
+        if (!isObj19(debate)) return null;
         const title = cleanText(debate.title || debate.label || debate.question || debate.summary, LIMITS.labelChars);
         if (!title) return null;
         const claims = toArray(debate.claims).slice(0, LIMITS.claimsPerDebate).map((claim, claimIndex) => {
-          if (!isObj18(claim)) return null;
+          if (!isObj19(claim)) return null;
           const label = cleanText(claim.label || claim.claim || claim.title || claim.summary, LIMITS.labelChars);
           if (!label) return null;
           const summary2 = cleanText(claim.summary || claim.description || claim.evidence);
@@ -76248,11 +76463,11 @@ var init_resultsAnalysisArtifactValidation = __esm({
       return nodes.some((node) => visit(node.id));
     };
     normalizeAtlas = (rawSection, allowed) => {
-      if (!isObj18(rawSection)) return defaultSection("atlas", "AI generation did not return atlas data.");
+      if (!isObj19(rawSection)) return defaultSection("atlas", "AI generation did not return atlas data.");
       const errors = [];
       const seenIds = /* @__PURE__ */ new Set();
       const nodes = toArray(rawSection.nodes).slice(0, LIMITS.atlasNodes).map((node, index) => {
-        if (!isObj18(node)) return null;
+        if (!isObj19(node)) return null;
         const label = cleanText(node.label || node.name || node.title || node.summary, LIMITS.labelChars);
         if (!label) return null;
         let id2 = slugId(node.id || label, `atlas_${index + 1}`);
@@ -76268,7 +76483,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       }).filter(Boolean);
       const nodeIds = new Set(nodes.map((node) => node.id));
       const edges = toArray(rawSection.edges).slice(0, LIMITS.atlasEdges).map((edge, index) => {
-        if (!isObj18(edge)) return null;
+        if (!isObj19(edge)) return null;
         const source = slugId(edge.source || edge.sourceId, "");
         const target = slugId(edge.target || edge.targetId, "");
         if (!source || !target || source === target || !nodeIds.has(source) || !nodeIds.has(target)) {
@@ -76288,16 +76503,16 @@ var init_resultsAnalysisArtifactValidation = __esm({
       return { available: true, nodes, edges };
     };
     normalizeBreakdown = (rawSection, allowed) => {
-      if (!isObj18(rawSection)) return defaultSection("breakdown", "AI generation did not return breakdown data.");
+      if (!isObj19(rawSection)) return defaultSection("breakdown", "AI generation did not return breakdown data.");
       const errors = [];
       const summary = normalizeSummaryRecord(rawSection.summary);
       const dimensions = toArray(rawSection.dimensions).slice(0, LIMITS.breakdownDimensions).map((dimension, index) => {
-        if (!isObj18(dimension)) return null;
+        if (!isObj19(dimension)) return null;
         const label = cleanText(dimension.label || dimension.name || dimension.dimension, LIMITS.labelChars);
         if (!label) return null;
         const description = cleanText(dimension.summary || dimension.description || dimension.interpretation);
         const values = toArray(dimension.values).slice(0, LIMITS.breakdownDimensionValues).map((value, valueIndex) => {
-          const item = isObj18(value) ? value : { label: value };
+          const item = isObj19(value) ? value : { label: value };
           const valueLabel = cleanText(item.label || item.value || item.name, LIMITS.labelChars);
           if (!valueLabel) return null;
           const valueSummary = cleanText(item.summary || item.description || item.interpretation);
@@ -76315,7 +76530,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
         };
       }).filter(Boolean);
       const groups = toArray(rawSection.groups).slice(0, LIMITS.breakdownGroups).map((group, index) => {
-        if (!isObj18(group)) return null;
+        if (!isObj19(group)) return null;
         const label = cleanText(group.label || group.name || group.title || group.group, LIMITS.labelChars);
         const summaryText = cleanText(group.summary || group.description || group.interpretation || group.insight);
         if (!label && !summaryText) return null;
@@ -76358,7 +76573,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       }
     });
     normalizeRiskAxis = (axis, fallback) => {
-      if (!isObj18(axis)) return null;
+      if (!isObj19(axis)) return null;
       const record4 = axis;
       const label = cleanText(record4.label || record4.name, LIMITS.labelChars);
       if (!label) return null;
@@ -76366,7 +76581,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       const rawLevels = toArray(record4.levels);
       const seen = /* @__PURE__ */ new Set();
       const levels = rawLevels.slice(0, LIMITS.riskAxisLevels).map((level, index) => {
-        const levelRecord = isObj18(level) ? level : { label: level, id: level };
+        const levelRecord = isObj19(level) ? level : { label: level, id: level };
         const levelLabel = cleanText(levelRecord.label || levelRecord.name || levelRecord.id, LIMITS.labelChars);
         if (!levelLabel) return null;
         let levelId = slugId(levelRecord.id || levelLabel, `level_${index + 1}`);
@@ -76379,7 +76594,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       return { id: id2, label, levels };
     };
     normalizeRiskAxes = (rawAxes) => {
-      const axes = isObj18(rawAxes) ? rawAxes : {};
+      const axes = isObj19(rawAxes) ? rawAxes : {};
       const x = normalizeRiskAxis(axes.x || axes.columns || axes.horizontal, DEFAULT_RISK_AXES.x);
       const y = normalizeRiskAxis(axes.y || axes.rows || axes.vertical, DEFAULT_RISK_AXES.y);
       return x && y ? { x, y } : null;
@@ -76388,7 +76603,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       const xLevelIds = new Set(axes.x.levels.map((level) => level.id));
       const yLevelIds = new Set(axes.y.levels.map((level) => level.id));
       return toArray(rawAssessments).slice(0, LIMITS.riskAssessments).map((assessment, index) => {
-        if (!isObj18(assessment)) return null;
+        if (!isObj19(assessment)) return null;
         const label = cleanText(assessment.label || assessment.category || assessment.name || assessment.title, LIMITS.labelChars);
         const summary = cleanText(assessment.summary || assessment.description || assessment.rationale || assessment.evidence);
         const xLevelId = slugId(assessment.xLevelId || assessment.x || assessment.columnLevelId || assessment.likelihood, "");
@@ -76431,16 +76646,16 @@ var init_resultsAnalysisArtifactValidation = __esm({
     };
     normalizeLegacyRiskMatrix = (rawSection, allowed) => {
       const errors = [];
-      const rawHeatmap = isObj18(rawSection.heatmap) ? rawSection.heatmap : {};
+      const rawHeatmap = isObj19(rawSection.heatmap) ? rawSection.heatmap : {};
       const categoryEntries = [];
       const heatmap = {};
       const assessments = [];
       toArray(rawSection.categories).slice(0, LIMITS.riskCategories).forEach((category, index) => {
-        if (!isObj18(category)) return;
+        if (!isObj19(category)) return;
         const label = cleanText(category.label || category.name || category.title, LIMITS.labelChars);
         if (!label) return;
         const id2 = slugId(category.id || label, `risk_${index + 1}`);
-        const heat = isObj18(rawHeatmap[id2]) ? rawHeatmap[id2] : {};
+        const heat = isObj19(rawHeatmap[id2]) ? rawHeatmap[id2] : {};
         const likelihood = normalizeSeverity(category.likelihood || heat.likelihood);
         const impact = normalizeSeverity(category.impact || heat.impact);
         if (!likelihood || !impact) {
@@ -76467,7 +76682,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       });
       const categoryIds = new Set(categoryEntries.map((category) => category.id));
       const comments = toArray(rawSection.comments).slice(0, LIMITS.riskComments).map((comment, index) => {
-        if (!isObj18(comment)) return null;
+        if (!isObj19(comment)) return null;
         const categoryId = slugId(comment.categoryId || comment.category || comment.id, "");
         if (!categoryId || !categoryIds.has(categoryId)) {
           errors.push(`unknown risk category for comment ${index + 1}`);
@@ -76495,8 +76710,8 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeRiskMatrix = (rawSection, allowed) => {
-      if (!isObj18(rawSection)) return defaultSection("riskMatrix", "AI generation did not return risk matrix data.");
-      if (isObj18(rawSection.axes) || Array.isArray(rawSection.assessments)) return normalizeDynamicRiskMatrix(rawSection, allowed);
+      if (!isObj19(rawSection)) return defaultSection("riskMatrix", "AI generation did not return risk matrix data.");
+      if (isObj19(rawSection.axes) || Array.isArray(rawSection.assessments)) return normalizeDynamicRiskMatrix(rawSection, allowed);
       return normalizeLegacyRiskMatrix(rawSection, allowed);
     };
     normalizeGeneratedAt = (value) => {
@@ -76539,9 +76754,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     applyResultsAnalysisExposurePolicy = ({ artifact, exposure, sections = SECTION_ORDER } = {}) => {
-      if (!isObj18(artifact?.sections)) return artifact;
+      if (!isObj19(artifact?.sections)) return artifact;
       const enabled = new Set(sections);
-      const groupPolicy = isObj18(exposure) && (hasOwn5(exposure, "anonymizedGroupsEnabled") || hasOwn5(exposure, "minGroupSize"));
+      const groupPolicy = isObj19(exposure) && (hasOwn5(exposure, "anonymizedGroupsEnabled") || hasOwn5(exposure, "minGroupSize"));
       const minGroupSize = Number.isSafeInteger(exposure?.minGroupSize) && exposure.minGroupSize >= 2 ? exposure.minGroupSize : 2;
       const participants = new Set(toArray(artifact.participants).map((participant) => participant.syntheticId));
       const projected = {};
@@ -76549,7 +76764,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
         const section = artifact.sections[key];
         if (!enabled.has(key)) {
           projected[key] = defaultSection(key, "This generated view is disabled for the session.");
-        } else if (key === "breakdown" && isObj18(section) && section.available !== false && groupPolicy) {
+        } else if (key === "breakdown" && isObj19(section) && section.available !== false && groupPolicy) {
           projected[key] = { ...section, groups: toArray(section.groups).filter((group) => exposure.anonymizedGroupsEnabled !== false && unique(toArray(group?.participantIds).filter((id2) => participants.has(id2))).length >= minGroupSize) };
         } else {
           projected[key] = section;
@@ -76659,21 +76874,21 @@ var init_aiRequestNormalization = __esm({
 });
 
 // workers/sessionCorsWorker/storageAudience.js
-var isObj19, trim15, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience;
+var isObj20, trim15, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience;
 var init_storageAudience = __esm({
   "workers/sessionCorsWorker/storageAudience.js"() {
     init_deployHelperCore();
     init_payloadAccessControl();
     init_stringCoercion();
-    isObj19 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     trim15 = (value) => toStr6(value).trim();
     parseAccessRecord = (value) => {
-      if (isObj19(value)) return value;
+      if (isObj20(value)) return value;
       const raw = trim15(value);
       if (!raw || raw[0] !== "{") return {};
       try {
         const parsed = JSON.parse(raw);
-        return isObj19(parsed) ? parsed : {};
+        return isObj20(parsed) ? parsed : {};
       } catch {
         return {};
       }
@@ -76692,7 +76907,7 @@ var init_storageAudience = __esm({
       };
     };
     metadataAccessMatchesPublishedAudience = (metadata = {}, config = {}) => {
-      if (!isObj19(metadata?.payloadAccessControl) && !trim15(metadata?.payloadAccessMode) && !metadata?.accessConditions) return true;
+      if (!isObj20(metadata?.payloadAccessControl) && !trim15(metadata?.payloadAccessMode) && !metadata?.accessConditions) return true;
       const expectedValue = resolveConfiguredPayloadAccessValue(config);
       const actualValue = metadata.payloadAccessControl || metadata.payloadAccessMode;
       const expected = normalizePayloadAccessControl2(expectedValue);
@@ -76857,7 +77072,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder8, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj20, hasOwn6, trim16, lower7, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId2, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder8, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj21, hasOwn6, trim16, lower7, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId2, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_aiRequestPolicy();
@@ -76904,7 +77119,7 @@ var init_resultsAnalysisGeneration = __esm({
     RESULT_SECTION_ORDER = ["argumentMap", "atlas", "breakdown", "riskMatrix"];
     DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS = 8 * 60 * 1e3;
     RESULTS_CONTEXT_CHARS = 12e3;
-    isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj21 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasOwn6 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     trim16 = (value) => toStr6(value).trim();
     lower7 = (value) => trim16(value).toLowerCase();
@@ -76913,7 +77128,7 @@ var init_resultsAnalysisGeneration = __esm({
     );
     getCanonicalSessionId = (config = {}) => normalizeSessionIdHex2(resolveCanonicalWorkerSessionIdHex(config));
     publicDraft = (draft, config) => {
-      if (!isObj20(draft)) return null;
+      if (!isObj21(draft)) return null;
       const {
         participantWatermark,
         participantDigests,
@@ -76955,14 +77170,14 @@ var init_resultsAnalysisGeneration = __esm({
       if (value == null || value === false) return false;
       if (typeof value === "string") return trim16(value) !== "";
       if (Array.isArray(value)) return value.length > 0;
-      if (isObj20(value)) return Object.keys(value).length > 0;
+      if (isObj21(value)) return Object.keys(value).length > 0;
       return true;
     };
-    isBlankFieldValue = (value) => value == null || typeof value === "string" && !trim16(value) || Array.isArray(value) && value.length === 0 || isObj20(value) && Object.keys(value).length === 0;
+    isBlankFieldValue = (value) => value == null || typeof value === "string" && !trim16(value) || Array.isArray(value) && value.length === 0 || isObj21(value) && Object.keys(value).length === 0;
     isClearedFieldWithLockFlag = (value) => hasOwn6(value, "value") && isBlankFieldValue(value.value) && !["envelope", ...ENCRYPTED_ENVELOPE_KEYS].some((key) => encryptedEnvelopeValueHasContent(value[key]));
     valueLooksEncrypted = (value, depth = 0) => {
       if (depth > 5) return false;
-      if (!isObj20(value)) return false;
+      if (!isObj21(value)) return false;
       if (value.locked === true || value.payloadEncrypted === true) return true;
       if (value.encrypted === true && !isClearedFieldWithLockFlag(value)) return true;
       if (Object.entries(value).some(([key, entry2]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry2))) return true;
@@ -76972,16 +77187,16 @@ var init_resultsAnalysisGeneration = __esm({
       if (value == null) return "";
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return trim16(value);
       if (Array.isArray(value)) return value.map(valueFromAnswerLike).filter((entry2) => entry2 !== "").join("; ");
-      if (isObj20(value) && hasOwn6(value, "value")) return valueFromAnswerLike(value.value);
+      if (isObj21(value) && hasOwn6(value, "value")) return valueFromAnswerLike(value.value);
       return "";
     };
     FIELD_MASKS = /* @__PURE__ */ new Set(["*", "[encrypted]"]);
     withoutFieldMask = (value) => {
-      const raw = isObj20(value) && hasOwn6(value, "value") ? value.value : value;
+      const raw = isObj21(value) && hasOwn6(value, "value") ? value.value : value;
       return typeof raw === "string" && FIELD_MASKS.has(raw.trim()) ? "" : value;
     };
     rowLooksLocked = (row) => {
-      if (!isObj20(row)) return true;
+      if (!isObj21(row)) return true;
       if (row.encrypted === true || row.payloadEncrypted === true || row.locked === true) return true;
       return valueLooksEncrypted(hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response);
     };
@@ -77061,7 +77276,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     participantDigest = async (sourceKey) => sha256Hex(`participant:${trim16(sourceKey).toLowerCase()}`);
     normalizeQuestionRecord = (question) => {
-      if (!isObj20(question)) return null;
+      if (!isObj21(question)) return null;
       const questionId4 = normalizeQuestionId2(question.questionId || question.questionID || question.id);
       if (!questionId4) return null;
       const type = normalizeQuestionType5(question.type || question.questionType);
@@ -77115,7 +77330,7 @@ var init_resultsAnalysisGeneration = __esm({
       let excludedCount = 0;
       let lockedCount = 0;
       for (const row of Array.isArray(rows) ? rows : []) {
-        if (!isObj20(row)) {
+        if (!isObj21(row)) {
           excludedCount += 1;
           continue;
         }
@@ -77303,12 +77518,12 @@ var init_resultsAnalysisGeneration = __esm({
       };
       const questionRows = await listCloudflareMetadataRows({ index, slug, resource: "questions", budget, strict: true });
       const hiddenQuestionIds = await listHiddenStorageResourceIds({ index, slug, resource: "questions", budget });
-      const readableQuestion = (metadata) => isObj20(metadata) && metadata.hidden !== true && !isEncrypted(metadata) && metadataAccessMatchesPublishedAudience(metadata, config);
+      const readableQuestion = (metadata) => isObj21(metadata) && metadata.hidden !== true && !isEncrypted(metadata) && metadataAccessMatchesPublishedAudience(metadata, config);
       const readQuestionPayload = await readPayloads(questionRows.map((row) => row?.metadata).filter(readableQuestion));
       const candidates = [];
       for (const row of questionRows) {
         const metadata = row?.metadata;
-        if (!isObj20(metadata) || metadata.hidden === true) continue;
+        if (!isObj21(metadata) || metadata.hidden === true) continue;
         const version2 = {
           createdAtMs: Date.parse(trim16(metadata.createdAt)) || 0,
           storageRefId: trim16(metadata.id),
@@ -77321,7 +77536,7 @@ var init_resultsAnalysisGeneration = __esm({
           continue;
         }
         const payload = parseJsonBytes(await readQuestionPayload(metadata));
-        if (!isObj20(payload)) continue;
+        if (!isObj21(payload)) continue;
         if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
         const payloadId = trim16(payload.id || payload.questionId || payload.questionID);
         const normalized2 = normalizeQuestionRecord({
@@ -77333,13 +77548,13 @@ var init_resultsAnalysisGeneration = __esm({
       }
       const questions = selectCanonicalStorageVersions(candidates).filter((candidate) => !candidate.withheld).map((candidate) => candidate.question);
       const rows = await listCloudflareMetadataRows({ index, slug, resource: "responses", budget, strict: true });
-      const readResponsePayload = await readPayloads(rows.map((row) => row?.metadata).filter((metadata) => isObj20(metadata) && trim16(metadata.responder) && !isEncrypted(metadata)));
+      const readResponsePayload = await readPayloads(rows.map((row) => row?.metadata).filter((metadata) => isObj21(metadata) && trim16(metadata.responder) && !isEncrypted(metadata)));
       const responseRows = [];
       let excludedCount = 0;
       let lockedCount = 0;
       for (const row of rows) {
         const metadata = row?.metadata;
-        if (!isObj20(metadata) || !trim16(metadata.responder)) {
+        if (!isObj21(metadata) || !trim16(metadata.responder)) {
           excludedCount += 1;
           continue;
         }
@@ -77349,7 +77564,7 @@ var init_resultsAnalysisGeneration = __esm({
           continue;
         }
         const payload = parseJsonBytes(await readResponsePayload(metadata));
-        if (!isObj20(payload)) {
+        if (!isObj21(payload)) {
           excludedCount += 1;
           continue;
         }
@@ -77360,7 +77575,7 @@ var init_resultsAnalysisGeneration = __esm({
         budget.payload(jsonByteLength(committed));
         const metadata = committed?.metadata;
         const payload = committed?.payload;
-        if (!isObj20(metadata) || !isObj20(payload) || !trim16(metadata.responder)) {
+        if (!isObj21(metadata) || !isObj21(payload) || !trim16(metadata.responder)) {
           excludedCount += 1;
           continue;
         }
@@ -77398,7 +77613,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     loadAdminSnapshotResultsAnalysisSource = async ({ body, slug, config } = {}) => {
       const snapshot = body?.source?.snapshot;
-      if (!isObj20(snapshot)) return { ok: false, status: 400, error: "Missing admin results-analysis snapshot." };
+      if (!isObj21(snapshot)) return { ok: false, status: 400, error: "Missing admin results-analysis snapshot." };
       if (!compareIdentity({ slug, config, suppliedSlug: snapshot.sessionSlug, suppliedSessionId: snapshot.sessionId || snapshot.sessionIdHex })) {
         return { ok: false, status: 400, error: "Snapshot session identity does not match the target session." };
       }
@@ -77422,15 +77637,15 @@ var init_resultsAnalysisGeneration = __esm({
       if (kind === "admin-snapshot") return loadAdminSnapshotResultsAnalysisSource({ body, slug, config });
       return loadWorkerCanonicalResultsAnalysisSource({ env, slug, config, committedResponses: body?.committedResponses });
     };
-    normalizeProviderResponse = async (response2, now = Date.now()) => {
-      const data = await response2?.json?.().catch?.(() => ({}));
-      if (!response2?.ok) {
-        const retryAfter = trim16(response2?.headers?.get?.("retry-after"));
+    normalizeProviderResponse = async (response3, now = Date.now()) => {
+      const data = await response3?.json?.().catch?.(() => ({}));
+      if (!response3?.ok) {
+        const retryAfter = trim16(response3?.headers?.get?.("retry-after"));
         const seconds = Number(retryAfter);
         const retryAfterMs = Number.isFinite(seconds) ? seconds * 1e3 : Date.parse(retryAfter) - now;
         return {
           ok: false,
-          status: response2?.status || 502,
+          status: response3?.status || 502,
           error: data?.error || "AI provider request failed.",
           ...Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? { retryAfterMs } : {}
         };
@@ -77439,20 +77654,20 @@ var init_resultsAnalysisGeneration = __esm({
       for (const candidate of [raw, raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)]) {
         try {
           const value = JSON.parse(candidate);
-          if (isObj20(value)) return { ok: true, value };
+          if (isObj21(value)) return { ok: true, value };
         } catch {
         }
       }
       return { ok: false, status: 502, retryable: false, error: "AI provider returned invalid JSON." };
     };
     resolveAnalysisAiPayload = ({ config, prompt }) => {
-      const ai = isObj20(config?.ai) ? config.ai : {};
-      const providers = isObj20(ai.providers) ? ai.providers : {};
+      const ai = isObj21(config?.ai) ? config.ai : {};
+      const providers = isObj21(ai.providers) ? ai.providers : {};
       const { provider, model } = resolveSessionAiModel(config, { taskType: "analysis", modelType: "thinking" });
       const reasoningEffort = trim16(
         ai?.taskReasoningEffort?.analysis || ai?.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low"
       );
-      const providerEntry = isObj20(providers[provider]) ? providers[provider] : {};
+      const providerEntry = isObj21(providers[provider]) ? providers[provider] : {};
       return {
         provider,
         model,
@@ -77492,7 +77707,7 @@ var init_resultsAnalysisGeneration = __esm({
       }
       const secrets = await (deps?.getSessionSecrets ? deps.getSessionSecrets(env, slug) : getSessionSecrets(env, slug)) || {};
       const proxyArgs = { payload, secrets, config, baseHeaders: headers2 };
-      let response2;
+      let response3;
       const fetchImpl = deps?.fetch || globalThis.fetch?.bind(globalThis);
       const { safeFetch } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: fetchImpl } });
       const proxyDeps = { fetch: fetchImpl, safeFetch, json: deps?.json || json };
@@ -77502,8 +77717,8 @@ var init_resultsAnalysisGeneration = __esm({
         if (provider === "custom") return (deps?.proxyCustomRPC || ((args) => proxyCustomRPC({ ...args, deps: proxyDeps })))({ ...proxyArgs, auth: { scopes: { ai: true, custom_rpc: true } } });
         return (deps?.proxyOpenAI || ((args) => proxyOpenAI({ ...args, deps: proxyDeps })))(proxyArgs);
       };
-      response2 = await withTimeout(runProvider(), deps?.resultsAnalysisProviderTimeoutMs, "AI results analysis generation timed out.");
-      return normalizeProviderResponse(response2, Number(deps?.now?.() ?? Date.now()));
+      response3 = await withTimeout(runProvider(), deps?.resultsAnalysisProviderTimeoutMs, "AI results analysis generation timed out.");
+      return normalizeProviderResponse(response3, Number(deps?.now?.() ?? Date.now()));
     };
     normalizeGeneratedArtifact = ({ value, source, sections, generatedAt, model = "" }) => {
       const validationSource = {
@@ -77534,12 +77749,12 @@ var init_resultsAnalysisGeneration = __esm({
     filterDraftForStatus = (draft, includeDraft, config) => {
       const safe = publicDraft(draft, config);
       if (includeDraft) return safe;
-      if (!isObj20(safe)) return null;
+      if (!isObj21(safe)) return null;
       const { artifact, snapshot, ...rest } = safe;
       return rest;
     };
     summarizeReservation = (reservation, requestId = "") => {
-      if (!isObj20(reservation)) return null;
+      if (!isObj21(reservation)) return null;
       return {
         kind: trim16(reservation.kind),
         ...requestId ? { requestId } : {}
@@ -77554,7 +77769,7 @@ var init_resultsAnalysisGeneration = __esm({
       return { eligible: reasons.length === 0, reasons };
     };
     summarizeActiveState = (active) => {
-      if (!isObj20(active)) return null;
+      if (!isObj21(active)) return null;
       return {
         ...trim16(active.requestId) ? { requestId: trim16(active.requestId) } : {},
         ...trim16(active.trigger) ? { trigger: trim16(active.trigger) } : {},
@@ -77562,7 +77777,7 @@ var init_resultsAnalysisGeneration = __esm({
       };
     };
     summarizeFailureState = (failure4) => {
-      if (!isObj20(failure4)) return null;
+      if (!isObj21(failure4)) return null;
       return {
         ok: false,
         error: trim16(failure4.error) || "Results analysis generation failed.",
@@ -77808,7 +78023,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     normalizedResultsProfile = (config = {}) => {
       const normalizedConfig = normalizeWorkerConfigRecord(config || {}, { slug: normalizeWorkerSessionSlug(config?.slug) });
-      return isObj20(normalizedConfig?.sessionModeProfile?.results) ? normalizedConfig.sessionModeProfile.results : {};
+      return isObj21(normalizedConfig?.sessionModeProfile?.results) ? normalizedConfig.sessionModeProfile.results : {};
     };
     resolveResultsVisibility = (config = {}) => lower7(normalizedResultsProfile(config).visibility);
     aggregateResultsEnabled = (config = {}) => normalizedResultsProfile(config)?.exposure?.aggregateResultsEnabled === true;
@@ -77855,7 +78070,7 @@ var init_resultsAnalysisGeneration = __esm({
 });
 
 // workers/sessionCorsWorker/resultsBuildStore.js
-var CHUNK_CHARS, MAX_CHUNKS, MAX_RESULTS_BUILDS, RESULTS_BUILD_LEASE_MS, RESULTS_BUILD_KINDS, json4, isObj21, trim17, isFresh, randomHex2, chunkBuild, listedBuild, dispatchResultsBuildStore;
+var CHUNK_CHARS, MAX_CHUNKS, MAX_RESULTS_BUILDS, RESULTS_BUILD_LEASE_MS, RESULTS_BUILD_KINDS, json4, isObj22, trim17, isFresh, randomHex2, chunkBuild, listedBuild, dispatchResultsBuildStore;
 var init_resultsBuildStore = __esm({
   "workers/sessionCorsWorker/resultsBuildStore.js"() {
     CHUNK_CHARS = 24e3;
@@ -77883,9 +78098,9 @@ var init_resultsBuildStore = __esm({
       }
     });
     json4 = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-    isObj21 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     trim17 = (value) => typeof value === "string" ? value.trim() : "";
-    isFresh = (active, nowMs) => isObj21(active) && nowMs - Number(active.startedAtMs || 0) < RESULTS_BUILD_LEASE_MS;
+    isFresh = (active, nowMs) => isObj22(active) && nowMs - Number(active.startedAtMs || 0) < RESULTS_BUILD_LEASE_MS;
     randomHex2 = (coordinator, bytes3) => [...(coordinator.crypto || globalThis.crypto).getRandomValues(new Uint8Array(bytes3))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
     chunkBuild = (build) => {
       const serialized = JSON.stringify(build);
@@ -77903,7 +78118,7 @@ var init_resultsBuildStore = __esm({
       const chunkKey = (id2, index) => `${kind.key}:build:${id2}:${index}`;
       const readIndex = async (store) => {
         const value = await store.get(kind.key);
-        return isObj21(value) && Array.isArray(value.builds) ? value : { version: 1, active: null, builds: [] };
+        return isObj22(value) && Array.isArray(value.builds) ? value : { version: 1, active: null, builds: [] };
       };
       const readBuild = async (entry2) => {
         const chunks = [];
@@ -77914,7 +78129,7 @@ var init_resultsBuildStore = __esm({
         }
         try {
           const build = JSON.parse(chunks.join(""));
-          return isObj21(build) && build.id === entry2.id ? build : null;
+          return isObj22(build) && build.id === entry2.id ? build : null;
         } catch {
           return null;
         }
@@ -77937,7 +78152,7 @@ var init_resultsBuildStore = __esm({
         });
       }
       if (operation === "finalize") {
-        const build = isObj21(payload.build) ? payload.build : null;
+        const build = isObj22(payload.build) ? payload.build : null;
         const invalid3 = !!build && !idPattern.test(trim17(build.id));
         const chunks = build && !invalid3 ? chunkBuild(build) : [];
         const refusal2 = invalid3 ? json4({ ok: false, error: `Invalid ${kind.name} build.` }, 400) : chunks.length > MAX_CHUNKS ? json4({ ok: false, error: `This ${kind.name} is too large to keep.` }, 413) : null;
@@ -78005,15 +78220,15 @@ var init_sessionAgentOptOuts = __esm({
     dispatchSessionAgentOptOutStore = async (coordinator, operation, payload = {}) => {
       const storage = coordinator.state.storage;
       if (operation === "list") return json5({ ok: true, addresses: await listAddresses2(storage) });
-      const address2 = addressOf(payload.address);
-      if (!canOptOut(address2)) return json5({ ok: false, error: "Sign in with an address to change this." }, 400);
-      if (operation === "read") return json5({ ok: true, optedOut: await storage.get(PREFIX + address2) === true });
+      const address3 = addressOf(payload.address);
+      if (!canOptOut(address3)) return json5({ ok: false, error: "Sign in with an address to change this." }, 400);
+      if (operation === "read") return json5({ ok: true, optedOut: await storage.get(PREFIX + address3) === true });
       if (operation === "set") {
         if (typeof payload.optedOut !== "boolean") {
           return json5({ ok: false, error: "Say whether the Session Agent may use your answers and files." }, 400);
         }
-        if (payload.optedOut) await storage.put(PREFIX + address2, true);
-        else await storage.delete(PREFIX + address2);
+        if (payload.optedOut) await storage.put(PREFIX + address3, true);
+        else await storage.delete(PREFIX + address3);
         return json5({ ok: true, optedOut: payload.optedOut });
       }
       return json5({ ok: false, error: "Not found." }, 404);
@@ -78638,7 +78853,7 @@ var init_litWorkerAuthorization = __esm({
 });
 
 // workers/sessionCorsWorker/chipotleClient.js
-var import_rpcDefaults4, LIT_PROVISIONING_CREDENTIALS_CONFLICT, DEFAULT_LIT_API_BASE, CHIPOTLE_API_PREFIX, APPROVED_LIT_CHIPOTLE_API_HOSTS, LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, DEFAULT_PAGE_NUMBER, DEFAULT_PAGE_SIZE, getPathRpcUrl2, getPublicRpcUrls2, ethersUtils2, toTrimmedString9, isObj22, normalizeChipotleRpcCandidateList, normalizeValidChipotlePkpId, normalizeChipotleMembershipValue, normalizeHostname, parseIpv4Octets2, isPrivateOrLocalIpv4, isPrivateOrLocalIpv6, isPrivateOrLocalHostname, isApprovedLocalChipotleApiHost, isTruthyFlag, isLitChipotleLocalApiBaseAllowed, normalizeLitChipotleApiBase, normalizeChipotleRequestPath, buildChipotleUrl, parseJsonIfPossible, extractChipotleErrorMessage, fetchChipotleJson, resolveLitChipotleRuntime, resolveLitChipotleProvisioningRuntime, ensureChipotleApiKey, ensureChipotleManagementApiKey, buildPagedPath, runtimeAllowsLocalApiBase, listGroupWallets, listActions, listGroupActions, listWallets, MAX_GONE_CHECK_PAGES, GONE_CHECK_STATUSES, listAllIds, mayMeanLitSetupGone, confirmLitSetupGone, resolveActionCidMembership, createStatusWarning, readLitChipotleStatus, deriveLitActionCid, normalizeSessionScopedNameSegment, normalizeGateMode3, isPrivateHostname, validateChipotleRpcUrl, resolveConfigMappedChipotleRpcUrls, resolveDefaultChipotleRpcUrls, resolveSessionChipotleRpcUrl, buildSessionBootstrapMetadata, createLitChipotleAccount, createLitChipotleGroup, createLitChipotleWallet, createLitChipotleUsageKey, readChipotleBillingBalance, ensureActionMetadata, ensureActionInGroup, ensurePkpInGroup, provisionLitChipotleAction, bootstrapLitChipotleSession, bootstrapLitChipotleSessionCore, executeLitChipotleAction, executeSessionLitChipotleAction;
+var import_rpcDefaults4, LIT_PROVISIONING_CREDENTIALS_CONFLICT, DEFAULT_LIT_API_BASE, CHIPOTLE_API_PREFIX, APPROVED_LIT_CHIPOTLE_API_HOSTS, LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, DEFAULT_PAGE_NUMBER, DEFAULT_PAGE_SIZE, getPathRpcUrl2, getPublicRpcUrls2, ethersUtils2, toTrimmedString9, isObj23, normalizeChipotleRpcCandidateList, normalizeValidChipotlePkpId, normalizeChipotleMembershipValue, normalizeHostname, parseIpv4Octets2, isPrivateOrLocalIpv4, isPrivateOrLocalIpv6, isPrivateOrLocalHostname, isApprovedLocalChipotleApiHost, isTruthyFlag, isLitChipotleLocalApiBaseAllowed, normalizeLitChipotleApiBase, normalizeChipotleRequestPath, buildChipotleUrl, parseJsonIfPossible, extractChipotleErrorMessage, fetchChipotleJson, resolveLitChipotleRuntime, resolveLitChipotleProvisioningRuntime, ensureChipotleApiKey, ensureChipotleManagementApiKey, buildPagedPath, runtimeAllowsLocalApiBase, listGroupWallets, listActions, listGroupActions, listWallets, MAX_GONE_CHECK_PAGES, GONE_CHECK_STATUSES, listAllIds, mayMeanLitSetupGone, confirmLitSetupGone, resolveActionCidMembership, createStatusWarning, readLitChipotleStatus, deriveLitActionCid, normalizeSessionScopedNameSegment, normalizeGateMode3, isPrivateHostname, validateChipotleRpcUrl, resolveConfigMappedChipotleRpcUrls, resolveDefaultChipotleRpcUrls, resolveSessionChipotleRpcUrl, buildSessionBootstrapMetadata, createLitChipotleAccount, createLitChipotleGroup, createLitChipotleWallet, createLitChipotleUsageKey, readChipotleBillingBalance, ensureActionMetadata, ensureActionInGroup, ensurePkpInGroup, provisionLitChipotleAction, bootstrapLitChipotleSession, bootstrapLitChipotleSessionCore, executeLitChipotleAction, executeSessionLitChipotleAction;
 var init_chipotleClient = __esm({
   "workers/sessionCorsWorker/chipotleClient.js"() {
     init_litChipotleAction();
@@ -78658,7 +78873,7 @@ var init_chipotleClient = __esm({
     ({ getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default);
     ethersUtils2 = ethers_exports?.utils || ethers_exports;
     toTrimmedString9 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-    isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj23 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     normalizeChipotleRpcCandidateList = (value = []) => {
       const out = [];
       const seen = /* @__PURE__ */ new Set();
@@ -78797,7 +79012,7 @@ var init_chipotleClient = __esm({
     };
     extractChipotleErrorMessage = (status, body, fallback) => {
       if (typeof body === "string" && body.trim()) return body.trim();
-      if (isObj22(body)) {
+      if (isObj23(body)) {
         const nestedError = toTrimmedString9(body.error || body.message || body.detail);
         if (nestedError) return nestedError;
       }
@@ -78825,9 +79040,9 @@ var init_chipotleClient = __esm({
         headers2["X-Api-Key"] = normalizedApiKey;
         headers2.Authorization = `Bearer ${normalizedApiKey}`;
       }
-      let response2;
+      let response3;
       try {
-        response2 = await fetchImpl(requestUrl, {
+        response3 = await fetchImpl(requestUrl, {
           method,
           headers: headers2,
           // The deployed Workers runtime supports manual/follow, but rejects error.
@@ -78838,19 +79053,19 @@ var init_chipotleClient = __esm({
       } catch (error) {
         throw new Error(toTrimmedString9(error?.message || error) || "Chipotle request failed.");
       }
-      if (response2.status >= 300 && response2.status < 400) {
+      if (response3.status >= 300 && response3.status < 400) {
         throw new Error("Chipotle redirects are not allowed.");
       }
-      const text6 = await response2.text().catch(() => "");
+      const text6 = await response3.text().catch(() => "");
       const parsed = parseJsonIfPossible(text6);
-      if (!response2.ok) {
+      if (!response3.ok) {
         throw Object.assign(
-          new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed")),
-          { litStatus: response2.status }
+          new Error(extractChipotleErrorMessage(response3.status, parsed, "Chipotle request failed")),
+          { litStatus: response3.status }
         );
       }
-      if (isObj22(parsed) && toTrimmedString9(parsed.error || "").trim()) {
-        throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
+      if (isObj23(parsed) && toTrimmedString9(parsed.error || "").trim()) {
+        throw new Error(extractChipotleErrorMessage(response3.status, parsed, "Chipotle request failed"));
       }
       return parsed;
     };
@@ -78860,8 +79075,8 @@ var init_chipotleClient = __esm({
       secrets = {},
       body = {}
     } = {}) => {
-      const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
-      const requestBody = isObj22(body) ? body : {};
+      const litCredentials = isObj23(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj23(body) ? body : {};
       const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
       const envApiKey = toTrimmedString9(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
       const requestApiKey = toTrimmedString9(requestBody.litUsageApiKey || requestBody.apiKey);
@@ -78893,8 +79108,8 @@ var init_chipotleClient = __esm({
       secrets = {},
       body = {}
     } = {}) => {
-      const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
-      const requestBody = isObj22(body) ? body : {};
+      const litCredentials = isObj23(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj23(body) ? body : {};
       const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
       const secretManagementApiKey = toTrimmedString9(secrets?.litAccountApiKey);
       const envManagementApiKey = toTrimmedString9(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
@@ -78941,7 +79156,7 @@ var init_chipotleClient = __esm({
     runtimeAllowsLocalApiBase = (runtime = {}) => runtime?.allowLocalApiBase === true;
     listGroupWallets = async ({ runtime, fetchImpl } = {}) => {
       if (!toTrimmedString9(runtime?.litGroupId)) return [];
-      const response2 = await fetchChipotleJson({
+      const response3 = await fetchChipotleJson({
         apiBase: runtime.litApiBase,
         apiKey: runtime.litUsageApiKey,
         allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -78952,13 +79167,13 @@ var init_chipotleClient = __esm({
         }),
         fetchImpl
       });
-      return Array.isArray(response2) ? response2 : [];
+      return Array.isArray(response3) ? response3 : [];
     };
     listActions = async ({ runtime, fetchImpl, groupId } = {}) => {
       const rawGroupId = groupId === null ? "" : groupId === void 0 ? runtime?.litGroupId : groupId;
       const resolvedGroupId = toTrimmedString9(rawGroupId);
       if (groupId !== void 0 && groupId !== null && !resolvedGroupId && groupId !== "") return [];
-      const response2 = await fetchChipotleJson({
+      const response3 = await fetchChipotleJson({
         apiBase: runtime.litApiBase,
         apiKey: runtime.litUsageApiKey || runtime.litManagementApiKey,
         allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -78969,14 +79184,14 @@ var init_chipotleClient = __esm({
         }),
         fetchImpl
       });
-      return Array.isArray(response2) ? response2 : [];
+      return Array.isArray(response3) ? response3 : [];
     };
     listGroupActions = async ({ runtime, fetchImpl } = {}) => {
       if (!toTrimmedString9(runtime?.litGroupId)) return [];
       return listActions({ runtime, fetchImpl, groupId: runtime.litGroupId });
     };
     listWallets = async ({ runtime, fetchImpl } = {}) => {
-      const response2 = await fetchChipotleJson({
+      const response3 = await fetchChipotleJson({
         apiBase: runtime.litApiBase,
         apiKey: runtime.litManagementApiKey,
         allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -78986,7 +79201,7 @@ var init_chipotleClient = __esm({
         }),
         fetchImpl
       });
-      return Array.isArray(response2) ? response2 : [];
+      return Array.isArray(response3) ? response3 : [];
     };
     MAX_GONE_CHECK_PAGES = 10;
     GONE_CHECK_STATUSES = /* @__PURE__ */ new Set([400, 401, 403, 404, 410, 422]);
@@ -79182,7 +79397,7 @@ var init_chipotleClient = __esm({
     } = {}) => {
       const normalizedChainId = toChainId(chainId);
       if (!normalizedChainId) return [];
-      const map = isObj22(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
+      const map = isObj23(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
       const mapped = normalizeChipotleRpcCandidateList(
         map[normalizedChainId] || map[String(normalizedChainId)] || []
       );
@@ -79205,7 +79420,7 @@ var init_chipotleClient = __esm({
       chainId = 0,
       op = ""
     } = {}) => {
-      const requestBody = isObj22(request) ? request : {};
+      const requestBody = isObj23(request) ? request : {};
       const normalizedChainId = toChainId(chainId);
       const requestRpcUrl = toTrimmedString9(requestBody.rpcUrl || requestBody.customRpcUrl);
       const candidates = normalizeChipotleRpcCandidateList([
@@ -79246,7 +79461,7 @@ var init_chipotleClient = __esm({
       request = {},
       sessionSlug = ""
     } = {}) => {
-      const requestBody = isObj22(request) ? request : {};
+      const requestBody = isObj23(request) ? request : {};
       const slugSegment = normalizeSessionScopedNameSegment(
         requestBody.sessionSlug || requestBody.slug || sessionSlug,
         "session"
@@ -79273,8 +79488,8 @@ var init_chipotleClient = __esm({
       fetchImpl = globalThis.fetch
     } = {}) => {
       const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-      const requestBody = isObj22(request) ? request : {};
-      const response2 = await fetchChipotleJson({
+      const requestBody = isObj23(request) ? request : {};
+      const response3 = await fetchChipotleJson({
         apiBase,
         allowLocalApiBase,
         path: "/new_account",
@@ -79287,8 +79502,8 @@ var init_chipotleClient = __esm({
         fetchImpl
       });
       return {
-        accountApiKey: toTrimmedString9(response2?.api_key),
-        accountWalletAddress: toTrimmedString9(response2?.wallet_address),
+        accountApiKey: toTrimmedString9(response3?.api_key),
+        accountWalletAddress: toTrimmedString9(response3?.wallet_address),
         metadata
       };
     };
@@ -79299,7 +79514,7 @@ var init_chipotleClient = __esm({
       fetchImpl = globalThis.fetch
     } = {}) => {
       const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-      const response2 = await fetchChipotleJson({
+      const response3 = await fetchChipotleJson({
         apiBase: runtime.litApiBase,
         apiKey: runtime.litManagementApiKey,
         allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -79314,7 +79529,7 @@ var init_chipotleClient = __esm({
         fetchImpl
       });
       return {
-        groupId: toTrimmedString9(response2?.group_id),
+        groupId: toTrimmedString9(response3?.group_id),
         metadata
       };
     };
@@ -79323,14 +79538,14 @@ var init_chipotleClient = __esm({
       fetchImpl = globalThis.fetch,
       checkpointWallet
     } = {}) => {
-      const response2 = await fetchChipotleJson({
+      const response3 = await fetchChipotleJson({
         apiBase: runtime.litApiBase,
         apiKey: runtime.litManagementApiKey,
         allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
         path: "/create_wallet",
         fetchImpl
       });
-      const walletAddress = toTrimmedString9(response2?.wallet_address);
+      const walletAddress = toTrimmedString9(response3?.wallet_address);
       if (walletAddress) await checkpointWallet?.(walletAddress);
       const wallets = await listWallets({ runtime, fetchImpl }).catch(() => []);
       const matchedWallet = wallets.find((entry2) => {
@@ -79354,7 +79569,7 @@ var init_chipotleClient = __esm({
       if (!Number.isFinite(numericGroupId) || numericGroupId <= 0) {
         throw new Error("Lit group ID not configured.");
       }
-      const response2 = await fetchChipotleJson({
+      const response3 = await fetchChipotleJson({
         apiBase: runtime.litApiBase,
         apiKey: runtime.litManagementApiKey,
         allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -79374,7 +79589,7 @@ var init_chipotleClient = __esm({
         fetchImpl
       });
       return {
-        usageApiKey: toTrimmedString9(response2?.usage_api_key),
+        usageApiKey: toTrimmedString9(response3?.usage_api_key),
         metadata
       };
     };
@@ -79400,7 +79615,7 @@ var init_chipotleClient = __esm({
       if (hasAction) {
         return { created: false };
       }
-      const response2 = await fetchChipotleJson({
+      const response3 = await fetchChipotleJson({
         apiBase: runtime.litApiBase,
         apiKey: runtime.litManagementApiKey,
         allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -79415,7 +79630,7 @@ var init_chipotleClient = __esm({
       });
       return {
         created: true,
-        response: response2
+        response: response3
       };
     };
     ensureActionInGroup = async ({ runtime = {}, groupId = "", litActionCid = "", fetchImpl = globalThis.fetch } = {}) => {
@@ -79432,7 +79647,7 @@ var init_chipotleClient = __esm({
       if (hasAction) {
         return { added: false };
       }
-      const response2 = await fetchChipotleJson({
+      const response3 = await fetchChipotleJson({
         apiBase: runtime.litApiBase,
         apiKey: runtime.litManagementApiKey,
         allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -79446,7 +79661,7 @@ var init_chipotleClient = __esm({
       });
       return {
         added: true,
-        response: response2
+        response: response3
       };
     };
     ensurePkpInGroup = async ({ runtime = {}, groupId = "", fetchImpl = globalThis.fetch } = {}) => {
@@ -79466,7 +79681,7 @@ var init_chipotleClient = __esm({
       if (hasPkp) {
         return { added: false };
       }
-      const response2 = await fetchChipotleJson({
+      const response3 = await fetchChipotleJson({
         apiBase: runtime.litApiBase,
         apiKey: runtime.litManagementApiKey,
         allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -79480,7 +79695,7 @@ var init_chipotleClient = __esm({
       });
       return {
         added: true,
-        response: response2
+        response: response3
       };
     };
     provisionLitChipotleAction = async ({ runtime = {}, config = {}, secrets = {}, request = {}, sessionSlug = "", persistAuthorizationSecret, provisioning, checkpointProvisioning, fetchImpl = globalThis.fetch } = {}) => {
@@ -79557,8 +79772,8 @@ var init_chipotleClient = __esm({
         Object.assign(progress, values);
         await checkpointProvisioning?.({ ...progress });
       };
-      const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
-      const requestBody = isObj22(request) ? request : {};
+      const litCredentials = isObj23(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj23(request) ? request : {};
       const secretAccountApiKey = toTrimmedString9(secrets?.litAccountApiKey);
       const requestAccountApiKey = toTrimmedString9(requestBody.litAccountApiKey);
       const envAccountApiKey = toTrimmedString9(env?.LIT_ACCOUNT_API_KEY);
@@ -79701,7 +79916,7 @@ var init_chipotleClient = __esm({
       fetchImpl = globalThis.fetch
     } = {}) => {
       ensureChipotleApiKey(runtime);
-      const actionRequest = isObj22(request) ? request : {};
+      const actionRequest = isObj23(request) ? request : {};
       const code = toTrimmedString9(actionRequest.code);
       const ipfsId = toTrimmedString9(
         actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
@@ -79717,9 +79932,9 @@ var init_chipotleClient = __esm({
       } else if (Object.prototype.hasOwnProperty.call(actionRequest, "js_params")) {
         payload.js_params = actionRequest.js_params;
       }
-      let response2;
+      let response3;
       try {
-        response2 = await fetchChipotleJson({
+        response3 = await fetchChipotleJson({
           apiBase: runtime.litApiBase,
           apiKey: runtime.litUsageApiKey,
           allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
@@ -79739,7 +79954,7 @@ var init_chipotleClient = __esm({
         ok: true,
         apiBase: runtime.litApiBase,
         apiKeySource: runtime.apiKeySource,
-        response: response2
+        response: response3
       };
     };
     executeSessionLitChipotleAction = async ({
@@ -79751,8 +79966,8 @@ var init_chipotleClient = __esm({
       sessionSlug = "",
       fetchImpl = globalThis.fetch
     } = {}) => {
-      const litCredentials = isObj22(config?.litCredentials) ? config.litCredentials : {};
-      const requestBody = isObj22(request) ? request : {};
+      const litCredentials = isObj23(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj23(request) ? request : {};
       const runtime = resolveLitChipotleRuntime({
         env,
         config,
@@ -79883,23 +80098,23 @@ var init_chipotleClient = __esm({
       }
       if (result.response?.has_error) throw new Error("Lit Action authorization failed.");
       const rawResponse = result.response?.response ?? result.response;
-      let response2;
+      let response3;
       try {
-        response2 = typeof rawResponse === "string" ? JSON.parse(rawResponse) : rawResponse;
+        response3 = typeof rawResponse === "string" ? JSON.parse(rawResponse) : rawResponse;
       } catch {
         throw new Error("Invalid Lit Action response.");
       }
-      if (!response2 || typeof response2 !== "object") throw new Error("Invalid Lit Action response.");
-      if (op === "decrypt" && response2.ok === true && response2.allowed === true) {
-        const plaintext = normalizeChipotleCekHex(await openLitReply(response2.encryptedReply, replyContext));
+      if (!response3 || typeof response3 !== "object") throw new Error("Invalid Lit Action response.");
+      if (op === "decrypt" && response3.ok === true && response3.allowed === true) {
+        const plaintext = normalizeChipotleCekHex(await openLitReply(response3.encryptedReply, replyContext));
         return { ok: true, response: { ok: true, allowed: true, op, plaintext, policyFingerprint: expectedPolicyFingerprint } };
       }
       return { ok: true, response: {
-        ok: response2.ok === true,
-        allowed: response2.allowed === true,
+        ok: response3.ok === true,
+        allowed: response3.allowed === true,
         op,
-        ...response2.allowed === false ? { reason: "Requester does not satisfy the SBT gate." } : {},
-        ...op === "encrypt" && typeof response2.ciphertext === "string" ? { ciphertext: response2.ciphertext } : {},
+        ...response3.allowed === false ? { reason: "Requester does not satisfy the SBT gate." } : {},
+        ...op === "encrypt" && typeof response3.ciphertext === "string" ? { ciphertext: response3.ciphertext } : {},
         policyFingerprint: expectedPolicyFingerprint,
         policy
       } };
@@ -80210,12 +80425,12 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       }
       try {
         const name = await sha256Hex(`session-config:${normalizedSlug}`);
-        const response2 = await binding.get(binding.idFromName(name)).fetch(
+        const response3 = await binding.get(binding.idFromName(name)).fetch(
           `https://session-coordinator.internal/session-config/lit-authorization/${path}`,
           { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: normalizedSlug, ...payload }) }
         );
-        const body = await response2.json();
-        return { ok: response2.ok && body?.ok === true, status: response2.status, body };
+        const body = await response3.json();
+        return { ok: response3.ok && body?.ok === true, status: response3.status, body };
       } catch {
         return { ok: false, status: 503, body: { error: COORDINATION_ERROR } };
       }
@@ -80404,11 +80619,11 @@ var init_sessionWriteCoordinator = __esm({
       for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
       return difference === 0;
     };
-    signAuthNonce = async ({ cryptoImpl, keyHex, slug, address: address2, random, expiry }) => {
+    signAuthNonce = async ({ cryptoImpl, keyHex, slug, address: address3, random, expiry }) => {
       const key = await cryptoImpl.subtle.importKey("raw", hexToBytes2(keyHex), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
       const message = new TextEncoder().encode(`ce-auth-nonce-v1
 ${slug}
-${address2}
+${address3}
 ${random}
 ${expiry}`);
       return bytesToHex3(new Uint8Array(await cryptoImpl.subtle.sign("HMAC", key, message))).slice(0, 32);
@@ -82567,32 +82782,32 @@ ${expiry}`);
       async executeAuthNonceIssue(payload) {
         const nowMs = Number(this.now()) || Date.now();
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-        const address2 = toTrimmedString10(payload?.address).toLowerCase();
+        const address3 = toTrimmedString10(payload?.address).toLowerCase();
         const random = toTrimmedString10(payload?.nonce);
         const expiresAtMs = normalizeBoundedFutureTimestamp(
           payload?.expiresAtMs,
           nowMs,
           MAX_AUTH_NONCE_LIFETIME_MS
         );
-        if (!slug || !address2 || !/^[0-9a-f]{32}$/.test(random) || !expiresAtMs) {
+        if (!slug || !address3 || !/^[0-9a-f]{32}$/.test(random) || !expiresAtMs) {
           return jsonResponse2({ error: "Invalid auth nonce issuance request." }, 400);
         }
         const keyHex = await this.readAuthNonceKey({ create: true });
         const expiry = String(expiresAtMs).padStart(13, "0");
-        const mac = await signAuthNonce({ cryptoImpl: this.crypto, keyHex, slug, address: address2, random, expiry });
+        const mac = await signAuthNonce({ cryptoImpl: this.crypto, keyHex, slug, address: address3, random, expiry });
         return jsonResponse2({ ok: true, nonce: `n1${random}${expiry}${mac}` });
       }
       async executeAuthNonceConsume(payload) {
         const nowMs = Number(this.now()) || Date.now();
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-        const address2 = toTrimmedString10(payload?.address).toLowerCase();
+        const address3 = toTrimmedString10(payload?.address).toLowerCase();
         const nonce = toTrimmedString10(payload?.nonce);
         const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
           payload?.usedExpiresAtMs,
           nowMs,
           MAX_AUTH_NONCE_LIFETIME_MS
         );
-        if (!slug || !address2 || !nonce || nonce.length > 256 || !usedExpiresAtMs) {
+        if (!slug || !address3 || !nonce || nonce.length > 256 || !usedExpiresAtMs) {
           return jsonResponse2({ error: "Invalid auth nonce consumption request." }, 400);
         }
         const signed2 = nonce.match(SIGNED_AUTH_NONCE_RE);
@@ -82600,7 +82815,7 @@ ${expiry}`);
         if (signed2) {
           const keyHex = await this.readAuthNonceKey();
           const expiresAtMs = Number(signed2[2]);
-          const mac = keyHex ? await signAuthNonce({ cryptoImpl: this.crypto, keyHex, slug, address: address2, random: signed2[1], expiry: signed2[2] }) : "";
+          const mac = keyHex ? await signAuthNonce({ cryptoImpl: this.crypto, keyHex, slug, address: address3, random: signed2[1], expiry: signed2[2] }) : "";
           if (mac && equalText(mac, signed2[3]) && expiresAtMs > nowMs && expiresAtMs <= nowMs + MAX_AUTH_NONCE_LIFETIME_MS) {
             signedExpiresAtMs = expiresAtMs;
           }
@@ -83238,12 +83453,12 @@ ${expiry}`);
       }
       const coordinatorName = await sha256Hex(`sponsored-grant:${normalizedGrantToken}`);
       const stub = coordinator.get(coordinator.idFromName(coordinatorName));
-      const response2 = await stub.fetch("https://session-coordinator.internal/sponsored-deploy", {
+      const response3 = await stub.fetch("https://session-coordinator.internal/sponsored-deploy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestDigest, deployBody, requestOrigin, sensitiveValues })
       });
-      const result = await response2.json().catch(() => ({}));
+      const result = await response3.json().catch(() => ({}));
       if (result && typeof result === "object" && result.body && Number(result.status || 0)) {
         return {
           ok: result.ok === true,
@@ -83251,7 +83466,7 @@ ${expiry}`);
           body: result.body
         };
       }
-      return { ok: false, status: response2.status || 502, body: result };
+      return { ok: false, status: response3.status || 502, body: result };
     };
     resolveCoordinatorStub = async (env, identity) => {
       const coordinator = env?.CE_SESSION_COORDINATOR;
@@ -83267,17 +83482,17 @@ ${expiry}`);
         const owner = await sha256Hex(`upload-receipts:${normalizedSlug}:${toTrimmedString10(responder).toLowerCase()}`);
         const stub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
         if (!stub?.fetch || !["reserve", "settle", "withdraw"].includes(operation)) return unavailable3;
-        const response2 = await stub.fetch(`https://session-coordinator.internal/upload-receipts/${operation}`, {
+        const response3 = await stub.fetch(`https://session-coordinator.internal/upload-receipts/${operation}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, responder: toTrimmedString10(responder).toLowerCase(), diagnostics: { slug: normalizedSlug, owner } })
         });
-        const body = await response2.json();
-        if (!isObjectRecord(body) || !response2.ok && ![409, 422, 503].includes(response2.status)) return unavailable3;
-        if (response2.ok && (operation !== "reserve" ? body.ok !== true : !(body.kind === "execute" && toTrimmedString10(body.attemptId)) && !(body.kind === "replay" && body.storageRef?.id))) return unavailable3;
+        const body = await response3.json();
+        if (!isObjectRecord(body) || !response3.ok && ![409, 422, 503].includes(response3.status)) return unavailable3;
+        if (response3.ok && (operation !== "reserve" ? body.ok !== true : !(body.kind === "execute" && toTrimmedString10(body.attemptId)) && !(body.kind === "replay" && body.storageRef?.id))) return unavailable3;
         const priorStorageIds = body.priorStorageIds ?? [];
-        if (response2.ok && body.kind === "execute" && (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)) || !Array.isArray(priorStorageIds) || !priorStorageIds.every(isSafeCloudflareStorageRefId))) return unavailable3;
-        return { ...body, status: response2.status };
+        if (response3.ok && body.kind === "execute" && (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)) || !Array.isArray(priorStorageIds) || !priorStorageIds.every(isSafeCloudflareStorageRefId))) return unavailable3;
+        return { ...body, status: response3.status };
       } catch {
         return unavailable3;
       }
@@ -83301,16 +83516,16 @@ ${expiry}`);
       }
       if (!stub?.fetch) return { ...AUTH_STATE_UNAVAILABLE };
       try {
-        const response2 = await stub.fetch(`https://session-coordinator.internal${path}`, {
+        const response3 = await stub.fetch(`https://session-coordinator.internal${path}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        const body = await response2.json().catch(() => null);
+        const body = await response3.json().catch(() => null);
         if (!body || typeof body !== "object") return { ...AUTH_STATE_UNAVAILABLE };
         return {
           ...body,
-          status: response2.status
+          status: response3.status
         };
       } catch {
         return { ...AUTH_STATE_UNAVAILABLE };
@@ -83319,7 +83534,7 @@ ${expiry}`);
     issueCoordinatedAuthNonce = async ({
       env,
       slug,
-      address: address2,
+      address: address3,
       nonce,
       ttlSeconds,
       usedNonceTtlSeconds = 600,
@@ -83328,11 +83543,11 @@ ${expiry}`);
       const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
       return callAuthStateCoordinator({
         env,
-        identity: `auth-nonce:${toTrimmedString10(slug)}:${toTrimmedString10(address2).toLowerCase()}`,
+        identity: `auth-nonce:${toTrimmedString10(slug)}:${toTrimmedString10(address3).toLowerCase()}`,
         path: "/auth-state/nonce/issue",
         payload: {
           slug,
-          address: address2,
+          address: address3,
           nonce,
           expiresAtMs: nowMs + normalizePositiveSafeInteger(ttlSeconds) * 1e3,
           usedExpiresAtMs: nowMs + normalizePositiveSafeInteger(usedNonceTtlSeconds) * 1e3
@@ -83342,7 +83557,7 @@ ${expiry}`);
     consumeCoordinatedAuthNonce = async ({
       env,
       slug,
-      address: address2,
+      address: address3,
       nonce,
       usedNonceTtlSeconds,
       now = Date.now
@@ -83350,19 +83565,19 @@ ${expiry}`);
       const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
       return callAuthStateCoordinator({
         env,
-        identity: `auth-nonce:${toTrimmedString10(slug)}:${toTrimmedString10(address2).toLowerCase()}`,
+        identity: `auth-nonce:${toTrimmedString10(slug)}:${toTrimmedString10(address3).toLowerCase()}`,
         path: "/auth-state/nonce/consume",
         payload: {
           slug,
-          address: address2,
+          address: address3,
           nonce,
           usedExpiresAtMs: nowMs + normalizePositiveSafeInteger(usedNonceTtlSeconds) * 1e3
         }
       });
     };
-    callHostedFaucetQuota = ({ env, slug, address: address2, requestId, sent }, finalize) => callAuthStateCoordinator({
+    callHostedFaucetQuota = ({ env, slug, address: address3, requestId, sent }, finalize) => callAuthStateCoordinator({
       env,
-      identity: `hosted-faucet:${resolveCoordinatorSessionSlugStorageKey(slug)}:${toTrimmedString10(address2).toLowerCase()}`,
+      identity: `hosted-faucet:${resolveCoordinatorSessionSlugStorageKey(slug)}:${toTrimmedString10(address3).toLowerCase()}`,
       path: finalize ? "/hosted-faucet/finalize" : "/hosted-faucet/reserve",
       payload: { requestId, ...finalize ? { sent } : {} }
     });
@@ -83437,9 +83652,9 @@ ${expiry}`);
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) throw new Error("Session config coordination is unavailable.");
-      let response2;
+      let response3;
       try {
-        response2 = await stub.fetch(
+        response3 = await stub.fetch(
           "https://session-coordinator.internal/session-config/storage-envelope-key/get-or-create",
           {
             method: "POST",
@@ -83454,9 +83669,9 @@ ${expiry}`);
       } catch {
         throw new Error("Session config coordination failed; retry.");
       }
-      const result = await response2.json().catch(() => ({}));
-      if (!response2.ok || result?.ok !== true) {
-        throw new Error(response2.status === 503 ? "Session config projection is pending; retry." : "Session config coordination failed.");
+      const result = await response3.json().catch(() => ({}));
+      if (!response3.ok || result?.ok !== true) {
+        throw new Error(response3.status === 503 ? "Session config projection is pending; retry." : "Session config coordination failed.");
       }
       return result;
     };
@@ -83476,9 +83691,9 @@ ${expiry}`);
           body: { error: "Session config coordination is unavailable; config was not changed." }
         };
       }
-      let response2;
+      let response3;
       try {
-        response2 = await stub.fetch("https://session-coordinator.internal/session-config/mutate", {
+        response3 = await stub.fetch("https://session-coordinator.internal/session-config/mutate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -83495,10 +83710,10 @@ ${expiry}`);
           body: { error: "Session config coordination failed; retry." }
         };
       }
-      const result = await response2.json().catch(() => ({}));
-      return response2.ok && result?.ok === true ? { ok: true, status: 200, body: { ok: true } } : {
+      const result = await response3.json().catch(() => ({}));
+      return response3.ok && result?.ok === true ? { ok: true, status: 200, body: { ok: true } } : {
         ok: false,
-        status: response2.status || 503,
+        status: response3.status || 503,
         body: { error: result?.error || "Session config mutation failed." }
       };
     };
@@ -83508,12 +83723,12 @@ ${expiry}`);
       const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
       if (!stub) return { kind: "unavailable" };
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/sponsored-faucet/reserve", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/sponsored-faucet/reserve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ requestDigest: digest2 })
         });
-        return response2.json().catch(() => ({ kind: "unavailable" }));
+        return response3.json().catch(() => ({ kind: "unavailable" }));
       } catch {
         return { kind: "unavailable" };
       }
@@ -83528,13 +83743,13 @@ ${expiry}`);
       const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
       if (!stub) return null;
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/sponsored-faucet/finalize", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/sponsored-faucet/finalize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ requestDigest, receipt })
         });
-        const result = await response2.json().catch(() => ({}));
-        return response2.ok ? result?.receipt : null;
+        const result = await response3.json().catch(() => ({}));
+        return response3.ok ? result?.receipt : null;
       } catch {
         return null;
       }
@@ -83546,13 +83761,13 @@ ${expiry}`);
       const unavailable3 = { ok: false, status: 503, error: LEGACY_SCAN_FAILED_ERROR };
       try {
         for (let step = 0; step < LEGACY_SCAN_STEPS_PER_UPLOAD; step += 1) {
-          const response2 = await stub.fetch("https://session-coordinator.internal/storage/legacy-owner", {
+          const response3 = await stub.fetch("https://session-coordinator.internal/storage/legacy-owner", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ slug, config, resource, resourceId })
           });
-          const result = await response2.json().catch(() => ({}));
-          if (response2.ok && result?.ok === true) return { ok: true, adminOnly: result.adminOnly === true };
+          const result = await response3.json().catch(() => ({}));
+          if (response3.ok && result?.ok === true) return { ok: true, adminOnly: result.adminOnly === true };
           if (result?.pending !== true) return unavailable3;
         }
         return { ok: false, status: 503, error: LEGACY_SCAN_PENDING_ERROR };
@@ -83565,13 +83780,13 @@ ${expiry}`);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { ok: false, status: 503, error: "Results analysis coordination is unavailable." };
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/results-analysis/status", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/results-analysis/status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({})
         });
-        const result = await response2.json().catch(() => ({}));
-        return response2.ok ? result : { ok: false, status: response2.status || 503, error: result?.error || "Results analysis status unavailable." };
+        const result = await response3.json().catch(() => ({}));
+        return response3.ok ? result : { ok: false, status: response3.status || 503, error: result?.error || "Results analysis status unavailable." };
       } catch {
         return { ok: false, status: 503, error: "Results analysis coordination failed; retry." };
       }
@@ -83581,12 +83796,12 @@ ${expiry}`);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { kind: "failed", status: 503, error: "Results analysis coordination is unavailable." };
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/results-analysis/reserve", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/results-analysis/reserve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(reservation || {})
         });
-        return response2.json().catch(() => ({ kind: "failed", status: response2.status || 503 }));
+        return response3.json().catch(() => ({ kind: "failed", status: response3.status || 503 }));
       } catch {
         return { kind: "failed", status: 503, error: "Results analysis coordination failed; retry." };
       }
@@ -83596,13 +83811,13 @@ ${expiry}`);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { ok: false, status: 503, error: "Results analysis coordination is unavailable." };
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/results-analysis/finalize", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/results-analysis/finalize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(finalization || {})
         });
-        const result = await response2.json().catch(() => ({}));
-        return response2.ok ? result : { ok: false, status: response2.status || 503, error: result?.error || "Results analysis finalization failed." };
+        const result = await response3.json().catch(() => ({}));
+        return response3.ok ? result : { ok: false, status: response3.status || 503, error: result?.error || "Results analysis finalization failed." };
       } catch {
         return { ok: false, status: 503, error: "Results analysis coordination failed; retry." };
       }
@@ -83612,13 +83827,13 @@ ${expiry}`);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { ok: false, status: 503, error: "Results analysis coordination is unavailable." };
       try {
-        const response2 = await stub.fetch("https://session-coordinator.internal/results-analysis/auto/enqueue", {
+        const response3 = await stub.fetch("https://session-coordinator.internal/results-analysis/auto/enqueue", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...job || {}, slug: normalizedSlug })
         });
-        const result = await response2.json().catch(() => ({}));
-        return response2.ok ? result : { ok: false, status: response2.status || 503, error: result?.error || "Results analysis auto enqueue failed." };
+        const result = await response3.json().catch(() => ({}));
+        return response3.ok ? result : { ok: false, status: response3.status || 503, error: result?.error || "Results analysis auto enqueue failed." };
       } catch {
         return { ok: false, status: 503, error: "Results analysis auto enqueue failed; retry." };
       }
@@ -85112,38 +85327,38 @@ var require_api = __commonJS({
         }
         const contentType = res.headers.get("content-type");
         const charset = contentType?.match(/charset=([^()<>@,;:\"/[\]?.=\s]*)/i)?.[1];
-        const response2 = res;
+        const response3 = res;
         const decodeText2 = async () => {
           if (charset) {
             try {
-              response2.data = new TextDecoder(charset).decode(await res.arrayBuffer());
+              response3.data = new TextDecoder(charset).decode(await res.arrayBuffer());
             } catch (e) {
-              response2.data = await res.text();
+              response3.data = await res.text();
             }
           } else {
-            response2.data = await res.text();
+            response3.data = await res.text();
           }
         };
         if (responseType === "arraybuffer") {
-          response2.data = await res.arrayBuffer();
+          response3.data = await res.arrayBuffer();
         } else if (responseType === "text") {
           await decodeText2();
         } else if (responseType === "webstream") {
-          response2.data = addAsyncIterator(res.body);
+          response3.data = addAsyncIterator(res.body);
         } else {
           try {
             let test = await res.clone().json();
             if (typeof test !== "object") {
               await decodeText2();
             } else {
-              response2.data = await res.json();
+              response3.data = await res.json();
             }
             test = null;
           } catch {
             await decodeText2();
           }
         }
-        return response2;
+        return response3;
       }
     };
     exports.default = Api;
@@ -85522,13 +85737,13 @@ var require_network2 = __commonJS({
         this.api = api;
       }
       getInfo() {
-        return this.api.get(`info`).then((response2) => {
-          return response2.data;
+        return this.api.get(`info`).then((response3) => {
+          return response3.data;
         });
       }
       getPeers() {
-        return this.api.get(`peers`).then((response2) => {
-          return response2.data;
+        return this.api.get(`peers`).then((response3) => {
+          return response3.data;
         });
       }
     };
@@ -86302,28 +86517,28 @@ var require_transactions = __commonJS({
         return res.data;
       }
       async get(id2) {
-        const response2 = await this.api.get(`tx/${id2}`);
-        if (response2.status == 200) {
-          const data_size = parseInt(response2.data.data_size);
-          if (response2.data.format >= 2 && data_size > 0 && data_size <= 1024 * 1024 * 12) {
+        const response3 = await this.api.get(`tx/${id2}`);
+        if (response3.status == 200) {
+          const data_size = parseInt(response3.data.data_size);
+          if (response3.data.format >= 2 && data_size > 0 && data_size <= 1024 * 1024 * 12) {
             const data = await this.getData(id2);
             return new transaction_1.default({
-              ...response2.data,
+              ...response3.data,
               data
             });
           }
           return new transaction_1.default({
-            ...response2.data,
-            format: response2.data.format || 1
+            ...response3.data,
+            format: response3.data.format || 1
           });
         }
-        if (response2.status == 404) {
+        if (response3.status == 404) {
           throw new error_1.default(
             "TX_NOT_FOUND"
             /* ArweaveErrorType.TX_NOT_FOUND */
           );
         }
-        if (response2.status == 410) {
+        if (response3.status == 410) {
           throw new error_1.default(
             "TX_FAILED"
             /* ArweaveErrorType.TX_FAILED */
@@ -86343,23 +86558,23 @@ var require_transactions = __commonJS({
           op: "equals",
           expr1: tagName,
           expr2: tagValue
-        }).then((response2) => {
-          if (!response2.data) {
+        }).then((response3) => {
+          if (!response3.data) {
             return [];
           }
-          return response2.data;
+          return response3.data;
         });
       }
       getStatus(id2) {
-        return this.api.get(`tx/${id2}/status`).then((response2) => {
-          if (response2.status == 200) {
+        return this.api.get(`tx/${id2}/status`).then((response3) => {
+          if (response3.status == 200) {
             return {
               status: 200,
-              confirmed: response2.data
+              confirmed: response3.data
             };
           }
           return {
-            status: response2.status,
+            status: response3.status,
             confirmed: null
           };
         });
@@ -86581,9 +86796,9 @@ var require_wallets = __commonJS({
        *
        * @returns {Promise<string>} - Promise which resolves with a winston string balance.
        */
-      getBalance(address2) {
-        return this.api.get(`wallet/${address2}/balance`).then((response2) => {
-          return response2.data;
+      getBalance(address3) {
+        return this.api.get(`wallet/${address3}/balance`).then((response3) => {
+          return response3.data;
         });
       }
       /**
@@ -86593,9 +86808,9 @@ var require_wallets = __commonJS({
        *
        * @returns {Promise<string>} - Promise which resolves with a transaction ID.
        */
-      getLastTransactionID(address2) {
-        return this.api.get(`wallet/${address2}/last_tx`).then((response2) => {
-          return response2.data;
+      getLastTransactionID(address3) {
+        return this.api.get(`wallet/${address3}/last_tx`).then((response3) => {
+          return response3.data;
         });
       }
       generate() {
@@ -86795,17 +87010,17 @@ var require_blocks = __commonJS({
        * Gets a block by its "indep_hash"
        */
       async get(indepHash) {
-        const response2 = await this.api.get(`${_Blocks.HASH_ENDPOINT}${indepHash}`);
-        if (response2.status === 200) {
-          return response2.data;
+        const response3 = await this.api.get(`${_Blocks.HASH_ENDPOINT}${indepHash}`);
+        if (response3.status === 200) {
+          return response3.data;
         } else {
-          if (response2.status === 404) {
+          if (response3.status === 404) {
             throw new error_1.default(
               "BLOCK_NOT_FOUND"
               /* ArweaveErrorType.BLOCK_NOT_FOUND */
             );
           } else {
-            throw new Error(`Error while loading block data: ${response2}`);
+            throw new Error(`Error while loading block data: ${response3}`);
           }
         }
       }
@@ -86813,17 +87028,17 @@ var require_blocks = __commonJS({
        * Gets a block by its "height"
        */
       async getByHeight(height) {
-        const response2 = await this.api.get(`${_Blocks.HEIGHT_ENDPOINT}${height}`);
-        if (response2.status === 200) {
-          return response2.data;
+        const response3 = await this.api.get(`${_Blocks.HEIGHT_ENDPOINT}${height}`);
+        if (response3.status === 200) {
+          return response3.data;
         } else {
-          if (response2.status === 404) {
+          if (response3.status === 404) {
             throw new error_1.default(
               "BLOCK_NOT_FOUND"
               /* ArweaveErrorType.BLOCK_NOT_FOUND */
             );
           } else {
-            throw new Error(`Error while loading block data: ${response2}`);
+            throw new Error(`Error while loading block data: ${response3}`);
           }
         }
       }
@@ -86963,7 +87178,7 @@ var require_common = __commonJS({
         return siloTransaction;
       }
       arql(query) {
-        return this.api.post("/arql", query).then((response2) => response2.data || []);
+        return this.api.post("/arql", query).then((response3) => response3.data || []);
       }
     };
     __publicField(_Arweave, "init");
@@ -87283,7 +87498,7 @@ var createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     faucetSbtGateInterface = buildInterface(faucetSbtGateInterface, constants?.faucetSbtGateAbi);
     return faucetSbtGateInterface;
   };
-  const checkSbtGate = async ({ sbtAddresses, address: address2, rpcUrl, mode, chainId, rpcUrlIsPrivate = false, chainAttestationCache }) => {
+  const checkSbtGate = async ({ sbtAddresses, address: address3, rpcUrl, mode, chainId, rpcUrlIsPrivate = false, chainAttestationCache }) => {
     if (!Array.isArray(sbtAddresses) || sbtAddresses.length === 0) return true;
     if (!rpcUrl) return false;
     const log2 = deps?.log || console.log;
@@ -87298,7 +87513,7 @@ var createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     });
     if (!attestation.ok) {
       log2("[gating] sbt rpc chain attestation failed", {
-        address: address2,
+        address: address3,
         rpcUrl: rpcUrlDiagnostic,
         expectedChainId: attestation.expectedChainId,
         actualChainId: attestation.actualChainId,
@@ -87319,7 +87534,7 @@ var createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
             contractAddress: sbt,
             iface,
             method: "balanceOf",
-            args: [address2]
+            args: [address3]
           });
           const bal = Array.isArray(decoded) ? decoded[0] : decoded;
           return Boolean(isPositiveBalance(bal));
@@ -87343,7 +87558,7 @@ var createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     );
     if (!checks.some(Boolean) && errors.length) {
       log2("[gating] sbt balanceOf failed", {
-        address: address2,
+        address: address3,
         rpcUrl: rpcUrlDiagnostic,
         errors
       });
@@ -88157,7 +88372,7 @@ init_chainIdNormalization();
 var validateAdmin = async ({
   env,
   slug,
-  address: address2,
+  address: address3,
   config,
   body,
   deps
@@ -88178,7 +88393,7 @@ var validateAdmin = async ({
     }
   }
   if (adminAddress && deps?.isAddress?.(adminAddress)) {
-    if (adminAddress.toLowerCase() === address2.toLowerCase()) return true;
+    if (adminAddress.toLowerCase() === address3.toLowerCase()) return true;
   }
   if (adminHatId > 0n && deps?.isAddress?.(hatsAddress)) {
     const expectedChainId = resolveRegistryChainId(config);
@@ -88202,7 +88417,7 @@ var validateAdmin = async ({
           contractAddress: hatsAddress,
           iface,
           method: "isWearerOfHat",
-          args: [address2, adminHatId]
+          args: [address3, adminHatId]
         });
         const ok = Array.isArray(decoded) ? decoded[0] : decoded;
         if (ok) return true;
@@ -88740,8 +88955,8 @@ var parseSiweMessage = (message) => {
   const header = lines[0] || "";
   const domain = header.endsWith(SIWE_HEADER_SUFFIX) ? header.slice(0, -SIWE_HEADER_SUFFIX.length) : "";
   if (!SIWE_DOMAIN_RE.test(domain)) return malformedSiwe("missing or invalid header");
-  const address2 = lines[1] || "";
-  if (!SIWE_ADDRESS_RE.test(address2)) return malformedSiwe("invalid address line");
+  const address3 = lines[1] || "";
+  if (!SIWE_ADDRESS_RE.test(address3)) return malformedSiwe("invalid address line");
   if (lines[2] !== "") return malformedSiwe("expected a blank line after the address");
   let index = 3;
   let statement;
@@ -88782,7 +88997,7 @@ var parseSiweMessage = (message) => {
   if (!SIWE_NONCE_RE.test(fields2.nonce)) return malformedSiwe("invalid nonce");
   return {
     domain,
-    address: address2,
+    address: address3,
     ...statement === void 0 ? {} : { statement },
     uri: fields2.uri,
     chainId: fields2.chainId,
@@ -89308,14 +89523,14 @@ var createRateLimitFaucetSupportWithWorkerDeps = ({
   const checkRateLimit = async ({
     env,
     slug,
-    address: address2,
+    address: address3,
     limit,
     route
   } = {}) => {
     const numeric = Number(limit || 0);
     if (!numeric || Number.isNaN(numeric) || numeric <= 0) return true;
     const routeKey = toTrimmedString2(route, deps).toLowerCase() || "default";
-    const identity = toTrimmedString2(address2, deps).toLowerCase() || "anonymous";
+    const identity = toTrimmedString2(address3, deps).toLowerCase() || "anonymous";
     const coordinate2 = deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit;
     const result = await coordinate2({
       env,
@@ -89372,16 +89587,16 @@ var resolveBootstrapAdminAddress = (body = {}, deps) => {
 var validateBootstrapAdmin = async ({
   env,
   slug,
-  address: address2,
+  address: address3,
   body,
   deps
 } = {}) => {
   const requestedAdmin = resolveBootstrapAdminAddress(body, deps);
-  const requestedAdminMatches = !!requestedAdmin && requestedAdmin.toLowerCase() === address2.toLowerCase();
+  const requestedAdminMatches = !!requestedAdmin && requestedAdmin.toLowerCase() === address3.toLowerCase();
   const boundBootstrapAdmin = deps?.toStr?.(env?.BOOTSTRAP_ADMIN_ADDRESS || "").trim();
   if (boundBootstrapAdmin) {
     if (!deps?.isAddress?.(boundBootstrapAdmin)) return false;
-    return requestedAdminMatches && boundBootstrapAdmin.toLowerCase() === address2.toLowerCase();
+    return requestedAdminMatches && boundBootstrapAdmin.toLowerCase() === address3.toLowerCase();
   }
   const registryAddress = deps?.toStr?.(env?.REGISTRY_ADDRESS || "").trim();
   const registryRpcUrls = deps?.normalizeRpcUrlList?.(env?.RPC_URL) || [];
@@ -89432,7 +89647,7 @@ var validateBootstrapAdmin = async ({
     }
     const onChainAdmin = deps?.toStr?.(tupleRead?.tuple?.[4] || "").trim();
     if (!onChainAdmin || !deps?.isAddress?.(onChainAdmin)) return false;
-    return requestedAdminMatches && onChainAdmin.toLowerCase() === address2.toLowerCase();
+    return requestedAdminMatches && onChainAdmin.toLowerCase() === address3.toLowerCase();
   } catch {
     return false;
   }
@@ -89692,7 +89907,7 @@ var maskGateRpcUrlList = ({ config, gateChainId, rpcUrls, deps }) => (Array.isAr
   deps
 }));
 var resolveLoginGateAuthority = async ({
-  address: address2,
+  address: address3,
   config,
   registryAddress,
   registryRpcUrls,
@@ -89746,7 +89961,7 @@ var resolveLoginGateAuthority = async ({
       if (key === "default") {
         warn("[gating] default gate lookup failed", {
           slug: registrySlug,
-          address: address2,
+          address: address3,
           registryAddress,
           registryRpcUrls: maskRpcUrlList2(registryRpcUrls, deps),
           registryRpcErrors,
@@ -89789,7 +90004,7 @@ var resolveLoginGateAuthority = async ({
       if (key === "default") {
         log2(`[gating] default gate empty (allow) [${gateSource}]`, {
           slug: registrySlug,
-          address: address2,
+          address: address3,
           gateChainId: gate.chainId || null,
           registryAddress,
           registryRpcUrl: registryRpcUrlUsed ? maskRpcUrl(registryRpcUrlUsed) : ""
@@ -89801,7 +90016,7 @@ var resolveLoginGateAuthority = async ({
     if (!rpcUrls.length && key === "default") {
       warn("[gating] default gate missing rpc url", {
         slug: registrySlug,
-        address: address2,
+        address: address3,
         gateChainId: gate.chainId || null,
         registryChainId,
         registryAddress,
@@ -89814,7 +90029,7 @@ var resolveLoginGateAuthority = async ({
     for (const rpcUrl of rpcUrls) {
       const candidate = await checkSbtGate({
         sbtAddresses: gate.sbtAddresses,
-        address: address2,
+        address: address3,
         rpcUrl,
         mode: gate.mode,
         chainId: gate.chainId,
@@ -89835,7 +90050,7 @@ var resolveLoginGateAuthority = async ({
     if (key === "default") {
       (ok ? log2 : warn)(`[gating] default gate check ${ok ? "ok" : "failed"} [${gateSource}]`, {
         slug: registrySlug,
-        address: address2,
+        address: address3,
         gateChainId: gate.chainId || null,
         mode: gate.mode,
         sbtCount: gate.sbtAddresses.length,
@@ -89862,7 +90077,7 @@ var resolveLoginGateAuthority = async ({
 // workers/sessionCorsWorker/loginScopeEvaluation.js
 init_workerCanonicalAuthority();
 var computeLoginScopes = async ({
-  address: address2,
+  address: address3,
   authorityMode,
   config,
   env,
@@ -89875,7 +90090,7 @@ var computeLoginScopes = async ({
 } = {}) => {
   if (authorityMode === "worker_canonical") {
     return (deps?.resolveWorkerCanonicalLoginScopes || resolveWorkerCanonicalLoginScopes)({
-      address: address2,
+      address: address3,
       config,
       env,
       slug: registrySlug,
@@ -89886,7 +90101,7 @@ var computeLoginScopes = async ({
   }
   const keys = Array.isArray(resourceKeys) ? resourceKeys : [];
   const gateResults = await (deps?.resolveLoginGateAuthority || resolveLoginGateAuthority)({
-    address: address2,
+    address: address3,
     config,
     registryAddress,
     registryRpcUrls,
@@ -89935,7 +90150,7 @@ init_workerCanonicalAuthority();
 init_chainIdNormalization();
 var resolveLoginAuthorityContext = async ({
   slug,
-  address: address2,
+  address: address3,
   config,
   deps
 } = {}) => {
@@ -89978,7 +90193,7 @@ var resolveLoginAuthorityContext = async ({
     const reason = sessionCheck?.exists === false ? "session-not-registered" : "session-check-unavailable";
     warn("[gating] on-chain gate authority unavailable; denying login", {
       slug: registrySlug,
-      address: address2,
+      address: address3,
       reason,
       registryAddress,
       rpcUrl: sessionCheck?.rpcUrl ? maskRpcUrl(sessionCheck.rpcUrl) : "",
@@ -90043,7 +90258,7 @@ var createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
   const computeScopesForLogin = async ({
     env,
     slug,
-    address: address2,
+    address: address3,
     config,
     requestedScopes
   } = {}) => {
@@ -90056,7 +90271,7 @@ var createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
       sessionCheck
     } = await (deps?.resolveLoginAuthorityContext || resolveLoginAuthorityContext)({
       slug,
-      address: address2,
+      address: address3,
       config,
       deps: {
         toStr: deps?.toStr,
@@ -90070,7 +90285,7 @@ var createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
       }
     });
     return (deps?.computeLoginScopes || computeLoginScopes)({
-      address: address2,
+      address: address3,
       authorityMode,
       config,
       env,
@@ -91608,7 +91823,7 @@ var resolveAdminSignatureAuthority = async ({
   body,
   config,
   allowBootstrapWithoutConfig = false,
-  address: address2 = "",
+  address: address3 = "",
   message = "",
   signature = "",
   targetSlug = "",
@@ -91626,7 +91841,7 @@ var resolveAdminSignatureAuthority = async ({
   const validateSiweAddressMatchesRequest2 = typeof deps?.validateSiweAddressMatchesRequest === "function" ? deps.validateSiweAddressMatchesRequest : () => ({ ok: false, error: "SIWE address does not match request." });
   const consumeNonce2 = typeof deps?.consumeNonce === "function" ? deps.consumeNonce : async () => ({ ok: false, error: "Invalid or expired nonce." });
   const validateAdmin2 = typeof deps?.validateAdmin === "function" ? deps.validateAdmin : async () => false;
-  if (!address2 || !isAddress2(address2)) {
+  if (!address3 || !isAddress2(address3)) {
     return {
       ok: false,
       status: 400,
@@ -91661,7 +91876,7 @@ var resolveAdminSignatureAuthority = async ({
       reason: "invalid_signature"
     };
   }
-  const recoveredCheck = validateRecoveredAddressMatchesRequest2({ recovered, address: address2 }) || {};
+  const recoveredCheck = validateRecoveredAddressMatchesRequest2({ recovered, address: address3 }) || {};
   if (!recoveredCheck?.ok) {
     return {
       ok: false,
@@ -91682,7 +91897,7 @@ var resolveAdminSignatureAuthority = async ({
       logExtra: { error: siweCheck?.error }
     };
   }
-  const siweAddressCheck = validateSiweAddressMatchesRequest2({ siwe, address: address2 }) || {};
+  const siweAddressCheck = validateSiweAddressMatchesRequest2({ siwe, address: address3 }) || {};
   if (!siweAddressCheck?.ok) {
     return {
       ok: false,
@@ -91691,7 +91906,7 @@ var resolveAdminSignatureAuthority = async ({
       reason: "siwe_address_mismatch"
     };
   }
-  const nonceResult = await consumeNonce2(env, targetSlug, address2.toLowerCase(), siwe?.nonce);
+  const nonceResult = await consumeNonce2(env, targetSlug, address3.toLowerCase(), siwe?.nonce);
   if (!nonceResult?.ok) {
     return {
       ok: false,
@@ -91710,11 +91925,11 @@ var resolveAdminSignatureAuthority = async ({
     return {
       ok: true,
       slug: targetSlug,
-      address: address2,
+      address: address3,
       reason: "bootstrap-no-config"
     };
   }
-  const adminOk = await validateAdmin2({ env, slug: targetSlug, address: address2, config, body });
+  const adminOk = await validateAdmin2({ env, slug: targetSlug, address: address3, config, body });
   if (!adminOk) {
     return {
       ok: false,
@@ -91727,7 +91942,7 @@ var resolveAdminSignatureAuthority = async ({
   return {
     ok: true,
     slug: targetSlug,
-    address: address2,
+    address: address3,
     reason: "authorized"
   };
 };
@@ -91743,7 +91958,7 @@ var verifyAdminSignature = async ({
   deps
 } = {}) => {
   const {
-    address: address2,
+    address: address3,
     message,
     signature,
     requestId
@@ -91763,7 +91978,7 @@ var verifyAdminSignature = async ({
     deps?.log?.("[arweave] admin verify reject", {
       requestId: requestId || null,
       reason,
-      address: address2 || null,
+      address: address3 || null,
       targetSlug: targetSlug || null,
       ...extra
     });
@@ -91796,7 +92011,7 @@ var verifyAdminSignature = async ({
   }
   deps?.log?.("[arweave] admin verify start", {
     requestId: requestId || null,
-    address: address2 || null,
+    address: address3 || null,
     targetSlug: targetSlug || null,
     hasMessage: !!message,
     hasSignature: !!signature,
@@ -91810,7 +92025,7 @@ var verifyAdminSignature = async ({
     body,
     config,
     allowBootstrapWithoutConfig,
-    address: address2,
+    address: address3,
     message,
     signature,
     targetSlug,
@@ -91847,7 +92062,7 @@ var verifyAdminSignature = async ({
   if (authorityResult?.reason === "bootstrap-no-config") {
     deps?.log?.("[arweave] admin verify ok (bootstrap no config)", {
       requestId: requestId || null,
-      address: address2,
+      address: address3,
       targetSlug: targetSlug || null
     });
     return {
@@ -91858,7 +92073,7 @@ var verifyAdminSignature = async ({
   }
   deps?.log?.("[arweave] admin verify ok", {
     requestId: requestId || null,
-    address: address2,
+    address: address3,
     targetSlug: targetSlug || null
   });
   return {
@@ -92080,19 +92295,19 @@ var transcribe = async ({
     body: upstreamFormData
   };
   if (outboundUrlPolicy) fetchOptions.outboundUrlPolicy = outboundUrlPolicy;
-  const response2 = await deps?.safeFetch?.(targetUrl, fetchOptions);
-  if (!(response2 instanceof Response)) {
-    return json8?.({ error: response2?.error }, response2?.status, baseHeaders);
+  const response3 = await deps?.safeFetch?.(targetUrl, fetchOptions);
+  if (!(response3 instanceof Response)) {
+    return json8?.({ error: response3?.error }, response3?.status, baseHeaders);
   }
   let data = {};
   try {
-    data = await response2.json();
+    data = await response3.json();
   } catch {
     data = {};
   }
-  if (!response2.ok) {
-    const message = typeof data?.error === "string" ? data.error : data?.error?.message || data?.message || (response2.status === 401 ? "Unauthorized: invalid API key on server." : "Transcription failed.");
-    return json8?.({ error: String(message), details: data }, response2.status, baseHeaders);
+  if (!response3.ok) {
+    const message = typeof data?.error === "string" ? data.error : data?.error?.message || data?.message || (response3.status === 401 ? "Unauthorized: invalid API key on server." : "Transcription failed.");
+    return json8?.({ error: String(message), details: data }, response3.status, baseHeaders);
   }
   if (typeof data?.text !== "string") {
     return json8?.({ error: "The transcription service sent an unreadable reply." }, 502, baseHeaders);
@@ -92242,6 +92457,8 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
       isAddress: deps?.isAddress,
       getAddress: deps?.getAddress,
       putSessionConfig: deps?.putSessionConfig,
+      // Draft text export: only whoever may change the session config.
+      validateAdmin: deps?.validateAdmin,
       readResourceGateOnChain: deps?.readResourceGateOnChain,
       resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
       toRegistrySessionSlug: deps?.toRegistrySessionSlug,
@@ -92381,7 +92598,7 @@ var evaluateAuthenticatedRoutePreflight = async ({
   config,
   env,
   slug,
-  address: address2,
+  address: address3,
   limit,
   headers: headers2,
   deps
@@ -92399,7 +92616,7 @@ var evaluateAuthenticatedRoutePreflight = async ({
     currentScopes = await deps?.computeScopesForLogin?.({
       env,
       slug,
-      address: address2,
+      address: address3,
       config,
       requestedScopes: [scope]
     });
@@ -92424,7 +92641,7 @@ var evaluateAuthenticatedRoutePreflight = async ({
   const rateAllowed = await deps?.checkRateLimit?.({
     env,
     slug,
-    address: address2,
+    address: address3,
     limit,
     route
   });
@@ -92589,7 +92806,7 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
       if (!ctx.scopes?.faucet || ctx.config.agentHttp?.sponsoredFaucetAllowed !== true) return { ok: false, skipped: true, reason: "session_faucet_not_allowed" };
       const secrets = await deps.getSessionSecrets(env, ctx.slug);
       const takeWalletTurn = deps.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
-      const response2 = await takeWalletTurn({ env, secrets }, () => deps.faucet({
+      const response3 = await takeWalletTurn({ env, secrets }, () => deps.faucet({
         payload: { to: ctx.address },
         secrets,
         config: ctx.config,
@@ -92601,13 +92818,13 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
         // a payout counts. A refusal doesn't stop the answer: the account may already hold enough to submit it.
         beforePayout: () => deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: "faucet", limit: config.limits?.perWalletPerDay || 0 })
       }));
-      if (!response2) return { ok: false, reason: "faucet_busy", status: 503 };
-      const body = await response2.json();
-      if (response2.status === 429) return { ok: false, reason: "faucet_rate_limited", status: 429 };
-      return response2.ok ? { ok: true, ...body } : {
+      if (!response3) return { ok: false, reason: "faucet_busy", status: 503 };
+      const body = await response3.json();
+      if (response3.status === 429) return { ok: false, reason: "faucet_rate_limited", status: 429 };
+      return response3.ok ? { ok: true, ...body } : {
         ok: false,
         reason: "faucet_request_failed",
-        status: response2.status,
+        status: response3.status,
         ...body.txHash ? { txHash: body.txHash } : {}
       };
     },
@@ -92638,9 +92855,9 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
       delete safe.rpcKey;
       activeAi.set(key, (activeAi.get(key) || 0) + 1);
       try {
-        const response2 = await proxy({ payload: safe, secrets, config: ctx.config, baseHeaders: {}, deps: { fetch: boundedAgentFetch(deps.fetch || fetch) } });
-        const body = await response2.json();
-        if (!response2.ok) throw authorityError("agent_ai_request_failed", response2.status);
+        const response3 = await proxy({ payload: safe, secrets, config: ctx.config, baseHeaders: {}, deps: { fetch: boundedAgentFetch(deps.fetch || fetch) } });
+        const body = await response3.json();
+        if (!response3.ok) throw authorityError("agent_ai_request_failed", response3.status);
         return body;
       } finally {
         const remaining = (activeAi.get(key) || 1) - 1;
@@ -92914,7 +93131,7 @@ var resolveAdminRequestAuthority = async ({
   deps
 } = {}) => {
   const {
-    address: address2,
+    address: address3,
     signature
   } = deps?.normalizeSignedWorkerRequest?.(body) || {};
   const signedAction = toTrimmedString15(body?.action);
@@ -92936,7 +93153,7 @@ var resolveAdminRequestAuthority = async ({
   }
   const { envSlug, slugPayload, targetSlug } = slugContext;
   const explicitSlugProvided = slugContext?.explicitSlugProvided === true || !!envSlug || !!slugPayload?.hasAnySlug;
-  if (!address2 || !deps?.isAddress?.(address2)) {
+  if (!address3 || !deps?.isAddress?.(address3)) {
     return {
       ok: false,
       response: deps?.json?.({ error: "Invalid address." }, 400, baseHeaders)
@@ -93012,7 +93229,7 @@ var resolveAdminRequestAuthority = async ({
     nonce,
     audience: audienceCheck?.audience || audience,
     expiration,
-    expectedAddress: address2,
+    expectedAddress: address3,
     deps: {
       verifyTypedData: deps?.verifyTypedData,
       now: deps?.now
@@ -93024,7 +93241,7 @@ var resolveAdminRequestAuthority = async ({
       response: deps?.json?.({ error: signatureCheck?.error }, 400, headers2)
     };
   }
-  const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address2.toLowerCase(), nonce);
+  const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address3.toLowerCase(), nonce);
   if (!nonceResult?.ok) {
     return {
       ok: false,
@@ -93039,16 +93256,16 @@ var resolveAdminRequestAuthority = async ({
   let adminOk = false;
   if (!existingConfig && (action === "set-config" || restoringFreshSession)) {
     const bootstrapBody = restoringFreshSession ? { ...body, config: {
-      adminAddress: address2,
+      adminAddress: address3,
       sessionId: body?.page?.manifest?.sessionId
     } } : body;
-    adminOk = await deps?.validateBootstrapAdmin?.({ env, slug: targetSlug, address: address2, body: bootstrapBody });
+    adminOk = await deps?.validateBootstrapAdmin?.({ env, slug: targetSlug, address: address3, body: bootstrapBody });
   }
   if (!adminOk) {
     adminOk = await deps?.validateAdmin?.({
       env,
       slug: targetSlug,
-      address: address2,
+      address: address3,
       config: existingConfig,
       body
     });
@@ -93060,7 +93277,7 @@ var resolveAdminRequestAuthority = async ({
       path: "backup/status",
       completedOnly: true,
       archiveId: action === "import-session-backup" ? body?.page?.archiveId : body?.archiveId,
-      expectedAuthority: { actor: address2.toLowerCase(), revision: corsState.revision, authzEpoch: readAuthorizationEpoch(existingConfig) }
+      expectedAuthority: { actor: address3.toLowerCase(), revision: corsState.revision, authzEpoch: readAuthorizationEpoch(existingConfig) }
     });
     adminOk = completion.ok === true;
   }
@@ -93072,11 +93289,11 @@ var resolveAdminRequestAuthority = async ({
   }
   return {
     ok: true,
-    address: address2,
+    address: address3,
     existingConfig,
     headers: headers2,
     targetSlug,
-    expectedAuthority: { actor: address2.toLowerCase(), revision: corsState.revision, authzEpoch: readAuthorizationEpoch(existingConfig) }
+    expectedAuthority: { actor: address3.toLowerCase(), revision: corsState.revision, authzEpoch: readAuthorizationEpoch(existingConfig) }
   };
 };
 
@@ -93138,15 +93355,15 @@ var resolveAuthenticatedRouteContext = async ({
       response: deps?.json?.({ error: "Token authorization is stale." }, 401, corsContext.headers)
     };
   }
-  const address2 = deps?.toStr?.(payload.sub || "").toLowerCase();
+  const address3 = deps?.toStr?.(payload.sub || "").toLowerCase();
   return {
     ok: true,
     slug,
     config,
     headers: corsContext.headers,
     scopes: payload.scopes || {},
-    address: address2,
-    expectedAuthority: { actor: address2, revision, authzEpoch: currentEpoch },
+    address: address3,
+    expectedAuthority: { actor: address3, revision, authzEpoch: currentEpoch },
     limit: config?.limits?.perWalletPerDay || 0
   };
 };
@@ -94384,7 +94601,7 @@ async function submitAgentOnlyAnswersBulk({
   const state = await loadAnswerState({ env, sessionSlug: slug, telegramUserId });
   const replay = findRecentRequest(state, requestId);
   const skipsRecorded = validated.accepted.filter((row) => row.skipped).length;
-  const response2 = {
+  const response3 = {
     ok: true,
     accepted: validated.accepted.length,
     skipsRecorded,
@@ -94394,7 +94611,7 @@ async function submitAgentOnlyAnswersBulk({
     if (safeString(replay.summaryHash) !== summaryHash) {
       return { ok: false, status: 409, reason: "request_id_conflict" };
     }
-    return { ...response2, replay: true };
+    return { ...response3, replay: true };
   }
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== "function") {
@@ -94462,7 +94679,7 @@ async function submitAgentOnlyAnswersBulk({
     events,
     changes,
     initialState: state,
-    response: response2,
+    response: response3,
     runStatementIds: materialized.space.statements.map((statement) => statement.statement_id),
     stateMetadata: { v: 1, t: "ao_ans", sg: slug }
   });
@@ -94696,7 +94913,7 @@ async function submitAgentOnlyTokenVotesBulk({
   const requestId = await canonicalRequestId(`votes:${mode}`, requestBody, body.request_id || body.requestId);
   const summaryHash = await requestSummaryHash(`votes:${mode}`, requestBody);
   const state = await loadVoteState({ env, sessionSlug: slug, telegramUserId, mode });
-  const response2 = {
+  const response3 = {
     ok: true,
     mode,
     budgetUsed: validated.budgetUsed,
@@ -94707,7 +94924,7 @@ async function submitAgentOnlyTokenVotesBulk({
     if (safeString(replay.summaryHash) !== summaryHash) {
       return { ok: false, status: 409, reason: "request_id_conflict" };
     }
-    return { ...response2, replay: true };
+    return { ...response3, replay: true };
   }
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== "function") {
@@ -94744,7 +94961,7 @@ async function submitAgentOnlyTokenVotesBulk({
     summaryHash,
     createdAt,
     initialState: state,
-    response: response2,
+    response: response3,
     events: [{ key: eventKey, value: event, metadata: { v: 1, t: "ao_vote_evt", sg: slug, m: mode === "linear" ? "l" : "q", u: validated.budgetUsed } }],
     changes: { votes, statements, budgetUsed: validated.budgetUsed, runId, requestId },
     stateMetadata: { v: 1, t: "ao_vote", sg: slug, m: mode === "linear" ? "l" : "q", u: validated.budgetUsed }
@@ -95071,21 +95288,21 @@ async function requestOpenAiWrappedImage({
     quality,
     referenceBytes
   });
-  const response2 = await boundedAgentFetch(fetchImpl, { timeoutMs: 6e4, maxBytes: 8 * 1024 * 1024 })(targetUrl, {
+  const response3 = await boundedAgentFetch(fetchImpl, { timeoutMs: 6e4, maxBytes: 8 * 1024 * 1024 })(targetUrl, {
     method: "POST",
     headers: {
       authorization: `Bearer ${openAiKey}`
     },
     body: requestBody
   });
-  const responseText = await response2.text().catch(() => "");
+  const responseText = await response3.text().catch(() => "");
   const parsed = safeJsonParse(responseText, null);
-  if (!response2.ok) {
+  if (!response3.ok) {
     return {
       ok: false,
       status: 502,
       reason: "openai_image_generation_failed",
-      upstreamStatus: response2.status,
+      upstreamStatus: response3.status,
       upstreamReason: parsed?.error?.code === "moderation_blocked" ? "moderation_blocked" : "provider_request_failed"
     };
   }
@@ -96472,7 +96689,7 @@ async function handleServiceCredentialBootstrapRequest({ request, env = {}, crea
       }
     );
   }
-  const response2 = {
+  const response3 = {
     ok: true,
     token: issued.token,
     principal: issued.record.principal,
@@ -96481,9 +96698,9 @@ async function handleServiceCredentialBootstrapRequest({ request, env = {}, crea
     expiresAt: issued.record.expiresAt,
     accountAddress: account.accountAddress
   };
-  const { token: _token, ...secretFree } = response2;
+  const { token: _token, ...secretFree } = response3;
   assertNoSecretShape(secretFree, "Service credential bootstrap metadata must not serialize bearer secrets.");
-  return json7(response2);
+  return json7(response3);
 }
 
 // workers/sessionCorsWorker/agent/questions.mjs
@@ -98351,8 +98568,8 @@ function normalizeAddress2(value = "") {
 }
 function bucketMembershipKey({ sessionSlug = "", accountAddress = "" } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
-  const address2 = normalizeAddress2(accountAddress);
-  return slug && address2 ? `${AGENT_BUCKET_MEMBERSHIP_KV_PREFIX}${slug}:${address2}` : "";
+  const address3 = normalizeAddress2(accountAddress);
+  return slug && address3 ? `${AGENT_BUCKET_MEMBERSHIP_KV_PREFIX}${slug}:${address3}` : "";
 }
 function proposalPrefix(sessionSlug = "") {
   const slug = sanitizeSessionSlug(sessionSlug);
@@ -100760,9 +100977,9 @@ async function currentResultSourceFingerprint(env, sessionSlug) {
     const seen = /* @__PURE__ */ new Set();
     for (let page = 0; page < 3 && !complete; page++) {
       const query = new URLSearchParams({ resource: "responses", limit: "100", ...cursor ? { cursor } : {} });
-      const response2 = await env.AGENT_SERVICES.storage(`/storage/list?${query}`);
-      if (!response2.ok) throw new Error("result_cache_source_denied");
-      const body = await response2.json();
+      const response3 = await env.AGENT_SERVICES.storage(`/storage/list?${query}`);
+      if (!response3.ok) throw new Error("result_cache_source_denied");
+      const body = await response3.json();
       for (const item of body.items || []) {
         const id2 = item.storageRef?.id || item.id;
         if (!id2 || responses.length >= 200) throw new Error("result_cache_source_limit");
@@ -102592,7 +102809,7 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
     );
   }
   const wrappedOnboarding = agentOnly && isSessionWrappedOnboardingRequest(body);
-  const response2 = {
+  const response3 = {
     ok: true,
     token: issued.token,
     worker: sessionAgentOrigin(env),
@@ -102609,9 +102826,9 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
       start: `${sessionAgentOrigin(env)}${toCanonicalAgentApiPathname(AGENT_ONLY_ENDPOINTS.start)}?sessionSlug=${encodeURIComponent(env.AGENT_CONTEXT.slug)}`
     } : {}
   };
-  const { token: _token, ...secretFree } = response2;
+  const { token: _token, ...secretFree } = response3;
   assertNoSecretShape(secretFree, "Agent invite onboarding token response metadata must not serialize secrets.");
-  return json7(response2);
+  return json7(response3);
 }
 
 // workers/sessionCorsWorker/agent/exchanges.mjs
@@ -102944,8 +103161,8 @@ var dispatchSessionAgentRequest = async ({ request, env, deps, baseHeaders = {} 
       const membership = await authorizeSessionMemberAggregateResults({ env: agentEnv, context, input: {} });
       if (!membership.ok) throw authorityError(membership.reason, membership.status);
     }
-    const response2 = await handleAgentHttpRequest({ request, env: agentEnv, body, context, input, route, waitUntil: deps.waitUntil, fetchImpl: deps.fetch });
-    const output2 = new Response(method === "HEAD" ? null : response2.body, response2);
+    const response3 = await handleAgentHttpRequest({ request, env: agentEnv, body, context, input, route, waitUntil: deps.waitUntil, fetchImpl: deps.fetch });
+    const output2 = new Response(method === "HEAD" ? null : response3.body, response3);
     new Headers(headers2).forEach((value, key) => output2.headers.set(key, value));
     return output2;
   } catch (error) {
@@ -102963,10 +103180,10 @@ init_sessionConfigAuthority();
 init_outboundUrlSafetyBinding();
 
 // workers/sessionCorsWorker/anonymousRateLimitPolicy.js
-var isObj23 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj24 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0;
 var resolveAnonymousIpDailyLimit = (config = {}) => {
-  const limits = isObj23(config?.limits) ? config.limits : {};
+  const limits = isObj24(config?.limits) ? config.limits : {};
   return isNonNegativeInteger(limits.perAnonymousIpPerDay) ? limits.perAnonymousIpPerDay : 0;
 };
 
@@ -102981,7 +103198,7 @@ init_ratingScale();
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
 var trim18 = (value) => String(value == null ? "" : value).trim();
 var lower8 = (value) => trim18(value).toLowerCase();
-var isObj24 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj25 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower8(question.visibility || question.access || question.questionVisibility);
   return Boolean(
@@ -102989,7 +103206,7 @@ var hasRestrictedPrompt = (question = {}) => {
   );
 };
 var normalizeQuestion = (value = {}) => {
-  const question = isObj24(value) ? value : {};
+  const question = isObj25(value) ? value : {};
   const id2 = lower8(question.id || question.questionId);
   const prompt = trim18(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /^(?:\[encrypted\]|encrypted prompt[.!]?(?:\s*connect.+decrypt[.!]?)?|connect(?: wallet)? to decrypt(?: encrypted prompt)?[.!]?)$/i.test(
@@ -102998,7 +103215,7 @@ var normalizeQuestion = (value = {}) => {
     return null;
   const type = lower8(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
-  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim18(isObj24(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim18(isObj25(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
   const ratingScale = type === "rating" ? normalizeRatingScale(question) : null;
   const ratingStep = ratingStepFor(question);
   return {
@@ -103042,16 +103259,16 @@ var catalog = (questions = [], incomplete = false, refused = false) => ({ questi
 var retryableReadStatus = (status) => !status || status === 408 || status === 429 || status >= 500;
 var trim19 = (value) => String(value == null ? "" : value).trim();
 var lower9 = (value) => trim19(value).toLowerCase();
-var isObj25 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj26 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 var payloadQuestionId = (payload) => lower9(payload?.id || payload?.questionId);
-var readJsonResponse = async (response2) => {
-  if (!response2 || Number(response2.status || 0) < 200 || Number(response2.status || 0) >= 300) return null;
+var readJsonResponse = async (response3) => {
+  if (!response3 || Number(response3.status || 0) < 200 || Number(response3.status || 0) >= 300) return null;
   try {
-    return await response2.clone().json();
+    return await response3.clone().json();
   } catch {
     try {
-      return JSON.parse(await response2.text());
+      return JSON.parse(await response3.text());
     } catch {
       return null;
     }
@@ -103067,9 +103284,9 @@ var listQuestionRows = async (callStorage) => {
     const query = new URLSearchParams({ resource: "questions", limit: String(MAX_QUESTIONS), ...cursor ? { cursor } : {} });
     let listing;
     try {
-      const response2 = await callStorage("/storage/list", query.toString());
-      if (!page) refused = [401, 403].includes(Number(response2?.status));
-      listing = await readJsonResponse(response2);
+      const response3 = await callStorage("/storage/list", query.toString());
+      if (!page) refused = [401, 403].includes(Number(response3?.status));
+      listing = await readJsonResponse(response3);
     } catch {
       break;
     }
@@ -103105,10 +103322,10 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const hiddenIds = /* @__PURE__ */ new Set([...blockedQuestionIds(config), ...items.filter((item) => item?.hidden === true || item?.metadata?.hidden === true).map((item) => lower9(item?.metadata?.resourceId)).filter(Boolean)]);
   const readPayload = async (storageRefId) => {
     try {
-      const response2 = await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`);
-      if (retryableReadStatus(response2?.status)) incomplete = true;
-      const payload = await readJsonResponse(response2);
-      return isObj25(payload) ? payload : null;
+      const response3 = await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`);
+      if (retryableReadStatus(response3?.status)) incomplete = true;
+      const payload = await readJsonResponse(response3);
+      return isObj26(payload) ? payload : null;
     } catch {
       incomplete = true;
       return null;
@@ -103150,15 +103367,15 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   );
 };
 var pickContractAddress = (config = {}) => {
-  const contracts = isObj25(config.contracts) ? config.contracts : {};
-  const surveys = isObj25(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  const contracts = isObj26(config.contracts) ? config.contracts : {};
+  const surveys = isObj26(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
   return trim19(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
   const chainId = trim19(config.networkChainId || config.registryChainId || config.chainId || "11155420");
-  const rpcConfig = isObj25(config.rpc) ? config.rpc : {};
-  const pathProvider = isObj25(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj25(rpcConfig.path) ? rpcConfig.path : {};
-  const byChainMap = isObj25(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj25(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const rpcConfig = isObj26(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj26(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj26(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj26(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj26(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
   const byChain = byChainMap[chainId];
   const source = [
     ...Array.isArray(byChain) ? byChain : [byChain],
@@ -103171,13 +103388,13 @@ var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   let lastError;
   for (const rpcUrl of rpcUrls) {
     try {
-      const response2 = await fetchImpl(rpcUrl, {
+      const response3 = await fetchImpl(rpcUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
       });
-      const data = await response2.json();
-      if (!response2.ok || data?.error) throw new Error(data?.error?.message || `RPC ${method} failed.`);
+      const data = await response3.json();
+      if (!response3.ok || data?.error) throw new Error(data?.error?.message || `RPC ${method} failed.`);
       return data.result;
     } catch (error) {
       lastError = error;
@@ -103210,7 +103427,7 @@ var base64urlFromHex = (hex = "") => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 var payloadSessionSlug = (payload = {}) => {
-  const session = isObj25(payload.session) ? payload.session : {};
+  const session = isObj26(payload.session) ? payload.session : {};
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
@@ -103229,19 +103446,19 @@ var fetchArweaveQuestion = async (pointer, fetchImpl) => {
   if (!/^[a-zA-Z0-9_-]{1,43}$/.test(pointer)) return { payload: null, retryable: false };
   let retryable = false;
   for (const gateway of ["https://ar-io.dev", "https://arweave.net"]) {
-    let response2;
+    let response3;
     try {
-      response2 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
+      response3 = await fetchImpl(`${gateway}/${pointer}`, { headers: { accept: "application/json" } });
     } catch {
       retryable = true;
       continue;
     }
-    if (!response2?.ok) {
-      retryable || (retryable = retryableReadStatus(response2?.status));
+    if (!response3?.ok) {
+      retryable || (retryable = retryableReadStatus(response3?.status));
       continue;
     }
-    const payload = await response2.json().catch(() => null);
-    if (isObj25(payload)) return { payload, retryable: false };
+    const payload = await response3.json().catch(() => null);
+    if (isObj26(payload)) return { payload, retryable: false };
   }
   return { payload: null, retryable };
 };
@@ -103582,6 +103799,7 @@ init_storageRouteExecution();
 var FEATURES = Object.freeze([
   "agent_http_v1",
   "context_sources_v1",
+  "draft_text_v1",
   "envelope_export_identity_v1",
   "participant_context_links_v1",
   "participant_context_v1",
@@ -103593,7 +103811,7 @@ var FEATURES = Object.freeze([
   "upload_authority_stamps",
   "worker_groups"
 ]);
-var workerRelease = () => "0.9.5" ? "0.9.5" : null;
+var workerRelease = () => "0.9.6" ? "0.9.6" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const body = {
     type: "ce_worker_capabilities",
@@ -103665,9 +103883,9 @@ init_realtimeInterviewConfig();
 var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 var trim20 = (value) => String(value == null ? "" : value).trim();
-var isObj26 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj27 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewModeEnabled = (config = {}) => {
-  const interview = isObj26(config?.interviewMode || config?.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj27(config?.interviewMode || config?.interview) ? config.interviewMode || config.interview : {};
   return config?.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var buildRealtimeMultipartBody = ({ sdp, session }) => {
@@ -103697,7 +103915,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   } catch {
     return { ok: false, status: 400, error: "Invalid JSON." };
   }
-  if (!isObj26(body)) return { ok: false, status: 400, error: "Invalid JSON." };
+  if (!isObj27(body)) return { ok: false, status: 400, error: "Invalid JSON." };
   const sdp = String(body.sdp == null ? "" : body.sdp);
   const instructions = trim20(body.instructions);
   if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
@@ -103708,7 +103926,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   return { ok: true, payload: { sdp, instructions } };
 };
 var resolveRealtimeConfig = (config = {}) => {
-  const interview = isObj26(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj27(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   const provider = trim20(interview.provider || "openai").toLowerCase();
   const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
@@ -103755,7 +103973,7 @@ var proxyOpenAiRealtimeCall = async ({
   };
   const multipart = buildRealtimeMultipartBody({ sdp: payload.sdp, session });
   const url = live ? constants?.openAiLiveSessionsUrl || OPENAI_LIVE_SESSIONS_URL : constants?.openAiRealtimeCallsUrl || OPENAI_REALTIME_CALLS_URL;
-  const response2 = await fetchImpl(url, {
+  const response3 = await fetchImpl(url, {
     method: "POST",
     headers: {
       authorization: `Bearer ${key}`,
@@ -103763,10 +103981,10 @@ var proxyOpenAiRealtimeCall = async ({
     },
     body: live ? JSON.stringify({ session, transport: { type: "webrtc", sdp: payload.sdp } }) : multipart.body
   });
-  const text6 = await response2.text();
-  if (!response2.ok) {
-    const message = response2.status === 401 || response2.status === 403 ? "OpenAI denied the interview. Ask the session owner to check the Worker key and model access." : response2.status === 429 ? "OpenAI is at its usage limit. Try again later or contact the session owner." : "OpenAI could not connect the interview. Try again or contact the session owner.";
-    return deps?.json?.({ error: message }, response2.status, baseHeaders);
+  const text6 = await response3.text();
+  if (!response3.ok) {
+    const message = response3.status === 401 || response3.status === 403 ? "OpenAI denied the interview. Ask the session owner to check the Worker key and model access." : response3.status === 429 ? "OpenAI is at its usage limit. Try again later or contact the session owner." : "OpenAI could not connect the interview. Try again or contact the session owner.";
+    return deps?.json?.({ error: message }, response3.status, baseHeaders);
   }
   let answerSdp = text6;
   if (live) {
@@ -104022,7 +104240,7 @@ var dispatchAuthenticatedRoute = async ({
     config,
     headers: headers2,
     scopes,
-    address: address2,
+    address: address3,
     expectedAuthority,
     limit
   } = authenticatedContext || {};
@@ -104032,7 +104250,7 @@ var dispatchAuthenticatedRoute = async ({
     request,
     config,
     slug,
-    address: address2,
+    address: address3,
     expectedAuthority,
     limit,
     headers: headers2,
@@ -104058,7 +104276,7 @@ var dispatchAuthenticatedRoute = async ({
     body,
     config,
     slug,
-    address: address2,
+    address: address3,
     limit,
     headers: headers2,
     scopes
@@ -104070,7 +104288,7 @@ var dispatchAuthenticatedRoute = async ({
     body,
     config,
     slug,
-    address: address2,
+    address: address3,
     limit,
     headers: headers2,
     scopes
@@ -104336,12 +104554,12 @@ var trim21 = (value) => value == null ? "" : String(value).trim();
 var lower10 = (value) => trim21(value).toLowerCase();
 var capitalize = (value) => value.charAt(0).toUpperCase() + value.slice(1);
 var cleanBuildText = (value, max) => (typeof value === "string" ? value : "").replace(ADDRESS_TEXT, "[redacted-address]").replace(/\s+/g, " ").trim().slice(0, max);
-var listAddresses3 = (value) => toArray2(value).map(lower10).filter((address2) => ADDRESS3.test(address2));
-var isListedResultsBuilder = (config, address2) => {
-  const normalized = lower10(address2);
+var listAddresses3 = (value) => toArray2(value).map(lower10).filter((address3) => ADDRESS3.test(address3));
+var isListedResultsBuilder = (config, address3) => {
+  const normalized = lower10(address3);
   return ADDRESS3.test(normalized) && (resolveSessionAdminAddresses(config || {}).has(normalized) || listAddresses3(config?.resultsAdminAddresses).includes(normalized));
 };
-var canBuildResults = async ({ env, slug, config, address: address2, validateAdmin: validateAdmin2 }) => isListedResultsBuilder(config, address2) || typeof validateAdmin2 === "function" && await validateAdmin2({ env, slug, address: lower10(address2), config, body: {} }) === true;
+var canBuildResults = async ({ env, slug, config, address: address3, validateAdmin: validateAdmin2 }) => isListedResultsBuilder(config, address3) || typeof validateAdmin2 === "function" && await validateAdmin2({ env, slug, address: lower10(address3), config, body: {} }) === true;
 var callBuildStore = (kindName) => (env, slug, operation, payload = {}) => callSessionConfigCoordinator({
   env,
   slug,
@@ -104442,14 +104660,14 @@ var withPrivateNoStoreHeaders = (headers2 = {}) => {
   next.set("Cache-Control", "private, no-store");
   return next;
 };
-var readViewerRefusal = async ({ kind, env, config, slug, address: address2, scopes, headers: headers2, deps }) => {
+var readViewerRefusal = async ({ kind, env, config, slug, address: address3, scopes, headers: headers2, deps }) => {
   const visibility = (deps.evaluateResultsAnalysisViewerEligibility || evaluateResultsAnalysisViewerEligibility)({ config });
   if (!visibility?.ok) {
     return deps.json({ ok: false, error: visibility?.error || `${kind.plural} are not visible on this session.`, reason: visibility?.reason }, visibility?.status || 403, headers2);
   }
   const authorize = deps.authorizeCloudflareStorageResourceRead || authorizeCloudflareStorageResourceRead;
   for (const resource of ["generatedArtifacts", "questions", "responses"]) {
-    const access = await authorize({ env, config, slug, resource, requesterAddress: address2, authScopes: scopes, baseHeaders: headers2, deps });
+    const access = await authorize({ env, config, slug, resource, requesterAddress: address3, authScopes: scopes, baseHeaders: headers2, deps });
     if (!access?.ok) return access?.response || deps.json({ ok: false, error: "Access denied." }, 403, headers2);
   }
   return null;
@@ -104461,17 +104679,17 @@ var dispatchResultsBuildRead = async ({
   env,
   config,
   slug,
-  address: address2,
+  address: address3,
   scopes,
   headers: headers2,
   deps = {}
 } = {}) => {
   const kind = RESULTS_BUILD_KINDS[kindName];
   const responseHeaders = withPrivateNoStoreHeaders(headers2);
-  let builder = isListedResultsBuilder(config, address2);
+  let builder = isListedResultsBuilder(config, address3);
   if (!builder) {
-    const refusal2 = await readViewerRefusal({ kind, env, config, slug, address: address2, scopes, headers: responseHeaders, deps });
-    builder = !!refusal2 && !!address2 && await canBuildResults({ env, slug, config, address: address2, validateAdmin: deps.validateAdmin });
+    const refusal2 = await readViewerRefusal({ kind, env, config, slug, address: address3, scopes, headers: responseHeaders, deps });
+    builder = !!refusal2 && !!address3 && await canBuildResults({ env, slug, config, address: address3, validateAdmin: deps.validateAdmin });
     if (refusal2 && !builder) return refusal2;
   }
   let id2 = "";
@@ -104627,9 +104845,9 @@ var normalizeDebateAtlasTopic = ({ value, answeredBy, placeParticipants, partici
     const y = unit(entry2?.y);
     if (!placeable.has(id2) || placed.has(id2) || x === null || y === null) return null;
     placed.add(id2);
-    const address2 = participantAddresses?.get?.(id2) || "";
+    const address3 = participantAddresses?.get?.(id2) || "";
     return {
-      ...address2 ? { address: address2 } : { label: `Participant ${Number(id2.replace(/\D/g, "")) || placed.size}` },
+      ...address3 ? { address: address3 } : { label: `Participant ${Number(id2.replace(/\D/g, "")) || placed.size}` },
       x,
       y,
       reason: text5(entry2?.reason, 160)
@@ -104658,8 +104876,8 @@ var buildDebateAtlas = (args = {}) => runResultsBuild({
   compose: async ({ source, callAi, contextText }) => {
     const { questions, responses } = source.aiSnapshot;
     const responsesByQuestion = /* @__PURE__ */ new Map();
-    responses.forEach((response2) => {
-      responsesByQuestion.set(response2.questionId, [...responsesByQuestion.get(response2.questionId) || [], response2]);
+    responses.forEach((response3) => {
+      responsesByQuestion.set(response3.questionId, [...responsesByQuestion.get(response3.questionId) || [], response3]);
     });
     const answeredQuestionIds = new Set(responsesByQuestion.keys());
     const planResult = await callAi(buildDebateAtlasPlanPrompt({
@@ -104676,7 +104894,7 @@ var buildDebateAtlas = (args = {}) => runResultsBuild({
     const mapped = await runWithConcurrency([...topics, ...branchJobs], DEBATE_ATLAS_LIMITS.concurrency, async ({ branch, topic, questionIds }) => {
       const topicResponses = questionIds.flatMap((id2) => responsesByQuestion.get(id2));
       const answeredBy = /* @__PURE__ */ new Map();
-      topicResponses.forEach((response2) => answeredBy.set(response2.participantId, (answeredBy.get(response2.participantId) || 0) + 1));
+      topicResponses.forEach((response3) => answeredBy.set(response3.participantId, (answeredBy.get(response3.participantId) || 0) + 1));
       const placeParticipants = [...answeredBy.entries()].sort((a, b2) => b2[1] - a[1] || a[0].localeCompare(b2[0])).slice(0, DEBATE_ATLAS_LIMITS.placedParticipants).map(([id2]) => id2);
       const result = await callAi(buildDebateAtlasTopicPrompt({
         branch: branch.label,
@@ -104833,7 +105051,7 @@ var buildRiskMatrix = (args = {}) => runResultsBuild({
   limits: RISK_MATRIX_LIMITS,
   compose: async ({ source, callAi, contextText }) => {
     const { questions, responses } = source.aiSnapshot;
-    const answered = new Set(responses.map((response2) => response2.questionId));
+    const answered = new Set(responses.map((response3) => response3.questionId));
     const asked = questions.filter((question) => answered.has(question.id));
     const alias = new Map(asked.map((question, index) => [question.id, `q${index + 1}`]));
     const storedId = new Map(asked.map((question) => [alias.get(question.id), question.id]));
@@ -104981,7 +105199,7 @@ var dispatchAdminRequest = async ({
     expectedAuthority
   } = authorityResult;
   if (action?.startsWith?.("groups/")) {
-    const response2 = await (deps?.dispatchAdminWorkerGroupRequest || dispatchAdminWorkerGroupRequest)({
+    const response3 = await (deps?.dispatchAdminWorkerGroupRequest || dispatchAdminWorkerGroupRequest)({
       action,
       body,
       config: existingConfig,
@@ -105001,7 +105219,7 @@ var dispatchAdminRequest = async ({
         reconcileCoordinatedWorkerGroupCapacity: deps?.reconcileCoordinatedWorkerGroupCapacity
       }
     });
-    if (response2) return response2;
+    if (response3) return response3;
   }
   if (action === "results-analysis/generate") {
     const privateHeaders = withPrivateNoStoreHeaders2(headers2);
@@ -105478,11 +105696,11 @@ var dispatchAdminAbuseSummaryRequest = async ({
   if (!context.ok) return context.response;
   const config = context.config;
   const headers2 = context.headers;
-  const address2 = toTrimmedString17(auth.payload?.sub, deps).toLowerCase();
+  const address3 = toTrimmedString17(auth.payload?.sub, deps).toLowerCase();
   const isAdmin = await deps?.validateAdmin?.({
     env,
     slug: targetSlug,
-    address: address2,
+    address: address3,
     config,
     body: {}
   });
@@ -105586,8 +105804,8 @@ var dispatchAdminResultsAnalysisStatusRequest = async ({
   if (!context.ok) return context.response;
   const config = context.config;
   const headers2 = withPrivateNoStoreHeaders3(context.headers);
-  const address2 = toTrimmedString18(auth.payload?.sub, deps).toLowerCase();
-  const isAdmin = diagnostics ? await deps?.validateAdmin?.({ env, slug: targetSlug, address: address2, config, body: {} }) : await canBuildResults({ env, slug: targetSlug, config, address: address2, validateAdmin: deps?.validateAdmin });
+  const address3 = toTrimmedString18(auth.payload?.sub, deps).toLowerCase();
+  const isAdmin = diagnostics ? await deps?.validateAdmin?.({ env, slug: targetSlug, address: address3, config, body: {} }) : await canBuildResults({ env, slug: targetSlug, config, address: address3, validateAdmin: deps?.validateAdmin });
   if (!isAdmin) {
     await recordAuthFailure4({ env, deps });
     return deps?.json?.({ error: "Admin authorization failed." }, 403, headers2);
@@ -105640,7 +105858,7 @@ var dispatchResultsAnalysisArtifactRequest = async ({
   env,
   config,
   slug,
-  address: address2,
+  address: address3,
   scopes,
   headers: headers2,
   deps
@@ -105657,7 +105875,7 @@ var dispatchResultsAnalysisArtifactRequest = async ({
       config,
       slug,
       resource,
-      requesterAddress: address2,
+      requesterAddress: address3,
       authScopes: scopes,
       baseHeaders: responseHeaders,
       deps
@@ -105700,8 +105918,8 @@ var dispatchAuthNonceRequest = async ({
   } catch {
     return deps?.json?.({ error: "Invalid JSON." }, 400, baseHeaders);
   }
-  const address2 = (deps?.toStr?.(body?.address) ?? "").trim();
-  if (!address2 || !deps?.isAddress?.(address2)) {
+  const address3 = (deps?.toStr?.(body?.address) ?? "").trim();
+  if (!address3 || !deps?.isAddress?.(address3)) {
     return deps?.json?.({ error: "Invalid address." }, 400, baseHeaders);
   }
   const slugContext = deps?.resolveWorkerBodySlugContext?.({ body, env, slugHint: slug }) || {
@@ -105764,7 +105982,7 @@ var dispatchAuthNonceRequest = async ({
     env,
     slug: targetSlug,
     identity: rateLimitIdentity,
-    address: address2,
+    address: address3,
     limit: deps?.NONCE_RATE_LIMIT_MAX,
     sharedNetworkLimit: deps?.NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
     now: deps?.now,
@@ -105779,7 +105997,7 @@ var dispatchAuthNonceRequest = async ({
   const issueResult = await deps?.issueNonce?.(
     env,
     targetSlug,
-    address2.toLowerCase(),
+    address3.toLowerCase(),
     nonce,
     deps?.NONCE_TTL_SECONDS
   );
@@ -105810,7 +106028,7 @@ var resolveAuthLoginRequestAuthority = async ({
   deps
 } = {}) => {
   const {
-    address: address2,
+    address: address3,
     message,
     signature
   } = deps?.normalizeSignedWorkerRequest?.(body) || {};
@@ -105826,7 +106044,7 @@ var resolveAuthLoginRequestAuthority = async ({
   }
   const { envSlug, slugPayload, targetSlug } = slugContext;
   const explicitSlugProvided = slugContext?.explicitSlugProvided === true || !!envSlug || !!slugPayload?.hasAnySlug;
-  if (!address2 || !deps?.isAddress?.(address2)) {
+  if (!address3 || !deps?.isAddress?.(address3)) {
     return {
       ok: false,
       response: deps?.json?.({ error: "Invalid address." }, 400, baseHeaders)
@@ -105866,7 +106084,7 @@ var resolveAuthLoginRequestAuthority = async ({
       response: deps?.json?.({ error: "Invalid signature." }, 400, headers2)
     };
   }
-  const recoveredCheck = deps?.validateRecoveredAddressMatchesRequest?.({ recovered, address: address2 }) || {};
+  const recoveredCheck = deps?.validateRecoveredAddressMatchesRequest?.({ recovered, address: address3 }) || {};
   if (!recoveredCheck?.ok) {
     return {
       ok: false,
@@ -105928,14 +106146,14 @@ var resolveAuthLoginRequestAuthority = async ({
       response: deps?.json?.({ error: loginOriginCheck?.error }, 403, headers2)
     };
   }
-  const siweAddressCheck = deps?.validateSiweAddressMatchesRequest?.({ siwe, address: address2 }) || {};
+  const siweAddressCheck = deps?.validateSiweAddressMatchesRequest?.({ siwe, address: address3 }) || {};
   if (!siweAddressCheck?.ok) {
     return {
       ok: false,
       response: deps?.json?.({ error: siweAddressCheck?.error }, 400, headers2)
     };
   }
-  const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address2.toLowerCase(), siwe?.nonce);
+  const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address3.toLowerCase(), siwe?.nonce);
   if (!nonceResult?.ok) {
     return {
       ok: false,
@@ -105951,7 +106169,7 @@ var resolveAuthLoginRequestAuthority = async ({
     scopes = await deps?.computeScopesForLogin?.({
       env,
       slug: targetSlug,
-      address: address2,
+      address: address3,
       config
     });
   } catch (err) {
@@ -105962,7 +106180,7 @@ var resolveAuthLoginRequestAuthority = async ({
   }
   return {
     ok: true,
-    address: address2,
+    address: address3,
     config,
     headers: headers2,
     scopes,
@@ -106030,14 +106248,14 @@ var dispatchAuthLoginRequest = async ({
     return authorityResult?.response;
   }
   const {
-    address: address2,
+    address: address3,
     config,
     headers: headers2,
     scopes,
     targetSlug
   } = authorityResult;
   const exp = Math.floor((deps?.now?.() ?? Date.now()) / 1e3) + deps?.TOKEN_TTL_SECONDS;
-  const sub = deps?.getAddress?.(address2);
+  const sub = deps?.getAddress?.(address3);
   const authzEpoch = readAuthorizationEpoch(config);
   if (authzEpoch === null) {
     return deps?.json?.({ error: "Session authorization epoch is invalid." }, 500, headers2);
@@ -106122,12 +106340,12 @@ var buildNonce = (deps) => {
   fillRandomValues2(bytes3, deps);
   return Array.from(bytes3, (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
-var issueNonce = async (env, slug, address2, nonce, ttlSeconds, deps = {}) => {
+var issueNonce = async (env, slug, address3, nonce, ttlSeconds, deps = {}) => {
   const coordinate2 = deps?.issueCoordinatedAuthNonce || issueCoordinatedAuthNonce;
   const result = await coordinate2({
     env,
     slug,
-    address: address2,
+    address: address3,
     nonce,
     ttlSeconds,
     usedNonceTtlSeconds: deps?.usedNonceTtlSeconds ?? DEFAULT_USED_NONCE_TTL_SECONDS,
@@ -106143,13 +106361,13 @@ var issueNonce = async (env, slug, address2, nonce, ttlSeconds, deps = {}) => {
   }
   return { ok: true, nonce: signed2 };
 };
-var consumeNonce = async (env, slug, address2, nonce, deps = {}) => {
+var consumeNonce = async (env, slug, address3, nonce, deps = {}) => {
   const usedNonceTtlSeconds = Number.isFinite(deps?.usedNonceTtlSeconds) ? deps.usedNonceTtlSeconds : DEFAULT_USED_NONCE_TTL_SECONDS;
   const coordinate2 = deps?.consumeCoordinatedAuthNonce || consumeCoordinatedAuthNonce;
   const result = await coordinate2({
     env,
     slug,
-    address: address2,
+    address: address3,
     nonce,
     usedNonceTtlSeconds,
     now: deps?.now
@@ -106174,7 +106392,7 @@ var checkNonceRateLimit = async ({
   env,
   slug,
   identity,
-  address: address2,
+  address: address3,
   limit = DEFAULT_NONCE_RATE_LIMIT_MAX,
   sharedNetworkLimit = DEFAULT_NONCE_SHARED_NETWORK_RATE_LIMIT_MAX,
   now,
@@ -106190,7 +106408,7 @@ var checkNonceRateLimit = async ({
   }
   const numericWindowMs = Number.isFinite(Number(windowMs)) && Number(windowMs) > 0 ? Number(windowMs) : DEFAULT_NONCE_RATE_LIMIT_WINDOW_MS;
   const normalizedIdentity = String(identity || "").trim().toLowerCase();
-  const fallbackIdentity = String(address2 || "").trim().toLowerCase();
+  const fallbackIdentity = String(address3 || "").trim().toLowerCase();
   const walletIdentity = fallbackIdentity || "unknown-wallet";
   const networkIdentity = normalizedIdentity || "unknown-network";
   const sessionSlug = String(slug || "").trim();
@@ -106393,18 +106611,18 @@ var readJsonRequestBody = async (request) => {
     return null;
   }
 };
-var readReceiptResponse = async (response2) => {
-  if (response2?.body && typeof response2.body === "object" && typeof response2?.clone !== "function") {
-    return response2;
+var readReceiptResponse = async (response3) => {
+  if (response3?.body && typeof response3.body === "object" && typeof response3?.clone !== "function") {
+    return response3;
   }
-  if (typeof response2?.clone === "function") {
-    const body = await response2.clone().json().catch(() => ({}));
+  if (typeof response3?.clone === "function") {
+    const body = await response3.clone().json().catch(() => ({}));
     return {
-      status: Number(response2.status || 0) || 200,
+      status: Number(response3.status || 0) || 200,
       body: body && typeof body === "object" ? body : {}
     };
   }
-  return { status: Number(response2?.status || 0) || 200, body: {} };
+  return { status: Number(response3?.status || 0) || 200, body: {} };
 };
 var buildGrantErrorResponse = (deps, headers2, status, error) => deps?.json?.({ error }, status, headers2);
 var buildDeployExecutionFailure = (error) => ({
@@ -106839,17 +107057,17 @@ var buildBootstrapHeaders = (headers2) => {
   next.set("Cache-Control", "no-store");
   return next;
 };
-var protectBootstrapResponse = (response2, baseHeaders) => {
-  if (!response2) return response2;
-  const headers2 = buildBootstrapHeaders(response2.headers || baseHeaders);
-  if (response2 instanceof Response) {
-    return new Response(response2.body, {
-      status: response2.status,
-      statusText: response2.statusText,
+var protectBootstrapResponse = (response3, baseHeaders) => {
+  if (!response3) return response3;
+  const headers2 = buildBootstrapHeaders(response3.headers || baseHeaders);
+  if (response3 instanceof Response) {
+    return new Response(response3.body, {
+      status: response3.status,
+      statusText: response3.statusText,
       headers: headers2
     });
   }
-  return { ...response2, headers: headers2 };
+  return { ...response3, headers: headers2 };
 };
 var readWorkerSessionConfig = async ({ request, env, slugHint, headers: headers2, deps, constants } = {}) => {
   const refuse = (error, status) => ({ response: deps?.json?.({ error }, status, headers2) });
@@ -106978,16 +107196,16 @@ var signTicket = async ({ env, config, slug, sub, parent, exp, deps }) => {
   return base64UrlEncode(await signHmac(fields2.join("\n"), key, deps), deps);
 };
 var issueInterviewCatalogTicket = async ({ env, config, slug, sub, parent, parentExp, deps } = {}) => {
-  const address2 = trim24(sub).toLowerCase();
+  const address3 = trim24(sub).toLowerCase();
   const signIn = trim24(parent);
   const now = nowSeconds(deps);
   const exp = Math.min(now + INTERVIEW_CATALOG_TICKET_TTL_SECONDS, Math.floor(Number(parentExp) || 0));
-  if (!/^0x[0-9a-f]{40}$/.test(address2) || !/^[A-Za-z0-9_-]{8,64}$/.test(signIn)) {
+  if (!/^0x[0-9a-f]{40}$/.test(address3) || !/^[A-Za-z0-9_-]{8,64}$/.test(signIn)) {
     throw new Error("Catalog tickets need a signed-in person.");
   }
   if (exp <= now || readAuthorizationEpoch(config) === null) throw new Error("Catalog tickets need a current sign-in.");
-  const mac = await signTicket({ env, config, slug, sub: address2, parent: signIn, exp, deps });
-  return { ticket: [TICKET_VERSION, address2, signIn, exp, mac].join("."), expiresAt: exp };
+  const mac = await signTicket({ env, config, slug, sub: address3, parent: signIn, exp, deps });
+  return { ticket: [TICKET_VERSION, address3, signIn, exp, mac].join("."), expiresAt: exp };
 };
 var verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, deps } = {}) => {
   const match = trim24(ticket).match(TICKET_PATTERN);
@@ -107030,9 +107248,9 @@ init_workerGroups();
 init_interviewSettings();
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v6";
 var trim25 = (value) => String(value == null ? "" : value).trim();
-var isObj27 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj28 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
-  const interview = isObj27(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj28(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   return config.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry2) => {
@@ -107847,7 +108065,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
         const corsContext = await deps?.getCorsContext?.({ request: withQuerySlugHeader, config, baseHeaders: routeBaseHeaders });
         if (corsContext && !corsContext.ok) return corsContext.response;
         const hasAuth = !!deps?.toStr?.(withQuerySlugHeader.headers.get("authorization") || "").trim();
-        let address2 = "";
+        let address3 = "";
         let scopes = {};
         if (hasAuth) {
           const auth = await deps?.requireAuth?.({ request: withQuerySlugHeader, env, baseHeaders: corsContext?.headers || routeBaseHeaders, slugHint: targetSlug });
@@ -107876,7 +108094,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
           });
           if (!preflight?.ok) return preflight?.response;
           config = context.config;
-          address2 = context.address;
+          address3 = context.address;
           scopes = context.scopes;
         }
         if (routeSelection.kind === "debate-atlas" || routeSelection.kind === "risk-matrix") {
@@ -107886,7 +108104,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             env,
             config,
             slug: targetSlug,
-            address: address2,
+            address: address3,
             scopes,
             headers: corsContext?.headers || routeBaseHeaders,
             deps: {
@@ -107908,7 +108126,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
           env,
           config,
           slug: targetSlug,
-          address: address2,
+          address: address3,
           scopes,
           headers: corsContext?.headers || routeBaseHeaders,
           deps: {
@@ -108408,13 +108626,14 @@ var resolveAuthenticatedRouteSecrets = async ({
 init_uploadSizeLimits();
 init_workerGroups();
 init_sessionLifecycle();
+init_draftTextRoute();
 var dispatchAuthenticatedSecretPathRoute = async ({
   path,
   method,
   request,
   config,
   slug,
-  address: address2,
+  address: address3,
   expectedAuthority,
   env,
   limit,
@@ -108425,7 +108644,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
   const isTranscribeRoute = path === "/transcribe" && method === "POST";
   const isArweaveUploadRoute = path === "/arweave/upload" && method === "POST";
   const isAgentQuestionsRoute = path === "/api/agent/questions" && method === "GET";
-  const isStorageRoute = ["/storage/response-field-key/wrap", "/storage/response-field-key/unwrap"].includes(path) && method === "POST" || path === "/storage/upload" && method === "POST" || path === "/storage/context" && method === "POST" || path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST") || path === "/storage/read-batch" && method === "POST" || path === "/storage/export-envelopes" && (method === "GET" || method === "POST");
+  const isStorageRoute = ["/storage/response-field-key/wrap", "/storage/response-field-key/unwrap"].includes(path) && method === "POST" || DRAFT_TEXT_PATHS.includes(path) && method === "POST" || path === "/storage/upload" && method === "POST" || path === "/storage/context" && method === "POST" || path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST") || path === "/storage/read-batch" && method === "POST" || path === "/storage/export-envelopes" && (method === "GET" || method === "POST");
   const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/members" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
   if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute && !isAgentQuestionsRoute) {
     return { handled: false };
@@ -108436,7 +108655,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
       response: deps?.json?.({ error: "Agent HTTP is disabled for this session." }, 404, headers2)
     };
   }
-  const isParticipantWrite = path === "/storage/response-field-key/wrap" && method === "POST" || isTranscribeRoute || isArweaveUploadRoute || path === "/storage/upload" && method === "POST" || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
+  const isParticipantWrite = path === "/storage/response-field-key/wrap" && method === "POST" || path === "/storage/draft-text/put" && method === "POST" || isTranscribeRoute || isArweaveUploadRoute || path === "/storage/upload" && method === "POST" || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
   const endedResponse = isParticipantWrite ? buildSessionEndedResponse({ config, headers: headers2, json: deps?.json, now: deps?.now }) : null;
   if (endedResponse) {
     return {
@@ -108453,7 +108672,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
     config,
     env,
     slug,
-    address: address2,
+    address: address3,
     limit,
     headers: headers2,
     deps: {
@@ -108510,7 +108729,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
         env,
         config,
         slug,
-        uploaderAddress: address2,
+        uploaderAddress: address3,
         expectedAuthority,
         authScopes: scopes,
         baseHeaders: headers2,
@@ -108530,7 +108749,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
         env,
         config,
         slug,
-        requesterAddress: address2,
+        requesterAddress: address3,
         expectedAuthority,
         baseHeaders: headers2,
         deps: {
@@ -108602,7 +108821,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
       baseHeaders: headers2,
       config,
       slug,
-      uploaderAddress: address2
+      uploaderAddress: address3
     })
   };
 };
@@ -108638,9 +108857,9 @@ var NOT_ADMITTED = {
   reason: "session_agent_not_admitted"
 };
 var UNCHECKED = { ok: false, status: 503, error: "Who may ask could not be checked just now. Try again shortly." };
-var resolveAsker = async ({ setting, config, address: address2, aiScope, access }) => {
+var resolveAsker = async ({ setting, config, address: address3, aiScope, access }) => {
   if (!aiScope) return NOT_ADMITTED;
-  if (resolveSessionAdminAddresses(config).has(lower11(address2))) {
+  if (resolveSessionAdminAddresses(config).has(lower11(address3))) {
     return { ok: true, answers: "detailed", audience: "admin" };
   }
   const gate = await access.sessionGate();
@@ -108665,8 +108884,8 @@ var resultsText = (artifact) => {
   walk(artifact?.sections);
   return lines.join("\n");
 };
-var readVisibleResults = async ({ env, slug, config, address: address2, scopes, deps }) => {
-  if (!isListedResultsBuilder(config, address2)) {
+var readVisibleResults = async ({ env, slug, config, address: address3, scopes, deps }) => {
+  if (!isListedResultsBuilder(config, address3)) {
     if (!(deps.evaluateResultsAnalysisViewerEligibility || evaluateResultsAnalysisViewerEligibility)({ config })?.ok) return "";
     for (const resource of ["generatedArtifacts", "questions", "responses"]) {
       const access = await (deps.authorizeCloudflareStorageResourceRead || authorizeCloudflareStorageResourceRead)({
@@ -108674,7 +108893,7 @@ var readVisibleResults = async ({ env, slug, config, address: address2, scopes, 
         config,
         slug,
         resource,
-        requesterAddress: address2,
+        requesterAddress: address3,
         authScopes: scopes,
         deps
       });
@@ -108707,18 +108926,18 @@ var readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, de
     question.id,
     { question: trim26(question.prompt), scale: scaleText(question), counted: COUNTED_TYPES.has(question.type), answers: [] }
   ]));
-  source.snapshot.responses.forEach((response2) => {
-    const from = source.participantAddresses?.get(response2.participantId);
-    const group = byQuestion.get(response2.questionId);
+  source.snapshot.responses.forEach((response3) => {
+    const from = source.participantAddresses?.get(response3.participantId);
+    const group = byQuestion.get(response3.questionId);
     if (!group || !from || optedOut.has(from)) return;
-    const given = (Array.isArray(response2.answer) ? response2.answer : [response2.answer]).map(trim26).filter(Boolean);
-    const comment = trim26(response2.additional);
+    const given = (Array.isArray(response3.answer) ? response3.answer : [response3.answer]).map(trim26).filter(Boolean);
+    const comment = trim26(response3.additional);
     const answer = group.counted ? { choices: given, text: comment } : { choices: [], text: [given.join("; "), comment].filter(Boolean).join(" \u2014 ") };
     if (answer.choices.length || answer.text) group.answers.push(answer);
   });
   return [...byQuestion.values()].filter((group) => group.answers.length >= minAnswers).map(({ question, scale, answers }) => ({ question, ...scale ? { scale } : {}, answers }));
 };
-var gatherMaterial = async ({ env, slug, config, setting, address: address2, scopes, asker, access, optedOut, deps }) => {
+var gatherMaterial = async ({ env, slug, config, setting, address: address3, scopes, asker, access, optedOut, deps }) => {
   const detailed = asker.answers === "detailed";
   const [sources, results, answers] = await Promise.all([
     loadParticipantContextSources({
@@ -108726,13 +108945,13 @@ var gatherMaterial = async ({ env, slug, config, setting, address: address2, sco
       slug,
       config,
       deps,
-      principal: lower11(address2),
+      principal: lower11(address3),
       leaveOutUploaders: optedOut,
       // A General asker reads the files open to everyone the session admits;
       // each read checks the session's own gate again, as a file read does.
       readable: detailed ? access.canRead : async (row) => forEveryone(row, config) && access.canRead(row)
     }),
-    readVisibleResults({ env, slug, config, address: address2, scopes, deps }),
+    readVisibleResults({ env, slug, config, address: address3, scopes, deps }),
     detailed ? readMemberAnswers({
       env,
       slug,
@@ -108746,7 +108965,7 @@ var gatherMaterial = async ({ env, slug, config, setting, address: address2, sco
 };
 var checkSessionAgentPayment = async () => ({ ok: true });
 var PROXIES = { anthropic: "proxyAnthropic", openai: "proxyOpenAI", openrouter: "proxyOpenRouter", custom: "proxyCustomRPC" };
-var askAi = async ({ messages, config, secrets, address: address2, scopes, headers: headers2, deps }) => {
+var askAi = async ({ messages, config, secrets, address: address3, scopes, headers: headers2, deps }) => {
   const request = (deps.normalizeAiRequestPayload || normalizeAiRequestPayload)({
     payload: { taskType: "session-agent", messages, max_tokens: 3e3, max_output_tokens: 3e3 },
     config
@@ -108755,27 +108974,27 @@ var askAi = async ({ messages, config, secrets, address: address2, scopes, heade
   if (!isModelAllowed(payload.model, provider)) return { ok: false, status: 403, body: AI_MODEL_NOT_ALLOWED };
   const proxy = deps[PROXIES[provider]];
   if (!proxy) return { ok: false, status: 503, body: { error: "The session\u2019s AI provider can\u2019t answer the Session Agent." } };
-  const response2 = await proxy({
+  const response3 = await proxy({
     payload,
     config,
     secrets,
     baseHeaders: headers2,
-    ...provider === "custom" ? { auth: { address: address2, scopes } } : {}
+    ...provider === "custom" ? { auth: { address: address3, scopes } } : {}
   });
-  const data = await response2.json().catch(() => ({}));
-  if (!response2.ok) {
-    return response2.status === 429 ? { ok: false, status: 429, body: { error: "The session\u2019s AI is busy. Try again shortly." } } : { ok: false, status: 502, body: { error: "The session\u2019s AI couldn\u2019t answer. Try again." } };
+  const data = await response3.json().catch(() => ({}));
+  if (!response3.ok) {
+    return response3.status === 429 ? { ok: false, status: 429, body: { error: "The session\u2019s AI is busy. Try again shortly." } } : { ok: false, status: 502, body: { error: "The session\u2019s AI couldn\u2019t answer. Try again." } };
   }
   const answer = clip4(trim26(data?.completion), SESSION_AGENT_LIMITS.answerChars);
   return answer ? { ok: true, answer } : { ok: false, status: 502, body: { error: "The Session Agent gave no answer. Try again." } };
 };
-var accessFor = ({ env, config, slug, address: address2, scopes, deps }) => createRequesterAccessChecks({ env, config, slug, requesterAddress: address2, authScopes: scopes, deps });
-var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: address2, env, limit, headers: headers2, scopes, deps } = {}) => {
+var accessFor = ({ env, config, slug, address: address3, scopes, deps }) => createRequesterAccessChecks({ env, config, slug, requesterAddress: address3, authScopes: scopes, deps });
+var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: address3, env, limit, headers: headers2, scopes, deps } = {}) => {
   const json8 = (payload, status = 200) => deps.json(payload, status, headers2);
   const setting = sessionAgentSettingOf(config?.sessionAgent);
   const store = deps.callSessionAgentOptOutStore || callOptOutStore;
   if (path === "/session-agent/opt-out") {
-    const saved = await store(env, slug, "set", { address: address2, optedOut: body?.optedOut });
+    const saved = await store(env, slug, "set", { address: address3, optedOut: body?.optedOut });
     if (!saved.ok) return json8({ error: saved.status === 400 ? saved.body?.error : OPT_OUTS_UNAVAILABLE }, saved.status === 400 ? 400 : 503);
     return json8({ optedOut: saved.body.optedOut });
   }
@@ -108790,11 +109009,11 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
       resolveAsker({
         setting,
         config,
-        address: address2,
+        address: address3,
         aiScope: scopes?.ai === true,
-        access: accessFor({ env, config, slug, address: address2, scopes, deps })
+        access: accessFor({ env, config, slug, address: address3, scopes, deps })
       }),
-      canOptOut(address2) ? store(env, slug, "read", { address: address2 }) : { ok: true, body: { optedOut: false } }
+      canOptOut(address3) ? store(env, slug, "read", { address: address3 }) : { ok: true, body: { optedOut: false } }
     ]);
     if (!asker2.ok && asker2.status === 503) return json8({ error: asker2.error }, 503);
     if (!own.ok) return json8({ error: OPT_OUTS_UNAVAILABLE }, 503);
@@ -108818,15 +109037,15 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
     config,
     env,
     slug,
-    address: address2,
+    address: address3,
     limit,
     headers: headers2,
     deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: deps.json }
   });
   if (!preflight?.ok) return preflight?.response || json8({ error: "Current authorization check failed." }, 403);
   const currentScopes = { ...scopes, ai: preflight.tokenHasScope === true };
-  const access = accessFor({ env, config, slug, address: address2, scopes: currentScopes, deps });
-  const asker = await resolveAsker({ setting, config, address: address2, aiScope: preflight.tokenHasScope === true, access });
+  const access = accessFor({ env, config, slug, address: address3, scopes: currentScopes, deps });
+  const asker = await resolveAsker({ setting, config, address: address3, aiScope: preflight.tokenHasScope === true, access });
   if (!asker.ok) return json8({ error: asker.error, ...asker.reason ? { reason: asker.reason } : {} }, asker.status);
   const secretContext = await deps.resolveAuthenticatedRouteSecrets({
     env,
@@ -108843,7 +109062,7 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
     slug,
     config,
     setting,
-    address: address2,
+    address: address3,
     scopes: currentScopes,
     asker,
     access,
@@ -108853,7 +109072,7 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
   const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
   if (!payment?.ok) return json8({ error: payment?.error || "This answer needs payment first.", reason: "session_agent_payment_required" }, 402);
   const { messages, read } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
-  const reply5 = await askAi({ messages, config, secrets: secretContext.secrets, address: address2, scopes: currentScopes, headers: headers2, deps });
+  const reply5 = await askAi({ messages, config, secrets: secretContext.secrets, address: address3, scopes: currentScopes, headers: headers2, deps });
   if (!reply5.ok) return json8(reply5.body, reply5.status);
   return json8({
     answer: reply5.answer,
@@ -108882,7 +109101,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
   body,
   config,
   slug,
-  address: address2,
+  address: address3,
   env,
   limit,
   headers: headers2,
@@ -108892,7 +109111,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
   if (SESSION_AGENT_PATHS.includes(path)) {
     return {
       handled: true,
-      response: await dispatchSessionAgentRoute({ path, body, config, slug, address: address2, env, limit, headers: headers2, scopes, deps })
+      response: await dispatchSessionAgentRoute({ path, body, config, slug, address: address3, env, limit, headers: headers2, scopes, deps })
     };
   }
   const isFaucetAction = action === "request_test_eth";
@@ -108919,7 +109138,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     const toStr11 = typeof deps?.toStr === "function" ? deps.toStr : (value) => typeof value === "string" ? value : value == null ? "" : String(value);
     const hasProofBackedFaucetRequest = !!toStr11(body?.sbtAddress).trim();
     const requestedRecipient = toStr11(body?.to || body?.recipient || body?.address).trim().toLowerCase();
-    const normalizedAddress = toStr11(address2).trim().toLowerCase();
+    const normalizedAddress = toStr11(address3).trim().toLowerCase();
     const isSelfFundingRequest = !!requestedRecipient && requestedRecipient === normalizedAddress;
     const hosted = config?.sessionModeProfile?.authority?.mode === "worker_canonical";
     if (hosted && !isSelfFundingRequest) {
@@ -108933,7 +109152,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
       allowWithoutScope: !hosted && (hasProofBackedFaucetRequest || isSelfFundingRequest),
       env,
       slug,
-      address: address2,
+      address: address3,
       limit,
       headers: headers2,
       deps: {
@@ -108965,7 +109184,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     }
     const reserve = deps?.reserveCoordinatedHostedFaucet || reserveCoordinatedHostedFaucet;
     const finalize = deps?.finalizeCoordinatedHostedFaucet || finalizeCoordinatedHostedFaucet;
-    const reservation = hosted ? await reserve({ env, slug, address: address2 }) : null;
+    const reservation = hosted ? await reserve({ env, slug, address: address3 }) : null;
     if (hosted && reservation?.ok !== true) {
       return { handled: true, response: deps?.json?.({ error: "Faucet coordination is unavailable; try later." }, 503, headers2) };
     }
@@ -108973,14 +109192,14 @@ var dispatchAuthenticatedSecretActionRoute = async ({
       return { handled: true, response: deps?.json?.({ error: "Today's test-ETH limit for this address is used up." }, 429, headers2) };
     }
     let submissionAttempted = false;
-    let response2;
+    let response3;
     const send = () => deps?.faucet?.({
       payload: body,
       secrets: secretContext2.secrets,
       config,
       baseHeaders: headers2,
       slug,
-      requesterAddress: address2,
+      requesterAddress: address3,
       tokenHasFaucetScope: preflight2.tokenHasScope,
       ...hosted ? {
         onSubmissionAttempt: () => {
@@ -108990,20 +109209,20 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     });
     const takeWalletTurn = deps?.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
     try {
-      response2 = await takeWalletTurn({ env, secrets: secretContext2.secrets }, send);
+      response3 = await takeWalletTurn({ env, secrets: secretContext2.secrets }, send);
     } catch (error) {
       if (hosted && !submissionAttempted) {
-        await finalize({ env, slug, address: address2, requestId: reservation.requestId, sent: false });
+        await finalize({ env, slug, address: address3, requestId: reservation.requestId, sent: false });
       }
       throw error;
     }
-    if (!response2) response2 = deps?.json?.({ error: "The faucet is busy; try again shortly." }, 503, headers2);
+    if (!response3) response3 = deps?.json?.({ error: "The faucet is busy; try again shortly." }, 503, headers2);
     if (hosted) {
-      if (!submissionAttempted || response2?.status === 200) {
-        await finalize({ env, slug, address: address2, requestId: reservation.requestId, sent: response2?.status === 200 });
+      if (!submissionAttempted || response3?.status === 200) {
+        await finalize({ env, slug, address: address3, requestId: reservation.requestId, sent: response3?.status === 200 });
       }
     }
-    return { handled: true, response: response2 };
+    return { handled: true, response: response3 };
   }
   if (isAiAction) {
     const preflight2 = await deps?.evaluateAuthenticatedRoutePreflight?.({
@@ -109013,7 +109232,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
       config,
       env,
       slug,
-      address: address2,
+      address: address3,
       limit,
       headers: headers2,
       deps: {
@@ -109095,7 +109314,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
           secrets: secretContext2.secrets,
           baseHeaders: headers2,
           auth: {
-            address: address2,
+            address: address3,
             scopes
           }
         })
@@ -109113,7 +109332,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     config,
     env,
     slug,
-    address: address2,
+    address: address3,
     limit,
     headers: headers2,
     deps: {
@@ -109149,7 +109368,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
       config,
       secrets: secretContext.secrets,
       request: body,
-      requesterAddress: address2,
+      requesterAddress: address3,
       sessionSlug: slug,
       fetchImpl: deps?.fetchImpl
     });
@@ -109175,7 +109394,7 @@ var dispatchAuthenticatedNonSecretActionRoute = async ({
   body,
   config,
   slug,
-  address: address2,
+  address: address3,
   env,
   limit,
   headers: headers2,
@@ -109206,7 +109425,7 @@ var dispatchAuthenticatedNonSecretActionRoute = async ({
     config,
     env,
     slug,
-    address: address2,
+    address: address3,
     limit,
     headers: headers2,
     deps: {
@@ -109329,10 +109548,10 @@ var normalizeSignedWorkerRequest = (body = {}) => ({
 });
 var validateRecoveredAddressMatchesRequest = ({
   recovered,
-  address: address2
+  address: address3
 } = {}) => {
   const normalizedRecovered = normalizeAddressLower3(recovered);
-  const normalizedAddress = normalizeAddressLower3(address2);
+  const normalizedAddress = normalizeAddressLower3(address3);
   if (!normalizedRecovered || !normalizedAddress || normalizedRecovered !== normalizedAddress) {
     return { ok: false, error: "Signature does not match address." };
   }
@@ -109340,9 +109559,9 @@ var validateRecoveredAddressMatchesRequest = ({
 };
 var validateSiweAddressMatchesRequest = ({
   siwe,
-  address: address2
+  address: address3
 } = {}) => {
-  const normalizedAddress = normalizeAddressLower3(address2);
+  const normalizedAddress = normalizeAddressLower3(address3);
   const normalizedSiweAddress = normalizeAddressLower3(siwe?.address);
   if (!normalizedSiweAddress) return { ok: true, error: "" };
   if (!normalizedAddress || normalizedSiweAddress !== normalizedAddress) {
