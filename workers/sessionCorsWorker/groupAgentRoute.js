@@ -9,6 +9,7 @@ import {
   readPublishedResultsAnalysisArtifact,
 } from './resultsAnalysisGeneration.js';
 import { canOptOut } from './groupAgentOptOuts.js';
+import { isListedResultsBuilder } from './resultsBuild.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import {
   authorizeCloudflareStorageResourceRead,
@@ -69,9 +70,11 @@ const resultsText = (artifact) => {
   return lines.join('\n');
 };
 
-// Results reach an answer only for those who may see them on the page.
-const readVisibleResults = async ({ env, slug, config, address, scopes, admin, deps }) => {
-  if (!admin) {
+// Results reach an answer only for those who may see them on the page:
+// viewers under the rule AI Views follow, and anyone listed to build results
+// (admins and results admins) on any session.
+const readVisibleResults = async ({ env, slug, config, address, scopes, deps }) => {
+  if (!isListedResultsBuilder(config, address)) {
     if (!(deps.evaluateResultsAnalysisViewerEligibility || evaluateResultsAnalysisViewerEligibility)({ config })?.ok) return '';
     for (const resource of ['generatedArtifacts', 'questions', 'responses']) {
       const access = await (deps.authorizeCloudflareStorageResourceRead || authorizeCloudflareStorageResourceRead)({
@@ -129,7 +132,7 @@ const gatherMaterial = async ({ env, slug, config, address, scopes, asker, acces
       env, slug, config, deps, principal: lower(address), leaveOutUploaders: optedOut,
       ...(detailed ? { readable: access.canRead } : {}),
     }),
-    readVisibleResults({ env, slug, config, address, scopes, admin: asker.audience === 'admin', deps }),
+    readVisibleResults({ env, slug, config, address, scopes, deps }),
     detailed ? readMemberAnswers({ env, slug, config, optedOut, deps }) : [],
   ]);
   return { material: { sessionContext: config?.sessionContext, sources, results, answers: answers || [] }, answersUnavailable: answers === null };

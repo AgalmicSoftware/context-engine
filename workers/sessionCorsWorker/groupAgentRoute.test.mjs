@@ -186,11 +186,17 @@ test('Detailed answers add what the asker may read and members’ answers, and n
   assert.match(unread.body.note, /couldn’t be read/);
 });
 
-test('results reach a non-admin’s answer only where the page shows them results', async () => {
+test('results reach an answer only where the page shows the asker results', async () => {
   const h = await seeded();
   const deps = { evaluateResultsAnalysisViewerEligibility: () => ({ ok: false }) };
   assert.doesNotMatch((await ask(h, { address: MEMBER, deps })).prompt, /RESULTS/);
   assert.match((await ask(h, { address: ADMIN, deps })).prompt, /RESULTS/);
+  // A results admin sees results on any session, as on the Results page, and is answered as their audience says.
+  h.state.config.resultsAdminAddresses = [MEMBER];
+  const resultsAdmin = await ask(h, { address: MEMBER, deps });
+  assert.match(resultsAdmin.prompt, /RESULTS/);
+  assert.equal(resultsAdmin.body.audience, 0);
+  delete h.state.config.resultsAdminAddresses;
   const unreadable = { authorizeCloudflareStorageResourceRead: async ({ resource }) => ({ ok: resource !== 'responses' }) };
   assert.doesNotMatch((await ask(h, { deps: unreadable })).prompt, /RESULTS/);
 });

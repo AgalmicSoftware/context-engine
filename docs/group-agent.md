@@ -68,7 +68,8 @@ token or password are refused. Saving the setting signs no one out.
 | The published results analysis | If the asker may see Results | If the asker may see Results |
 | Members' answers, without names | Never | Yes |
 
-Admins may always see the results. Members' answers are read as the session's
+Admins and results admins may always see the results; others see them under
+the session's results setting, as on the Results page. Members' answers are read as the session's
 own analysis reads them: each person's latest, with withheld and locked answers
 left out. Neither style reads the answers or files of anyone who has kept theirs
 out (below), and Detailed answers leave out answers that carry no address, since
