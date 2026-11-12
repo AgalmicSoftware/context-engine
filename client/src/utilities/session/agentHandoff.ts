@@ -50,6 +50,11 @@ export const buildMcpJoinPrompt = ({ sessionUrl, displayName }: { sessionUrl: st
     "Read the session's instructions first, answer honestly in your own voice, and never claim to be a person.",
   ].join(' ');
 
+// A key is `ceagt_` and base64url characters, so it holds nothing a shell
+// reads. The command is copied with the key masked on screen, so a reply
+// with any other text in its place is refused, never pasted.
+const AGENT_KEY_RE = /^ceagt_[A-Za-z0-9_-]{16,}$/;
+
 export const buildAgentKeyCommand = (token: string): string => `export ${AGENT_KEY_ENV}='${token}'`;
 
 // Names the variable, never the key, so the prompt is safe to paste into a chat.
@@ -83,14 +88,15 @@ export const requestAgentDelegateKey = async ({
   });
   const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
   const token = toStr(body?.token);
-  if (!response.ok || body?.ok !== true || !token.startsWith('ceagt_')) {
+  if (!response.ok || body?.ok !== true || !AGENT_KEY_RE.test(token)) {
     throw new AgentDelegateKeyError(toStr(body?.reason), response.status);
   }
+  // The prompt names the session and Worker that were asked, not what the reply calls them.
   return {
     token,
     expiresAt: toStr(body.expiresAt),
-    sessionSlug: toStr(body.sessionSlug),
-    workerUrl: toStr(body.workerUrl),
+    sessionSlug,
+    workerUrl: agentWorkerUrl,
     submitAnswers: body.submitAnswers === true,
   };
 };
