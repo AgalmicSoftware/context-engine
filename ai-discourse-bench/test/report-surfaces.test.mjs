@@ -993,11 +993,29 @@ test('analysis overlay populates risk matrix popups and Debate Map generated sur
             confidence: 'medium',
             generatedBy: 'fixture-model',
           },
+          'Capabilities.Agents.Safety.Evaluations': { summary: 'Scored only.', value: -2 },
+          'Capabilities.Scaling.Safety.Alignment': {
+            summary: 'Scaling outpaces alignment checks.',
+            opportunities: ['Shared evaluations.', 'Earlier red teaming.'],
+            risks: [],
+            confidence: 'medium',
+            generatedBy: 'fixture-model',
+          },
         },
       },
     },
   };
   const html = renderHtmlReport(report);
+  // A square scored without listed notes still shows its balance, not "No notes".
+  assert.match(
+    html,
+    /data-testid="ce-risk-matrix-subcell-capabilities-agents-vs-safety-evaluations"\s+aria-label="Capabilities Agents versus Safety Evaluations, risk balance -2\. Open detailed notes\."\s*>\s*<span class="riskMatrixCellValue cellValue">▼ -2<\/span>\s*<\/button>/,
+  );
+  // A square with analysis gives its direction and note count, not colour alone.
+  assert.match(
+    html,
+    /data-testid="ce-risk-matrix-subcell-capabilities-scaling-vs-safety-alignment"\s+aria-label="Capabilities Scaling versus Safety Alignment, opportunity balance \+2, 2 notes\. Open detailed notes\."\s*>\s*<span class="riskMatrixCellValue cellValue">▲ \+2<\/span><span class="detailNoteCount">2 notes<\/span>/,
+  );
 
   assert.match(html, /id="ai-analysis"/);
   assert.match(html, /data-ce-ai-analysis-overlay/);
@@ -2365,17 +2383,19 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /opportunity balance \+/);
   assert.doesNotMatch(html, /risk balance -/);
   assert.doesNotMatch(html, /riskMatrixGridCellLinked gridCellLinked/);
-  assert.match(html, /class="selectorGrid"/);
-  assert.match(html, /class="selectorPanel"/);
-  assert.match(html, /data-testid="ce-risk-matrix-selector-x-/);
-  assert.match(html, /data-testid="ce-risk-matrix-selector-y-/);
-  assert.match(html, /data-testid="ce-risk-matrix-selector-x-clear"[\s\S]*?disabled/);
   assert.match(html, /data-testid="ce-risk-matrix-subheader-x-/);
   assert.match(html, /data-testid="ce-risk-matrix-subheader-y-/);
   assert.match(html, /data-testid="ce-risk-matrix-subgrid"/);
-  assert.match(html, /class="subgridContainer"/);
+  assert.match(html, /class="subgridContainer detailGrid"/);
   assert.match(html, /data-testid="ce-risk-matrix-subcell-/);
-  assert.match(html, /Refine generated analysis into sub-overlaps and open atlas-linked scenarios attached to each detail cell\./);
+  assert.match(html, /Open a square to read its analysis\./);
+  // The detail grid names its axes, has a key, and says when a square is empty.
+  assert.match(html, />Columns: [^<]+<\/div>/);
+  assert.match(html, />Rows: [^<]+<\/div>/);
+  assert.match(html, /<ul class="detailLegend" aria-label="Key">[\s\S]*More opportunity[\s\S]*More risk[\s\S]*No notes/);
+  assert.match(html, /<summary aria-label="How to read this grid">/);
+  assert.match(html, /<span class="detailEmptyLabel">No notes<\/span>/);
+  assert.doesNotMatch(html, /ce-risk-matrix-selector-/);
   assert.doesNotMatch(html, /class="riskMatrixCellMeta">AI analysis<\/span>/);
   assert.doesNotMatch(html, /AI Discourse Risk Matrix/);
   assert.doesNotMatch(html, /Facet Scenarios/);
@@ -2406,13 +2426,12 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.riskMatrixGridCellLinked,\s*\.riskMatrixGridCellLinked\.gridCellLinked \{ border-color: rgba\(0, 197, 255, 0\.18\); box-shadow: inset 0 0 0 1px rgba\(0, 197, 255, 0\.08\), 0 12px 24px rgba\(0, 0, 0, 0\.14\); \}/);
   assert.match(html, /\.riskMatrixEmptyCell,\s*\.riskMatrixEmptyCell\.emptyCell \{ background: rgba\(255, 255, 255, 0\.04\); color: rgba\(244, 247, 255, 0\.35\); \}/);
   assert.match(html, /\.riskMatrixDiagonalCell, \.diagonalCell \{ cursor: default; background: rgba\(255, 255, 255, 0\.03\); color: rgba\(190, 199, 230, 0\.82\); font-size: 1\.35rem; \}/);
-  // A figure sits on its own surface, readable on the strongest fill, and a
-  // disabled selector stays legible instead of fading.
+  // A figure sits on its own surface, readable on the strongest fill, and an
+  // empty detail square is framed rather than blank.
   assert.match(html, /\.riskMatrixCellValue \{ padding: 2px 8px; border-radius: var\(--ce-radius-pill\); background: #1f234f; color: rgba\(244, 247, 255, 0\.96\);/);
-  assert.match(html, /\.selectorButton:disabled \{ cursor: not-allowed; border-style: dashed; color: rgba\(190, 199, 230, 0\.82\); transform: none; \}/);
   assert.match(html, /\.riskMatrixContainer \.sectionTitle \{ color: rgba\(244, 247, 255, 0\.96\); \}/);
-  assert.match(html, /\.selectorGrid \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   assert.match(html, /\.subgridContainer \{ display: grid; gap: 8px; min-width: 100%; width: 100%; \}/);
+  assert.match(html, /\.riskMatrixCell\.cell\.detailCellEmpty \{ background: transparent; border-style: dashed; \}/);
 
   const ceExport = buildContextEnginePolisExport(report);
   assert.equal(ceExport.kind, 'ce_polis_question_responses_export');
