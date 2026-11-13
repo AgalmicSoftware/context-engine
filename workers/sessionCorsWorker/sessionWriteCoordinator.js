@@ -2170,7 +2170,12 @@ export class SessionWriteCoordinator {
     // while this queue is held.
     return this.sessionConfigQueue.shared('', async () => {
       try {
-        const authority = await this.assertSessionAuthority(payload);
+        // A join or a member's own leave needs only the current authorization
+        // epoch, which every access change moves, so a content-only setting
+        // save made meanwhile does not refuse it. Other changes keep the revision.
+        const ownMembership = payload?.operation === 'join' ||
+          (payload?.operation === 'remove-member' && payload?.remover === 'member');
+        const authority = await this.assertSessionAuthority(payload, { requireRevision: !ownMembership });
         const { expectedAuthority: _expectedAuthority, ...mutation } = payload;
         // The ceiling comes from the config this object holds, never the request.
         const result = await forwardWorkerGroupMutation({

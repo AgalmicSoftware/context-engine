@@ -98,6 +98,24 @@ test('a config change mid-burst refuses every join admitted under the old settin
   assert.equal(f.memberKeys().length, admitted);
 });
 
+test('a content-only setting save refuses no join or leave sent before it', async () => {
+  const f = await createFixture();
+  await Promise.all(Array.from({ length: 5 }, (_, index) => f.join(index)));
+  const renamed = await f.renameSession();
+  assert.equal(renamed.ok, true, JSON.stringify(renamed));
+  // These still carry the revision read before the save.
+  const joins = await Promise.all(Array.from({ length: 10 }, (_, index) => f.join(10 + index)));
+  assert.deepEqual(joins.filter((result) => !result.ok), []);
+  const leave = await f.mutate({ operation: 'remove-member', principal: principal(2), actorPrincipal: principal(2), remover: 'member' });
+  assert.equal(leave.ok, true, JSON.stringify(leave));
+  // An admin's change to the group still needs the current revision.
+  const update = await f.mutate({ operation: 'update', input: { label: 'Salon 2' } });
+  assert.equal(update.reason, 'session_authority_changed');
+  const removal = await f.mutate({ operation: 'remove-member', principal: principal(3), remover: 'admin' });
+  assert.equal(removal.reason, 'session_authority_changed');
+  assert.equal(f.groupRecord().memberCount, 14);
+});
+
 test('reads during a burst show each finished join and never a refused one', async () => {
   const f = await createFixture({ memberLimit: 5 });
   const outcomes = await Promise.all(Array.from({ length: 12 }, async (_, index) => {

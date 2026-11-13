@@ -102,6 +102,9 @@ export const createFixture = async ({ memberLimit, groupMemberCeiling, joinMode 
   // session's authority on; proofs read before it no longer admit anything.
   const changeConfig = () => executeCoordinatedSessionConfigMutation({ env, slug: 'fixture', existingConfig: sessionConfig,
     expectedAuthority, mutation: { kind: 'set-config', incomingConfig: { adminAddress: `0x${'bb'.repeat(20)}` } } });
+  // A content-only save, such as a new session name, leaves the epoch as it is.
+  const renameSession = () => executeCoordinatedSessionConfigMutation({ env, slug: 'fixture', existingConfig: sessionConfig,
+    expectedAuthority, mutation: { kind: 'set-config', incomingConfig: { sessionName: 'Renamed salon' } } });
   const memberships = async (index) => (await readCoordinatedWorkerGroupMemberships({ env, slug: 'fixture', sessionId: SESSION_ID,
     principal: principal(index) })).groups?.map((group) => group.groupId);
   const created = await mutate({ operation: 'create', principal: undefined,
@@ -122,6 +125,6 @@ export const createFixture = async ({ memberLimit, groupMemberCeiling, joinMode 
       deps: { json: (payload, status) => ({ status, body: payload }) } });
     return { status: response.status, ...response.body };
   };
-  return { kv, env, mutate, join, groupRecord, memberKeys, groupState, changeConfig, memberships, catalog, activeMembers,
+  return { kv, env, mutate, join, groupRecord, memberKeys, groupState, changeConfig, renameSession, memberships, catalog, activeMembers,
     admin, sessionConfig, values, groups };
 };
