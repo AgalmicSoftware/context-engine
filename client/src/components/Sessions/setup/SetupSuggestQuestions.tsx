@@ -35,7 +35,9 @@ export const SetupSuggestQuestions = ({ draft, pending, apiKey, onAdd }: Props) 
     try {
       const { questions, skipped } = await suggestSetupQuestions({ draft, pending, apiKey });
       onAdd(questions);
-      const added = `Added ${questions.length} ${questions.length === 1 ? 'draft' : 'drafts'}. Edit or remove them before Create.`;
+      const added = questions.length
+        ? `Added ${questions.length} ${questions.length === 1 ? 'draft' : 'drafts'}. Edit or remove them before Create.`
+        : 'No new questions: nothing in the context clearly supports one.';
       setStatus({
         alert: false,
         message: skipped.length

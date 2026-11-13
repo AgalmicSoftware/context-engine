@@ -109,11 +109,15 @@ it('replaces unedited questions without asking', async () => {
   expect(window.confirm).not.toHaveBeenCalled();
 });
 
-it('keeps edited questions when generation returns no usable replacement', async () => {
+it('keeps edited questions, and says so plainly, when the source supports no new questions', async () => {
   await firstGeneration();
   callAI.mockResolvedValueOnce(JSON.stringify({ questions: [] }));
   generate();
-  await screen.findByText(/no usable questions/i);
+  expect(await screen.findByText('No questions: nothing in this source clearly supports one.')).toHaveAttribute(
+    'role',
+    'status',
+  );
+  expect(screen.queryByText(/no usable questions/i)).not.toBeInTheDocument();
   expect(screen.getByDisplayValue('My edited question?')).toBeVisible();
   expect(window.confirm).not.toHaveBeenCalled();
 });

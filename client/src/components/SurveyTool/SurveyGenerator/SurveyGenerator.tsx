@@ -403,6 +403,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const [loading, setLoading] = useState(false);
   const [activeAction, setActiveAction] = useState('');
   const [error, setError] = useState('');
+  // The AI wrote no questions: the source supported none, which is a result rather than an error.
+  const [noneFound, setNoneFound] = useState(false);
   const [sourceWarnings, setSourceWarnings] = useState<string[]>([]);
   // Files rejected at selection, repeated by the next Generate only while the source list stays the same.
   const selectionWarningsRef = React.useRef<string[]>([]);
@@ -755,6 +757,10 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       fallbackTitle,
       generateQuestionId: generateSurveyGeneratorQuestionId,
     });
+    if (!statements.length && !aiData.questions?.length) {
+      setNoneFound(true);
+      return false;
+    }
     if (!statements.length) {
       throw new Error(
         'Generation returned no usable questions. Try a different source or enable another question type.',
@@ -1233,6 +1239,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     e.preventDefault();
     if (!selectedQuestionTypes.length) return;
     setError('');
+    setNoneFound(false);
     setActiveAction('generate');
     setSourceWarnings([...selectionWarningsRef.current]);
     selectionWarningsRef.current = [];
@@ -2248,6 +2255,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
               {sourceWarnings.join(' ')}
             </div>
           )}
+          {noneFound && !loading ? (
+            <div role="status">No questions: nothing in this source clearly supports one.</div>
+          ) : null}
           {error && !loading && (
             <div className={styles.error} style={SURVEY_GENERATOR_ERROR_STYLE}>
               {error}

@@ -67,6 +67,19 @@ describe('Suggest questions on /new', () => {
     expect(screen.getByRole('button', { name: 'Suggest questions' })).toBeEnabled();
   });
 
+  it('says plainly when the context supports no new questions', async () => {
+    globalThis.fetch = answer(200, {
+      output_text: JSON.stringify({ surveyTitle: 'Library budget', questions: [] }),
+    }) as unknown as typeof fetch;
+    render(<SetupSuggestQuestions draft={DRAFT} pending={NO_FILES} apiKey="sk-test" onAdd={jest.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest questions' }));
+    expect(await screen.findByText('No new questions: nothing in the context clearly supports one.')).toHaveAttribute(
+      'role',
+      'status',
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('shows OpenAI’s refusal as an alert and adds nothing', async () => {
     globalThis.fetch = answer(401, {
       error: { message: 'Incorrect API key provided: sk-test.' },

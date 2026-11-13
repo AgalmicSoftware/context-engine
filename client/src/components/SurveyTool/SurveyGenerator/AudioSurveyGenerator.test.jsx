@@ -341,7 +341,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent).toBe(
       '15',
     );
-    expect(mockCallAI.mock.calls[0][0]).toMatch(/Write 15 questions/);
+    expect(mockCallAI.mock.calls[0][0]).toMatch(/Write at most 15 questions/);
   });
 
   it('uses webpage source type when only additional URL sources are provided', async () => {

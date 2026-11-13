@@ -1367,6 +1367,40 @@ describe('SessionListeningPanel', () => {
       expect(await screen.findByText(/Its questions are drafted when you reopen it\./)).toBeInTheDocument();
     });
 
+    it('counts only the drafts it added, and drops "no new questions" once recording resumes', async () => {
+      const asked = 'Should the council pilot AI summaries?';
+      const pooled = () => (
+        <SessionListeningPanel
+          sessionSlug="demo"
+          sessionConfig={atEnd}
+          questionPool={[{ id: 's-1', type: 'binary', prompt: asked }]}
+          panelMode="recordGroup"
+          embeddedInModal
+        />
+      );
+      const once = { transcript: first, segments: [chunk('s1', 0, first)] };
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(once));
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts([asked]));
+      const { rerender } = render(pooled());
+      expect(await screen.findByText('No new questions from this discussion.')).toBeInTheDocument();
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ ...once, status: 'recording', isRecording: true }),
+      );
+      rerender(pooled());
+      await waitFor(() => expect(screen.queryByText('No new questions from this discussion.')).toBeNull());
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['D?']));
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: `${first}\n${second}`, segments: [chunk('s1', 0, first), chunk('s2', 1, second)] }),
+      );
+      rerender(pooled());
+      await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2));
+      // The repeat of a session question added nothing, so all three are still to come.
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenLastCalledWith(
+        `${first}\n${second}`,
+        expect.objectContaining({ count: 3 }),
+      );
+    });
+
     it('drafts once after a failure only when Generate is pressed, with the set number', async () => {
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
         buildRecorder({ transcript: `${first}\n${second}`, segments: [chunk('s1', 0, first), chunk('s2', 1, second)] }),
@@ -1413,6 +1447,42 @@ describe('SessionListeningPanel', () => {
         expect.objectContaining({ count: 3 }),
       ),
     );
+  });
+
+  it('says plainly when a discussion gives no new question, and drafts none the session already asks', async () => {
+    const transcript = 'Person 1: The council should pilot AI summaries in the February budget consultation.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1, completedAt: 2 }],
+      }),
+    );
+    // The same question as the session's, but for case and punctuation.
+    mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
+      surveyTitle: 'Breakout',
+      statements: [{ id: 'q1', type: 'binary', prompt: 'should the council pilot AI summaries', tags: [] }],
+      raw: { questions: [] },
+    });
+    render(
+      <SessionListeningPanel
+        sessionSlug="demo"
+        sessionConfig={{ sessionName: 'Reverse Alignment', sessionInfo: 'Democracy and AI.' }}
+        questionPool={[{ id: 's-1', type: 'binary', prompt: 'Should the council pilot AI summaries?' }]}
+        panelMode="recordGroup"
+        embeddedInModal
+      />,
+    );
+    expect(await screen.findByText('No new questions from this discussion.')).toHaveAttribute('role', 'status');
+    expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
+      transcript,
+      expect.objectContaining({
+        sessionQuestionPrompts: ['Should the council pilot AI summaries?'],
+        sessionSubject: 'Reverse Alignment: Democracy and AI.',
+      }),
+    );
+    expect(screen.queryByTestId('mock-create-questions')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
   });
 
   it('drafts the set number after each part while recording, when the session asks for that', async () => {
