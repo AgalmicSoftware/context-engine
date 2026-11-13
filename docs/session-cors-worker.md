@@ -1504,6 +1504,16 @@ still disable it explicitly. The legacy `arweave` compatibility scope applies
 only to storage routes. Group membership is visible to the worker/operator by
 design. This is the same trust domain as worker-enforced gates.
 
+Joins, leaves, and membership reads for different people run side by side in
+the session's group coordinator, one at a time per person, so a room joining one
+group at once is not served in single file. Group creates, edits, deletes,
+backups, and the recovery of a stranded group change still run alone, and no
+session config change lands while a group change is committing. A join that
+finds the coordinator busy answers `503` with
+`Session config coordination is unavailable; retry.` and its `reason`; joining
+again is a no-op that finishes an interrupted join, so the website and the MCP
+send it again after a short wait.
+
 Member reads and roster pages use only canonical session-identity keys. Legacy
 slug-only or case-folded membership rows are ignored and never migrated during
 reads. Roster pagination does not write membership records or indexes, so a
