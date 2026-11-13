@@ -1191,7 +1191,12 @@ test('an agent sees the session’s instructions and groups, joins the group the
   await kami.participant.joinGroup({ groupId: salon.groupId });
   assert.deepEqual(await kami.participant.leaveGroup({ groupId: salon.groupId }), { session: SLUG, leftGroup: salon.groupId });
   await assert.rejects(kami.participant.leaveGroup({ groupId: salon.groupId }), new RegExp(`^Error: You aren’t a member of group "${salon.groupId}"\\.$`));
-  await assert.rejects(kami.participant.joinGroup({ groupId: 'no-such-group' }), /^Error: This session has no group "no-such-group"\.$/);
+  // An unknown group gets the one refusal every refused join gets, so no answer
+  // shows whether an unlisted group exists.
+  await assert.rejects(
+    kami.participant.joinGroup({ groupId: 'no-such-group' }),
+    /^Error: That link, invite or password didn’t work for group "no-such-group"\. Ask whoever invited you for a new one\.$/,
+  );
 
   const groups = byName((await kami.participant.getSession()).groups);
   assert.deepEqual([groups['AI agents'].member, groups['AI agents'].members, groups.Salon.member, groups.Salon.members], [true, 1, false, 0]);
