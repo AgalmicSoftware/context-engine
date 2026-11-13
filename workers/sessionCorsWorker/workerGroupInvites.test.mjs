@@ -186,8 +186,10 @@ test('thirty password joins against a limit of 25 admit exactly 25; a new passwo
   assert.equal(f.groupRecord().memberCount, 25);
   await f.mutate({ operation: 'update', input: { memberLimit: 50 } });
   await f.admin('groups/password/set', { signer: passwordKey('22').address });
-  assert.deepEqual(await f.join(26, { proof: proofs[26] }), REFUSED);
-  assert.equal((await f.join(27, { proof: await proofFor(passwordKey('22'), 27) })).ok, true);
+  // Which five lose the race varies with timing; only they are still outside.
+  const [outside, joiner] = raced.flatMap((result, index) => (result.ok ? [] : [index]));
+  assert.deepEqual(await f.join(outside, { proof: proofs[outside] }), REFUSED);
+  assert.equal((await f.join(joiner, { proof: await proofFor(passwordKey('22'), joiner) })).ok, true);
   assert.equal(f.groupRecord().memberCount, 26);
 });
 
