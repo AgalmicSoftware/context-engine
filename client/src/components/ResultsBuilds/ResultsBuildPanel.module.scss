@@ -56,7 +56,7 @@
   select {
     // A select is as wide as its longest option unless it may shrink.
     min-width: 0;
-    max-width: min(100%, 22rem);
+    max-width: min(100%, 30rem);
     padding: 4px 8px;
   }
 }

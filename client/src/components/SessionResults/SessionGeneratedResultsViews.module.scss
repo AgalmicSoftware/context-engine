@@ -8,8 +8,10 @@
 
 .header {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   padding: 1rem;
   border: 1px solid color-mix(in srgb, var(--ce-color-white) 14%, transparent);
   border-radius: 8px;
@@ -17,9 +19,47 @@
   box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
 }
 
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+// Matches a built view's Version picker, as text: there is one result.
+.version {
+  --ce-text: var(--ce-panel-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+// The theme's select frame, without the arrow: nothing to pick.
+.versionValue {
+  padding: 4px 8px;
+  // Separate properties, as the theme's own: classic's inset colour is four colours.
+  border-color: var(--ce-border-inset);
+  border-radius: var(--ce-radius-4);
+  border-style: solid;
+  border-width: var(--ce-border-control-width);
+  background-color: var(--ce-input-bg);
+  color: var(--ce-text);
+}
+
+@media (max-width: 480px) {
+  .version {
+    width: 100%;
+  }
+  .versionValue {
+    flex: 1;
+  }
+}
+
 .eyebrow {
   margin: 0;
-  color: var(--ce-action-accent);
+  // Panel text: the accent and white were unreadable on civic's and classic's light panels.
+  color: var(--ce-panel-text);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -28,7 +68,7 @@
 
 .title {
   margin: 0;
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
   font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -54,7 +94,7 @@
 
 .unavailableTitle {
   margin: 0 0 0.35rem;
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
   font-size: 1rem;
   font-weight: 800;
 }

@@ -81,18 +81,17 @@ export default function ResultsBuildPanel({
           </div>
           <p className={styles.meta}>Built {describeBuild(build)}</p>
         </div>
-        {builds.length > 1 && (
-          <label className={styles.picker}>
-            <span>Version</span>
-            <select value={build.id} onChange={(event) => onSelectBuild(event.target.value)}>
-              {builds.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {describeBuild(entry)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        {/* Shown with one build too, so the time sits in the same place in every built view. */}
+        <label className={styles.picker}>
+          <span>Version</span>
+          <select value={build.id} onChange={(event) => onSelectBuild(event.target.value)}>
+            {builds.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {describeBuild(entry)}
+              </option>
+            ))}
+          </select>
+        </label>
       </header>
       {children}
     </section>
