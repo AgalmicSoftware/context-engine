@@ -10,7 +10,6 @@ export const WORKER_GROUP_MEMBER_CEILING_MAX: number;
 export const WORKER_GROUP_INVITE_BATCH_MAX: number;
 export const WORKER_GROUP_PASSWORD_MIN_LENGTH: number;
 export const WORKER_GROUP_INVITE_FRAGMENT_KEY: 'groupInvite';
-export const WORKER_GROUP_JOIN_CHOICES_FIELD: 'groupJoinChoices';
 export const WORKER_GROUP_MEMBER_CEILING_FIELD: 'groupMemberCeiling';
 export function isWorkerGroupMemberCeiling(value: unknown): value is number;
 export function readWorkerGroupMemberCeiling(config: unknown): number;

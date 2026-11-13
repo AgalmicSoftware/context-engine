@@ -3,6 +3,8 @@
 // The secret is a group password, from which the browser derives a key that signs a join statement,
 // or a one-use claim code, of which the Worker stores only the SHA-256 hash.
 
+import { GROUP_JOIN_CHOICES_FIELD } from './workerSessionPublicConfig.mjs';
+
 export const WORKER_GROUP_JOIN_MODES = Object.freeze(['open', 'one_use', 'group_password', 'admin_add']);
 export const WORKER_GROUP_SECRET_MODES = Object.freeze(['one_use', 'group_password']);
 // Every refusal before a valid secret, so a refusal never shows whether a group exists.
@@ -13,8 +15,6 @@ export const WORKER_GROUP_INVITE_BATCH_MAX = 500;
 // The Worker never shows the password's signer, so guessing is online and rate-limited.
 export const WORKER_GROUP_PASSWORD_MIN_LENGTH = 8;
 export const WORKER_GROUP_INVITE_FRAGMENT_KEY = 'groupInvite';
-// Set by a Worker that offers these choices on every public config read (never stored), like `memberResults`.
-export const WORKER_GROUP_JOIN_CHOICES_FIELD = 'groupJoinChoices';
 // The session setting for the most members a group may have.
 export const WORKER_GROUP_MEMBER_CEILING_FIELD = 'groupMemberCeiling';
 
@@ -29,7 +29,7 @@ export const readWorkerGroupMemberCeiling = (config) => {
 
 /** Whether the session's Worker offers One-use URLs, Group Password and unlisted groups. */
 export const workerOffersGroupJoinChoices = (config) =>
-  !!config && typeof config === 'object' && config[WORKER_GROUP_JOIN_CHOICES_FIELD] === true;
+  !!config && typeof config === 'object' && config[GROUP_JOIN_CHOICES_FIELD] === true;
 
 const PASSWORD_PREFIX = 'gp:';
 const INVITE_PREFIX = 'inv:';
