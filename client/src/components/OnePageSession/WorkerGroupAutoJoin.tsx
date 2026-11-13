@@ -84,6 +84,8 @@ function AutoJoinIntent({
   // The link's invite, or one the person typed; it stays in this tab.
   const [token, setToken] = useState(intent.token || '');
   const [publicGroup, setPublicGroup] = useState<PublicGroup>('unknown');
+  // A refused token isn't sent again, even for another account: each send spends a guess.
+  const refusedTokenRef = useRef('');
 
   useEffect(() => {
     if (ready || finishedRef.current) return undefined;
@@ -132,6 +134,7 @@ function AutoJoinIntent({
       if (!active) return;
       // A refused invite leaves the tab, so a reload doesn't spend another of this person's guesses on it.
       if (isRefusedWorkerGroupError(error)) {
+        refusedTokenRef.current = token;
         const { token: _refused, ...withoutToken } = intent;
         savePendingAutoJoin({ ...withoutToken, sessionId });
       }
@@ -186,6 +189,7 @@ function AutoJoinIntent({
           setProgress({ phase: 'code', message: NEEDS_CODE_MESSAGE });
           return;
         }
+        if (token === refusedTokenRef.current) throw new Error('worker_group_join_refused');
         if (consumeCancellation()) return;
         setProgress({ phase: 'joining', message: group ? `Joining ${group.label}…` : 'Joining the group…' });
         const { buildWorkerGroupJoinCredentials } = await import('../../domains/worker/workerGroupSecrets');

@@ -495,11 +495,16 @@ describe('WorkerGroupAutoJoin', () => {
         AUTO_JOIN_STORAGE_KEY,
         JSON.stringify({ ...readPendingAutoJoinFixture(), token: 'abcdef0123456789abcdef0123456789' }),
       );
-      render(<WorkerGroupAutoJoin {...props} />);
+      const { rerender } = render(<WorkerGroupAutoJoin {...props} />);
       await settle();
       expect(screen.getByRole('alert')).toHaveTextContent(
         'That link, invite or password didn’t work. Ask whoever invited you for a new one.',
       );
+      // Another account doesn't send the refused code again.
+      rerender(<WorkerGroupAutoJoin {...props} account={`0x${'2'.repeat(40)}`} />);
+      await settle();
+      expect(joins()).toHaveLength(1);
+      expect(screen.getByRole('alert')).toHaveTextContent('That link, invite or password didn’t work.');
       expect(screen.getByLabelText(/Group password or claim code for/)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
       // The refused code leaves the tab, so a reload doesn't send it again.
