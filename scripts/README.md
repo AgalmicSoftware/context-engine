@@ -74,7 +74,7 @@ npm run deploy-helper:deploy -- \
   --api-token "$CLOUDFLARE_API_TOKEN"
 ```
 
-When `--allowed-origins` is omitted, the deploy-helper publish script seeds the stable hosted/local bootstrap origins used by `/new`.
+When `--allowed-origins` is omitted, the deploy-helper publish script seeds the site's two origins, `https://contextengine.sh` and `https://www.contextengine.sh`.
 For self-hosted app origins, pass `--allowed-origins` explicitly because the CLI cannot infer the current browser host.
 
 If you are looking for Solidity deployment entry points, use

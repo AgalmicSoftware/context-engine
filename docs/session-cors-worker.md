@@ -8,7 +8,7 @@ Session secrets use a separate AES-GCM-encrypted, versioned Worker KV envelope;
 public config never contains API keys, private keys, JWKs, bearer tokens,
 credentials, RPC/faucet settings, or URL-embedded credentials.
 
-Its storage routes are `POST /storage/upload`, `GET|POST /storage/read`, `GET|POST /storage/list`, and the authorization-gated `GET|POST /storage/export-envelopes`; see [Session Storage Routes](#session-storage-routes). `POST /arweave/upload` uploads directly to Arweave.
+Its storage routes are `POST /storage/upload`, `GET|POST /storage/read`, `POST /storage/read-batch`, `GET|POST /storage/list`, the `POST /storage/draft-text/*` routes, and the authorization-gated `GET|POST /storage/export-envelopes`; see [Session Storage Routes](#session-storage-routes). `POST /arweave/upload` uploads directly to Arweave.
 
 Research summary completion is calculated from each run's distinct accepted
 answer and privacy-skip events. The first accepted batch fixes that run's
@@ -314,10 +314,10 @@ deleted speculatively.
   bodies, and worker bundle bytes are not written to either coordinator state or
   the journal. KV journal records expire after seven days.
 - Deploy-helper origin configuration:
-  - CE-hosted mode should set `ALLOWED_ORIGINS` explicitly to the public app origins it serves. Current hosted example: `https://contextengine.sh,https://www.contextengine.sh,https://contextengine.xyz,https://www.contextengine.xyz,http://localhost:3000`.
+  - CE-hosted mode should set `ALLOWED_ORIGINS` explicitly to the public app origins it serves. Current hosted list: `https://contextengine.sh,https://www.contextengine.sh`.
   - Self-hosted mode should replace that list with the origins for your own app/admin hosts. Leaving `ALLOWED_ORIGINS` unset is intentionally restrictive and only allows `http://localhost:3000` until you configure it.
   - `CE_CLOUDFLARE_API_BASE_URL` is optional and defaults to `https://api.cloudflare.com/client/v4`. Override it only for Cloudflare-compatible test or proxy endpoints.
-  - `npm run deploy-helper:deploy` can seed the stable CE/local defaults, but unlike the `/new` browser flow it cannot discover your current custom app origin. If your UI runs on `https://your-app.example`, pass that origin explicitly with `--allowed-origins`.
+  - `npm run deploy-helper:deploy` seeds the site's two origins (`https://contextengine.sh` and `https://www.contextengine.sh`) when no list is given, but unlike the `/new` browser flow it cannot discover your current custom app origin. If your UI runs on `https://your-app.example`, pass that origin explicitly with `--allowed-origins`.
   - Worker URLs returned from deploy flows are normalized to absolute `http(s)` base URLs before auth/admin calls run. Protocol-less hosts are prefixed (`https://` except local dev hosts), while relative paths are rejected.
 - Admin origin management:
   - `GET /admin/origins` with `Authorization: Bearer <ADMIN_SECRET>` returns the current `{ origins, source }`.
@@ -540,8 +540,10 @@ Admin test panel:
 - If tests fail with a browser network error like `Load failed` / `Failed to fetch`, the worker is often
   rejecting the browser origin via `allowOrigins` (CORS allowlist).
   - Local dev frequently runs at `http://localhost:3001` (and E2E may use `http://127.0.0.1:3000`).
-  - Use the `/admin` CORS allowlist editor to inspect and edit the full list directly. `Add recommended origins` appends the current browser origin plus the stable defaults, and `Save allowlist` persists the exact list you entered.
-  - Trusted admin origins (for example the first-party localhost admin hosts) can reach `/admin/*` even when the session's current allowlist is wrong, so admins can repair a blocked allowlist without manual KV edits first.
+  - Use the `/admin` CORS allowlist editor to inspect and edit the full list directly. `Add recommended origins` appends the current browser origin plus the site's two origins, and `Save allowlist` persists the exact list you entered.
+  - Trusted admin origins (the site's two `.sh` origins, or the deployment's
+    `ADMIN_TRUSTED_ORIGINS`, plus the local dev servers on ports 3000, 3001 and
+    7391 when the Worker sets `CE_ALLOW_LOCAL_ORIGINS=true`) can reach `/admin/*` even when the session's current allowlist is wrong, so admins can repair a blocked allowlist without manual KV edits first.
 - Static custom-domain frontend deploys must add the final browser origin (for
   example `https://app.example`) to the same `allowOrigins` list after DNS
   cutover. See the Netlify/static hosting checklist in
@@ -967,6 +969,15 @@ Authenticated clients can use the worker as the session storage boundary:
     `Content-Disposition: attachment`, so opening the URL downloads it instead
     of rendering it on the Worker origin. A malformed declared type is served
     as `application/octet-stream`.
+- `POST /storage/read-batch` with `{ "ids": [...] }`: reads 1 to 100 distinct
+  storage ids in one request (Workers advertising `storage_read_batch_v1`).
+  Each id is read exactly as `/storage/read` reads it, with its own access
+  check, so a batch never shows more than single reads would. The reply is
+  `{ items }`, one per id in order, each `{ id, status, contentType, text }`
+  or `{ id, status, error, reason? }`. Only text and JSON items come back
+  (`415` otherwise). Items are read five at a time; once the batch holds 8 MiB
+  of text the rest answer `413`, to be read one by one. The reply is
+  `private, no-store` when any item is private.
 - `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in batches of at most eight concurrent KV reads. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Question and survey rows include `metadata.uploader` and `metadata.resourceId` when they were recorded, and `metadata.uploadAuthority` for new uploads. `metadata.uploaderIsAdmin` is derived strictly from `uploadAuthority === "admin"`. Clients use the explicit upload authority stamp for precedence and ignore legacy flags and current public admin configuration. A version of an id that an admin hid is listed only as a marker, `{ "hidden": true, "metadata": { "resource", "resourceId", "hidden": true } }`, with no storage reference, so clients can drop a copy they cached earlier. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
   - Worker-canonical question and survey authoring writes payloads to this
     session's Cloudflare storage and does not register them in the Surveys
@@ -977,6 +988,14 @@ Authenticated clients can use the worker as the session storage boundary:
     the active passkey context. List/read/auth failures fail closed without an
     EVM scan or registry fallback.
 - `GET|POST /storage/export-envelopes`: returns ciphertext plus envelope metadata for encrypted Cloudflare payloads in the requested resource. Only a session admin can call it. It does not decrypt payload bytes and does not include session KEK material.
+- `POST /storage/draft-text/put`, `/storage/draft-text/delete` and
+  `/storage/draft-text/export` keep the AI's drafted text for config admins
+  when `interviewMode.keepDraftTextForAdmins` is on (Workers advertising
+  `draft_text_v1`). A signed-in person puts up to 200 drafts at once, one per
+  session question, each field at most 8,000 characters; deletes their own by
+  `questionIds` or with `all: true`, which needs only a sign-in, no storage
+  scope, and works whatever the setting; and a config admin pages the export 250 rows at a time. See
+  [AI draft text for admins](session-interview-research.md#ai-draft-text-for-admins).
 
 Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; legacy doc-library configs with `docLibrary.provider = "cloudflare"` are also accepted by the worker for storage route compatibility. Backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for authoritative R2 per-item authorization metadata plus the KV-only payload fallback. R2-only payload objects are not readable through the worker, including legacy objects whose per-item conditions cannot be proven from R2 metadata; restore their matching index rows rather than weakening authorization. KV-only payload storage remains supported. The Deploy to Cloudflare template binds only `GROUP_KV` and sets `CE_STORAGE_IN_GROUP_KV=1`, which keeps payloads there. One-click deploys that receive a Cloudflare storage profile bind the created session KV namespace as both `GROUP_KV` and `CE_STORAGE_INDEX_KV`, then persist a sanitized `storageProfile` in `session:{slug}:config`. If the deploy request explicitly asks for R2 storage, it must provide an existing bucket name so the helper can bind it as `CE_STORAGE_R2`; otherwise the helper fails before provisioning partial Cloudflare resources. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
@@ -1882,8 +1901,10 @@ the groups. Joining at sign-in and its outcome show in the notice as usual. Canc
 membership. Before sign-in the cancellation is stored for the signed-out visitor;
 when that invitation’s visitor signs in, it is assigned to that account.
 A changed canonical session identity does not inherit another session's choice.
-No credentials are saved with an invitation. Browser storage restrictions can
-limit persistence to the current page.
+A link's one-use code or group password is kept with the pending invitation in
+the tab's session storage, never in the address, and is dropped when the join
+succeeds, is refused or cancelled, or after 24 hours. Browser storage
+restrictions can limit persistence to the current page.
 
 Native Group membership is separate from the existing on-chain SBT results
 filters. Auto-joining records the cohort membership, but does not itself filter
@@ -2057,8 +2078,11 @@ Runtime:
 
 - `session:{slug}:config` JSON. This example uses the `fast_cheap_cloudflare`
   preset, which is the access baseline for non-public Cloudflare sessions. A new
-  `/new` draft instead starts with `"preset": "custom"`, `gate: "none"`,
-  `encryption: "none"` and `"visibility": "public_full_if_storage_public"`:
+  `/new` draft instead starts with `"preset": "custom"`, the
+  `fast_cheap_cloudflare` preset's `role_gate` payload access with
+  `encryption: "none"`, and
+  `"visibility": "session_member_full"`, so every signed-in member reads the
+  results:
 
   ```json
   {
@@ -2468,6 +2492,9 @@ and authenticated routes reject tokens when that marker is missing or expired,
 with `401 { error: "Invalid token." }`. The worker neither mints nor accepts tokens
 without a `jti`.
 
+`POST /auth/logout` with the bearer token deletes that token's marker, so the
+token, and any copy of it, stops working at once. It returns `{ ok: true }`.
+
 ## Required headers
 
 Authenticated requests must include:
@@ -2808,7 +2835,9 @@ Signed login/bootstrap requests:
   instructions, or a config that isn't Worker-canonical, returns `404`.
 - `GET /health` (requires Authorization token; does not require session KV config, so it works for newly registered sessions during bootstrap)
 - `GET /capabilities` is public and returns the code-defined feature list, API
-  version and optional bundle hash, cached for 30 seconds. With `?slug=<slug>`,
+  version, optional bundle hash and the Worker's `release` (the version it was
+  bundled from, `null` from unbundled source), cached for 30 seconds. Features
+  include `draft_text_v1`, `session_feedback` and `storage_read_batch_v1`. With `?slug=<slug>`,
   it also reports coordinator, config authority, storage-index and secret-presence
   readiness, plus fixed reasons for unavailable submit, publication, correction
   and backup operations. A fresh authority reports `seeding`; legacy config
@@ -3207,7 +3236,7 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   - The helper still needs only one deployment token containing `Workers
 Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
     binding and migration are part of the Worker script upload.
-  - If you omit `--allowed-origins`, the CLI seeds the stable hosted/local defaults only. Unlike `/new`, it does not know your current self-hosted browser origin, so custom hosts still need an explicit `--allowed-origins`.
+  - If you omit `--allowed-origins`, the CLI seeds the site's two origins only. Unlike `/new`, it does not know your current self-hosted browser origin, so custom hosts still need an explicit `--allowed-origins`.
   - If you omit `--admin-secret`, the script generates one and prints it after deploy so you can still manage `/admin/origins`.
 - `POST /deploy` with CF API token, requested worker name, passkey-derived admin
   address, session identity/profile, authority policy, public canonical config,
@@ -3295,7 +3324,7 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
   script-level workers.dev setup are both covered by `Workers Scripts: Edit`.
 - `allowOrigins` entries are normalized to origins (`https://host`, `http://localhost:3000`), and the
-  helper returns a normalized `workerUrl` with protocol. The first-party Session Wizard default seed list includes the hosted app plus local dev/E2E origins for ports `3000`, `3001`, and `7391`.
+  helper returns a normalized `workerUrl` with protocol. The first-party Session Wizard seeds the site's two origins plus the page's own origin.
 - `/new` deploys through the project helper at
   `https://ce-deploy-helper.agalmic.workers.dev/` by default; the dashboard handoff
   under Hosting and storage → More is the token-free alternative.

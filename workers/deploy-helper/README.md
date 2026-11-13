@@ -26,7 +26,7 @@ Starter files shipped in this folder:
 - `npm run worker:bundle` emits generated local fallback bundles at `dist/deployHelper.bundle.js` and `dist/sessionCorsWorker.bundle.js`
 - `npm run deploy-helper:deploy -- --worker-name <name> --api-token <token>` bundles and publishes this helper to your Cloudflare account without requiring Wrangler
   - if you omit `--admin-secret`, the script generates one and prints it after deploy
-  - if you omit `--allowed-origins`, the CLI seeds the stable Context Engine hosted/local defaults used by `/new`
+  - if you omit `--allowed-origins`, the CLI seeds the site's two origins, `https://contextengine.sh` and `https://www.contextengine.sh`; `/new` also adds the page's own origin
   - unlike the in-browser `/new` flow, the CLI cannot infer your current self-hosted app origin, so custom hosts must still pass `--allowed-origins https://your-app.example,...`
   - the upload binds `CE_SESSION_COORDINATOR` and installs the SQLite-backed
     `SessionWriteCoordinator` migration; a repeat deploy keeps the binding and
