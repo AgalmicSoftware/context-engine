@@ -238,6 +238,9 @@ removing its empty `state.lock` directory and restarting. Keep the key and
 
 - `list_questions` describes its default correctly: it lists only unanswered
   questions unless asked for the others. What the tool does is unchanged.
+- A group join refused when no invite was sent says to call `join_session`
+  again with the full link, pass the invite, or check the group's id. The
+  link's invite is held only until the server restarts.
 
 ## Upgrading to 0.4.1
 

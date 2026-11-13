@@ -4,9 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.9] - 2026-11-13
 
+### Workers — requires redeployment
+
+- A session can set a separate daily limit for signed-in AI calls (`limits.aiPerWalletPerDay`): `/ai`, Session Agent questions and Agent HTTP's AI share one count per person. A cap on AI spend no longer stops answers or reads; empty or 0 falls back to the general limit. Changing any limit signs everyone out, as before, so set it before a gathering.
+- Admin diagnostics show how many stored question and answer versions an AI build reads, against its limit of 10,000, and a build over the limit says so in plain words.
+- A rate limit that cannot be reached answers "busy, retry" (`503`) instead of "Rate limit exceeded.", so the site and the MCP try again. The Worker logs a line when its limit, sign-in or receipt object does not answer.
+- Restoring a backup keeps everyone who turned the Session Agent off opted out. Backups made before this release carry no opt-outs.
+- An admin saving a setting that does not affect access no longer refuses group joins and leaves already under way.
+- New Session Workers keep their logs: the deployment template and the deploy helper turn Cloudflare's logs on, for every request.
+
 ### Agents and MCP
 
 - MCP 0.4.2.
+- A group join refused when no invite was sent says to call `join_session` again with the full link, pass the invite, or check the group's id, instead of blaming an invite.
 - `list_questions` says that by default it lists only unanswered questions, as it always has, and how to list the others.
 
 ## [0.9.8] - 2026-11-14
