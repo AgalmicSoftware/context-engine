@@ -211,6 +211,54 @@ describe('workerCanonicalMetadataHydrationPort', () => {
     );
   });
 
+  it('reads questions a hundred to a request from a Worker that reads in batches', async () => {
+    const sessionConfig = buildWorkerSessionConfig();
+    const items = Array.from({ length: 150 }, (_, index) =>
+      buildListedItem(`cf_question_${index}`, 'questions', `2026-07-23T00:00:00.${String(index).padStart(3, '0')}Z`),
+    );
+    const listSessionStorageRefsPage = jest.fn(async () => ({ items, cursor: null, listComplete: true }));
+    const readSessionStorageBlob = jest.fn();
+    const readSessionStorageBatch = jest.fn(async ({ ids }: { ids: string[] }) =>
+      ids.map((id) => {
+        const n = Number(id.split('_').pop());
+        // A row the batch can't return as JSON is left out, as a single read's would be.
+        return n === 7
+          ? null
+          : {
+              id: `0xquestion${n}`,
+              prompt: `Question ${n}`,
+              sessionId: SESSION_ID,
+              sessionSlug: 'worker-session',
+              type: 'freeform',
+            };
+      }),
+    );
+    const readWorkerCapabilities = jest.fn(
+      async (_workerUrl: string, _slug: string) => ({ features: ['storage_read_batch_v1'] }) as any,
+    );
+
+    const { rows } = await loadWorkerCanonicalQuestions(
+      { account: 'passkey-account', sessionConfig, sessionSlug: 'worker-session' },
+      { listSessionStorageRefsPage, readSessionStorageBlob, readSessionStorageBatch, readWorkerCapabilities },
+    );
+
+    expect(readWorkerCapabilities).toHaveBeenCalledWith(WORKER_URL, 'worker-session');
+    expect(readSessionStorageBlob).not.toHaveBeenCalled();
+    expect(readSessionStorageBatch.mock.calls.map(([options]) => options.ids.length)).toEqual([100, 50]);
+    expect(readSessionStorageBatch.mock.calls[0][0]).toMatchObject({
+      sessionSlug: 'worker-session',
+      sessionConfig,
+      workerUrl: WORKER_URL,
+      context: { account: 'passkey-account' },
+    });
+    expect(rows).toHaveLength(149);
+    expect(rows.some((row) => row.id === '0xquestion7')).toBe(false);
+    expect(rows.find((row) => row.id === '0xquestion120')).toMatchObject({
+      payload: expect.objectContaining({ prompt: 'Question 120' }),
+      storageRef: expect.objectContaining({ id: 'cf_question_120' }),
+    });
+  });
+
   it('accepts legacy payloads without a session ID while preserving the verified Worker identity', async () => {
     const sessionConfig = buildWorkerSessionConfig();
     const listSessionStorageRefsPage = jest.fn().mockResolvedValue({
