@@ -4,9 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.9] - 2026-11-13
 
+### Client — available when the site deploys
+
+- When a session is briefly busy, signing in and saving the AI draft text kept for admins wait a moment and try again. A withdrawn consent whose delete still fails is sent again the next time the page loads.
+- Group member limits on `/new` and in the participants' create form follow the session's **Most members in a group**, not 1,000. A blank limit shows that number, and so does a group's page.
+- The Public URL help says anyone signed in can join such a group, with or without the link. Suggest questions says it drafts up to five, and none when nothing in the context supports one.
+- Admins see how many question and answer versions the session stores against the 10,000 that AI Views, the atlas and the risk matrix can read, with a warning from 8,000. It shows once the session's Worker runs this release.
+- Settings has **AI requests per person a day**, a cap on one person's AI requests (drafting, Session Agent questions, agents' AI calls) apart from saving answers. Saving it signs no one out. It does not count AI used before signing in, which voice interviews are.
+
 ### Workers — requires redeployment
 
-- A session can set a separate daily limit for signed-in AI calls (`limits.aiPerWalletPerDay`): `/ai`, Session Agent questions and Agent HTTP's AI share one count per person. A cap on AI spend no longer stops answers or reads; empty or 0 falls back to the general limit. Changing any limit signs everyone out, as before, so set it before a gathering.
+- A session can set a separate daily limit for signed-in AI calls (`limits.aiPerWalletPerDay`): `/ai`, Session Agent questions and Agent HTTP's AI share one count per person. A cap on AI spend no longer stops answers or reads; empty or 0 falls back to the general limit. It counts signed-in calls only: where a session opens AI to signed-out visitors, those calls fall under the per-network limit. Saved from Settings (`set-limits`) it signs no one out; a limit changed in a full settings save (`set-config`) signs everyone out, as before.
 - Admin diagnostics show how many stored question and answer versions an AI build reads, against its limit of 10,000, and a build over the limit says so in plain words.
 - A rate limit that cannot be reached answers "busy, retry" (`503`) instead of "Rate limit exceeded.", so the site and the MCP try again. The Worker logs a line when its limit, sign-in or receipt object does not answer.
 - Restoring a backup keeps everyone who turned the Session Agent off opted out. Backups made before this release carry no opt-outs.
