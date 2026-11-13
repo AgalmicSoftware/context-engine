@@ -65,8 +65,10 @@ export const writeStorageResourceHidden = ({ index, slug, resource, resourceId, 
   }));
 };
 
+export const hiddenStorageResourcePrefix = ({ slug, resource }) => recordKey('hidden', { slug, resource });
+
 export const listHiddenStorageResourceIds = async ({ index, slug, resource, budget }) => {
-  const prefix = recordKey('hidden', { slug, resource });
+  const prefix = hiddenStorageResourcePrefix({ slug, resource });
   const ids = new Set();
   let cursor = '';
   const seenCursors = new Set();

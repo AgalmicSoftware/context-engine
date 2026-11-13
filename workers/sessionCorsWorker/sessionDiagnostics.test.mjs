@@ -119,6 +119,18 @@ test('diagnostics count all receipt stores, ignore expired leases, and contain n
   assert.equal((await (await f.status()).json()).uploadReceipts.settledCount, 0);
 });
 
+test('diagnostics show stored question and answer versions against the AI build limit', async () => {
+  const f = await fixture();
+  f.env.CE_STORAGE_INDEX_KV = { list: async ({ prefix }) => ({
+    keys: prefix === 'ce-storage:fixture:responses:' ? [{ name: `${prefix}a` }, { name: `${prefix}b` }] : [], list_complete: true }) };
+  assert.deepEqual((await (await f.status()).json()).storedVersions, { count: 2, limit: 10_000, overLimit: false });
+  // A count that can't be read leaves the rest of the page.
+  f.env.CE_STORAGE_INDEX_KV = { list: async () => { throw new Error('Synthetic KV outage'); } };
+  const body = await (await f.status()).json();
+  assert.equal(body.storedVersions, null);
+  assert.equal(body.ok, true);
+});
+
 test('receipt aggregation pages at 25 stores, isolates sessions, and bounds index cleanup', async () => {
   const f = await fixture();
   for (let n = 1; n <= 27; n += 1) await f.receipt(`0x${n.toString(16).padStart(40, '0')}`, `request-${n}`);

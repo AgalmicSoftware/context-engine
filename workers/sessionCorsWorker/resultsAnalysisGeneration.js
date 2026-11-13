@@ -39,7 +39,7 @@ import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 import { buildParticipantContextPrompt } from './contextSourceLoader.js';
 import { formatValidAnalysisAnswer, readStoredRating } from './resultsAnalysisAnswerValidation.js';
 import { DEFAULT_RATING_SCALE, normalizeRatingScale, ratingStepFor } from '../../shared/questions/ratingScale.mjs';
-import { createResultsAnalysisScanBudget, isStorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
+import { RESULTS_ANALYSIS_SCAN_LIMITS, createResultsAnalysisScanBudget, isStorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 
 
 const readCoordinatedResultsAnalysisStatusDefault = async (args = {}) => (
@@ -639,6 +639,11 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
   };
 };
 
+// Every saved version counts, so an answer changed five times is five rows.
+const snapshotLimitText = (kind) => (kind === 'rows'
+  ? `AI builds read at most ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} stored question and answer versions at once, and this session stores more (each saved change to an answer counts).`
+  : 'This session’s stored questions and answers are too large for an AI build to read at once.');
+
 export const loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
   try {
     return await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: createResultsAnalysisScanBudget() });
@@ -650,7 +655,7 @@ export const loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
     // Retrying cannot shrink the session, so automatic runs pause instead.
     return {
       ok: false, status: 503, reason: 'results_analysis_snapshot_limit', retryable: false,
-      error: 'The complete results snapshot exceeds the synchronous analysis limit. No report was generated; the last successful report is unchanged. A bounded background snapshot is required for this session.',
+      error: `${snapshotLimitText(error.kind)} No report was made; the last one is unchanged.`,
     };
   }
 };

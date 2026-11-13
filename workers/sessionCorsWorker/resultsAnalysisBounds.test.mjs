@@ -4,6 +4,7 @@ import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 import { generateResultsAnalysisDraft, loadWorkerCanonicalResultsAnalysisSource, maybeTriggerAutomaticResultsAnalysis, readResultsAnalysisAdminStatus, runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
 import { buildIndexKey, buildPayloadKey, readStoredCloudflarePayloadsBulk } from './storageRouteExecution.js';
 import { RESULTS_ANALYSIS_SCAN_LIMITS } from './storageScanBudget.js';
+import { countResultsScanRows } from './resultsScanRowCount.js';
 
 const config = {
   sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -33,9 +34,21 @@ test('canonical analysis fails clearly before an unbounded history scan complete
   const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a', config });
   assert.equal(source.ok, false);
   assert.equal(source.status, 503);
-  assert.match(source.error, /synchronous.*limit/i);
+  assert.match(source.error, /AI builds read at most 10,000 stored question and answer versions at once, and this session stores more \(each saved change to an answer counts\)\. No report was made/);
   assert.ok(history.operations <= 800);
   assert.equal(source.snapshot, undefined);
+});
+
+test('the stored-version count stops just past the build limit, and is exact below it', async () => {
+  const history = oversizedHistory();
+  assert.deepEqual(await countResultsScanRows({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a' }),
+    { count: RESULTS_ANALYSIS_SCAN_LIMITS.rows + 1, limit: RESULTS_ANALYSIS_SCAN_LIMITS.rows, overLimit: true });
+  // Key lists only, never the rows themselves.
+  assert.ok(history.operations <= 12, `operations: ${history.operations}`);
+  const keys = { 'ce-storage:session-a:questions:': 2, 'ce-storage:session-a:responses:': 5, 'ce-storage-hidden:session-a:questions:': 1 };
+  const index = { list: async ({ prefix }) => ({ keys: Array.from({ length: keys[prefix] || 0 }, (_, i) => ({ name: `${prefix}${i}` })), list_complete: true }) };
+  assert.deepEqual(await countResultsScanRows({ env: { CE_STORAGE_INDEX_KV: index }, slug: 'session-a' }),
+    { count: 8, limit: RESULTS_ANALYSIS_SCAN_LIMITS.rows, overLimit: false });
 });
 
 test('an oversized canonical source neither calls AI nor replaces the last good artifact', async () => {
@@ -74,7 +87,7 @@ for (const [label, raw] of [
     }, CE_STORAGE_R2: { get: async () => { payloadReads += 1; throw new Error('must not read payload'); } } };
     const source = await loadWorkerCanonicalResultsAnalysisSource({ env, config, slug: 'session-a' });
     assert.equal(source.status, 503);
-    assert.match(source.error, /synchronous analysis limit/);
+    assert.match(source.error, /too large for an AI build to read at once/);
     assert.equal(payloadReads, 0);
   });
 }

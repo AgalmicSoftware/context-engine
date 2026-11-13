@@ -232,6 +232,11 @@ test('Detailed answers add what the asker may read and members’ answers, and n
   assert.equal(unread.status, 200);
   assert.doesNotMatch(unread.prompt, /ANSWER/);
   assert.match(unread.body.note, /couldn’t be read/);
+  // Past the build limit the note says which limit, in plain words.
+  const tooMany = await ask(h, { address: MEMBER, deps: { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+    ok: false, status: 503, reason: 'results_analysis_snapshot_limit' }) } });
+  assert.doesNotMatch(tooMany.prompt, /ANSWER/);
+  assert.match(tooMany.body.note, /weren’t read: this session stores more than 10,000 question and answer versions/);
 });
 
 test('results reach an answer only where the page shows the asker results', async () => {

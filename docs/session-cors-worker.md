@@ -739,6 +739,10 @@ Admin test panel:
   provider generation reuse the same complete snapshot and its single scan
   budget. These application limits leave room for authentication and JSON
   processing; they are not a claim about a universal platform request ceiling.
+  Past the row limit the error says so in plain words ("AI builds read at most
+  10,000 stored question and answer versions at once…"), and the Session Agent's
+  Detailed answers note the same limit; `GET /admin/diagnostics` returns the
+  count as `storedVersions`.
   Larger histories require a future bounded background snapshot/current-version
   index. This guard covers Worker storage history, not the separate existing
   admin-snapshot contract.
@@ -2868,6 +2872,11 @@ Signed login/bootstrap requests:
   Diagnostics inspect the current durable authority without first repairing its
   KV projection, so a failed repair remains visible and a removed admin cannot
   use the stale projection to retain access.
+  The first page (no cursor) also has `storedVersions: { count, limit, overLimit }`:
+  how many stored question and answer versions, with hidden-question marks, an AI
+  build would read, against its 10,000-row limit (every saved change to an answer
+  counts). It is counted from key lists and stops just past the limit, so an
+  over-limit session shows `limit + 1`; it is `null` when the count can't be read.
   Receipt counts are sampled from up to 25 participant coordinators per page;
   `complete` and `cursor` distinguish partial totals, and the card can load more.
   Cursors use a deployment-secret-derived HMAC and a private continuation map;

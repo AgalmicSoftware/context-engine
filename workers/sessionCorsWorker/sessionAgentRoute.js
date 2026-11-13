@@ -14,6 +14,7 @@ import { canOptOut } from './sessionAgentOptOuts.js';
 import { isListedResultsBuilder } from './resultsBuild.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
+import { RESULTS_ANALYSIS_SCAN_LIMITS } from './storageScanBudget.js';
 import {
   authorizeCloudflareStorageResourceRead,
   createRequesterAccessChecks,
@@ -116,9 +117,10 @@ const scaleText = ({ scale } = {}) => {
 // Someone who is not an admin gets nothing from a question fewer than
 // `minAnswers` members answered: a count of one, or the one answer left when
 // the asker keeps their own out, would be a single person's answer.
+const TOO_MANY_STORED = Symbol('too many stored versions');
 const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
-  if (!source?.ok) return null;
+  if (!source?.ok) return source?.reason === 'results_analysis_snapshot_limit' ? TOO_MANY_STORED : null;
   const byQuestion = new Map(source.snapshot.questions.map((question) => [
     question.id, { question: trim(question.prompt), scale: scaleText(question), counted: COUNTED_TYPES.has(question.type), answers: [] },
   ]));
@@ -156,7 +158,10 @@ const gatherMaterial = async ({ env, slug, config, setting, address, scopes, ask
       env, slug, config, optedOut, deps, minAnswers: asker.audience === 'admin' ? 1 : sessionAgentMinAnswers(setting),
     }) : [],
   ]);
-  return { material: { sessionContext: config?.sessionContext, sources, results, answers: answers || [] }, answersUnavailable: answers === null };
+  return {
+    material: { sessionContext: config?.sessionContext, sources, results, answers: Array.isArray(answers) ? answers : [] },
+    answersUnavailable: answers === TOO_MANY_STORED ? 'too_many' : answers === null,
+  };
 };
 
 // A price for an audience will be checked here, refusing with 402 until it
@@ -265,6 +270,8 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
     answers: asker.answers,
     audience: asker.audience,
     read,
-    ...(answersUnavailable ? { note: 'Members’ answers couldn’t be read for this answer.' } : {}),
+    ...(answersUnavailable ? { note: answersUnavailable === 'too_many'
+      ? `Members’ answers weren’t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} question and answer versions, the most the Session Agent can read at once.`
+      : 'Members’ answers couldn’t be read for this answer.' } : {}),
   });
 };
