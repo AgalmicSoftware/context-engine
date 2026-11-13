@@ -8,6 +8,7 @@ import InterviewSettingsFields, {
   DRAFT_TEXT_NEEDS_WORKER,
 } from '../InterviewSettingsFields';
 import { SESSION_CONTEXT_LIMITS, isHttpsUrl, validateSessionContext } from '@ce-shared/sessionContext.mjs';
+import { WORKER_GROUP_MEMBER_CEILING_DEFAULT, WORKER_GROUP_MEMBER_CEILING_MAX } from '@ce-shared/workerGroupJoin.mjs';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
   DEFAULT_SESSION_COLOR_SCHEME_ID,
@@ -644,6 +645,23 @@ export const SetupParticipationSection = ({
             aria-describedby={setupHelpId('ce-setup-ends-at')}
             data-testid={E2E_TESTIDS.WIZARD_SESSION_ENDS_AT}
             onChange={(event) => onChange(['sessionEndsAt'], event.target.value)}
+          />
+        </SetupField>
+        <SetupField
+          id="ce-setup-group-member-ceiling"
+          label="Most members in a group"
+          help={`The largest any group may be. Leave blank for ${WORKER_GROUP_MEMBER_CEILING_DEFAULT.toLocaleString('en-US')}; up to ${WORKER_GROUP_MEMBER_CEILING_MAX.toLocaleString('en-US')}.`}
+        >
+          <Input
+            id="ce-setup-group-member-ceiling"
+            type="number"
+            min="1"
+            max={WORKER_GROUP_MEMBER_CEILING_MAX}
+            step="1"
+            placeholder={WORKER_GROUP_MEMBER_CEILING_DEFAULT.toLocaleString('en-US')}
+            value={text(draft.groupMemberCeiling)}
+            aria-describedby={setupHelpId('ce-setup-group-member-ceiling')}
+            onChange={(event) => onChange(['groupMemberCeiling'], event.target.value)}
           />
         </SetupField>
         <SetupAgentInstructionsField

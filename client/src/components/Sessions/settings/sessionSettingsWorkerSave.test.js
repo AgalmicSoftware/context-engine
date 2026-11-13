@@ -343,6 +343,33 @@ describe('saving the edit page through the Session Worker', () => {
     expect(result.config.contextAdditionPolicy).toBe('admin_only');
   });
 
+  it('saves the most members in a group, and blank puts the default back', () => {
+    const stored = publishedSession();
+    expect(stored).not.toHaveProperty('groupMemberCeiling');
+    const raised = editAndSave(stored, (draft) => {
+      expect(draft.groupMemberCeiling).toBe('');
+      draft.groupMemberCeiling = '2500';
+    });
+    expect(raised.save.patch).toEqual({ groupMemberCeiling: 2500 });
+    expect(raised.save.classification.signsParticipantsOut).toBe(false);
+    expect(raised.result).toMatchObject({ ok: true });
+    expect(raised.result.config.groupMemberCeiling).toBe(2500);
+
+    const cleared = editAndSave(raised.result.config, (draft) => {
+      expect(draft.groupMemberCeiling).toBe('2500');
+      draft.groupMemberCeiling = '';
+    });
+    expect(cleared.save.patch).toEqual({ groupMemberCeiling: 1000 });
+    expect(cleared.result).toMatchObject({ ok: true });
+
+    const before = projectPublicWorkerSessionConfig(stored);
+    const draft = buildSessionSettingsDraft(before);
+    draft.groupMemberCeiling = '10001';
+    expect(() => buildSessionSettingsSave(before, draft)).toThrow(
+      'Most members in a group: a whole number from 1 to 10,000.',
+    );
+  });
+
   it('saves highlighted and hidden lists, one ID per line, without signing anyone out', () => {
     const stored = publishedSession();
     const questionId = `0x${'ab'.repeat(32)}`;

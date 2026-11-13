@@ -1,6 +1,7 @@
 import {
   DEBATE_ATLAS_FIELD,
   SESSION_AGENT_READY_FIELD,
+  GROUP_JOIN_CHOICES_FIELD,
   MEMBER_RESULTS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
@@ -80,6 +81,7 @@ const WORKER_MANAGED_PUBLIC_CONFIG_FIELDS = Object.freeze([
   RISK_MATRIX_FIELD,
   MEMBER_RESULTS_FIELD,
   SESSION_AGENT_READY_FIELD,
+  GROUP_JOIN_CHOICES_FIELD,
 ]);
 // Only a finalizing write claims a revision. Before that, a stored revision
 // (such as one the deploy helper staged) is not part of the checked config.

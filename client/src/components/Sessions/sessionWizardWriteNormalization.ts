@@ -4,6 +4,11 @@ import { DEFAULT_TRANSCRIPTION_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { validateSessionContext, type SessionContext } from '@ce-shared/sessionContext.mjs';
 import { validateSessionAgent } from '@ce-shared/sessionAgent.mjs';
+import {
+  isWorkerGroupMemberCeiling,
+  WORKER_GROUP_MEMBER_CEILING_DEFAULT,
+  WORKER_GROUP_MEMBER_CEILING_MAX,
+} from '@ce-shared/workerGroupJoin.mjs';
 import { withoutNewInterviewDefaults } from '../../utilities/session/interviewModeWrite';
 import {
   normalizeResultsAnalysisSettings,
@@ -500,6 +505,16 @@ export const buildSessionWizardWorkerConfigPayload = ({
     const sessionAgent = validateSessionAgent(resolvedDraft.sessionAgent ?? null);
     if (!sessionAgent.ok) throw new Error(`Fix the Session Agent: ${sessionAgent.errors[0].message}`);
     if (sessionAgent.value) next.sessionAgent = sessionAgent.value;
+    // The default is left out, so a Worker without the setting takes the session.
+    const ceiling = trimString(resolvedDraft.groupMemberCeiling);
+    if (ceiling && Number(ceiling) !== WORKER_GROUP_MEMBER_CEILING_DEFAULT) {
+      if (!isWorkerGroupMemberCeiling(Number(ceiling))) {
+        throw new Error(
+          `Most members in a group: a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX.toLocaleString('en-US')}.`,
+        );
+      }
+      next.groupMemberCeiling = Number(ceiling);
+    }
     if (usesOnChainSbt) {
       next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
       next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(resolvedDraft.defaultFeaturedSBTs);

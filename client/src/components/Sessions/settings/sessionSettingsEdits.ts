@@ -4,6 +4,11 @@ import { isRealtimeInterviewModel } from '@ce-shared/realtimeInterviewConfig.mjs
 import { normalizeResultsAnalysisSettings } from '@ce-shared/resultsAnalysisSettings.mjs';
 import { normalizeSessionContext } from '@ce-shared/sessionContext.mjs';
 import {
+  isWorkerGroupMemberCeiling,
+  WORKER_GROUP_MEMBER_CEILING_DEFAULT,
+  WORKER_GROUP_MEMBER_CEILING_MAX,
+} from '@ce-shared/workerGroupJoin.mjs';
+import {
   CURATED_ID_LIST_KEYS,
   MAX_AGENT_INSTRUCTIONS_CHARS,
   MAX_CURATED_IDS,
@@ -117,6 +122,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     sessionContext: normalizeSessionContext(source.sessionContext),
     defaultTags: text(source.defaultTags),
     defaultGroupTags: text(source.defaultGroupTags),
+    groupMemberCeiling: isWorkerGroupMemberCeiling(source.groupMemberCeiling) ? String(source.groupMemberCeiling) : '',
     questionsGenPrompt: text(source.questionsGenPrompt),
     agentInstructions: text(source.agentInstructions),
     groupCreationPolicy: source.groupCreationPolicy,
@@ -273,6 +279,16 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
     if (!validAgentInstructions(values.agentInstructions)) {
       throw new Error(
         `Instructions for AI agents: up to ${MAX_AGENT_INSTRUCTIONS_CHARS.toLocaleString('en-US')} characters.`,
+      );
+    }
+  }
+  // Worker sessions only. Blank is the default, sent only to clear a stored limit.
+  const ceiling = trimmed(draft.groupMemberCeiling);
+  if (!onChain && (ceiling || before.groupMemberCeiling != null)) {
+    values.groupMemberCeiling = ceiling ? Number(ceiling) : WORKER_GROUP_MEMBER_CEILING_DEFAULT;
+    if (!isWorkerGroupMemberCeiling(values.groupMemberCeiling)) {
+      throw new Error(
+        `Most members in a group: a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX.toLocaleString('en-US')}.`,
       );
     }
   }
@@ -436,6 +452,7 @@ const LABELS: Record<string, string> = {
   sessionEndsAt: 'End time',
   defaultTags: 'Tag suggestions',
   defaultGroupTags: 'Group tags',
+  groupMemberCeiling: 'Most members in a group',
   questionsGenPrompt: 'Question prompt',
   agentInstructions: 'Instructions for AI agents',
   interviewModeEnabled: 'Voice interviews',
