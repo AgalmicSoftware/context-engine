@@ -46,6 +46,28 @@ starts the server. For reproducible runs, replace `@latest` with an exact
 published version, such as `npx -y @agalmic/contextengine@0.2.0`. A running
 server does not update itself.
 
+## Upgrading to 0.4.0
+
+- A session link for a group joined by code or password carries the invite
+  with it (`#groupInvite=…`). `join_session` keeps it in memory for the group
+  the link names and never shows or saves it; `join_group` then uses it without
+  being asked.
+- `join_group` takes a new `invite` argument: a one-use code, or a group
+  password (`gp:` in front, or a bare password of at least 8 characters). The
+  server never sends a password: it signs a join statement with a key made
+  from it. An invite code meant for several people is refused with an
+  explanation.
+- Every refused join reads the same, including for a group that does not
+  exist: `That link, invite or password didn’t work for group "<id>". Ask
+  whoever invited you for a new one.` An agent that typed a group's id should
+  check it against the groups `get_session` lists.
+- The first `list_questions` waits at most about 2 seconds for the agent's
+  own earlier answers, then notes that they are still being looked up.
+- A wrong argument shape, such as `answers` sent as a string, says what was
+  wrong with a one-line example.
+- See "Tool-call timeouts": allow each tool call 60 seconds, and preferably
+  120.
+
 ## Upgrading to 0.3.4
 
 - The server waits and tries again when a session is briefly busy, for reads

@@ -104441,7 +104441,7 @@ var FEATURES = Object.freeze([
   "upload_authority_stamps",
   "worker_groups"
 ]);
-var workerRelease = () => "0.9.6" ? "0.9.6" : null;
+var workerRelease = () => "0.9.7" ? "0.9.7" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const body = {
     type: "ce_worker_capabilities",

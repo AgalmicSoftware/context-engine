@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.7] - 2026-11-13
+
+### Workers — requires redeployment
+
+- An admin chooses how people join a group on a Session Worker: anyone with the link, one-use codes, a group password, or only people an admin adds. For a group joined by code or password, the group's id in a link no longer admits anyone. Admins add, list and revoke codes at `groups/invites/add`, `groups/invites/list` and `groups/invites/revoke`, and set a password at `groups/password/set`; a password is never sent or stored, only the signer made from it.
+- A group can be left out of group lists. Someone who is not a member gets "not found" for an unlisted group's members, as for a group that does not exist.
+- A session sets the most members any group may have (`groupMemberCeiling`, 1,000 unless set, up to 10,000), where the Worker had a fixed 1,000.
+- Every join refused before a valid code or password answers the same `403` and sentence, so an answer does not show whether a group exists. Wrong tries are limited: ten an hour for a person, and 300 an hour for a password group.
+- Session backups carry a group's codes and a password group's signer, which a restore needs. Keep backups private.
+- `/capabilities` reports `groupJoinChoices`.
+
+### Agents and MCP
+
+- MCP 0.4.0. `join_group` uses the invite a session link carries (`#groupInvite=…`), or a one-use code or group password passed as `invite`. The server never sends a password: it signs a join statement with a key made from it.
+- Every refused join reads the same, including for a group that does not exist; it used to say "This session has no group".
+- The first `list_questions` waits at most about 2 seconds for the agent's own earlier answers. A wrong argument shape says what was wrong, with a one-line example. The README says how long a host should allow a tool call.
+
 ## [0.9.6] - 2026-11-12
 
 ### Client — available when the site deploys
