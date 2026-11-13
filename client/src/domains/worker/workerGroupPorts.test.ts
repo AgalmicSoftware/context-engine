@@ -1325,9 +1325,12 @@ describe('worker group ports', () => {
       expect(groups[1]).toMatchObject({ passwordSet: true, guessLimited: true });
       expect(groups[2].memberLimit).toBe(10000);
       expect(isWorkerGroupListed(groups[0])).toBe(false);
-      // A record without the setting, and every Public URL group, is listed.
-      expect(isWorkerGroupListed(groups[1])).toBe(true);
-      expect(isWorkerGroupListed({ joinMode: 'open', listed: false })).toBe(true);
+      // Without the setting, a group is listed when the whole session sees its members, as the Worker resolves it.
+      expect(isWorkerGroupListed({ ...groups[1], memberVisibility: 'members' })).toBe(false);
+      expect(isWorkerGroupListed({ ...groups[1], memberVisibility: 'session' })).toBe(true);
+      expect(isWorkerGroupListed({ ...groups[1], memberVisibility: 'members', listed: true })).toBe(true);
+      // Every Public URL group is listed.
+      expect(isWorkerGroupListed({ joinMode: 'open', listed: false, memberVisibility: 'admin_only' })).toBe(true);
       expect(groups.map(workerGroupNeedsSecret)).toEqual([true, true, false]);
     });
 

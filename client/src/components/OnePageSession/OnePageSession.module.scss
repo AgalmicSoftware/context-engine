@@ -603,6 +603,35 @@
   }
 }
 
+.workerGroupCardCodeForm {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.workerGroupCardCodeInput {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--ce-authoring-input-border);
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-document-canvas);
+  color: var(--ce-document-text);
+  font-family: var(--ce-font-body);
+  font-size: 0.9rem;
+
+  &::placeholder {
+    color: var(--ce-document-text-muted);
+    opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--ce-session-focus);
+    outline-offset: 2px;
+  }
+}
+
 .workerGroupCardLeaveButton {
   border: 1px solid color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
   background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);

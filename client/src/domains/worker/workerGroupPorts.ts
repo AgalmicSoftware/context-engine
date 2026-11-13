@@ -34,7 +34,7 @@ export type WorkerGroup = {
   joinEndsAt?: string;
   adminAddress?: string;
   joinMode: WorkerGroupJoinMode;
-  /** Shown in the group list; a Worker before join choices sends none, and its groups are all listed. */
+  /** Shown in the group list; a Worker before join choices sends none (see isWorkerGroupListed). */
   listed?: boolean;
   memberVisibility: WorkerGroupMemberVisibility;
   removalAuth?: WorkerGroupRemovalAuth;
@@ -48,9 +48,16 @@ export type WorkerGroup = {
 };
 export type WorkerGroupInviteCounts = { unused: number; used: number; revoked: number };
 
-/** A group that lists itself; one with no setting is listed, and Public URL groups always are. */
-export const isWorkerGroupListed = ({ listed, joinMode }: Pick<WorkerGroup, 'listed' | 'joinMode'>): boolean =>
-  listed !== false || joinMode === 'open';
+/**
+ * A group shown in the group list. Public URL groups always are; with no setting, as the Worker resolves it, so
+ * are groups whose members the whole session sees.
+ */
+export const isWorkerGroupListed = ({
+  listed,
+  joinMode,
+  memberVisibility,
+}: Pick<WorkerGroup, 'listed' | 'joinMode' | 'memberVisibility'>): boolean =>
+  joinMode === 'open' || (listed ?? memberVisibility === 'session');
 /** Joining needs a group password or a one-use claim code. */
 export const workerGroupNeedsSecret = ({ joinMode }: Pick<WorkerGroup, 'joinMode'>): boolean =>
   joinMode === 'one_use' || joinMode === 'group_password';
@@ -582,7 +589,7 @@ export const loadWorkerGroupOverview = async ({
   const membershipGroupIds = new Set(memberships.map(({ group }) => group.groupId));
   return {
     groups: normalizeGroups(groupsPayload.groups, expectedSessionSlug, true).filter(
-      (group) => group.memberVisibility === 'session' || membershipGroupIds.has(group.groupId),
+      (group) => isWorkerGroupListed(group) || membershipGroupIds.has(group.groupId),
     ),
     memberships,
   };

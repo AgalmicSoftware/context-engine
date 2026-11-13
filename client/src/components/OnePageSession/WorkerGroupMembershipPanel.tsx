@@ -18,6 +18,7 @@ import {
   loadWorkerGroupMembers,
   loadWorkerGroupOverview,
   workerGroupMembersMayLeave,
+  workerGroupNeedsSecret,
   type WorkerGroup,
   type WorkerGroupMember,
   type WorkerGroupOverview,
@@ -34,7 +35,14 @@ import WorkerGroupMembersModal, { workerGroupPrincipalIdentity } from './WorkerG
 import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
 import { reconcileConfirmedWorkerGroupMembership } from './workerGroupMembershipProjection';
 import { useWorkerGroupMembershipMutations } from './useWorkerGroupMembershipMutations';
-import { BUSY_WORKER_GROUP_JOIN_MESSAGE, isBusyWorkerGroupError } from '../../domains/worker/workerGroupBusy';
+import {
+  BUSY_WORKER_GROUP_JOIN_MESSAGE,
+  isBusyWorkerGroupError,
+  isRefusedWorkerGroupError,
+  REFUSED_WORKER_GROUP_JOIN_MESSAGE,
+} from '../../domains/worker/workerGroupBusy';
+import { WORKER_GROUP_JOIN_LABELS } from '../Shared/WorkerGroupJoinChoiceHelp';
+import WorkerGroupCodeField from './WorkerGroupCodeField';
 import {
   buildWorkerGroupMembershipIdentity,
   projectWorkerGroupMembership,
@@ -108,6 +116,8 @@ const emptyMemberListState = (targetKey: string, groupId = ''): WorkerGroupMembe
 
 const groupJoinHasEnded = (group: WorkerGroup): boolean =>
   Boolean(group.joinEndsAt && Date.parse(group.joinEndsAt) <= Date.now());
+// A person can still join it: by link, or with a password or claim code.
+const groupIsJoinable = (group: WorkerGroup): boolean => group.joinMode !== 'admin_add' && !groupJoinHasEnded(group);
 
 const WorkerGroupBackControl = ({
   onBack,
@@ -314,7 +324,7 @@ const WorkerGroupDetailView = ({
               </p>
               <p>
                 <span className={sbtPageStyles.label}>Join policy:</span>
-                <span>{group.joinMode === 'open' ? 'Open to participants' : 'Admin adds members'}</span>
+                <span>{WORKER_GROUP_JOIN_LABELS[group.joinMode]}</span>
               </p>
               <p className={styles.workerGroupVisibility} data-testid="ce-worker-group-member-visibility">
                 <span className={sbtPageStyles.label}>Member visibility:</span>
@@ -416,6 +426,7 @@ const WorkerGroupMembershipPanel = ({
   refreshNonce = 0,
   refreshControlTarget,
   fetchImpl = fetch,
+  participantAddress = '',
   sessionConfig = null,
   sessionId: sessionIdProp = '',
   sessionSlug: sessionSlugProp = '',
@@ -439,6 +450,7 @@ const WorkerGroupMembershipPanel = ({
   const workerToken = workerTokenProp || envelope?.workerCredential?.token || '';
   const sessionId = normalizeWorkerCanonicalSessionIdHex(sessionIdProp || envelope?.sessionId || '');
   const sessionSlug = canonicalizeSessionSlug(sessionSlugProp || envelope?.sessionSlug || '');
+  const address = String(participantAddress || envelope?.address || '').trim();
   const groupIdFilter = String(groupIdFilterProp || '').trim();
   const navigationKey = `${sessionId}\n${sessionSlug}\n${workerUrl}\n${groupIdFilter}`;
   const [inlineSelection, setInlineSelection] = useState({ navigationKey, groupId: '' });
@@ -711,7 +723,7 @@ const WorkerGroupMembershipPanel = ({
     [sessionSlug],
   );
   const handleJoin = useCallback(
-    async (group: WorkerGroup) => {
+    async (group: WorkerGroup, token = '') => {
       const mutationTargetKey = targetKey;
       const mutation = beginMembershipMutation(group.groupId, 'join');
       setMembershipStatusState({ targetKey: mutationTargetKey, status: '' });
@@ -720,6 +732,12 @@ const WorkerGroupMembershipPanel = ({
         error: '',
       }));
       try {
+        // A typed password or claim code becomes a claim code or a signed proof; neither is kept.
+        const credentials = token
+          ? await import('../../domains/worker/workerGroupSecrets').then(({ buildWorkerGroupJoinCredentials }) =>
+              buildWorkerGroupJoinCredentials({ token, sessionId, groupId: group.groupId, address }),
+            )
+          : null;
         const result = await joinWorkerGroup({
           workerUrl,
           credentialToken: workerToken,
@@ -727,6 +745,7 @@ const WorkerGroupMembershipPanel = ({
           sessionSlug,
           groupId: group.groupId,
           fetchImpl,
+          ...credentials,
         });
         clearWorkerGroupAutoJoinCancellation({
           workerUrl,
@@ -755,15 +774,18 @@ const WorkerGroupMembershipPanel = ({
           status: 'error',
           error: isBusyWorkerGroupError(joinError)
             ? BUSY_WORKER_GROUP_JOIN_MESSAGE
-            : joinError instanceof Error
-              ? joinError.message
-              : 'worker_group_join_failed',
+            : isRefusedWorkerGroupError(joinError)
+              ? REFUSED_WORKER_GROUP_JOIN_MESSAGE
+              : joinError instanceof Error
+                ? joinError.message
+                : 'worker_group_join_failed',
         }));
       } finally {
         finishMembershipMutation(mutation);
       }
     },
     [
+      address,
       applyConfirmedMembership,
       beginMembershipMutation,
       fetchImpl,
@@ -882,9 +904,21 @@ const WorkerGroupMembershipPanel = ({
         </button>
       );
     }
-    const joinEnded = group.joinMode === 'open' && groupJoinHasEnded(group);
+    const joinEnded = group.joinMode !== 'admin_add' && groupJoinHasEnded(group);
     if (joinEnded) {
       return <span className={styles.workerGroupCardInactiveStatus}>Join period ended</span>;
+    }
+    if (workerGroupNeedsSecret(group) && workerToken) {
+      return (
+        <WorkerGroupCodeField
+          groupLabel={group.label}
+          disabled={membershipAction === 'join'}
+          formClassName={styles.workerGroupCardCodeForm}
+          inputClassName={styles.workerGroupCardCodeInput}
+          buttonClassName={styles.workerGroupCardPrimaryButton}
+          onSubmit={(token) => void handleJoin(group, token)}
+        />
+      );
     }
     if (group.joinMode === 'open' && workerToken) {
       const isJoining = membershipAction === 'join';
@@ -900,7 +934,7 @@ const WorkerGroupMembershipPanel = ({
         </button>
       );
     }
-    if (group.joinMode === 'open') {
+    if (group.joinMode !== 'admin_add') {
       return (
         <button
           type="button"
@@ -942,7 +976,7 @@ const WorkerGroupMembershipPanel = ({
             copyGroupLink={copyGroupLink}
             fetchImpl={fetchImpl}
             group={selectedGroup}
-            isActive={selectedGroup.joinMode === 'open' && !groupJoinHasEnded(selectedGroup)}
+            isActive={groupIsJoinable(selectedGroup)}
             memberListState={activeMemberListState}
             sessionConfig={sessionConfig}
             sessionName={sessionName.trim()}
@@ -1014,7 +1048,7 @@ const WorkerGroupMembershipPanel = ({
               copyGroupLink={copyGroupLink}
               fetchImpl={fetchImpl}
               group={membership.group}
-              isActive={membership.group.joinMode === 'open' && !groupJoinHasEnded(membership.group)}
+              isActive={groupIsJoinable(membership.group)}
               onOpenDetails={openGroupDetails}
               showDescription={showDescriptions}
               sessionConfig={sessionConfig}
@@ -1031,7 +1065,7 @@ const WorkerGroupMembershipPanel = ({
               copyGroupLink={copyGroupLink}
               fetchImpl={fetchImpl}
               group={group}
-              isActive={group.joinMode === 'open' && !groupJoinHasEnded(group)}
+              isActive={groupIsJoinable(group)}
               onOpenDetails={openGroupDetails}
               showDescription={showDescriptions}
               sessionConfig={sessionConfig}

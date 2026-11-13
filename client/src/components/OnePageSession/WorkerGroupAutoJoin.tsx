@@ -16,7 +16,11 @@ import {
   isWorkerGroupAutoJoinCancelled,
   rememberWorkerGroupAutoJoinCancellation,
 } from '../../domains/worker/workerGroupAutoJoinPreference';
-import { BUSY_WORKER_GROUP_JOIN_MESSAGE, isBusyWorkerGroupError } from '../../domains/worker/workerGroupBusy';
+import {
+  BUSY_WORKER_GROUP_JOIN_MESSAGE,
+  isBusyWorkerGroupError,
+  REFUSED_WORKER_GROUP_JOIN_MESSAGE,
+} from '../../domains/worker/workerGroupBusy';
 import WorkerGroupAutoJoinNotice from './WorkerGroupAutoJoinNotice';
 import WorkerGroupCodeField from './WorkerGroupCodeField';
 import styles from './WorkerGroupAutoJoinNotice.module.scss';
@@ -36,7 +40,6 @@ type Progress = { phase: 'loading' | 'joining' | 'done' | 'cancelled' | 'error' 
 // What public discovery said of the group before sign-in: an unlisted group isn't there.
 type PublicGroup = 'unknown' | 'open' | 'secret' | 'absent';
 
-export const REFUSED_JOIN_MESSAGE = 'That link, invite or password didn’t work. Ask whoever invited you for a new one.';
 const NEEDS_CODE_MESSAGE = 'Enter the group password or claim code from your invitation.';
 
 const subscribeLocation = (notify: () => void) => {
@@ -50,7 +53,7 @@ const autoJoinErrorMessage = (error: unknown): string => {
   if (reason === 'worker_group_member_cap_exceeded' || reason === 'worker_group_session_cap_exceeded')
     return 'This group has reached its member limit.';
   if (reason === 'worker_group_join_ended') return 'The joining deadline for this group has passed.';
-  if (reason === 'worker_group_join_refused') return REFUSED_JOIN_MESSAGE;
+  if (reason === 'worker_group_join_refused') return REFUSED_WORKER_GROUP_JOIN_MESSAGE;
   if (reason === 'worker_group_join_denied') return 'This group is not open for joining.';
   if (reason === 'worker_group_not_found') return 'This group is unavailable in this session.';
   return reason.startsWith('worker_group_') || !reason
@@ -236,7 +239,7 @@ function AutoJoinIntent({
       setRetry((value) => value + 1);
     }
   };
-  const refused = progress.phase === 'error' && progress.message === REFUSED_JOIN_MESSAGE;
+  const refused = progress.phase === 'error' && progress.message === REFUSED_WORKER_GROUP_JOIN_MESSAGE;
   const asksCode =
     (ready && (progress.phase === 'code' || refused)) ||
     (!ready && !token && (publicGroup === 'secret' || publicGroup === 'absent'));

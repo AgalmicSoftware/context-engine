@@ -76,10 +76,12 @@ export const buildWorkerGroupJoinCredentials = async ({
 }): Promise<WorkerGroupJoinCredentials | null> => {
   const parsed = parseGroupInviteToken(token);
   if (parsed?.kind === 'one_use') return { secret: parsed.secret };
-  if (parsed?.kind === 'password')
+  if (parsed?.kind === 'password') {
+    if (!address) throw new Error('Sign in with a wallet or passkey account to use a group password.');
     return {
       proof: await keys.signJoin({ password: parsed.password, sessionId: canonical(sessionId), groupId, address }),
     };
+  }
   return null;
 };
 
