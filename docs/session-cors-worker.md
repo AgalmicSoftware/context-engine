@@ -2537,9 +2537,10 @@ Anonymous exception (AI/transcribe/realtime interview only):
 
 ## Admin endpoints
 
-`GET /admin/abuse-summary`, `GET /admin/diagnostics` and
+`GET /admin/abuse-summary`, `GET /admin/diagnostics`, `GET /admin/feedback` and
 `GET /admin/results-analysis/status` use a current session token; see
-[Endpoints](#endpoints) and the Results notes above.
+[Endpoints](#endpoints), [Session feedback](#session-feedback) and the Results
+notes above.
 
 The remaining Admin requests are signed EIP-712 admin actions with no session
 token. The body carries `address`, `signature`, `action`, `slug`, `bodyHash`,
@@ -2551,6 +2552,7 @@ token. The body carries `address`, `signature`, `action`, `slug`, `bodyHash`,
 - `POST /admin/set-limits`
 - `POST /admin/lit-chipotle-status`
 - `POST /admin/storage/set-hidden`
+- `POST /admin/feedback/delete` (see [Session feedback](#session-feedback))
 
 `/admin/storage/set-hidden` notes:
 
@@ -2611,8 +2613,9 @@ Never return secrets in responses.
   `sessionInfo`, `sessionContext`, `questionsGenPrompt`, `agentInstructions`,
   `appearance`, `sessionHeaderImg`, `contextAdditionPolicy`,
   `resultsAdminAddresses`, every interview setting (`interviewModeEnabled` and
-  all of `interviewMode`, which each interview request reads afresh), and the
-  curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
+  all of `interviewMode`, which each interview request reads afresh),
+  `sessionAgent`, `groupMemberCeiling` and `feedbackEnabled` (each read afresh
+  where it applies), and the curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
   invite records remain unchanged. Removing, disabling, re-enabling or editing
@@ -3202,6 +3205,51 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
   - `request_test_eth` is always token-required. Registry third-party generic transfers still require `scopes.faucet=true`;
     same-wallet generic requests may re-check `txGas` access without that scope, and proof-backed pre-claim funding
     may proceed without that scope when the request includes `sbtAddress` plus the required proof.
+
+### Session feedback
+
+Anyone on a session page can tell the session's admins what worked in the app
+and what didn't (Workers advertising `session_feedback`). Only sessions a
+Worker runs take feedback; an on-chain session refuses it with `403`
+`feedback_off`, as does a session whose `feedbackEnabled` is `false`. The
+setting is on unless set; turning it off keeps stored messages and signs no
+one out.
+
+- `POST /feedback` takes `{ text, view, theme, screen, appRelease?, contact? }`
+  as JSON, at most 8 KiB. `text` is 1 to 2,000 characters; `view` names a
+  section (letters, digits, `:`, `_` and `-`, up to 80), never a URL; `theme`
+  is a theme id; `screen` is `phone`, `tablet` or `desktop`; `appRelease` is a
+  release number. A bad field is `400` `feedback_invalid` and says which.
+  - Signed in, it runs with the session token. Signed out, it has no
+    `Authorization` header and names the session with `?slug=` (a Worker
+    pinned to one session refuses another slug with `404`); the session's CORS
+    rules apply either way.
+  - A person sends at most 5 in any 24 hours, counted by their address, or by
+    their network when signed out (`429` `feedback_person_limit`); a send the
+    store then refuses still counts. A session takes 200 a UTC day (`429`
+    `feedback_session_limit`) and stores at most 2,000 (`409` `feedback_full`,
+    until an admin clears some).
+  - Stored with each message: the text, view, theme, screen, the app's release
+    if sent, whether the sender was signed in, the Worker's own release and the
+    time. Nothing names the sender unless they ask to be contacted:
+    `contact: { reachMe }` (1 to 200 characters) then also stores their
+    signed-in address, if any. A name the sender types is never stored as who
+    sent it.
+- `GET /admin/feedback[?limit=<1-100>&cursor=<id>]` with the session token
+  returns `{ messages, cursor?, counts: { stored, today } }`, newest first, 100
+  a page by default; each message carries its `id`. A reply's `cursor`, sent
+  back as `?cursor=`, reads the next, older page; a bad `limit` or `cursor` is
+  `400` `feedback_page_invalid`. Only full session admins
+  may read it: results admins and agent keys, even one minted for an admin,
+  get `403`.
+- `POST /admin/feedback/delete` is a signed admin action whose body adds
+  `ids` (1 to 100 message ids) or `through` (an id: every message stored at or
+  before it), never both. Unknown or repeated ids are skipped, and `deleted`
+  counts only messages removed. It returns `{ ok, deleted, counts }`.
+- Feedback lives in the session's coordinator under its own prefix. Nothing
+  that reads answers, files or results lists it, so it never reaches AI Views,
+  the atlas, the risk matrix, the Session Agent, the fidelity report, exports
+  or backups.
 
 ## Self-deploy
 
