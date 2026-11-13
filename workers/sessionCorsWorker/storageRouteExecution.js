@@ -111,6 +111,9 @@ const DEFAULT_STORAGE_LIST_PAGE_SIZE = 100;
 const MAX_STORAGE_LIST_PAGE_SIZE = 100;
 // KV list calls one context listing may make to fill its page.
 const MAX_CONTEXT_LIST_KV_PAGES = 10;
+// An own-answer listing scans at most 10,000 keys a request, 1,000 a KV call.
+const MINE_LIST_KV_KEYS = 1000;
+const MINE_LIST_KV_PAGES = 10;
 const DEFAULT_RESOURCE_GATES = Object.freeze({
   docsContext: 'docUploads',
   questions: 'questionResponses',
@@ -151,9 +154,14 @@ const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${sessionSlugStorageKe
 export const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${sessionSlugStorageKey(slug)}:${id}`;
 // KV list metadata for an index row: on a docsContext row, whether it is a
 // context source, so context scans skip other files unread. Set on every write.
-export const storageIndexPutOptions = (metadata) => ((trim(metadata?.resource) || 'docsContext') === 'docsContext'
-  ? { metadata: { contextSource: metadata?.contextSource === true } }
-  : undefined);
+// List metadata lets a listing pass over a row unread: a context listing skips
+// other files, and a person's own-answer listing skips other people's answers.
+export const storageIndexPutOptions = (metadata) => {
+  const resource = trim(metadata?.resource) || 'docsContext';
+  if (resource === 'docsContext') return { metadata: { contextSource: metadata?.contextSource === true } };
+  const responder = resource === 'responses' ? trim(metadata?.responder).toLowerCase() : '';
+  return responder ? { metadata: { responder } } : undefined;
+};
 const safeGroupId = (value) => trim(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
 const normalizeGroupIdList = (value) => {
   let raw = value;
@@ -2122,13 +2130,21 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   // until its page is full, so sources past many library files still reach a
   // client that reads only a few pages. Each KV call asks for just the rows
   // still wanted, so the cursor marks exactly where the page stopped.
+  // An own-answer listing reads up to 1,000 keys a call and skips other
+  // people's answers by their list metadata, so it can return more than
+  // `limit` rows. Rows stored before answers carried their author are read.
   const keys = [];
   let nextCursor = cursor;
-  for (let page = 0; page < (contextOnly ? MAX_CONTEXT_LIST_KV_PAGES : 1); page += 1) {
+  const ownOrUnknown = (entry) => {
+    const author = entry?.metadata?.responder;
+    return typeof author !== 'string' || author === responder;
+  };
+  const kvPages = contextOnly ? MAX_CONTEXT_LIST_KV_PAGES : (mine ? MINE_LIST_KV_PAGES : 1);
+  for (let page = 0; page < kvPages; page += 1) {
     const listed = await index.list({
       prefix: buildIndexPrefix({ slug, resource }),
       ...(nextCursor ? { cursor: nextCursor } : {}),
-      limit: limit - keys.length,
+      limit: mine ? MINE_LIST_KV_KEYS : limit - keys.length,
     });
     nextCursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
     if (listed?.list_complete === false && !nextCursor) {
@@ -2140,7 +2156,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
       );
     }
     keys.push(...(Array.isArray(listed?.keys) ? listed.keys : [])
-      .filter((entry) => !(contextOnly && entry?.metadata?.contextSource === false)));
+      .filter((entry) => !(contextOnly && entry?.metadata?.contextSource === false) && !(mine && !ownOrUnknown(entry))));
     if (!nextCursor || keys.length >= limit) break;
   }
   const rows = [];
@@ -2149,7 +2165,23 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     // Hidden markers also cover a version whose own flag a hide has not
     // written yet, such as one uploaded in another region during the hide.
     if (isOwnedStorageResource(resource)) hiddenIds = await listHiddenStorageResourceIds({ index, slug, resource });
-    for (let offset = 0; offset < keys.length; offset += 8) {
+    // An own-answer page may hold up to 10,000 older rows with no author, so
+    // it reads them in bulk gets of 100 and keeps only rows that may be the
+    // requester's; a row it can't parse is kept, to fail the page below.
+    const othersRow = (raw) => {
+      try {
+        const author = trim(JSON.parse(raw)?.responder);
+        return !!author && normalizeAddress(author) !== responder;
+      } catch {
+        return false;
+      }
+    };
+    for (let offset = 0; mine && offset < keys.length; offset += KV_BULK_GET_KEYS) {
+      const batch = keys.slice(offset, offset + KV_BULK_GET_KEYS).map((keyEntry) => trim(keyEntry?.name || keyEntry)).filter(Boolean);
+      const got = await index.get(batch);
+      rows.push(...batch.map((name) => ({ name, raw: got?.get?.(name) ?? null })).filter(({ raw }) => typeof raw !== 'string' || !othersRow(raw)));
+    }
+    for (let offset = 0; !mine && offset < keys.length; offset += 8) {
       rows.push(...await Promise.all(keys.slice(offset, offset + 8).map(async (keyEntry) => {
         const name = trim(keyEntry?.name || keyEntry);
         return { name, raw: name ? await index.get(name) : null };

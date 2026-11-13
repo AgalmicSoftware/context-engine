@@ -3293,11 +3293,14 @@ payloads are read. Session and per-payload authorization still apply; unavailabl
 metadata or denied own payloads fail the lookup rather than imply an empty history.
 The ordinary public listing contract and its UI cap are unchanged.
 
-This reuses the existing metadata index and requires no data migration. The own
-lookup follows all pages, including beyond the public UI's 100-page cap, and
-reads only the participant's payloads, in batches of eight. Metadata scanning
-still scales with total stored response versions; this is not a new per-user
-index. It uses the same Worker timestamp and storage-reference ordering as the
+This reuses the existing metadata index and requires no data migration. Each
+answer's index row carries its author in KV list metadata, so the own lookup
+passes over other people's answers without reading them: one request scans up
+to 10,000 index keys, 1,000 per KV list call, and reads only the participant's
+rows in bulk. Rows written before answers carried their author are read and
+checked as before, so older sessions stay correct, only slower. Each row read is
+still checked against the verified requester, whatever its list metadata says.
+The lookup follows all pages, including beyond the public UI's 100-page cap. It uses the same Worker timestamp and storage-reference ordering as the
 public cache to select the latest edits. Closing the interview or changing its
 identity cancels the in-flight lookup. Failures show **Retry saved answers** and
 do not enable submission. An older Worker lacking the scope/completeness fields
