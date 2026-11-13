@@ -172,8 +172,9 @@ describe('PolisReportFidelitySection', () => {
       ).flat(),
     );
     const overview = computeFidelityOverview({ questions, questionResponses: byQuestion(rows), minParticipants: 5 });
-    expect(overview?.mirrorScore.byPlatform?.claude.value).toBe(1);
-    expect(overview?.mirrorScore.byPlatform?.chatgpt.value).toBe(1);
+    const byPlatform = overview?.mirrorScore.byPlatform || {};
+    expect(byPlatform['claude'].value).toBe(1);
+    expect(byPlatform['chatgpt'].value).toBe(1);
   });
 
   it('says a hidden-draft score from enough people is withheld, not too small', async () => {
