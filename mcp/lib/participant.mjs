@@ -256,12 +256,18 @@ const contextRefusal = (error, { olderLink = false } = {}) => {
   return error;
 };
 
+// While a lookup of earlier answers is still running, it can only fill in
+// questions shown as unanswered; with every question answered here it has
+// nothing left to add. An unread answer still may be newer, so it keeps the note.
+const lookupMoot = (questions, mine) =>
+  mine.pending && !mine.unread && questions.length > 0 && questions.every((question) => mine.has(question.id));
+
 const progressNotes = (questions, mine) => ({
   ...(questions.locked ? { lockedQuestions: questions.locked } : {}),
   ...(questions.complete === false ? { questionsComplete: false } : {}),
   ...(questions.unread ? { unreadQuestions: questions.unread } : {}),
   ...(mine.unread ? { unreadMyAnswers: mine.unread } : {}),
-  ...(mine.complete === false
+  ...(mine.complete === false && !lookupMoot(questions, mine)
     ? { myAnswersComplete: false, note: mine.pending
       ? 'Your earlier answers are still being looked up, so some you gave may show as unanswered; call again in a minute to see them.'
       : 'Some answers could not be read or the scan is unfinished; the answers shown may be incomplete.' }
@@ -701,13 +707,19 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       }).finally(() => { if (ctx.ownScanRun === run) ctx.ownScanRun = null; });
       ctx.ownScanRun = run;
     }
-    let timer;
-    const waited = await Promise.race([
-      ctx.ownScanRun,
-      new Promise((resolve) => { timer = setTimeout(resolve, ownAnswerWaitMs, null); }),
-    ]);
-    clearTimeout(timer);
+    // Only the first call waits for a scan; while it runs on, later calls answer at once.
+    const run = ctx.ownScanRun;
+    let waited = null;
+    if (ctx.ownScanWaitedOut !== run) {
+      let timer;
+      waited = await Promise.race([
+        run,
+        new Promise((resolve) => { timer = setTimeout(resolve, ownAnswerWaitMs, null); }),
+      ]);
+      clearTimeout(timer);
+    }
     if (waited) return waited;
+    ctx.ownScanWaitedOut = run;
     const last = ctx.ownScan?.sessionId === ctx.client.sessionId ? ctx.ownScan : null;
     return { answers: last?.answers || new Map(), complete: false, pending: true, unread: last?.unread || 0 };
   };

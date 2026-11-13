@@ -16,7 +16,7 @@ const { slug, sessionId, corsWorkerUrl } = fixture.config;
 const GROUP_ID = 'e478b073-5b03-4ba3-9cb0-d31977f61af4';
 const questionId = (index) => `0x${(index + 1).toString(16).padStart(64, '0')}`;
 
-const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplete: true }), keyMadeHere = false, now, config = fixture.config, everyone, seedState, groupLabel = 'AI agents', uploads = false } = {}) => {
+const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplete: true }), keyMadeHere = false, now, config = fixture.config, everyone, seedState, groupLabel = 'AI agents', uploads = false, waitMs = 50 } = {}) => {
   const stateDir = await mkdtemp(join(tmpdir(), 'ce-agent-list-'));
   t.after(() => rm(stateDir, { recursive: true, force: true }));
   // A key made with this state marks it; a key from elsewhere does not.
@@ -62,7 +62,7 @@ const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplet
     config: { stateDir, profile: {}, appOrigin: 'https://contextengine.sh', trustedAppOrigins: ['https://contextengine.sh'] },
     fetchImpl,
     ...(now ? { now } : {}),
-    ownAnswerWaitMs: 50,
+    ownAnswerWaitMs: waitMs,
   });
   const joined = await participant.joinSession({ link: `https://contextengine.sh/session/${slug}?joinGroup=${GROUP_ID}&worker=${encodeURIComponent(corsWorkerUrl)}` });
   return { participant, calls, joined, payloads };
@@ -107,6 +107,26 @@ test('the questions come back without waiting for a slow own-answer lookup, whic
   const after = await participant.listQuestions({});
   assert.equal(after.myAnswersComplete, undefined);
   assert.equal(calls.mine, 1);
+});
+
+test('only the first call waits for a slow lookup; later ones answer at once', { timeout: 10_000 }, async (t) => {
+  const { participant } = await setup(t, { waitMs: 600, mine: () => new Promise(() => {}) });
+  const timed = async (call) => { const started = Date.now(); const result = await call(); return { result, ms: Date.now() - started }; };
+  const first = await timed(() => participant.listQuestions({}));
+  assert.ok(first.ms >= 550, `first call took ${first.ms} ms`);
+  const second = await timed(() => participant.listQuestions({}));
+  assert.ok(second.ms < 300, `second call took ${second.ms} ms`);
+  assert.match(second.result.note, /still being looked up/);
+});
+
+test('once every question shows an answer, an unfinished lookup adds no note', async (t) => {
+  const { participant } = await setup(t, { questions: 2, uploads: true, mine: () => new Promise(() => {}) });
+  assert.match((await participant.listQuestions({})).note, /still being looked up/);
+  await participant.answer({ answers: [0, 1].map((index) => ({ questionId: questionId(index), value: 'Agree' })) });
+  const listed = await participant.listQuestions({});
+  assert.equal(listed.answeredByMe, 2);
+  assert.equal(listed.note, undefined);
+  assert.equal(listed.myAnswersComplete, undefined);
 });
 
 test('an unfinished lookup is reused for a while rather than restarted by every call', async (t) => {
@@ -259,3 +279,4 @@ test('an answer whose transaction may have gone through is not called a failure'
   assert.equal(uncertain.result.isError, undefined);
   assert.equal(uncertain.result.structuredContent.reconciliationRequired, true);
 });
+
