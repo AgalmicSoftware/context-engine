@@ -213,6 +213,11 @@ const manualChunkGroups = [
     ],
   },
   {
+    // Only the lazy transcript-claim scanner reads QR codes; vendor-misc loads with every page.
+    name: 'vendor-qr-reader',
+    patterns: ['/node_modules/jsqr/'],
+  },
+  {
     name: 'vendor-polyfills',
     patterns: [
       '/node_modules/buffer/',
@@ -231,6 +236,10 @@ export const resolveManualChunk = (id) => {
   }
   if (normalizedId.includes('/src/variables/demo/demo_polis_data.json')) {
     return 'demo-polis-data';
+  }
+  // The atlas's historical demo cases are most of DebateMap's size; keep them cacheable on their own.
+  if (normalizedId.includes('/src/variables/demo/loophole_historical_cases.json')) {
+    return 'demo-historical-cases';
   }
   // Test IDs are shared static data; keep them cacheable and out of the AppShell budget.
   if (normalizedId.includes('/src/utilities/e2eTestIds.json')) return 'e2e-test-ids';

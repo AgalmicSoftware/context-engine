@@ -27,3 +27,16 @@ test('shared test IDs get their own chunk instead of growing the AppShell chunk'
   assert.equal(resolveManualChunk('/repo/client/src/utilities/e2eTestIds.json'), 'e2e-test-ids');
   assert.equal(resolveManualChunk('/repo/client/src/utilities/e2eTestIds.ts'), undefined);
 });
+
+test('the QR reader stays out of vendor-misc, which every page preloads', () => {
+  assert.equal(resolveManualChunk('/repo/node_modules/jsqr/dist/jsQR.js'), 'vendor-qr-reader');
+  assert.equal(resolveManualChunk('/repo/node_modules/some-small-lib/index.js'), 'vendor-misc');
+});
+
+test('the atlas demo cases get their own chunk instead of filling DebateMap', () => {
+  assert.equal(
+    resolveManualChunk('/repo/client/src/variables/demo/loophole_historical_cases.json'),
+    'demo-historical-cases',
+  );
+  assert.equal(resolveManualChunk('/repo/client/src/components/DebateMap/debateMapHistoricalData.ts'), undefined);
+});
