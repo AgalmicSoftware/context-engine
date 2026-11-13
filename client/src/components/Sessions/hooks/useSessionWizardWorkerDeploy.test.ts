@@ -208,6 +208,18 @@ describe('useSessionWizardWorkerDeploy', () => {
     },
   );
 
+  it('deploys with an AI daily limit the draft carries, as verify and publish do', async () => {
+    const options = buildDeployHookOptions();
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const runtime = options.refs.runtimeRef.current;
+    options.refs.runtimeRef.current = { ...runtime, draft: { ...runtime.draft, limits: { aiPerWalletPerDay: 40 } } };
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    await act(async () => {
+      expect((await result.current.handleDeployWorker())?.ok).toBe(true);
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).limits).toMatchObject({ aiPerWalletPerDay: 40 });
+  });
+
   it.each(['', 'invalid'])('refuses a chosen but invalid operator key (%s)', async (key) => {
     const options = buildDeployHookOptions();
     const fetchMock = mockSuccessfulWorkerDeployFetch();

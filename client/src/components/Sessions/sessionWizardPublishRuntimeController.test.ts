@@ -244,6 +244,28 @@ describe('sessionWizardPublishRuntimeController', () => {
     );
   });
 
+  it('publishes an AI daily limit the draft carries, beside the request limits', async () => {
+    const harness = createControllerHarness();
+    Object.assign(harness.runtimeRef.current.draft, { limits: { aiPerWalletPerDay: 40 } });
+    await harness.controller.runPreparation({
+      publishAllowed: true,
+      publishExecutionPlan: {
+        shouldPersistWorkerConfig: true,
+        shouldRegisterSession: false,
+        shouldRefreshRegistryCache: false,
+      },
+      signerAccountOverride: ADMIN_ADDRESS,
+      runTrackedPublishEffect: harness.runTrackedPublishEffect,
+    });
+    expect(harness.buildWorkerConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deployPayload: expect.objectContaining({
+          limits: { perWalletPerDay: 7, perAnonymousIpPerDay: null, aiPerWalletPerDay: 40 },
+        }),
+      }),
+    );
+  });
+
   it('creates queued Groups after verified config persistence and before settlement', async () => {
     const harness = createControllerHarness();
     const pendingWorkerGroupDrafts = [

@@ -51,6 +51,7 @@ export const buildSessionWizardWorkerVerificationConfig = ({
       limits: buildSessionWizardWorkerLimits({
         perWalletPerDay: resolvedRuntime.workerLimitPerWallet,
         perAnonymousIpPerDay: resolvedRuntime.workerLimitPerAnonymousIp,
+        aiPerWalletPerDay: (resolvedDraft.limits as AnyRecord | null | undefined)?.aiPerWalletPerDay,
       }),
       scopes: {},
       embeddedDeployHelperEnabled: resolvedRuntime.embeddedDeployHelperEnabled,

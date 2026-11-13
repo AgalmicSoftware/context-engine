@@ -144,8 +144,15 @@ it('verifies and publishes over the config a deploy helper staged', async () => 
   expect(worker.stored.configRevision).toBe(published.configRevision);
 });
 
-const buildWizardConfig = ({ sessionEndsAt, perWalletPerDay, perAnonymousIpPerDay, agentInstructions = '' }) => {
+const buildWizardConfig = ({
+  sessionEndsAt,
+  perWalletPerDay,
+  perAnonymousIpPerDay,
+  agentInstructions = '',
+  draftLimits = undefined,
+}) => {
   const draft = buildSessionWizardDefaultTemplate();
+  if (draftLimits) draft.limits = draftLimits;
   draft.slug = slug;
   draft.sessionName = 'Edited session';
   draft.sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
@@ -208,6 +215,23 @@ it.each([
     expect(worker.stored.workerCanonicalPublicationRevision).toBe(published.configRevision);
   },
 );
+
+// A draft that carries the session's limits (a re-verify, or an imported
+// config) keeps the AI limit: /new has no field for it, and the Worker
+// replaces limits whole.
+it('keeps an AI daily limit from the draft when verifying and publishing again', async () => {
+  const worker = createWorker();
+  const config = buildWizardConfig({
+    sessionEndsAt: '',
+    perWalletPerDay: '100',
+    perAnonymousIpPerDay: '',
+    draftLimits: { perWalletPerDay: 100, aiPerWalletPerDay: 40 },
+  });
+  await verifySessionWizardWorkerPublicDeployment(buildInput(config, worker));
+  expect(worker.stored.limits).toEqual({ perWalletPerDay: 100, perAnonymousIpPerDay: null, aiPerWalletPerDay: 40 });
+  await persistAndVerifySessionWizardWorkerConfig({ ...buildInput(config, worker), retryDelaysMs: [] });
+  expect(worker.stored.limits.aiPerWalletPerDay).toBe(40);
+});
 
 it('verifies and publishes with no instructions for AI agents on an older Worker that refuses the field', async () => {
   const worker = createWorker();

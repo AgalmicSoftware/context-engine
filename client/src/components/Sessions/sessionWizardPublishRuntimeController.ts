@@ -161,10 +161,12 @@ export const createSessionWizardPublishRuntimeController = ({
   }): AnyRecord => {
     const evidenceRuntime = evidence.runtime;
     const evidenceDraft = evidence.draft;
-    const limitValidationError = validateSessionWizardWorkerLimits({
+    const limitsInput = {
       perWalletPerDay: evidenceRuntime.workerLimitPerWallet,
       perAnonymousIpPerDay: evidenceRuntime.workerLimitPerAnonymousIp,
-    });
+      aiPerWalletPerDay: (evidenceDraft.limits as AnyRecord | null | undefined)?.aiPerWalletPerDay,
+    };
+    const limitValidationError = validateSessionWizardWorkerLimits(limitsInput);
     if (limitValidationError) {
       throw new Error(`Fix Worker request limits before publishing: ${limitValidationError}`);
     }
@@ -176,10 +178,7 @@ export const createSessionWizardPublishRuntimeController = ({
         rpcUrl: resolveWorkerRpcUrl(),
         rpcUrlsByChainId: resolveWorkerRpcUrlMap(),
         allowOrigins: parseAllowOriginsInput(),
-        limits: buildSessionWizardWorkerLimits({
-          perWalletPerDay: evidenceRuntime.workerLimitPerWallet,
-          perAnonymousIpPerDay: evidenceRuntime.workerLimitPerAnonymousIp,
-        }),
+        limits: buildSessionWizardWorkerLimits(limitsInput),
         scopes: {},
         embeddedDeployHelperEnabled: evidenceRuntime.embeddedDeployHelperEnabled,
       },

@@ -349,6 +349,7 @@ const useSessionWizardWorkerDeploy = ({
           limits: buildSessionWizardWorkerLimits({
             perWalletPerDay: runtime.workerLimitPerWallet,
             perAnonymousIpPerDay: runtime.workerLimitPerAnonymousIp,
+            aiPerWalletPerDay: (currentDraft.limits as Record<string, unknown> | null | undefined)?.aiPerWalletPerDay,
           }),
           scopes: {},
           faucet: resolveSessionWizardWorkerFaucetConfigFromDraft({

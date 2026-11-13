@@ -389,6 +389,141 @@ describe('SessionSettingsPage', () => {
     expect(screen.queryByTestId('ce-setting-results-admins')).not.toBeInTheDocument();
   });
 
+  it('sets the AI daily limit under AI, with its “?”, merging it through set-limits without a sign-out', async () => {
+    mockFetchBootstrap.mockResolvedValue(bootstrapOf(workerConfig({ limits: { perWalletPerDay: 300 } })));
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
+    const field = screen.getByTestId('ce-settings-ai-daily-limit');
+    expect(field).toHaveValue(null);
+    expect(document.getElementById(field.getAttribute('aria-describedby') || '')).toHaveTextContent(
+      'Saving or reading answers, transcription and voice interview connections aren’t counted.',
+    );
+    fireEvent.change(field, { target: { value: '25' } });
+    expect(screen.getByTestId('ce-settings-content-changes')).toHaveTextContent('AI requests per person a day');
+    expect(screen.queryByTestId('ce-settings-authority-changes')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), { target: { value: 'Reverse Alignment' } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE));
+    });
+    await waitFor(() => expect(screen.getByTestId('ce-settings-status')).toHaveTextContent('Settings saved.'));
+    // set-config replaces limits whole, so the limit goes alone to set-limits, which merges it.
+    const writes = posted.filter((entry) => String(entry.url).includes('/admin/'));
+    expect(writes.map((entry) => [String(entry.url).replace(WORKER, ''), entry.body])).toEqual([
+      [
+        '/admin/set-config',
+        { sessionSlug: 'edit-salon', config: { sessionName: 'Reverse Alignment' }, signature: '0xsigned' },
+      ],
+      ['/admin/set-limits', { sessionSlug: 'edit-salon', limits: { aiPerWalletPerDay: 25 }, signature: '0xsigned' }],
+    ]);
+  });
+
+  it('says when the other settings saved but the AI limit did not, and shows what was saved', async () => {
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    global.fetch = jest.fn(async (url: unknown, init: RequestInit = {}) => {
+      posted.push({ url: String(url), body: JSON.parse(String(init.body || '{}')) });
+      const refused = String(url).endsWith('/admin/set-limits');
+      return {
+        ok: !refused,
+        status: refused ? 400 : 200,
+        json: async () => (refused ? { error: 'Limit refused.' } : { ok: true }),
+      } as Response;
+    }) as unknown as typeof fetch;
+    fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
+    fireEvent.change(screen.getByTestId('ce-settings-ai-daily-limit'), { target: { value: '25' } });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), { target: { value: 'Reverse Alignment' } });
+    mockFetchBootstrap.mockClear();
+    mockFetchBootstrap.mockResolvedValue(bootstrapOf(workerConfig({ sessionName: 'Reverse Alignment' })));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE));
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('ce-settings-status')).toHaveTextContent(
+        'Other settings saved. The AI limit wasn’t: Limit refused.',
+      ),
+    );
+    expect(mockFetchBootstrap).toHaveBeenCalled();
+    expect(posted.filter((entry) => String(entry.url).includes('/admin/')).map((entry) => entry.body)).toEqual([
+      { sessionSlug: 'edit-salon', config: { sessionName: 'Reverse Alignment' }, signature: '0xsigned' },
+      { sessionSlug: 'edit-salon', limits: { aiPerWalletPerDay: 25 }, signature: '0xsigned' },
+    ]);
+    // The name is saved; the AI limit stays typed, ready to save again.
+    expect(screen.getByTestId('ce-settings-content-changes')).toHaveTextContent(
+      /^Keeps everyone signed inAI requests per person a day$/,
+    );
+    expect(screen.getByTestId('ce-settings-ai-daily-limit')).toHaveValue(25);
+  });
+
+  describe('a save that fails part way', () => {
+    const refuse = (path: string) => {
+      global.fetch = jest.fn(async (url: unknown, init: RequestInit = {}) => {
+        posted.push({ url: String(url), body: JSON.parse(String(init.body || '{}')) });
+        const refused = String(url).endsWith(path);
+        return {
+          ok: !refused,
+          status: refused ? 400 : 200,
+          json: async () => (refused ? { error: 'Refused.' } : { ok: true }),
+        } as Response;
+      }) as unknown as typeof fetch;
+    };
+    const edit = async ({ name = '', limit = '', beforeSave = () => {} }) => {
+      renderPage();
+      await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+      beforeSave();
+      fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
+      if (limit) fireEvent.change(screen.getByTestId('ce-settings-ai-daily-limit'), { target: { value: limit } });
+      if (name) fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), { target: { value: name } });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE));
+      });
+    };
+    const writes = () => posted.filter((entry) => String(entry.url).includes('/admin/')).map((entry) => entry.url);
+
+    it('reports a refused AI limit as not saved when nothing else was', async () => {
+      refuse('/admin/set-limits');
+      await edit({ limit: '25' });
+      await waitFor(() => expect(screen.getByTestId('ce-settings-status')).toHaveTextContent('Refused.'));
+      expect(screen.getByTestId('ce-settings-status')).not.toHaveTextContent('saved');
+      expect(writes()).toEqual([`${WORKER}/admin/set-limits`]);
+    });
+
+    it('says both what saved and that reloading failed after a partial save', async () => {
+      refuse('/admin/set-limits');
+      await edit({
+        limit: '25',
+        name: 'Reverse Alignment',
+        beforeSave: () => mockFetchBootstrap.mockRejectedValue(new Error('Worker unreachable.')),
+      });
+      await waitFor(() =>
+        expect(screen.getByTestId('ce-settings-status')).toHaveTextContent(
+          'Other settings saved. The AI limit wasn’t: Refused. Reloading them failed: Worker unreachable.',
+        ),
+      );
+      expect(screen.getByTestId('ce-settings-ai-daily-limit')).toHaveValue(25);
+    });
+
+    it('sends no AI limit when the other settings are refused', async () => {
+      refuse('/admin/set-config');
+      await edit({ limit: '25', name: 'Reverse Alignment' });
+      await waitFor(() => expect(screen.getByTestId('ce-settings-status')).toHaveTextContent('Refused.'));
+      expect(writes()).toEqual([`${WORKER}/admin/set-config`]);
+    });
+
+    it('says the settings saved when only reloading them fails', async () => {
+      refuse('/never');
+      await edit({
+        name: 'Reverse Alignment',
+        beforeSave: () => mockFetchBootstrap.mockRejectedValue(new Error('Worker unreachable.')),
+      });
+      await waitFor(() =>
+        expect(screen.getByTestId('ce-settings-status')).toHaveTextContent(
+          'Settings saved. Reloading them failed: Worker unreachable.',
+        ),
+      );
+    });
+  });
+
   it('offers the Session Agent only on a Worker that answers it, and says why otherwise', async () => {
     renderPage();
     await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
@@ -553,6 +688,13 @@ describe('SessionSettingsPage', () => {
       mockUploadMetadata.mockResolvedValue({ metadataUri: 'ar://new-metadata' });
       mockUpdateMetadataOnChain.mockResolvedValue({ ok: true, txHash: '0xmetadatahash' });
       mockReadWallet.mockResolvedValue({ address: ADMIN, chainId: 11155420 });
+    });
+
+    it('has no AI daily limit, which only a Session Worker counts', async () => {
+      renderPage({ sessionConfig: registryConfig(), workerOrigin: '' });
+      fireEvent.click(await screen.findByTestId('ce-setup-more-ai'));
+      expect(screen.getByTestId('ce-setup-ai-fast')).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-settings-ai-daily-limit')).not.toBeInTheDocument();
     });
 
     it('uses the same sections, adds the chain fields, and saves through the registry step by step', async () => {

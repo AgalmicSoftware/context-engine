@@ -300,19 +300,29 @@ const SessionSettingsPage = ({
     }
   };
 
-  const saveToWorker = async (patch: Record<string, unknown>) => {
+  // The page's limits (the AI one) merge through set-limits, so a limit
+  // changed since this page loaded stays.
+  const saveToWorker = async ({ limits, ...patch }: Record<string, unknown>) => {
     setStatus('Saving…');
-    await saveSessionSettings({
+    const limitsError = await saveSessionSettings({
       workerOrigin,
       sessionSlug,
       sessionIdHex: resolveWorkerCanonicalSessionIdHex(saved),
       patch,
+      ...(limits ? { limits: limits as Record<string, unknown> } : {}),
       account,
       provider,
       chainId: Number(network?.id || 1) || 1,
     });
-    await refresh(false);
-    setStatus('Settings saved.');
+    const outcome = limitsError ? `Other settings saved. The AI limit wasn’t: ${limitsError}` : 'Settings saved.';
+    try {
+      // On a partial save the unsaved AI limit stays as typed, ready to save again.
+      await refresh(!!limitsError);
+      setStatus(outcome);
+    } catch (error) {
+      const reason = error instanceof Error && error.message ? error.message : 'reload the page';
+      setStatus(`${outcome} Reloading them failed: ${reason}`);
+    }
   };
 
   const showStep = (step: OnChainSaveStep, state: OnChainSaveStepState, detail?: string) =>
@@ -636,6 +646,7 @@ const SessionSettingsPage = ({
           open={openSections.ai}
           onToggle={() => setOpenSections((prev) => ({ ...prev, ai: !prev.ai }))}
           lockedReason={onChain || workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
+          dailyLimit={!onChain}
           sessionAgent={
             onChain ? null : workerAnswersSessionAgent(saved) ? (
               <SetupSessionAgent

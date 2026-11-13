@@ -1,4 +1,5 @@
 import { applySessionConfigMutation } from '../../../../../workers/sessionCorsWorker/sessionConfigMutation.js';
+import { resolveAiDailyLimit } from '../../../../../workers/sessionCorsWorker/aiRateLimitPolicy.js';
 import { projectPublicWorkerSessionConfig } from '../../../../../workers/shared/workerSessionConfig.mjs';
 import { WORKER_CANONICAL_SET_CONFIG_KEYS } from '@ce-shared/sessionConfigEdits.mjs';
 import { GROUP_JOIN_CHOICES_FIELD } from '@ce-shared/workerSessionPublicConfig.mjs';
@@ -25,6 +26,9 @@ const WORKER_URL = 'https://edit-salon.example.workers.dev';
 
 const workerSave = (existingConfig, incomingConfig) =>
   applySessionConfigMutation({ existingConfig, mutation: { kind: 'set-config', incomingConfig }, slug: SLUG });
+// saveSessionSettings sends limits to set-limits, which merges them, and the rest to set-config.
+const workerSaveLimits = (existingConfig, incomingLimits) =>
+  applySessionConfigMutation({ existingConfig, mutation: { kind: 'set-limits', incomingLimits }, slug: SLUG });
 
 // A Worker-hosted session stored the way the setup page publishes it.
 const publishedSession = () => {
@@ -372,6 +376,46 @@ describe('saving the edit page through the Session Worker', () => {
     // A Worker without join choices refuses the field, so it stays out of the save.
     const { [GROUP_JOIN_CHOICES_FIELD]: _choices, ...older } = before;
     expect(buildSessionSettingsSave(older, draft).patch).not.toHaveProperty('groupMemberCeiling');
+  });
+
+  it('saves only the AI daily limit, signing no one out and keeping newer limits; blank goes back to the daily limit', () => {
+    const stored = workerSave(publishedSession(), { limits: { perWalletPerDay: 300 } }).config;
+    const before = projectPublicWorkerSessionConfig(stored);
+    const draft = buildSessionSettingsDraft(before);
+    expect(buildSessionSettingsSave(before, draft).patch).not.toHaveProperty('limits');
+    expect(draft.aiPerWalletPerDay).toBe('');
+    draft.aiPerWalletPerDay = '40';
+    const save = buildSessionSettingsSave(before, draft);
+    expect(save.patch).toEqual({ limits: { aiPerWalletPerDay: 40 } });
+    // set-limits, unlike set-config, never moves the sign-in epoch.
+    expect(save.classification.signsParticipantsOut).toBe(false);
+    expect(save.classification.content.map(describeSessionSettingsPath)).toEqual(['AI requests per person a day']);
+
+    // Another admin raised the request limit after this page loaded; the AI limit merges in without undoing it.
+    const raised = workerSave(stored, { limits: { perWalletPerDay: 500 } }).config;
+    const set = workerSaveLimits(raised, save.patch.limits);
+    expect(set).toMatchObject({ ok: true });
+    expect(set.config.limits).toMatchObject({ perWalletPerDay: 500, aiPerWalletPerDay: 40 });
+    expect(set.config.authzEpoch).toBe(raised.authzEpoch);
+    expect(resolveAiDailyLimit(set.config)).toBe(40);
+
+    const after = projectPublicWorkerSessionConfig(set.config);
+    const clearing = buildSessionSettingsDraft(after);
+    expect(clearing.aiPerWalletPerDay).toBe('40');
+    clearing.aiPerWalletPerDay = '';
+    const cleared = buildSessionSettingsSave(after, clearing);
+    expect(cleared.patch).toEqual({ limits: { aiPerWalletPerDay: null } });
+    const clearedConfig = workerSaveLimits(set.config, cleared.patch.limits).config;
+    expect(resolveAiDailyLimit(clearedConfig)).toBe(500);
+    expect(buildSessionSettingsDraft(projectPublicWorkerSessionConfig(clearedConfig)).aiPerWalletPerDay).toBe('');
+
+    // 0 and blank are the same setting, so neither is a change.
+    draft.aiPerWalletPerDay = '0';
+    expect(buildSessionSettingsSave(before, draft).patch).not.toHaveProperty('limits');
+    draft.aiPerWalletPerDay = '100001';
+    expect(() => buildSessionSettingsSave(before, draft)).toThrow(
+      'AI requests per person a day: Use a whole number from 0 to 100,000, or leave it blank.',
+    );
   });
 
   it('saves highlighted and hidden lists, one ID per line, without signing anyone out', () => {

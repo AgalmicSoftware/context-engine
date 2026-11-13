@@ -214,6 +214,18 @@ describe('sessionWizardWorkerRuntimeSupport', () => {
     });
   });
 
+  it('carries an AI daily limit only when it is set, and refuses one the Worker would', () => {
+    expect(buildSessionWizardWorkerLimits({ perWalletPerDay: '9', aiPerWalletPerDay: 40 })).toEqual({
+      perWalletPerDay: 9,
+      perAnonymousIpPerDay: null,
+      aiPerWalletPerDay: 40,
+    });
+    expect(buildSessionWizardWorkerLimits({ aiPerWalletPerDay: 0 })).not.toHaveProperty('aiPerWalletPerDay');
+    expect(() => buildSessionWizardWorkerLimits({ aiPerWalletPerDay: 100_001 })).toThrow(
+      'AI requests per person a day (limits.aiPerWalletPerDay in the imported settings): Use a whole number from 0 to 100,000, or leave it blank.',
+    );
+  });
+
   it('rejects negative and fractional limit inputs', () => {
     expect(validateSessionWizardWorkerLimits({ perWalletPerDay: '-1' })).toMatch(/wallet/i);
     expect(validateSessionWizardWorkerLimits({ perAnonymousIpPerDay: '1.5' })).toMatch(/anonymous/i);
