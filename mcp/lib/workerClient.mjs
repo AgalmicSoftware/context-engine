@@ -153,9 +153,10 @@ export const createWorkerClient = ({
   let featuresLoadedAt = -Infinity;
 
   // A busy session coordinator refuses a request before it has any effect.
-  // Reads and answers with a request id (replayed, never stored twice) wait
-  // and try again; other writes are sent once.
-  const replaySafe = (path, method, body) => method === 'GET' || (path === '/storage/upload' && !!body?.requestId);
+  // Reads, answers with a request id (replayed, never stored twice) and group
+  // joins (joining again is a no-op) wait and try again; other writes are sent once.
+  const replaySafe = (path, method, body) => method === 'GET' ||
+    (path === '/storage/upload' && !!body?.requestId) || (path === '/groups/join' && method === 'POST');
   const waitBeforeRetry = (attempt, signal) => new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new Error('Stopped before the Worker request was sent.'));
     const timer = setTimeout(resolve, COORDINATOR_RETRY_DELAYS_MS[attempt] * (0.5 + Math.random()));

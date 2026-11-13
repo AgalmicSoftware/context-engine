@@ -40,6 +40,17 @@ test('a busy coordinator is retried for reads and for answers with a request id'
   assert.deepEqual(sent, ['/storage/list', '/storage/list', '/storage/list', '/storage/upload', '/storage/upload', '/storage/upload']);
 });
 
+test('a busy group join is sent again; leaving a group is sent once', async (t) => {
+  const join = setup(t, 2);
+  await join.settle(join.client.joinGroup('salon'));
+  assert.deepEqual(join.sent, ['/groups/join', '/groups/join', '/groups/join']);
+  t.mock.timers.reset();
+
+  const leave = setup(t, 1);
+  await assert.rejects(leave.settle(leave.client.leaveGroup('salon')), /coordination is unavailable/);
+  assert.deepEqual(leave.sent, ['/groups/leave']);
+});
+
 test('a write without a request id is sent once, and retries stop after three', async (t) => {
   const once = setup(t, 1);
   await assert.rejects(once.settle(once.client.upload({ resource: 'questions', data: { id: 'q1' } })), /coordination is unavailable/);
