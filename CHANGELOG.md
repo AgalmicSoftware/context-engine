@@ -32,6 +32,11 @@ All notable changes to this project will be documented in this file.
 - The guide for AI agents (`/skill.md`) now starts from what an agent can do with a session link. An agent that can run commands can take part with nothing set up, and each of Claude Code, Codex, Gemini CLI, Hermes Agent, Cursor and the OpenAI Agents SDK adds the tools in one step. The MCP README says the same.
 - `scripts/mcp-mcpb.mjs` packs the MCP as a Claude Desktop bundle (`.mcpb`), which installs from a double-click and needs no Node. Nothing builds or publishes it yet.
 
+### Local tooling
+
+- The typed-tests check gives the TypeScript compiler a 4 GB heap of its own. On a small CI runner the compiler ran out of memory and the check failed without saying why; it now names the signal and the compiler's last words when the compiler is killed.
+- The Session Worker's shared config-read tests wait for what they need to have happened. They allowed a fixed number of event-loop turns and failed on a slow CI runner.
+
 ## [0.9.6] - 2026-11-12
 
 ### Client — available when the site deploys
