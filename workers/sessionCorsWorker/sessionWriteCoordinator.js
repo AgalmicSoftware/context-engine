@@ -1563,15 +1563,27 @@ export class SessionWriteCoordinator {
   }
 
   async finalizeWorkerGroupUpdate({ groupId, group }) {
+    const key = workerGroupCapacityGroupKey(groupId);
+    const joinMode = toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add';
+    // Leaving a mode voids its secrets, so switching back never revives a
+    // leaked password or forgotten codes: the admin sets or makes new ones.
+    // Codes go first, while joins are still closed; a replay repeats this.
+    if (joinMode !== 'one_use') {
+      const state = await this.state.storage.get(key);
+      if (state?.phase === 'updating' && workerGroupInviteCounts(state).unused > 0) {
+        await this.revokeAllUnusedWorkerGroupInvites(groupId, new Date(Number(this.now())).toISOString());
+      }
+    }
     await this.state.storage.transaction(async (transaction) => {
-      const key = workerGroupCapacityGroupKey(groupId);
       const state = await transaction.get(key);
       if (state?.phase !== 'updating') return;
+      const { signer, signerSetAt, ...kept } = withoutPendingMutation(state);
       await transaction.put(key, {
-        ...withoutPendingMutation(state),
+        ...kept,
+        ...(joinMode === 'group_password' && signer ? { signer, signerSetAt } : {}),
         phase: 'active',
         active: true,
-        joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
+        joinMode,
         memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
         listed: resolveWorkerGroupListed(group),
         removalAuth: toTrimmedString(group?.removalAuth).toLowerCase() || 'both',
@@ -2386,6 +2398,47 @@ export class SessionWriteCoordinator {
     return this.respondToWorkerGroupMutation(mutation, result);
   }
 
+  // Revokes the unused codes among `keys` in one transaction. Revoking by hash
+  // marks a code spent by a join still settling too: if that join fails, its
+  // code comes back revoked, not usable. Revoking all of them stamps the time,
+  // which does the same for every such code.
+  async revokeWorkerGroupInvites(groupId, keys, { nowIso, all = false }) {
+    const groupKey = workerGroupCapacityGroupKey(groupId);
+    return this.state.storage.transaction(async (transaction) => {
+      const state = await transaction.get(groupKey);
+      const counts = workerGroupInviteCounts(state);
+      let revoked = 0;
+      for (const key of keys) {
+        const record = await transaction.get(key);
+        if (record?.state === 'used' && !all) await transaction.put(key, { ...record, revokeOnRestore: true });
+        if (record?.state !== 'unused') continue;
+        await transaction.put(key, { ...record, state: 'revoked', revokedAt: nowIso });
+        counts.unused = Math.max(0, counts.unused - 1);
+        counts.revoked += 1;
+        revoked += 1;
+      }
+      await transaction.put(groupKey, { ...state, invites: counts, ...(all ? { invitesRevokedAt: nowIso } : {}) });
+      return { revoked, counts };
+    });
+  }
+
+  // A page at a time, so a group with many codes never loads them all.
+  async revokeAllUnusedWorkerGroupInvites(groupId, nowIso) {
+    const prefix = workerGroupInvitePrefix(groupId);
+    let revoked = 0;
+    let counts;
+    let after = '';
+    do {
+      const page = [...await this.state.storage.list({ prefix, startAfter: after, limit: WORKER_GROUP_REVOKE_BATCH })];
+      after = page.length === WORKER_GROUP_REVOKE_BATCH ? page.at(-1)[0] : '';
+      const keys = page.filter(([, record]) => record?.state === 'unused').map(([key]) => key);
+      const batch = await this.revokeWorkerGroupInvites(groupId, keys, { nowIso, all: true });
+      revoked += batch.revoked;
+      counts = batch.counts;
+    } while (after);
+    return { revoked, counts };
+  }
+
   async applyWorkerGroupSecretOperation(payload) {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
@@ -2483,38 +2536,9 @@ export class SessionWriteCoordinator {
       const all = input.allUnused === true;
       const hashes = all ? null : normalizeWorkerGroupInviteHashes(input.hashes, { max: WORKER_GROUP_REVOKE_BATCH });
       if (all === (input.hashes != null) || (!all && !hashes)) return refuse(400, 'invalid_group_invites');
-      let revoked = 0;
-      let counts = workerGroupInviteCounts(active.state);
-      // A code spent by a join still settling is marked too: if that join
-      // fails, its code comes back revoked, not usable.
-      const revokeBatch = (keys) => this.state.storage.transaction(async (transaction) => {
-        const state = await transaction.get(groupKey);
-        const next = workerGroupInviteCounts(state);
-        for (const key of keys) {
-          const record = await transaction.get(key);
-          if (record?.state === 'used' && !all) await transaction.put(key, { ...record, revokeOnRestore: true });
-          if (record?.state !== 'unused') continue;
-          await transaction.put(key, { ...record, state: 'revoked', revokedAt: nowIso });
-          next.unused = Math.max(0, next.unused - 1);
-          next.revoked += 1;
-          revoked += 1;
-        }
-        await transaction.put(groupKey, { ...state, invites: next, ...(all ? { invitesRevokedAt: nowIso } : {}) });
-        return next;
-      });
-      if (all) {
-        // A page at a time, so a group with many codes never loads them all.
-        let after = '';
-        do {
-          const page = [...await this.state.storage.list({
-            prefix: workerGroupInvitePrefix(groupId), startAfter: after, limit: WORKER_GROUP_REVOKE_BATCH,
-          })];
-          after = page.length === WORKER_GROUP_REVOKE_BATCH ? page.at(-1)[0] : '';
-          counts = await revokeBatch(page.filter(([, record]) => record?.state === 'unused').map(([key]) => key));
-        } while (after);
-      } else {
-        counts = await revokeBatch(hashes.map((hash) => workerGroupInviteKey(groupId, hash)));
-      }
+      const { revoked, counts } = all
+        ? await this.revokeAllUnusedWorkerGroupInvites(groupId, nowIso)
+        : await this.revokeWorkerGroupInvites(groupId, hashes.map((hash) => workerGroupInviteKey(groupId, hash)), { nowIso });
       await bumpStorageBackupRevision(this.state.storage);
       return jsonResponse({ ok: true, status: 200, groupId, revoked, counts }, 200);
     }

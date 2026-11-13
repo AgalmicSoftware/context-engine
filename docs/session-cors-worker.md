@@ -1764,7 +1764,8 @@ back. `group_password` admits whoever brings `proof`, an EIP-191 signature of
 where `<address>` is the joiner's own lowercase address, by the key the app
 derives from the password (see `shared/workerGroupJoin.mjs`). The Worker
 compares its signer with the stored one and never sees the password. A `group_password` group with no password set
-admits no one. `admin_add` admits no one by joining. A member joining again
+admits no one. Changing a group's `joinMode` voids its password and revokes its
+unused codes, so switching back needs a new password or new codes. `admin_add` admits no one by joining. A member joining again
 succeeds without a code being checked or spent. Codes and proofs are never
 stored, logged or returned, and never enter a pending intent or KV.
 

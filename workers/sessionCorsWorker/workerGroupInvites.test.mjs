@@ -190,6 +190,31 @@ test('thirty password joins against a limit of 25 admit exactly 25; a new passwo
   assert.equal(f.groupRecord().memberCount, 26);
 });
 
+test('leaving a join mode voids its password or codes, so switching back revives neither', async () => {
+  const password = await createFixture({ joinMode: 'group_password' });
+  const key = passwordKey('11');
+  await password.admin('groups/password/set', { signer: key.address });
+  // An update that keeps the mode keeps the password.
+  assert.equal((await password.mutate({ operation: 'update', input: { memberLimit: 40 } })).ok, true);
+  assert.equal((await password.join(0, { proof: await proofFor(key, 0) })).ok, true);
+  for (const joinMode of ['admin_add', 'group_password']) {
+    assert.equal((await password.mutate({ operation: 'update', input: { joinMode } })).ok, true);
+  }
+  assert.equal((await password.admin('groups/list')).groups[0].passwordSet, false);
+  assert.deepEqual(await password.join(1, { proof: await proofFor(key, 1) }), REFUSED);
+
+  const oneUse = await createFixture({ joinMode: 'one_use' });
+  const list = codes(2);
+  await oneUse.admin('groups/invites/add', { hashes: await hashes(list) });
+  assert.equal((await oneUse.join(0, { secret: list[0] })).ok, true);
+  for (const joinMode of ['open', 'one_use']) {
+    assert.equal((await oneUse.mutate({ operation: 'update', input: { joinMode } })).ok, true);
+  }
+  const after = await oneUse.admin('groups/invites/list');
+  assert.deepEqual(after.counts, { unused: 0, used: 1, revoked: 1 });
+  assert.deepEqual(await oneUse.join(1, { secret: list[1] }), REFUSED);
+});
+
 test('a join that fails after spending its code gives the code back; a resent one spends nothing more', async () => {
   const f = await createFixture({ joinMode: 'one_use' });
   const [code, other] = codes(2);
