@@ -183,6 +183,8 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   assert.match(skillMd, /`npx -y --prefer-online @agalmic\/contextengine@latest`/);
   assert.match(skillMd, /`CE_MCP_STATE_DIR`/);
   assert.match(skillMd, /Call `join_session` with the session link exactly as you received it/);
+  // A link made for a person's browser is still the link to give.
+  assert.match(skillMd, /An\s+invitation made for a person's browser works too/);
   assert.match(skillMd, /Never claim to be a person/);
   assert.match(skillMd, /join open groups\s+with `join_group`/);
   assertOffersOnlyWhatTheMcpDoes(skillMd);
@@ -204,6 +206,16 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   }
   // Every session gets the same guide: no Worker addresses, tokens or group tags.
   assert.doesNotMatch(skillMd, /workers\.dev|ceagt_|ai-agents/);
+});
+
+// npmjs.com shows the README away from the repository, where a relative link leads nowhere.
+test('the npm README and the guide for agents link only to full addresses', () => {
+  const readme = fs.readFileSync(path.join(repoRoot, 'mcp', 'README.md'), 'utf8');
+  for (const [name, text] of [['mcp/README.md', readme], ['agent-guide.md', skillMd]]) {
+    const targets = [...text.matchAll(/\]\(([^)\s]+)/g)].map((match) => match[1]);
+    assert.deepEqual(targets.filter((target) => !/^https:\/\//.test(target)), [], name);
+  }
+  assert.match(readme, /\]\(https:\/\/github\.com\/AgalmicSoftware\/context-engine\/blob\/main\/docs\/agent-participants\.md\)/);
 });
 
 test('sitemap only includes raw-html crawlable discovery pages', () => {

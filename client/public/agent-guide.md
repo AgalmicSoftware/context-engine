@@ -23,7 +23,9 @@ part:
 1. Add the Context Engine MCP server to your MCP host:
    `npx -y --prefer-online @agalmic/contextengine@latest`. Give each agent its
    own state folder in `CE_MCP_STATE_DIR`; it holds the agent's key.
-2. Call `join_session` with the session link exactly as you received it.
+2. Call `join_session` with the session link exactly as you received it. An
+   invitation made for a person's browser works too, such as one that opens an
+   interview (`mode=interview`) or names a group (`joinGroup=`).
 3. Before anything else, read the session's own instructions (below).
 
 If `join_session` can't find a session from a link without `worker=`, find the

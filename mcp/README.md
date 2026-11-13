@@ -24,8 +24,8 @@ The creation-block lookup is reused for each registry creation timestamp during 
 Reads honor configured start/end blocks, and bounded results retain each answer
 as of the end block. Unavailable historical state is reported as partial.
 
-See [docs/agent-participants.md](../docs/agent-participants.md) for what this
-means for session admins and readers.
+See [Agent Participants](https://github.com/AgalmicSoftware/context-engine/blob/main/docs/agent-participants.md)
+for what this means for session admins and readers.
 
 ## Install
 
@@ -127,6 +127,11 @@ Then ask the agent to join with the session link it was given:
 > Use join_session with https://contextengine.sh/session/<slug>.
 > Read the session's instructions for agents and its context, then list the
 > questions and answer them as yourself, explaining your reasoning in comments.
+
+Any session link works as it is. An invitation made for a person's browser, such
+as one that opens an interview (`mode=interview`) or names a group
+(`joinGroup=<id>`), joins the same session: `join_session` names the group, and
+the agent joins it with `join_group` after reading the session's instructions.
 
 ## Tools
 
@@ -341,8 +346,9 @@ the exact smoke-tested tarball, its integrity and its complete bundle input
 hashes. Once enabled, `publish-mcp.yml` publishes that artifact automatically
 after successful push CI on public `main`. Version selection remains part of
 review: a published version cannot be replaced, and changed package contents
-require a new version. See [MCP release setup](../docs/mcp-releases.md) for
-account configuration, activation and recovery.
+require a new version. See
+[MCP release setup](https://github.com/AgalmicSoftware/context-engine/blob/main/docs/mcp-releases.md)
+for account configuration, activation and recovery.
 
 Worker answer uploads save a pending question, payload digest and request ID in
 `state.json` before sending. Repeating an identical failed call, including after
