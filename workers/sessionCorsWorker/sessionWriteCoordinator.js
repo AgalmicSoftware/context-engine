@@ -5,7 +5,7 @@ import { executeAgentQuestionQueueAdvance } from './agent/agentQuestionQueue.mjs
 import { dispatchWrappedResearch } from './agent/wrappedJournal.mjs';
 import { controlCoordinatorBackupImport, assertNoActiveBackupImport } from './sessionBackupLifecycle.js';
 import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
-import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
+import { backupExportActive, bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { createOperationQueue } from './operationQueue.js';
 import {
@@ -2596,7 +2596,9 @@ export class SessionWriteCoordinator {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     if (!slug) return jsonResponse({ error: 'Invalid session slug.' }, 400);
     try {
-      return jsonResponse({ ok: true, ...(await this.readCurrentSessionConfig(slug)) });
+      // Writes skip their backup marks only while no export holds its lease.
+      const backupExport = await backupExportActive(this.state.storage);
+      return jsonResponse({ ok: true, ...(await this.readCurrentSessionConfig(slug)), backupExportActive: backupExport });
     } catch (error) {
       if (error?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
         const safeError = legacySessionConfigMigrationError();

@@ -49,24 +49,33 @@ const createReadShare = (copy) => {
     if (!state) slugs.set(slug, state = { generation: 0, cached: null, inFlight: null });
     return state;
   };
+  // When a read was asked: what it saw is no older than this. Not enumerable,
+  // so callers comparing results see only what the coordinator answered.
+  const stamp = (result, readStartedAt) => {
+    if (result && typeof result === 'object' && !Object.isFrozen(result)) Object.defineProperty(result, 'readStartedAt', { value: readStartedAt });
+    return result;
+  };
   const share = (state, read) => {
     const joined = state.inFlight;
     if (!joined) {
       const generation = state.generation;
+      const startedAt = Date.now();
       const pending = read().then((result) => {
         // A read that overlapped a change made here may predate it; never keep it.
         if (result?.ok && state.generation === generation) {
-          state.cached = { result, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
+          state.cached = { result, startedAt, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
         }
         return result;
       }).finally(() => { if (state.inFlight === pending) state.inFlight = null; });
       state.inFlight = pending;
-      return pending.then(copy);
+      state.inFlightStartedAt = startedAt;
+      return pending.then((result) => stamp(copy(result), startedAt));
     }
+    const joinedStartedAt = state.inFlightStartedAt;
     let timer;
     const stalled = new Promise((resolve) => { timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED); });
     return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
-      if (result !== STALLED) return copy(result);
+      if (result !== STALLED) return stamp(copy(result), joinedStartedAt);
       // The stalled read may still finish; it must not replace a newer copy.
       if (state.inFlight === joined) { state.inFlight = null; state.generation += 1; }
       return share(state, read);
@@ -75,7 +84,7 @@ const createReadShare = (copy) => {
   return {
     read: ({ binding, slug, cache, read }) => {
       const state = stateFor(binding, slug);
-      if (cache && state.cached && Date.now() < state.cached.expiresAt) return Promise.resolve(copy(state.cached.result));
+      if (cache && state.cached && Date.now() < state.cached.expiresAt) return Promise.resolve(stamp(copy(state.cached.result), state.cached.startedAt));
       return share(state, read);
     },
     forget: (binding, slug) => {

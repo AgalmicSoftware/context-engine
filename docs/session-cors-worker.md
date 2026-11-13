@@ -1308,6 +1308,15 @@ visibility changes during export, returning `complete: false` and
 cannot provide a joint point-in-time snapshot. Keep the complete JSONL archive with the deployment's
 recovery key; a fingerprint cannot decrypt it.
 
+A write marks that revision before its first change and after its last, but
+only when an export could see the mark. Each export page takes or renews a
+10-minute export lease. The first page then waits 5 seconds before it reads
+the revision it starts from. A write skips a mark only when a settings view
+asked for at most 2 seconds earlier showed no lease. A skipped mark therefore
+falls before the export's starting read, where it could not have changed the
+outcome. If the lease lapses between pages, the next page restarts the export,
+because writes in the gap skipped their marks.
+
 Backup restore reads JSONL as a UTF-8 stream, validating the complete file before
 signing and holding only one page while importing. Resuming reopens the selected
 file and skips completed pages. Restore requires an empty target session: no

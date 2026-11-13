@@ -8,7 +8,8 @@ import { storageRoute } from './storageRouteExecution.js';
 import { exportSessionBackup as exportPage } from './sessionBackup.js';
 import { sendSessionFeedback } from './sessionFeedbackRoute.js';
 import { STORAGE_EXPORT_PAGE_LIMITS } from './storageScanBudget.js';
-import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
+import { callSessionConfigCoordinator, forgetSessionConfig } from './sessionConfigAuthority.js';
+import { BACKUP_EXPORT_LEASE_MS, BACKUP_EXPORT_SETTLE_MS, BACKUP_VIEW_MAX_AGE_MS, markStorageBackupWrite } from './storageBackupRevision.js';
 import { workerGroupBackupPrefixes, coordinateWorkerGroupBackup, executeCoordinatedWorkerGroupMutation } from './workerGroups.js';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -259,7 +260,9 @@ test('signed backup replies identify config, group, and invalid-cursor restarts'
 
 const exportSessionBackup = async (args) => {
   for (;;) {
-    const page = await args.env.GROUP_KV.request(() => exportPage(args));
+    // Tests skip the first page's wait; dropping this isolate's settings copy
+    // stands in for its ageing out meanwhile. Tests below drive the wait.
+    const page = await args.env.GROUP_KV.request(() => exportPage({ settle: async () => forgetSessionConfig(args.env, slug), ...args }));
     if (!page.preparing) return page;
     assert.ok(page.nextCursor && page.nextCursor !== args.cursor);
     args = { ...args, cursor: page.nextCursor };
@@ -983,6 +986,154 @@ test('an upload between export pages makes the archive incomplete and asks for a
   assert.match(next.error, /session changed during export; export again/i);
 });
 
+
+// Only a backup mark landing after an export read its start revision can
+// change the export, so writes skip the marks no export could see.
+const answerUpload = (source, value) => storageRoute({ path: '/storage/upload', method: 'POST', env: source.env, slug,
+  config: JSON.parse(source.kv.values.get(`session:${slug}:config`)), uploaderAddress: admin, expectedAuthority,
+  request: makeJsonRequest('/storage/upload', { resource: 'responses', data: JSON.stringify({ questionID: `0x${'7'.repeat(64)}`, answer: { value } }) }),
+  baseHeaders: new Headers() });
+const countCoordinatorCalls = (env, onCall = () => {}) => {
+  const calls = [];
+  const binding = env.CE_SESSION_COORDINATOR;
+  env.CE_SESSION_COORDINATOR = { idFromName: (name) => binding.idFromName(name), get: (id) => {
+    const stub = binding.get(id);
+    return { fetch: (url, init) => {
+      const path = new URL(url).pathname.replace('/session-config/', '');
+      calls.push(path);
+      onCall(path);
+      return stub.fetch(url, init);
+    } };
+  } };
+  return calls;
+};
+// Moves this process's clock, the coordinator's included.
+const shiftableClock = (t) => {
+  const realNow = Date.now.bind(Date);
+  let offset = 0;
+  t.mock.method(Date, 'now', () => realNow() + offset);
+  return (ms) => { offset += ms; };
+};
+const marks = (calls) => calls.filter((path) => path === 'backup/write-revision').length;
+
+test('an answer marks no backup revision while no export runs, and marks both sides during one', async () => {
+  const source = largeArchiveSource();
+  const calls = countCoordinatorCalls(source.env);
+  assert.equal((await answerUpload(source, 'No export')).status, 200);
+  assert.equal(marks(calls), 0);
+  assert.ok((await exportSessionBackup({ env: source.env, slug, expectedAuthority })).nextCursor);
+  assert.equal((await answerUpload(source, 'During export')).status, 200);
+  assert.equal(marks(calls), 2);
+});
+
+test('a write marks when its settings view was asked for more than 2 s ago', async (t) => {
+  const { env } = fixture();
+  const shift = shiftableClock(t);
+  let slow = false;
+  const calls = countCoordinatorCalls(env, (path) => { if (slow && path === 'current') shift(BACKUP_VIEW_MAX_AGE_MS + 1); });
+  await markStorageBackupWrite(env, slug);
+  assert.deepEqual(calls, ['current']);
+  forgetSessionConfig(env, slug);
+  slow = true;
+  await markStorageBackupWrite(env, slug);
+  assert.deepEqual(calls, ['current', 'current', 'backup/write-revision']);
+});
+
+test('an export waits after taking its lease, so a write that skipped its first mark makes its last', async (t) => {
+  const source = largeArchiveSource();
+  const shift = shiftableClock(t);
+  // A write begins with no export running, so it skips its first mark.
+  const calls = countCoordinatorCalls(source.env);
+  await markStorageBackupWrite(source.env, slug);
+  assert.equal(marks(calls), 0);
+  // An export takes its lease and waits before it reads its start revision.
+  const first = await exportSessionBackup({ env: source.env, slug, expectedAuthority, settle: async () => shift(BACKUP_EXPORT_SETTLE_MS) });
+  assert.ok(first.nextCursor);
+  // The write's last check, after the wait, sees the lease, so it marks and the export restarts.
+  await markStorageBackupWrite(source.env, slug);
+  assert.equal(marks(calls), 1);
+  const next = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: first.nextCursor });
+  assert.equal(next.reason, 'backup_session_changed');
+});
+
+test('an export whose lease lapsed between pages restarts, since writes then skip their marks', async (t) => {
+  const source = largeArchiveSource();
+  const shift = shiftableClock(t);
+  const first = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  shift(BACKUP_EXPORT_LEASE_MS + 1);
+  const calls = countCoordinatorCalls(source.env);
+  assert.equal((await answerUpload(source, 'After the lease')).status, 200);
+  assert.equal(marks(calls), 0);
+  const next = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: first.nextCursor });
+  assert.equal(next.reason, 'backup_session_changed');
+});
+
+test('a backup taken while answers are saved restores every answer saved before its cut and none half-written', async (t) => {
+  const source = largeArchiveSource();
+  const shift = shiftableClock(t);
+  const saved = [];
+  const save = async (value) => {
+    const response = await answerUpload(source, value);
+    assert.equal(response.status, 200, await response.clone().text());
+    saved.push((await response.json()).id);
+  };
+  // One answer is mid-write when the export takes its lease: stopped before its list row.
+  const put = source.kv.put;
+  let reachHold;
+  let release;
+  const reached = new Promise((resolve) => { reachHold = resolve; });
+  const held = new Promise((resolve) => { release = resolve; });
+  let holdNext = true;
+  source.kv.put = async (key, ...rest) => {
+    if (holdNext && key.startsWith(`ce-storage:${slug}:responses:`)) { holdNext = false; reachHold(); await held; }
+    return put(key, ...rest);
+  };
+  const midWrite = save('Mid-write at the cut');
+  await reached;
+  let pages = null;
+  let cut = [];
+  let attempts = 0;
+  for (; !pages; attempts += 1) {
+    const attempt = [];
+    let cursor = '';
+    do {
+      const page = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor, settle: async () => {
+        // During the wait the mid-write answer finishes and another is saved;
+        // the export's start revision, its cut, is read after this.
+        release();
+        await midWrite;
+        await save(`During the wait ${attempts}`);
+        cut = [...saved];
+        shift(BACKUP_EXPORT_SETTLE_MS);
+      } });
+      attempt.push(page);
+      cursor = page.nextCursor;
+      // For two attempts, answers keep arriving between pages.
+      if (cursor && attempts < 2) await save(`Between pages ${attempts}`);
+    } while (cursor);
+    if (attempt.at(-1).manifest.complete) pages = attempt;
+    else assert.equal(attempt.at(-1).reason, 'backup_session_changed');
+  }
+  assert.equal(attempts, 3);
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  let result;
+  for (const page of pages) {
+    result = await importPage(target.env, page);
+    assert.equal(result.ok, true, JSON.stringify(result));
+  }
+  assert.equal(result.body.complete, true);
+  const ids = (kv, prefix) => [...kv.values.keys()].filter((key) => key.startsWith(prefix)).map((key) => key.split(':').pop()).sort();
+  const answers = ids(target.kv, `ce-storage:${slug}:responses:`);
+  // Every answer saved before the cut is restored, and nothing else.
+  assert.deepEqual(answers, [...cut, 'cf_abandon_fixture'].sort());
+  // Nothing half-written: each restored answer has its payload, and each payload its answer.
+  assert.deepEqual(ids(target.kv, `ce-storage-payload:${slug}:`), answers);
+  for (const id of cut) {
+    const payload = `ce-storage-payload:${slug}:${id}`;
+    assert.equal(target.kv.values.get(payload), source.kv.values.get(payload), id);
+  }
+});
 
 test('large group snapshots and small payload pages stay within the KV request budget', async (t) => {
   const source = fixture();
