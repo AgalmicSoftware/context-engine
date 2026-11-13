@@ -790,7 +790,7 @@ describe('deploy-helper worker', () => {
       expect(uploadMetadata.compatibility_flags).toContain('global_fetch_strictly_public');
       // The Worker keeps its own log lines.
       expect(uploadMetadata.observability).toEqual({
-        enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: true },
+        enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false },
       });
       expect(uploadMetadata.bindings).toContainEqual({
         name: 'CE_SESSION_COORDINATOR',

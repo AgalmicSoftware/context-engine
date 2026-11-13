@@ -31,9 +31,11 @@ export const DEFAULT_FAUCET_RPC_URL = getPathRpcUrl(11155420) || '';
 export const DEFAULT_FAUCET_AMOUNT_ETH = '0.0002';
 export const DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH = '0.001';
 export const DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = true;
-// The same in the checked-in template's wrangler.jsonc.
+// The same in the checked-in template's wrangler.jsonc. The Worker's own lines
+// are kept; invocation logs are not, since they record each request's URL,
+// and some URLs carry a sign-in ticket.
 export const SESSION_WORKER_OBSERVABILITY = Object.freeze({
-  enabled: true, head_sampling_rate: 1, logs: Object.freeze({ enabled: true, invocation_logs: true }),
+  enabled: true, head_sampling_rate: 1, logs: Object.freeze({ enabled: true, invocation_logs: false }),
 });
 // Fail closed for self-hosted/manual deploys that forgot to configure
 // ALLOWED_ORIGINS. The broader CE/local bootstrap defaults belong in the

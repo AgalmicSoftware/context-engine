@@ -90,7 +90,6 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     });
     if (!attestation.ok) {
       log('[gating] sbt rpc chain attestation failed', {
-        address,
         rpcUrl: rpcUrlDiagnostic,
         expectedChainId: attestation.expectedChainId,
         actualChainId: attestation.actualChainId,
@@ -135,7 +134,6 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     );
     if (!checks.some(Boolean) && errors.length) {
       log('[gating] sbt balanceOf failed', {
-        address,
         rpcUrl: rpcUrlDiagnostic,
         errors,
       });

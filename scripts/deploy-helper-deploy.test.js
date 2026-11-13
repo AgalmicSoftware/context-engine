@@ -162,10 +162,10 @@ test('manual Worker deployment configs permit public same-account Worker calls',
   }
 });
 
-test('the Session Worker template keeps its logs', () => {
+test('the Session Worker template keeps its own logs, not request URLs', () => {
   const source = fs.readFileSync(path.join(__dirname, '../deploy/cloudflare/session-worker/wrangler.jsonc'), 'utf8');
   assert.deepEqual(JSON.parse(source).observability, {
-    enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: true },
+    enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false },
   });
 });
 

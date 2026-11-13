@@ -2835,7 +2835,6 @@ test('storageRoute rejects a private session RPC on the wrong chain before any S
 		[
 			'[gating] sbt rpc chain attestation failed',
 			{
-				address: '0x0000000000000000000000000000000000000abc',
 				rpcUrl: PRIVATE_SESSION_RPC_LABEL,
 				expectedChainId: 31337,
 				actualChainId: 84532,

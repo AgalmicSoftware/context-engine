@@ -150,7 +150,6 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate 
   assert.deepEqual(logs, [[
     '[gating] sbt balanceOf failed',
     {
-      address: '0x00000000000000000000000000000000000000cc',
       rpcUrl: PRIVATE_SESSION_RPC_LABEL,
       errors: [{
         sbt: '0x00000000000000000000000000000000000000bb',

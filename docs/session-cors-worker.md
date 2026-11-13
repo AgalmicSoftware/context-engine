@@ -103,7 +103,7 @@ in `workers/sessionCorsWorker/agent/` within the Session Worker.
 - Per-session worker: set `DEFAULT_SESSION_SLUG` to the session slug (single-tenant).
 - Multi-tenant worker: leave `DEFAULT_SESSION_SLUG` empty; all requests must include `X-Session-Slug` (legacy `X-Group-Slug` still accepted) or a token claim.
 - Note: the registry’s default session is stored under the literal `general` slug; the worker maps an empty slug to `general` for gate lookups.
-- Logs: the deploy helper's upload and the checked-in `wrangler.jsonc` both set `observability` on (all requests, invocation logs kept), so the Worker's own lines, such as why its coordinator or a limit, receipt or sign-in object did not answer, can be read in the dashboard afterwards. A Worker deployed before this keeps whatever Cloudflare gave it; check it under the Worker's Observability tab.
+- Logs: the deploy helper's upload and the checked-in `wrangler.jsonc` both set `observability` on for all requests, so the Worker's own lines, such as why its coordinator or a limit, receipt or sign-in object did not answer, can be read in the dashboard afterwards. Invocation logs, one per request with its URL, are off: an interview catalog link carries a sign-in ticket in its query string. A Worker deployed before this keeps whatever Cloudflare gave it; check it under the Worker's Observability tab.
 
 ## Runtime dependency boundary
 
