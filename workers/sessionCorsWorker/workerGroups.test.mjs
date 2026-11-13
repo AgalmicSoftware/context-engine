@@ -736,12 +736,11 @@ test('Worker Groups prefer an independently migrated coordinator binding when co
 	assert.equal(kv.store.size, 0);
 });
 
-test('worker group CRUD stores memberships separately and enforces caps', async () => {
+test('worker group CRUD stores memberships separately and enforces the group cap', async () => {
 	const kv = createMockKv();
 	const env = {
 		CE_WORKER_GROUPS_KV: kv,
 		CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
-		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '1',
 	};
 	const deps = {
 		now: () => Date.parse('2026-02-03T04:05:06.000Z'),
@@ -789,16 +788,6 @@ test('worker group CRUD stores memberships separately and enforces caps', async 
 		true,
 	);
 
-	const overflow = await addWorkerGroupMember({
-		env,
-		slug: 'session-a',
-		groupId: 'group-alpha',
-		principal: { kind: 'telegram', principalId: 'telegram:test-user-2' },
-		actorPrincipal: actor,
-		deps,
-	});
-	assert.equal(overflow.ok, false);
-	assert.equal(overflow.reason, 'worker_group_member_cap_exceeded');
 
 	const membership = await readWorkerGroupMembershipProjection({
 		env,
@@ -818,11 +807,10 @@ test('worker group CRUD stores memberships separately and enforces caps', async 
 	assert.equal(denied.reason, 'worker_group_membership_denied');
 });
 
-test('worker group metadata is validated, persisted, projected, and enforces its own member limit', async () => {
+test('worker group metadata is validated, persisted and projected', async () => {
 	const kv = createMockKv();
 	const env = {
 		CE_WORKER_GROUPS_KV: kv,
-		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '5',
 	};
 	const deps = {
 		now: () => Date.parse('2026-02-03T04:05:06.000Z'),
@@ -860,16 +848,6 @@ test('worker group metadata is validated, persisted, projected, and enforces its
 		deps,
 	});
 	assert.equal(first.ok, true);
-	const overflow = await addWorkerGroupMember({
-		env,
-		slug: 'session-a',
-		groupId: 'metadata-group',
-		principal: { kind: 'telegram', principalId: 'telegram:overflow' },
-		actorPrincipal: actor,
-		deps,
-	});
-	assert.equal(overflow.ok, false);
-	assert.equal(overflow.reason, 'worker_group_member_cap_exceeded');
 
 	const unsafeUrl = await createWorkerGroup({
 		env,

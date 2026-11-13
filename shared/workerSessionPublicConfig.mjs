@@ -39,6 +39,7 @@ export const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'resultsExposure',
   'workerAuthority',
   'groupCreationPolicy',
+  'groupMemberCeiling',
   'contextAdditionPolicy',
   'sessionAgent',
   'linkedWorkerGroups',

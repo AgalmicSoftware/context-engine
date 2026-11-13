@@ -8,6 +8,7 @@ import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispa
 import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { createOperationQueue } from './operationQueue.js';
+import { WORKER_GROUP_MEMBER_CEILING_DEFAULT, WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mjs';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import {
   SESSION_CONFIG_COORDINATION_ERROR, assertExpectedSessionAuthority, forgetResultsAnalysisStatus, forgetSessionConfig,
@@ -376,6 +377,14 @@ const WORKER_GROUP_INPUT_FIELDS = Object.freeze([
   'memberLimit', 'joinEndsAt', 'joinMode', 'memberVisibility', 'removalAuth', 'adminAddress',
 ]);
 const WORKER_GROUP_INTENT_MAX_BYTES = 32 * 1024;
+
+// The session's most members in a group, as session config passes it; any
+// other value reads as the default.
+const resolveWorkerGroupMemberCeiling = (value) => (
+  Number.isSafeInteger(value) && value >= 1 && value <= WORKER_GROUP_MEMBER_CEILING_MAX
+    ? value
+    : WORKER_GROUP_MEMBER_CEILING_DEFAULT
+);
 
 const pickWorkerGroupInput = (input) => Object.fromEntries(WORKER_GROUP_INPUT_FIELDS
   .filter((key) => isObjectRecord(input) && Object.prototype.hasOwnProperty.call(input, key))
@@ -1560,7 +1569,7 @@ export class SessionWriteCoordinator {
   async reserveWorkerGroupMemberSlot({
     groupId,
     principalDigest,
-    maxMembersPerGroup,
+    memberCeiling,
     intent,
   }) {
     return this.state.storage.transaction(async (transaction) => {
@@ -1588,8 +1597,8 @@ export class SessionWriteCoordinator {
       }
       const configuredMemberLimit = normalizePositiveSafeInteger(groupState.memberLimit);
       const effectiveMemberLimit = configuredMemberLimit
-        ? Math.min(configuredMemberLimit, maxMembersPerGroup)
-        : maxMembersPerGroup;
+        ? Math.min(configuredMemberLimit, memberCeiling)
+        : memberCeiling;
       if (Number(groupState.memberCount || 0) >= effectiveMemberLimit) {
         return { ok: false, status: 409, reason: 'worker_group_member_cap_exceeded' };
       }
@@ -2076,9 +2085,14 @@ export class SessionWriteCoordinator {
     // while this queue is held.
     return this.sessionConfigQueue.shared('', async () => {
       try {
-        await this.assertSessionAuthority(payload);
+        const authority = await this.assertSessionAuthority(payload);
         const { expectedAuthority: _expectedAuthority, ...mutation } = payload;
-        const result = await forwardWorkerGroupMutation({ ...mutation, env: this.env });
+        // The ceiling comes from the config this object holds, never the request.
+        const result = await forwardWorkerGroupMutation({
+          ...mutation,
+          memberCeiling: authority?.config?.groupMemberCeiling,
+          env: this.env,
+        });
         return jsonResponse(result, result.status || (result.ok ? 200 : 503));
       } catch (error) {
         return jsonResponse({ ok: false, error: error.message || 'Worker group request failed.',
@@ -2115,6 +2129,13 @@ export class SessionWriteCoordinator {
       return jsonResponse(initialized, initialized.status || 503);
     }
     const caps = resolveWorkerGroupCaps(this.env);
+    const memberCeiling = resolveWorkerGroupMemberCeiling(payload?.memberCeiling);
+    if (
+      (mutation.operation === 'create' || mutation.operation === 'update') &&
+      Number(mutation.input?.memberLimit) > memberCeiling
+    ) {
+      return jsonResponse({ ok: false, status: 400, reason: 'worker_group_member_limit_above_ceiling' }, 400);
+    }
     let groupReservation = null;
     let memberReservation = null;
     let updateReservation = null;
@@ -2217,7 +2238,7 @@ export class SessionWriteCoordinator {
       memberReservation = await this.reserveWorkerGroupMemberSlot({
         groupId: mutation.groupId,
         principalDigest,
-        maxMembersPerGroup: caps.maxMembersPerGroup,
+        memberCeiling,
         intent,
       });
       if (!memberReservation.ok) {

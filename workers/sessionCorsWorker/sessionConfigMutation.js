@@ -22,6 +22,7 @@ import {
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 import { normalizeWorkerSessionAppearance } from '../shared/sessionColorSchemeConfig.mjs';
 import { validResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
+import { WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mjs';
 import { validateSessionContext } from '../../shared/sessionContext.mjs';
 import { validateSessionAgent } from '../../shared/sessionAgent.mjs';
 import {
@@ -52,6 +53,11 @@ const validGroupCreationPolicy = (config) =>
   !hasOwn(config, 'groupCreationPolicy') ||
   config?.groupCreationPolicy === 'admin_only' ||
   config?.groupCreationPolicy === 'participants';
+// The most members any one group may have; a group's own limit is capped at it.
+const validGroupMemberCeiling = (config) =>
+  !hasOwn(config, 'groupMemberCeiling') ||
+  (Number.isSafeInteger(config.groupMemberCeiling) && config.groupMemberCeiling >= 1 &&
+    config.groupMemberCeiling <= WORKER_GROUP_MEMBER_CEILING_MAX);
 const validContextAdditionPolicy = (config) =>
   !hasOwn(config, 'contextAdditionPolicy') ||
   config?.contextAdditionPolicy === 'admin_only' ||
@@ -312,6 +318,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (!validContextAdditionPolicy(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid context addition policy.' };
     }
+    if (!validGroupMemberCeiling(incomingConfig)) {
+      return { ok: false, status: 400, error: `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.` };
+    }
     if (!validAppearanceConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid session appearance config.' };
     }
@@ -424,6 +433,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   }
   if (!validContextAdditionPolicy(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid context addition policy.' };
+  }
+  if (!validGroupMemberCeiling(mergedConfig)) {
+    return { ok: false, status: 400, error: `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.` };
   }
   if (!validAppearanceConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid session appearance config.' };

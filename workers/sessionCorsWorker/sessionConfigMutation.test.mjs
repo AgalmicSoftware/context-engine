@@ -5,6 +5,7 @@ import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import { resolveRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
 import { resolveSessionConfigSessionIdHex } from './sessionConfigMutation.js';
+import { projectPublicWorkerSessionConfig } from '../shared/workerSessionConfig.mjs';
 
 const baseConfig = {
   slug: 'session-a',
@@ -268,6 +269,31 @@ test('set-config persists only exact group creation policies', () => {
       ok: false,
       status: 400,
       error: 'Invalid group creation policy.',
+    });
+  }
+});
+
+test('set-config takes a group member ceiling from 1 to 10,000, and it reaches the public config', () => {
+  for (const groupMemberCeiling of [1, 1000, 10000]) {
+    const result = applySessionConfigMutation({
+      existingConfig: baseConfig,
+      mutation: { kind: 'set-config', incomingConfig: { groupMemberCeiling } },
+      slug: 'session-a',
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.config.groupMemberCeiling, groupMemberCeiling);
+    assert.equal(projectPublicWorkerSessionConfig(result.config).groupMemberCeiling, groupMemberCeiling);
+  }
+  for (const groupMemberCeiling of [0, 10001, 1.5, '500', null]) {
+    const invalid = applySessionConfigMutation({
+      existingConfig: baseConfig,
+      mutation: { kind: 'set-config', incomingConfig: { groupMemberCeiling } },
+      slug: 'session-a',
+    });
+    assert.deepEqual(invalid, {
+      ok: false,
+      status: 400,
+      error: 'groupMemberCeiling must be a whole number from 1 to 10000.',
     });
   }
 });

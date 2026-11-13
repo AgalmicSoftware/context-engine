@@ -1476,7 +1476,12 @@ principal with the session's `groups` scope. The Worker ignores caller-selected
 identifiers and access modes, generates participant-created IDs, and forces
 those groups to open self-join with session visibility. The configured worker
 admin retains the signed create, edit, delete, and membership controls under
-either policy. Group discovery is independent: an unsigned `GET /groups/list`
+either policy. The top-level `groupMemberCeiling` (a whole number from 1 to
+10,000, default 1,000) is the most members any group may have: a group's own
+`memberLimit` may not exceed it, and the coordinator caps every group at the
+lower of the two, reading the ceiling from the session config it holds.
+Lowering it below a group's current count refuses new joins and removes no one.
+Group discovery is independent: an unsigned `GET /groups/list`
 is accepted when the validated session mode declares public stored results
 over unencrypted, ungated Cloudflare storage, or when it carries a join link's
 `joinGroup` for a group someone could join on their own. It returns only
@@ -1660,7 +1665,7 @@ Implemented routes:
   resolution, coordinator access, or KV mutation.
 - `POST /admin/groups/create`: admin-signed create. Alongside label,
   description, and image, records accept `tags` (maximum 20),
-  `documentURLs` (maximum 10 public HTTPS URLs), `memberLimit` (1–1,000),
+  `documentURLs` (maximum 10 public HTTPS URLs), `memberLimit` (1 to the session's `groupMemberCeiling`),
   future `joinEndsAt`, `adminAddress`, and `removalAuth` (below). `joinMode`
   supports `admin_add` and `open`; `password` and `invite` are recognized but
   rejected with `join_mode_not_implemented`.
@@ -1951,7 +1956,6 @@ Vars:
 - `BOOTSTRAP_ADMIN_ADDRESS` (public admin address allowed to write the first
   session config; see [Auth flow](#auth-flow-siwe-style))
 - `CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION` (optional; defaults to `100`)
-- `CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP` (optional; defaults to `1000`)
 - `CE_WORKER_GROUPS_BOOTSTRAP` (manual fresh-namespace assertion for the
   standalone Cloudflare template; keep the packaged
   `fresh-template-v2` value only when `GROUP_KV` is newly provisioned, and

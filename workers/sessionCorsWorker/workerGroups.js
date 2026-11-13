@@ -9,6 +9,7 @@ import {
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { workerConfigAllowsAnonymousGroupDiscovery } from '../shared/workerConfigModeValidation.mjs';
 import { toStr } from './stringCoercion.js';
+import { WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mjs';
 
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -35,12 +36,10 @@ export const WORKER_GROUP_REMOVAL_AUTH = Object.freeze({
 });
 
 export const DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
-export const DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1000;
 export const MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
 export const MAX_WORKER_GROUP_DOCUMENT_URLS = 10;
 export const MAX_WORKER_GROUP_TAGS = 20;
 export const MAX_WORKER_GROUP_TAG_LENGTH = 64;
-export const MAX_WORKER_GROUP_MEMBER_LIMIT = 1000;
 export const MAX_WORKER_GROUP_ID_LENGTH = 80;
 export const MAX_WORKER_GROUP_SESSION_SLUG_LENGTH = 128;
 export const DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
@@ -134,7 +133,6 @@ const encodeWorkerGroupMemberCursor = (source, cursor = '') => `${WORKER_GROUP_M
 
 export const resolveWorkerGroupCaps = (env = {}) => ({
 	maxGroupsPerSession: parsePositiveInt(env.CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION),
-	maxMembersPerGroup: parsePositiveInt(env.CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP),
 });
 
 export const resolveWorkerGroupsKv = (env = {}) =>
@@ -184,8 +182,6 @@ const memberIndexKey = ({ slug, sessionId, principalKey, groupId }) =>
 	`ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:${normalizeWorkerGroupId(groupId)}`;
 const memberPrefix = ({ slug, sessionId, groupId }) =>
 	`ce-worker-group-member:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}:`;
-const principalPrefix = ({ slug, sessionId, principalKey }) =>
-	`ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:`;
 
 const legacyGroupKey = ({ slug, groupId }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
 const legacyGroupPrefix = ({ slug }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:`;
@@ -270,7 +266,7 @@ const normalizeGroupDocumentUrls = (value) => {
 const normalizeGroupMemberLimit = (value) => {
 	if (value == null || value === '' || Number(value) === 0) return { ok: true, value: 0 };
 	const memberLimit = Number(value);
-	if (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > MAX_WORKER_GROUP_MEMBER_LIMIT) {
+	if (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > WORKER_GROUP_MEMBER_CEILING_MAX) {
 		return { ok: false };
 	}
 	return { ok: true, value: memberLimit };
@@ -881,36 +877,6 @@ const readMembershipRecord = async ({ store, slug, sessionId, groupId, principal
 	return null;
 };
 
-const listMembershipRecords = async ({ store, slug, sessionId, groupId = '', principalKey = '' }) => {
-	const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-	if (!canonicalSessionId) throw new Error('Worker group session identity is invalid.');
-	const prefix = groupId
-		? memberPrefix({ slug, sessionId: canonicalSessionId, groupId })
-		: principalPrefix({ slug, sessionId: canonicalSessionId, principalKey });
-	const members = [];
-	for (const key of await kvListKeys(store.store, prefix)) {
-		let indexedGroupId = groupId;
-		if (!indexedGroupId) {
-			try {
-				indexedGroupId = await store.store.get(key);
-			} catch {
-				throw new Error('Worker group membership index is unavailable.');
-			}
-		}
-		if (!normalizeWorkerGroupId(indexedGroupId)) throw new Error('Worker group membership index is malformed.');
-		if (!groupId && key !== memberIndexKey({ slug, sessionId: canonicalSessionId, principalKey, groupId: indexedGroupId })) {
-			throw new Error('Worker group membership index does not match its key.');
-		}
-		const rawRow = groupId
-			? await kvGetJsonStrict(store.store, key)
-			: await readMembershipRecord({ store, slug, sessionId: canonicalSessionId, groupId: indexedGroupId, principalKey });
-		const row = canonicalizeMembershipRecord({ row: rawRow, slug, sessionId: canonicalSessionId, groupId: indexedGroupId, principalKey });
-		if (!row && rawRow) throw new Error('Worker group membership KV record does not match its key.');
-		if (row && !row.removedAt) members.push(row);
-	}
-	return members;
-};
-
 const listMembershipRecordPage = async ({ store, slug, sessionId, groupId, cursor, limit }) => {
 	const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
 	if (!canonicalSessionId) throw new Error('Worker group session identity is invalid.');
@@ -1076,7 +1042,6 @@ export const addWorkerGroupMember = async ({
 	groupId,
 	principal,
 	actorPrincipal,
-	capacityAuthorized = false,
 	resume = false,
 	deps = {},
 } = {}) => {
@@ -1086,27 +1051,16 @@ export const addWorkerGroupMember = async ({
 	if (!group || group.deletedAt) return { ok: false, status: 404, reason: 'worker_group_not_found' };
 	const normalized = normalizeWorkerGroupPrincipal(principal, deps);
 	if (!normalized.ok) return { ok: false, status: 400, reason: normalized.reason };
-	let existing;
-	if (capacityAuthorized) {
-		const existingRecord = await readMembershipRecord({
-			store,
-			slug,
-			sessionId,
-			groupId,
-			principalKey: normalized.key,
-		});
-		existing = existingRecord && !existingRecord.removedAt ? existingRecord : null;
-	} else {
-		const caps = resolveWorkerGroupCaps(env);
-		const configuredMemberLimit =
-			Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? group.memberLimit : caps.maxMembersPerGroup;
-		const effectiveMemberLimit = Math.min(configuredMemberLimit, caps.maxMembersPerGroup);
-		const members = await listMembershipRecords({ store, slug, sessionId, groupId });
-		existing = members.find((member) => member.principalKey === normalized.key);
-		if (!existing && members.length >= effectiveMemberLimit) {
-			return { ok: false, status: 409, reason: 'worker_group_member_cap_exceeded' };
-		}
-	}
+	// Only the person's own record is read: the coordinator holds the count and
+	// the limit, so this cost doesn't grow with the group.
+	const existingRecord = await readMembershipRecord({
+		store,
+		slug,
+		sessionId,
+		groupId,
+		principalKey: normalized.key,
+	});
+	const existing = existingRecord && !existingRecord.removedAt ? existingRecord : null;
 	// Repeated joins are no-ops. An interrupted write still replays the indexes.
 	if (existing && !resume) return { ok: true, store: store.kind, group: redactGroupForMember(group), member: existing, created: false };
 	const addedAt = nowIso(deps);
@@ -1672,6 +1626,7 @@ export const forwardWorkerGroupMutation = async ({
 	principal,
 	actorPrincipal,
 	remover,
+	memberCeiling,
 } = {}) => {
 	return callWorkerGroupCoordinator({
 		env,
@@ -1685,6 +1640,7 @@ export const forwardWorkerGroupMutation = async ({
 			principal,
 			actorPrincipal,
 			remover,
+			memberCeiling,
 		},
 	});
 };

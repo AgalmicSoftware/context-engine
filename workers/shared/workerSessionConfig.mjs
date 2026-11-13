@@ -40,6 +40,7 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'responseFieldEncryption',
   'workerAuthority',
   'groupCreationPolicy',
+  'groupMemberCeiling',
   'contextAdditionPolicy',
   'linkedWorkerGroups',
   'storageProfile',

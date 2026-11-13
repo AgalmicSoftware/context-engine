@@ -41,6 +41,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'roles',
   'authorization',
   'groupCreationPolicy',
+  'groupMemberCeiling',
   'contextAdditionPolicy',
   'sessionAgent',
   'storageProfile',
@@ -96,6 +97,8 @@ const CONTENT_FIELDS = new Set([
   'interviewModeEnabled', 'interviewMode',
   // Checked on each question to the Session Agent, the same way.
   'sessionAgent',
+  // Checked on each group join, the same way.
+  'groupMemberCeiling',
   ...CURATED_ID_LIST_KEYS,
 ]);
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);

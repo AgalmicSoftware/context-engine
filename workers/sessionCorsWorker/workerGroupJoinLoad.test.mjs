@@ -70,8 +70,9 @@ const createSlowKv = (values, { delayMs = 5 } = {}) => {
   return kv;
 };
 
-const createFixture = async ({ memberLimit } = {}) => {
-  const sessionConfig = { slug: 'fixture', adminAddress: ADMIN, sessionId: SESSION_ID };
+const createFixture = async ({ memberLimit, groupMemberCeiling } = {}) => {
+  const sessionConfig = { slug: 'fixture', adminAddress: ADMIN, sessionId: SESSION_ID,
+    ...(groupMemberCeiling ? { groupMemberCeiling } : {}) };
   const values = new Map([['session:fixture:config', JSON.stringify(sessionConfig)]]);
   const kv = createSlowKv(values);
   const env = { CE_STORAGE_ENVELOPE_KEK: 'synthetic-test-kek', GROUP_KV: kv, CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2' };
@@ -305,4 +306,37 @@ test('joins sent during a group update wait for it', async () => {
   release();
   assert.equal((await change).ok, true);
   assert.equal((await joining).ok, true);
+});
+
+test("the session's ceiling caps every group, and a group limit above it is refused", async () => {
+  const f = await createFixture({ groupMemberCeiling: 3 });
+  const results = await Promise.all(Array.from({ length: 6 }, (_, index) => f.join(index)));
+  assert.equal(results.filter((result) => result.ok).length, 3);
+  assert.deepEqual([...new Set(results.filter((result) => !result.ok).map((result) => result.reason))], ['worker_group_member_cap_exceeded']);
+  assert.equal(f.groupRecord().memberCount, 3);
+  const above = await f.mutate({ operation: 'create', principal: undefined, groupId: 'big',
+    input: { groupId: 'big', label: 'Big', joinMode: 'open', memberLimit: 4 } });
+  assert.equal(above.status, 400);
+  assert.equal(above.reason, 'worker_group_member_limit_above_ceiling');
+  const raised = await f.mutate({ operation: 'update', principal: undefined, input: { memberLimit: 4 } });
+  assert.equal(raised.reason, 'worker_group_member_limit_above_ceiling');
+  const within = await f.mutate({ operation: 'create', principal: undefined, groupId: 'small',
+    input: { groupId: 'small', label: 'Small', joinMode: 'open', memberLimit: 3 } });
+  assert.equal(within.ok, true, JSON.stringify(within));
+});
+
+test('a group limit may go up to the highest ceiling, 10,000, and no further', async () => {
+  const f = await createFixture({ groupMemberCeiling: 10000 });
+  const top = await f.mutate({ operation: 'update', principal: undefined, input: { memberLimit: 10000 } });
+  assert.equal(top.ok, true, JSON.stringify(top));
+  assert.equal(f.groupRecord().memberLimit, 10000);
+  const over = await f.mutate({ operation: 'update', principal: undefined, input: { memberLimit: 10001 } });
+  assert.equal(over.ok, false);
+  assert.equal(over.status, 400);
+});
+
+test('without a ceiling in the session config, a group holds at most 1,000', async () => {
+  const f = await createFixture();
+  const over = await f.mutate({ operation: 'update', principal: undefined, input: { memberLimit: 1001 } });
+  assert.equal(over.reason, 'worker_group_member_limit_above_ceiling');
 });
