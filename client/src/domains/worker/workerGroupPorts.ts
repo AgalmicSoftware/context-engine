@@ -179,9 +179,11 @@ const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'worker_group_id_retired',
   'worker_group_join_denied',
   'worker_group_join_ended',
+  'worker_group_join_mode_mismatch',
   'worker_group_join_refused',
   'worker_group_leave_denied',
   'worker_group_member_cap_exceeded',
+  'worker_group_member_limit_above_ceiling',
   'worker_group_member_limit_below_current',
   'worker_group_member_list_forbidden',
   'worker_group_member_not_found',
@@ -1018,8 +1020,9 @@ type AdminGroupRequest = {
   postSignedRequest: PostSignedWorkerGroupRequest;
 };
 export type WorkerGroupInvite = {
-  id: string;
+  hash: string;
   state: 'unused' | 'used' | 'revoked';
+  createdAt?: string;
   expiresAt?: string;
   usedAt?: string;
 };
@@ -1040,25 +1043,28 @@ export const addWorkerGroupInvites = ({
     action: 'groups/invites/add',
     body: { groupId: toStringValue(request.groupId), hashes, ...(expiresAt ? { expiresAt } : {}) },
     ...request,
-  }).then((payload) => ({ added: Number(payload.added) || 0, invites: readInviteCounts(payload, 'invites') }));
+  }).then((payload) => ({ added: Number(payload.added) || 0, counts: readInviteCounts(payload, 'counts') }));
 
 const INVITE_STATES = ['unused', 'used', 'revoked'];
 const normalizeInvite = (value: unknown): WorkerGroupInvite | null => {
   const source = toRecord(value);
-  const id = toStringValue(source.id);
+  const hash = toStringValue(source.hash);
   const state = toStringValue(source.state);
-  if (!/^[0-9a-f]{1,16}$/.test(id) || !INVITE_STATES.includes(state)) return null;
-  const expiresAt = toStringValue(source.expiresAt);
-  const usedAt = toStringValue(source.usedAt);
+  if (!/^[0-9a-f]{64}$/.test(hash) || !INVITE_STATES.includes(state)) return null;
+  const time = (key: string) => {
+    const value = toStringValue(source[key]);
+    return value && Number.isFinite(Date.parse(value)) ? { [key]: value } : {};
+  };
   return {
-    id,
+    hash,
     state: state as WorkerGroupInvite['state'],
-    ...(expiresAt && Number.isFinite(Date.parse(expiresAt)) ? { expiresAt } : {}),
-    ...(usedAt && Number.isFinite(Date.parse(usedAt)) ? { usedAt } : {}),
+    ...time('createdAt'),
+    ...time('expiresAt'),
+    ...time('usedAt'),
   };
 };
 
-/** One page of a group's one-use links, newest first, by short id and status; never a code. */
+/** One page of a group's one-use links in hash order, by hash and status; a hash never reveals its code. */
 export const listWorkerGroupInvites = ({ cursor, ...request }: AdminGroupRequest & { cursor?: string }) =>
   runAdminAction({
     action: 'groups/invites/list',
@@ -1073,10 +1079,13 @@ export const listWorkerGroupInvites = ({ cursor, ...request }: AdminGroupRequest
   }));
 
 /** Spends the named one-use links, or every unused one, so they no longer admit anyone. */
-export const revokeWorkerGroupInvites = ({ ids, ...request }: AdminGroupRequest & { ids: string[] | 'allUnused' }) =>
+export const revokeWorkerGroupInvites = ({
+  hashes,
+  ...request
+}: AdminGroupRequest & { hashes: string[] | 'allUnused' }) =>
   runAdminAction({
     action: 'groups/invites/revoke',
-    body: { groupId: toStringValue(request.groupId), ...(ids === 'allUnused' ? { allUnused: true } : { ids }) },
+    body: { groupId: toStringValue(request.groupId), ...(hashes === 'allUnused' ? { allUnused: true } : { hashes }) },
     ...request,
   }).then((payload) => ({ revoked: Number(payload.revoked) || 0, counts: readInviteCounts(payload, 'counts') }));
 

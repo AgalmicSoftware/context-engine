@@ -1365,7 +1365,7 @@ describe('worker group ports', () => {
     it('binds invites and the password to their signed admin actions, without a secret', async () => {
       const counts = { unused: 2, used: 0, revoked: 1 };
       const request = { groupId: 'salon', sessionId: SESSION_ID, sessionSlug: SESSION_SLUG };
-      const add = signed({ added: 2, invites: counts });
+      const add = signed({ groupId: 'salon', added: 2, counts });
       await expect(
         addWorkerGroupInvites({
           ...request,
@@ -1373,7 +1373,7 @@ describe('worker group ports', () => {
           expiresAt: '2026-11-30T00:00:00.000Z',
           postSignedRequest: add,
         }),
-      ).resolves.toEqual({ added: 2, invites: counts });
+      ).resolves.toEqual({ added: 2, counts });
       expect(add).toHaveBeenCalledWith({
         action: 'groups/invites/add',
         path: '/admin/groups/invites/add',
@@ -1387,25 +1387,37 @@ describe('worker group ports', () => {
 
       const list = signed({
         invites: [
-          { id: 'abcd1234', state: 'used', usedAt: '2026-11-20T10:00:00.000Z' },
-          { id: 'not hex', state: 'unused' },
-          { id: 'ef567890', state: 'lost' },
+          {
+            hash: 'b'.repeat(64),
+            state: 'used',
+            createdAt: '2026-11-19T10:00:00.000Z',
+            usedAt: '2026-11-20T10:00:00.000Z',
+          },
+          { hash: 'abcd1234', state: 'unused' },
+          { hash: 'c'.repeat(64), state: 'lost' },
         ],
         counts,
         cursor: 'next',
       });
       await expect(listWorkerGroupInvites({ ...request, postSignedRequest: list })).resolves.toEqual({
-        invites: [{ id: 'abcd1234', state: 'used', usedAt: '2026-11-20T10:00:00.000Z' }],
+        invites: [
+          {
+            hash: 'b'.repeat(64),
+            state: 'used',
+            createdAt: '2026-11-19T10:00:00.000Z',
+            usedAt: '2026-11-20T10:00:00.000Z',
+          },
+        ],
         counts,
         cursor: 'next',
       });
 
       const revoke = signed({ revoked: 1, counts });
-      await revokeWorkerGroupInvites({ ...request, ids: 'allUnused', postSignedRequest: revoke });
-      await revokeWorkerGroupInvites({ ...request, ids: ['abcd1234'], postSignedRequest: revoke });
+      await revokeWorkerGroupInvites({ ...request, hashes: 'allUnused', postSignedRequest: revoke });
+      await revokeWorkerGroupInvites({ ...request, hashes: ['b'.repeat(64)], postSignedRequest: revoke });
       expect(revoke.mock.calls.map(([request]) => request.body)).toEqual([
         { groupId: 'salon', allUnused: true, sessionId: SESSION_ID },
-        { groupId: 'salon', ids: ['abcd1234'], sessionId: SESSION_ID },
+        { groupId: 'salon', hashes: ['b'.repeat(64)], sessionId: SESSION_ID },
       ]);
 
       const password = signed({ group: { ...base, joinMode: 'group_password', passwordSet: true } });
