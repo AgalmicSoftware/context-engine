@@ -65,7 +65,8 @@ const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplet
     config: { stateDir, profile, appOrigin: 'https://contextengine.sh', trustedAppOrigins: ['https://contextengine.sh'] },
     fetchImpl,
     ...(now ? { now } : {}),
-    ownAnswerWaitMs: waitMs,
+    // null keeps the server's own default wait.
+    ...(waitMs === null ? {} : { ownAnswerWaitMs: waitMs }),
   });
   const joined = await participant.joinSession({ link: `https://contextengine.sh/session/${slug}?joinGroup=${GROUP_ID}&worker=${encodeURIComponent(corsWorkerUrl)}${linkSuffix}` });
   return { participant, calls, joined, payloads };
@@ -352,6 +353,29 @@ test('a join with no answer says it may not have gone through and how to check',
   const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID });
   assert.equal(reply.result.isError, true);
   assert.match(reply.result.content[0].text, /may not have gone through\. Call get_session to see whether you are in it/);
+});
+
+test('the first list returns within about two seconds while earlier answers are still being looked up', { timeout: 15_000 }, async (t) => {
+  const { participant } = await setup(t, { questions: 2, waitMs: null, mine: () => new Promise(() => {}) });
+  const started = Date.now();
+  const listed = await participant.listQuestions({});
+  const took = Date.now() - started;
+  assert.ok(took >= 1_500 && took < 3_000, `took ${took} ms`);
+  assert.equal(listed.questions.length, 2);
+  assert.match(listed.note, /still being looked up/);
+});
+
+test('arguments of the wrong shape say what was wrong and show the right one', async (t) => {
+  const { participant } = await setup(t, { questions: 1 });
+  const errorOf = async (name, args) => (await callTool(participant, name, args)).result.content[0].text;
+  const example = /For example: "answers": \[\{ "questionId": "0x1a…", "value": "Agree"/;
+  const asString = await errorOf('answer', { answers: JSON.stringify([{ questionId: questionId(0), value: 'Agree' }]) });
+  assert.match(asString, /answers must be a list of answer objects, not a string/);
+  assert.match(asString, example);
+  assert.match(await errorOf('answer', { answers: [] }), example);
+  const item = await participant.answer({ answers: ['Agree'] });
+  assert.match(item.results[0].error, /Each answer must be an object, not a string/);
+  assert.match(await errorOf('get_results', { questionIds: questionId(0) }), /questionIds must be a list of question ids/);
 });
 
 const uploadedMarker = (calls) => {

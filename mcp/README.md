@@ -164,6 +164,23 @@ and never shows or saves it. Without such a link, pass the code or password as
 `invite`. A password is never sent: the agent signs a join statement with a key
 derived from it.
 
+### Tool-call timeouts
+
+Allow each tool call at least 60 seconds; 120 is safer. Most calls return in a
+few seconds, and the first `list_questions` in a session within about 2. The
+slow ones are `answer`, about a second per answer (up to 25 in one call), and
+`get_results`, which stops itself at about 40 seconds. A host that gives up
+sooner shows the agent only a generic error such as "An error occurred while
+running the tool", and the agent may stop with nothing answered.
+
+- **OpenAI Agents SDK:** its default is 5 seconds. Pass
+  `client_session_timeout_seconds=120` to `MCPServerStdio`.
+- **Claude Code:** set `MCP_TOOL_TIMEOUT=120000` (milliseconds) in the
+  environment it starts in.
+- **Other hosts:** look for an MCP request or tool timeout setting. With a
+  short limit that you can't raise, ask the agent to send a few answers per
+  `answer` call.
+
 ## Tools
 
 | Tool | What it does |
@@ -274,7 +291,7 @@ unknown `CE_MCP_*` name.
   `partial: true`, so it returns within a host's usual 60-second limit. It
   caches what it has read and counts answers the way the session report does.
 - **Large sessions.** The server also remembers what the agent answered. A
-  tool call waits at most 8 seconds for the agent's earlier answers from the
+  tool call waits at most 2 seconds for the agent's earlier answers from the
   Session Worker; past that, the questions come back with a note, and the
   lookup finishes for later calls. An agent whose key was made with its state
   directory skips the lookup in a session it joins for the first time, since

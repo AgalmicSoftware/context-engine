@@ -36,8 +36,8 @@ const OWN_ANSWER_SCAN_MAX_AGE_MS = 10 * 60 * 1000;
 // starts, as an unread record is.
 const OWN_ANSWER_RETRY_MS = 60_000;
 // A tool call waits this long for that scan, then answers without it; the
-// scan finishes for later calls. Hosts often give a tool call 60 seconds.
-const OWN_ANSWER_WAIT_MS = 8_000;
+// scan finishes for later calls. Some hosts give a tool call only 5 seconds.
+const OWN_ANSWER_WAIT_MS = 2_000;
 // get_results lists answers for at most this long, then reads them until the
 // second limit, so it returns within a host's usual 60 seconds.
 const RESULTS_LIST_DEADLINE_MS = 20_000;
@@ -66,6 +66,7 @@ const CONTEXT_RATE_LIMITED = 'The session’s Worker is rate limiting you, so no
 
 // Agent-supplied arguments may be numbers or strings; Worker data uses text().
 const trim = (value) => (typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : '');
+const ANSWERS_EXAMPLE = 'For example: "answers": [{ "questionId": "0x1a…", "value": "Agree", "comment": "Why I agree." }]';
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const sessionKey = (info) => info.kind === 'registry' ? `registry ${info.chainId || 11155420} ${info.slug}` : `${info.workerOrigin} ${info.slug}`;
 
@@ -1018,7 +1019,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     },
 
     async answer({ session, answers } = {}) {
-      if (!Array.isArray(answers) || !answers.length) throw new Error('Pass at least one answer.');
+      if (!Array.isArray(answers)) {
+        throw new Error(`answers must be a list of answer objects, not ${answers === undefined ? 'missing' : `a ${typeof answers}`}. ${ANSWERS_EXAMPLE}`);
+      }
+      if (!answers.length) throw new Error(`Pass at least one answer. ${ANSWERS_EXAMPLE}`);
       if (answers.length > MAX_ANSWERS_PER_CALL) throw new Error(`Send at most ${MAX_ANSWERS_PER_CALL} answers per call.`);
       const ctx = await resolveSession(session);
       const sessionConfig = await ensureReady(ctx);
@@ -1035,7 +1039,11 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       let reconciliationRequired = false;
       const seen = new Set();
       for (const item of answers) {
-        const questionId = trim(item?.questionId).toLowerCase();
+        if (!isRecord(item)) {
+          results.push({ questionId: '', ok: false, error: `Each answer must be an object, not a ${Array.isArray(item) ? 'list' : typeof item}. ${ANSWERS_EXAMPLE}` });
+          continue;
+        }
+        const questionId = trim(item.questionId).toLowerCase();
         if (seen.has(questionId)) {
           results.push({ questionId, ok: false, error: 'This question appears more than once in the call; send one answer per question.' });
           continue;
@@ -1207,6 +1215,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     },
 
     async getResults({ session, questionIds, maxRecords = MAX_RESULT_RECORDS } = {}) {
+      if (questionIds !== undefined && !Array.isArray(questionIds)) {
+        throw new Error(`questionIds must be a list of question ids, such as ["0x1a…"], not a ${typeof questionIds}.`);
+      }
       const ctx = await resolveSession(session);
       const sessionConfig = await ensureReady(ctx);
       const visibility = sessionConfig?.sessionModeProfile?.results?.visibility;
@@ -1219,7 +1230,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       }
       const cap = Math.min(Math.max(Number(maxRecords) || MAX_RESULT_RECORDS, 1), MAX_RESULT_RECORDS);
       const questions = await loadQuestions(ctx);
-      const wanted = Array.isArray(questionIds) && questionIds.length ? idList(questionIds) : null;
+      const wanted = questionIds?.length ? idList(questionIds) : null;
       let entries;
       let complete;
       let listedCount;
