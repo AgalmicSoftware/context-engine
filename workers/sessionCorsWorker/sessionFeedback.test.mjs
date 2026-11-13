@@ -77,7 +77,7 @@ test('the contact box stores who to reach only when ticked', async () => {
   await send({ ...SEND, contact: { reachMe: ' sam on Signal ', displayName: 'Sam' } }, { address: ADDRESS.toUpperCase().replace('0X', '0x') });
   await send({ ...SEND, contact: { reachMe: '@sam' } });
   const [signedOut, signedIn] = (await feedback.call({}, 'salon', 'list')).body.messages;
-  assert.deepEqual(signedIn.contact, { address: ADDRESS, displayName: 'Sam', reachMe: 'sam on Signal' });
+  assert.deepEqual(signedIn.contact, { address: ADDRESS, reachMe: 'sam on Signal' });
   assert.deepEqual(signedOut.contact, { reachMe: '@sam' });
 });
 
@@ -108,7 +108,6 @@ test('wrong or oversized sends say which field, and nothing is stored', async ()
     [{ ...SEND, appRelease: 'latest' }, /appRelease/],
     [{ ...SEND, contact: { reachMe: '' } }, /How to reach you/],
     [{ ...SEND, contact: { reachMe: 'x'.repeat(201) } }, /How to reach you/],
-    [{ ...SEND, contact: { reachMe: 'me', displayName: 'n'.repeat(81) } }, /name/],
     [{ ...SEND, padding: 'p'.repeat(FEEDBACK_LIMITS.bodyBytes) }, /too long/],
   ];
   for (const [body, error] of cases) {

@@ -9,7 +9,7 @@ import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
 
 export const FEEDBACK_PATH = '/feedback';
-export const FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2000, reachMeChars: 200, nameChars: 80, bodyBytes: 8192 });
+export const FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2000, reachMeChars: 200, bodyBytes: 8192 });
 
 const SCREENS = new Set(['phone', 'tablet', 'desktop']);
 // A view names a section, never a URL: links carry group ids and fragments carry invites.
@@ -44,12 +44,11 @@ export const normalizeFeedback = (body, { address = '' } = {}) => {
   let contact;
   if (!absent(body.contact)) {
     const reachMe = plain(body.contact?.reachMe);
-    const displayName = plain(body.contact?.displayName);
     if (typeof body.contact !== 'object' || !reachMe || reachMe.length > FEEDBACK_LIMITS.reachMeChars) {
       return invalid(`How to reach you must be 1 to ${FEEDBACK_LIMITS.reachMeChars} characters.`);
     }
-    if (displayName.length > FEEDBACK_LIMITS.nameChars) return invalid(`A name can be at most ${FEEDBACK_LIMITS.nameChars} characters.`);
-    contact = { ...(address ? { address } : {}), ...(displayName ? { displayName } : {}), reachMe };
+    // Only the Worker names who sent it: the signed-in address, never a name the sender typed.
+    contact = { ...(address ? { address } : {}), reachMe };
   }
   // Without the contact box ticked, nothing stored names the sender.
   return {
