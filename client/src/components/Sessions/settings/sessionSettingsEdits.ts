@@ -7,6 +7,7 @@ import {
   isWorkerGroupMemberCeiling,
   WORKER_GROUP_MEMBER_CEILING_DEFAULT,
   WORKER_GROUP_MEMBER_CEILING_MAX,
+  workerOffersGroupJoinChoices,
 } from '@ce-shared/workerGroupJoin.mjs';
 import {
   CURATED_ID_LIST_KEYS,
@@ -282,9 +283,9 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
       );
     }
   }
-  // Worker sessions only. Blank is the default, sent only to clear a stored limit.
+  // Workers with join choices only; older ones refuse it. Blank is the default, sent only to clear a stored limit.
   const ceiling = trimmed(draft.groupMemberCeiling);
-  if (!onChain && (ceiling || before.groupMemberCeiling != null)) {
+  if (!onChain && workerOffersGroupJoinChoices(before) && (ceiling || before.groupMemberCeiling != null)) {
     values.groupMemberCeiling = ceiling ? Number(ceiling) : WORKER_GROUP_MEMBER_CEILING_DEFAULT;
     if (!isWorkerGroupMemberCeiling(values.groupMemberCeiling)) {
       throw new Error(

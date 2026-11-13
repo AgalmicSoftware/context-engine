@@ -41,6 +41,7 @@ import {
 import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/session/sessionWorkerConfigCache';
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
 import { readWorkerKeepsDraftText, readWorkerReleaseLabel } from '../../../domains/worker/workerRelease';
+import { workerOffersGroupJoinChoices } from '@ce-shared/workerGroupJoin.mjs';
 import {
   applyTemplateToSessionSettingsDraft,
   buildSessionSettingsDraft,
@@ -560,6 +561,7 @@ const SessionSettingsPage = ({
         <SetupParticipationSection
           {...section('participation')}
           workerHosted={!onChain}
+          groupCeilingSupported={workerOffersGroupJoinChoices(saved)}
           draftTextSupported={workerKeepsDraftText !== false}
         />
         <SetupResultsSection

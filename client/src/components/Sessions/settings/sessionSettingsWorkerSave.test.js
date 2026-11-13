@@ -1,6 +1,7 @@
 import { applySessionConfigMutation } from '../../../../../workers/sessionCorsWorker/sessionConfigMutation.js';
 import { projectPublicWorkerSessionConfig } from '../../../../../workers/shared/workerSessionConfig.mjs';
 import { WORKER_CANONICAL_SET_CONFIG_KEYS } from '@ce-shared/sessionConfigEdits.mjs';
+import { GROUP_JOIN_CHOICES_FIELD } from '@ce-shared/workerSessionPublicConfig.mjs';
 import { cloneSessionModePreset, compileSessionModeProfile } from '../../../utilities/session/sessionModeProfile';
 import { buildSessionWizardDefaultTemplate } from '../sessionWizardDraftState';
 import { applySessionModeProfileSelectionToDraft } from '../sessionWizardModeProfileDraftController';
@@ -368,6 +369,9 @@ describe('saving the edit page through the Session Worker', () => {
     expect(() => buildSessionSettingsSave(before, draft)).toThrow(
       'Most members in a group: a whole number from 1 to 10,000.',
     );
+    // A Worker without join choices refuses the field, so it stays out of the save.
+    const { [GROUP_JOIN_CHOICES_FIELD]: _choices, ...older } = before;
+    expect(buildSessionSettingsSave(older, draft).patch).not.toHaveProperty('groupMemberCeiling');
   });
 
   it('saves highlighted and hidden lists, one ID per line, without signing anyone out', () => {
