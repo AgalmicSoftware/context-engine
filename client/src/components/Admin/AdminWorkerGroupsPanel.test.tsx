@@ -662,6 +662,40 @@ describe('AdminWorkerGroupsPanel', () => {
       expect(optionLabels()).toEqual(['One-use URLs', 'Group Password', 'Public URL', 'Admin adds members']);
     });
 
+    it('keeps a set password through an edit, and reads the list again when the mode changes', async () => {
+      let stored: Record<string, unknown> = group({ joinMode: 'group_password', passwordSet: true, listed: true });
+      const postSignedRequest = jest.fn(async ({ action, body }: Request) => {
+        if (action === 'groups/list') return respond({ groups: [stored] });
+        if (action === 'groups/update') {
+          // Like the Worker, the update reply has no admin-only fields.
+          const { label, joinMode, listed } = body?.group as Record<string, unknown>;
+          const reply: Record<string, unknown> = { ...stored, label, joinMode, listed };
+          delete reply.passwordSet;
+          stored = { ...stored, ...reply };
+          return respond({ group: reply });
+        }
+        throw new Error(`unexpected ${action}`);
+      });
+      const lists = () => postSignedRequest.mock.calls.filter(([request]) => request.action === 'groups/list');
+      renderPanel(postSignedRequest);
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+      await screen.findByRole('button', { name: 'Edit Salon' });
+      expect(screen.queryByText('No password yet: no one can join.')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Salon' }));
+      fireEvent.change(screen.getByTestId('ce-admin-worker-group-edit-label'), { target: { value: 'Salon 2' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save group' }));
+      expect(await screen.findByText('Group updated.')).toBeInTheDocument();
+      expect(screen.queryByText('No password yet: no one can join.')).not.toBeInTheDocument();
+      expect(lists()).toHaveLength(1);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Salon 2' }));
+      fireEvent.change(document.getElementById('worker-group-edit-mode')!, { target: { value: 'open' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save group' }));
+      expect(await screen.findByText('Group updated.')).toBeInTheDocument();
+      await waitFor(() => expect(lists()).toHaveLength(2));
+    });
+
     it('creates a Group Password group, sets its signer and shows the password once', async () => {
       const postSignedRequest = jest.fn(async ({ action, body }: Request) => {
         if (action === 'groups/create') {

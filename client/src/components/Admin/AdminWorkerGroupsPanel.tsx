@@ -375,6 +375,9 @@ const AdminWorkerGroupsPanel = ({
       return;
     }
     const { removalAuth } = editDraft;
+    // The update reply has no admin-only fields (password set, link counts). Keep them; a new join mode can
+    // change what they hold, so then the list is read again.
+    const modeChanged = groups.find((group) => group.groupId === editingGroupId)?.joinMode !== editDraft.joinMode;
     void runMutation(
       () =>
         updateWorkerGroup({
@@ -385,13 +388,17 @@ const AdminWorkerGroupsPanel = ({
           postSignedRequest: postExactSignedRequest,
         }),
       (result) => withRemovalAuthNotice('Group updated.', removalAuth, savedGroup(result).removalAuth),
-      (current, result) => {
-        const updated = normalizeWorkerGroupsAdminPayload(
-          { groups: [asRecord(result).group] },
-          normalizedSessionSlug,
-        )[0];
-        return updated ? current.map((group) => (group.groupId === updated.groupId ? updated : group)) : current;
-      },
+      modeChanged
+        ? undefined
+        : (current, result) => {
+            const updated = normalizeWorkerGroupsAdminPayload(
+              { groups: [asRecord(result).group] },
+              normalizedSessionSlug,
+            )[0];
+            return updated
+              ? current.map((group) => (group.groupId === updated.groupId ? { ...group, ...updated } : group))
+              : current;
+          },
     ).then((updated) => {
       if (updated) setEditingGroupId('');
     });
