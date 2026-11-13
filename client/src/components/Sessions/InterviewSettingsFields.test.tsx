@@ -110,12 +110,12 @@ it('sets how many questions a group recording drafts and when, defaulting to at 
   expect(onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({ recordingQuestionCount: 5, steeringPrompt: 'Listen first.' }),
   );
-  rerender(<InterviewSettingsFields value={onChange.mock.lastCall[0]} onChange={onChange} />);
+  rerender(<InterviewSettingsFields value={onChange.mock.lastCall?.[0]} onChange={onChange} />);
   fireEvent.change(screen.getByLabelText(timing), { target: { value: 'chunk' } });
   expect(onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({ recordingQuestionCount: 5, recordingQuestionTiming: 'chunk' }),
   );
-  rerender(<InterviewSettingsFields value={onChange.mock.lastCall[0]} onChange={onChange} />);
+  rerender(<InterviewSettingsFields value={onChange.mock.lastCall?.[0]} onChange={onChange} />);
   expect(screen.getByRole('combobox', { name: count })).toHaveValue('5');
   expect(screen.getByLabelText(timing)).toHaveDisplayValue('after each part');
 });
