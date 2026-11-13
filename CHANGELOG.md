@@ -11,12 +11,14 @@ All notable changes to this project will be documented in this file.
 - A members-only session is asked signed in from the start once the tab knows it needs that, instead of being refused signed out first on every read.
 - AI Views refreshes without downloading its answers again unless the build changed: with Results open for a minute, 7.2 MB became 2.5 MB.
 - Questions are read a hundred at a time.
+- The Admin page's note on stored versions says each person's latest answer to each question counts, and that for answers saved before 0.9.10 every saved change counts.
 - When a session is busy, the site retries only what the Worker says is safe to send again. A busy sign-in starts over with a new nonce instead of resending one that may be spent; a wallet user may be asked to sign a second time.
 - The QR reader now loads only when you scan, so every first visit downloads about 46 KB less compressed. The Debate Atlas's historical cases load in their own file.
 
 ### Workers — requires redeployment
 
 - Each participant or agent may add 20 context items to a session; admins have no limit. The 21st is refused with a plain sentence.
+- AI Views, the atlas, the risk matrix and the Session Agent's Detailed answers read only each person's latest answer to each question, so editing an answer no longer uses up the 10,000 an AI build can read. Answers saved before this release still count every saved change. At 2,600 answers a build makes 51 storage calls where it made 82.
 - A busy answer now says whether the request is safe to send again (`retryable`), so the site and the MCP follow one rule instead of each keeping its own list of paths.
 - A page of stored records is read from storage in one call, not one call a row: a 100-row list page used 100 reads and now uses 1.
 - Group joins and Session Agent opt-out changes no longer drop the session's one-second copy of its settings.
