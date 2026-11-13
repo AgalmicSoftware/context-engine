@@ -109,3 +109,17 @@ test('Lit setup drops the copy of the config it may change', async () => {
   await c.answer(c.cachedRead());
   assert.equal(c.reads(), 2);
 });
+
+test('group joins and Session Agent opt-outs keep the copy; a settings change drops it', async () => {
+  const c = controlled();
+  await c.answer(c.cachedRead());
+  for (const path of ['worker-groups/mutate', 'session-agent/read', 'session-agent/set', 'session-agent/list']) {
+    await callSessionConfigCoordinator({ env: c.env, slug: 'salon', path });
+    await c.answer(c.cachedRead());
+  }
+  // Before, each of these four calls cost the next request a fresh read.
+  assert.equal(c.reads(), 1);
+  await callSessionConfigCoordinator({ env: c.env, slug: 'salon', path: 'mutate', mutation: {} });
+  await c.answer(c.cachedRead());
+  assert.equal(c.reads(), 2);
+});

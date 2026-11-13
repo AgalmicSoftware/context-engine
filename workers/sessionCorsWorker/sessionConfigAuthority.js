@@ -129,11 +129,12 @@ export const forgetSessionConfig = (env, slug) => {
   resultsAnalysisStatusReads.forget(key.binding, key.slug);
 };
 
-// Calls that leave the config as it was: reads, backup marks and exports, and
-// the per-answer and per-view journals. Every other call drops this copy.
+// Calls that leave the config as it was: reads, backup marks and exports, the
+// per-answer and per-view journals, group joins and changes (the group object
+// keeps them), and Session Agent opt-outs. Every other call drops this copy.
 // (backup/status can finish a restore, so it drops it.)
-const KEEPS_CONFIG = new Set(['current', 'backup/write-revision', 'backup/export', 'diagnostics', 'storage/publish']);
-const KEEPS_CONFIG_PREFIXES = ['agent-submit/', 'debate-atlas/', 'risk-matrix/', 'session-feedback/'];
+const KEEPS_CONFIG = new Set(['current', 'backup/write-revision', 'backup/export', 'diagnostics', 'storage/publish', 'worker-groups/mutate']);
+const KEEPS_CONFIG_PREFIXES = ['agent-submit/', 'debate-atlas/', 'risk-matrix/', 'session-feedback/', 'session-agent/'];
 const keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
 
 export const callSessionConfigCoordinator = async ({ env, slug, path, cache = false, ...payload }) => {
