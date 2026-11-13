@@ -940,7 +940,7 @@ export default function SessionInterviewPanel({
     try {
       const instructions = buildRealtimeInterviewInstructions({
         questions: openQuestions.length ? openQuestions : questions,
-        onlyRevisions: !openQuestions.length,
+        answeredQuestions: questions.filter((question) => answered(question.id)),
         responderContext: voiceContext,
         openingPrompt: openQuestions.length === questions.length ? interviewOpening.opening : undefined,
         steeringPrompt: interviewOpening.steeringPrompt,

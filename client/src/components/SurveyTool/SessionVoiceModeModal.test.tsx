@@ -1307,6 +1307,15 @@ describe('SessionVoiceModeModal', () => {
     expect(instructions).toContain('[q3]');
     expect(instructions).not.toContain('[q1]');
     expect(instructions).not.toContain('[q2]');
+    // It knows what was answered, without the answers, so it does not ask again unless the person raises it.
+    expect(instructions).toContain(
+      'Do not ask them again or ask about those answers unless the responder brings one up',
+    );
+    expect(instructions).toMatch(
+      /Already answered \(reference only; not to ask again\):\n- What matters\?\n- Second question\?/,
+    );
+    expect(instructions).not.toContain('Mine');
+    expect(instructions).not.toContain('Ask which earlier answer');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
     await expectReadableDraftText('Draft answer for Third question?', 'New answer');
     await expectReadableDraftText('Draft answer for What matters?', 'Refined answer');
@@ -1552,6 +1561,8 @@ describe('SessionVoiceModeModal', () => {
     const answered = mockedStartSessionRealtimeInterview.mock.calls[1][0].instructions;
     expect(answered).toContain('[q1]');
     expect(answered).toContain('[q2]');
+    expect(answered).toContain('Ask which earlier answer, if any, the responder wants to change');
+    expect(answered).not.toContain('Already answered (reference only');
     expect(answered).not.toContain('EVIDENCE-q1');
     expect(answered).not.toContain('EVIDENCE-q2');
   });
