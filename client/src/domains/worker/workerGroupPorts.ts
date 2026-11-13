@@ -2,6 +2,7 @@ import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { noteWorkerAccessChanged } from '../../utilities/worker/workerAuth.js';
+import { withCoordinatorRetry } from '../../utilities/worker/coordinatorRetry';
 export {
   getWorkerSessionToken,
   isWorkerSignInNeededError,
@@ -664,7 +665,8 @@ export const joinWorkerGroup = async ({
     path: '/groups/join',
     method: 'POST',
     body: { groupId: toStringValue(groupId) },
-    fetchImpl,
+    // A room joining one group at once can find the session busy.
+    fetchImpl: withCoordinatorRetry(fetchImpl),
   }).then((payload) => {
     const group = normalizeGroup(payload.group, expectedSessionSlug);
     if (!group || group.groupId !== toStringValue(groupId)) {

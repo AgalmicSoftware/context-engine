@@ -6,6 +6,8 @@ export { SESSION_COORDINATOR_UNAVAILABLE };
 // busy-coordinator 503 instead of failing.
 const RETRY_DELAYS_MS = COORDINATOR_RETRY_DELAYS_MS;
 const READ_PATHS = /\/(capabilities|storage\/(list|read|read-batch)|realtime\/call)$/;
+// Joining a group again is a no-op that finishes an interrupted join.
+const REPEATABLE_WRITE_PATHS = /\/groups\/join$/;
 
 const wait = (ms: number, signal?: AbortSignal | null) =>
   new Promise<void>((resolve, reject) => {
@@ -14,15 +16,15 @@ const wait = (ms: number, signal?: AbortSignal | null) =>
     signal?.addEventListener('abort', () => (clearTimeout(timer), reject(signal.reason)), { once: true });
   });
 
-// Reads, and answer uploads that carry a request id the Worker replays rather
-// than stores twice. Streamed bodies cannot be sent again.
+// Reads, group joins, and answer uploads that carry a request id the Worker
+// replays rather than stores twice. Streamed bodies cannot be sent again.
 const replaySafe = (url: string, init: RequestInit) => {
   const method = (init.method || 'GET').toUpperCase();
   if (method === 'GET' || method === 'HEAD') return true;
   const body = init.body;
   if (body != null && typeof body !== 'string' && !(body instanceof FormData)) return false;
   const path = new URL(url, 'https://worker.invalid').pathname;
-  if (READ_PATHS.test(path)) return true;
+  if (READ_PATHS.test(path) || REPEATABLE_WRITE_PATHS.test(path)) return true;
   if (!path.endsWith('/storage/upload')) return false;
   if (body instanceof FormData) return !!body.get('requestId');
   try {

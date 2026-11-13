@@ -34,6 +34,7 @@ import {
   readPendingInterviewInvite,
   resumeInterviewInvite,
 } from './sessionInterviewGroupInvite';
+import { isBusyWorkerGroupError } from '../../domains/worker/workerGroupBusy';
 import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import { VoiceModeUnjoinedGroupsContext } from './SessionVoiceModeBack';
 import styles from './SurveyTool.module.scss';
@@ -112,6 +113,7 @@ const resolveChainId = (network: unknown, sessionConfig: unknown): unknown => {
 };
 
 const formatJoinError = (error: unknown): string => {
+  if (isBusyWorkerGroupError(error)) return 'many people are joining at once; try again in a moment.';
   const message = error instanceof Error ? error.message : '';
   if (message.includes('worker_group_member_cap_exceeded')) return 'it is full.';
   if (message.includes('worker_group_join_ended')) return 'it is closed.';

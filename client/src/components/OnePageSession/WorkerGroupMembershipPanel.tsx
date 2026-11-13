@@ -34,6 +34,7 @@ import WorkerGroupMembersModal, { workerGroupPrincipalIdentity } from './WorkerG
 import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
 import { reconcileConfirmedWorkerGroupMembership } from './workerGroupMembershipProjection';
 import { useWorkerGroupMembershipMutations } from './useWorkerGroupMembershipMutations';
+import { BUSY_WORKER_GROUP_JOIN_MESSAGE, isBusyWorkerGroupError } from '../../domains/worker/workerGroupBusy';
 import {
   buildWorkerGroupMembershipIdentity,
   projectWorkerGroupMembership,
@@ -752,7 +753,11 @@ const WorkerGroupMembershipPanel = ({
         setViewState((current) => ({
           ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
           status: 'error',
-          error: joinError instanceof Error ? joinError.message : 'worker_group_join_failed',
+          error: isBusyWorkerGroupError(joinError)
+            ? BUSY_WORKER_GROUP_JOIN_MESSAGE
+            : joinError instanceof Error
+              ? joinError.message
+              : 'worker_group_join_failed',
         }));
       } finally {
         finishMembershipMutation(mutation);

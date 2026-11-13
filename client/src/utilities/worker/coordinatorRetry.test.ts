@@ -19,13 +19,14 @@ describe('withCoordinatorRetry', () => {
     jest.useRealTimers();
   });
 
-  it('retries a busy coordinator for reads, voice starts and answers with a request id', async () => {
+  it('retries a busy coordinator for reads, voice starts, group joins and answers with a request id', async () => {
     const answer = JSON.stringify({ resource: 'responses', requestId: 'answer:v1:op:q1:0', data: {} });
     for (const [url, init] of [
       [`${worker}/storage/list?resource=responses`, {}],
       [`${worker}/storage/read-batch`, { method: 'POST', body: '{"ids":["a"]}' }],
       [`${worker}/realtime/call?slug=s`, { method: 'POST', body: '{"sdp":"v=0"}' }],
       [`${worker}/storage/upload`, { method: 'POST', body: answer }],
+      [`${worker}/groups/join`, { method: 'POST', body: '{"groupId":"salon"}' }],
     ] as Array<[string, RequestInit]>) {
       const { response, calls } = await run([busy, busy], url, init);
       expect(response.status).toBe(200);
@@ -37,6 +38,9 @@ describe('withCoordinatorRetry', () => {
     const question = JSON.stringify({ resource: 'questions', data: {} });
     expect((await run([busy], `${worker}/storage/upload`, { method: 'POST', body: question })).calls).toBe(1);
     expect((await run([busy], `${worker}/admin/action`, { method: 'POST', body: '{}' })).calls).toBe(1);
+    expect((await run([busy], `${worker}/groups/leave`, { method: 'POST', body: '{"groupId":"salon"}' })).calls).toBe(
+      1,
+    );
     const other = () =>
       new Response(JSON.stringify({ error: 'Upload settlement is unavailable; retry.' }), { status: 503 });
     expect((await run([other], `${worker}/storage/list`)).calls).toBe(1);
