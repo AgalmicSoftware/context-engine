@@ -3,7 +3,7 @@ import {
   resolveAiDailyLimit,
   validAiDailyLimit,
 } from '../../../../workers/sessionCorsWorker/aiRateLimitPolicy.js';
-import { AI_DAILY_LIMIT_MAX, getAiDailyLimitInputError, withAiDailyLimit } from './aiDailyLimit';
+import { AI_DAILY_LIMIT_MAX, getAiDailyLimitInputError } from './aiDailyLimit';
 
 // The client checks limits.aiPerWalletPerDay before saving; the Worker refuses
 // what it would not count. A change on either side fails here.
@@ -18,10 +18,9 @@ describe('the AI daily limit, against the Worker that enforces it', () => {
     });
   });
 
-  it('bounds AI by the set limit, and by the daily request limit when blank or 0', () => {
-    const limits = { perWalletPerDay: 300, aiPerWalletPerDay: 9 };
-    expect(resolveAiDailyLimit({ limits: withAiDailyLimit(limits, '40') })).toBe(40);
-    expect(resolveAiDailyLimit({ limits: withAiDailyLimit(limits, '') })).toBe(300);
-    expect(resolveAiDailyLimit({ limits: withAiDailyLimit(limits, '0') })).toBe(300);
+  // Settings sends the number, or null when the field is blank or 0.
+  it('bounds AI by the set limit, and by the daily request limit when cleared', () => {
+    expect(resolveAiDailyLimit({ limits: { perWalletPerDay: 300, aiPerWalletPerDay: 40 } })).toBe(40);
+    expect(resolveAiDailyLimit({ limits: { perWalletPerDay: 300, aiPerWalletPerDay: null } })).toBe(300);
   });
 });

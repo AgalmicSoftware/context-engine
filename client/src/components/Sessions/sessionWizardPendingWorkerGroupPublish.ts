@@ -83,7 +83,9 @@ export const publishPendingWorkerGroupDrafts = async ({
   uploadImageImpl = uploadWorkerGroupImage,
 }: PublishPendingWorkerGroupsInput): Promise<{ created: number; reused: number }> => {
   // The /new draft, where the ceiling is still the text typed in.
-  const ceiling = resolveDraftGroupMemberCeiling((sessionConfig as AnyRecord | undefined)?.groupMemberCeiling);
+  const ceiling = resolveDraftGroupMemberCeiling(
+    (sessionConfig as Record<string, unknown> | undefined)?.groupMemberCeiling,
+  );
   const issues = validatePendingWorkerGroupDrafts(drafts, ceiling);
   if (issues.length) throw new Error(issues[0]);
   const normalizedDrafts = normalizePendingWorkerGroupDrafts(drafts);

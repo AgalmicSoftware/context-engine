@@ -335,8 +335,10 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
 // config already has the field. A Worker with no config answers 404. Any other
 // failed read stops before signing: leaving a field out could keep what is
 // stored, and would change the revision a retry signs.
+// set-config replaces limits whole and /new has no AI daily limit, so the one
+// stored (set in Settings) is kept the same way.
 const CLEARED_WHEN_LEFT_OUT = { agentInstructions: '', sessionAgent: null } as const;
-export const withLeftOutFieldsCleared = async <T extends UnknownRecord>({
+export const withStoredConfigKept = async <T extends UnknownRecord>({
   config,
   workerOrigin,
   slug,
@@ -351,7 +353,9 @@ export const withLeftOutFieldsCleared = async <T extends UnknownRecord>({
   const leftOut = Object.keys(CLEARED_WHEN_LEFT_OUT).filter(
     (field) => !Object.prototype.hasOwnProperty.call(config, field),
   ) as Array<keyof typeof CLEARED_WHEN_LEFT_OUT>;
-  if (!leftOut.length || profile?.authority?.mode !== 'worker_canonical') return config;
+  const limits = config.limits && typeof config.limits === 'object' ? (config.limits as UnknownRecord) : null;
+  const keepsAiLimit = !!limits && !Object.prototype.hasOwnProperty.call(limits, 'aiPerWalletPerDay');
+  if ((!leftOut.length && !keepsAiLimit) || profile?.authority?.mode !== 'worker_canonical') return config;
   let response: Response;
   try {
     response = await fetchImpl(`${workerOrigin}/session-config`, {
@@ -370,9 +374,14 @@ export const withLeftOutFieldsCleared = async <T extends UnknownRecord>({
     );
   }
   const stored = getPublicConfigFromResponse(await readResponseJson(response));
+  const storedAiLimit = (stored.limits as UnknownRecord | undefined)?.aiPerWalletPerDay;
+  const withAiLimit =
+    keepsAiLimit && storedAiLimit != null
+      ? { ...config, limits: { ...limits, aiPerWalletPerDay: storedAiLimit } }
+      : config;
   return leftOut
     .filter((field) => Object.prototype.hasOwnProperty.call(stored, field))
-    .reduce<T>((cleared, field) => ({ ...cleared, [field]: CLEARED_WHEN_LEFT_OUT[field] }), config);
+    .reduce<T>((cleared, field) => ({ ...cleared, [field]: CLEARED_WHEN_LEFT_OUT[field] }), withAiLimit);
 };
 
 const assertReachableWorkerCanonicalProfile = (profile: unknown, context: string): SessionModeProfile => {
@@ -490,7 +499,7 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
 
   const preparedConfig = clonePublicConfig(config);
   assertReachableWorkerCanonicalProfile(preparedConfig.sessionModeProfile, 'Prepared worker config');
-  const publicConfig = await withLeftOutFieldsCleared({
+  const publicConfig = await withStoredConfigKept({
     config: preparedConfig,
     workerOrigin,
     slug: normalizedSlug,

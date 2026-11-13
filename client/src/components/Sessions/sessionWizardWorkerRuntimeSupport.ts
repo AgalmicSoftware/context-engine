@@ -13,7 +13,6 @@ import {
 } from './sessionWizardWorkerDefaults';
 import { resolveSessionWizardWorkerBaseUrl } from './sessionWizardWorkerState';
 import type { AnyRecord } from '../shellTypes';
-import { AI_DAILY_LIMIT_LABEL, getAiDailyLimitInputError, withAiDailyLimit } from './aiDailyLimit';
 
 type WorkerBaseUrlParams = {
   draft?: AnyRecord | null;
@@ -203,40 +202,36 @@ export const normalizeSessionWizardWorkerLimitInput = (value: unknown): number |
   return numeric;
 };
 
-type SessionWizardWorkerLimitsInput = {
-  perWalletPerDay?: unknown;
-  perAnonymousIpPerDay?: unknown;
-  /** Carried from an imported draft's limits; /new has no field for it. */
-  aiPerWalletPerDay?: unknown;
-};
-
 export const validateSessionWizardWorkerLimits = ({
   perWalletPerDay,
   perAnonymousIpPerDay,
-  aiPerWalletPerDay,
-}: SessionWizardWorkerLimitsInput = {}): string => {
+}: {
+  perWalletPerDay?: unknown;
+  perAnonymousIpPerDay?: unknown;
+} = {}): string => {
   const walletError = getSessionWizardWorkerLimitInputError(perWalletPerDay);
   if (walletError) return `Authenticated requests per wallet per day: ${walletError}`;
   const anonymousError = getSessionWizardWorkerLimitInputError(perAnonymousIpPerDay);
   if (anonymousError) return `Anonymous requests per IP per day: ${anonymousError}`;
-  const aiError = getAiDailyLimitInputError(aiPerWalletPerDay);
-  if (aiError) return `${AI_DAILY_LIMIT_LABEL} (limits.aiPerWalletPerDay in the imported settings): ${aiError}`;
   return '';
 };
 
 // Always the full object: a blank limit is sent as null, which every Worker
 // reads like an absent one. Older Workers merge limit keys on set-config, so
 // leaving a cleared limit out would keep its old value there.
-export const buildSessionWizardWorkerLimits = (input: SessionWizardWorkerLimitsInput = {}): AnyRecord => {
-  const validationError = validateSessionWizardWorkerLimits(input);
+export const buildSessionWizardWorkerLimits = ({
+  perWalletPerDay,
+  perAnonymousIpPerDay,
+}: {
+  perWalletPerDay?: unknown;
+  perAnonymousIpPerDay?: unknown;
+} = {}): AnyRecord => {
+  const validationError = validateSessionWizardWorkerLimits({ perWalletPerDay, perAnonymousIpPerDay });
   if (validationError) throw new Error(validationError);
-  return withAiDailyLimit(
-    {
-      perWalletPerDay: normalizeSessionWizardWorkerLimitInput(input.perWalletPerDay),
-      perAnonymousIpPerDay: normalizeSessionWizardWorkerLimitInput(input.perAnonymousIpPerDay),
-    },
-    input.aiPerWalletPerDay,
-  );
+  return {
+    perWalletPerDay: normalizeSessionWizardWorkerLimitInput(perWalletPerDay),
+    perAnonymousIpPerDay: normalizeSessionWizardWorkerLimitInput(perAnonymousIpPerDay),
+  };
 };
 
 export const parseSessionWizardAllowOriginsInput = (value: unknown): string[] => {

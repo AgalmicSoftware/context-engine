@@ -29,13 +29,3 @@ export const formatAiDailyLimit = (limits: unknown): string => {
     limits && typeof limits === 'object' ? (limits as Record<string, unknown>).aiPerWalletPerDay : undefined;
   return Number.isInteger(value) && (value as number) > 0 ? String(value) : '';
 };
-
-/**
- * Limits with the AI one set from a valid input, removed when blank or 0.
- * set-config replaces limits whole, so /new's full limits carry it.
- */
-export const withAiDailyLimit = (limits: Record<string, unknown>, input: unknown): Record<string, unknown> => {
-  const { aiPerWalletPerDay: _replaced, ...rest } = limits;
-  const limit = Number(toStr(input).trim());
-  return limit > 0 ? { ...rest, aiPerWalletPerDay: limit } : rest;
-};

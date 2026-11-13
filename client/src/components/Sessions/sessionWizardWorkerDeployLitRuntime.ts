@@ -3,7 +3,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../shellTypes';
 import { CHIPOTLE_LIT_CONFIG_FIELDS, LIT_RUNTIME_RECOVERY_MARKER_FIELD } from './sessionWizardWorkerSecretSupport';
 import { normalizeSessionWizardSlug, normalizeSessionWizardWorkerUrl } from './sessionWizardUrlSupport';
-import { withLeftOutFieldsCleared } from './sessionWizardWorkerConfigPersistence';
+import { withStoredConfigKept } from './sessionWizardWorkerConfigPersistence';
 
 export type SessionWizardLitBootstrapRecovery = {
   workerUrl: string;
@@ -24,7 +24,7 @@ export const createSessionWizardEnsureWorkerSessionConfig =
     fetchImpl?: typeof fetch;
   }) =>
   async ({ workerUrl, slug: targetSlug }: AnyRecord): Promise<void> => {
-    const workerConfig = await withLeftOutFieldsCleared({
+    const workerConfig = await withStoredConfigKept({
       config: getWorkerConfig(),
       workerOrigin: workerUrl,
       slug: targetSlug,

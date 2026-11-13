@@ -553,6 +553,8 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
   it('fails closed when the matching revision contains an unexpected nested public field', async () => {
     const fetchImpl = jest
       .fn()
+      // The stored config read that keeps a Settings-set AI limit; a new session has none.
+      .mockResolvedValueOnce(jsonResponse(404, {}))
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
       .mockResolvedValueOnce(
         jsonResponse(200, {
@@ -580,6 +582,8 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     delete (readback as Record<string, unknown>).appearance;
     const fetchImpl = jest
       .fn()
+      // The stored config read that keeps a Settings-set AI limit; a new session has none.
+      .mockResolvedValueOnce(jsonResponse(404, {}))
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
       .mockResolvedValueOnce(jsonResponse(200, { config: readback }));
 
@@ -603,6 +607,8 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     const limits = { perWalletPerDay: 2 };
     const fetchImpl = jest
       .fn()
+      // The stored config read that keeps a Settings-set AI limit; a new session has none.
+      .mockResolvedValueOnce(jsonResponse(404, {}))
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
       .mockResolvedValueOnce(
         jsonResponse(200, {
