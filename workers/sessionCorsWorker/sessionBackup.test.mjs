@@ -130,7 +130,9 @@ test('backup pages preserve all storage records and chunk payloads larger than a
 
 test('feedback is never a storage resource and never enters a backup', async () => {
   const { env, kv } = fixture();
+  // Whole phrases: a short marker like 7d1c turns up in random MACs and ids.
   const text = 'Feedback marker 7d1c: the atlas was hard to find.';
+  const leaked = (value) => String(value).includes(text);
   const sent = await sendSessionFeedback({
     env, slug, config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }, body: { text, view: 'results', theme: 'civic', screen: 'desktop' },
     identity: 'anon:203.0.113.9', checkRateLimit: async () => true, release: '0.9.8',
@@ -138,10 +140,10 @@ test('feedback is never a storage resource and never enters a backup', async () 
   assert.equal(sent.status, 200, JSON.stringify(sent));
   const listed = await callSessionConfigCoordinator({ env, slug, path: 'session-feedback/list' });
   assert.equal(listed.body.messages[0].text, text);
-  assert.ok(![...kv.values.values()].some((value) => String(value).includes('7d1c')));
+  assert.ok(![...kv.values.values()].some(leaked));
   const pages = await allPages(env);
   assert.equal(pages.at(-1).manifest.complete, true);
-  assert.ok(!JSON.stringify(pages).includes('7d1c'));
+  assert.ok(!leaked(JSON.stringify(pages)));
 });
 
 test('a restore keeps everyone who turned the Session Agent off opted out', async () => {
