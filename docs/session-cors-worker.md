@@ -1476,12 +1476,25 @@ principal with the session's `groups` scope. The Worker ignores caller-selected
 identifiers and access modes, generates participant-created IDs, and forces
 those groups to open self-join with session visibility. The configured worker
 admin retains the signed create, edit, delete, and membership controls under
-either policy. Group discovery is independent: an unsigned `GET /groups/list`
+either policy. The top-level `groupMemberCeiling` (a whole number from 1 to
+10,000, default 1,000) is the most members any group may have: a group's own
+`memberLimit` may not exceed it, and the coordinator caps every group at the
+lower of the two, reading the ceiling from the session config it holds.
+Lowering it below a group's current count refuses new joins and removes no one.
+Group discovery is independent: an unsigned `GET /groups/list`
 is accepted when the validated session mode declares public stored results
 over unencrypted, ungated Cloudflare storage, or when it carries a join link's
-`joinGroup` for a group someone could join on their own. It returns only
-`session`-visible group metadata, never memberships, member identities, member
-counts, or groups restricted to admins/members. Private, gated, and encrypted
+`joinGroup` naming a listed group. It returns only listed groups' metadata,
+never memberships, member identities, member counts, or unlisted groups.
+
+Each group is listed or unlisted (`listed`, "Show in the group list"). A
+listed group shows in every group list the caller may see; an unlisted one
+shows only to its members and admins, and in no signed-out discovery. An open
+group created with this setting is always listed, since anyone may join it.
+`memberVisibility` governs only who sees the member list, no longer whether the
+group shows. A group stored without `listed`, open or not, reads as listed only
+if its members were visible to the whole session, so groups hidden before stay
+hidden until an admin lists them. Private, gated, and encrypted
 modes otherwise keep discovery authenticated. This flow never opens the
 legacy SBT deployment form and does not request a contract address, chain, RPC,
 gas, or burn policy. A
@@ -1660,13 +1673,33 @@ Implemented routes:
   resolution, coordinator access, or KV mutation.
 - `POST /admin/groups/create`: admin-signed create. Alongside label,
   description, and image, records accept `tags` (maximum 20),
-  `documentURLs` (maximum 10 public HTTPS URLs), `memberLimit` (1–1,000),
-  future `joinEndsAt`, `adminAddress`, and `removalAuth` (below). `joinMode`
-  supports `admin_add` and `open`; `password` and `invite` are recognized but
-  rejected with `join_mode_not_implemented`.
+  `documentURLs` (maximum 10 public HTTPS URLs), `memberLimit` (1 to the session's `groupMemberCeiling`),
+  future `joinEndsAt`, `adminAddress`, and `removalAuth` (below). `joinMode` is
+  `open`, `one_use`, `group_password` or `admin_add` (see **How people join**
+  below); anything else is refused 400 `invalid_join_mode`.
 - `POST /admin/groups/update`: admin-signed update for group metadata,
   membership limit/deadline, join mode, member visibility, and `removalAuth`. A
   limit cannot be reduced below the current authoritative member count.
+- `POST /admin/groups/invites/add` `{ groupId, hashes, expiresAt? }`: adds
+  1 to 500 one-use codes to a `one_use` group as their SHA-256 hashes (64 hex);
+  the code itself never reaches the Worker. A batch with a hash already stored
+  is refused whole, 409 `worker_group_invite_exists`. Returns
+  `{ groupId, added, counts }`.
+- `POST /admin/groups/invites/list` `{ groupId, cursor?, limit? }`: up to 250
+  codes a page, in hash order, each as
+  `{ hash, state, createdAt, expiresAt?, usedAt? }` with `state` `unused`,
+  `used` or `revoked`, plus `cursor` while more remain and `counts`.
+- `POST /admin/groups/invites/revoke` `{ groupId, hashes }` or
+  `{ groupId, allUnused: true }`: revokes unused codes; a used code stays used.
+  Returns `{ groupId, revoked, counts }`.
+- `POST /admin/groups/password/set` `{ groupId, signer }`: sets a
+  `group_password` group's password as the address of the key the app derives
+  from it. A new signer voids the old password at once; members stay. Returns
+  `{ groupId, passwordSet: true, signerSetAt }`. The signer is never returned.
+- The code routes answer 409 `worker_group_join_mode_mismatch` unless the group
+  is `one_use`, and `password/set` unless it is `group_password`. Admin group
+  lists add `passwordSet` and, for `one_use` groups,
+  `invites: { unused, used, revoked }`.
 - `POST /admin/groups/delete`: admin-signed tombstone. Deletion revokes future `group_gate` and `worker_group` condition checks.
 - `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation. Remove answers 403 `worker_group_removal_denied` when the group's `removalAuth` is `member_only` or `neither`. The verified authority proof is carried to the session config coordinator, which rechecks it and holds its serialization queue while the separate group coordinator commits. Stale proofs return 409 before any group write. Participant create/join/leave use the same check because their JWT admission depends on the session authorization epoch. Already committed group intents recover within the group coordinator without repeating admission or copying session authority into that object.
 - `POST /admin/groups/reconcile-empty`: admin-signed, idempotent repair for a
@@ -1681,13 +1714,13 @@ Implemented routes:
   Worker-canonical profile declares `public_full_if_storage_public` over
   unencrypted Cloudflare storage with `gate: "none"` and no access conditions.
   On any other session it is allowed only with one `joinGroup=<groupId>` naming
-  an open, session-visible group whose joining hasn't closed, as a join link
-  does; the response is then what that group's members see, less each group's
-  `adminAddress`. Other requests get 403 `worker_group_discovery_not_public`.
-  It returns only redacted, session-visible group metadata. The request must
+  a listed group, as a join link does; the response is then the listed groups,
+  less each group's `adminAddress`. A link to an unlisted or unknown group gets
+  the same 403 `worker_group_discovery_not_public` as any other request. It
+  returns only redacted, listed group metadata. The request must
   include the exact session slug header and canonical session ID. With a Worker
   credential, `GET` remains the authenticated member route and additionally
-  returns member-visible groups for the caller. Authenticated participant and
+  returns the listed groups plus the caller's own unlisted ones. Authenticated participant and
   Admin lists include the coordinator's current `memberCount` only after the
   caller passes that group's visibility check; unsigned discovery never
   includes it. Authenticated `POST` remains supported. `groupCreationPolicy`
@@ -1707,19 +1740,56 @@ Implemented routes:
   forces `joinMode: "open"` plus `memberVisibility: "session"`. It accepts the
   safe metadata and limit/deadline fields above and `removalAuth`, but derives
   `adminAddress` from the authenticated principal.
-- `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups
-  only, before `joinEndsAt` and while the per-group and deployment-wide member
-  limits have capacity. Join returns the coordinator's post-mutation
+- `POST /groups/join` `{ sessionId, groupId, secret?, proof? }`: authenticated
+  self-join, as **How people join** below describes, before `joinEndsAt` and
+  while the group's `memberLimit` and the session's `groupMemberCeiling` have
+  room. Join returns the coordinator's post-mutation
   `memberCount` with the joined group so the client can reconcile that card
   without reloading the collection.
 - `POST /groups/leave`: authenticated self-removal from a current membership,
   when the group's `removalAuth` is `both` or `member_only`; otherwise 403
-  `worker_group_leave_denied`.
+  `worker_group_leave_denied`. Leaving a group you aren't in, or one that
+  doesn't exist, answers 404 `worker_group_member_not_found` either way.
   The Worker derives the principal from the bearer credential and ignores any
   caller-supplied principal, so a participant cannot remove another member. A
   session-visible leave returns the retained group and post-mutation count;
   restricted leave for `members` or `admin_only` visibility omits both group
   metadata and count once the caller is no longer permitted to see them.
+
+**How people join.** A group's id never admits anyone; its `joinMode` does.
+`open` admits any signed-in session principal. `one_use` admits whoever brings
+an unused, unexpired code (`secret`, 32 hex characters in any case), and spends
+it in the same Durable Object transaction that takes the seat, so two people
+holding one code can never both get in; a join that then fails gives the code
+back. `group_password` admits whoever brings `proof`, an EIP-191 signature of
+`ContextEngine.WorkerGroup.Join:1\nsession:<sessionId>\ngroup:<groupId>\naddress:<address>`,
+where `<address>` is the joiner's own lowercase address, by the key the app
+derives from the password (see `shared/workerGroupJoin.mjs`). The Worker
+compares its signer with the stored one and never sees the password. A `group_password` group with no password set
+admits no one. Changing a group's `joinMode` voids its password and revokes its
+unused codes, so switching back needs a new password or new codes. `admin_add` admits no one by joining. A member joining again
+succeeds without a code being checked or spent. Codes and proofs are never
+stored, logged or returned, and never enter a pending intent or KV.
+
+Every join refused before a valid code or password gets the same answer, 403
+`worker_group_join_refused`: an unknown group, an unlisted or non-open group
+without a valid code or password, a wrong, spent, revoked or expired code, a
+signature for another session, group or address, and `admin_add`. Only after a valid code or password, or on an `open` group, does a join
+learn that the group is full (409 `worker_group_member_cap_exceeded`) or
+closed (403 `worker_group_join_ended`); either way the code stays unused.
+Wrong codes and passwords are not counted or limited: a right code or password
+always gets in, however many wrong tries came before it from anyone, so no one
+can shut a group by guessing. The secret's strength is the protection. A code
+is 128 random bits. A guesser with many throwaway accounts is held back only by
+how fast the session's group coordinator answers joins, at most about 1,000 a
+second, and every try is a billed request. At that rate a generated
+three-word password (2,048³, about 8.6 billion) takes about 50 days on average,
+while a short or common hand-typed password can fall within hours. Codes travel in session backups with their groups, so a spent
+code stays spent after a restore, and a code revoked while a join that spent it
+is still settling comes back revoked if that join fails. Backups also carry a
+password group's signer, from which the password could be guessed offline, so
+keep them as private as the session's keys. Every public config
+read sets `groupJoinChoices: true`; older Workers lack it and refuse these modes.
 
 **Who can remove members.** Each group's `removalAuth` says who can end a
 membership, like an SBT's burn auth: `both` (the default) lets the member leave
@@ -1951,7 +2021,6 @@ Vars:
 - `BOOTSTRAP_ADMIN_ADDRESS` (public admin address allowed to write the first
   session config; see [Auth flow](#auth-flow-siwe-style))
 - `CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION` (optional; defaults to `100`)
-- `CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP` (optional; defaults to `1000`)
 - `CE_WORKER_GROUPS_BOOTSTRAP` (manual fresh-namespace assertion for the
   standalone Cloudflare template; keep the packaged
   `fresh-template-v2` value only when `GROUP_KV` is newly provisioned, and

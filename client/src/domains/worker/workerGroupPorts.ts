@@ -3,6 +3,11 @@ import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessio
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { noteWorkerAccessChanged } from '../../utilities/worker/workerAuth.js';
 import { withCoordinatorRetry } from '../../utilities/worker/coordinatorRetry';
+import {
+  WORKER_GROUP_JOIN_MODES,
+  WORKER_GROUP_MEMBER_CEILING_MAX,
+  type WorkerGroupJoinMode,
+} from '../../../../shared/workerGroupJoin.mjs';
 export {
   getWorkerSessionToken,
   isWorkerSignInNeededError,
@@ -11,7 +16,7 @@ export {
 
 type UnknownRecord = Record<string, unknown>;
 
-export type WorkerGroupJoinMode = 'open' | 'admin_add';
+export type { WorkerGroupJoinMode };
 export type WorkerGroupMemberVisibility = 'admin_only' | 'members' | 'session';
 // Who can end a membership: admins, the member, both or neither, like an SBT's burn auth.
 export const WORKER_GROUP_REMOVAL_AUTHS = ['both', 'admin_only', 'member_only', 'neither'] as const;
@@ -29,12 +34,32 @@ export type WorkerGroup = {
   joinEndsAt?: string;
   adminAddress?: string;
   joinMode: WorkerGroupJoinMode;
+  /** Shown in the group list; a Worker before join choices sends none (see isWorkerGroupListed). */
+  listed?: boolean;
   memberVisibility: WorkerGroupMemberVisibility;
   removalAuth?: WorkerGroupRemovalAuth;
   memberCount?: number;
   createdAt?: string;
   updatedAt?: string;
+  // Only admins see these.
+  passwordSet?: boolean;
+  invites?: WorkerGroupInviteCounts;
 };
+export type WorkerGroupInviteCounts = { unused: number; used: number; revoked: number };
+
+/**
+ * A group shown in the group list. Public URL groups always are; with no setting, as the Worker resolves it, so
+ * are groups whose members the whole session sees.
+ */
+export const isWorkerGroupListed = ({
+  listed,
+  joinMode,
+  memberVisibility,
+}: Pick<WorkerGroup, 'listed' | 'joinMode' | 'memberVisibility'>): boolean =>
+  joinMode === 'open' || (listed ?? memberVisibility === 'session');
+/** Joining needs a group password or a one-use claim code. */
+export const workerGroupNeedsSecret = ({ joinMode }: Pick<WorkerGroup, 'joinMode'>): boolean =>
+  joinMode === 'one_use' || joinMode === 'group_password';
 
 // A Worker deployed before the setting reports none, and every group there works as both.
 export const workerGroupMembersMayLeave = ({ removalAuth = 'both' }: Pick<WorkerGroup, 'removalAuth'>): boolean =>
@@ -159,9 +184,14 @@ const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'worker_group_exists',
   'worker_group_id_retired',
   'worker_group_join_denied',
+  'worker_group_invite_exists',
+  'worker_group_invite_page_invalid',
   'worker_group_join_ended',
+  'worker_group_join_mode_mismatch',
+  'worker_group_join_refused',
   'worker_group_leave_denied',
   'worker_group_member_cap_exceeded',
+  'worker_group_member_limit_above_ceiling',
   'worker_group_member_limit_below_current',
   'worker_group_member_list_forbidden',
   'worker_group_member_not_found',
@@ -317,7 +347,8 @@ const normalizeGroup = (
   if (
     !groupId ||
     !label ||
-    !['open', 'admin_add'].includes(joinMode) ||
+    !(WORKER_GROUP_JOIN_MODES as readonly string[]).includes(joinMode) ||
+    (source.listed != null && typeof source.listed !== 'boolean') ||
     !['admin_only', 'members', 'session'].includes(memberVisibility) ||
     (removalAuth !== undefined && !(WORKER_GROUP_REMOVAL_AUTHS as readonly string[]).includes(removalAuth)) ||
     (source.tags != null &&
@@ -330,7 +361,8 @@ const normalizeGroup = (
         documentURLs.length !== source.documentURLs.length ||
         documentURLs.length > 10 ||
         documentURLs.some((url) => !isSafeHttpsUrl(url)))) ||
-    (source.memberLimit != null && (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > 1000)) ||
+    (source.memberLimit != null &&
+      (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > WORKER_GROUP_MEMBER_CEILING_MAX)) ||
     (source.joinEndsAt != null && (!joinEndsAt || !Number.isFinite(Date.parse(joinEndsAt)))) ||
     (source.adminAddress != null && !/^0x[0-9a-fA-F]{40}$/.test(adminAddress))
   ) {
@@ -352,12 +384,23 @@ const normalizeGroup = (
     joinEndsAt: joinEndsAt || undefined,
     adminAddress: adminAddress || undefined,
     joinMode: joinMode as WorkerGroupJoinMode,
+    ...(typeof source.listed === 'boolean' ? { listed: source.listed } : {}),
     memberVisibility: memberVisibility as WorkerGroupMemberVisibility,
     ...(removalAuth === undefined ? {} : { removalAuth: removalAuth as WorkerGroupRemovalAuth }),
     ...(memberCount === undefined ? {} : { memberCount }),
     createdAt: toStringValue(source.createdAt) || undefined,
     updatedAt: toStringValue(source.updatedAt) || undefined,
+    ...(typeof source.passwordSet === 'boolean' ? { passwordSet: source.passwordSet } : {}),
+    ...(normalizeInviteCounts(source.invites) ? { invites: normalizeInviteCounts(source.invites)! } : {}),
   };
+};
+
+const normalizeInviteCounts = (value: unknown): WorkerGroupInviteCounts | null => {
+  const source = toRecord(value);
+  const counts = { unused: source.unused, used: source.used, revoked: source.revoked };
+  return Object.values(counts).every((count) => Number.isSafeInteger(count) && (count as number) >= 0)
+    ? (counts as WorkerGroupInviteCounts)
+    : null;
 };
 
 const normalizeMembership = (value: unknown, expectedSessionSlug?: unknown): WorkerGroupMembership | null => {
@@ -546,7 +589,7 @@ export const loadWorkerGroupOverview = async ({
   const membershipGroupIds = new Set(memberships.map(({ group }) => group.groupId));
   return {
     groups: normalizeGroups(groupsPayload.groups, expectedSessionSlug, true).filter(
-      (group) => group.memberVisibility === 'session' || membershipGroupIds.has(group.groupId),
+      (group) => isWorkerGroupListed(group) || membershipGroupIds.has(group.groupId),
     ),
     memberships,
   };
@@ -646,6 +689,8 @@ export const joinWorkerGroup = async ({
   sessionId,
   sessionSlug,
   groupId,
+  secret,
+  proof,
   fetchImpl = fetch,
 }: {
   workerUrl: unknown;
@@ -653,6 +698,10 @@ export const joinWorkerGroup = async ({
   sessionId: unknown;
   sessionSlug: unknown;
   groupId: unknown;
+  /** A one-use claim code. */
+  secret?: string;
+  /** A group password's signature over the join statement. */
+  proof?: string;
   fetchImpl?: typeof fetch;
 }): Promise<UnknownRecord> => {
   const expectedSessionSlug = normalizeExpectedSessionSlug(sessionSlug);
@@ -664,7 +713,7 @@ export const joinWorkerGroup = async ({
     sessionSlug: expectedSessionSlug,
     path: '/groups/join',
     method: 'POST',
-    body: { groupId: toStringValue(groupId) },
+    body: { groupId: toStringValue(groupId), ...(secret ? { secret } : {}), ...(proof ? { proof } : {}) },
     // A room joining one group at once can find the session busy.
     fetchImpl: withCoordinatorRetry(fetchImpl),
   }).then((payload) => {
@@ -969,6 +1018,94 @@ export const removeWorkerGroupMember = ({
     sessionId,
     sessionSlug,
     postSignedRequest,
+  });
+
+type AdminGroupRequest = {
+  groupId: unknown;
+  sessionId: unknown;
+  sessionSlug: unknown;
+  postSignedRequest: PostSignedWorkerGroupRequest;
+};
+export type WorkerGroupInvite = {
+  hash: string;
+  state: 'unused' | 'used' | 'revoked';
+  createdAt?: string;
+  expiresAt?: string;
+  usedAt?: string;
+};
+
+const readInviteCounts = (payload: UnknownRecord, key: string): WorkerGroupInviteCounts => {
+  const counts = normalizeInviteCounts(payload[key]);
+  if (!counts) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+  return counts;
+};
+
+/** Stores the hashes of new one-use claim codes; the codes themselves never leave the browser. */
+export const addWorkerGroupInvites = ({
+  hashes,
+  expiresAt,
+  ...request
+}: AdminGroupRequest & { hashes: string[]; expiresAt?: string }) =>
+  runAdminAction({
+    action: 'groups/invites/add',
+    body: { groupId: toStringValue(request.groupId), hashes, ...(expiresAt ? { expiresAt } : {}) },
+    ...request,
+  }).then((payload) => ({ added: Number(payload.added) || 0, counts: readInviteCounts(payload, 'counts') }));
+
+const INVITE_STATES = ['unused', 'used', 'revoked'];
+const normalizeInvite = (value: unknown): WorkerGroupInvite | null => {
+  const source = toRecord(value);
+  const hash = toStringValue(source.hash);
+  const state = toStringValue(source.state);
+  if (!/^[0-9a-f]{64}$/.test(hash) || !INVITE_STATES.includes(state)) return null;
+  const time = (key: string) => {
+    const value = toStringValue(source[key]);
+    return value && Number.isFinite(Date.parse(value)) ? { [key]: value } : {};
+  };
+  return {
+    hash,
+    state: state as WorkerGroupInvite['state'],
+    ...time('createdAt'),
+    ...time('expiresAt'),
+    ...time('usedAt'),
+  };
+};
+
+/** One page of a group's one-use links in hash order, by hash and status; a hash never reveals its code. */
+export const listWorkerGroupInvites = ({ cursor, ...request }: AdminGroupRequest & { cursor?: string }) =>
+  runAdminAction({
+    action: 'groups/invites/list',
+    body: { groupId: toStringValue(request.groupId), ...(cursor ? { cursor } : {}) },
+    ...request,
+  }).then((payload) => ({
+    invites: (Array.isArray(payload.invites) ? payload.invites : [])
+      .map(normalizeInvite)
+      .filter((invite): invite is WorkerGroupInvite => !!invite),
+    counts: readInviteCounts(payload, 'counts'),
+    cursor: typeof payload.cursor === 'string' ? payload.cursor : '',
+  }));
+
+/** Spends the named one-use links, or every unused one, so they no longer admit anyone. */
+export const revokeWorkerGroupInvites = ({
+  hashes,
+  ...request
+}: AdminGroupRequest & { hashes: string[] | 'allUnused' }) =>
+  runAdminAction({
+    action: 'groups/invites/revoke',
+    body: { groupId: toStringValue(request.groupId), ...(hashes === 'allUnused' ? { allUnused: true } : { hashes }) },
+    ...request,
+  }).then((payload) => ({ revoked: Number(payload.revoked) || 0, counts: readInviteCounts(payload, 'counts') }));
+
+/** Sets or replaces the group password by its signer address; replacing voids the old one. Members stay. */
+export const setWorkerGroupPassword = ({ signer, ...request }: AdminGroupRequest & { signer: string }) =>
+  runAdminAction({
+    action: 'groups/password/set',
+    body: { groupId: toStringValue(request.groupId), signer },
+    ...request,
+  }).then((payload) => {
+    if (payload.groupId !== toStringValue(request.groupId).toLowerCase() || payload.passwordSet !== true)
+      throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+    return { groupId: payload.groupId, passwordSet: true as const, signerSetAt: toStringValue(payload.signerSetAt) };
   });
 
 export const normalizeWorkerGroupsAdminPayload = (payload: unknown, sessionSlug?: unknown): WorkerGroup[] =>

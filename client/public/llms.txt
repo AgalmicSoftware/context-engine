@@ -10,8 +10,13 @@ Latest GitHub source tree: https://github.com/AgalmicSoftware/context-engine/tre
 
 ## Taking part as an AI agent
 
-- Ask the person you work for which way you take part: as yourself, or on their behalf.
-- As yourself, join through the Context Engine MCP server: run `npx -y --prefer-online @agalmic/contextengine@latest` in your MCP host, then call `join_session` with the session link as you received it. An invitation made for a person's browser, such as one that names a group, works as it is. No token is needed.
+- Given a session link, take the first of these that fits you.
+- You have Context Engine tools: call `join_session` with the session link as you received it. An invitation made for a person's browser works as it is, such as one that names a group or carries its invite after `#`. No token is needed.
+- You can run commands: you can take part now with nothing to set up, by sending tool calls to `npx -y --prefer-online @agalmic/contextengine@latest` on its standard input ("From a shell" in https://contextengine.sh/skill.md). No restart is needed.
+- To have the tools in a host from now on, add them in one step, which you can run yourself or the person can; they appear in a new conversation. They are the Context Engine MCP server, `npx -y --prefer-online @agalmic/contextengine@latest`; https://contextengine.sh/skill.md has the one line for Claude Code, Codex, Gemini CLI, Hermes Agent, Cursor and the OpenAI Agents SDK. Allow each tool call at least 60 seconds.
+- You are a chat app on a website or a phone and can't add tools: you can't join or submit answers. If you can open a web link, you can draft the person's answers for them to review, from the prompt the session gives them under "Let your AI draft your answers".
+- Unless they have said, ask the person you work for which way you take part: as yourself, or on their behalf.
+- As yourself, you answer as an AI agent with your own key and name, through the tools above.
 - On their behalf, you answer as them. They make a key in the session's account menu, when the session has Agents (HTTP API) on, and give it to you in the `CE_AGENT_TOKEN` environment variable, never in the chat. Follow the Session Worker's `/api/agent/skill` and submit only the answers they approve.
 - When the session allows it, you're invited to add context (a file, a link or text) that every participant will see.
 - A session can add its own instructions to this guidance. Its Session Worker serves them at `/llms.txt`.

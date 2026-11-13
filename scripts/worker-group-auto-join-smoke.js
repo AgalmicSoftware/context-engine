@@ -229,7 +229,43 @@ async function main() {
     await page.goto(`${baseUrl}/session/${sessionSlug}?joinGroup=${'a'.repeat(80)}`);
     await page.getByRole('button', { name: 'Log in', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
-    console.log('PASS: Cloudflare auto-join smoke (sign-in, join, cleanup, real app group routes, clean links and refresh, aligned toolbar controls, no blockchain progress, detail-only sharing, existing member, cancellation, navigation/refresh before login, mobile layout)');
+    // A one-use link: its claim code rides in the fragment, leaves the address at once and reaches only the join.
+    const code = 'c0ffee'.padEnd(32, '0');
+    const table = { ...group, groupId: 'table-3', label: 'Table 3', joinMode: 'one_use', listed: false, memberVisibility: 'members' };
+    const invited = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    let joinBody = null;
+    await invited.route('**/*', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.origin === new URL(baseUrl).origin) {
+        if (url.pathname === `/session/${sessionSlug}`) return route.fulfill({ contentType: 'text/html', body: html });
+        return route.continue();
+      }
+      if (url.origin === 'https://auto-join-worker.example') {
+        const payload = { ok: true, sessionId, sessionSlug };
+        if (url.pathname === '/session-config') payload.config = sessionConfig;
+        // An unlisted group is in no list, so only its invitation names it.
+        if (url.pathname === '/groups/list') payload.groups = [];
+        if (url.pathname === '/groups/my-memberships') payload.memberships = joinBody ? [{ group: table, member: { sessionSlug } }] : [];
+        if (url.pathname === '/groups/join') {
+          joinBody = route.request().postDataJSON();
+          payload.group = table; payload.memberCount = 1;
+        }
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify(payload) });
+      }
+      return route.abort();
+    });
+    const invitedPage = await invited.newPage();
+    await invitedPage.goto(`${baseUrl}/session/${sessionSlug}?joinGroup=${table.groupId}#groupInvite=${code}`);
+    const invitation = invitedPage.getByTestId('ce-session-worker-group-auto-join');
+    await invitation.getByText('Group invitation', { exact: false }).first().waitFor();
+    assert.equal(new URL(invitedPage.url()).hash, '');
+    assert.equal(await invitedPage.evaluate(() => JSON.stringify(history.state || null).includes('c0ffee')), false);
+    await invitedPage.getByRole('button', { name: 'Log in', exact: true }).click();
+    await invitation.getByText('Joined Table 3.', { exact: true }).waitFor();
+    assert.deepEqual(joinBody, { groupId: table.groupId, sessionId, secret: code });
+    assert.equal(await invitedPage.evaluate(() => sessionStorage.getItem('ce:worker-group-auto-join:v1')), null);
+    await invited.close();
+    console.log('PASS: Cloudflare auto-join smoke (sign-in, join, cleanup, real app group routes, clean links and refresh, aligned toolbar controls, no blockchain progress, detail-only sharing, existing member, cancellation, navigation/refresh before login, mobile layout, one-use invite link)');
   } finally { await browser.close(); }
 }
 

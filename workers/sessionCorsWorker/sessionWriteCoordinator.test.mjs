@@ -545,7 +545,6 @@ test('SessionWriteCoordinator admits exactly one distinct concurrent member add 
 	const env = {
 		CE_WORKER_GROUPS_KV: kv,
 		CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2',
-		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '1',
 	};
 	const actorPrincipal = {
 		kind: 'evm_address',
@@ -561,6 +560,7 @@ test('SessionWriteCoordinator admits exactly one distinct concurrent member add 
 				groupId: 'reviewers',
 				label: 'Reviewers',
 				joinMode: 'admin_add',
+				memberLimit: 1,
 				memberVisibility: 'members',
 			},
 			actorPrincipal,
@@ -595,7 +595,6 @@ test('SessionWriteCoordinator authoritatively enforces per-group membership limi
 	const env = {
 		CE_WORKER_GROUPS_KV: kv,
 		CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2',
-		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '5',
 	};
 	let coordinatorNow = Date.now();
 	const coordinator = new SessionWriteCoordinator(createTransactionalState().state, env, {
@@ -667,7 +666,6 @@ test('coordinated Worker Group CRUD keeps capacity authoritative across release 
 	const env = installWorkerGroupCoordinatorBinding({
 		CE_WORKER_GROUPS_KV: createWorkerGroupKv(),
 		CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
-		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '1',
 	});
 	const actorPrincipal = {
 		kind: 'evm_address',
@@ -694,6 +692,7 @@ test('coordinated Worker Group CRUD keeps capacity authoritative across release 
 					groupId: 'reviewers',
 					label: 'Reviewers',
 					joinMode: 'open',
+					memberLimit: 1,
 					memberVisibility: 'members',
 				},
 			})
@@ -764,7 +763,6 @@ test('Worker Group capacity initialization locks unprovisioned legacy KV state',
 	const env = {
 		CE_WORKER_GROUPS_KV: kv,
 		CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
-		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '1',
 	};
 	const actorPrincipal = {
 		kind: 'evm_address',
@@ -921,7 +919,6 @@ test('stale duplicate member removal cannot release the same durable capacity tw
 	const env = {
 		CE_WORKER_GROUPS_KV: kv,
 		CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2',
-		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '2',
 	};
 	const actorPrincipal = {
 		kind: 'evm_address',
@@ -952,6 +949,7 @@ test('stale duplicate member removal cannot release the same durable capacity tw
 					groupId: 'reviewers',
 					label: 'Reviewers',
 					joinMode: 'admin_add',
+					memberLimit: 2,
 					memberVisibility: 'members',
 				},
 			})
@@ -1211,7 +1209,6 @@ test('a KV created:false result retains the reserved member capacity', async () 
 	const kv = createWorkerGroupKv();
 	const env = installWorkerGroupCoordinatorBinding({
 		CE_WORKER_GROUPS_KV: kv,
-		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '1',
 	});
 	const actorPrincipal = {
 		kind: 'evm_address',
@@ -1228,6 +1225,7 @@ test('a KV created:false result retains the reserved member capacity', async () 
 					groupId: 'reviewers',
 					label: 'Reviewers',
 					joinMode: 'admin_add',
+					memberLimit: 1,
 				},
 				actorPrincipal,
 			})

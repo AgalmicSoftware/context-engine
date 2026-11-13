@@ -11,3 +11,5 @@ export const RISK_MATRIX_FIELD: 'riskMatrix';
 export const MEMBER_RESULTS_FIELD: 'memberResults';
 /** The public config field a Worker sets when it answers the Session Agent and accepts its setting. */
 export const SESSION_AGENT_READY_FIELD: 'sessionAgentReady';
+/** The public config field a Worker sets when it takes group codes and passwords and honours groupMemberCeiling. */
+export const GROUP_JOIN_CHOICES_FIELD: 'groupJoinChoices';

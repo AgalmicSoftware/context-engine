@@ -147,6 +147,7 @@ import {
 import { resolveInterviewDraftOrigin } from './sessionInterviewResearch';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { confidenceMeaningOf } from '../../../../shared/interviewConfidence.mjs';
+import { holdGroupInviteForLink } from '../../domains/worker/workerGroupAutoJoinIntent';
 import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
 
 // Crypto and contract utilities
@@ -1136,6 +1137,8 @@ export const receiveTranscriptClaim = (engine: PileViewModeEngine, claim: Transc
   if (!claim.joinGroup) return;
   const url = new URL(window.location.href);
   url.searchParams.set('joinGroup', claim.joinGroup);
+  // The group's password goes straight to the auto-join, never into the address.
+  if (claim.joinToken) holdGroupInviteForLink(`${url.pathname}${url.search}`, claim.joinToken);
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
   window.dispatchEvent(new PopStateEvent('popstate'));
 };

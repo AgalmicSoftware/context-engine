@@ -8,6 +8,7 @@ import InterviewSettingsFields, {
   DRAFT_TEXT_NEEDS_WORKER,
 } from '../InterviewSettingsFields';
 import { SESSION_CONTEXT_LIMITS, isHttpsUrl, validateSessionContext } from '@ce-shared/sessionContext.mjs';
+import { WORKER_GROUP_MEMBER_CEILING_DEFAULT, WORKER_GROUP_MEMBER_CEILING_MAX } from '@ce-shared/workerGroupJoin.mjs';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
   DEFAULT_SESSION_COLOR_SCHEME_ID,
@@ -570,6 +571,8 @@ type ParticipationProps = SetupSectionProps & {
   workerHosted: boolean;
   /** False when the session's Worker predates keeping AI draft text for admins. */
   draftTextSupported?: boolean;
+  /** False when the session's Worker predates group join choices, which brought the ceiling. */
+  groupCeilingSupported?: boolean;
 };
 
 export const SetupParticipationSection = ({
@@ -579,6 +582,7 @@ export const SetupParticipationSection = ({
   onToggle,
   workerHosted,
   draftTextSupported,
+  groupCeilingSupported = true,
 }: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
@@ -646,6 +650,25 @@ export const SetupParticipationSection = ({
             onChange={(event) => onChange(['sessionEndsAt'], event.target.value)}
           />
         </SetupField>
+        {groupCeilingSupported ? (
+          <SetupField
+            id="ce-setup-group-member-ceiling"
+            label="Most members in a group"
+            help={`The largest any group may be. Leave blank for ${WORKER_GROUP_MEMBER_CEILING_DEFAULT.toLocaleString('en-US')}; up to ${WORKER_GROUP_MEMBER_CEILING_MAX.toLocaleString('en-US')}.`}
+          >
+            <Input
+              id="ce-setup-group-member-ceiling"
+              type="number"
+              min="1"
+              max={WORKER_GROUP_MEMBER_CEILING_MAX}
+              step="1"
+              placeholder={WORKER_GROUP_MEMBER_CEILING_DEFAULT.toLocaleString('en-US')}
+              value={text(draft.groupMemberCeiling)}
+              aria-describedby={setupHelpId('ce-setup-group-member-ceiling')}
+              onChange={(event) => onChange(['groupMemberCeiling'], event.target.value)}
+            />
+          </SetupField>
+        ) : null}
         <SetupAgentInstructionsField
           value={text(draft.agentInstructions)}
           onChange={(value) => onChange(['agentInstructions'], value)}

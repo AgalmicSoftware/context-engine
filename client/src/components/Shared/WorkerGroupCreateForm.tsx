@@ -11,6 +11,19 @@ import createStyles from '../SBTs/CreateSBTGroup.module.scss';
 import CompactImageChooser from './CompactImageChooser';
 import { readCompactImageClipboard } from './compactImageClipboard';
 import WorkerGroupRemovalAuthHelp, { WorkerGroupRemovalAuthOptions } from './WorkerGroupRemovalAuthHelp';
+import {
+  BASIC_WORKER_GROUP_JOIN_MODES,
+  WorkerGroupJoinDeadlineHelp,
+  WorkerGroupJoinModeHelp,
+  WorkerGroupJoinModeOptions,
+  WorkerGroupListedHelp,
+  WorkerGroupMemberLimitHelp,
+} from './WorkerGroupJoinChoiceHelp';
+import { generateCreateSbtGroupPassphrase } from '../SBTs/createSbtGroupPasswordHelpers';
+import {
+  WORKER_GROUP_MEMBER_CEILING_DEFAULT,
+  workerGroupPasswordProblem,
+} from '../../../../shared/workerGroupJoin.mjs';
 import styles from './WorkerGroupCreateForm.module.scss';
 
 type WorkerGroupCreateFormProps = {
@@ -36,6 +49,16 @@ type WorkerGroupCreateFormProps = {
   imageTestId: string;
   joinMode?: WorkerGroupJoinMode;
   joinModeTestId?: string;
+  /** The choices this Worker offers; older Workers only the basic two. */
+  joinModes?: WorkerGroupJoinMode[];
+  /** Shown in the group list; offered only with onListedChange, for groups that aren't Public URL. */
+  listed?: boolean;
+  onListedChange?: (value: boolean) => void;
+  /** A Group Password group's password; offered only with onGroupPasswordChange. */
+  groupPassword?: string;
+  onGroupPasswordChange?: (value: string) => void;
+  /** The session's most members in a group. */
+  memberLimitMax?: number;
   memberVisibility?: WorkerGroupMemberVisibility;
   memberVisibilityTestId?: string;
   removalAuth?: WorkerGroupRemovalAuth;
@@ -125,6 +148,12 @@ const WorkerGroupCreateForm = ({
   adminAddressReadOnly = false,
   joinMode = 'open',
   joinModeTestId,
+  joinModes = BASIC_WORKER_GROUP_JOIN_MODES,
+  listed = true,
+  onListedChange,
+  groupPassword = '',
+  onGroupPasswordChange,
+  memberLimitMax = WORKER_GROUP_MEMBER_CEILING_DEFAULT,
   label,
   labelTestId,
   memberVisibility = 'session',
@@ -348,11 +377,14 @@ const WorkerGroupCreateForm = ({
   const memberLimitNumber = Number(memberLimit);
   const memberLimitInvalid = Boolean(
     memberLimit.trim() &&
-    (!Number.isSafeInteger(memberLimitNumber) || memberLimitNumber < 1 || memberLimitNumber > 1000),
+    (!Number.isSafeInteger(memberLimitNumber) || memberLimitNumber < 1 || memberLimitNumber > memberLimitMax),
   );
   const joinEndsAtTime = joinEndsAt ? new Date(joinEndsAt).getTime() : 0;
   const joinEndsAtInvalid = Boolean(joinEndsAt && (!Number.isFinite(joinEndsAtTime) || joinEndsAtTime <= Date.now()));
   const adminAddressInvalid = Boolean(adminAddress.trim() && !/^0x[0-9a-fA-F]{40}$/.test(adminAddress.trim()));
+  const asksPassword = joinMode === 'group_password' && !!onGroupPasswordChange;
+  const passwordProblem = asksPassword ? workerGroupPasswordProblem(groupPassword) : '';
+  const passwordInvalid = Boolean(passwordProblem);
   const submitForm = async () => {
     if (selectedImageFile && !imageUrl.trim()) {
       if (deferImageUpload) {
@@ -574,16 +606,16 @@ const WorkerGroupCreateForm = ({
           <div className={styles.accessStack}>
             <div className={styles.accessRow}>
               <div className={styles.accessCopy}>
-                <span className={styles.accessLabel}>Member limit</span>
-                <span className={styles.accessHelp}>
-                  Optional maximum membership—the Worker equivalent of a token supply limit.
+                <span className={styles.accessLabel}>
+                  Member limit
+                  <WorkerGroupMemberLimitHelp />
                 </span>
               </div>
               <input
                 className={styles.accessInput}
                 type="number"
                 min="1"
-                max="1000"
+                max={memberLimitMax}
                 step="1"
                 value={memberLimit}
                 placeholder="Unlimited"
@@ -594,8 +626,10 @@ const WorkerGroupCreateForm = ({
 
             <div className={styles.accessRow}>
               <div className={styles.accessCopy}>
-                <span className={styles.accessLabel}>Join deadline</span>
-                <span className={styles.accessHelp}>Optional end time for participant self-join.</span>
+                <span className={styles.accessLabel}>
+                  Join deadline
+                  <WorkerGroupJoinDeadlineHelp />
+                </span>
               </div>
               <input
                 className={styles.accessInput}
@@ -629,12 +663,15 @@ const WorkerGroupCreateForm = ({
 
             <div className={styles.accessRow}>
               <div className={styles.accessCopy}>
-                <span className={styles.accessLabel}>Who can join</span>
-                <span className={styles.accessHelp}>
-                  {participantDefaults
-                    ? 'Participant-created groups use this session’s configured open-join behavior.'
-                    : 'Choose whether participants join themselves or are added by an admin.'}
+                <span className={styles.accessLabel}>
+                  Who can join
+                  {participantDefaults ? null : <WorkerGroupJoinModeHelp modes={joinModes} />}
                 </span>
+                {participantDefaults ? (
+                  <span className={styles.accessHelp}>
+                    Participant-created groups use this session’s configured open-join behavior.
+                  </span>
+                ) : null}
               </div>
               {participantDefaults ? (
                 <span className={styles.fixedValue}>Open to participants</span>
@@ -646,11 +683,57 @@ const WorkerGroupCreateForm = ({
                   data-testid={joinModeTestId}
                   onChange={(event) => onJoinModeChange?.(event.target.value as WorkerGroupJoinMode)}
                 >
-                  <option value="admin_add">Admin adds members</option>
-                  <option value="open">Open self-join</option>
+                  <WorkerGroupJoinModeOptions modes={joinModes} />
                 </select>
               )}
             </div>
+
+            {asksPassword ? (
+              <div className={styles.accessRow}>
+                <div className={styles.accessCopy}>
+                  <span className={styles.accessLabel}>Group password</span>
+                  {passwordInvalid && groupPassword ? (
+                    <span className={styles.accessHelp}>{passwordProblem}</span>
+                  ) : null}
+                </div>
+                <span className={styles.passwordRow}>
+                  <input
+                    className={styles.accessInput}
+                    type="text"
+                    value={groupPassword}
+                    placeholder="Enter the group password"
+                    aria-label="Group password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    onChange={(event) => onGroupPasswordChange?.(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className={styles.messageAction}
+                    onClick={() => onGroupPasswordChange?.(generateCreateSbtGroupPassphrase())}
+                  >
+                    Generate new
+                  </button>
+                </span>
+              </div>
+            ) : null}
+
+            {onListedChange && joinMode !== 'open' ? (
+              <div className={styles.accessRow}>
+                <div className={styles.accessCopy}>
+                  <span className={styles.accessLabel}>
+                    Show in the group list
+                    <WorkerGroupListedHelp />
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={listed}
+                  aria-label="Show in the group list"
+                  onChange={(event) => onListedChange(event.target.checked)}
+                />
+              </div>
+            ) : null}
 
             <div className={styles.accessRow}>
               <div className={styles.accessCopy}>
@@ -713,6 +796,7 @@ const WorkerGroupCreateForm = ({
               memberLimitInvalid ||
               joinEndsAtInvalid ||
               adminAddressInvalid ||
+              passwordInvalid ||
               submitDisabled
             }
             onClick={() => void submitForm()}

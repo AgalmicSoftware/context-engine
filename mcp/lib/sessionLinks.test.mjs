@@ -19,6 +19,16 @@ test('parses a hosted session link with group and SBT invite parameters', () => 
   ]);
 });
 
+test('keeps the invite a link carries after # for its joinGroup group only', () => {
+  const base = `https://contextengine.sh/session/town-hall?worker=${encodeURIComponent(WORKER)}`;
+  const code = 'ab'.repeat(16);
+  assert.equal(parseSessionLink(`${base}&joinGroup=grp_1#groupInvite=${code}`).groupInvite, code);
+  assert.equal(parseSessionLink(`${base}&joinGroup=grp_1#groupInvite=${encodeURIComponent('gp:correct horse')}`).groupInvite,
+    'gp:correct horse');
+  assert.equal('groupInvite' in parseSessionLink(`${base}#groupInvite=${code}`), false);
+  assert.equal('groupInvite' in parseSessionLink(`${base}&joinGroup=grp_1`), false);
+});
+
 test('parses normal registry links without changing explicit Worker links', () => {
   const parsed = parseSessionLink('https://contextengine.sh/session/town-hall?src=agent');
   assert.equal(parsed.kind, 'registry');

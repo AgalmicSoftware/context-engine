@@ -39,6 +39,7 @@ export const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'resultsExposure',
   'workerAuthority',
   'groupCreationPolicy',
+  'groupMemberCeiling',
   'contextAdditionPolicy',
   'sessionAgent',
   'linkedWorkerGroups',
@@ -77,3 +78,7 @@ export const MEMBER_RESULTS_FIELD = 'memberResults';
 // Set the same way: this Worker answers the Session Agent and accepts its
 // `sessionAgent` setting, which older Workers refuse.
 export const SESSION_AGENT_READY_FIELD = 'sessionAgentReady';
+
+// Set the same way: this Worker takes one-use codes and group passwords for
+// group joins and honours groupMemberCeiling, which older Workers refuse.
+export const GROUP_JOIN_CHOICES_FIELD = 'groupJoinChoices';

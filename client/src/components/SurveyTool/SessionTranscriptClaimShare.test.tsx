@@ -4,6 +4,7 @@ import SessionTranscriptClaimShare from './SessionTranscriptClaimShare';
 import { createClaimCollector, readClaimFrame, unpackClaim } from './sessionTranscriptClaim';
 import { applySpeakerMerges, type SpeakerMerges } from '../../utilities/audio/speakerMerges';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { finishWorkerGroupAutoJoin } from '../../domains/worker/workerGroupAutoJoin';
 
 jest.mock('../../utilities/audio/useRecordingWakeLock', () => ({
   useRecordingWakeLock: jest.fn(() => ({ wakeLockHeld: true })),
@@ -88,6 +89,26 @@ describe('giving each person their part', () => {
     expect(await open('salon')).toContain('/session/salon?worker=https%3A%2F%2Fworker.example#claim=');
     // A session the site ships with opens from its clean link anywhere.
     expect(await open('eddy26')).toContain('/session/salon#claim=');
+  });
+
+  it('hands on the group password the recorder joined with, but says a one-use link needs invites', async () => {
+    const open = async (token: string) => {
+      finishWorkerGroupAutoJoin('salon', 'salon-group', undefined, token);
+      const view = render(<Share transcript={TRANSCRIPT} sessionSlug="salon" />);
+      fireEvent.click(screen.getByRole('button', { name: 'Person 2' }));
+      const claim = await readCode();
+      const note = screen.queryByText('Each person needs their own invite to join the group.');
+      view.unmount();
+      return { claim, note };
+    };
+    const shared = await open('gp:river-stone-lamp');
+    expect(shared.claim).toMatchObject({ joinGroup: 'salon-group', joinToken: 'gp:river-stone-lamp' });
+    expect(shared.note).toBeNull();
+    const oneUse = await open('a'.repeat(32));
+    expect(oneUse.claim.joinGroup).toBe('salon-group');
+    expect(oneUse.claim).not.toHaveProperty('joinToken');
+    expect(oneUse.note).not.toBeNull();
+    finishWorkerGroupAutoJoin('other', 'other-group');
   });
 
   it('offers a button to every speaker, however little they said, and nothing for an unlabelled transcript', () => {

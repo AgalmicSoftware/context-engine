@@ -9,14 +9,20 @@ import {
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { workerConfigAllowsAnonymousGroupDiscovery } from '../shared/workerConfigModeValidation.mjs';
 import { toStr } from './stringCoercion.js';
+import {
+	WORKER_GROUP_JOIN_REFUSED,
+	WORKER_GROUP_MEMBER_CEILING_DEFAULT,
+	WORKER_GROUP_MEMBER_CEILING_MAX,
+} from '../../shared/workerGroupJoin.mjs';
 
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
+// Public URL, One-use URLs, Group Password and Admin adds members.
 export const WORKER_GROUP_JOIN_MODES = Object.freeze({
 	OPEN: 'open',
-	PASSWORD: 'password',
-	INVITE: 'invite',
+	ONE_USE: 'one_use',
+	GROUP_PASSWORD: 'group_password',
 	ADMIN_ADD: 'admin_add',
 });
 
@@ -35,19 +41,23 @@ export const WORKER_GROUP_REMOVAL_AUTH = Object.freeze({
 });
 
 export const DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
-export const DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1000;
 export const MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
 export const MAX_WORKER_GROUP_DOCUMENT_URLS = 10;
 export const MAX_WORKER_GROUP_TAGS = 20;
 export const MAX_WORKER_GROUP_TAG_LENGTH = 64;
-export const MAX_WORKER_GROUP_MEMBER_LIMIT = 1000;
 export const MAX_WORKER_GROUP_ID_LENGTH = 80;
 export const MAX_WORKER_GROUP_SESSION_SLUG_LENGTH = 128;
 export const DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
 export const MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
 const WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = 'fresh-template-v2';
 
-const IMPLEMENTED_JOIN_MODES = new Set([WORKER_GROUP_JOIN_MODES.OPEN, WORKER_GROUP_JOIN_MODES.ADMIN_ADD]);
+const JOIN_MODE_SET = new Set(Object.values(WORKER_GROUP_JOIN_MODES));
+
+// The session's most members in any group: its setting, or the default.
+export const resolveWorkerGroupMemberCeiling = (value) =>
+	Number.isSafeInteger(value) && value >= 1 && value <= WORKER_GROUP_MEMBER_CEILING_MAX
+		? value
+		: WORKER_GROUP_MEMBER_CEILING_DEFAULT;
 
 export const normalizeWorkerGroupId = (value) => {
 	const normalized = trim(value).toLowerCase();
@@ -55,6 +65,15 @@ export const normalizeWorkerGroupId = (value) => {
 	if (!/^[a-z0-9][a-z0-9._-]*$/.test(normalized)) return '';
 	return normalized;
 };
+
+// Whether a group shows in group lists to people who aren't its members. A
+// Public URL ('open') group does: anyone may join it. A group stored before
+// the setting existed keeps the visibility it had, open or not: listed only
+// when its members were visible to the whole session.
+export const resolveWorkerGroupListed = ({ joinMode, memberVisibility, listed } = {}) =>
+	typeof listed === 'boolean'
+		? listed || joinMode === WORKER_GROUP_JOIN_MODES.OPEN
+		: memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
 
 export const isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim(value));
 
@@ -134,7 +153,6 @@ const encodeWorkerGroupMemberCursor = (source, cursor = '') => `${WORKER_GROUP_M
 
 export const resolveWorkerGroupCaps = (env = {}) => ({
 	maxGroupsPerSession: parsePositiveInt(env.CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION),
-	maxMembersPerGroup: parsePositiveInt(env.CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP),
 });
 
 export const resolveWorkerGroupsKv = (env = {}) =>
@@ -184,8 +202,6 @@ const memberIndexKey = ({ slug, sessionId, principalKey, groupId }) =>
 	`ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:${normalizeWorkerGroupId(groupId)}`;
 const memberPrefix = ({ slug, sessionId, groupId }) =>
 	`ce-worker-group-member:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}:`;
-const principalPrefix = ({ slug, sessionId, principalKey }) =>
-	`ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:`;
 
 const legacyGroupKey = ({ slug, groupId }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
 const legacyGroupPrefix = ({ slug }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:`;
@@ -270,7 +286,7 @@ const normalizeGroupDocumentUrls = (value) => {
 const normalizeGroupMemberLimit = (value) => {
 	if (value == null || value === '' || Number(value) === 0) return { ok: true, value: 0 };
 	const memberLimit = Number(value);
-	if (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > MAX_WORKER_GROUP_MEMBER_LIMIT) {
+	if (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > WORKER_GROUP_MEMBER_CEILING_MAX) {
 		return { ok: false };
 	}
 	return { ok: true, value: memberLimit };
@@ -386,11 +402,19 @@ export const createWorkerGroupId = (deps = {}) => {
 const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps = {} } = {}) => {
 	const joinMode = normalizeJoinMode(input.joinMode || existing?.joinMode);
 	if (!joinMode) return { ok: false, status: 400, reason: 'invalid_join_mode' };
-	if (!IMPLEMENTED_JOIN_MODES.has(joinMode)) {
-		return { ok: false, status: 400, reason: 'join_mode_not_implemented' };
-	}
 	const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
 	if (!memberVisibility) return { ok: false, status: 400, reason: 'invalid_member_visibility' };
+	if (Object.prototype.hasOwnProperty.call(input, 'listed') && typeof input.listed !== 'boolean') {
+		return { ok: false, status: 400, reason: 'invalid_group_listed' };
+	}
+	// Stored only as chosen; an open group's forced listing applies on read, so
+	// it doesn't stick if the group later stops being open. A new group always
+	// stores it, so only groups from before the setting read the old rule.
+	const listed = Object.prototype.hasOwnProperty.call(input, 'listed')
+		? input.listed
+		: existing
+			? existing.listed
+			: memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
 	const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
 	if (!removalAuth) return { ok: false, status: 400, reason: 'invalid_removal_auth' };
 	const label = trim(input.label || existing?.label);
@@ -432,6 +456,7 @@ const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps
 			adminAddress: adminAddress || undefined,
 			joinMode,
 			memberVisibility,
+			listed: typeof listed === 'boolean' ? listed : undefined,
 			removalAuth,
 			updatedAt,
 			...(existing
@@ -881,36 +906,6 @@ const readMembershipRecord = async ({ store, slug, sessionId, groupId, principal
 	return null;
 };
 
-const listMembershipRecords = async ({ store, slug, sessionId, groupId = '', principalKey = '' }) => {
-	const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-	if (!canonicalSessionId) throw new Error('Worker group session identity is invalid.');
-	const prefix = groupId
-		? memberPrefix({ slug, sessionId: canonicalSessionId, groupId })
-		: principalPrefix({ slug, sessionId: canonicalSessionId, principalKey });
-	const members = [];
-	for (const key of await kvListKeys(store.store, prefix)) {
-		let indexedGroupId = groupId;
-		if (!indexedGroupId) {
-			try {
-				indexedGroupId = await store.store.get(key);
-			} catch {
-				throw new Error('Worker group membership index is unavailable.');
-			}
-		}
-		if (!normalizeWorkerGroupId(indexedGroupId)) throw new Error('Worker group membership index is malformed.');
-		if (!groupId && key !== memberIndexKey({ slug, sessionId: canonicalSessionId, principalKey, groupId: indexedGroupId })) {
-			throw new Error('Worker group membership index does not match its key.');
-		}
-		const rawRow = groupId
-			? await kvGetJsonStrict(store.store, key)
-			: await readMembershipRecord({ store, slug, sessionId: canonicalSessionId, groupId: indexedGroupId, principalKey });
-		const row = canonicalizeMembershipRecord({ row: rawRow, slug, sessionId: canonicalSessionId, groupId: indexedGroupId, principalKey });
-		if (!row && rawRow) throw new Error('Worker group membership KV record does not match its key.');
-		if (row && !row.removedAt) members.push(row);
-	}
-	return members;
-};
-
 const listMembershipRecordPage = async ({ store, slug, sessionId, groupId, cursor, limit }) => {
 	const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
 	if (!canonicalSessionId) throw new Error('Worker group session identity is invalid.');
@@ -951,6 +946,7 @@ const redactGroupForMember = (group) => ({
 	...(group.adminAddress ? { adminAddress: group.adminAddress } : {}),
 	joinMode: group.joinMode,
 	memberVisibility: group.memberVisibility,
+	listed: resolveWorkerGroupListed(group),
 	removalAuth: normalizeRemovalAuth(group.removalAuth),
 	createdAt: group.createdAt,
 	updatedAt: group.updatedAt,
@@ -1076,7 +1072,6 @@ export const addWorkerGroupMember = async ({
 	groupId,
 	principal,
 	actorPrincipal,
-	capacityAuthorized = false,
 	resume = false,
 	deps = {},
 } = {}) => {
@@ -1086,27 +1081,16 @@ export const addWorkerGroupMember = async ({
 	if (!group || group.deletedAt) return { ok: false, status: 404, reason: 'worker_group_not_found' };
 	const normalized = normalizeWorkerGroupPrincipal(principal, deps);
 	if (!normalized.ok) return { ok: false, status: 400, reason: normalized.reason };
-	let existing;
-	if (capacityAuthorized) {
-		const existingRecord = await readMembershipRecord({
-			store,
-			slug,
-			sessionId,
-			groupId,
-			principalKey: normalized.key,
-		});
-		existing = existingRecord && !existingRecord.removedAt ? existingRecord : null;
-	} else {
-		const caps = resolveWorkerGroupCaps(env);
-		const configuredMemberLimit =
-			Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? group.memberLimit : caps.maxMembersPerGroup;
-		const effectiveMemberLimit = Math.min(configuredMemberLimit, caps.maxMembersPerGroup);
-		const members = await listMembershipRecords({ store, slug, sessionId, groupId });
-		existing = members.find((member) => member.principalKey === normalized.key);
-		if (!existing && members.length >= effectiveMemberLimit) {
-			return { ok: false, status: 409, reason: 'worker_group_member_cap_exceeded' };
-		}
-	}
+	// Only the person's own record is read: the coordinator holds the count and
+	// the limit, so this cost doesn't grow with the group.
+	const existingRecord = await readMembershipRecord({
+		store,
+		slug,
+		sessionId,
+		groupId,
+		principalKey: normalized.key,
+	});
+	const existing = existingRecord && !existingRecord.removedAt ? existingRecord : null;
 	// Repeated joins are no-ops. An interrupted write still replays the indexes.
 	if (existing && !resume) return { ok: true, store: store.kind, group: redactGroupForMember(group), member: existing, created: false };
 	const addedAt = nowIso(deps);
@@ -1209,6 +1193,7 @@ export const listWorkerGroups = async ({
 		sessionId,
 		groupIds: groups.map((group) => group.groupId),
 		principal: admin ? undefined : actorPrincipalResult?.principal,
+		admin,
 	});
 	if (!catalog.ok) return normalizeWorkerGroupMembershipFailure(catalog);
 	const authorityByGroupId = new Map();
@@ -1220,7 +1205,7 @@ export const listWorkerGroups = async ({
 		if (
 			!groupId ||
 			authorityByGroupId.has(groupId) ||
-			!IMPLEMENTED_JOIN_MODES.has(joinMode) ||
+			!JOIN_MODE_SET.has(joinMode) ||
 			!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) ||
 			!Number.isSafeInteger(memberCount) ||
 			memberCount < 0
@@ -1230,8 +1215,12 @@ export const listWorkerGroups = async ({
 		authorityByGroupId.set(groupId, {
 			joinMode,
 			memberVisibility,
+			// The catalog has already applied the listing rule; applying it again
+			// would list an open group an older Worker hid.
+			listed: authority?.listed === true,
 			memberCount,
 			isMember: authority?.isMember === true,
+			...(admin && isObj(authority?.admin) ? { adminDetails: authority.admin } : {}),
 		});
 	}
 	// KV indexes are an eventually consistent projection. The Durable Object
@@ -1251,15 +1240,15 @@ export const listWorkerGroups = async ({
 			...group,
 			joinMode: authority.joinMode,
 			memberVisibility: authority.memberVisibility,
+			listed: authority.listed,
 		};
-		const mayViewGroup =
-			admin ||
-			authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION ||
-			(authority.isMember && authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS);
-		if (!mayViewGroup) continue;
+		// Member visibility governs only the member list: an unlisted group shows
+		// to its members and admins, a listed one to everyone this list serves.
+		if (!admin && !authority.listed && !authority.isMember) continue;
 		visible.push({
 			...redactGroupForMember(authoritativeGroup),
 			...(includeMemberCount ? { memberCount: authority.memberCount } : {}),
+			...(authority.adminDetails || {}),
 		});
 	}
 	return { ok: true, store: store.kind, groups: visible };
@@ -1346,12 +1335,17 @@ export const listWorkerGroupMembersForPrincipal = async ({
 		return { ok: false, status: 404, reason: 'worker_group_not_found' };
 	}
 	const authority = catalog.groups[0];
+	// To anyone but its members, an unlisted group is as absent as an unknown one;
+	// admins read its members through the signed Admin route.
+	if (authority?.listed !== true && authority?.isMember !== true) {
+		return { ok: false, status: 404, reason: 'worker_group_not_found' };
+	}
 	const memberVisibility = trim(authority?.memberVisibility).toLowerCase();
 	const joinMode = trim(authority?.joinMode).toLowerCase();
 	const memberCount = Number(authority?.memberCount);
 	if (
 		!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) ||
-		!IMPLEMENTED_JOIN_MODES.has(joinMode) ||
+		!JOIN_MODE_SET.has(joinMode) ||
 		!Number.isSafeInteger(memberCount) ||
 		memberCount < 0
 	) {
@@ -1378,6 +1372,7 @@ export const listWorkerGroupMembersForPrincipal = async ({
 			...page.group,
 			joinMode,
 			memberVisibility,
+			listed: authority?.listed,
 		}),
 		members: (page.members || []).map(redactWorkerGroupMemberForViewer),
 		memberCount,
@@ -1407,7 +1402,7 @@ export const listWorkerGroupMemberships = async ({ env, slug, sessionId, princip
 		if (
 			!authoritativeGroupId ||
 			seenGroupIds.has(authoritativeGroupId) ||
-			!IMPLEMENTED_JOIN_MODES.has(authoritativeJoinMode) ||
+			!JOIN_MODE_SET.has(authoritativeJoinMode) ||
 			!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) ||
 			!Number.isSafeInteger(authoritativeMemberCount) ||
 			authoritativeMemberCount < 0
@@ -1448,6 +1443,7 @@ export const listWorkerGroupMemberships = async ({ env, slug, sessionId, princip
 				...group,
 				joinMode: authoritativeJoinMode,
 				memberVisibility: authoritativeVisibility,
+				listed: authoritativeGroup?.listed,
 			}),
 			member,
 			memberCount: authoritativeMemberCount,
@@ -1524,12 +1520,17 @@ export const executeWorkerGroupMutation = async ({
 		if (!group || group.deletedAt) {
 			return { ok: false, status: 404, reason: 'worker_group_not_found' };
 		}
-		if (group.joinMode !== WORKER_GROUP_JOIN_MODES.OPEN) {
-			return { ok: false, status: 403, reason: 'worker_group_join_denied' };
-		}
-		const joinEndsAt = Date.parse(trim(group.joinEndsAt));
-		if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
-			return { ok: false, status: 403, reason: 'worker_group_join_ended' };
+		// The coordinator has already checked the mode, the deadline and any
+		// code or password, with the seat; checking again here could refuse a
+		// join it has admitted.
+		if (!capacityAuthorized) {
+			if (group.joinMode !== WORKER_GROUP_JOIN_MODES.OPEN) {
+				return { ok: false, status: 403, reason: WORKER_GROUP_JOIN_REFUSED };
+			}
+			const joinEndsAt = Date.parse(trim(group.joinEndsAt));
+			if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
+				return { ok: false, status: 403, reason: 'worker_group_join_ended' };
+			}
 		}
 		return addWorkerGroupMember({
 			env,
@@ -1618,7 +1619,7 @@ export const reconcileCoordinatedWorkerGroupCapacity = async ({ env, slug, sessi
 		path: '/worker-groups/reconcile-empty',
 	});
 
-export const readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds, principal } = {}) =>
+export const readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds, principal, admin = false } = {}) =>
 	callWorkerGroupCoordinator({
 		env,
 		slug,
@@ -1627,6 +1628,7 @@ export const readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, 
 		payload: {
 			groupIds,
 			...(principal ? { principal } : {}),
+			...(admin ? { admin: true } : {}),
 		},
 	});
 
@@ -1672,6 +1674,8 @@ export const forwardWorkerGroupMutation = async ({
 	principal,
 	actorPrincipal,
 	remover,
+	memberCeiling,
+	credential,
 } = {}) => {
 	return callWorkerGroupCoordinator({
 		env,
@@ -1685,6 +1689,8 @@ export const forwardWorkerGroupMutation = async ({
 			principal,
 			actorPrincipal,
 			remover,
+			memberCeiling,
+			credential,
 		},
 	});
 };
@@ -1732,17 +1738,12 @@ const participantGroupCreationAllowed = (config) => config?.groupCreationPolicy 
 // Whether someone could join this group on their own right now, as a join link does.
 const isSelfJoinableWorkerGroup = (group, nowMs) => {
 	const joinEndsAt = Date.parse(trim(group?.joinEndsAt));
-	return (
-		group?.joinMode === WORKER_GROUP_JOIN_MODES.OPEN &&
-		group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION &&
-		!(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs)
-	);
+	return group?.joinMode === WORKER_GROUP_JOIN_MODES.OPEN && !(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs);
 };
 
 /**
- * The groups a signed-out visitor may see. A private session shows them only to someone holding a
- * join link to a group they could join on their own, and then only what that group's members see:
- * groups visible to the whole session. Groups shown to their members or admins stay hidden.
+ * The groups a signed-out visitor may see: listed groups only. A private session shows them only to
+ * someone whose join link names a listed group, so an unlisted group's link reveals nothing.
  */
 export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, deps = {} } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
@@ -1776,7 +1777,7 @@ export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGrou
 	if (!result.ok) return result;
 	const nowMs = Number(deps.now?.() || Date.now());
 	if (!invite) return { ok: true, sessionIdentity, store: result.store, groups: result.groups };
-	if (!result.groups.some((group) => group.groupId === invite && isSelfJoinableWorkerGroup(group, nowMs))) {
+	if (!result.groups.some((group) => group.groupId === invite)) {
 		return { ok: false, status: 403, reason: 'worker_group_discovery_not_public' };
 	}
 	// A link shows group names, not who runs each group: a participant's group names its creator.
@@ -1823,8 +1824,10 @@ export const listSelfJoinableWorkerGroupsForMember = async ({ env, config, slug,
 		if (!listed.ok || !joined.ok) return [];
 		const joinedIds = new Set(joined.memberships.map((membership) => normalizeWorkerGroupId(membership?.group?.groupId)));
 		const nowMs = Number(deps.now?.() || Date.now());
+		const ceiling = resolveWorkerGroupMemberCeiling(config?.groupMemberCeiling);
 		return listed.groups.filter((group) => {
-			const full = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 && group.memberCount >= group.memberLimit;
+			const limit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? Math.min(group.memberLimit, ceiling) : ceiling;
+			const full = group.memberCount >= limit;
 			return isSelfJoinableWorkerGroup(group, nowMs) && !joinedIds.has(group.groupId) && !full;
 		});
 	} catch {
@@ -1868,6 +1871,14 @@ export const dispatchPublicWorkerGroupListRequest = async ({ request, config, en
 	if (!result.ok) return routeError(deps, result, baseHeaders);
 	return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
 };
+
+// The admin actions on a group's one-use codes and password, by the coordinator operation each runs.
+const WORKER_GROUP_SECRET_ACTIONS = Object.freeze({
+	'groups/invites/add': 'invites-add',
+	'groups/invites/list': 'invites-list',
+	'groups/invites/revoke': 'invites-revoke',
+	'groups/password/set': 'password-set',
+});
 
 export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, expectedAuthority, headers, deps } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
@@ -2012,6 +2023,25 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 			200,
 			headers,
 		);
+	}
+	if (Object.hasOwn(WORKER_GROUP_SECRET_ACTIONS, action)) {
+		const result = await mutate({
+			expectedAuthority,
+			env,
+			slug,
+			sessionId: sessionIdentity.sessionId,
+			operation: WORKER_GROUP_SECRET_ACTIONS[action],
+			groupId: body?.groupId,
+			input: Object.fromEntries(
+				['hashes', 'expiresAt', 'cursor', 'limit', 'allUnused', 'signer']
+					.filter((key) => Object.hasOwn(body || {}, key))
+					.map((key) => [key, body[key]]),
+			),
+			actorPrincipal: actor.principal,
+		});
+		if (!result.ok) return routeError(deps, result, headers);
+		const { ok: _ok, status: _status, store: _store, ...answer } = result;
+		return jsonResponse(deps, { ok: true, ...sessionIdentity, ...answer }, 200, headers);
 	}
 	if (action === 'groups/list') {
 		const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
@@ -2282,6 +2312,8 @@ export const workerGroupsRoute = async ({
 			groupId: routeBody.groupId,
 			principal: actor.principal,
 			actorPrincipal: actor.principal,
+			// Only the coordinator reads these; they are never stored or logged.
+			credential: { secret: routeBody.secret, proof: routeBody.proof },
 		});
 		// Joining again is a no-op and finishes an interrupted join, so a busy
 		// answer carries the text and the wait clients use to send it again.
@@ -2323,11 +2355,17 @@ export const workerGroupsRoute = async ({
 			actorPrincipal: actor.principal,
 			remover: 'member',
 		});
+		// Leaving a group that doesn't exist reads as leaving one you aren't in,
+		// so the answer never shows whether an unlisted group is there.
+		if (result.reason === 'worker_group_not_found') {
+			return routeError(deps, { status: 404, reason: 'worker_group_member_not_found' }, baseHeaders);
+		}
 		if (!result.ok) return routeError(deps, result, baseHeaders);
 		if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
 			return routeError(deps, { status: 503, reason: 'worker_group_projection_unavailable' }, baseHeaders);
 		}
-		const retainGroup = result.group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
+		// Someone who left still sees a listed group, so the answer keeps it.
+		const retainGroup = result.group?.listed === true;
 		return jsonResponse(
 			deps,
 			{

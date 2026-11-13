@@ -515,14 +515,14 @@ function toBeArray(_value2) {
   if (value === BN_0) {
     return new Uint8Array([]);
   }
-  let hex = value.toString(16);
-  if (hex.length % 2) {
-    hex = "0" + hex;
+  let hex2 = value.toString(16);
+  if (hex2.length % 2) {
+    hex2 = "0" + hex2;
   }
-  const result = new Uint8Array(hex.length / 2);
+  const result = new Uint8Array(hex2.length / 2);
   for (let i = 0; i < result.length; i++) {
     const offset = i * 2;
-    result[i] = parseInt(hex.substring(offset, offset + 2), 16);
+    result[i] = parseInt(hex2.substring(offset, offset + 2), 16);
   }
   return result;
 }
@@ -4469,31 +4469,31 @@ __export(utils_exports, {
 function bytesToHex(bytes3) {
   if (!u8a2(bytes3))
     throw new Error("Uint8Array expected");
-  let hex = "";
+  let hex2 = "";
   for (let i = 0; i < bytes3.length; i++) {
-    hex += hexes[bytes3[i]];
+    hex2 += hexes[bytes3[i]];
   }
-  return hex;
+  return hex2;
 }
 function numberToHexUnpadded(num) {
-  const hex = num.toString(16);
-  return hex.length & 1 ? `0${hex}` : hex;
+  const hex2 = num.toString(16);
+  return hex2.length & 1 ? `0${hex2}` : hex2;
 }
-function hexToNumber(hex) {
-  if (typeof hex !== "string")
-    throw new Error("hex string expected, got " + typeof hex);
-  return BigInt(hex === "" ? "0" : `0x${hex}`);
+function hexToNumber(hex2) {
+  if (typeof hex2 !== "string")
+    throw new Error("hex string expected, got " + typeof hex2);
+  return BigInt(hex2 === "" ? "0" : `0x${hex2}`);
 }
-function hexToBytes(hex) {
-  if (typeof hex !== "string")
-    throw new Error("hex string expected, got " + typeof hex);
-  const len = hex.length;
+function hexToBytes(hex2) {
+  if (typeof hex2 !== "string")
+    throw new Error("hex string expected, got " + typeof hex2);
+  const len = hex2.length;
   if (len % 2)
     throw new Error("padded hex string expected, got unpadded hex of length " + len);
   const array = new Uint8Array(len / 2);
   for (let i = 0; i < array.length; i++) {
     const j = i * 2;
-    const hexByte = hex.slice(j, j + 2);
+    const hexByte = hex2.slice(j, j + 2);
     const byte = Number.parseInt(hexByte, 16);
     if (Number.isNaN(byte) || byte < 0)
       throw new Error("Invalid byte sequence");
@@ -4518,16 +4518,16 @@ function numberToBytesLE(n2, len) {
 function numberToVarBytesBE(n2) {
   return hexToBytes(numberToHexUnpadded(n2));
 }
-function ensureBytes(title, hex, expectedLength) {
+function ensureBytes(title, hex2, expectedLength) {
   let res;
-  if (typeof hex === "string") {
+  if (typeof hex2 === "string") {
     try {
-      res = hexToBytes(hex);
+      res = hexToBytes(hex2);
     } catch (e) {
-      throw new Error(`${title} must be valid hex string, got "${hex}". Cause: ${e}`);
+      throw new Error(`${title} must be valid hex string, got "${hex2}". Cause: ${e}`);
     }
-  } else if (u8a2(hex)) {
-    res = Uint8Array.from(hex);
+  } else if (u8a2(hex2)) {
+    res = Uint8Array.from(hex2);
   } else {
     throw new Error(`${title} must be hex string or Uint8Array`);
   }
@@ -5184,8 +5184,8 @@ function weierstrassPoints(opts) {
      * Converts hash string or Uint8Array to Point.
      * @param hex short/long ECDSA hex
      */
-    static fromHex(hex) {
-      const P = Point2.fromAffine(fromBytes(ensureBytes("pointHex", hex)));
+    static fromHex(hex2) {
+      const P = Point2.fromAffine(fromBytes(ensureBytes("pointHex", hex2)));
       P.assertValidity();
       return P;
     }
@@ -5555,15 +5555,15 @@ function weierstrass(curveDef) {
       this.assertValidity();
     }
     // pair (bytes of r, bytes of s)
-    static fromCompact(hex) {
+    static fromCompact(hex2) {
       const l = CURVE.nByteLength;
-      hex = ensureBytes("compactSignature", hex, l * 2);
-      return new Signature2(slcNum(hex, 0, l), slcNum(hex, l, 2 * l));
+      hex2 = ensureBytes("compactSignature", hex2, l * 2);
+      return new Signature2(slcNum(hex2, 0, l), slcNum(hex2, l, 2 * l));
     }
     // DER encoded ECDSA signature
     // https://bitcoin.stackexchange.com/questions/57644/what-are-the-parts-of-a-bitcoin-transaction-input-script
-    static fromDER(hex) {
-      const { r, s } = DER.toSig(ensureBytes("DER", hex));
+    static fromDER(hex2) {
+      const { r, s } = DER.toSig(ensureBytes("DER", hex2));
       return new Signature2(r, s);
     }
     assertValidity() {
@@ -5616,7 +5616,7 @@ function weierstrass(curveDef) {
       return numToNByteStr(this.r) + numToNByteStr(this.s);
     }
   }
-  const utils2 = {
+  const utils3 = {
     isValidPrivateKey(privateKey) {
       try {
         normPrivateKeyToScalar(privateKey);
@@ -5790,7 +5790,7 @@ function weierstrass(curveDef) {
     verify,
     ProjectivePoint: Point2,
     Signature: Signature2,
-    utils: utils2
+    utils: utils3
   };
 }
 var b2n, h2b, DER, _0n5, _1n5, _2n4, _3n2, _4n2;
@@ -5822,9 +5822,9 @@ var init_weierstrass = __esm({
           throw new E("Invalid signature integer: unnecessary leading zero");
         return { d: b2n(res), l: data.subarray(len + 2) };
       },
-      toSig(hex) {
+      toSig(hex2) {
         const { Err: E } = DER;
-        const data = typeof hex === "string" ? h2b(hex) : hex;
+        const data = typeof hex2 === "string" ? h2b(hex2) : hex2;
         if (!(data instanceof Uint8Array))
           throw new Error("ui8a expected");
         let l = data.length;
@@ -5841,8 +5841,8 @@ var init_weierstrass = __esm({
       hexFromSig(sig) {
         const slice = (s2) => Number.parseInt(s2[0], 16) & 8 ? "00" + s2 : s2;
         const h = (num) => {
-          const hex = num.toString(16);
-          return hex.length & 1 ? `0${hex}` : hex;
+          const hex2 = num.toString(16);
+          return hex2.length & 1 ? `0${hex2}` : hex2;
         };
         const s = slice(h(sig.s));
         const r = slice(h(sig.r));
@@ -25304,6 +25304,7 @@ var init_sessionConfigEdits = __esm({
       "roles",
       "authorization",
       "groupCreationPolicy",
+      "groupMemberCeiling",
       "contextAdditionPolicy",
       "sessionAgent",
       "storageProfile",
@@ -25353,6 +25354,8 @@ var init_sessionConfigEdits = __esm({
       "interviewMode",
       // Checked on each question to the Session Agent, the same way.
       "sessionAgent",
+      // Checked on each group join, the same way.
+      "groupMemberCeiling",
       ...CURATED_ID_LIST_KEYS
     ]);
     record2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -25958,7 +25961,7 @@ var init_deployHelperEndpointConfig = __esm({
 });
 
 // shared/workerSessionPublicConfig.mjs
-var PUBLIC_WORKER_CONFIG_FIELDS, PUBLIC_WORKER_AI_FIELDS, SET_CONFIG_MERGES_AI_FIELD, DEBATE_ATLAS_FIELD, RISK_MATRIX_FIELD, MEMBER_RESULTS_FIELD, SESSION_AGENT_READY_FIELD;
+var PUBLIC_WORKER_CONFIG_FIELDS, PUBLIC_WORKER_AI_FIELDS, SET_CONFIG_MERGES_AI_FIELD, DEBATE_ATLAS_FIELD, RISK_MATRIX_FIELD, MEMBER_RESULTS_FIELD, SESSION_AGENT_READY_FIELD, GROUP_JOIN_CHOICES_FIELD;
 var init_workerSessionPublicConfig = __esm({
   "shared/workerSessionPublicConfig.mjs"() {
     PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
@@ -26002,6 +26005,7 @@ var init_workerSessionPublicConfig = __esm({
       "resultsExposure",
       "workerAuthority",
       "groupCreationPolicy",
+      "groupMemberCeiling",
       "contextAdditionPolicy",
       "sessionAgent",
       "linkedWorkerGroups",
@@ -26022,6 +26026,7 @@ var init_workerSessionPublicConfig = __esm({
     RISK_MATRIX_FIELD = "riskMatrix";
     MEMBER_RESULTS_FIELD = "memberResults";
     SESSION_AGENT_READY_FIELD = "sessionAgentReady";
+    GROUP_JOIN_CHOICES_FIELD = "groupJoinChoices";
   }
 });
 
@@ -26059,6 +26064,7 @@ var init_workerSessionConfig = __esm({
       "responseFieldEncryption",
       "workerAuthority",
       "groupCreationPolicy",
+      "groupMemberCeiling",
       "contextAdditionPolicy",
       "linkedWorkerGroups",
       "storageProfile",
@@ -26281,6 +26287,7 @@ var init_workerSessionConfig = __esm({
       projected[RISK_MATRIX_FIELD] = true;
       projected[MEMBER_RESULTS_FIELD] = true;
       projected[SESSION_AGENT_READY_FIELD] = true;
+      projected[GROUP_JOIN_CHOICES_FIELD] = true;
       return projected;
     };
     profileUsesOnChainSbt = (profile) => {
@@ -30436,8 +30443,8 @@ var init_siweMessage = __esm({
     normalizeSessionIdHex = (value) => {
       if (typeof value !== "string" || value !== value.trim()) return "";
       const lower12 = value.toLowerCase();
-      const hex = lower12.startsWith("0x") ? lower12.slice(2) : lower12;
-      if (/^[0-9a-f]{32}$/.test(hex) && !/^0+$/.test(hex)) return `0x${hex}`;
+      const hex2 = lower12.startsWith("0x") ? lower12.slice(2) : lower12;
+      if (/^[0-9a-f]{32}$/.test(hex2) && !/^0+$/.test(hex2)) return `0x${hex2}`;
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(lower12)) {
         const uuidHex = lower12.replace(/-/g, "");
         return /^0+$/.test(uuidHex) ? "" : `0x${uuidHex}`;
@@ -30462,6 +30469,35 @@ var init_realtimeInterviewConfig = __esm({
       const interview = config?.interviewMode || config?.interview;
       return normalizeRealtimeInterviewModel(interview?.realtimeModel || config?.ai?.realtimeModel);
     };
+  }
+});
+
+// shared/workerGroupJoin.mjs
+var WORKER_GROUP_JOIN_MODES, WORKER_GROUP_SECRET_MODES, WORKER_GROUP_JOIN_REFUSED, WORKER_GROUP_MEMBER_CEILING_DEFAULT, WORKER_GROUP_MEMBER_CEILING_MAX, WORKER_GROUP_INVITE_BATCH_MAX, ONE_USE_SECRET, SECRET_HASH, JOIN_STATEMENT, hex, hashOneUseSecret, isOneUseSecretHash, workerGroupJoinStatement;
+var init_workerGroupJoin = __esm({
+  "shared/workerGroupJoin.mjs"() {
+    init_workerSessionPublicConfig();
+    WORKER_GROUP_JOIN_MODES = Object.freeze(["open", "one_use", "group_password", "admin_add"]);
+    WORKER_GROUP_SECRET_MODES = Object.freeze(["one_use", "group_password"]);
+    WORKER_GROUP_JOIN_REFUSED = "worker_group_join_refused";
+    WORKER_GROUP_MEMBER_CEILING_DEFAULT = 1e3;
+    WORKER_GROUP_MEMBER_CEILING_MAX = 1e4;
+    WORKER_GROUP_INVITE_BATCH_MAX = 500;
+    ONE_USE_SECRET = /^[0-9a-f]{32}$/i;
+    SECRET_HASH = /^[0-9a-f]{64}$/;
+    JOIN_STATEMENT = "ContextEngine.WorkerGroup.Join:1";
+    hex = (bytes3) => Array.from(bytes3, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    hashOneUseSecret = async (secret) => {
+      if (typeof secret !== "string" || !ONE_USE_SECRET.test(secret))
+        throw new Error("A 32-character claim code is required.");
+      const digest2 = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret.toLowerCase()));
+      return hex(new Uint8Array(digest2));
+    };
+    isOneUseSecretHash = (value) => typeof value === "string" && SECRET_HASH.test(value);
+    workerGroupJoinStatement = ({ sessionId, groupId, address: address3 }) => `${JOIN_STATEMENT}
+session:${String(sessionId).toLowerCase()}
+group:${String(groupId)}
+address:${String(address3).toLowerCase()}`;
   }
 });
 
@@ -31004,7 +31040,7 @@ ${SESSION_AGENT_RULES.map((rule) => `- ${rule}`).join("\n")}`
 });
 
 // workers/sessionCorsWorker/sessionConfigMutation.js
-var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEY_SET, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validContextAdditionPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
+var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEY_SET, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validGroupMemberCeiling, validContextAdditionPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
 var init_sessionConfigMutation = __esm({
   "workers/sessionCorsWorker/sessionConfigMutation.js"() {
     init_sessionConfigEdits();
@@ -31017,6 +31053,7 @@ var init_sessionConfigMutation = __esm({
     init_workerConfigModeValidation();
     init_sessionColorSchemeConfig();
     init_resultsAnalysisSettings();
+    init_workerGroupJoin();
     init_sessionContext();
     init_sessionAgent();
     init_sessionConfigNormalization();
@@ -31028,6 +31065,7 @@ var init_sessionConfigMutation = __esm({
     toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
     hasOwn4 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     validGroupCreationPolicy = (config) => !hasOwn4(config, "groupCreationPolicy") || config?.groupCreationPolicy === "admin_only" || config?.groupCreationPolicy === "participants";
+    validGroupMemberCeiling = (config) => !hasOwn4(config, "groupMemberCeiling") || Number.isSafeInteger(config.groupMemberCeiling) && config.groupMemberCeiling >= 1 && config.groupMemberCeiling <= WORKER_GROUP_MEMBER_CEILING_MAX;
     validContextAdditionPolicy = (config) => !hasOwn4(config, "contextAdditionPolicy") || config?.contextAdditionPolicy === "admin_only" || config?.contextAdditionPolicy === "participants";
     validAllowOrigins = (config) => !hasOwn4(config, "allowOrigins") || !Array.isArray(config?.allowOrigins) || config.allowOrigins.every((origin) => typeof origin !== "string" || !origin.includes("*"));
     validAppearanceConfig = (config) => !hasOwn4(config, "appearance") || normalizeWorkerSessionAppearance(config.appearance) !== null;
@@ -31233,6 +31271,9 @@ var init_sessionConfigMutation = __esm({
         if (!validContextAdditionPolicy(incomingConfig)) {
           return { ok: false, status: 400, error: "Invalid context addition policy." };
         }
+        if (!validGroupMemberCeiling(incomingConfig)) {
+          return { ok: false, status: 400, error: `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.` };
+        }
         if (!validAppearanceConfig(incomingConfig)) {
           return { ok: false, status: 400, error: "Invalid session appearance config." };
         }
@@ -31328,6 +31369,9 @@ var init_sessionConfigMutation = __esm({
       if (!validContextAdditionPolicy(mergedConfig)) {
         return { ok: false, status: 400, error: "Invalid context addition policy." };
       }
+      if (!validGroupMemberCeiling(mergedConfig)) {
+        return { ok: false, status: 400, error: `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.` };
+      }
       if (!validAppearanceConfig(mergedConfig)) {
         return { ok: false, status: 400, error: "Invalid session appearance config." };
       }
@@ -31402,7 +31446,7 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, TRANSIENT_WORKER_GROUP_REASONS, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj7, WORKER_GROUP_JOIN_MODES2, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, JOIN_MODE_SET, resolveWorkerGroupMemberCeiling, normalizeWorkerGroupId, resolveWorkerGroupListed, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, TRANSIENT_WORKER_GROUP_REASONS, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, WORKER_GROUP_SECRET_ACTIONS, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_sessionConfigAuthority();
@@ -31412,12 +31456,13 @@ var init_workerGroups = __esm({
     init_sessionConfigMutation();
     init_workerConfigModeValidation();
     init_stringCoercion();
+    init_workerGroupJoin();
     trim2 = (value) => toStr6(value).trim();
     isObj7 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    WORKER_GROUP_JOIN_MODES = Object.freeze({
+    WORKER_GROUP_JOIN_MODES2 = Object.freeze({
       OPEN: "open",
-      PASSWORD: "password",
-      INVITE: "invite",
+      ONE_USE: "one_use",
+      GROUP_PASSWORD: "group_password",
       ADMIN_ADD: "admin_add"
     });
     WORKER_GROUP_MEMBER_VISIBILITY = Object.freeze({
@@ -31432,33 +31477,33 @@ var init_workerGroups = __esm({
       NEITHER: "neither"
     });
     DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
-    DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1e3;
     MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
     MAX_WORKER_GROUP_DOCUMENT_URLS = 10;
     MAX_WORKER_GROUP_TAGS = 20;
     MAX_WORKER_GROUP_TAG_LENGTH = 64;
-    MAX_WORKER_GROUP_MEMBER_LIMIT = 1e3;
     MAX_WORKER_GROUP_ID_LENGTH = 80;
     MAX_WORKER_GROUP_SESSION_SLUG_LENGTH = 128;
     DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
     MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
     WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = "fresh-template-v2";
-    IMPLEMENTED_JOIN_MODES = /* @__PURE__ */ new Set([WORKER_GROUP_JOIN_MODES.OPEN, WORKER_GROUP_JOIN_MODES.ADMIN_ADD]);
+    JOIN_MODE_SET = new Set(Object.values(WORKER_GROUP_JOIN_MODES2));
+    resolveWorkerGroupMemberCeiling = (value) => Number.isSafeInteger(value) && value >= 1 && value <= WORKER_GROUP_MEMBER_CEILING_MAX ? value : WORKER_GROUP_MEMBER_CEILING_DEFAULT;
     normalizeWorkerGroupId = (value) => {
       const normalized = trim2(value).toLowerCase();
       if (!normalized || normalized.length > MAX_WORKER_GROUP_ID_LENGTH) return "";
       if (!/^[a-z0-9][a-z0-9._-]*$/.test(normalized)) return "";
       return normalized;
     };
+    resolveWorkerGroupListed = ({ joinMode, memberVisibility, listed } = {}) => typeof listed === "boolean" ? listed || joinMode === WORKER_GROUP_JOIN_MODES2.OPEN : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
     isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim2(value));
     encodedPrincipalKeyPart = (value) => btoa(trim2(value || "id")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "") || "id";
     canonicalSessionIdKeyPart = (value) => {
       const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: value });
       if (!canonicalSessionId) return "";
-      const hex = canonicalSessionId.slice(2);
+      const hex2 = canonicalSessionId.slice(2);
       let binary = "";
-      for (let index = 0; index < hex.length; index += 2) {
-        binary += String.fromCharCode(Number.parseInt(hex.slice(index, index + 2), 16));
+      for (let index = 0; index < hex2.length; index += 2) {
+        binary += String.fromCharCode(Number.parseInt(hex2.slice(index, index + 2), 16));
       }
       return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
     };
@@ -31507,8 +31552,7 @@ var init_workerGroups = __esm({
     };
     encodeWorkerGroupMemberCursor = (source, cursor = "") => `${WORKER_GROUP_MEMBER_CURSOR_PREFIX}${source}:${cursor}`;
     resolveWorkerGroupCaps = (env = {}) => ({
-      maxGroupsPerSession: parsePositiveInt(env.CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION),
-      maxMembersPerGroup: parsePositiveInt(env.CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP)
+      maxGroupsPerSession: parsePositiveInt(env.CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION)
     });
     resolveWorkerGroupsKv = (env = {}) => env.CE_WORKER_GROUPS_KV || env.GROUP_KV || env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
     resolveWorkerGroupStore = (env = {}) => {
@@ -31537,15 +31581,14 @@ var init_workerGroups = __esm({
     memberKey = ({ slug, sessionId, groupId, principalKey }) => `ce-worker-group-member:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}:${encodedPrincipalKeyPart(principalKey)}`;
     memberIndexKey = ({ slug, sessionId, principalKey, groupId }) => `ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:${normalizeWorkerGroupId(groupId)}`;
     memberPrefix = ({ slug, sessionId, groupId }) => `ce-worker-group-member:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}:`;
-    principalPrefix = ({ slug, sessionId, principalKey }) => `ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:`;
     legacyGroupKey = ({ slug, groupId }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
     legacyGroupPrefix = ({ slug }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:`;
     legacyGroupIndexKey = ({ slug, groupId }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
     legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:`;
     jsonResponse = (deps, body, status, headers2) => deps?.json?.(body, status, headers2) || new Response(JSON.stringify(body), { status, headers: headers2 });
     normalizeJoinMode = (value) => {
-      const mode = trim2(value || WORKER_GROUP_JOIN_MODES.ADMIN_ADD).toLowerCase();
-      if (Object.values(WORKER_GROUP_JOIN_MODES).includes(mode)) return mode;
+      const mode = trim2(value || WORKER_GROUP_JOIN_MODES2.ADMIN_ADD).toLowerCase();
+      if (Object.values(WORKER_GROUP_JOIN_MODES2).includes(mode)) return mode;
       return "";
     };
     normalizeMemberVisibility = (value) => {
@@ -31609,7 +31652,7 @@ var init_workerGroups = __esm({
     normalizeGroupMemberLimit = (value) => {
       if (value == null || value === "" || Number(value) === 0) return { ok: true, value: 0 };
       const memberLimit = Number(value);
-      if (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > MAX_WORKER_GROUP_MEMBER_LIMIT) {
+      if (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > WORKER_GROUP_MEMBER_CEILING_MAX) {
         return { ok: false };
       }
       return { ok: true, value: memberLimit };
@@ -31713,11 +31756,12 @@ var init_workerGroups = __esm({
     normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps = {} } = {}) => {
       const joinMode = normalizeJoinMode(input.joinMode || existing?.joinMode);
       if (!joinMode) return { ok: false, status: 400, reason: "invalid_join_mode" };
-      if (!IMPLEMENTED_JOIN_MODES.has(joinMode)) {
-        return { ok: false, status: 400, reason: "join_mode_not_implemented" };
-      }
       const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
       if (!memberVisibility) return { ok: false, status: 400, reason: "invalid_member_visibility" };
+      if (Object.prototype.hasOwnProperty.call(input, "listed") && typeof input.listed !== "boolean") {
+        return { ok: false, status: 400, reason: "invalid_group_listed" };
+      }
+      const listed = Object.prototype.hasOwnProperty.call(input, "listed") ? input.listed : existing ? existing.listed : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
       const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
       if (!removalAuth) return { ok: false, status: 400, reason: "invalid_removal_auth" };
       const label = trim2(input.label || existing?.label);
@@ -31755,6 +31799,7 @@ var init_workerGroups = __esm({
           adminAddress: adminAddress || void 0,
           joinMode,
           memberVisibility,
+          listed: typeof listed === "boolean" ? listed : void 0,
           removalAuth,
           updatedAt,
           ...existing ? {} : {
@@ -32136,31 +32181,6 @@ var init_workerGroups = __esm({
       }
       return null;
     };
-    listMembershipRecords = async ({ store, slug, sessionId, groupId = "", principalKey = "" }) => {
-      const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-      if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
-      const prefix = groupId ? memberPrefix({ slug, sessionId: canonicalSessionId, groupId }) : principalPrefix({ slug, sessionId: canonicalSessionId, principalKey });
-      const members = [];
-      for (const key of await kvListKeys(store.store, prefix)) {
-        let indexedGroupId = groupId;
-        if (!indexedGroupId) {
-          try {
-            indexedGroupId = await store.store.get(key);
-          } catch {
-            throw new Error("Worker group membership index is unavailable.");
-          }
-        }
-        if (!normalizeWorkerGroupId(indexedGroupId)) throw new Error("Worker group membership index is malformed.");
-        if (!groupId && key !== memberIndexKey({ slug, sessionId: canonicalSessionId, principalKey, groupId: indexedGroupId })) {
-          throw new Error("Worker group membership index does not match its key.");
-        }
-        const rawRow = groupId ? await kvGetJsonStrict(store.store, key) : await readMembershipRecord({ store, slug, sessionId: canonicalSessionId, groupId: indexedGroupId, principalKey });
-        const row = canonicalizeMembershipRecord({ row: rawRow, slug, sessionId: canonicalSessionId, groupId: indexedGroupId, principalKey });
-        if (!row && rawRow) throw new Error("Worker group membership KV record does not match its key.");
-        if (row && !row.removedAt) members.push(row);
-      }
-      return members;
-    };
     listMembershipRecordPage = async ({ store, slug, sessionId, groupId, cursor, limit }) => {
       const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
       if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
@@ -32200,6 +32220,7 @@ var init_workerGroups = __esm({
       ...group.adminAddress ? { adminAddress: group.adminAddress } : {},
       joinMode: group.joinMode,
       memberVisibility: group.memberVisibility,
+      listed: resolveWorkerGroupListed(group),
       removalAuth: normalizeRemovalAuth(group.removalAuth),
       createdAt: group.createdAt,
       updatedAt: group.updatedAt
@@ -32314,7 +32335,6 @@ var init_workerGroups = __esm({
       groupId,
       principal,
       actorPrincipal,
-      capacityAuthorized = false,
       resume = false,
       deps = {}
     } = {}) => {
@@ -32324,26 +32344,14 @@ var init_workerGroups = __esm({
       if (!group || group.deletedAt) return { ok: false, status: 404, reason: "worker_group_not_found" };
       const normalized = normalizeWorkerGroupPrincipal(principal, deps);
       if (!normalized.ok) return { ok: false, status: 400, reason: normalized.reason };
-      let existing;
-      if (capacityAuthorized) {
-        const existingRecord = await readMembershipRecord({
-          store,
-          slug,
-          sessionId,
-          groupId,
-          principalKey: normalized.key
-        });
-        existing = existingRecord && !existingRecord.removedAt ? existingRecord : null;
-      } else {
-        const caps = resolveWorkerGroupCaps(env);
-        const configuredMemberLimit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? group.memberLimit : caps.maxMembersPerGroup;
-        const effectiveMemberLimit = Math.min(configuredMemberLimit, caps.maxMembersPerGroup);
-        const members = await listMembershipRecords({ store, slug, sessionId, groupId });
-        existing = members.find((member2) => member2.principalKey === normalized.key);
-        if (!existing && members.length >= effectiveMemberLimit) {
-          return { ok: false, status: 409, reason: "worker_group_member_cap_exceeded" };
-        }
-      }
+      const existingRecord = await readMembershipRecord({
+        store,
+        slug,
+        sessionId,
+        groupId,
+        principalKey: normalized.key
+      });
+      const existing = existingRecord && !existingRecord.removedAt ? existingRecord : null;
       if (existing && !resume) return { ok: true, store: store.kind, group: redactGroupForMember(group), member: existing, created: false };
       const addedAt = nowIso(deps);
       const member = {
@@ -32436,7 +32444,8 @@ var init_workerGroups = __esm({
         slug,
         sessionId,
         groupIds: groups.map((group) => group.groupId),
-        principal: admin ? void 0 : actorPrincipalResult?.principal
+        principal: admin ? void 0 : actorPrincipalResult?.principal,
+        admin
       });
       if (!catalog2.ok) return normalizeWorkerGroupMembershipFailure(catalog2);
       const authorityByGroupId = /* @__PURE__ */ new Map();
@@ -32445,14 +32454,18 @@ var init_workerGroups = __esm({
         const joinMode = trim2(authority?.joinMode).toLowerCase();
         const memberVisibility = trim2(authority?.memberVisibility).toLowerCase();
         const memberCount = Number(authority?.memberCount);
-        if (!groupId || authorityByGroupId.has(groupId) || !IMPLEMENTED_JOIN_MODES.has(joinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
+        if (!groupId || authorityByGroupId.has(groupId) || !JOIN_MODE_SET.has(joinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
           return normalizeWorkerGroupMembershipFailure();
         }
         authorityByGroupId.set(groupId, {
           joinMode,
           memberVisibility,
+          // The catalog has already applied the listing rule; applying it again
+          // would list an open group an older Worker hid.
+          listed: authority?.listed === true,
           memberCount,
-          isMember: authority?.isMember === true
+          isMember: authority?.isMember === true,
+          ...admin && isObj7(authority?.admin) ? { adminDetails: authority.admin } : {}
         });
       }
       if (authorityByGroupId.size !== authoritativeGroupCount) {
@@ -32468,13 +32481,14 @@ var init_workerGroups = __esm({
         const authoritativeGroup = {
           ...group,
           joinMode: authority.joinMode,
-          memberVisibility: authority.memberVisibility
+          memberVisibility: authority.memberVisibility,
+          listed: authority.listed
         };
-        const mayViewGroup = admin || authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION || authority.isMember && authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS;
-        if (!mayViewGroup) continue;
+        if (!admin && !authority.listed && !authority.isMember) continue;
         visible.push({
           ...redactGroupForMember(authoritativeGroup),
-          ...includeMemberCount ? { memberCount: authority.memberCount } : {}
+          ...includeMemberCount ? { memberCount: authority.memberCount } : {},
+          ...authority.adminDetails || {}
         });
       }
       return { ok: true, store: store.kind, groups: visible };
@@ -32550,10 +32564,13 @@ var init_workerGroups = __esm({
         return { ok: false, status: 404, reason: "worker_group_not_found" };
       }
       const authority = catalog2.groups[0];
+      if (authority?.listed !== true && authority?.isMember !== true) {
+        return { ok: false, status: 404, reason: "worker_group_not_found" };
+      }
       const memberVisibility = trim2(authority?.memberVisibility).toLowerCase();
       const joinMode = trim2(authority?.joinMode).toLowerCase();
       const memberCount = Number(authority?.memberCount);
-      if (!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !IMPLEMENTED_JOIN_MODES.has(joinMode) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
+      if (!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !JOIN_MODE_SET.has(joinMode) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
         return normalizeWorkerGroupMembershipFailure();
       }
       const canViewMembers = memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION || memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS && authority?.isMember === true;
@@ -32574,7 +32591,8 @@ var init_workerGroups = __esm({
         group: redactGroupForMember({
           ...page.group,
           joinMode,
-          memberVisibility
+          memberVisibility,
+          listed: authority?.listed
         }),
         members: (page.members || []).map(redactWorkerGroupMemberForViewer),
         memberCount
@@ -32600,7 +32618,7 @@ var init_workerGroups = __esm({
         const authoritativeJoinMode = trim2(authoritativeGroup?.joinMode).toLowerCase();
         const authoritativeVisibility = trim2(authoritativeGroup?.memberVisibility).toLowerCase();
         const authoritativeMemberCount = Number(authoritativeGroup?.memberCount);
-        if (!authoritativeGroupId || seenGroupIds.has(authoritativeGroupId) || !IMPLEMENTED_JOIN_MODES.has(authoritativeJoinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) || !Number.isSafeInteger(authoritativeMemberCount) || authoritativeMemberCount < 0) {
+        if (!authoritativeGroupId || seenGroupIds.has(authoritativeGroupId) || !JOIN_MODE_SET.has(authoritativeJoinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) || !Number.isSafeInteger(authoritativeMemberCount) || authoritativeMemberCount < 0) {
           return normalizeWorkerGroupMembershipFailure();
         }
         seenGroupIds.add(authoritativeGroupId);
@@ -32634,7 +32652,8 @@ var init_workerGroups = __esm({
           group: redactGroupForMember({
             ...group,
             joinMode: authoritativeJoinMode,
-            memberVisibility: authoritativeVisibility
+            memberVisibility: authoritativeVisibility,
+            listed: authoritativeGroup?.listed
           }),
           member,
           memberCount: authoritativeMemberCount
@@ -32710,12 +32729,14 @@ var init_workerGroups = __esm({
         if (!group || group.deletedAt) {
           return { ok: false, status: 404, reason: "worker_group_not_found" };
         }
-        if (group.joinMode !== WORKER_GROUP_JOIN_MODES.OPEN) {
-          return { ok: false, status: 403, reason: "worker_group_join_denied" };
-        }
-        const joinEndsAt = Date.parse(trim2(group.joinEndsAt));
-        if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
-          return { ok: false, status: 403, reason: "worker_group_join_ended" };
+        if (!capacityAuthorized) {
+          if (group.joinMode !== WORKER_GROUP_JOIN_MODES2.OPEN) {
+            return { ok: false, status: 403, reason: WORKER_GROUP_JOIN_REFUSED };
+          }
+          const joinEndsAt = Date.parse(trim2(group.joinEndsAt));
+          if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
+            return { ok: false, status: 403, reason: "worker_group_join_ended" };
+          }
         }
         return addWorkerGroupMember({
           env,
@@ -32793,14 +32814,15 @@ var init_workerGroups = __esm({
       sessionId,
       path: "/worker-groups/reconcile-empty"
     });
-    readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds, principal } = {}) => callWorkerGroupCoordinator({
+    readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds, principal, admin = false } = {}) => callWorkerGroupCoordinator({
       env,
       slug,
       sessionId,
       path: "/worker-groups/catalog",
       payload: {
         groupIds,
-        ...principal ? { principal } : {}
+        ...principal ? { principal } : {},
+        ...admin ? { admin: true } : {}
       }
     });
     readCoordinatedWorkerGroupMemberships = async ({ env, slug, sessionId, principal } = {}) => callWorkerGroupCoordinator({
@@ -32839,7 +32861,9 @@ var init_workerGroups = __esm({
       groupId,
       principal,
       actorPrincipal,
-      remover
+      remover,
+      memberCeiling,
+      credential
     } = {}) => {
       return callWorkerGroupCoordinator({
         env,
@@ -32852,7 +32876,9 @@ var init_workerGroups = __esm({
           groupId,
           principal,
           actorPrincipal,
-          remover
+          remover,
+          memberCeiling,
+          credential
         }
       });
     };
@@ -32900,7 +32926,7 @@ var init_workerGroups = __esm({
     participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === "participants";
     isSelfJoinableWorkerGroup = (group, nowMs) => {
       const joinEndsAt = Date.parse(trim2(group?.joinEndsAt));
-      return group?.joinMode === WORKER_GROUP_JOIN_MODES.OPEN && group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION && !(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs);
+      return group?.joinMode === WORKER_GROUP_JOIN_MODES2.OPEN && !(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs);
     };
     listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, deps = {} } = {}) => {
       const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
@@ -32934,7 +32960,7 @@ var init_workerGroups = __esm({
       if (!result.ok) return result;
       const nowMs = Number(deps.now?.() || Date.now());
       if (!invite) return { ok: true, sessionIdentity, store: result.store, groups: result.groups };
-      if (!result.groups.some((group) => group.groupId === invite && isSelfJoinableWorkerGroup(group, nowMs))) {
+      if (!result.groups.some((group) => group.groupId === invite)) {
         return { ok: false, status: 403, reason: "worker_group_discovery_not_public" };
       }
       const groups = result.groups.map(({ adminAddress: _adminAddress, ...group }) => group);
@@ -32976,8 +33002,10 @@ var init_workerGroups = __esm({
         if (!listed.ok || !joined.ok) return [];
         const joinedIds = new Set(joined.memberships.map((membership) => normalizeWorkerGroupId(membership?.group?.groupId)));
         const nowMs = Number(deps.now?.() || Date.now());
+        const ceiling = resolveWorkerGroupMemberCeiling(config?.groupMemberCeiling);
         return listed.groups.filter((group) => {
-          const full = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 && group.memberCount >= group.memberLimit;
+          const limit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? Math.min(group.memberLimit, ceiling) : ceiling;
+          const full = group.memberCount >= limit;
           return isSelfJoinableWorkerGroup(group, nowMs) && !joinedIds.has(group.groupId) && !full;
         });
       } catch {
@@ -33020,6 +33048,12 @@ var init_workerGroups = __esm({
       if (!result.ok) return routeError(deps, result, baseHeaders);
       return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
     };
+    WORKER_GROUP_SECRET_ACTIONS = Object.freeze({
+      "groups/invites/add": "invites-add",
+      "groups/invites/list": "invites-list",
+      "groups/invites/revoke": "invites-revoke",
+      "groups/password/set": "password-set"
+    });
     dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, expectedAuthority, headers: headers2, deps } = {}) => {
       const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
       if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, headers2);
@@ -33163,6 +33197,23 @@ var init_workerGroups = __esm({
           200,
           headers2
         );
+      }
+      if (Object.hasOwn(WORKER_GROUP_SECRET_ACTIONS, action)) {
+        const result = await mutate({
+          expectedAuthority,
+          env,
+          slug,
+          sessionId: sessionIdentity.sessionId,
+          operation: WORKER_GROUP_SECRET_ACTIONS[action],
+          groupId: body?.groupId,
+          input: Object.fromEntries(
+            ["hashes", "expiresAt", "cursor", "limit", "allUnused", "signer"].filter((key) => Object.hasOwn(body || {}, key)).map((key) => [key, body[key]])
+          ),
+          actorPrincipal: actor.principal
+        });
+        if (!result.ok) return routeError(deps, result, headers2);
+        const { ok: _ok, status: _status, store: _store, ...answer } = result;
+        return jsonResponse(deps, { ok: true, ...sessionIdentity, ...answer }, 200, headers2);
       }
       if (action === "groups/list") {
         const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
@@ -33412,7 +33463,7 @@ var init_workerGroups = __esm({
             memberLimit: routeBody?.group?.memberLimit,
             joinEndsAt: routeBody?.group?.joinEndsAt,
             adminAddress: actor.principal?.address,
-            joinMode: WORKER_GROUP_JOIN_MODES.OPEN,
+            joinMode: WORKER_GROUP_JOIN_MODES2.OPEN,
             memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION,
             removalAuth: routeBody?.group?.removalAuth
           },
@@ -33431,7 +33482,9 @@ var init_workerGroups = __esm({
           operation: "join",
           groupId: routeBody.groupId,
           principal: actor.principal,
-          actorPrincipal: actor.principal
+          actorPrincipal: actor.principal,
+          // Only the coordinator reads these; they are never stored or logged.
+          credential: { secret: routeBody.secret, proof: routeBody.proof }
         });
         if (!result.ok && result.status === 503 && TRANSIENT_WORKER_GROUP_REASONS.has(result.reason)) {
           const headers2 = new Headers(baseHeaders || {});
@@ -33471,11 +33524,14 @@ var init_workerGroups = __esm({
           actorPrincipal: actor.principal,
           remover: "member"
         });
+        if (result.reason === "worker_group_not_found") {
+          return routeError(deps, { status: 404, reason: "worker_group_member_not_found" }, baseHeaders);
+        }
         if (!result.ok) return routeError(deps, result, baseHeaders);
         if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
           return routeError(deps, { status: 503, reason: "worker_group_projection_unavailable" }, baseHeaders);
         }
-        const retainGroup = result.group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
+        const retainGroup = result.group?.listed === true;
         return jsonResponse(
           deps,
           {
@@ -35657,14 +35713,14 @@ var require_maths = __commonJS({
       if (value === BN_012) {
         return new Uint8Array([]);
       }
-      let hex = value.toString(16);
-      if (hex.length % 2) {
-        hex = "0" + hex;
+      let hex2 = value.toString(16);
+      if (hex2.length % 2) {
+        hex2 = "0" + hex2;
       }
-      const result = new Uint8Array(hex.length / 2);
+      const result = new Uint8Array(hex2.length / 2);
       for (let i = 0; i < result.length; i++) {
         const offset = i * 2;
-        result[i] = parseInt(hex.substring(offset, offset + 2), 16);
+        result[i] = parseInt(hex2.substring(offset, offset + 2), 16);
       }
       return result;
     }
@@ -38312,23 +38368,23 @@ var require_utils2 = __commonJS({
     function bytesToHex4(bytes3) {
       if (!u8a3(bytes3))
         throw new Error("Uint8Array expected");
-      let hex = "";
+      let hex2 = "";
       for (let i = 0; i < bytes3.length; i++) {
-        hex += hexes2[bytes3[i]];
+        hex2 += hexes2[bytes3[i]];
       }
-      return hex;
+      return hex2;
     }
     exports.bytesToHex = bytesToHex4;
-    function hexToBytes3(hex) {
-      if (typeof hex !== "string")
-        throw new Error("hex string expected, got " + typeof hex);
-      const len = hex.length;
+    function hexToBytes3(hex2) {
+      if (typeof hex2 !== "string")
+        throw new Error("hex string expected, got " + typeof hex2);
+      const len = hex2.length;
       if (len % 2)
         throw new Error("padded hex string expected, got unpadded hex of length " + len);
       const array = new Uint8Array(len / 2);
       for (let i = 0; i < array.length; i++) {
         const j = i * 2;
-        const hexByte = hex.slice(j, j + 2);
+        const hexByte = hex2.slice(j, j + 2);
         const byte = Number.parseInt(hexByte, 16);
         if (Number.isNaN(byte) || byte < 0)
           throw new Error("Invalid byte sequence");
@@ -40072,34 +40128,34 @@ var require_utils3 = __commonJS({
     function bytesToHex4(bytes3) {
       if (!u8a3(bytes3))
         throw new Error("Uint8Array expected");
-      let hex = "";
+      let hex2 = "";
       for (let i = 0; i < bytes3.length; i++) {
-        hex += hexes2[bytes3[i]];
+        hex2 += hexes2[bytes3[i]];
       }
-      return hex;
+      return hex2;
     }
     exports.bytesToHex = bytesToHex4;
     function numberToHexUnpadded2(num) {
-      const hex = num.toString(16);
-      return hex.length & 1 ? `0${hex}` : hex;
+      const hex2 = num.toString(16);
+      return hex2.length & 1 ? `0${hex2}` : hex2;
     }
     exports.numberToHexUnpadded = numberToHexUnpadded2;
-    function hexToNumber2(hex) {
-      if (typeof hex !== "string")
-        throw new Error("hex string expected, got " + typeof hex);
-      return BigInt(hex === "" ? "0" : `0x${hex}`);
+    function hexToNumber2(hex2) {
+      if (typeof hex2 !== "string")
+        throw new Error("hex string expected, got " + typeof hex2);
+      return BigInt(hex2 === "" ? "0" : `0x${hex2}`);
     }
     exports.hexToNumber = hexToNumber2;
-    function hexToBytes3(hex) {
-      if (typeof hex !== "string")
-        throw new Error("hex string expected, got " + typeof hex);
-      const len = hex.length;
+    function hexToBytes3(hex2) {
+      if (typeof hex2 !== "string")
+        throw new Error("hex string expected, got " + typeof hex2);
+      const len = hex2.length;
       if (len % 2)
         throw new Error("padded hex string expected, got unpadded hex of length " + len);
       const array = new Uint8Array(len / 2);
       for (let i = 0; i < array.length; i++) {
         const j = i * 2;
-        const hexByte = hex.slice(j, j + 2);
+        const hexByte = hex2.slice(j, j + 2);
         const byte = Number.parseInt(hexByte, 16);
         if (Number.isNaN(byte) || byte < 0)
           throw new Error("Invalid byte sequence");
@@ -40130,16 +40186,16 @@ var require_utils3 = __commonJS({
       return hexToBytes3(numberToHexUnpadded2(n2));
     }
     exports.numberToVarBytesBE = numberToVarBytesBE2;
-    function ensureBytes2(title, hex, expectedLength) {
+    function ensureBytes2(title, hex2, expectedLength) {
       let res;
-      if (typeof hex === "string") {
+      if (typeof hex2 === "string") {
         try {
-          res = hexToBytes3(hex);
+          res = hexToBytes3(hex2);
         } catch (e) {
-          throw new Error(`${title} must be valid hex string, got "${hex}". Cause: ${e}`);
+          throw new Error(`${title} must be valid hex string, got "${hex2}". Cause: ${e}`);
         }
-      } else if (u8a3(hex)) {
-        res = Uint8Array.from(hex);
+      } else if (u8a3(hex2)) {
+        res = Uint8Array.from(hex2);
       } else {
         throw new Error(`${title} must be hex string or Uint8Array`);
       }
@@ -40789,9 +40845,9 @@ var require_weierstrass = __commonJS({
           throw new E("Invalid signature integer: unnecessary leading zero");
         return { d: b2n2(res), l: data.subarray(len + 2) };
       },
-      toSig(hex) {
+      toSig(hex2) {
         const { Err: E } = exports.DER;
-        const data = typeof hex === "string" ? h2b2(hex) : hex;
+        const data = typeof hex2 === "string" ? h2b2(hex2) : hex2;
         if (!(data instanceof Uint8Array))
           throw new Error("ui8a expected");
         let l = data.length;
@@ -40808,8 +40864,8 @@ var require_weierstrass = __commonJS({
       hexFromSig(sig) {
         const slice = (s2) => Number.parseInt(s2[0], 16) & 8 ? "00" + s2 : s2;
         const h = (num) => {
-          const hex = num.toString(16);
-          return hex.length & 1 ? `0${hex}` : hex;
+          const hex2 = num.toString(16);
+          return hex2.length & 1 ? `0${hex2}` : hex2;
         };
         const s = slice(h(sig.s));
         const r = slice(h(sig.r));
@@ -40923,8 +40979,8 @@ var require_weierstrass = __commonJS({
          * Converts hash string or Uint8Array to Point.
          * @param hex short/long ECDSA hex
          */
-        static fromHex(hex) {
-          const P = Point2.fromAffine(fromBytes((0, utils_js_1.ensureBytes)("pointHex", hex)));
+        static fromHex(hex2) {
+          const P = Point2.fromAffine(fromBytes((0, utils_js_1.ensureBytes)("pointHex", hex2)));
           P.assertValidity();
           return P;
         }
@@ -41295,15 +41351,15 @@ var require_weierstrass = __commonJS({
           this.assertValidity();
         }
         // pair (bytes of r, bytes of s)
-        static fromCompact(hex) {
+        static fromCompact(hex2) {
           const l = CURVE.nByteLength;
-          hex = (0, utils_js_1.ensureBytes)("compactSignature", hex, l * 2);
-          return new Signature2(slcNum(hex, 0, l), slcNum(hex, l, 2 * l));
+          hex2 = (0, utils_js_1.ensureBytes)("compactSignature", hex2, l * 2);
+          return new Signature2(slcNum(hex2, 0, l), slcNum(hex2, l, 2 * l));
         }
         // DER encoded ECDSA signature
         // https://bitcoin.stackexchange.com/questions/57644/what-are-the-parts-of-a-bitcoin-transaction-input-script
-        static fromDER(hex) {
-          const { r, s } = exports.DER.toSig((0, utils_js_1.ensureBytes)("DER", hex));
+        static fromDER(hex2) {
+          const { r, s } = exports.DER.toSig((0, utils_js_1.ensureBytes)("DER", hex2));
           return new Signature2(r, s);
         }
         assertValidity() {
@@ -41356,7 +41412,7 @@ var require_weierstrass = __commonJS({
           return numToNByteStr(this.r) + numToNByteStr(this.s);
         }
       }
-      const utils2 = {
+      const utils3 = {
         isValidPrivateKey(privateKey) {
           try {
             normPrivateKeyToScalar(privateKey);
@@ -41530,7 +41586,7 @@ var require_weierstrass = __commonJS({
         verify,
         ProjectivePoint: Point2,
         Signature: Signature2,
-        utils: utils2
+        utils: utils3
       };
     }
     exports.weierstrass = weierstrass2;
@@ -46504,11 +46560,11 @@ var require_message = __commonJS({
       ]));
     }
     exports.hashMessage = hashMessage2;
-    function verifyMessage2(message, sig) {
+    function verifyMessage3(message, sig) {
       const digest2 = hashMessage2(message);
       return (0, index_js_3.recoverAddress)(digest2, sig);
     }
-    exports.verifyMessage = verifyMessage2;
+    exports.verifyMessage = verifyMessage3;
   }
 });
 
@@ -64662,40 +64718,40 @@ function strip0x(value = "") {
   return safeString(value).replace(/^0x/i, "");
 }
 function decodeUint256Word(word = "") {
-  const hex = strip0x(word).slice(0, 64);
-  return hex ? BigInt(`0x${hex}`) : 0n;
+  const hex2 = strip0x(word).slice(0, 64);
+  return hex2 ? BigInt(`0x${hex2}`) : 0n;
 }
-function wordAt(hex = "", index = 0) {
-  const clean = strip0x(hex);
+function wordAt(hex2 = "", index = 0) {
+  const clean = strip0x(hex2);
   return clean.slice(index * 64, index * 64 + 64);
 }
 function decodeAbiString(result = "", slotIndex = 0) {
-  const hex = strip0x(result);
-  if (hex.length < 64) return "";
-  const offset = Number(decodeUint256Word(wordAt(hex, slotIndex)));
+  const hex2 = strip0x(result);
+  if (hex2.length < 64) return "";
+  const offset = Number(decodeUint256Word(wordAt(hex2, slotIndex)));
   const lengthOffset = offset * 2;
-  const length = Number(decodeUint256Word(hex.slice(lengthOffset, lengthOffset + 64)));
-  const bytesHex = hex.slice(lengthOffset + 64, lengthOffset + 64 + length * 2);
+  const length = Number(decodeUint256Word(hex2.slice(lengthOffset, lengthOffset + 64)));
+  const bytesHex = hex2.slice(lengthOffset + 64, lengthOffset + 64 + length * 2);
   if (!bytesHex) return "";
   const bytes3 = bytesHex.match(/.{1,2}/g)?.map((part) => Number.parseInt(part, 16)) || [];
   return new TextDecoder().decode(new Uint8Array(bytes3)).trim();
 }
 function decodeBytes32ArrayFromData(data = "", headSlotIndex = 0) {
-  const hex = strip0x(data);
-  if (hex.length < 64) return [];
-  const offset = Number(decodeUint256Word(wordAt(hex, headSlotIndex)));
+  const hex2 = strip0x(data);
+  if (hex2.length < 64) return [];
+  const offset = Number(decodeUint256Word(wordAt(hex2, headSlotIndex)));
   const lengthOffset = offset * 2;
-  const length = Number(decodeUint256Word(hex.slice(lengthOffset, lengthOffset + 64)));
+  const length = Number(decodeUint256Word(hex2.slice(lengthOffset, lengthOffset + 64)));
   const out = [];
   for (let index = 0; index < length; index += 1) {
-    const word = hex.slice(lengthOffset + 64 + index * 64, lengthOffset + 128 + index * 64);
+    const word = hex2.slice(lengthOffset + 64 + index * 64, lengthOffset + 128 + index * 64);
     const bytes32 = normalizeBytes32(`0x${word}`);
     if (bytes32 && bytes32 !== ZERO_BYTES32) out.push(bytes32);
   }
   return out;
 }
-function bytesFromHex(hex = "") {
-  const clean = strip0x(hex);
+function bytesFromHex(hex2 = "") {
+  const clean = strip0x(hex2);
   if (!clean || clean.length % 2 !== 0) return new Uint8Array();
   return new Uint8Array(clean.match(/.{1,2}/g).map((part) => Number.parseInt(part, 16)));
 }
@@ -64707,8 +64763,8 @@ function base64urlFromBytes(bytes3) {
   const encoded = typeof btoa === "function" ? btoa(binary) : Buffer.from(bytes3).toString("base64");
   return encoded.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
-function hexToBase64url(hex = "") {
-  const bytes3 = bytesFromHex(hex);
+function hexToBase64url(hex2 = "") {
+  const bytes3 = bytesFromHex(hex2);
   return bytes3.length ? base64urlFromBytes(bytes3) : "";
 }
 var DEFAULT_CHAIN_ID, ARWEAVE_GATEWAY, ARWEAVE_GATEWAYS, DEFAULT_CACHE_TTL_SECONDS, DEFAULT_SCAN_BLOCKS, DEFAULT_LOG_CHUNK_SIZE, DEFAULT_PAYLOAD_CONCURRENCY, DEFAULT_FOREGROUND_CHUNKS, DEFAULT_RPC_TIMEOUT_MS, DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS, QUESTION_CACHE_PREFIX, questionMemoryCache, QUESTION_PAYLOAD_SKIP, STORAGE_BACKENDS2, SELECTORS, QUESTIONS_ADDED_TOPIC0, SESSION_CREATED_TOPIC0, ZERO_BYTES32, BYTES32_RE2;
@@ -75290,6 +75346,60 @@ var init_operationQueue = __esm({
   }
 });
 
+// workers/sessionCorsWorker/workerGroupInvites.js
+var verifyMessage2, ONE_USE_SECRET2, JOIN_PROOF, SIGNER, WORKER_GROUP_INVITE_LIST_MAX, workerGroupInvitePrefix, workerGroupInviteKey, workerGroupInviteCounts, normalizeWorkerGroupInviteHashes, normalizeWorkerGroupSigner, constantTimeEqual, resolveWorkerGroupJoinCredential;
+var init_workerGroupInvites = __esm({
+  "workers/sessionCorsWorker/workerGroupInvites.js"() {
+    init_lib2();
+    init_workerGroupJoin();
+    verifyMessage2 = verifyMessage || (void 0)?.verifyMessage || (void 0)?.verifyMessage;
+    ONE_USE_SECRET2 = /^[0-9a-f]{32}$/i;
+    JOIN_PROOF = /^0x[0-9a-f]{130}$/i;
+    SIGNER = /^0x[0-9a-f]{40}$/i;
+    WORKER_GROUP_INVITE_LIST_MAX = 250;
+    workerGroupInvitePrefix = (groupId) => `worker-group-capacity-invite-v3:${encodeURIComponent(groupId)}:`;
+    workerGroupInviteKey = (groupId, hash2) => `${workerGroupInvitePrefix(groupId)}${hash2}`;
+    workerGroupInviteCounts = (state) => ({
+      unused: Math.max(0, Number(state?.invites?.unused) || 0),
+      used: Math.max(0, Number(state?.invites?.used) || 0),
+      revoked: Math.max(0, Number(state?.invites?.revoked) || 0)
+    });
+    normalizeWorkerGroupInviteHashes = (value, { max = WORKER_GROUP_INVITE_BATCH_MAX } = {}) => {
+      if (!Array.isArray(value) || value.length < 1 || value.length > max) return null;
+      const hashes = value.map((hash2) => typeof hash2 === "string" ? hash2.toLowerCase() : "");
+      if (!hashes.every(isOneUseSecretHash) || new Set(hashes).size !== hashes.length) return null;
+      return hashes;
+    };
+    normalizeWorkerGroupSigner = (value) => typeof value === "string" && SIGNER.test(value) ? value.toLowerCase() : "";
+    constantTimeEqual = (left, right) => {
+      const a = String(left);
+      const b2 = String(right);
+      let difference = a.length ^ b2.length;
+      for (let index = 0; index < Math.max(a.length, b2.length); index += 1) {
+        difference |= (a.charCodeAt(index) || 0) ^ (b2.charCodeAt(index) || 0);
+      }
+      return difference === 0;
+    };
+    resolveWorkerGroupJoinCredential = async ({ credential, sessionId, groupId, address: address3 }) => {
+      const secret = credential?.secret;
+      const proof = credential?.proof;
+      if (secret == null && proof == null) return null;
+      if (secret != null && proof != null) return { kind: "invalid" };
+      if (secret != null) {
+        return typeof secret === "string" && ONE_USE_SECRET2.test(secret) ? { kind: "one_use", hash: await hashOneUseSecret(secret) } : { kind: "invalid" };
+      }
+      if (!address3) return null;
+      if (typeof proof !== "string" || !JOIN_PROOF.test(proof)) return { kind: "invalid" };
+      try {
+        const signer = verifyMessage2(workerGroupJoinStatement({ sessionId, groupId, address: address3 }), proof);
+        return { kind: "password", signer: signer.toLowerCase() };
+      } catch {
+        return { kind: "invalid" };
+      }
+    };
+  }
+});
+
 // workers/sessionCorsWorker/sessionSecretsAuthority.js
 var SESSION_SECRETS_AUTHORITY_KEY, fail7, readSessionSecretsAuthority, readCommittedSessionSecrets, commitSessionSecrets, repairPendingSessionSecretsProjection;
 var init_sessionSecretsAuthority = __esm({
@@ -75609,7 +75719,7 @@ var init_sessionBackupCoordinator = __esm({
         if (typeof key !== "string" || seen.has(key)) fail9("Invalid or duplicate group backup key.", 400);
         seen.add(key);
         if (key.startsWith("worker-group-capacity-")) {
-          if (!/^(worker-group-capacity-meta-v3|worker-group-capacity-(group|member)-v3:.+)$/.test(key) || !object2(value) || value.pending || ["creating", "updating", "deleting", "reserved", "removing"].includes(value.phase || value.state) || key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail9("Invalid group authority backup.", 400);
+          if (!/^(worker-group-capacity-meta-v3|worker-group-capacity-(group|member|invite)-v3:.+)$/.test(key) || !object2(value) || value.pending || ["creating", "updating", "deleting", "reserved", "removing"].includes(value.phase || value.state) || key === "worker-group-capacity-meta-v3" && (value.slug !== slug || value.sessionId !== sessionId)) fail9("Invalid group authority backup.", 400);
         } else if (typeof value !== "string") fail9("Invalid group backup value.", 400);
       }
       const kv = resolveWorkerGroupsKv(coordinator.env);
@@ -78851,14 +78961,14 @@ var init_litChipotlePolicyCore = __esm({
     CHIPOTLE_WRAPPED_KEY_VERSION = 2;
     CHIPOTLE_POLICY_VERSION = "chipotle-sbt-v2";
     ethersUtils = (() => {
-      const utils2 = ethers_exports?.utils || {};
+      const utils3 = ethers_exports?.utils || {};
       return {
-        isAddress: utils2.isAddress || ethers_exports.isAddress,
-        getAddress: utils2.getAddress || ethers_exports.getAddress,
-        keccak256: utils2.keccak256 || ethers_exports.keccak256,
-        toUtf8Bytes: utils2.toUtf8Bytes || ethers_exports.toUtf8Bytes,
-        hexlify: utils2.hexlify || ethers_exports.hexlify,
-        arrayify: utils2.arrayify || ethers_exports.getBytes
+        isAddress: utils3.isAddress || ethers_exports.isAddress,
+        getAddress: utils3.getAddress || ethers_exports.getAddress,
+        keccak256: utils3.keccak256 || ethers_exports.keccak256,
+        toUtf8Bytes: utils3.toUtf8Bytes || ethers_exports.toUtf8Bytes,
+        hexlify: utils3.hexlify || ethers_exports.hexlify,
+        arrayify: utils3.arrayify || ethers_exports.getBytes
       };
     })();
     toStr10 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
@@ -78963,14 +79073,14 @@ var init_litChipotlePolicyCore = __esm({
 });
 
 // workers/sessionCorsWorker/litWorkerAuthorization.js
-var utils, bytes2, LIT_AUTHORIZATION_REPROVISION_ERROR, resolveLitAuthorization, prepareLitAuthorization, litAuthorizationMessage, authorizeLitRequest, openLitReply, isLitAuthorizationReady;
+var utils2, bytes2, LIT_AUTHORIZATION_REPROVISION_ERROR, resolveLitAuthorization, prepareLitAuthorization, litAuthorizationMessage, authorizeLitRequest, openLitReply, isLitAuthorizationReady;
 var init_litWorkerAuthorization = __esm({
   "workers/sessionCorsWorker/litWorkerAuthorization.js"() {
     init_lib2();
     init_litChipotlePolicyCore();
     init_litChipotleAction();
-    utils = ethers_exports.utils || ethers_exports;
-    bytes2 = utils.arrayify || utils.getBytes;
+    utils2 = ethers_exports.utils || ethers_exports;
+    bytes2 = utils2.arrayify || utils2.getBytes;
     LIT_AUTHORIZATION_REPROVISION_ERROR = "Worker authorization is not configured. Ask the session admin to reprovision Lit with a fresh session authority.";
     resolveLitAuthorization = ({ secrets = {}, config = {}, sessionSlug = "" } = {}) => {
       const credentials = config.litCredentials || {};
@@ -79027,7 +79137,7 @@ var init_litWorkerAuthorization = __esm({
         policyFingerprint: params.expectedPolicyFingerprint,
         pkpId: params.pkpId,
         actionCid: params.litActionCid,
-        inputDigest: utils.keccak256(utils.toUtf8Bytes(params.op === "encrypt" ? params.message || "" : params.op === "decrypt" ? params.ciphertext || "" : "")),
+        inputDigest: utils2.keccak256(utils2.toUtf8Bytes(params.op === "encrypt" ? params.message || "" : params.op === "decrypt" ? params.ciphertext || "" : "")),
         issuedAt: auth.issuedAt,
         expiresAt: auth.expiresAt,
         requestId: auth.requestId,
@@ -79040,8 +79150,8 @@ var init_litWorkerAuthorization = __esm({
         sessionSlug,
         issuedAt: now,
         expiresAt: now + 60,
-        requestId: utils.hexlify(crypto.getRandomValues(new Uint8Array(32))),
-        replyPublicKey: utils.hexlify(new Uint8Array(await crypto.subtle.exportKey("raw", replyKeys.publicKey)))
+        requestId: utils2.hexlify(crypto.getRandomValues(new Uint8Array(32))),
+        replyPublicKey: utils2.hexlify(new Uint8Array(await crypto.subtle.exportKey("raw", replyKeys.publicKey)))
       };
       const message = litAuthorizationMessage(jsParams);
       jsParams.authorization.signature = await wallet.signMessage(message);
@@ -79054,13 +79164,13 @@ var init_litWorkerAuthorization = __esm({
       const publicKey = await crypto.subtle.importKey("raw", bytes2(reply5.publicKey), { name: "ECDH", namedCurve: "P-256" }, false, []);
       const sharedSecret = await crypto.subtle.deriveBits({ name: "ECDH", public: publicKey }, context.privateKey, 256);
       const material = await crypto.subtle.importKey("raw", sharedSecret, "HKDF", false, ["deriveKey"]);
-      const aad = utils.toUtf8Bytes(context.message);
+      const aad = utils2.toUtf8Bytes(context.message);
       const key = await crypto.subtle.deriveKey(
         {
           name: "HKDF",
           hash: "SHA-256",
-          salt: bytes2(utils.keccak256(aad)),
-          info: utils.toUtf8Bytes("Context Engine Lit reply v1")
+          salt: bytes2(utils2.keccak256(aad)),
+          info: utils2.toUtf8Bytes("Context Engine Lit reply v1")
         },
         material,
         { name: "AES-GCM", length: 256 },
@@ -80721,7 +80831,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet,
   withCoordinatedFaucetWalletTurn: () => withCoordinatedFaucetWalletTurn
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, WORKER_GROUP_MEMBER_MUTATIONS, NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, WORKER_GROUP_MEMBER_MUTATIONS, WORKER_GROUP_SECRET_OPERATIONS, WORKER_GROUP_REVOKE_BATCH, NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, workerGroupJoinRefused, admitWorkerGroupJoin, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_lib2();
@@ -80734,6 +80844,8 @@ var init_sessionWriteCoordinator = __esm({
     init_storageBackupRevision();
     init_recoveryKeyExport();
     init_operationQueue();
+    init_workerGroupInvites();
+    init_workerGroupJoin();
     init_recoveryKey();
     init_sessionConfigAuthority();
     init_sessionBackupCoordinator();
@@ -80852,7 +80964,7 @@ var init_sessionWriteCoordinator = __esm({
     };
     SIGNED_AUTH_NONCE_RE = /^n1([0-9a-f]{32})(\d{13})([0-9a-f]{32})$/;
     bytesToHex3 = (bytes3) => Array.from(bytes3, (byte) => byte.toString(16).padStart(2, "0")).join("");
-    hexToBytes2 = (hex) => Uint8Array.from(hex.match(/../g) || [], (pair) => parseInt(pair, 16));
+    hexToBytes2 = (hex2) => Uint8Array.from(hex2.match(/../g) || [], (pair) => parseInt(pair, 16));
     equalText = (left, right) => {
       if (left.length !== right.length) return false;
       let difference = 0;
@@ -80952,11 +81064,13 @@ ${expiry}`);
     PENDING_WORKER_GROUP_OPERATIONS = Object.freeze({ creating: "create", updating: "update", deleting: "delete" });
     PENDING_WORKER_GROUP_MEMBER_OPERATIONS = Object.freeze({ reserved: "add-member", removing: "remove-member" });
     WORKER_GROUP_MEMBER_MUTATIONS = /* @__PURE__ */ new Set(["join", "add-member", "remove-member"]);
+    WORKER_GROUP_SECRET_OPERATIONS = /* @__PURE__ */ new Set(["invites-add", "invites-list", "invites-revoke", "password-set"]);
+    WORKER_GROUP_REVOKE_BATCH = 500;
     NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION = Symbol("needsExclusiveWorkerGroupOperation");
     DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = /* @__PURE__ */ new Set([
       "invalid_join_mode",
-      "join_mode_not_implemented",
       "invalid_member_visibility",
+      "invalid_group_listed",
       "invalid_removal_auth",
       "invalid_group_label",
       "invalid_group_description",
@@ -80979,6 +81093,7 @@ ${expiry}`);
       "joinEndsAt",
       "joinMode",
       "memberVisibility",
+      "listed",
       "removalAuth",
       "adminAddress"
     ]);
@@ -80992,6 +81107,20 @@ ${expiry}`);
       const next = { ...state };
       delete next.pending;
       return next;
+    };
+    workerGroupJoinRefused = () => ({ ok: false, status: 403, reason: WORKER_GROUP_JOIN_REFUSED });
+    admitWorkerGroupJoin = async (transaction, { groupId, groupState, credential, nowMs }) => {
+      if (groupState.joinMode === "open") return { ok: true };
+      if (groupState.joinMode === "group_password" && credential?.kind === "password" && groupState.signer) {
+        return constantTimeEqual(credential.signer, groupState.signer) ? { ok: true } : workerGroupJoinRefused();
+      }
+      if (groupState.joinMode === "one_use" && credential?.kind === "one_use") {
+        const key = workerGroupInviteKey(groupId, credential.hash);
+        const invite = await transaction.get(key);
+        const expiresAt = Date.parse(invite?.expiresAt ?? "");
+        if (invite?.state === "unused" && !(expiresAt <= nowMs)) return { ok: true, spent: { key, invite } };
+      }
+      return workerGroupJoinRefused();
     };
     normalizeWorkerGroupMutation = (payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
@@ -81970,6 +82099,8 @@ ${expiry}`);
             active: true,
             joinMode: toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add",
             memberVisibility: toTrimmedString10(group?.memberVisibility).toLowerCase() || "admin_only",
+            // As stored, so a group from before the setting keeps reading the old rule.
+            listed: typeof group?.listed === "boolean" ? group.listed : void 0,
             removalAuth: toTrimmedString10(group?.removalAuth).toLowerCase() || "both",
             memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
             joinEndsAt: toTrimmedString10(group?.joinEndsAt)
@@ -82002,16 +82133,27 @@ ${expiry}`);
         });
       }
       async finalizeWorkerGroupUpdate({ groupId, group }) {
+        const key = workerGroupCapacityGroupKey(groupId);
+        const joinMode = toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add";
+        if (joinMode !== "one_use") {
+          const state = await this.state.storage.get(key);
+          if (state?.phase === "updating" && workerGroupInviteCounts(state).unused > 0) {
+            await this.revokeAllUnusedWorkerGroupInvites(groupId, new Date(Number(this.now())).toISOString());
+          }
+        }
         await this.state.storage.transaction(async (transaction) => {
-          const key = workerGroupCapacityGroupKey(groupId);
           const state = await transaction.get(key);
           if (state?.phase !== "updating") return;
+          const { signer, signerSetAt, ...kept } = withoutPendingMutation(state);
           await transaction.put(key, {
-            ...withoutPendingMutation(state),
+            ...kept,
+            ...joinMode === "group_password" && signer ? { signer, signerSetAt } : {},
             phase: "active",
             active: true,
-            joinMode: toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add",
+            joinMode,
             memberVisibility: toTrimmedString10(group?.memberVisibility).toLowerCase() || "admin_only",
+            // As stored, so a group from before the setting keeps reading the old rule.
+            listed: typeof group?.listed === "boolean" ? group.listed : void 0,
             removalAuth: toTrimmedString10(group?.removalAuth).toLowerCase() || "both",
             memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
             joinEndsAt: toTrimmedString10(group?.joinEndsAt)
@@ -82052,14 +82194,16 @@ ${expiry}`);
       async reserveWorkerGroupMemberSlot({
         groupId,
         principalDigest,
-        maxMembersPerGroup,
-        intent
+        memberCeiling,
+        intent,
+        join = null
       }) {
+        const nowMs = Number(this.now());
         return this.state.storage.transaction(async (transaction) => {
           const groupKey2 = workerGroupCapacityGroupKey(groupId);
           const groupState = await transaction.get(groupKey2);
           if (groupState?.phase !== "active" || groupState.active !== true) {
-            return { ok: false, status: 404, reason: "worker_group_not_found" };
+            return join ? workerGroupJoinRefused() : { ok: false, status: 404, reason: "worker_group_not_found" };
           }
           const generation = Math.max(1, Number(groupState.generation || 0));
           const memberKey2 = workerGroupCapacityMemberKey({
@@ -82078,19 +82222,29 @@ ${expiry}`);
               reason: "worker_group_membership_state_pending"
             };
           }
+          const admitted = join ? await admitWorkerGroupJoin(transaction, { groupId, groupState, credential: join.credential, nowMs }) : { ok: true };
+          if (!admitted.ok) return admitted;
+          const joinEndsAt = Date.parse(toTrimmedString10(groupState.joinEndsAt));
+          if (join && joinEndsAt <= nowMs) return { ok: false, status: 403, reason: "worker_group_join_ended" };
           const configuredMemberLimit = normalizePositiveSafeInteger(groupState.memberLimit);
-          const effectiveMemberLimit = configuredMemberLimit ? Math.min(configuredMemberLimit, maxMembersPerGroup) : maxMembersPerGroup;
+          const effectiveMemberLimit = configuredMemberLimit ? Math.min(configuredMemberLimit, memberCeiling) : memberCeiling;
           if (Number(groupState.memberCount || 0) >= effectiveMemberLimit) {
             return { ok: false, status: 409, reason: "worker_group_member_cap_exceeded" };
           }
-          await transaction.put(groupKey2, {
-            ...groupState,
-            memberCount: Number(groupState.memberCount || 0) + 1
-          });
+          const nextGroupState = { ...groupState, memberCount: Number(groupState.memberCount || 0) + 1 };
+          if (admitted.spent) {
+            const { key, invite } = admitted.spent;
+            await transaction.put(key, { ...invite, state: "used", usedAt: new Date(nowMs).toISOString() });
+            const counts = workerGroupInviteCounts(groupState);
+            nextGroupState.invites = { ...counts, unused: Math.max(0, counts.unused - 1), used: counts.used + 1 };
+          }
+          await transaction.put(groupKey2, nextGroupState);
           await transaction.put(memberKey2, {
             version: 2,
             state: "reserved",
-            pending: intent
+            pending: intent,
+            // Which code this seat spent, so a failed join can give it back.
+            ...admitted.spent ? { spentInvite: admitted.spent.key } : {}
           });
           return { ok: true, reserved: true, generation, memberKey: memberKey2 };
         });
@@ -82111,10 +82265,16 @@ ${expiry}`);
           const groupState = await transaction.get(groupKey2);
           const memberState = await transaction.get(memberKey2);
           if (groupState?.active && memberState?.state === "reserved") {
-            await transaction.put(groupKey2, {
-              ...groupState,
-              memberCount: Math.max(0, Number(groupState.memberCount || 0) - 1)
-            });
+            const nextGroupState = { ...groupState, memberCount: Math.max(0, Number(groupState.memberCount || 0) - 1) };
+            const invite = memberState.spentInvite ? await transaction.get(memberState.spentInvite) : null;
+            if (invite?.state === "used") {
+              const { usedAt, revokeOnRestore, ...rest } = invite;
+              const state = revokeOnRestore || groupState.invitesRevokedAt >= usedAt ? "revoked" : "unused";
+              await transaction.put(memberState.spentInvite, { ...rest, state, ...state === "revoked" ? { revokedAt: new Date(Number(this.now())).toISOString() } : {} });
+              const counts = workerGroupInviteCounts(groupState);
+              nextGroupState.invites = { ...counts, [state]: counts[state] + 1, used: Math.max(0, counts.used - 1) };
+            }
+            await transaction.put(groupKey2, nextGroupState);
             await transaction.put(memberKey2, {
               version: 2,
               state: "removed"
@@ -82374,6 +82534,7 @@ ${expiry}`);
               groupId,
               joinMode: group.state.joinMode,
               memberVisibility: group.state.memberVisibility,
+              listed: resolveWorkerGroupListed(group.state),
               memberCount: Number(group.state.memberCount || 0)
             }
           }, 200);
@@ -82420,8 +82581,17 @@ ${expiry}`);
               groupId,
               joinMode: group.state.joinMode,
               memberVisibility: group.state.memberVisibility,
+              listed: resolveWorkerGroupListed(group.state),
               memberCount: Number(group.state.memberCount || 0),
-              isMember
+              isMember,
+              // For admins only: whether a password is set and how many codes
+              // there are, never the password's signer or a code.
+              ...payload?.admin === true ? {
+                admin: {
+                  passwordSet: Boolean(group.state.signer),
+                  ...group.state.joinMode === "one_use" ? { invites: workerGroupInviteCounts(group.state) } : {}
+                }
+              } : {}
             });
           }
           return jsonResponse2({
@@ -82498,6 +82668,7 @@ ${expiry}`);
               groupId,
               joinMode: state.joinMode,
               memberVisibility: state.memberVisibility,
+              listed: resolveWorkerGroupListed(state),
               memberCount
             });
           }
@@ -82510,9 +82681,13 @@ ${expiry}`);
       async executeAuthorizedWorkerGroupMutation(payload) {
         return this.sessionConfigQueue.shared("", async () => {
           try {
-            await this.assertSessionAuthority(payload);
+            const authority = await this.assertSessionAuthority(payload);
             const { expectedAuthority: _expectedAuthority, ...mutation } = payload;
-            const result = await forwardWorkerGroupMutation({ ...mutation, env: this.env });
+            const result = await forwardWorkerGroupMutation({
+              ...mutation,
+              memberCeiling: authority?.config?.groupMemberCeiling,
+              env: this.env
+            });
             return jsonResponse2(result, result.status || (result.ok ? 200 : 503));
           } catch (error) {
             return jsonResponse2({
@@ -82524,6 +82699,9 @@ ${expiry}`);
         });
       }
       async executeWorkerGroupMutation(payload) {
+        if (WORKER_GROUP_SECRET_OPERATIONS.has(toTrimmedString10(payload?.operation).toLowerCase())) {
+          return this.serializeWorkerGroupOperation(() => this.applyWorkerGroupSecretOperation(payload));
+        }
         if (WORKER_GROUP_MEMBER_MUTATIONS.has(toTrimmedString10(payload?.operation).toLowerCase())) {
           const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || "";
           return this.runWorkerGroupMemberOperation(principalKey, (shared) => this.applyWorkerGroupMutation(payload, shared));
@@ -82547,6 +82725,10 @@ ${expiry}`);
           return jsonResponse2(initialized, initialized.status || 503);
         }
         const caps = resolveWorkerGroupCaps(this.env);
+        const memberCeiling = resolveWorkerGroupMemberCeiling(payload?.memberCeiling);
+        if ((mutation.operation === "create" || mutation.operation === "update") && Number(mutation.input?.memberLimit) > memberCeiling) {
+          return jsonResponse2({ ok: false, status: 400, reason: "worker_group_member_limit_above_ceiling" }, 400);
+        }
         let groupReservation = null;
         let memberReservation = null;
         let updateReservation = null;
@@ -82574,6 +82756,12 @@ ${expiry}`);
           const finished = settled2.replayed.find((entry2) => entry2.result.ok && (entry2.operation === mutation.operation && (mutation.operation === "delete" || mutation.operation === "remove-member" && entry2.principalKey === mutation.principalKey || mutation.operation === "create" && sameWorkerGroupInput(entry2.input, intent.input)) || entry2.operation === "add-member" && (mutation.operation === "join" || mutation.operation === "add-member") && entry2.principalKey === mutation.principalKey));
           if (finished) return this.respondToWorkerGroupMutation(mutation, finished.result);
         }
+        const joinCredential = mutation.operation === "join" ? await resolveWorkerGroupJoinCredential({
+          credential: payload?.credential,
+          sessionId: mutation.sessionId,
+          groupId: mutation.groupId,
+          address: mutation.principal?.address
+        }) : null;
         if (mutation.operation === "create") {
           groupReservation = await this.reserveWorkerGroupSlot({
             slug: mutation.slug,
@@ -82588,24 +82776,10 @@ ${expiry}`);
         } else {
           activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
           if (!activeGroup.ok) {
-            return jsonResponse2(activeGroup, activeGroup.status || 404);
-          }
-          if (mutation.operation === "join" && activeGroup.state.joinMode !== "open") {
-            return jsonResponse2({
-              ok: false,
-              status: 403,
-              reason: "worker_group_join_denied"
-            }, 403);
-          }
-          if (mutation.operation === "join") {
-            const joinEndsAt = Date.parse(toTrimmedString10(activeGroup.state.joinEndsAt));
-            if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(this.now())) {
-              return jsonResponse2({
-                ok: false,
-                status: 403,
-                reason: "worker_group_join_ended"
-              }, 403);
+            if (mutation.operation === "join" && activeGroup.status === 404) {
+              return jsonResponse2(workerGroupJoinRefused(), 403);
             }
+            return jsonResponse2(activeGroup, activeGroup.status || 404);
           }
           if (mutation.operation === "update") {
             if (Object.prototype.hasOwnProperty.call(mutation.input, "memberLimit")) {
@@ -82632,8 +82806,9 @@ ${expiry}`);
           memberReservation = await this.reserveWorkerGroupMemberSlot({
             groupId: mutation.groupId,
             principalDigest,
-            maxMembersPerGroup: caps.maxMembersPerGroup,
-            intent
+            memberCeiling,
+            intent,
+            join: mutation.operation === "join" ? { credential: joinCredential } : null
           });
           if (!memberReservation.ok) {
             return jsonResponse2(memberReservation, memberReservation.status || 409);
@@ -82674,6 +82849,144 @@ ${expiry}`);
         if (!result.ok) return jsonResponse2(result, result.status || 400);
         return this.respondToWorkerGroupMutation(mutation, result);
       }
+      // Revokes the unused codes among `keys` in one transaction. Revoking by hash
+      // marks a code spent by a join still settling too: if that join fails, its
+      // code comes back revoked, not usable. Revoking all of them stamps the time,
+      // which does the same for every such code.
+      async revokeWorkerGroupInvites(groupId, keys, { nowIso: nowIso4, all = false }) {
+        const groupKey2 = workerGroupCapacityGroupKey(groupId);
+        return this.state.storage.transaction(async (transaction) => {
+          const state = await transaction.get(groupKey2);
+          const counts = workerGroupInviteCounts(state);
+          let revoked = 0;
+          for (const key of keys) {
+            const record4 = await transaction.get(key);
+            if (record4?.state === "used" && !all) await transaction.put(key, { ...record4, revokeOnRestore: true });
+            if (record4?.state !== "unused") continue;
+            await transaction.put(key, { ...record4, state: "revoked", revokedAt: nowIso4 });
+            counts.unused = Math.max(0, counts.unused - 1);
+            counts.revoked += 1;
+            revoked += 1;
+          }
+          await transaction.put(groupKey2, { ...state, invites: counts, ...all ? { invitesRevokedAt: nowIso4 } : {} });
+          return { revoked, counts };
+        });
+      }
+      // A page at a time, so a group with many codes never loads them all.
+      async revokeAllUnusedWorkerGroupInvites(groupId, nowIso4) {
+        const prefix = workerGroupInvitePrefix(groupId);
+        let revoked = 0;
+        let counts;
+        let after = "";
+        do {
+          const page = [...await this.state.storage.list({ prefix, startAfter: after, limit: WORKER_GROUP_REVOKE_BATCH })];
+          after = page.length === WORKER_GROUP_REVOKE_BATCH ? page.at(-1)[0] : "";
+          const keys = page.filter(([, record4]) => record4?.state === "unused").map(([key]) => key);
+          const batch = await this.revokeWorkerGroupInvites(groupId, keys, { nowIso: nowIso4, all: true });
+          revoked += batch.revoked;
+          counts = batch.counts;
+        } while (after);
+        return { revoked, counts };
+      }
+      async applyWorkerGroupSecretOperation(payload) {
+        const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+        const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+        const groupId = normalizeWorkerGroupId(payload?.groupId);
+        const operation = toTrimmedString10(payload?.operation).toLowerCase();
+        const input = isObjectRecord(payload?.input) ? payload.input : {};
+        const refuse = (status, reason) => jsonResponse2({ ok: false, status, reason }, status);
+        if (!slug || !sessionId || !groupId) return refuse(400, "worker_group_mutation_invalid");
+        const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
+        if (!initialized.ok) return jsonResponse2(initialized, initialized.status || 503);
+        const settled2 = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: [groupId] });
+        if (!settled2.ok) return jsonResponse2(settled2, settled2.status || 503);
+        const active = await this.getActiveWorkerGroupCapacity(groupId);
+        if (!active.ok) return jsonResponse2(active, active.status || 404);
+        const groupKey2 = workerGroupCapacityGroupKey(groupId);
+        const nowIso4 = new Date(Number(this.now())).toISOString();
+        const needsMode = (joinMode) => active.state.joinMode === joinMode ? null : refuse(409, "worker_group_join_mode_mismatch");
+        if (operation === "password-set") {
+          const mismatch2 = needsMode("group_password");
+          if (mismatch2) return mismatch2;
+          const signer = normalizeWorkerGroupSigner(input.signer);
+          if (!signer) return refuse(400, "invalid_group_password_signer");
+          await this.state.storage.transaction(async (transaction) => {
+            const state = await transaction.get(groupKey2);
+            await transaction.put(groupKey2, { ...state, signer, signerSetAt: nowIso4 });
+          });
+          await bumpStorageBackupRevision(this.state.storage);
+          return jsonResponse2({ ok: true, status: 200, groupId, passwordSet: true, signerSetAt: nowIso4 }, 200);
+        }
+        const mismatch = needsMode("one_use");
+        if (mismatch) return mismatch;
+        if (operation === "invites-add") {
+          const hashes = normalizeWorkerGroupInviteHashes(input.hashes);
+          if (!hashes) return refuse(400, "invalid_group_invites");
+          const expiresAtMs = input.expiresAt == null || input.expiresAt === "" ? null : Date.parse(input.expiresAt);
+          if (expiresAtMs !== null && !(Number.isFinite(expiresAtMs) && expiresAtMs > Number(this.now()))) {
+            return refuse(400, "invalid_group_invite_expiry");
+          }
+          const result = await this.state.storage.transaction(async (transaction) => {
+            for (const hash2 of hashes) {
+              if (await transaction.get(workerGroupInviteKey(groupId, hash2))) {
+                return { ok: false, status: 409, reason: "worker_group_invite_exists" };
+              }
+            }
+            for (const hash2 of hashes) {
+              await transaction.put(workerGroupInviteKey(groupId, hash2), {
+                state: "unused",
+                createdAt: nowIso4,
+                ...expiresAtMs !== null ? { expiresAt: new Date(expiresAtMs).toISOString() } : {}
+              });
+            }
+            const state = await transaction.get(groupKey2);
+            const counts = workerGroupInviteCounts(state);
+            counts.unused += hashes.length;
+            await transaction.put(groupKey2, { ...state, invites: counts });
+            return { ok: true, status: 200, groupId, added: hashes.length, counts };
+          });
+          if (result.ok) await bumpStorageBackupRevision(this.state.storage);
+          return jsonResponse2(result, result.status);
+        }
+        if (operation === "invites-list") {
+          const limit = input.limit == null ? 100 : Number(input.limit);
+          const cursor = input.cursor == null || input.cursor === "" ? "" : toTrimmedString10(input.cursor).toLowerCase();
+          if (!Number.isSafeInteger(limit) || limit < 1 || limit > WORKER_GROUP_INVITE_LIST_MAX || cursor && !/^[0-9a-f]{64}$/.test(cursor)) {
+            return refuse(400, "worker_group_invite_page_invalid");
+          }
+          const prefix = workerGroupInvitePrefix(groupId);
+          const page = await this.state.storage.list({
+            prefix,
+            ...cursor ? { startAfter: `${prefix}${cursor}` } : {},
+            limit: limit + 1
+          });
+          const entries = [...page].slice(0, limit);
+          const invites = entries.map(([key, record4]) => ({
+            hash: key.slice(prefix.length),
+            state: record4?.state,
+            createdAt: record4?.createdAt,
+            ...record4?.expiresAt ? { expiresAt: record4.expiresAt } : {},
+            ...record4?.usedAt ? { usedAt: record4.usedAt } : {}
+          }));
+          return jsonResponse2({
+            ok: true,
+            status: 200,
+            groupId,
+            invites,
+            ...page.size > limit ? { cursor: invites[invites.length - 1].hash } : {},
+            counts: workerGroupInviteCounts(active.state)
+          }, 200);
+        }
+        if (operation === "invites-revoke") {
+          const all = input.allUnused === true;
+          const hashes = all ? null : normalizeWorkerGroupInviteHashes(input.hashes, { max: WORKER_GROUP_REVOKE_BATCH });
+          if (all === (input.hashes != null) || !all && !hashes) return refuse(400, "invalid_group_invites");
+          const { revoked, counts } = all ? await this.revokeAllUnusedWorkerGroupInvites(groupId, nowIso4) : await this.revokeWorkerGroupInvites(groupId, hashes.map((hash2) => workerGroupInviteKey(groupId, hash2)), { nowIso: nowIso4 });
+          await bumpStorageBackupRevision(this.state.storage);
+          return jsonResponse2({ ok: true, status: 200, groupId, revoked, counts }, 200);
+        }
+        return refuse(400, "worker_group_mutation_invalid");
+      }
       async respondToWorkerGroupMutation(mutation, result) {
         if (mutation.operation === "add-member" || mutation.operation === "join" || mutation.operation === "remove-member") {
           const postMutationGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
@@ -82687,7 +83000,8 @@ ${expiry}`);
               ...result.group || {},
               groupId: mutation.groupId,
               joinMode: postMutationGroup.state.joinMode,
-              memberVisibility: postMutationGroup.state.memberVisibility
+              memberVisibility: postMutationGroup.state.memberVisibility,
+              listed: resolveWorkerGroupListed(postMutationGroup.state)
             },
             memberCount
           };
@@ -87907,42 +88221,42 @@ var createEthersPrimitiveValueHelpersWithWorkerDeps = ({
     return 0n;
   };
   const isAddress2 = (value) => {
-    const utils2 = getEthersUtils(deps);
-    const fn = getEthersFn(deps?.ethers?.isAddress, utils2?.isAddress);
+    const utils3 = getEthersUtils(deps);
+    const fn = getEthersFn(deps?.ethers?.isAddress, utils3?.isAddress);
     return fn ? fn(value) : false;
   };
   const getAddress2 = (value) => {
-    const utils2 = getEthersUtils(deps);
-    const fn = getEthersFn(deps?.ethers?.getAddress, utils2?.getAddress);
+    const utils3 = getEthersUtils(deps);
+    const fn = getEthersFn(deps?.ethers?.getAddress, utils3?.getAddress);
     return fn ? fn(value) : value;
   };
-  const verifyMessage2 = (message, signature) => {
-    const utils2 = getEthersUtils(deps);
-    const fn = getEthersFn(deps?.ethers?.verifyMessage, utils2?.verifyMessage);
+  const verifyMessage3 = (message, signature) => {
+    const utils3 = getEthersUtils(deps);
+    const fn = getEthersFn(deps?.ethers?.verifyMessage, utils3?.verifyMessage);
     if (!fn) throw new Error("verifyMessage unavailable");
     return fn(message, signature);
   };
   const getBytes2 = (value) => {
-    const utils2 = getEthersUtils(deps);
-    const fn = getEthersFn(deps?.ethers?.getBytes, utils2?.arrayify);
+    const utils3 = getEthersUtils(deps);
+    const fn = getEthersFn(deps?.ethers?.getBytes, utils3?.arrayify);
     if (!fn) throw new Error("getBytes unavailable");
     return fn(value);
   };
   const solidityKeccak256 = (types, values) => {
-    const utils2 = getEthersUtils(deps);
-    const fn = getEthersFn(deps?.ethers?.solidityPackedKeccak256, utils2?.solidityKeccak256);
+    const utils3 = getEthersUtils(deps);
+    const fn = getEthersFn(deps?.ethers?.solidityPackedKeccak256, utils3?.solidityKeccak256);
     if (!fn) throw new Error("solidityKeccak256 unavailable");
     return fn(types, values);
   };
   const parseEther2 = (value) => {
-    const utils2 = getEthersUtils(deps);
-    const fn = getEthersFn(deps?.ethers?.parseEther, utils2?.parseEther);
+    const utils3 = getEthersUtils(deps);
+    const fn = getEthersFn(deps?.ethers?.parseEther, utils3?.parseEther);
     if (!fn) throw new Error("parseEther unavailable");
     return fn(value);
   };
   const formatEther2 = (value) => {
-    const utils2 = getEthersUtils(deps);
-    const fn = getEthersFn(deps?.ethers?.formatEther, utils2?.formatEther);
+    const utils3 = getEthersUtils(deps);
+    const fn = getEthersFn(deps?.ethers?.formatEther, utils3?.formatEther);
     if (!fn) throw new Error("formatEther unavailable");
     return fn(value);
   };
@@ -87951,7 +88265,7 @@ var createEthersPrimitiveValueHelpersWithWorkerDeps = ({
     toBigInt: toBigInt2,
     isAddress: isAddress2,
     getAddress: getAddress2,
-    verifyMessage: verifyMessage2,
+    verifyMessage: verifyMessage3,
     getBytes: getBytes2,
     solidityKeccak256,
     parseEther: parseEther2,
@@ -87969,7 +88283,7 @@ var createGroupProofAddressHashHelpersWithWorkerDeps = ({
 } = {}) => {
   const isAddress2 = typeof deps?.isAddress === "function" ? deps.isAddress : () => false;
   const getAddress2 = typeof deps?.getAddress === "function" ? deps.getAddress : (value) => value;
-  const verifyMessage2 = typeof deps?.verifyMessage === "function" ? deps.verifyMessage : () => {
+  const verifyMessage3 = typeof deps?.verifyMessage === "function" ? deps.verifyMessage : () => {
     throw new Error("verifyMessage unavailable");
   };
   const getBytes2 = typeof deps?.getBytes === "function" ? deps.getBytes : () => {
@@ -88013,7 +88327,7 @@ var createGroupProofAddressHashHelpersWithWorkerDeps = ({
     }
     try {
       const messageHash = computeGroupMintMessageHash({ sbtAddress, recipientAddress });
-      const signer = normalizeAddressLower4(verifyMessage2(getBytes2(messageHash), normalizedSignature));
+      const signer = normalizeAddressLower4(verifyMessage3(getBytes2(messageHash), normalizedSignature));
       if (!signer) {
         return { ok: false, status: 403, error: "Invalid group signature." };
       }
@@ -89025,15 +89339,15 @@ var ethers = resolveEthersCompat(lib_exports);
 var getEthersFn2 = (...candidates) => candidates.find((fn) => typeof fn === "function") || null;
 var getEthersUtils2 = () => ethers?.utils || lib_exports?.utils || lib_exports?.ethers?.utils || null;
 var getAdminHashFns = () => {
-  const utils2 = getEthersUtils2();
+  const utils3 = getEthersUtils2();
   return {
     keccak256: getEthersFn2(
-      utils2?.keccak256,
+      utils3?.keccak256,
       ethers?.keccak256,
       ethers?.ethers?.keccak256
     ),
     toUtf8Bytes: getEthersFn2(
-      utils2?.toUtf8Bytes,
+      utils3?.toUtf8Bytes,
       ethers?.toUtf8Bytes,
       ethers?.ethers?.toUtf8Bytes
     )
@@ -92121,7 +92435,7 @@ var resolveAdminSignatureAuthority = async ({
   deps
 } = {}) => {
   const isAddress2 = typeof deps?.isAddress === "function" ? deps.isAddress : () => false;
-  const verifyMessage2 = typeof deps?.verifyMessage === "function" ? deps.verifyMessage : () => {
+  const verifyMessage3 = typeof deps?.verifyMessage === "function" ? deps.verifyMessage : () => {
     throw new Error("verifyMessage unavailable.");
   };
   const validateRecoveredAddressMatchesRequest2 = typeof deps?.validateRecoveredAddressMatchesRequest === "function" ? deps.validateRecoveredAddressMatchesRequest : () => ({ ok: false, error: "Recovered address mismatch." });
@@ -92156,7 +92470,7 @@ var resolveAdminSignatureAuthority = async ({
   }
   let recovered;
   try {
-    recovered = verifyMessage2(message, signature);
+    recovered = verifyMessage3(message, signature);
   } catch {
     return {
       ok: false,
@@ -103716,7 +104030,7 @@ var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   }
   throw lastError || new Error(`No RPC URL succeeded for ${method}.`);
 };
-var wordAt2 = (hex, index) => trim19(hex).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
+var wordAt2 = (hex2, index) => trim19(hex2).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
 var decodeQuestionIds = (data = "") => {
   const clean = trim19(data).replace(/^0x/, "");
   if (clean.length < 128) return [];
@@ -103730,8 +104044,8 @@ var decodeQuestionIds = (data = "") => {
   }
   return ids;
 };
-var base64urlFromHex = (hex = "") => {
-  const clean = trim19(hex).replace(/^0x/, "");
+var base64urlFromHex = (hex2 = "") => {
+  const clean = trim19(hex2).replace(/^0x/, "");
   if (!/^[0-9a-fA-F]{64}$/.test(clean)) return "";
   const bytes3 = new Uint8Array(clean.match(/.{2}/g).map((part) => Number.parseInt(part, 16)));
   let binary = "";
@@ -104125,7 +104439,7 @@ var FEATURES = Object.freeze([
   "upload_authority_stamps",
   "worker_groups"
 ]);
-var workerRelease = () => "0.9.6" ? "0.9.6" : null;
+var workerRelease = () => "0.9.7" ? "0.9.7" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const body = {
     type: "ce_worker_capabilities",

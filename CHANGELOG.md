@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.7] - 2026-11-13
+
+### Client — available when the site deploys
+
+- On the Admin page, each group on a Session Worker has **Who can join**: One-use URLs, Group Password, Public URL, or Admin adds members, with the detail behind a "?". The choices appear once the session's Worker runs this release; on an older Worker the form is as before.
+- One-use URLs: an admin generates 1 to 500 links, with an optional expiry. They are shown once, to copy or export as CSV, and listed afterwards by the start of their hash with **Revoke** and **Revoke all unused**. Only hashes of the links reach the Worker.
+- Group Password: an admin sets, generates or replaces a password, shown once with **Copy password** and a link with or without it. Only the signer made from the password reaches the Worker. A password a joiner could not type back is refused with the reason.
+- **Show in the group list** keeps a group out of the list. A group's card says how people join, "Not in the group list", "No password yet: no one can join.", and how many links are left.
+- A link's invite leaves the address bar at once and is never kept in history, logs or copied links. A listed group that needs a password or a code takes one typed into the Groups section. A refused join says one sentence and offers the field again, and a refused invite is never sent again.
+- A claim link from a group recording carries the recorder's group password, never a one-use code. A group joined by one-use links says each person needs their own invite.
+- `/new` and Settings have **Most members in a group** (1 to 10,000). Settings offers it once the session's Worker runs this release.
+- An on-chain group's open join choice is labelled **Public URL**.
+
+### Workers — requires redeployment
+
+- An admin chooses how people join a group on a Session Worker: anyone with the link, one-use codes, a group password, or only people an admin adds. For a group joined by code or password, the group's id in a link no longer admits anyone. Admins add, list and revoke codes at `groups/invites/add`, `groups/invites/list` and `groups/invites/revoke`, and set a password at `groups/password/set`; a password is never sent or stored, only the signer made from it. Changing a group's join mode voids its password and its unused codes.
+- A group can be left out of group lists. Someone who is not a member gets "not found" for an unlisted group's members, as for a group that does not exist, and leaving a group answers the same for both. Groups an earlier Worker kept out of lists stay out until an admin lists them.
+- A session sets the most members any group may have (`groupMemberCeiling`, 1,000 unless set, up to 10,000). The Worker variable `CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP` is gone: a deployment that set it should set the session's ceiling instead.
+- Every join refused before a valid code or password answers the same `403` and sentence, so an answer does not show whether a group exists. A right group password or code always gets in: wrong tries are not counted or limited, so no one can shut a group by guessing, and a password's strength is the protection. Prefer a generated password to a short or common one.
+- Session backups carry a group's codes and a password group's signer, which a restore needs. Keep backups private.
+- A session's public settings report `groupJoinChoices`, which the site and the MCP read to offer the new choices.
+
+### Agents and MCP
+
+- MCP 0.4.0. `join_group` uses the invite a session link carries (`#groupInvite=…`), or a one-use code or group password passed as `invite`. The server never sends a password: it signs a join statement with a key made from it.
+- Every refused join reads the same, including for a group that does not exist; it used to say "This session has no group". `get_session` and `join_session` say how a code or password group is joined.
+- The first `list_questions` waits at most about 2 seconds for the agent's own earlier answers. A wrong argument shape says what was wrong, with a one-line example. The README says how long a host should allow a tool call.
+- The guide for AI agents (`/skill.md`) now starts from what an agent can do with a session link. An agent that can run commands can take part with nothing set up, and each of Claude Code, Codex, Gemini CLI, Hermes Agent, Cursor and the OpenAI Agents SDK adds the tools in one step. The MCP README says the same.
+- `scripts/mcp-mcpb.mjs` packs the MCP as a Claude Desktop bundle (`.mcpb`), which installs from a double-click and needs no Node. Nothing builds or publishes it yet.
+
+### Local tooling
+
+- The typed-tests check gives the TypeScript compiler a 4 GB heap of its own. On a small CI runner the compiler ran out of memory and the check failed without saying why; it now names the signal and the compiler's last words when the compiler is killed.
+- The Session Worker's shared config-read tests wait for what they need to have happened. They allowed a fixed number of event-loop turns and failed on a slow CI runner.
+
 ## [0.9.6] - 2026-11-12
 
 ### Client — available when the site deploys

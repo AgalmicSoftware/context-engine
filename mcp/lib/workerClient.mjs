@@ -360,7 +360,11 @@ export const createWorkerClient = ({
 
   const contextAction = (body, { signal } = {}) => request('/storage/context', { method: 'POST', auth: true, signal, body });
 
-  const joinGroup = (groupId, { signal } = {}) => request('/groups/join', { method: 'POST', auth: true, signal, body: { sessionId, groupId } });
+  // `secret` (a one-use code) or `proof` (a group password's signature) admits
+  // the caller to a group that isn't open.
+  const joinGroup = (groupId, { signal, secret, proof } = {}) => request('/groups/join', {
+    method: 'POST', auth: true, signal, body: { sessionId, groupId, ...(secret ? { secret } : {}), ...(proof ? { proof } : {}) },
+  });
   const leaveGroup = (groupId, { signal } = {}) => request('/groups/leave', { method: 'POST', auth: true, signal, body: { sessionId, groupId } });
 
   /** The groups this agent may see, with their member counts. */

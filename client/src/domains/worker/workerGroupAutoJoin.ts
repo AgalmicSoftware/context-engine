@@ -79,6 +79,8 @@ export const canAutoJoinWorkerGroup = (group: WorkerGroup): boolean =>
 const LINKED_GROUP_STATE = 'ceLinkedWorkerGroup';
 type LinkedGroup = { sessionSlug: string; groupId: string };
 let joinedThroughLink: LinkedGroup | null = null;
+// The invite the link carried, kept only in this page's memory: a recording's claims hand a group password on.
+let joinedWithToken = '';
 
 const linkedGroupFor = (held: unknown, sessionSlug: string): string => {
   const value = held as Partial<LinkedGroup> | null | undefined;
@@ -93,8 +95,13 @@ export const readLinkedWorkerGroupId = (sessionSlug: string): string =>
   linkedGroupFor(joinedThroughLink, sessionSlug) ||
   linkedGroupFor(window.history.state?.[LINKED_GROUP_STATE], sessionSlug);
 
-export const finishWorkerGroupAutoJoin = (sessionSlug: string, groupId: string, sessionId?: string) => {
+/** The invite this page joined its linked group with; '' for another group or none. */
+export const readLinkedWorkerGroupToken = (sessionSlug: string, groupId: string): string =>
+  joinedThroughLink?.sessionSlug === sessionSlug && joinedThroughLink.groupId === groupId ? joinedWithToken : '';
+
+export const finishWorkerGroupAutoJoin = (sessionSlug: string, groupId: string, sessionId?: string, token = '') => {
   joinedThroughLink = { sessionSlug, groupId };
+  joinedWithToken = token;
   // Only consume the intent we handled; preserve other query parameters and
   // a newer link if navigation happened while a request was in flight.
   const url = new URL(window.location.href);

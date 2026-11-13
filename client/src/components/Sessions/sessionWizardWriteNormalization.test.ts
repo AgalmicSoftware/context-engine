@@ -771,6 +771,23 @@ describe('sessionWizardWriteNormalization', () => {
     expect(build(' Join the open group.\n')).toHaveProperty('agentInstructions', 'Join the open group.');
   });
 
+  test('buildSessionWizardWorkerConfigPayload sends the most members in a group only when it isn’t the default', () => {
+    const build = (groupMemberCeiling: string) =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'group-ceiling',
+        draft: {
+          groupMemberCeiling,
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+        workerUrl: 'https://worker.example',
+      });
+
+    expect(build('')).not.toHaveProperty('groupMemberCeiling');
+    expect(build('1000')).not.toHaveProperty('groupMemberCeiling');
+    expect(build(' 2500 ')).toHaveProperty('groupMemberCeiling', 2500);
+    expect(() => build('2.5')).toThrow('Most members in a group: a whole number from 1 to 10,000.');
+  });
+
   test('buildSessionWizardWorkerConfigPayload sends the Session Agent as the Worker stores it, and leaves it out when off', () => {
     const build = (
       sessionAgent: unknown,

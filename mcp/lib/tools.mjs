@@ -220,10 +220,14 @@ export const buildTools = (participant) => [
     name: 'join_group',
     title: 'Join a group',
     description:
-      'Join an open group in a hosted session by its id. join_session and get_session list the groups; join the one the session’s instructions ask you to, if any.',
+      'Join a group in a hosted session by its id. join_session and get_session list the groups; join the one the session’s instructions ask you to, if any. A group joined by code or password needs its invite: the one the session link carried is used, or pass invite.',
     inputSchema: {
       type: 'object',
-      properties: { session: sessionParam, groupId: text('Group id.') },
+      properties: {
+        session: sessionParam,
+        groupId: text('Group id.'),
+        invite: text('The group’s one-use code or password, if you were given one and the session link didn’t carry it.'),
+      },
       required: ['groupId'],
       additionalProperties: false,
     },

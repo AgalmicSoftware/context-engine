@@ -77,3 +77,24 @@ The default launch command, `npx -y --prefer-online @agalmic/contextengine@lates
 checks for a newer published version on restart; running servers are unchanged.
 Existing users must update their host command once to adopt this behavior.
 Exact version pins remain available for reproducible runs and stay fixed.
+
+## Claude Desktop bundle
+
+Claude Desktop installs a `.mcpb` file from a double-click and runs it with the
+Node built into the app, so the person needs neither Node nor a config file. To
+build one from the bundle the npm package ships:
+
+```sh
+npm --prefix mcp run build
+node scripts/mcp-mcpb.mjs
+```
+
+It writes `dist/context-engine.mcpb`: `mcp/mcpb/manifest.json` at the version in
+`mcp/package.json`, the server, and the licence notices. The same input gives the
+same file on one Node version. Claude Desktop uses its own Node only when the
+manifest's command is `node` with the script first, and only when that Node is
+one the manifest admits; a test pins both.
+
+The file holds one MCP version and does not update itself, unlike the `npx`
+command, so build it again at every MCP version. No workflow builds or publishes
+it: `publish-mcp.yml` and the Worker bundle workflows are unchanged.

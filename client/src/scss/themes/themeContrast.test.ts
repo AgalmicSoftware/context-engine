@@ -594,6 +594,33 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter((value) => value < 4.5)).toEqual([]);
   });
 
+  // A group that needs a password or claim code takes it on its card and in the sign-in notice.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the group code field readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const onePageCss = compileModule('components/OnePageSession/OnePageSession.module.scss');
+    const field = moduleRule(onePageCss, '.workerGroupCardCodeInput');
+    const placeholder = moduleRule(onePageCss, '.workerGroupCardCodeInput::placeholder');
+    const card = composite(
+      parseColor(values['card-bg']),
+      composite(parseColor(values.surface), parseColor(values.canvas)),
+    );
+    const notice = compileModule('components/OnePageSession/WorkerGroupAutoJoinNotice.module.scss');
+    const fields = [
+      [field, placeholder],
+      [moduleRule(notice, '.codeInput'), moduleRule(notice, '.codeInput::placeholder')],
+    ];
+    const ratios = fields.flatMap(([input, hint]) =>
+      [card, parseColor(values['document-canvas'])].flatMap((backdrop) => {
+        const fill = composite(paint(input.background), backdrop);
+        return [input.color, hint.color].map((color) =>
+          Number(contrastRatio(composite(paint(color), fill), fill).toFixed(2)),
+        );
+      }),
+    );
+    expect(ratios.filter((value) => value < 4.5)).toEqual([]);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps the session section headers readable', (themeId) => {
     const values = themeValues(css, themeId);
     const paint = painter(values);

@@ -1,9 +1,11 @@
 import { normalizeHttpOrigin } from './config.mjs';
 import { normalizeRecruitmentSource } from './records.mjs';
+import { WORKER_GROUP_INVITE_FRAGMENT_KEY } from '../../shared/workerGroupJoin.mjs';
 
 // Parses the session links the web app shares, for example
 // https://contextengine.sh/session/<slug>?worker=<origin>&joinGroup=<id>
-// with optional SBT claim pairs: sbt/gp/inv/auto and numbered sbtN/gpN/invN/autoN.
+// with optional SBT claim pairs: sbt/gp/inv/auto and numbered sbtN/gpN/invN/autoN,
+// and, after #, the joinGroup group's invite: #groupInvite=<code or gp:password>.
 
 const SLUG_RE = /^[a-z0-9_-]{1,128}$/;
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
@@ -83,12 +85,15 @@ export const parseSessionLink = (link, { allowLocalWorkers = false } = {}) => {
   }
   const joinGroup = trim(params.get('joinGroup'));
   if (joinGroup && !GROUP_ID_RE.test(joinGroup)) throw new Error('Session link has an invalid group id.');
+  // The fragment never reaches a server; it is kept only for joining that group.
+  const groupInvite = joinGroup ? trim(new URLSearchParams(url.hash.slice(1)).get(WORKER_GROUP_INVITE_FRAGMENT_KEY)) : '';
   return {
     appOrigin: normalizeHttpOrigin(url.origin, 'Session link'),
     slug: normalizeSessionSlug(decodeURIComponent(slugSegment)),
     workerOrigin: workers.length ? normalizeWorkerOrigin(workers[0], { allowLocalWorkers }) : '',
     ...(workers.length ? {} : { kind: 'registry', chainId: 11155420 }),
     joinGroupId: joinGroup,
+    ...(groupInvite ? { groupInvite } : {}),
     sbtClaims: readClaimPairs(params),
     recruitmentSource: normalizeRecruitmentSource(params.get('src')),
   };

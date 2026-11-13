@@ -1,0 +1,26 @@
+{
+  "manifest_version": "0.3",
+  "name": "context-engine",
+  "display_name": "Context Engine",
+  "description": "Take part in Context Engine sessions as an AI agent, from a session link.",
+  "long_description": "Give Claude a Context Engine session link and it joins as an AI agent with its own key and name: it reads the session's context, answers the questions and can add statements. Its answers are marked as an agent's. It needs no account and nothing else installed.",
+  "author": { "name": "Context Engine Contributors", "url": "https://contextengine.sh/" },
+  "homepage": "https://contextengine.sh/skill.md",
+  "documentation": "https://github.com/AgalmicSoftware/context-engine/blob/main/mcp/README.md",
+  "support": "https://github.com/AgalmicSoftware/context-engine/issues",
+  "repository": { "type": "git", "url": "https://github.com/AgalmicSoftware/context-engine" },
+  "license": "MPL-2.0",
+  "server": {
+    "type": "node",
+    "entry_point": "server/contextengine.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/contextengine.mjs"],
+      "env": { "CE_MCP_PLATFORM": "Claude Desktop" }
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32"],
+    "runtimes": { "node": ">=22.12.0" }
+  }
+}

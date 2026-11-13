@@ -17,6 +17,8 @@ import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
+import { createWorkerGroupPasswordKeys, parseGroupInviteToken } from '../../shared/workerGroupJoin.mjs';
+import { ethers } from 'ethers';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
 // The Session Worker shows these sessions' answers to every signed-in member.
@@ -34,8 +36,8 @@ const OWN_ANSWER_SCAN_MAX_AGE_MS = 10 * 60 * 1000;
 // starts, as an unread record is.
 const OWN_ANSWER_RETRY_MS = 60_000;
 // A tool call waits this long for that scan, then answers without it; the
-// scan finishes for later calls. Hosts often give a tool call 60 seconds.
-const OWN_ANSWER_WAIT_MS = 8_000;
+// scan finishes for later calls. Some hosts give a tool call only 5 seconds.
+const OWN_ANSWER_WAIT_MS = 2_000;
 // get_results lists answers for at most this long, then reads them until the
 // second limit, so it returns within a host's usual 60 seconds.
 const RESULTS_LIST_DEADLINE_MS = 20_000;
@@ -64,6 +66,7 @@ const CONTEXT_RATE_LIMITED = 'The session’s Worker is rate limiting you, so no
 
 // Agent-supplied arguments may be numbers or strings; Worker data uses text().
 const trim = (value) => (typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : '');
+const ANSWERS_EXAMPLE = 'For example: "answers": [{ "questionId": "0x1a…", "value": "Agree", "comment": "Why I agree." }]';
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const sessionKey = (info) => info.kind === 'registry' ? `registry ${info.chainId || 11155420} ${info.slug}` : `${info.workerOrigin} ${info.slug}`;
 
@@ -233,7 +236,18 @@ const WHO_CAN_END_MEMBERSHIP = {
   neither: 'No one can end a membership.',
 };
 
+// How someone joins a group on their own, by its join mode; any other mode
+// takes only members its admins add.
+const SELF_JOINING = {
+  open: 'Open: join with join_group.',
+  one_use: 'By one-use code: pass it to join_group as invite, unless the session link carried it.',
+  // Backticks, not quotes: the release secret scan flags a quoted value under a key containing "password".
+  group_password: `By group password: pass it to join_group as invite, unless the session link carried it.`,
+};
+
 const GROUP_REFUSALS = {
+  worker_group_join_refused: (id) =>
+    `That link, invite or password didn’t work for group "${id}". Ask whoever invited you for a new one.`,
   worker_group_not_found: (id) => `This session has no group "${id}".`,
   worker_group_join_denied: (id) => `Group "${id}" isn’t open to joining; its admins add members.`,
   worker_group_join_ended: (id) => `Joining group "${id}" has closed.`,
@@ -247,6 +261,19 @@ const BUSY_GROUP_REASONS = new Set(['worker_group_coordination_unavailable', 'wo
 
 // A busy or unanswered change may still land later, so it says the agent's
 // membership is unconfirmed and that repeating the call is harmless.
+const groupPasswordKeys = createWorkerGroupPasswordKeys(ethers);
+
+// What a join to a group that isn't open carries: a one-use code as it is, or a
+// group password as a signature naming this session, group and agent. The
+// password itself is never sent.
+const groupJoinCredential = async ({ token, sessionId, groupId, address }) => {
+  const invite = parseGroupInviteToken(token);
+  if (!invite) throw new Error('That invite is neither a 32-character code nor a group password of at least 8 characters.');
+  if (invite.kind === 'invite') throw new Error('Invite codes aren’t supported yet; ask for a group password or a one-use link instead.');
+  if (invite.kind === 'one_use') return { secret: invite.secret };
+  return { proof: await groupPasswordKeys.signJoin({ password: invite.password, sessionId, groupId, address }) };
+};
+
 const groupRefusal = (error, id, tool) => {
   if (!(error instanceof WorkerRequestError)) return error;
   if (Object.hasOwn(GROUP_REFUSALS, error.code)) return new Error(GROUP_REFUSALS[error.code](id));
@@ -430,10 +457,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const members = Number.isSafeInteger(memberCount) && memberCount >= 0 ? memberCount : null;
       const limit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? group.memberLimit : 0;
       const closesAt = text(group.joinEndsAt);
-      const open = text(group.joinMode).toLowerCase() === 'open';
-      let joining = open ? 'Open: join with join_group.' : 'Only admins add members.';
-      if (open && closesAt && Date.parse(closesAt) <= now()) joining = 'Joining has closed.';
-      else if (open && limit && members !== null && members >= limit) joining = 'Full.';
+      const selfJoin = SELF_JOINING[text(group.joinMode).toLowerCase()];
+      let joining = selfJoin || 'Only admins add members.';
+      if (selfJoin && closesAt && Date.parse(closesAt) <= now()) joining = 'Joining has closed.';
+      else if (selfJoin && limit && members !== null && members >= limit) joining = 'Full.';
       // A Worker from before the setting omits it, and works as 'both'.
       const removalAuth = text(group.removalAuth).toLowerCase() || 'both';
       return {
@@ -442,7 +469,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         ...(text(group.description) ? { description: text(group.description).slice(0, MAX_DESCRIPTION_LENGTH) } : {}),
         ...(tags.length ? { tags } : {}),
         joining,
-        ...(open && closesAt ? { joinClosesAt: closesAt } : {}),
+        ...(selfJoin && closesAt ? { joinClosesAt: closesAt } : {}),
         ...(members !== null ? { members } : {}),
         ...(limit ? { memberLimit: limit } : {}),
         member,
@@ -852,6 +879,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       } else {
         throw new Error('Pass a session link, or both worker and session.');
       }
+      // The link's group invite stays out of the session's info, which is remembered.
+      const groupInvite = parsed.groupInvite || '';
+      delete parsed.groupInvite;
       // Joining always starts a fresh client, so a session that changed identity can be joined again.
       sessions.delete(sessionKey(parsed));
       const ctx = await openSession(parsed);
@@ -865,6 +895,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         );
       }
       ctx.info.appOrigin = ctx.client.loginOrigin;
+      // Kept in memory for join_group only; never shown or saved.
+      if (groupInvite) ctx.groupInvites = new Map([[parsed.joinGroupId.toLowerCase(), groupInvite]]);
       const outcome = { ...sessionSummary(ctx, sessionConfig), address: wallet.address };
 
       // Like the web app, only SBTs the link marks for automatic claiming are claimed on join.
@@ -996,7 +1028,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     },
 
     async answer({ session, answers } = {}) {
-      if (!Array.isArray(answers) || !answers.length) throw new Error('Pass at least one answer.');
+      if (!Array.isArray(answers)) {
+        throw new Error(`answers must be a list of answer objects, not ${answers === undefined ? 'missing' : `a ${typeof answers}`}. ${ANSWERS_EXAMPLE}`);
+      }
+      if (!answers.length) throw new Error(`Pass at least one answer. ${ANSWERS_EXAMPLE}`);
       if (answers.length > MAX_ANSWERS_PER_CALL) throw new Error(`Send at most ${MAX_ANSWERS_PER_CALL} answers per call.`);
       const ctx = await resolveSession(session);
       const sessionConfig = await ensureReady(ctx);
@@ -1013,7 +1048,11 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       let reconciliationRequired = false;
       const seen = new Set();
       for (const item of answers) {
-        const questionId = trim(item?.questionId).toLowerCase();
+        if (!isRecord(item)) {
+          results.push({ questionId: '', ok: false, error: `Each answer must be an object, not a ${Array.isArray(item) ? 'list' : typeof item}. ${ANSWERS_EXAMPLE}` });
+          continue;
+        }
+        const questionId = trim(item.questionId).toLowerCase();
         if (seen.has(questionId)) {
           results.push({ questionId, ok: false, error: 'This question appears more than once in the call; send one answer per question.' });
           continue;
@@ -1185,6 +1224,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     },
 
     async getResults({ session, questionIds, maxRecords = MAX_RESULT_RECORDS } = {}) {
+      if (questionIds !== undefined && !Array.isArray(questionIds)) {
+        throw new Error(`questionIds must be a list of question ids, such as ["0x1a…"], not a ${typeof questionIds}.`);
+      }
       const ctx = await resolveSession(session);
       const sessionConfig = await ensureReady(ctx);
       const visibility = sessionConfig?.sessionModeProfile?.results?.visibility;
@@ -1197,7 +1239,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       }
       const cap = Math.min(Math.max(Number(maxRecords) || MAX_RESULT_RECORDS, 1), MAX_RESULT_RECORDS);
       const questions = await loadQuestions(ctx);
-      const wanted = Array.isArray(questionIds) && questionIds.length ? idList(questionIds) : null;
+      const wanted = questionIds?.length ? idList(questionIds) : null;
       let entries;
       let complete;
       let listedCount;
@@ -1241,14 +1283,19 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       };
     },
 
-    async joinGroup({ session, groupId } = {}) {
+    async joinGroup({ session, groupId, invite } = {}) {
       const ctx = await resolveSession(session);
       if (ctx.registry) throw new Error('Worker groups are not available in on-chain sessions.');
       await ensureReady(ctx);
       const id = trim(groupId);
       if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
+      // An invite passed here wins over the one the session link carried.
+      const token = trim(invite) || ctx.groupInvites?.get(id.toLowerCase()) || '';
+      const credential = token
+        ? await groupJoinCredential({ token, sessionId: ctx.client.sessionId, groupId: id.toLowerCase(), address: wallet.address })
+        : {};
       checkpoint();
-      await ctx.client.joinGroup(id, { signal }).catch((error) => {
+      await ctx.client.joinGroup(id, { signal, ...credential }).catch((error) => {
         throw groupRefusal(error, id, 'join_group');
       });
       return { session: ctx.info.slug, joinedGroup: id };

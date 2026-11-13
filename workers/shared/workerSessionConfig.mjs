@@ -2,6 +2,7 @@ import { projectPublicAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import {
   DEBATE_ATLAS_FIELD,
   SESSION_AGENT_READY_FIELD,
+  GROUP_JOIN_CHOICES_FIELD,
   MEMBER_RESULTS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
@@ -40,6 +41,7 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'responseFieldEncryption',
   'workerAuthority',
   'groupCreationPolicy',
+  'groupMemberCeiling',
   'contextAdditionPolicy',
   'linkedWorkerGroups',
   'storageProfile',
@@ -320,6 +322,7 @@ export const projectPublicWorkerSessionConfig = (config) => {
   projected[RISK_MATRIX_FIELD] = true;
   projected[MEMBER_RESULTS_FIELD] = true;
   projected[SESSION_AGENT_READY_FIELD] = true;
+  projected[GROUP_JOIN_CHOICES_FIELD] = true;
   return projected;
 };
 

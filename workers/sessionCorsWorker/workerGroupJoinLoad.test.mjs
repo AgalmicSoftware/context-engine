@@ -4,105 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SessionWriteCoordinator, executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
-import { executeCoordinatedWorkerGroupMutation, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships } from './workerGroups.js';
-
-const ADMIN = `0x${'aa'.repeat(20)}`;
-const SESSION_ID = `0x${'ab'.repeat(16)}`;
-const principal = (index) => ({ kind: 'evm_address', address: `0x${(index + 1).toString(16).padStart(40, '0')}` });
-
-// Durable Object storage whose transactions run one at a time, as the
-// runtime's input gates make them.
-const createDurableStorage = () => {
-  const store = new Map();
-  let tail = Promise.resolve();
-  const storage = {
-    get: async (key) => structuredClone(store.get(key)),
-    put: async (key, value) => { store.set(key, structuredClone(value)); },
-    delete: async (key) => store.delete(key),
-    list: async ({ prefix = '' } = {}) => new Map([...store].filter(([key]) => key.startsWith(prefix))),
-    transaction: (callback) => {
-      const run = tail.then(async () => {
-        const staged = new Map([...store].map(([key, value]) => [key, structuredClone(value)]));
-        const result = await callback({
-          get: async (key) => structuredClone(staged.get(key)),
-          put: async (key, value) => { staged.set(key, structuredClone(value)); },
-          delete: async (key) => staged.delete(key),
-        });
-        store.clear();
-        for (const [key, value] of staged) store.set(key, value);
-        return result;
-      });
-      tail = run.catch(() => undefined);
-      return run;
-    },
-  };
-  return { storage, store };
-};
-
-// KV with a round trip on every call, counting how many calls overlap.
-const createSlowKv = (values, { delayMs = 5 } = {}) => {
-  let inFlight = 0;
-  const kv = {
-    maxInFlight: 0,
-    failPut: null,
-    async call(work) {
-      inFlight += 1;
-      kv.maxInFlight = Math.max(kv.maxInFlight, inFlight);
-      try {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-        return work();
-      } finally {
-        inFlight -= 1;
-      }
-    },
-    get: (key) => kv.call(() => values.get(key) ?? null),
-    put: (key, value) => kv.call(() => {
-      if (kv.failPut?.(key)) { kv.failPut = null; throw new Error('KV write unavailable'); }
-      values.set(key, value);
-    }),
-    delete: (key) => kv.call(() => { values.delete(key); }),
-    list: ({ prefix = '' } = {}) => kv.call(() => ({
-      keys: [...values.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })),
-      list_complete: true,
-    })),
-  };
-  return kv;
-};
-
-const createFixture = async ({ memberLimit } = {}) => {
-  const sessionConfig = { slug: 'fixture', adminAddress: ADMIN, sessionId: SESSION_ID };
-  const values = new Map([['session:fixture:config', JSON.stringify(sessionConfig)]]);
-  const kv = createSlowKv(values);
-  const env = { CE_STORAGE_ENVELOPE_KEK: 'synthetic-test-kek', GROUP_KV: kv, CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2' };
-  const config = new SessionWriteCoordinator({ storage: createDurableStorage().storage }, env);
-  env.CE_SESSION_COORDINATOR = { idFromName: (name) => name, get: () => ({ fetch: (url, init) => config.fetch(new Request(url, init)) }) };
-  const groupState = createDurableStorage();
-  const groups = new SessionWriteCoordinator({ storage: groupState.storage }, env);
-  env.CE_WORKER_GROUP_COORDINATOR = { idFromName: (name) => name, get: () => ({ fetch: (url, init) => groups.fetch(new Request(url, init)) }) };
-  const current = await (await config.fetch(new Request('https://session-coordinator.internal/session-config/current', {
-    method: 'POST', body: JSON.stringify({ slug: 'fixture' }),
-  }))).json();
-  const expectedAuthority = { actor: ADMIN, revision: current.revision, authzEpoch: current.config?.authzEpoch ?? 0 };
-  const mutate = (args) => executeCoordinatedWorkerGroupMutation({ env, slug: 'fixture', sessionId: SESSION_ID, expectedAuthority,
-    groupId: 'salon', actorPrincipal: principal(-1), ...args });
-  // A config change, such as a new admin or signing everyone out, moves the
-  // session's authority on; proofs read before it no longer admit anything.
-  const changeConfig = () => executeCoordinatedSessionConfigMutation({ env, slug: 'fixture', existingConfig: sessionConfig,
-    expectedAuthority, mutation: { kind: 'set-config', incomingConfig: { adminAddress: `0x${'bb'.repeat(20)}` } } });
-  const memberships = async (index) => (await readCoordinatedWorkerGroupMemberships({ env, slug: 'fixture', sessionId: SESSION_ID,
-    principal: principal(index) })).groups?.map((group) => group.groupId);
-  const created = await mutate({ operation: 'create', principal: undefined,
-    input: { groupId: 'salon', label: 'Salon', joinMode: 'open', ...(memberLimit ? { memberLimit } : {}) } });
-  assert.equal(created.ok, true, JSON.stringify(created));
-  const join = (index) => mutate({ operation: 'join', principal: principal(index), actorPrincipal: principal(index) });
-  const groupRecord = () => [...groupState.store].find(([key]) => key.endsWith(':salon') && key.includes('group'))?.[1];
-  const memberKeys = () => [...values.keys()].filter((key) => key.startsWith('ce-worker-group-member:'));
-  const catalog = (index) => readCoordinatedWorkerGroupCatalog({ env, slug: 'fixture', sessionId: SESSION_ID, groupIds: ['salon'],
-    principal: principal(index) });
-  const activeMembers = () => [...groupState.store].filter(([key, value]) => key.includes('member') && value?.state === 'active').length;
-  return { kv, env, mutate, join, groupRecord, memberKeys, groupState, changeConfig, memberships, catalog, activeMembers };
-};
+import { createFixture, principal } from './workerGroupTestFixture.mjs';
 
 test('a hundred people joining one group at once all get in, side by side', async () => {
   const f = await createFixture();
@@ -173,7 +75,7 @@ const racedJoins = async (f, change, refusal) => {
 
 test('a group deleted mid-burst takes no join after it', async () => {
   const f = await createFixture();
-  const admitted = await racedJoins(f, () => f.mutate({ operation: 'delete' }), 'worker_group_not_found');
+  const admitted = await racedJoins(f, () => f.mutate({ operation: 'delete' }), 'worker_group_join_refused');
   assert.equal(f.memberKeys().length, admitted);
 });
 
@@ -209,7 +111,7 @@ test('reads during a burst show each finished join and never a refused one', asy
 test('an edit that closes joining mid-burst admits exactly the joins before it', async () => {
   const f = await createFixture();
   const admitted = await racedJoins(f, () => f.mutate({ operation: 'update', input: { joinMode: 'admin_add' } }),
-    'worker_group_join_denied');
+    'worker_group_join_refused');
   assert.equal(f.groupRecord().memberCount, admitted);
   assert.equal(f.memberKeys().length, admitted);
 });
@@ -223,7 +125,7 @@ test('a resent join finishes an interrupted one, even after joining closes', asy
   assert.equal(resent.ok, true, JSON.stringify(resent));
   assert.equal(resent.memberCount, 1);
   assert.deepEqual(await f.memberships(1), ['salon']);
-  assert.equal((await f.join(2)).reason, 'worker_group_join_denied');
+  assert.equal((await f.join(2)).reason, 'worker_group_join_refused');
 });
 
 test('reads and joins that meet a stranded group change recover it once and all answer', async () => {
@@ -305,4 +207,37 @@ test('joins sent during a group update wait for it', async () => {
   release();
   assert.equal((await change).ok, true);
   assert.equal((await joining).ok, true);
+});
+
+test("the session's ceiling caps every group, and a group limit above it is refused", async () => {
+  const f = await createFixture({ groupMemberCeiling: 3 });
+  const results = await Promise.all(Array.from({ length: 6 }, (_, index) => f.join(index)));
+  assert.equal(results.filter((result) => result.ok).length, 3);
+  assert.deepEqual([...new Set(results.filter((result) => !result.ok).map((result) => result.reason))], ['worker_group_member_cap_exceeded']);
+  assert.equal(f.groupRecord().memberCount, 3);
+  const above = await f.mutate({ operation: 'create', principal: undefined, groupId: 'big',
+    input: { groupId: 'big', label: 'Big', joinMode: 'open', memberLimit: 4 } });
+  assert.equal(above.status, 400);
+  assert.equal(above.reason, 'worker_group_member_limit_above_ceiling');
+  const raised = await f.mutate({ operation: 'update', principal: undefined, input: { memberLimit: 4 } });
+  assert.equal(raised.reason, 'worker_group_member_limit_above_ceiling');
+  const within = await f.mutate({ operation: 'create', principal: undefined, groupId: 'small',
+    input: { groupId: 'small', label: 'Small', joinMode: 'open', memberLimit: 3 } });
+  assert.equal(within.ok, true, JSON.stringify(within));
+});
+
+test('a group limit may go up to the highest ceiling, 10,000, and no further', async () => {
+  const f = await createFixture({ groupMemberCeiling: 10000 });
+  const top = await f.mutate({ operation: 'update', principal: undefined, input: { memberLimit: 10000 } });
+  assert.equal(top.ok, true, JSON.stringify(top));
+  assert.equal(f.groupRecord().memberLimit, 10000);
+  const over = await f.mutate({ operation: 'update', principal: undefined, input: { memberLimit: 10001 } });
+  assert.equal(over.ok, false);
+  assert.equal(over.status, 400);
+});
+
+test('without a ceiling in the session config, a group holds at most 1,000', async () => {
+  const f = await createFixture();
+  const over = await f.mutate({ operation: 'update', principal: undefined, input: { memberLimit: 1001 } });
+  assert.equal(over.reason, 'worker_group_member_limit_above_ceiling');
 });

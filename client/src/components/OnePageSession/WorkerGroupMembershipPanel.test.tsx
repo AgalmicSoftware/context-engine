@@ -1917,4 +1917,76 @@ describe('WorkerGroupMembershipPanel', () => {
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Admins can remove members. Members can’t leave.');
     });
   });
+
+  describe('join choices', () => {
+    const secretGroup = {
+      groupId: 'salon',
+      sessionSlug: 'alpha',
+      label: 'Salon',
+      joinMode: 'group_password',
+      listed: true,
+      memberVisibility: 'members',
+    };
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    const workerWith = (join: (body: Record<string, unknown>) => Response) =>
+      jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const pathname = new URL(String(input)).pathname;
+        if (pathname.endsWith('/groups/join')) return join(JSON.parse(String(init?.body || '{}')));
+        if (pathname.endsWith('/groups/my-memberships'))
+          return json({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', memberships: [] });
+        return json({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [secretGroup] });
+      });
+
+    it('joins a listed group with a claim code, never with its id alone', async () => {
+      const fetchImpl = workerWith(() =>
+        json({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', group: secretGroup }),
+      );
+      render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+
+      const field = await screen.findByLabelText('Group password or claim code for Salon');
+      // The only Join is the code field's, which waits for a code.
+      expect(screen.getByRole('button', { name: 'Join Salon' })).toBeDisabled();
+      fireEvent.change(field, { target: { value: 'A'.repeat(32) } });
+      fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Joined Salon.');
+      const join = fetchImpl.mock.calls.find(([input]) => String(input).endsWith('/groups/join'));
+      expect(JSON.parse(String(join?.[1]?.body))).toMatchObject({ groupId: 'salon', secret: 'a'.repeat(32) });
+    });
+
+    it('says one sentence when the code is refused', async () => {
+      const fetchImpl = workerWith(() =>
+        json({ error: 'Worker group request failed.', reason: 'worker_group_join_refused' }, 403),
+      );
+      render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+
+      fireEvent.change(await screen.findByLabelText('Group password or claim code for Salon'), {
+        target: { value: 'b'.repeat(32) },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
+      expect(
+        await screen.findByText('That link, invite or password didn’t work. Ask whoever invited you for a new one.'),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Group password or claim code for Salon')).toBeInTheDocument();
+    });
+
+    it('asks a signed-out person to sign in before typing a code', async () => {
+      const onSignIn = jest.fn();
+      const fetchImpl = workerWith(() => json({}, 500));
+      render(
+        <WorkerGroupMembershipPanel
+          canReadGroups={true}
+          allowAnonymousGroupDiscovery={true}
+          workerUrl="https://session-worker.example"
+          sessionId={SESSION_ID}
+          sessionSlug="alpha"
+          onSignIn={onSignIn}
+          fetchImpl={fetchImpl as typeof fetch}
+        />,
+      );
+      fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Salon' }));
+      expect(onSignIn).toHaveBeenCalledWith('salon');
+    });
+  });
 });

@@ -2,6 +2,7 @@ import {
   buildWorkerGroupAutoJoinPath,
   finishWorkerGroupAutoJoin,
   readLinkedWorkerGroupId,
+  readLinkedWorkerGroupToken,
   readWorkerGroupAutoJoinId,
 } from './workerGroupAutoJoin';
 
@@ -98,13 +99,18 @@ it('reuses a valid same-session Worker hint from the base path when no explicit 
 it('remembers the group a link joined through a reload of that page, for that session only', async () => {
   window.history.replaceState({}, '', '/session/salon?joinGroup=table-3');
   expect(readLinkedWorkerGroupId('salon')).toBe('table-3');
-  finishWorkerGroupAutoJoin('salon', 'table-3');
+  finishWorkerGroupAutoJoin('salon', 'table-3', undefined, 'gp:river-stone-lamp');
   expect(window.location.search).toBe('');
+  // The invite stays in this page's memory only, for that group.
+  expect(readLinkedWorkerGroupToken('salon', 'table-3')).toBe('gp:river-stone-lamp');
+  expect(readLinkedWorkerGroupToken('salon', 'table-4')).toBe('');
+  expect(JSON.stringify(window.history.state)).not.toContain('river');
   // A reload starts the page's memory afresh; the page's history entry still knows the group.
   jest.resetModules();
   const reloaded = await import('./workerGroupAutoJoin');
   expect(reloaded.readLinkedWorkerGroupId('salon')).toBe('table-3');
   expect(reloaded.readLinkedWorkerGroupId('other')).toBe('');
+  expect(reloaded.readLinkedWorkerGroupToken('salon', 'table-3')).toBe('');
   // A newer link in the address wins.
   window.history.replaceState({ ...window.history.state }, '', '/session/salon?joinGroup=table-4');
   expect(reloaded.readLinkedWorkerGroupId('salon')).toBe('table-4');

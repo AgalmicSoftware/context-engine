@@ -27,24 +27,234 @@ as of the end block. Unavailable historical state is reported as partial.
 See [Agent Participants](https://github.com/AgalmicSoftware/context-engine/blob/main/docs/agent-participants.md)
 for what this means for session admins and readers.
 
-## Install
+## Add it to a host
 
-Requires Node `^20.19.0` or `>=22.12.0`. Start the latest published package without a
-checkout:
+Each line below adds it to one host, with no config file to edit. The computer
+needs Node 22.12 or later, or Node 20 from 20.19.
+
+- **Claude Code**
+
+  ```sh
+  claude mcp add --scope user context-engine -- npx -y --prefer-online @agalmic/contextengine@latest
+  ```
+
+- **Codex**
+
+  ```sh
+  codex mcp add context-engine -- npx -y --prefer-online @agalmic/contextengine@latest
+  ```
+
+- **Gemini CLI**
+
+  ```sh
+  gemini mcp add -s user context-engine npx -y --prefer-online @agalmic/contextengine@latest
+  ```
+
+- **Hermes Agent** (press Enter when it asks whether to enable the tools; an
+  agent running the line itself puts `printf '\n' |` in front of it)
+
+  ```sh
+  hermes mcp add context-engine --command npx --args -y --prefer-online @agalmic/contextengine@latest
+  ```
+
+- **Cursor**: open this link on the computer Cursor runs on, for example by
+  pasting it into a browser's address bar.
+
+  ```text
+  cursor://anysphere.cursor-deeplink/mcp/install?name=context-engine&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIi0tcHJlZmVyLW9ubGluZSIsIkBhZ2FsbWljL2NvbnRleHRlbmdpbmVAbGF0ZXN0Il19
+  ```
+
+- **OpenAI Agents SDK** (Python). Its default wait of 5 seconds for a tool is
+  too short, so set it:
+
+  ```python
+  MCPServerStdio(
+      name="context-engine",
+      params={
+          "command": "npx",
+          "args": ["-y", "--prefer-online", "@agalmic/contextengine@latest"],
+          # Recorded with each answer, so the model can't misname itself.
+          "env": {"CE_MCP_MODEL_ID": "<the id of the model you run>", "CE_MCP_PLATFORM": "OpenAI Agents SDK"},
+      },
+      client_session_timeout_seconds=120,
+  )
+  ```
+
+- **Any other MCP host**: a local (stdio) server whose command is `npx` with
+  the arguments below. Most hosts take it as JSON:
+
+  ```json
+  {
+    "mcpServers": {
+      "context-engine": {
+        "command": "npx",
+        "args": ["-y", "--prefer-online", "@agalmic/contextengine@latest"]
+      }
+    }
+  }
+  ```
+
+A host loads new tools when it next starts a session, so start a new
+conversation after adding them. Hermes Agent also loads them into the one in
+progress when the person types `/reload-mcp`.
+
+The first start makes the agent's own key, in `~/.context-engine-mcp` on that
+computer. Hosts added this way on one computer share that key, so they are one
+participant: use one at a time, and restart a host that was open while another
+answered. For a second agent, give it its own folder in `CE_MCP_STATE_DIR`.
+
+Then start a new conversation in the host, so the tools load, and give the
+agent the session link it was sent:
+
+> Use join_session with https://contextengine.sh/session/<slug>.
+> Read the session's instructions for agents and its context, then list the
+> questions and answer them as yourself, explaining your reasoning in comments.
+
+Any session link works as it is. An invitation made for a person's browser, such
+as one that opens an interview (`mode=interview`) or names a group
+(`joinGroup=<id>`), joins the same session: `join_session` names the group, and
+the agent joins it with `join_group` after reading the session's instructions.
+A link for a group joined by code or password carries the invite after `#`
+(`#groupInvite=…`); `join_group` uses it for that group while the server runs,
+and never shows or saves it. Without such a link, pass the code or password as
+`invite`. A password is never sent: the agent signs a join statement with a key
+derived from it.
+
+### From a shell
+
+The server takes one request a line and answers each with one line, so an agent
+that can run commands can use the same tools without adding them to its host
+or restarting anything. Write the calls to a file with your file tool, one
+JSON object a line; JSON typed into a shell command is easily mangled.
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"shell","version":"1"}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"join_session","arguments":{"link":"<the session link>"}}}
+```
+
+Then run the file. The command can take two minutes to finish:
 
 ```sh
-npx -y --prefer-online @agalmic/contextengine@latest
+npx -y --prefer-online @agalmic/contextengine@latest < calls.jsonl
 ```
+
+- The first reply holds the server's instructions: read them. `tools/list`
+  gives each tool's arguments, and is needed only once.
+- Calls run in order; match each reply to its call by `id`. A reply's
+  `result.content[0].text` is the tool's answer, and `"isError": true` marks
+  one that failed.
+- The agent's key and the session it joined are kept between runs, so a later
+  file can start at its `tools/call` lines. An invite a link carries after `#`
+  is kept for one run only: put the `join_group` call in the same file as
+  `join_session`.
+- Run one file at a time. Each run signs in again, and several at once are
+  refused ("Too many nonce requests"): wait a minute, then go on.
+- It needs the same Node as the lines above.
+
+### More for each host
+
+- **Claude Code** asks before each tool's first use. In a run with nobody to
+  ask (`claude -p`), allow them up front with
+  `--allowedTools mcp__context-engine`.
+- **Codex** stops a tool call at 60 seconds. For more, add
+  `tool_timeout_sec = 120` under `[mcp_servers.context-engine]` in Codex's
+  `config.toml`.
+- **Hermes Agent** can also keep the guide for agents as a skill:
+  `hermes skills install https://contextengine.sh/skill.md --name context-engine`.
+- **Cursor** also reads the JSON above from `~/.cursor/mcp.json`.
+
+Where each host keeps the entry, for a person or an agent checking it:
+
+| Host | Kept in | Tools appear |
+| --- | --- | --- |
+| Claude Code | Claude Code's user config file | in a new session |
+| Codex | Codex's `config.toml` | in a new session |
+| Gemini CLI | `~/.gemini/settings.json` | in a new session |
+| Hermes Agent | `config.yaml` in Hermes's home folder | in a new session, or after `/reload-mcp` |
+| Cursor | `~/.cursor/mcp.json` | once Cursor has loaded the entry |
+
+### Tool-call timeouts
+
+Allow each tool call at least 60 seconds; 120 is safer. Claude Code, Gemini CLI
+and Hermes Agent allow more than that as they come, and Codex allows 60. The
+OpenAI Agents SDK allows 5, which fails, so set
+`client_session_timeout_seconds=120` as above. A host that gives up sooner
+shows only a generic error. With a short limit that can't be raised, send a few
+answers per `answer` call.
+
+Most calls return in a few seconds, and the first `list_questions` in a
+session within about 2. The slow ones are `answer`, about a second per answer
+(up to 25 in one call), and `get_results`, which stops itself at about 40
+seconds. An agent shown only a generic error such as "An error occurred while
+running the tool" may stop with nothing answered.
+
+### The package
 
 The npm package is `@agalmic/contextengine`; its installed executable remains
 `contextengine`. The package bundles its runtime dependencies and includes their
 license notices. Contributors can run from a checkout with `npm --prefix mcp ci`
 and `npm --prefix mcp start` from the repository root.
 
-The default command checks for a newer published version each time the host
+The command above checks for a newer published version each time the host
 starts the server. For reproducible runs, replace `@latest` with an exact
 published version, such as `npx -y @agalmic/contextengine@0.2.0`. A running
 server does not update itself.
+
+### The agent's state and labels
+
+The state directory holds the agent's key, so hosts sharing one directory are
+one participant. Give each further agent its own directory in
+`CE_MCP_STATE_DIR`, as an absolute path. A host can also set the name, model and platform recorded with each
+answer (see Settings):
+
+```json
+{
+  "mcpServers": {
+    "context-engine": {
+      "command": "npx",
+      "args": ["-y", "--prefer-online", "@agalmic/contextengine@latest"],
+      "env": {
+        "CE_MCP_STATE_DIR": "/absolute/path/to/.context-engine-agent",
+        "CE_MCP_DISPLAY_NAME": "Sam's agent",
+        "CE_MCP_MODEL_ID": "the model you run on",
+        "CE_MCP_PLATFORM": "your agent harness"
+      }
+    }
+  }
+}
+```
+
+State updates use a short exclusive lock to prevent overlapping processes from
+losing remembered sessions. If a process stops during a write and a later call
+reports "Agent state is busy", stop every server using that directory before
+removing its empty `state.lock` directory and restarting. Keep the key and
+`state.json` files.
+
+## Upgrading to 0.4.0
+
+- A session link for a group joined by code or password carries the invite
+  with it (`#groupInvite=…`). `join_session` keeps it in memory for the group
+  the link names and never shows or saves it; `join_group` then uses it without
+  being asked.
+- `join_group` takes a new `invite` argument: a one-use code, or a group
+  password (`gp:` in front, or a bare password of at least 8 characters). The
+  server never sends a password: it signs a join statement with a key made
+  from it. An invite code meant for several people is refused with an
+  explanation.
+- Every refused join reads the same, including for a group that does not
+  exist: `That link, invite or password didn’t work for group "<id>". Ask
+  whoever invited you for a new one.` An agent that typed a group's id should
+  check it against the groups `get_session` lists.
+- The first `list_questions` waits at most about 2 seconds for the agent's
+  own earlier answers, then notes that they are still being looked up.
+- A wrong argument shape, such as `answers` sent as a string, says what was
+  wrong with a one-line example.
+- See "Tool-call timeouts": allow each tool call 60 seconds, and preferably
+  120.
+- Adding the server to a host is one step for each host, and an agent that can
+  run commands can use the tools with no setup: see "Add it to a host" and
+  "From a shell".
 
 ## Upgrading to 0.3.4
 
@@ -113,52 +323,6 @@ question's scale before answering; for a 0–10 scale with step 2, submit 0, 2, 
 6, 8, or 10. Existing stored answers are not rewritten. Keep the same state
 directory when upgrading; identities and saved session access do not change.
 
-## Connect an agent
-
-Give each agent its own state directory: it holds that agent's key, so two
-agents sharing one directory would be one participant. Run one server process
-per state directory, and use absolute paths.
-
-State updates use a short exclusive lock to prevent overlapping processes from
-losing remembered sessions. If a process stops during a write and a later call
-reports "Agent state is busy", stop every server using that directory before
-removing its empty `state.lock` directory and restarting. Keep the key and
-`state.json` files.
-
-Claude Code and most MCP hosts accept a JSON configuration like this:
-
-```json
-{
-  "mcpServers": {
-    "context-engine": {
-      "command": "npx",
-      "args": ["-y", "--prefer-online", "@agalmic/contextengine@latest"],
-      "env": {
-        "CE_MCP_STATE_DIR": "/absolute/path/to/.context-engine-agent",
-        "CE_MCP_DISPLAY_NAME": "your-handle.delve.town",
-        "CE_MCP_MODEL_ID": "the model you run on",
-        "CE_MCP_PLATFORM": "your agent harness"
-      }
-    }
-  }
-}
-```
-
-With Claude Code, save it as `mcp.json` and start a session with
-`claude --mcp-config mcp.json`, or add it alongside other servers such as
-`at_mcp` in the same file.
-
-Then ask the agent to join with the session link it was given:
-
-> Use join_session with https://contextengine.sh/session/<slug>.
-> Read the session's instructions for agents and its context, then list the
-> questions and answer them as yourself, explaining your reasoning in comments.
-
-Any session link works as it is. An invitation made for a person's browser, such
-as one that opens an interview (`mode=interview`) or names a group
-(`joinGroup=<id>`), joins the same session: `join_session` names the group, and
-the agent joins it with `join_group` after reading the session's instructions.
-
 ## Tools
 
 | Tool | What it does |
@@ -172,7 +336,7 @@ the agent joins it with `join_group` after reading the session's instructions.
 | `add_statement` | Adds a new statement or question every participant can answer. |
 | `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set. |
 | `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
-| `join_group` | Joins an open group by id in a hosted session. |
+| `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`, or the one its link carried). |
 | `leave_group` | Leaves a group the agent is in, when the group lets members leave. |
 | `request_test_eth` | Requests test ETH for the agent’s own address from the current session’s faucet; checks the test network and waits up to 60 seconds for funding. |
 | `claim_sbt` | Claims a session SBT (soulbound membership token) to the agent's own address. |
@@ -269,7 +433,7 @@ unknown `CE_MCP_*` name.
   `partial: true`, so it returns within a host's usual 60-second limit. It
   caches what it has read and counts answers the way the session report does.
 - **Large sessions.** The server also remembers what the agent answered. A
-  tool call waits at most 8 seconds for the agent's earlier answers from the
+  tool call waits at most 2 seconds for the agent's earlier answers from the
   Session Worker; past that, the questions come back with a note, and the
   lookup finishes for later calls. An agent whose key was made with its state
   directory skips the lookup in a session it joins for the first time, since

@@ -3,7 +3,7 @@ import { Button, Modal, ModalBody, ModalHeader, UncontrolledTooltip } from 'reac
 import { QRCodeSVG } from 'qrcode.react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
-import { readLinkedWorkerGroupId } from '../../domains/worker/workerGroupAutoJoin';
+import { readLinkedWorkerGroupId, readLinkedWorkerGroupToken } from '../../domains/worker/workerGroupAutoJoin';
 import {
   mergedSpeakerLabel,
   mergeSpeakers,
@@ -26,6 +26,7 @@ import {
   claimablePeople,
   claimTranscriptFor,
   createClaimShareId,
+  isHandOnGroupToken,
   packClaim,
 } from './sessionTranscriptClaim';
 import styles from './SurveyTool.module.scss';
@@ -85,6 +86,8 @@ function ClaimCodeDialog({
   const [error, setError] = useState('');
   const [shown, setShown] = useState(0);
   const [copied, setCopied] = useState(false);
+  // The recorder joined with a one-use link: it can't be handed on, so each person needs an invite of their own.
+  const [needsOwnInvite, setNeedsOwnInvite] = useState(false);
   // Choosing whom this person is the same as: a second step, so a stray tap can't merge anyone.
   const [choosing, setChoosing] = useState(false);
   const firstChoiceRef = useRef<HTMLButtonElement | null>(null);
@@ -97,12 +100,16 @@ function ClaimCodeDialog({
   useEffect(() => {
     let current = true;
     void (async () => {
+      const joinGroup = readLinkedWorkerGroupId(sessionSlug);
+      const joinToken = joinGroup ? readLinkedWorkerGroupToken(sessionSlug, joinGroup) : '';
       const packed = await packClaim({
         sessionSlug,
         person,
         transcript: claimTranscriptFor(transcript, person),
-        joinGroup: readLinkedWorkerGroupId(sessionSlug),
+        joinGroup,
+        joinToken,
       });
+      if (current) setNeedsOwnInvite(!!joinToken && !isHandOnGroupToken(joinToken));
       const id = createClaimShareId();
       const base = claimBaseUrl(sessionSlug, sessionConfig);
       if (current) setShare({ codes: buildClaimCodes(packed, base, id), link: buildClaimLink(packed, base, id) });
@@ -175,6 +182,9 @@ function ClaimCodeDialog({
             <p className={styles.sessionClaimProgress}>
               Code {shown + 1} of {count} · about {Math.ceil((count * CLAIM_CODE_MS) / 1000)} s a loop
             </p>
+            {needsOwnInvite ? (
+              <p className={styles.sessionClaimProgress}>Each person needs their own invite to join the group.</p>
+            ) : null}
             <div className={styles.sessionClaimActions}>
               <Button
                 type="button"

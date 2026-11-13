@@ -7,11 +7,19 @@ import { AUTO_JOIN_STORAGE_KEY, readPendingAutoJoin } from '../../domains/worker
 import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
 import { AUTO_JOIN_CLAIM_ATTRIBUTE, VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
 import { rememberWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
+import { buildWorkerGroupJoinCredentials } from '../../domains/worker/workerGroupSecrets';
 jest.mock('../../utilities/session/sessionWorkerDiscovery', () => ({
   ...jest.requireActual<Record<string, unknown>>('../../utilities/session/sessionWorkerDiscovery'),
   fetchWorkerCanonicalSessionBootstrap: jest.fn(),
 }));
 const bootstrap = jest.mocked(fetchWorkerCanonicalSessionBootstrap);
+
+// The password's key takes 600,000 rounds to stretch; its proof is tested in workerGroupSecrets.test.ts.
+jest.mock('../../domains/worker/workerGroupSecrets', () => {
+  const actual = jest.requireActual<Record<string, unknown>>('../../domains/worker/workerGroupSecrets');
+  return { ...actual, buildWorkerGroupJoinCredentials: jest.fn(actual.buildWorkerGroupJoinCredentials as never) };
+});
+const credentials = jest.mocked(buildWorkerGroupJoinCredentials);
 
 jest.mock('../../utilities/worker/workerAuth', () => ({
   getWorkerSessionToken: jest.fn(),
@@ -32,6 +40,7 @@ const config = {
   sessionIdHex: sessionId,
   corsWorkerUrl: 'https://worker.example',
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  groupJoinChoices: true,
 };
 const props = {
   sessionConfig: config,
@@ -51,8 +60,20 @@ const tick = (ms = 5000) =>
   act(async () => {
     await jest.advanceTimersByTimeAsync(ms);
   });
+const settle = async () => {
+  for (let step = 0; step < 6; step++) await flush();
+};
 let fetchMock: jest.MockedFunction<typeof fetch>;
 const originalFetch = global.fetch;
+
+const readPendingAutoJoinFixture = () => ({
+  version: 1,
+  sessionSlug: 'alpha',
+  groupId: 'participants-2026',
+  workerOrigin: 'https://worker.example',
+  sessionId,
+  createdAt: Date.now(),
+});
 
 describe('WorkerGroupAutoJoin', () => {
   beforeEach(() => {
@@ -389,8 +410,108 @@ describe('WorkerGroupAutoJoin', () => {
     );
     render(<WorkerGroupAutoJoin {...props} />);
     await tick();
-    expect(screen.getByRole('alert')).toHaveTextContent(variant === 'missing' ? 'unavailable' : 'not open');
+    // A group missing from the list may be unlisted, so it asks for the invitation's code; the id never joins.
+    if (variant === 'missing') expect(screen.getByRole('status')).toHaveTextContent('Enter the group password');
+    else expect(screen.getByRole('alert')).toHaveTextContent('not open');
     expect(joins()).toHaveLength(0);
+  });
+
+  it('says a missing group is unavailable on a Worker without join choices', async () => {
+    fetchMock.mockImplementation(async (url: RequestInfo | URL) =>
+      response(String(url).includes('/my-memberships') ? { memberships: [] } : { groups: [] }),
+    );
+    render(<WorkerGroupAutoJoin {...props} sessionConfig={{ ...config, groupJoinChoices: undefined }} />);
+    await tick();
+    expect(screen.getByRole('alert')).toHaveTextContent('This group is unavailable in this session.');
+    expect(screen.queryByLabelText(/Group password or claim code for/)).not.toBeInTheDocument();
+    expect(joins()).toHaveLength(0);
+  });
+
+  describe('a group that needs a password or claim code', () => {
+    const secretGroup = { ...group, joinMode: 'group_password', listed: false };
+    const listing = (groups: unknown[]) =>
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/groups/list')) return response({ groups });
+        if (String(input).includes('/groups/my-memberships')) return response({ memberships: [] });
+        if (String(input).includes('/groups/join')) return response({ group: secretGroup, memberCount: 1 });
+        throw new Error(`Unexpected request: ${input}`);
+      });
+
+    it('takes a link’s password out of the address, keeps it in this tab, and joins with a proof, not the password', async () => {
+      listing([]);
+      window.history.replaceState(
+        {},
+        '',
+        '/session/alpha?joinGroup=participants-2026#claim=abc&groupInvite=gp%3Ariver-stone-lamp-oak',
+      );
+      const { rerender } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
+      await flush();
+      expect(window.location.hash).toBe('#claim=abc');
+      expect(readPendingAutoJoin()?.token).toBe('gp:river-stone-lamp-oak');
+      // Unlisted: no name before sign-in, and nothing to type, since the link carries the password.
+      expect(screen.getByRole('status')).toHaveTextContent('Group invitation: Will be joined upon sign-in');
+      const proof = `0x${'ab'.repeat(65)}`;
+      credentials.mockResolvedValueOnce({ proof });
+      rerender(<WorkerGroupAutoJoin {...props} />);
+      await settle();
+      expect(credentials).toHaveBeenCalledWith({
+        token: 'gp:river-stone-lamp-oak',
+        sessionId,
+        groupId: group.groupId,
+        address: account,
+      });
+      expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
+      const body = JSON.parse(String(joins()[0][1]?.body));
+      expect(body).toEqual({ groupId: group.groupId, proof, sessionId });
+      expect(readPendingAutoJoin()).toBeNull();
+    });
+
+    it('asks for a code without one, and sends a typed claim code as the secret', async () => {
+      listing([secretGroup]);
+      render(<WorkerGroupAutoJoin {...props} />);
+      await settle();
+      expect(joins()).toHaveLength(0);
+      expect(screen.getByRole('status')).toHaveTextContent('Enter the group password or claim code');
+      fireEvent.change(screen.getByLabelText(/Group password or claim code for/), {
+        target: { value: 'ABCDEF0123456789abcdef0123456789' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /^Join / }));
+      await settle();
+      expect(JSON.parse(String(joins()[0][1]?.body))).toEqual({
+        groupId: group.groupId,
+        secret: 'abcdef0123456789abcdef0123456789',
+        sessionId,
+      });
+    });
+
+    it('says one sentence for a refused join, and lets another code be tried', async () => {
+      listing([secretGroup]);
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/groups/list')) return response({ groups: [secretGroup] });
+        if (String(input).includes('/groups/my-memberships')) return response({ memberships: [] });
+        return response({ reason: 'worker_group_join_refused' }, 403);
+      });
+      sessionStorage.setItem(
+        AUTO_JOIN_STORAGE_KEY,
+        JSON.stringify({ ...readPendingAutoJoinFixture(), token: 'abcdef0123456789abcdef0123456789' }),
+      );
+      const { rerender } = render(<WorkerGroupAutoJoin {...props} />);
+      await settle();
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'That link, invite or password didn’t work. Ask whoever invited you for a new one.',
+      );
+      // Another account doesn't send the refused code again.
+      rerender(<WorkerGroupAutoJoin {...props} account={`0x${'2'.repeat(40)}`} />);
+      await settle();
+      expect(joins()).toHaveLength(1);
+      expect(screen.getByRole('alert')).toHaveTextContent('That link, invite or password didn’t work.');
+      expect(screen.getByLabelText(/Group password or claim code for/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+      // The refused code leaves the tab, so a reload doesn't send it again.
+      const kept = JSON.parse(sessionStorage.getItem(AUTO_JOIN_STORAGE_KEY) || '{}');
+      expect(kept.groupId).toBe(secretGroup.groupId);
+      expect(kept).not.toHaveProperty('token');
+    });
   });
 
   it('fails closed on wrong-session data before joining', async () => {

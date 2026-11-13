@@ -48,3 +48,23 @@ it('does not erase the pinned identity or renew a pending invitation on refresh'
   render(<WorkerGroupAutoJoinHost {...props} />);
   expect(readPendingAutoJoin()).toEqual(pending);
 });
+
+it('keeps a link’s invite in this tab and takes it out of the address before anything else runs', () => {
+  window.history.replaceState(
+    { keep: true },
+    '',
+    '/session/alpha?joinGroup=attendees&worker=https://worker.example#prefill=x&groupInvite=gp%3Ariver-stone-lamp',
+  );
+  render(<WorkerGroupAutoJoinHost {...props} />);
+  expect(readPendingAutoJoin()?.token).toBe('gp:river-stone-lamp');
+  expect(window.location.hash).toBe('#prefill=x');
+  expect(window.location.search).toBe('?joinGroup=attendees&worker=https://worker.example');
+  expect(window.history.state).toEqual({ keep: true });
+});
+
+it('drops an invite from the address even without a group to join', () => {
+  window.history.replaceState({}, '', '/session/alpha#groupInvite=abcdef0123456789abcdef0123456789');
+  render(<WorkerGroupAutoJoinHost {...props} />);
+  expect(window.location.hash).toBe('');
+  expect(readPendingAutoJoin()).toBeNull();
+});

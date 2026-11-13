@@ -179,12 +179,12 @@ test('llms.txt shows agents how to take part in a session', () => {
 });
 
 test('skill.md shows agents how to take part, with nothing session-specific', () => {
-  assert.match(skillMd, /^# Taking part in a Context Engine session as an AI agent\n/);
-  assert.match(skillMd, /`npx -y --prefer-online @agalmic\/contextengine@latest`/);
+  // The opening lines make the file a skill some hosts install as it is.
+  assert.match(skillMd, /^---\nname: context-engine\ndescription: [^\n]+\n---\n\n# Taking part in a Context Engine session as an AI agent\n/);
   assert.match(skillMd, /`CE_MCP_STATE_DIR`/);
-  assert.match(skillMd, /Call `join_session` with the session link exactly as you received it/);
+  assert.match(skillMd, /Call\s+`join_session` with the session link exactly as you received it/);
   // A link made for a person's browser is still the link to give.
-  assert.match(skillMd, /An\s+invitation made for a person's browser works too/);
+  assert.match(skillMd, /An\s+invitation made for a person's\s+browser works too/);
   assert.match(skillMd, /Never claim to be a person/);
   assert.match(skillMd, /join open groups\s+with `join_group`/);
   assertOffersOnlyWhatTheMcpDoes(skillMd);
@@ -206,6 +206,115 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   }
   // Every session gets the same guide: no Worker addresses, tokens or group tags.
   assert.doesNotMatch(skillMd, /workers\.dev|ceagt_|ai-agents/);
+});
+
+// An agent handed only a link has to find its own case first: tools already there, a computer to add them on,
+// or neither.
+test('skill.md starts from what the agent can do', () => {
+  const cases = skillMd.split('## You were given a session link\n')[1]?.split('\n## ')[0] || '';
+  const order = [
+    '**You have Context Engine tools**',
+    '**You can run commands**',
+    "**You run in an app on the person's computer**",
+    '**You are a chat app on a website or a phone**',
+  ];
+  const found = order.map((text) => cases.indexOf(text));
+  assert.ok(found.every((at) => at >= 0), 'a case is missing');
+  assert.deepEqual([...found].sort((a, b) => a - b), found);
+  assert.match(skillMd, /\n## Without tools\n[\s\S]*\*\*Let your AI draft your answers\*\*/);
+  // The invite a link carries is kept only by the server that read it.
+  assert.match(skillMd, /`join_group` uses it for that group without being asked, while the server that\s+joined is still running/);
+});
+
+const mcpReadme = fs.readFileSync(path.join(repoRoot, 'mcp', 'README.md'), 'utf8');
+const serverArgs = ['-y', '--prefer-online', '@agalmic/contextengine@latest'];
+// The fenced block that follows a host's name in the guide's list.
+const hostBlock = (host) => {
+  const block = skillMd.split(`- **${host}**`)[1]?.match(/```[a-z]*\n([\s\S]*?)```/)?.[1];
+  assert.ok(block, `the guide has no setup for ${host}`);
+  return block.replace(/^ {2}/gm, '').trim();
+};
+
+test('each host is added in one step that starts the published server', () => {
+  for (const [host, start] of [
+    ['Claude Code', 'claude mcp add --scope user context-engine --'],
+    ['Codex', 'codex mcp add context-engine --'],
+    ['Gemini CLI', 'gemini mcp add -s user context-engine'],
+    ['Hermes Agent', 'hermes mcp add context-engine --command'],
+  ]) {
+    const line = hostBlock(host);
+    assert.doesNotMatch(line, /\n/, `${host} takes more than one line`);
+    // Whatever follows the host's own words is the server's command, whole and last.
+    const command = line.slice(start.length).trim().split(' ');
+    // Only Hermes names the arguments apart from the command.
+    assert.deepEqual(host === 'Hermes Agent' ? command.filter((word) => word !== '--args') : command, ['npx', ...serverArgs], host);
+    assert.ok(line.startsWith(start), host);
+  }
+  // The Node the guide asks for is the Node the package runs on.
+  const { engines } = JSON.parse(fs.readFileSync(path.join(repoRoot, 'mcp', 'package.json'), 'utf8'));
+  assert.equal(engines.node, '^20.19.0 || >=22.12.0');
+  assert.match(skillMd, /[Tt]he computer\s+needs Node 22\.12 or later, or Node 20 from 20\.19\./);
+  const link = new URL(hostBlock('Cursor'));
+  assert.equal(`${link.protocol}//${link.host}${link.pathname}`, 'cursor://anysphere.cursor-deeplink/mcp/install');
+  assert.equal(link.searchParams.get('name'), 'context-engine');
+  assert.deepEqual(JSON.parse(Buffer.from(link.searchParams.get('config'), 'base64').toString('utf8')), { command: 'npx', args: serverArgs });
+  assert.deepEqual(JSON.parse(hostBlock('Any other MCP host')), { mcpServers: { 'context-engine': { command: 'npx', args: serverArgs } } });
+  const sdk = hostBlock('OpenAI Agents SDK');
+  assert.ok(sdk.includes(`"command": "npx",\n        "args": ${JSON.stringify(serverArgs).replaceAll(',', ', ')},`));
+  // Set by the host, so a model that guesses its own name can't record the guess.
+  assert.match(sdk, /"env": \{"CE_MCP_MODEL_ID": "[^"]+", "CE_MCP_PLATFORM": "OpenAI Agents SDK"\}/);
+  // Its 5-second default fails every slow call.
+  assert.match(sdk, /client_session_timeout_seconds=120/);
+  const llmsSection = llmsTxt.split('## Taking part as an AI agent\n')[1]?.split('\n## ')[0] || '';
+  for (const host of ['Claude Code', 'Codex', 'Gemini CLI', 'Hermes Agent', 'Cursor', 'OpenAI Agents SDK']) {
+    assert.ok(llmsSection.includes(host), `llms.txt does not name ${host}`);
+  }
+});
+
+// A person follows whichever page they land on, so the two must not drift apart.
+test('the guide and the npm README set a host up in the same words', () => {
+  const between = (text, from, to) => {
+    const start = text.indexOf(from);
+    const end = text.indexOf(to, start);
+    assert.ok(start >= 0 && end > start, `missing: ${from}`);
+    return text.slice(start, end + to.length);
+  };
+  for (const [from, to] of [
+    ['Each line below adds it to one host', '`CE_MCP_STATE_DIR`.\n'],
+    ['Allow each tool call at least 60 seconds', 'answers per `answer` call.\n'],
+    ['The server takes one request a line', 'It needs the same Node as the lines above.\n'],
+  ]) {
+    assert.ok(mcpReadme.includes(between(skillMd, from, to)), `the README words this differently: ${from}`);
+  }
+});
+
+// An agent with a shell sends the guide's own lines to the server and reads a reply to each, with no host set up.
+test("the guide's calls from a shell get an answer each, then the server stops", async () => {
+  const { PassThrough } = require('node:stream');
+  const { createMcpServer, serveStdio } = await import('../mcp/lib/mcpServer.mjs');
+  const shell = skillMd.split('\n## From a shell\n')[1]?.split('\n## ')[0] || '';
+  const calls = shell.match(/```json\n([\s\S]*?)```/)?.[1].trim().split('\n') || [];
+  assert.deepEqual(calls.map((line) => JSON.parse(line).method), ['initialize', 'tools/list', 'tools/call']);
+  assert.match(shell, /```sh\nnpx -y --prefer-online @agalmic\/contextengine@latest < calls\.jsonl\n```/);
+  const joinSession = mcpTools.match(/name: 'join_session',[\s\S]*?properties: \{\s*(\w+):/);
+  const server = createMcpServer({
+    serverInfo: { name: 'context-engine', version: '0' },
+    instructions: 'Read these.',
+    tools: [{ name: 'join_session', description: '', inputSchema: { type: 'object' }, handler: async (args) => ({ joined: args[joinSession[1]] }) }],
+  });
+  const input = new PassThrough();
+  const output = new PassThrough();
+  let written = '';
+  output.setEncoding('utf8');
+  output.on('data', (chunk) => { written += chunk; });
+  const stopped = serveStdio(server, { input, output });
+  // A file redirected to the command: every line at once, then the end of input.
+  input.end(`${calls.join('\n')}\n`);
+  await stopped;
+  const replies = written.trim().split('\n').map((line) => JSON.parse(line)).sort((a, b) => a.id - b.id);
+  assert.deepEqual(replies.map((reply) => reply.id), [1, 2, 3]);
+  assert.equal(replies[0].result.instructions, 'Read these.');
+  assert.deepEqual(JSON.parse(replies[2].result.content[0].text), { joined: '<the session link>' });
 });
 
 // npmjs.com shows the README away from the repository, where a relative link leads nowhere.

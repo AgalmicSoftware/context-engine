@@ -1,6 +1,7 @@
 import { applySessionConfigMutation } from '../../../../../workers/sessionCorsWorker/sessionConfigMutation.js';
 import { projectPublicWorkerSessionConfig } from '../../../../../workers/shared/workerSessionConfig.mjs';
 import { WORKER_CANONICAL_SET_CONFIG_KEYS } from '@ce-shared/sessionConfigEdits.mjs';
+import { GROUP_JOIN_CHOICES_FIELD } from '@ce-shared/workerSessionPublicConfig.mjs';
 import { cloneSessionModePreset, compileSessionModeProfile } from '../../../utilities/session/sessionModeProfile';
 import { buildSessionWizardDefaultTemplate } from '../sessionWizardDraftState';
 import { applySessionModeProfileSelectionToDraft } from '../sessionWizardModeProfileDraftController';
@@ -341,6 +342,36 @@ describe('saving the edit page through the Session Worker', () => {
     expect(save.classification.signsParticipantsOut).toBe(false);
     expect(result).toMatchObject({ ok: true });
     expect(result.config.contextAdditionPolicy).toBe('admin_only');
+  });
+
+  it('saves the most members in a group, and blank puts the default back', () => {
+    const stored = publishedSession();
+    expect(stored).not.toHaveProperty('groupMemberCeiling');
+    const raised = editAndSave(stored, (draft) => {
+      expect(draft.groupMemberCeiling).toBe('');
+      draft.groupMemberCeiling = '2500';
+    });
+    expect(raised.save.patch).toEqual({ groupMemberCeiling: 2500 });
+    expect(raised.save.classification.signsParticipantsOut).toBe(false);
+    expect(raised.result).toMatchObject({ ok: true });
+    expect(raised.result.config.groupMemberCeiling).toBe(2500);
+
+    const cleared = editAndSave(raised.result.config, (draft) => {
+      expect(draft.groupMemberCeiling).toBe('2500');
+      draft.groupMemberCeiling = '';
+    });
+    expect(cleared.save.patch).toEqual({ groupMemberCeiling: 1000 });
+    expect(cleared.result).toMatchObject({ ok: true });
+
+    const before = projectPublicWorkerSessionConfig(stored);
+    const draft = buildSessionSettingsDraft(before);
+    draft.groupMemberCeiling = '10001';
+    expect(() => buildSessionSettingsSave(before, draft)).toThrow(
+      'Most members in a group: a whole number from 1 to 10,000.',
+    );
+    // A Worker without join choices refuses the field, so it stays out of the save.
+    const { [GROUP_JOIN_CHOICES_FIELD]: _choices, ...older } = before;
+    expect(buildSessionSettingsSave(older, draft).patch).not.toHaveProperty('groupMemberCeiling');
   });
 
   it('saves highlighted and hidden lists, one ID per line, without signing anyone out', () => {
