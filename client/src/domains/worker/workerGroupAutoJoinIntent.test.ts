@@ -79,3 +79,20 @@ it('takes only the invite out of the address', () => {
   expect(`${window.location.search}${window.location.hash}`).toBe('?view=q#claim=a&prefill=b');
   expect(window.history.state).toEqual({ keep: 1 });
 });
+
+it('keeps an invite taken out of the address for its group until the Worker is known', () => {
+  window.history.replaceState(null, '', '/session/alpha?joinGroup=table-3#groupInvite=gp%3Ariver%20stone');
+  // Before the session's Worker is known, the link isn't an invitation yet, but its invite leaves the address.
+  expect(readAutoJoinLink(`${window.location.pathname}${window.location.search}`, null)).toBeNull();
+  removeGroupInviteFromAddress();
+  expect(window.location.hash).toBe('');
+  const context = { sessionSlug: 'alpha', sessionId: `0x${'1'.repeat(32)}`, workerUrl: 'https://worker.example' };
+  const path = `${window.location.pathname}${window.location.search}`;
+  expect(readAutoJoinLink(path, context as never)?.token).toBe('gp:river stone');
+  // Another group's link gets nothing from it.
+  expect(readAutoJoinLink('/session/alpha?joinGroup=table-4', context as never)?.token).toBeUndefined();
+  // Once an invitation holds it, the tab's storage keeps it and the page lets it go.
+  savePendingAutoJoin(readAutoJoinLink(path, context as never)!);
+  expect(readAutoJoinLink(path, context as never)?.token).toBeUndefined();
+  expect(readPendingAutoJoin()?.token).toBe('gp:river stone');
+});

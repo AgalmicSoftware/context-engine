@@ -37,12 +37,18 @@ export const readGroupInviteFragment = (hash: string): string => {
   }
 };
 
+// The invite last taken out of the address, for its link's group, until an invitation holds it. The address
+// loses it before the session's Worker is known, so the invitation that forms for that group takes it from here.
+let heldInvite: { sessionSlug: string; groupId: string; token: string } | null = null;
+
 /** Takes the invite out of the address at once, leaving the rest of the fragment as it was. */
 export const removeGroupInviteFromAddress = () => {
-  const { hash } = window.location;
+  const { pathname, search, hash } = window.location;
   if (!fragmentSegments(hash).some((part) => part.startsWith(INVITE_FRAGMENT))) return;
+  const target = readLinkTarget(`${pathname}${search}`);
+  const token = readGroupInviteFragment(hash);
+  if (target && token) heldInvite = { sessionSlug: target.sessionSlug, groupId: target.groupId, token };
   const rest = fragmentSegments(hash).filter((part) => part && !part.startsWith(INVITE_FRAGMENT));
-  const { pathname, search } = window.location;
   window.history.replaceState(
     window.history.state,
     '',
@@ -92,6 +98,8 @@ export const readPendingAutoJoin = (): WorkerGroupAutoJoinIntent | null => {
 };
 
 export const savePendingAutoJoin = (intent: WorkerGroupAutoJoinIntent) => {
+  // Once an invitation holds the invite, the tab's storage keeps it instead.
+  if (heldInvite && intent.token === heldInvite.token) heldInvite = null;
   try {
     sessionStorage.setItem(AUTO_JOIN_STORAGE_KEY, JSON.stringify(intent));
   } catch {
@@ -110,7 +118,8 @@ export const clearPendingAutoJoin = (intent: WorkerGroupAutoJoinIntent) => {
   }
 };
 
-export const readAutoJoinLink = (path: string, context: Context): WorkerGroupAutoJoinIntent | null => {
+// The session and group a session link names, or null.
+const readLinkTarget = (path: string) => {
   try {
     const url = new URL(path, 'https://session.invalid');
     const prefix = buildPublicRoute('/session/');
@@ -119,6 +128,17 @@ export const readAutoJoinLink = (path: string, context: Context): WorkerGroupAut
     const sessionSlug = canonicalizeSessionSlug(rawSlug);
     const groupId = readWorkerGroupAutoJoinId(url.search);
     if (!sessionSlug || sessionSlug !== rawSlug || rawSlug.includes('/') || !groupId) return null;
+    return { url, sessionSlug, groupId };
+  } catch {
+    return null;
+  }
+};
+
+export const readAutoJoinLink = (path: string, context: Context): WorkerGroupAutoJoinIntent | null => {
+  const target = readLinkTarget(path);
+  if (!target) return null;
+  const { url, sessionSlug, groupId } = target;
+  try {
     const workers = url.searchParams.getAll('worker');
     if (workers.length > 1) return null;
     const matchingContext = context?.sessionSlug === sessionSlug ? context : null;
@@ -127,7 +147,8 @@ export const readAutoJoinLink = (path: string, context: Context): WorkerGroupAut
       matchingContext && parseSessionWorkerDiscoveryOrigin(matchingContext.workerUrl) === workerOrigin
         ? matchingContext.sessionId
         : undefined;
-    const token = readGroupInviteFragment(url.hash);
+    const held = heldInvite?.sessionSlug === sessionSlug && heldInvite.groupId === groupId ? heldInvite.token : '';
+    const token = readGroupInviteFragment(url.hash) || held;
     return {
       version: 1,
       sessionSlug,
