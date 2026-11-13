@@ -30313,7 +30313,7 @@ var init_workerGroupUrl = __esm({
 });
 
 // shared/interviewSettings.mjs
-var GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_NEVER, GROUP_SUGGESTION_DATA_KINDS, DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
+var GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_NEVER, GROUP_SUGGESTION_DATA_KINDS, DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, MAX_RECORDING_QUESTION_COUNT, RECORDING_QUESTION_TIMINGS, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
 var init_interviewSettings = __esm({
   "shared/interviewSettings.mjs"() {
     GROUP_SUGGESTION_DATA = Object.freeze({
@@ -30342,10 +30342,14 @@ var init_interviewSettings = __esm({
       joinMatchingGroups: false,
       groupSuggestionData: Object.freeze(["country", "work", "interests"]),
       showFidelityResults: false,
-      fidelityMinimumPeople: 5
+      fidelityMinimumPeople: 5,
+      recordingQuestionCount: 3,
+      recordingQuestionTiming: "end"
     });
     MAX_HIDDEN_DRAFT_SHARE = 0.5;
     MAX_FIDELITY_MINIMUM_PEOPLE = 50;
+    MAX_RECORDING_QUESTION_COUNT = 10;
+    RECORDING_QUESTION_TIMINGS = ["chunk", "end"];
     normalizeInterviewSettings = (value = {}) => {
       const source = value && typeof value === "object" ? value : {};
       return {
@@ -30380,7 +30384,10 @@ var init_interviewSettings = __esm({
         // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
         showFidelityResults: source.showFidelityResults === true,
         // That section hides figures from fewer people than this; 1 shows all.
-        fidelityMinimumPeople: Number.isInteger(source.fidelityMinimumPeople) ? Math.max(1, Math.min(MAX_FIDELITY_MINIMUM_PEOPLE, source.fidelityMinimumPeople)) : DEFAULT_INTERVIEW_SETTINGS.fidelityMinimumPeople
+        fidelityMinimumPeople: Number.isInteger(source.fidelityMinimumPeople) ? Math.max(1, Math.min(MAX_FIDELITY_MINIMUM_PEOPLE, source.fidelityMinimumPeople)) : DEFAULT_INTERVIEW_SETTINGS.fidelityMinimumPeople,
+        // The most questions a group recording drafts each time: once when the recording stops, or after every chunk.
+        recordingQuestionCount: Number.isInteger(source.recordingQuestionCount) ? Math.max(1, Math.min(MAX_RECORDING_QUESTION_COUNT, source.recordingQuestionCount)) : DEFAULT_INTERVIEW_SETTINGS.recordingQuestionCount,
+        recordingQuestionTiming: source.recordingQuestionTiming === "chunk" ? "chunk" : "end"
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -30398,6 +30405,10 @@ var init_interviewSettings = __esm({
       if (value.groupSuggestionData !== void 0 && (!Array.isArray(value.groupSuggestionData) || new Set(value.groupSuggestionData).size !== value.groupSuggestionData.length || value.groupSuggestionData.some((kind) => !GROUP_SUGGESTION_DATA_KINDS.includes(kind))))
         return false;
       if (value.fidelityMinimumPeople !== void 0 && (!Number.isInteger(value.fidelityMinimumPeople) || value.fidelityMinimumPeople < 1 || value.fidelityMinimumPeople > MAX_FIDELITY_MINIMUM_PEOPLE))
+        return false;
+      if (value.recordingQuestionCount !== void 0 && (!Number.isInteger(value.recordingQuestionCount) || value.recordingQuestionCount < 1 || value.recordingQuestionCount > MAX_RECORDING_QUESTION_COUNT))
+        return false;
+      if (value.recordingQuestionTiming !== void 0 && !RECORDING_QUESTION_TIMINGS.includes(value.recordingQuestionTiming))
         return false;
       return [
         "autoRegenerate",
