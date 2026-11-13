@@ -6,8 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
-- A session page has a collapsed **Feedback** section below Results, where anyone, signed in or not, can say what worked in the app and what didn't. It goes to the session's admins and is no part of answers, Results or exports. A message is anonymous unless **You may contact me** is ticked. The section shows only on a Session Worker running this release.
-- Settings has a **Feedback** section for full admins, to read the messages, download them as a CSV and delete them, and a **Feedback box** setting, on by default.
+- A session page has a collapsed **Feedback** section below Results, where anyone, signed in or not, can say what worked in the app and what didn't. It goes to the session's admins and is no part of answers, Results or exports. A message is anonymous unless **You may contact me** is ticked. The section shows only for a session a Worker runs, on a Session Worker running this release; an on-chain session has none.
+- Settings has a **Feedback** section for full admins, to read the messages, download them as a CSV and delete them, and a **Feedback box** setting, on by default. Reading takes no signature; deleting one message or all of them takes one.
 - Risk Matrix: the detail grid for two areas labels its columns and rows, has a key, frames every square (an empty one says "No notes"), shows each balance with an arrow and its note count, and its column and row headings highlight, with a **Clear** button.
 - Every Results view shows when it was made in the same place, top right: built views always show their **Version**, even with one build, and AI Views show when they were generated. AI Views' titles and its Breakdown interpretation are readable in the civic and classic themes.
 - The debate atlas is called **Debate Atlas** everywhere, beside **Build atlas**; its help describes what it shows, and the Results admins help says they can build the atlas, risk matrix and AI Views.
