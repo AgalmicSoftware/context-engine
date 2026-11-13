@@ -14,10 +14,11 @@ import { WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mj
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
+// Public URL, One-use URLs, Group Password and Admin adds members.
 export const WORKER_GROUP_JOIN_MODES = Object.freeze({
 	OPEN: 'open',
-	PASSWORD: 'password',
-	INVITE: 'invite',
+	ONE_USE: 'one_use',
+	GROUP_PASSWORD: 'group_password',
 	ADMIN_ADD: 'admin_add',
 });
 
@@ -46,7 +47,7 @@ export const DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
 export const MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
 const WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = 'fresh-template-v2';
 
-const IMPLEMENTED_JOIN_MODES = new Set([WORKER_GROUP_JOIN_MODES.OPEN, WORKER_GROUP_JOIN_MODES.ADMIN_ADD]);
+const JOIN_MODE_SET = new Set(Object.values(WORKER_GROUP_JOIN_MODES));
 
 export const normalizeWorkerGroupId = (value) => {
 	const normalized = trim(value).toLowerCase();
@@ -390,9 +391,6 @@ export const createWorkerGroupId = (deps = {}) => {
 const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps = {} } = {}) => {
 	const joinMode = normalizeJoinMode(input.joinMode || existing?.joinMode);
 	if (!joinMode) return { ok: false, status: 400, reason: 'invalid_join_mode' };
-	if (!IMPLEMENTED_JOIN_MODES.has(joinMode)) {
-		return { ok: false, status: 400, reason: 'join_mode_not_implemented' };
-	}
 	const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
 	if (!memberVisibility) return { ok: false, status: 400, reason: 'invalid_member_visibility' };
 	if (Object.prototype.hasOwnProperty.call(input, 'listed') && typeof input.listed !== 'boolean') {
@@ -1179,6 +1177,7 @@ export const listWorkerGroups = async ({
 		sessionId,
 		groupIds: groups.map((group) => group.groupId),
 		principal: admin ? undefined : actorPrincipalResult?.principal,
+		admin,
 	});
 	if (!catalog.ok) return normalizeWorkerGroupMembershipFailure(catalog);
 	const authorityByGroupId = new Map();
@@ -1190,7 +1189,7 @@ export const listWorkerGroups = async ({
 		if (
 			!groupId ||
 			authorityByGroupId.has(groupId) ||
-			!IMPLEMENTED_JOIN_MODES.has(joinMode) ||
+			!JOIN_MODE_SET.has(joinMode) ||
 			!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) ||
 			!Number.isSafeInteger(memberCount) ||
 			memberCount < 0
@@ -1203,6 +1202,7 @@ export const listWorkerGroups = async ({
 			listed: resolveWorkerGroupListed({ joinMode, memberVisibility, listed: authority?.listed }),
 			memberCount,
 			isMember: authority?.isMember === true,
+			...(admin && isObj(authority?.admin) ? { adminDetails: authority.admin } : {}),
 		});
 	}
 	// KV indexes are an eventually consistent projection. The Durable Object
@@ -1230,6 +1230,7 @@ export const listWorkerGroups = async ({
 		visible.push({
 			...redactGroupForMember(authoritativeGroup),
 			...(includeMemberCount ? { memberCount: authority.memberCount } : {}),
+			...(authority.adminDetails || {}),
 		});
 	}
 	return { ok: true, store: store.kind, groups: visible };
@@ -1321,7 +1322,7 @@ export const listWorkerGroupMembersForPrincipal = async ({
 	const memberCount = Number(authority?.memberCount);
 	if (
 		!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) ||
-		!IMPLEMENTED_JOIN_MODES.has(joinMode) ||
+		!JOIN_MODE_SET.has(joinMode) ||
 		!Number.isSafeInteger(memberCount) ||
 		memberCount < 0
 	) {
@@ -1378,7 +1379,7 @@ export const listWorkerGroupMemberships = async ({ env, slug, sessionId, princip
 		if (
 			!authoritativeGroupId ||
 			seenGroupIds.has(authoritativeGroupId) ||
-			!IMPLEMENTED_JOIN_MODES.has(authoritativeJoinMode) ||
+			!JOIN_MODE_SET.has(authoritativeJoinMode) ||
 			!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) ||
 			!Number.isSafeInteger(authoritativeMemberCount) ||
 			authoritativeMemberCount < 0
@@ -1590,7 +1591,7 @@ export const reconcileCoordinatedWorkerGroupCapacity = async ({ env, slug, sessi
 		path: '/worker-groups/reconcile-empty',
 	});
 
-export const readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds, principal } = {}) =>
+export const readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds, principal, admin = false } = {}) =>
 	callWorkerGroupCoordinator({
 		env,
 		slug,
@@ -1599,6 +1600,7 @@ export const readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, 
 		payload: {
 			groupIds,
 			...(principal ? { principal } : {}),
+			...(admin ? { admin: true } : {}),
 		},
 	});
 
@@ -1838,6 +1840,14 @@ export const dispatchPublicWorkerGroupListRequest = async ({ request, config, en
 	return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
 };
 
+// The admin actions on a group's one-use codes and password, by the coordinator operation each runs.
+const WORKER_GROUP_SECRET_ACTIONS = Object.freeze({
+	'groups/invites/add': 'invites-add',
+	'groups/invites/list': 'invites-list',
+	'groups/invites/revoke': 'invites-revoke',
+	'groups/password/set': 'password-set',
+});
+
 export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, expectedAuthority, headers, deps } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
 	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, headers);
@@ -1981,6 +1991,25 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 			200,
 			headers,
 		);
+	}
+	if (Object.hasOwn(WORKER_GROUP_SECRET_ACTIONS, action)) {
+		const result = await mutate({
+			expectedAuthority,
+			env,
+			slug,
+			sessionId: sessionIdentity.sessionId,
+			operation: WORKER_GROUP_SECRET_ACTIONS[action],
+			groupId: body?.groupId,
+			input: Object.fromEntries(
+				['hashes', 'expiresAt', 'cursor', 'limit', 'allUnused', 'signer']
+					.filter((key) => Object.hasOwn(body || {}, key))
+					.map((key) => [key, body[key]]),
+			),
+			actorPrincipal: actor.principal,
+		});
+		if (!result.ok) return routeError(deps, result, headers);
+		const { ok: _ok, status: _status, store: _store, ...answer } = result;
+		return jsonResponse(deps, { ok: true, ...sessionIdentity, ...answer }, 200, headers);
 	}
 	if (action === 'groups/list') {
 		const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({

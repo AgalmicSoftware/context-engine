@@ -1488,17 +1488,17 @@ test('worker groups ignore session-worker D1 bindings and keep KV authoritative'
 	}
 });
 
-test('worker groups reject deferred join modes and malformed principals fail closed', async () => {
+test('worker groups reject unknown join modes and malformed principals fail closed', async () => {
 	const env = { CE_WORKER_GROUPS_KV: createMockKv() };
 	const password = await createWorkerGroup({
 		env,
 		slug: 'session-a',
-		input: { label: 'Deferred join', joinMode: 'password' },
+		input: { label: 'Old mode name', joinMode: 'password' },
 		actorPrincipal: actor,
 		deps: { randomUUID: () => 'deferred' },
 	});
 	assert.equal(password.ok, false);
-	assert.equal(password.reason, 'join_mode_not_implemented');
+	assert.equal(password.reason, 'invalid_join_mode');
 
 	assert.deepEqual(normalizeWorkerGroupPrincipal({ kind: 'telegram', principalId: '' }), {
 		ok: false,
@@ -2809,7 +2809,7 @@ test('worker group deletion revokes membership checks', async () => {
 	assert.equal(afterDelete.reason, 'worker_group_not_found');
 });
 
-test('worker group updates keep join mode implementation fail-closed', async () => {
+test('worker group updates take the four join modes and refuse any other', async () => {
 	const env = { CE_WORKER_GROUPS_KV: createMockKv() };
 	await createWorkerGroup({
 		env,
@@ -2828,6 +2828,10 @@ test('worker group updates keep join mode implementation fail-closed', async () 
 	assert.equal(updated.group.label, 'Reviewers v2');
 	assert.equal(updated.group.memberVisibility, 'session');
 
+	for (const joinMode of ['one_use', 'group_password', 'open', 'admin_add']) {
+		const changed = await updateWorkerGroup({ env, slug: 'session-a', groupId: 'reviewers', input: { joinMode }, actorPrincipal: actor });
+		assert.equal(changed.group.joinMode, joinMode);
+	}
 	const invite = await updateWorkerGroup({
 		env,
 		slug: 'session-a',
@@ -2836,7 +2840,7 @@ test('worker group updates keep join mode implementation fail-closed', async () 
 		actorPrincipal: actor,
 	});
 	assert.equal(invite.ok, false);
-	assert.equal(invite.reason, 'join_mode_not_implemented');
+	assert.equal(invite.reason, 'invalid_join_mode');
 });
 
 test('leave and admin removal follow each group\'s removal setting, and every list reports it', async () => {

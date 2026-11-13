@@ -8,6 +8,14 @@ import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispa
 import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { createOperationQueue } from './operationQueue.js';
+import {
+  WORKER_GROUP_INVITE_LIST_MAX,
+  normalizeWorkerGroupInviteHashes,
+  normalizeWorkerGroupSigner,
+  workerGroupInviteCounts,
+  workerGroupInviteKey,
+  workerGroupInvitePrefix,
+} from './workerGroupInvites.js';
 import { WORKER_GROUP_MEMBER_CEILING_DEFAULT, WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mjs';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import {
@@ -353,11 +361,14 @@ const workerGroupBackupPendingKey = (mutation, reservation) =>
 const PENDING_WORKER_GROUP_OPERATIONS = Object.freeze({ creating: 'create', updating: 'update', deleting: 'delete' });
 const PENDING_WORKER_GROUP_MEMBER_OPERATIONS = Object.freeze({ reserved: 'add-member', removing: 'remove-member' });
 const WORKER_GROUP_MEMBER_MUTATIONS = new Set(['join', 'add-member', 'remove-member']);
+// An admin's changes to a group's one-use codes and password. They touch only
+// the coordinator's own storage, never KV.
+const WORKER_GROUP_SECRET_OPERATIONS = new Set(['invites-add', 'invites-list', 'invites-revoke', 'password-set']);
+const WORKER_GROUP_REVOKE_BATCH = 500;
 const NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION = Symbol('needsExclusiveWorkerGroupOperation');
 
 const DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = new Set([
   'invalid_join_mode',
-  'join_mode_not_implemented',
   'invalid_member_visibility',
   'invalid_group_listed',
   'invalid_removal_auth',
@@ -1995,6 +2006,14 @@ export class SessionWriteCoordinator {
           listed: resolveWorkerGroupListed(group.state),
           memberCount: Number(group.state.memberCount || 0),
           isMember,
+          // For admins only: whether a password is set and how many codes
+          // there are, never the password's signer or a code.
+          ...(payload?.admin === true ? {
+            admin: {
+              passwordSet: Boolean(group.state.signer),
+              ...(group.state.joinMode === 'one_use' ? { invites: workerGroupInviteCounts(group.state) } : {}),
+            },
+          } : {}),
         });
       }
       return jsonResponse({
@@ -2109,6 +2128,9 @@ export class SessionWriteCoordinator {
   }
 
   async executeWorkerGroupMutation(payload) {
+    if (WORKER_GROUP_SECRET_OPERATIONS.has(toTrimmedString(payload?.operation).toLowerCase())) {
+      return this.serializeWorkerGroupOperation(() => this.applyWorkerGroupSecretOperation(payload));
+    }
     if (WORKER_GROUP_MEMBER_MUTATIONS.has(toTrimmedString(payload?.operation).toLowerCase())) {
       const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || '';
       return this.runWorkerGroupMemberOperation(principalKey, (shared) => this.applyWorkerGroupMutation(payload, shared));
@@ -2290,6 +2312,133 @@ export class SessionWriteCoordinator {
     );
     if (!result.ok) return jsonResponse(result, result.status || 400);
     return this.respondToWorkerGroupMutation(mutation, result);
+  }
+
+  async applyWorkerGroupSecretOperation(payload) {
+    const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+    const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+    const groupId = normalizeWorkerGroupId(payload?.groupId);
+    const operation = toTrimmedString(payload?.operation).toLowerCase();
+    const input = isObjectRecord(payload?.input) ? payload.input : {};
+    const refuse = (status, reason) => jsonResponse({ ok: false, status, reason }, status);
+    if (!slug || !sessionId || !groupId) return refuse(400, 'worker_group_mutation_invalid');
+    const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
+    if (!initialized.ok) return jsonResponse(initialized, initialized.status || 503);
+    const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: [groupId] });
+    if (!settled.ok) return jsonResponse(settled, settled.status || 503);
+    const active = await this.getActiveWorkerGroupCapacity(groupId);
+    if (!active.ok) return jsonResponse(active, active.status || 404);
+    const groupKey = workerGroupCapacityGroupKey(groupId);
+    const nowIso = new Date(Number(this.now())).toISOString();
+    const needsMode = (joinMode) => active.state.joinMode === joinMode ? null : refuse(409, 'worker_group_join_mode_mismatch');
+
+    if (operation === 'password-set') {
+      const mismatch = needsMode('group_password');
+      if (mismatch) return mismatch;
+      const signer = normalizeWorkerGroupSigner(input.signer);
+      if (!signer) return refuse(400, 'invalid_group_password_signer');
+      // A new signer voids the old password at once; members who joined stay.
+      await this.state.storage.transaction(async (transaction) => {
+        const state = await transaction.get(groupKey);
+        await transaction.put(groupKey, { ...state, signer, signerSetAt: nowIso });
+      });
+      await bumpStorageBackupRevision(this.state.storage);
+      return jsonResponse({ ok: true, status: 200, groupId, passwordSet: true, signerSetAt: nowIso }, 200);
+    }
+
+    const mismatch = needsMode('one_use');
+    if (mismatch) return mismatch;
+    if (operation === 'invites-add') {
+      const hashes = normalizeWorkerGroupInviteHashes(input.hashes);
+      if (!hashes) return refuse(400, 'invalid_group_invites');
+      const expiresAtMs = input.expiresAt == null || input.expiresAt === '' ? null : Date.parse(input.expiresAt);
+      if (expiresAtMs !== null && !(Number.isFinite(expiresAtMs) && expiresAtMs > Number(this.now()))) {
+        return refuse(400, 'invalid_group_invite_expiry');
+      }
+      const result = await this.state.storage.transaction(async (transaction) => {
+        for (const hash of hashes) {
+          if (await transaction.get(workerGroupInviteKey(groupId, hash))) {
+            return { ok: false, status: 409, reason: 'worker_group_invite_exists' };
+          }
+        }
+        for (const hash of hashes) {
+          await transaction.put(workerGroupInviteKey(groupId, hash), {
+            state: 'unused',
+            createdAt: nowIso,
+            ...(expiresAtMs !== null ? { expiresAt: new Date(expiresAtMs).toISOString() } : {}),
+          });
+        }
+        const state = await transaction.get(groupKey);
+        const counts = workerGroupInviteCounts(state);
+        counts.unused += hashes.length;
+        await transaction.put(groupKey, { ...state, invites: counts });
+        return { ok: true, status: 200, groupId, added: hashes.length, counts };
+      });
+      if (result.ok) await bumpStorageBackupRevision(this.state.storage);
+      return jsonResponse(result, result.status);
+    }
+    if (operation === 'invites-list') {
+      const limit = input.limit == null ? 100 : Number(input.limit);
+      const cursor = input.cursor == null || input.cursor === '' ? '' : toTrimmedString(input.cursor).toLowerCase();
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > WORKER_GROUP_INVITE_LIST_MAX ||
+        (cursor && !/^[0-9a-f]{64}$/.test(cursor))) {
+        return refuse(400, 'worker_group_invite_page_invalid');
+      }
+      const prefix = workerGroupInvitePrefix(groupId);
+      const page = await this.state.storage.list({
+        prefix,
+        ...(cursor ? { startAfter: `${prefix}${cursor}` } : {}),
+        limit: limit + 1,
+      });
+      const entries = [...page].slice(0, limit);
+      const invites = entries.map(([key, record]) => ({
+        hash: key.slice(prefix.length),
+        state: record?.state,
+        createdAt: record?.createdAt,
+        ...(record?.expiresAt ? { expiresAt: record.expiresAt } : {}),
+        ...(record?.usedAt ? { usedAt: record.usedAt } : {}),
+      }));
+      return jsonResponse({
+        ok: true,
+        status: 200,
+        groupId,
+        invites,
+        ...(page.size > limit ? { cursor: invites[invites.length - 1].hash } : {}),
+        counts: workerGroupInviteCounts(active.state),
+      }, 200);
+    }
+    if (operation === 'invites-revoke') {
+      const all = input.allUnused === true;
+      const hashes = all ? null : normalizeWorkerGroupInviteHashes(input.hashes, { max: WORKER_GROUP_REVOKE_BATCH });
+      if (all === (input.hashes != null) || (!all && !hashes)) return refuse(400, 'invalid_group_invites');
+      const keys = all
+        ? [...(await this.state.storage.list({ prefix: workerGroupInvitePrefix(groupId) }))]
+          .filter(([, record]) => record?.state === 'unused').map(([key]) => key)
+        : hashes.map((hash) => workerGroupInviteKey(groupId, hash));
+      let revoked = 0;
+      let counts = workerGroupInviteCounts(active.state);
+      // In batches, so revoking thousands never builds one oversized transaction.
+      for (let start = 0; start < keys.length; start += WORKER_GROUP_REVOKE_BATCH) {
+        const batch = keys.slice(start, start + WORKER_GROUP_REVOKE_BATCH);
+        counts = await this.state.storage.transaction(async (transaction) => {
+          const state = await transaction.get(groupKey);
+          const next = workerGroupInviteCounts(state);
+          for (const key of batch) {
+            const record = await transaction.get(key);
+            if (record?.state !== 'unused') continue;
+            await transaction.put(key, { ...record, state: 'revoked', revokedAt: nowIso });
+            next.unused = Math.max(0, next.unused - 1);
+            next.revoked += 1;
+            revoked += 1;
+          }
+          await transaction.put(groupKey, { ...state, invites: next });
+          return next;
+        });
+      }
+      if (revoked) await bumpStorageBackupRevision(this.state.storage);
+      return jsonResponse({ ok: true, status: 200, groupId, revoked, counts }, 200);
+    }
+    return refuse(400, 'worker_group_mutation_invalid');
   }
 
   async respondToWorkerGroupMutation(mutation, result) {
