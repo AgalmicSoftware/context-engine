@@ -40,7 +40,11 @@ import {
 } from '../../../utilities/session/sessionWorkerDiscovery';
 import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/session/sessionWorkerConfigCache';
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
-import { readWorkerKeepsDraftText, readWorkerReleaseLabel } from '../../../domains/worker/workerRelease';
+import {
+  readWorkerKeepsDraftText,
+  readWorkerReleaseLabel,
+  readWorkerTakesFeedback,
+} from '../../../domains/worker/workerRelease';
 import { workerOffersGroupJoinChoices } from '@ce-shared/workerGroupJoin.mjs';
 import {
   applyTemplateToSessionSettingsDraft,
@@ -67,7 +71,8 @@ import {
 } from './sessionSettingsSave';
 import { SettingsAiSection } from './SettingsAiSection';
 import { SettingsChainFacts, SettingsChainFields } from './SettingsChainFields';
-import { SettingsQuestionListFields, SettingsSbtFields } from './SettingsListFields';
+import SettingsFeedbackPanel from './SettingsFeedbackPanel';
+import { SettingsFeedbackField, SettingsQuestionListFields, SettingsSbtFields } from './SettingsListFields';
 import SettingsResultsAdminsField from './SettingsResultsAdminsField';
 
 type SessionSettingsPageProps = {
@@ -217,15 +222,21 @@ const SessionSettingsPage = ({
   const [workerRelease, setWorkerRelease] = useState('');
   // Whether it keeps AI draft text for admins; null while unknown, which leaves the setting as it is.
   const [workerKeepsDraftText, setWorkerKeepsDraftText] = useState<boolean | null>(null);
+  // Whether it takes feedback about the app; an older one shows no Feedback section here or on the session page.
+  const [workerTakesFeedback, setWorkerTakesFeedback] = useState(false);
   useEffect(() => {
     let stale = false;
     setWorkerRelease('');
     setWorkerKeepsDraftText(null);
+    setWorkerTakesFeedback(false);
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
       if (!stale) setWorkerRelease(release);
     });
     void readWorkerKeepsDraftText(workerOrigin, sessionSlug, fetchImpl).then((keeps) => {
       if (!stale) setWorkerKeepsDraftText(keeps);
+    });
+    void readWorkerTakesFeedback(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
+      if (!stale) setWorkerTakesFeedback(takes);
     });
     return () => {
       stale = true;
@@ -646,6 +657,21 @@ const SessionSettingsPage = ({
             </p>
           }
         />
+        {!onChain && workerTakesFeedback ? (
+          <SettingsFeedbackPanel
+            admin={{
+              workerOrigin,
+              sessionSlug,
+              sessionIdHex: resolveWorkerCanonicalSessionIdHex(saved),
+              account,
+              provider,
+              chainId: Number(network?.id || 1) || 1,
+              ...(fetchImpl ? { fetchImpl } : {}),
+            }}
+          >
+            <SettingsFeedbackField draft={draft} onChange={updateDraft} />
+          </SettingsFeedbackPanel>
+        ) : null}
         <section className={styles.section} aria-labelledby="ce-settings-save-title" data-testid="ce-settings-save">
           <h2 id="ce-settings-save-title" className={styles.sectionTitle}>
             Save

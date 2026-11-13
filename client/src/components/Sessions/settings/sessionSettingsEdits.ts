@@ -135,6 +135,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     ai: clone(asRecord(source.ai)),
     sessionModeProfile: clone(source.sessionModeProfile ?? null),
     pileAutoAdvanceEnabled: resolvePileAutoAdvanceEnabled(source),
+    feedbackEnabled: source.feedbackEnabled !== false,
     defaultFilterState: formatFilterState(source.defaultFilterState),
     defaultSbtTags: text(source.defaultSbtTags),
     autoFeatureSBTsBySessionSlug: resolveSessionWizardAutoFeatureBySessionSlug(source) !== false,
@@ -297,6 +298,11 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
   if (draft.pileAutoAdvanceEnabled !== resolvePileAutoAdvanceEnabled(before)) {
     values.pileAutoAdvanceEnabled = draft.pileAutoAdvanceEnabled === true;
   }
+  // The Feedback box is on unless turned off. Only a changed choice is stored, so a Worker too old to
+  // know the setting, whose page never shows it, is sent nothing.
+  if (!onChain && (draft.feedbackEnabled !== false) !== (before.feedbackEnabled !== false)) {
+    values.feedbackEnabled = draft.feedbackEnabled !== false;
+  }
   // A cleared end time is sent as '' so the stored one goes; an unchanged one is left alone.
   if (trimmed(draft.sessionEndsAt) !== trimmed(before.sessionEndsAt)) {
     values.sessionEndsAt = normalizeSessionWizardEndsAt(draft.sessionEndsAt, { nowMs });
@@ -341,6 +347,7 @@ const unchanged = (key: string, before: unknown, after: unknown) => {
   if (key === 'resultsAdminAddresses') return same(storedResultsAdmins(before), after);
   // Voice interviews are on unless turned off.
   if (key === 'interviewModeEnabled') return (before !== false) === after;
+  if (key === 'feedbackEnabled') return (before !== false) === after;
   return same(before, after) || (isBlank(before) && isBlank(after));
 };
 
@@ -469,6 +476,7 @@ const LABELS: Record<string, string> = {
   sessionModeProfile: 'Access, results and hosting',
   storageProfile: 'Storage access',
   pileAutoAdvanceEnabled: 'Next question after an answer',
+  feedbackEnabled: 'Feedback box',
   defaultFilterState: 'Default filters',
   defaultSbtTags: 'SBT tags',
   autoFeatureSBTsBySessionSlug: 'Feature this session’s SBTs',

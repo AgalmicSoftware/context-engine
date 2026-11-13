@@ -1212,6 +1212,26 @@ addresses it took from chain defaults because the metadata could not be read,
 until you correct or confirm them. An on-chain session's questions are added on
 its session page, not from a template here.
 
+### Read feedback about the app
+
+A session page whose Session Worker is on 0.9.8 or later has a collapsed
+**Feedback** section below Results. Anyone, signed in or not, can use it to say
+what worked in the app and what didn't; the session's admins read it. It is
+about the app, not the session's subject: nothing sent is part of anyone's
+answers, Results, AI views, the Session Agent's reading or any export. A line
+under the box points ideas for everyone to the project's GitHub issues.
+
+Each message is up to 2,000 characters of plain text. With it go the part of the
+page that was open (never the page's address, which can carry invites), the
+theme, whether the screen was a phone, tablet or desktop, and the app's and the
+Worker's releases. Nothing names the sender unless they tick **You may contact
+me** and say how to reach them.
+
+A full admin reads the messages under **Feedback** on the session's settings
+page: **Show messages**, **Download CSV**, and **Delete** for one message or all
+those listed. The **Feedback box** setting there, on by default, takes the section off
+the session page; changing it signs no one out.
+
 ### Templates and share links
 
 **Export** downloads the draft as a `ce.session-template/v1` JSON file;

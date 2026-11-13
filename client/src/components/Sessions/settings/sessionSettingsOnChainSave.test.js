@@ -91,6 +91,15 @@ describe('editing an on-chain session', () => {
     mockReadWallet.mockResolvedValue({ address: ADMIN, chainId: 11155420 });
   });
 
+  it('keeps the Feedback box out of the metadata: only a Session Worker takes feedback', () => {
+    const { patch } = edit(registryConfig(), (draft) => {
+      draft.feedbackEnabled = false;
+      draft.sessionName = 'Renamed';
+    });
+    expect(patch).not.toHaveProperty('feedbackEnabled');
+    expect(patch.sessionName).toBe('Renamed');
+  });
+
   it('writes every edited field, chain-only ones included, into the new metadata', () => {
     const config = registryConfig();
     const { patch } = edit(config, (draft) => {
