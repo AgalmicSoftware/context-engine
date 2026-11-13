@@ -404,3 +404,25 @@ test('an agent key, even one minted for an admin, does not read feedback', async
     [403, 'Only the session’s admins can read feedback.', 'private, no-store']);
   assert.deepEqual(reached, []);
 });
+
+test('a signed-out send names its session with ?slug=, and a pinned Worker refuses another session', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('No network in this test.'); });
+  const { admin, env } = createSessionEnv();
+  const send = async (query) => readJson(await fetchWorker(makeRequest(`/feedback${query}`, { method: 'POST', body: SEND }), env));
+  const stored = async () => {
+    const token = await login({ env, wallet: admin });
+    return (await readJson(await fetchWorker(makeRequest(`/admin/feedback?slug=${SLUG}`, { token }), env))).body.messages.length;
+  };
+
+  // Pinned to its session: the same slug is taken, another is refused, not filed under this one.
+  assert.equal((await send(`?slug=${SLUG}`)).status, 200);
+  const other = await send('?slug=another-session');
+  assert.equal(other.status, 404, JSON.stringify(other.body));
+  assert.equal(await stored(), 1);
+
+  // Serving many sessions, the query alone names the session.
+  delete env.DEFAULT_SESSION_SLUG;
+  assert.deepEqual(await send(`?slug=${SLUG}`), { status: 200, body: { ok: true } });
+  assert.equal((await send('')).status, 400);
+  assert.equal(await stored(), 2);
+});

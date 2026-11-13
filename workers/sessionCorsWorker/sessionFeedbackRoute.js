@@ -5,6 +5,7 @@
 // Worker stamps its own release on it.
 import { callSessionConfigCoordinator, readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { workerRelease } from './workerCapabilities.js';
+import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 
 export const FEEDBACK_PATH = '/feedback';
 export const FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2000, reachMeChars: 200, nameChars: 80, bodyBytes: 8192 });
@@ -89,13 +90,34 @@ export const sendSessionFeedback = async ({
     : { status: 503, body: { error: 'Feedback couldn’t be saved just now. Try again shortly.', reason: 'feedback_unavailable' } };
 };
 
+const querySlugOf = (request) => {
+  try {
+    const params = new URL(request.url).searchParams;
+    return params.get('sessionSlug') ?? params.get('slug');
+  } catch {
+    return null;
+  }
+};
+
 /** A signed-out send: the session comes from ?slug=, and the daily limit counts the network. */
 export const dispatchAnonymousFeedbackRequest = async ({ request, env, slugHint, baseHeaders, deps, constants }) => {
-  const resolved = deps.resolveRequestSlugWithoutToken({ request, env, slugHint });
+  // The page names the session in the query; the resolver reads it from the header.
+  const querySlug = querySlugOf(request);
+  let slugRequest = request;
+  if (querySlug != null && !request.headers.has('x-session-slug')) {
+    const headers = new Headers(request.headers);
+    headers.set('x-session-slug', querySlug);
+    slugRequest = new Request(request.url, { headers });
+  }
+  const resolved = deps.resolveRequestSlugWithoutToken({ request: slugRequest, env, slugHint });
   if (!resolved?.ok || !resolved.explicitSlugProvided) {
     return deps.json({ error: resolved?.error || constants?.missingSlugError }, 400, baseHeaders);
   }
   const slug = resolved.slug;
+  // A Worker pinned to one session keeps it; feedback named for another is refused, not misfiled.
+  if (querySlug != null && normalizeWorkerSessionSlug(querySlug) !== slug) {
+    return deps.json({ error: constants?.sessionConfigNotFoundError }, 404, baseHeaders);
+  }
   let config;
   try {
     ({ config } = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug, cache: true }));
