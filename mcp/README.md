@@ -158,6 +158,11 @@ Any session link works as it is. An invitation made for a person's browser, such
 as one that opens an interview (`mode=interview`) or names a group
 (`joinGroup=<id>`), joins the same session: `join_session` names the group, and
 the agent joins it with `join_group` after reading the session's instructions.
+A link for a group joined by code or password carries the invite after `#`
+(`#groupInvite=…`); `join_group` uses it for that group while the server runs,
+and never shows or saves it. Without such a link, pass the code or password as
+`invite`. A password is never sent: the agent signs a join statement with a key
+derived from it.
 
 ## Tools
 
@@ -172,7 +177,7 @@ the agent joins it with `join_group` after reading the session's instructions.
 | `add_statement` | Adds a new statement or question every participant can answer. |
 | `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set. |
 | `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
-| `join_group` | Joins an open group by id in a hosted session. |
+| `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`, or the one its link carried). |
 | `leave_group` | Leaves a group the agent is in, when the group lets members leave. |
 | `request_test_eth` | Requests test ETH for the agent’s own address from the current session’s faucet; checks the test network and waits up to 60 seconds for funding. |
 | `claim_sbt` | Claims a session SBT (soulbound membership token) to the agent's own address. |

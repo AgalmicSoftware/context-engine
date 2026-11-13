@@ -17,6 +17,8 @@ import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
+import { createWorkerGroupPasswordKeys, parseGroupInviteToken } from '../../shared/workerGroupJoin.mjs';
+import { ethers } from 'ethers';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
 // The Session Worker shows these sessions' answers to every signed-in member.
@@ -234,6 +236,8 @@ const WHO_CAN_END_MEMBERSHIP = {
 };
 
 const GROUP_REFUSALS = {
+  worker_group_join_refused: (id) =>
+    `That link, invite or password didn’t work for group "${id}". Ask whoever invited you for a new one.`,
   worker_group_not_found: (id) => `This session has no group "${id}".`,
   worker_group_join_denied: (id) => `Group "${id}" isn’t open to joining; its admins add members.`,
   worker_group_join_ended: (id) => `Joining group "${id}" has closed.`,
@@ -247,6 +251,19 @@ const BUSY_GROUP_REASONS = new Set(['worker_group_coordination_unavailable', 'wo
 
 // A busy or unanswered change may still land later, so it says the agent's
 // membership is unconfirmed and that repeating the call is harmless.
+const groupPasswordKeys = createWorkerGroupPasswordKeys(ethers);
+
+// What a join to a group that isn't open carries: a one-use code as it is, or a
+// group password as a signature naming this session, group and agent. The
+// password itself is never sent.
+const groupJoinCredential = async ({ token, sessionId, groupId, address }) => {
+  const invite = parseGroupInviteToken(token);
+  if (!invite) throw new Error('That invite is neither a 32-character code nor a group password of at least 8 characters.');
+  if (invite.kind === 'invite') throw new Error('Invite codes aren’t supported yet; ask for a group password or a one-use link instead.');
+  if (invite.kind === 'one_use') return { secret: invite.secret };
+  return { proof: await groupPasswordKeys.signJoin({ password: invite.password, sessionId, groupId, address }) };
+};
+
 const groupRefusal = (error, id, tool) => {
   if (!(error instanceof WorkerRequestError)) return error;
   if (Object.hasOwn(GROUP_REFUSALS, error.code)) return new Error(GROUP_REFUSALS[error.code](id));
@@ -852,6 +869,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       } else {
         throw new Error('Pass a session link, or both worker and session.');
       }
+      // The link's group invite stays out of the session's info, which is remembered.
+      const groupInvite = parsed.groupInvite || '';
+      delete parsed.groupInvite;
       // Joining always starts a fresh client, so a session that changed identity can be joined again.
       sessions.delete(sessionKey(parsed));
       const ctx = await openSession(parsed);
@@ -865,6 +885,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         );
       }
       ctx.info.appOrigin = ctx.client.loginOrigin;
+      // Kept in memory for join_group only; never shown or saved.
+      if (groupInvite) ctx.groupInvites = new Map([[parsed.joinGroupId.toLowerCase(), groupInvite]]);
       const outcome = { ...sessionSummary(ctx, sessionConfig), address: wallet.address };
 
       // Like the web app, only SBTs the link marks for automatic claiming are claimed on join.
@@ -1241,14 +1263,19 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       };
     },
 
-    async joinGroup({ session, groupId } = {}) {
+    async joinGroup({ session, groupId, invite } = {}) {
       const ctx = await resolveSession(session);
       if (ctx.registry) throw new Error('Worker groups are not available in on-chain sessions.');
       await ensureReady(ctx);
       const id = trim(groupId);
       if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
+      // An invite passed here wins over the one the session link carried.
+      const token = trim(invite) || ctx.groupInvites?.get(id.toLowerCase()) || '';
+      const credential = token
+        ? await groupJoinCredential({ token, sessionId: ctx.client.sessionId, groupId: id.toLowerCase(), address: wallet.address })
+        : {};
       checkpoint();
-      await ctx.client.joinGroup(id, { signal }).catch((error) => {
+      await ctx.client.joinGroup(id, { signal, ...credential }).catch((error) => {
         throw groupRefusal(error, id, 'join_group');
       });
       return { session: ctx.info.slug, joinedGroup: id };

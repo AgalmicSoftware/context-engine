@@ -8,6 +8,7 @@ import { loadOrCreateWallet, updateAgentState } from './agentState.mjs';
 import { createParticipant } from './participant.mjs';
 import { buildTools } from './tools.mjs';
 import { createMcpServer } from './mcpServer.mjs';
+import { createWorkerGroupPasswordKeys, workerGroupJoinStatement } from '../../shared/workerGroupJoin.mjs';
 
 // What an agent in a large session meets: its questions come back at once,
 // whatever its own-answer lookup is doing, and none are silently left out.
@@ -16,7 +17,7 @@ const { slug, sessionId, corsWorkerUrl } = fixture.config;
 const GROUP_ID = 'e478b073-5b03-4ba3-9cb0-d31977f61af4';
 const questionId = (index) => `0x${(index + 1).toString(16).padStart(64, '0')}`;
 
-const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplete: true }), keyMadeHere = false, now, config = fixture.config, everyone, seedState, groupLabel = 'AI agents', uploads = false, waitMs = 50, onJoin, profile = {} } = {}) => {
+const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplete: true }), keyMadeHere = false, now, config = fixture.config, everyone, seedState, groupLabel = 'AI agents', uploads = false, waitMs = 50, onJoin, profile = {}, linkSuffix = '' } = {}) => {
   const stateDir = await mkdtemp(join(tmpdir(), 'ce-agent-list-'));
   t.after(() => rm(stateDir, { recursive: true, force: true }));
   // A key made with this state marks it; a key from elsewhere does not.
@@ -38,7 +39,7 @@ const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplet
       return Response.json({ groups: [{ groupId: GROUP_ID, label: groupLabel, joinMode: 'open', memberCount: 0 }] });
     }
     if (path === '/groups/my-memberships') return Response.json({ memberships: [] });
-    if (path === '/groups/join' && onJoin) return onJoin();
+    if (path === '/groups/join' && onJoin) return onJoin(JSON.parse(init.body));
     if (path === '/storage/read') return Response.json(payloads.get(url.searchParams.get('id')));
     if (path === '/storage/list' && url.searchParams.get('resource') === 'questions') {
       return Response.json({ items: [...payloads.keys()].map((id, index) => ({
@@ -66,7 +67,7 @@ const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplet
     ...(now ? { now } : {}),
     ownAnswerWaitMs: waitMs,
   });
-  const joined = await participant.joinSession({ link: `https://contextengine.sh/session/${slug}?joinGroup=${GROUP_ID}&worker=${encodeURIComponent(corsWorkerUrl)}` });
+  const joined = await participant.joinSession({ link: `https://contextengine.sh/session/${slug}?joinGroup=${GROUP_ID}&worker=${encodeURIComponent(corsWorkerUrl)}${linkSuffix}` });
   return { participant, calls, joined, payloads };
 };
 
@@ -296,6 +297,54 @@ test('a join still busy after its retries says the agent is not in the group and
   assert.equal(joins, 4);
   assert.match(reply.result.content[0].text,
     new RegExp(`too busy to confirm that you joined group "${GROUP_ID}", so you may not be in it yet\\. Wait a few seconds and call join_group again: repeating it is harmless`));
+});
+
+const joinedGroup = (sent) => (body) => {
+  sent.push(body);
+  return Response.json({ ok: true, group: { groupId: GROUP_ID }, memberCount: 1 });
+};
+
+test('a link’s one-use code goes with the join to its group, and is never shown', async (t) => {
+  const code = 'c0'.repeat(16);
+  const sent = [];
+  const { participant, joined } = await setup(t, { onJoin: joinedGroup(sent), linkSuffix: `#groupInvite=${code}` });
+  assert.equal(JSON.stringify(joined).includes(code), false);
+  assert.equal((await callTool(participant, 'join_group', { groupId: GROUP_ID })).result.isError, undefined);
+  assert.deepEqual(sent[0], { sessionId: sessionId.toLowerCase(), groupId: GROUP_ID, secret: code });
+  // A code passed to join_group wins over the link's.
+  await callTool(participant, 'join_group', { groupId: GROUP_ID, invite: 'D1'.repeat(16) });
+  assert.equal(sent[1].secret, 'd1'.repeat(16));
+});
+
+test('a group password joins as a signature by the password’s key, never as the password', async (t) => {
+  const password = 'correct horse battery';
+  const sent = [];
+  const { participant } = await setup(t, { onJoin: joinedGroup(sent), linkSuffix: `#groupInvite=${encodeURIComponent(`gp:${password}`)}` });
+  // The Worker reads group ids in lower case, so the signature does too.
+  await callTool(participant, 'join_group', { groupId: GROUP_ID.toUpperCase() });
+  const [body] = sent;
+  assert.equal(body.secret, undefined);
+  assert.equal(JSON.stringify(body).includes(password), false);
+  const { address } = await participant.whoami();
+  const keys = createWorkerGroupPasswordKeys(ethers);
+  const signer = await keys.signerOf({ password, sessionId: body.sessionId, groupId: GROUP_ID });
+  const statement = workerGroupJoinStatement({ sessionId: body.sessionId, groupId: GROUP_ID, address });
+  assert.equal(ethers.utils.verifyMessage(statement, body.proof), signer);
+});
+
+test('a refused or unusable invite says what to do', async (t) => {
+  const sent = [];
+  const { participant } = await setup(t, { onJoin: (body) => {
+    sent.push(body);
+    return Response.json({ error: 'Worker group request failed.', reason: 'worker_group_join_refused' }, { status: 403 });
+  } });
+  const refused = await callTool(participant, 'join_group', { groupId: GROUP_ID, invite: 'ab'.repeat(16) });
+  assert.match(refused.result.content[0].text, new RegExp(`didn’t work for group "${GROUP_ID}"\\. Ask whoever invited you for a new one`));
+  for (const [invite, says] of [['inv:abc', /aren’t supported yet/], ['short', /neither a 32-character code nor a group password/]]) {
+    const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID, invite });
+    assert.match(reply.result.content[0].text, says);
+  }
+  assert.equal(sent.length, 1);
 });
 
 test('a join with no answer says it may not have gone through and how to check', async (t) => {
