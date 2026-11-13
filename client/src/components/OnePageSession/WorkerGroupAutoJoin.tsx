@@ -19,8 +19,10 @@ import {
 import {
   BUSY_WORKER_GROUP_JOIN_MESSAGE,
   isBusyWorkerGroupError,
+  isRefusedWorkerGroupError,
   REFUSED_WORKER_GROUP_JOIN_MESSAGE,
 } from '../../domains/worker/workerGroupBusy';
+import { workerOffersGroupJoinChoices } from '@ce-shared/workerGroupJoin.mjs';
 import WorkerGroupAutoJoinNotice from './WorkerGroupAutoJoinNotice';
 import WorkerGroupCodeField from './WorkerGroupCodeField';
 import styles from './WorkerGroupAutoJoinNotice.module.scss';
@@ -127,7 +129,13 @@ function AutoJoinIntent({
     };
     cancelRef.current = stop;
     const fail = (error: unknown) => {
-      if (active) setProgress({ phase: 'error', message: autoJoinErrorMessage(error) });
+      if (!active) return;
+      // A refused invite leaves the tab, so a reload doesn't spend another of this person's guesses on it.
+      if (isRefusedWorkerGroupError(error)) {
+        const { token: _refused, ...withoutToken } = intent;
+        savePendingAutoJoin({ ...withoutToken, sessionId });
+      }
+      setProgress({ phase: 'error', message: autoJoinErrorMessage(error) });
     };
     const complete = (message: string) => {
       if (!active) return;
@@ -172,6 +180,8 @@ function AutoJoinIntent({
           return;
         }
         if (group?.joinMode === 'admin_add') throw new Error('This group is not open for joining.');
+        // Without join choices every group is listed, so a missing one is gone.
+        if (!group && !workerOffersGroupJoinChoices(configRef.current)) throw new Error('worker_group_not_found');
         if (!token) {
           setProgress({ phase: 'code', message: NEEDS_CODE_MESSAGE });
           return;
@@ -242,7 +252,9 @@ function AutoJoinIntent({
   const refused = progress.phase === 'error' && progress.message === REFUSED_WORKER_GROUP_JOIN_MESSAGE;
   const asksCode =
     (ready && (progress.phase === 'code' || refused)) ||
-    (!ready && !token && (publicGroup === 'secret' || publicGroup === 'absent'));
+    (!ready &&
+      !token &&
+      (publicGroup === 'secret' || (publicGroup === 'absent' && workerOffersGroupJoinChoices(props.sessionConfig))));
   const joinExplicitly = () => {
     clearWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId });
     finishedRef.current = false;

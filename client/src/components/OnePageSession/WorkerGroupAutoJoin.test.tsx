@@ -40,6 +40,7 @@ const config = {
   sessionIdHex: sessionId,
   corsWorkerUrl: 'https://worker.example',
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  groupJoinChoices: true,
 };
 const props = {
   sessionConfig: config,
@@ -415,6 +416,17 @@ describe('WorkerGroupAutoJoin', () => {
     expect(joins()).toHaveLength(0);
   });
 
+  it('says a missing group is unavailable on a Worker without join choices', async () => {
+    fetchMock.mockImplementation(async (url: RequestInfo | URL) =>
+      response(String(url).includes('/my-memberships') ? { memberships: [] } : { groups: [] }),
+    );
+    render(<WorkerGroupAutoJoin {...props} sessionConfig={{ ...config, groupJoinChoices: undefined }} />);
+    await tick();
+    expect(screen.getByRole('alert')).toHaveTextContent('This group is unavailable in this session.');
+    expect(screen.queryByLabelText(/Group password or claim code for/)).not.toBeInTheDocument();
+    expect(joins()).toHaveLength(0);
+  });
+
   describe('a group that needs a password or claim code', () => {
     const secretGroup = { ...group, joinMode: 'group_password', listed: false };
     const listing = (groups: unknown[]) =>
@@ -490,6 +502,10 @@ describe('WorkerGroupAutoJoin', () => {
       );
       expect(screen.getByLabelText(/Group password or claim code for/)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+      // The refused code leaves the tab, so a reload doesn't send it again.
+      const kept = JSON.parse(sessionStorage.getItem(AUTO_JOIN_STORAGE_KEY) || '{}');
+      expect(kept.groupId).toBe(secretGroup.groupId);
+      expect(kept).not.toHaveProperty('token');
     });
   });
 
