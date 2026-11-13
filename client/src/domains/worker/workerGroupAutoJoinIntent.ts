@@ -16,6 +16,38 @@ export type WorkerGroupAutoJoinIntent = {
   workerOrigin: string;
   sessionId?: string;
   createdAt: number;
+  /** The group password or one-use claim code the link carried in its fragment; it stays in this tab. */
+  token?: string;
+};
+
+// A link's secret rides in `#groupInvite=`, which browsers never send to a server.
+const INVITE_FRAGMENT = 'groupInvite=';
+const MAX_TOKEN_LENGTH = 2000;
+const fragmentSegments = (hash: string) => hash.replace(/^#/, '').split('&');
+
+/** The fragment's group invite token, '' without one. */
+export const readGroupInviteFragment = (hash: string): string => {
+  const segment = fragmentSegments(hash).find((part) => part.startsWith(INVITE_FRAGMENT));
+  if (!segment) return '';
+  try {
+    const token = decodeURIComponent(segment.slice(INVITE_FRAGMENT.length)).trim();
+    return token.length <= MAX_TOKEN_LENGTH ? token : '';
+  } catch {
+    return '';
+  }
+};
+
+/** Takes the invite out of the address at once, leaving the rest of the fragment as it was. */
+export const removeGroupInviteFromAddress = () => {
+  const { hash } = window.location;
+  if (!fragmentSegments(hash).some((part) => part.startsWith(INVITE_FRAGMENT))) return;
+  const rest = fragmentSegments(hash).filter((part) => part && !part.startsWith(INVITE_FRAGMENT));
+  const { pathname, search } = window.location;
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${pathname}${search}${rest.length ? `#${rest.join('&')}` : ''}`,
+  );
 };
 type Context = ReturnType<typeof resolveWorkerGroupAutoJoinContext>;
 
@@ -36,6 +68,7 @@ export const readPendingAutoJoin = (): WorkerGroupAutoJoinIntent | null => {
       readWorkerGroupAutoJoinId(`?joinGroup=${encodeURIComponent(value.groupId)}`) !== value.groupId ||
       parseSessionWorkerDiscoveryOrigin(value.workerOrigin) !== value.workerOrigin ||
       (value.sessionId !== undefined && !/^0x[0-9a-f]{32}$/i.test(value.sessionId)) ||
+      (value.token !== undefined && (typeof value.token !== 'string' || value.token.length > MAX_TOKEN_LENGTH)) ||
       !Number.isFinite(value.createdAt) ||
       value.createdAt > Date.now() ||
       Date.now() - value.createdAt >= AUTO_JOIN_MAX_AGE_MS
@@ -43,7 +76,7 @@ export const readPendingAutoJoin = (): WorkerGroupAutoJoinIntent | null => {
       sessionStorage.removeItem(AUTO_JOIN_STORAGE_KEY);
       return null;
     }
-    // Persist only the destination, never credentials or a cached config.
+    // Persist only the destination and the link's own invite, never credentials or a cached config.
     return {
       version: 1,
       sessionSlug: value.sessionSlug,
@@ -51,6 +84,7 @@ export const readPendingAutoJoin = (): WorkerGroupAutoJoinIntent | null => {
       workerOrigin: value.workerOrigin,
       sessionId: value.sessionId,
       createdAt: value.createdAt,
+      ...(value.token ? { token: value.token } : {}),
     };
   } catch {
     return null;
@@ -93,7 +127,16 @@ export const readAutoJoinLink = (path: string, context: Context): WorkerGroupAut
       matchingContext && parseSessionWorkerDiscoveryOrigin(matchingContext.workerUrl) === workerOrigin
         ? matchingContext.sessionId
         : undefined;
-    return { version: 1, sessionSlug, groupId, workerOrigin, sessionId, createdAt: Date.now() };
+    const token = readGroupInviteFragment(url.hash);
+    return {
+      version: 1,
+      sessionSlug,
+      groupId,
+      workerOrigin,
+      sessionId,
+      createdAt: Date.now(),
+      ...(token ? { token } : {}),
+    };
   } catch {
     return null;
   }

@@ -16,6 +16,12 @@ import {
   updateWorkerGroup,
   workerGroupAdminsMayRemove,
   workerGroupMembersMayLeave,
+  addWorkerGroupInvites,
+  isWorkerGroupListed,
+  listWorkerGroupInvites,
+  revokeWorkerGroupInvites,
+  setWorkerGroupPassword,
+  workerGroupNeedsSecret,
 } from './workerGroupPorts';
 import * as workerAuth from '../../utilities/worker/workerAuth.js';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../utilities/worker/coordinatorRetry';
@@ -1291,5 +1297,126 @@ describe('worker group ports', () => {
       }),
     ).rejects.toMatchObject({ message: 'worker_group_expected_session_identity_missing' });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  describe('join choices', () => {
+    const base = { groupId: 'salon', sessionSlug: SESSION_SLUG, label: 'Salon', memberVisibility: 'members' };
+    const signed = (data: Record<string, unknown>) =>
+      jest.fn(async (_request: { action?: string; path?: string; body?: unknown }) => ({
+        data: { ok: true, sessionId: SESSION_ID, sessionSlug: SESSION_SLUG, ...data },
+      }));
+
+    it('reads every join choice, whether a group is listed, admin counts and a limit up to 10,000', () => {
+      const groups = normalizeWorkerGroupsAdminPayload(
+        {
+          groups: [
+            { ...base, joinMode: 'one_use', listed: false, invites: { unused: 3, used: 1, revoked: 0 } },
+            { ...base, groupId: 'pw', joinMode: 'group_password', passwordSet: true, guessLimited: true },
+            { ...base, groupId: 'big', joinMode: 'open', memberLimit: 10000 },
+            { ...base, groupId: 'too-big', joinMode: 'open', memberLimit: 10001 },
+            { ...base, groupId: 'odd', joinMode: 'code' },
+            { ...base, groupId: 'bad-listed', joinMode: 'open', listed: 'no' },
+          ],
+        },
+        SESSION_SLUG,
+      );
+      expect(groups.map((group) => group.groupId)).toEqual(['salon', 'pw', 'big']);
+      expect(groups[0]).toMatchObject({ listed: false, invites: { unused: 3, used: 1, revoked: 0 } });
+      expect(groups[1]).toMatchObject({ passwordSet: true, guessLimited: true });
+      expect(groups[2].memberLimit).toBe(10000);
+      expect(isWorkerGroupListed(groups[0])).toBe(false);
+      // A record without the setting, and every Public URL group, is listed.
+      expect(isWorkerGroupListed(groups[1])).toBe(true);
+      expect(isWorkerGroupListed({ joinMode: 'open', listed: false })).toBe(true);
+      expect(groups.map(workerGroupNeedsSecret)).toEqual([true, true, false]);
+    });
+
+    it('sends a join’s claim code or password proof, and nothing when there is none', async () => {
+      const fetchImpl = jest.fn(
+        async (_input?: RequestInfo | URL, _init?: RequestInit) =>
+          new Response(
+            JSON.stringify({
+              ok: true,
+              sessionId: SESSION_ID,
+              sessionSlug: SESSION_SLUG,
+              group: { ...base, joinMode: 'one_use' },
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+      );
+      const request = {
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        groupId: 'salon',
+        fetchImpl,
+      };
+      await joinWorkerGroup({ ...request, secret: 'abcdef0123456789abcdef0123456789' });
+      await joinWorkerGroup({ ...request, proof: '0xproof' });
+      await joinWorkerGroup(request);
+      const bodies = fetchImpl.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+      expect(bodies[0]).toMatchObject({ groupId: 'salon', secret: 'abcdef0123456789abcdef0123456789' });
+      expect(bodies[1]).toMatchObject({ groupId: 'salon', proof: '0xproof' });
+      expect(bodies[2]).not.toHaveProperty('secret');
+      expect(bodies[2]).not.toHaveProperty('proof');
+    });
+
+    it('binds invites and the password to their signed admin actions, without a secret', async () => {
+      const counts = { unused: 2, used: 0, revoked: 1 };
+      const request = { groupId: 'salon', sessionId: SESSION_ID, sessionSlug: SESSION_SLUG };
+      const add = signed({ added: 2, invites: counts });
+      await expect(
+        addWorkerGroupInvites({
+          ...request,
+          hashes: ['a'.repeat(64)],
+          expiresAt: '2026-11-30T00:00:00.000Z',
+          postSignedRequest: add,
+        }),
+      ).resolves.toEqual({ added: 2, invites: counts });
+      expect(add).toHaveBeenCalledWith({
+        action: 'groups/invites/add',
+        path: '/admin/groups/invites/add',
+        body: {
+          groupId: 'salon',
+          hashes: ['a'.repeat(64)],
+          expiresAt: '2026-11-30T00:00:00.000Z',
+          sessionId: SESSION_ID,
+        },
+      });
+
+      const list = signed({
+        invites: [
+          { id: 'abcd1234', state: 'used', usedAt: '2026-11-20T10:00:00.000Z' },
+          { id: 'not hex', state: 'unused' },
+          { id: 'ef567890', state: 'lost' },
+        ],
+        counts,
+        cursor: 'next',
+      });
+      await expect(listWorkerGroupInvites({ ...request, postSignedRequest: list })).resolves.toEqual({
+        invites: [{ id: 'abcd1234', state: 'used', usedAt: '2026-11-20T10:00:00.000Z' }],
+        counts,
+        cursor: 'next',
+      });
+
+      const revoke = signed({ revoked: 1, counts });
+      await revokeWorkerGroupInvites({ ...request, ids: 'allUnused', postSignedRequest: revoke });
+      await revokeWorkerGroupInvites({ ...request, ids: ['abcd1234'], postSignedRequest: revoke });
+      expect(revoke.mock.calls.map(([request]) => request.body)).toEqual([
+        { groupId: 'salon', allUnused: true, sessionId: SESSION_ID },
+        { groupId: 'salon', ids: ['abcd1234'], sessionId: SESSION_ID },
+      ]);
+
+      const password = signed({ group: { ...base, joinMode: 'group_password', passwordSet: true } });
+      const signer = '0x0000000000000000000000000000000000000002';
+      const saved = await setWorkerGroupPassword({ ...request, signer, postSignedRequest: password });
+      expect(saved.group.passwordSet).toBe(true);
+      expect(password).toHaveBeenCalledWith({
+        action: 'groups/password/set',
+        path: '/admin/groups/password/set',
+        body: { groupId: 'salon', signer, sessionId: SESSION_ID },
+      });
+    });
   });
 });

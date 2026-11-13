@@ -7,6 +7,7 @@ import {
   loadAutoJoinSessionConfig,
   readAutoJoinLink,
   readPendingAutoJoin,
+  removeGroupInviteFromAddress,
   savePendingAutoJoin,
   type WorkerGroupAutoJoinIntent,
 } from '../../domains/worker/workerGroupAutoJoinIntent';
@@ -17,6 +18,7 @@ import {
 } from '../../domains/worker/workerGroupAutoJoinPreference';
 import { BUSY_WORKER_GROUP_JOIN_MESSAGE, isBusyWorkerGroupError } from '../../domains/worker/workerGroupBusy';
 import WorkerGroupAutoJoinNotice from './WorkerGroupAutoJoinNotice';
+import WorkerGroupCodeField from './WorkerGroupCodeField';
 import styles from './WorkerGroupAutoJoinNotice.module.scss';
 
 export type WorkerGroupAutoJoinProps = {
@@ -29,19 +31,26 @@ export type WorkerGroupAutoJoinProps = {
 };
 type Props = WorkerGroupAutoJoinProps;
 type Context = NonNullable<ReturnType<typeof resolveWorkerGroupAutoJoinContext>>;
-type Progress = { phase: 'loading' | 'joining' | 'done' | 'cancelled' | 'error'; message: string };
+// 'code': signed in, and the group needs a password or claim code this tab doesn't hold.
+type Progress = { phase: 'loading' | 'joining' | 'done' | 'cancelled' | 'error' | 'code'; message: string };
+// What public discovery said of the group before sign-in: an unlisted group isn't there.
+type PublicGroup = 'unknown' | 'open' | 'secret' | 'absent';
+
+export const REFUSED_JOIN_MESSAGE = 'That link, invite or password didn’t work. Ask whoever invited you for a new one.';
+const NEEDS_CODE_MESSAGE = 'Enter the group password or claim code from your invitation.';
 
 const subscribeLocation = (notify: () => void) => {
   window.addEventListener('popstate', notify);
   return () => window.removeEventListener('popstate', notify);
 };
-const readLocation = () => `${window.location.pathname}${window.location.search}`;
+const readLocation = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
 const autoJoinErrorMessage = (error: unknown): string => {
   if (isBusyWorkerGroupError(error)) return BUSY_WORKER_GROUP_JOIN_MESSAGE;
   const reason = error instanceof Error ? error.message : '';
   if (reason === 'worker_group_member_cap_exceeded' || reason === 'worker_group_session_cap_exceeded')
     return 'This group has reached its member limit.';
   if (reason === 'worker_group_join_ended') return 'The joining deadline for this group has passed.';
+  if (reason === 'worker_group_join_refused') return REFUSED_JOIN_MESSAGE;
   if (reason === 'worker_group_join_denied') return 'This group is not open for joining.';
   if (reason === 'worker_group_not_found') return 'This group is unavailable in this session.';
   return reason.startsWith('worker_group_') || !reason
@@ -67,6 +76,9 @@ function AutoJoinIntent({
   const [groupLabel, setGroupLabel] = useState(groupId);
   const [retry, setRetry] = useState(0);
   const [progress, setProgress] = useState<Progress>({ phase: 'loading', message: 'Preparing to join group…' });
+  // The link's invite, or one the person typed; it stays in this tab.
+  const [token, setToken] = useState(intent.token || '');
+  const [publicGroup, setPublicGroup] = useState<PublicGroup>('unknown');
 
   useEffect(() => {
     if (ready || finishedRef.current) return undefined;
@@ -76,7 +88,11 @@ function AutoJoinIntent({
         if (!active) return;
         const groups = await loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug, joinGroup: groupId });
         const group = groups.find((candidate) => candidate.groupId === groupId);
-        if (active && group) setGroupLabel(group.label);
+        if (!active) return;
+        if (group) setGroupLabel(group.label);
+        // An unlisted group keeps its name until its member signs in.
+        else setGroupLabel('Group invitation');
+        setPublicGroup(!group ? 'absent' : group.joinMode === 'open' ? 'open' : 'secret');
       })
       .catch(() => {
         // An unavailable public label must not block sign-in. Use the group ID
@@ -141,15 +157,32 @@ function AutoJoinIntent({
           complete('');
           return;
         }
+        // An unlisted group shows only to its members, so with an invite it is joined without being listed.
         const group = overview.groups.find((candidate) => candidate.groupId === groupId);
-        if (!group) throw new Error('This group is unavailable in this session.');
-        setGroupLabel(group.label);
-        if (!canAutoJoinWorkerGroup(group)) throw new Error('This group is not open for joining.');
-        // The interview's Groups section can untick the link's group while sign-in is under way.
+        if (group) setGroupLabel(group.label);
+        if (group?.joinMode === 'open') {
+          if (!canAutoJoinWorkerGroup(group)) throw new Error('This group is not open for joining.');
+          if (consumeCancellation()) return;
+          setProgress({ phase: 'joining', message: `Joining ${group.label}…` });
+          await joinWorkerGroup({ ...request, groupId });
+          complete(`Joined ${group.label}.`);
+          return;
+        }
+        if (group?.joinMode === 'admin_add') throw new Error('This group is not open for joining.');
+        if (!token) {
+          setProgress({ phase: 'code', message: NEEDS_CODE_MESSAGE });
+          return;
+        }
         if (consumeCancellation()) return;
-        setProgress({ phase: 'joining', message: `Joining ${group.label}…` });
-        await joinWorkerGroup({ ...request, groupId });
-        complete(`Joined ${group.label}.`);
+        setProgress({ phase: 'joining', message: group ? `Joining ${group.label}…` : 'Joining the group…' });
+        const { buildWorkerGroupJoinCredentials } = await import('../../domains/worker/workerGroupSecrets');
+        const credentials = await buildWorkerGroupJoinCredentials({ token, sessionId, groupId, address: account });
+        if (!active) return;
+        if (!credentials) throw new Error('worker_group_join_refused');
+        const joined = await joinWorkerGroup({ ...request, groupId, ...credentials });
+        const label = String((joined.group as { label?: unknown } | undefined)?.label || group?.label || '');
+        if (label) setGroupLabel(label);
+        complete(label ? `Joined ${label}.` : 'Joined the group.');
       } catch (error) {
         fail(error);
       }
@@ -170,6 +203,7 @@ function AutoJoinIntent({
     intent,
     onConsumed,
     consumeCancellation,
+    token,
   ]);
 
   useEffect(() => {
@@ -192,6 +226,20 @@ function AutoJoinIntent({
   };
   const cancelled = progress.phase === 'cancelled';
   const done = progress.phase === 'done' || cancelled;
+  // A typed code is kept like a link's, so a sign-in that reloads the page still has it.
+  const submitCode = (code: string) => {
+    setToken(code);
+    savePendingAutoJoin({ ...intent, sessionId, token: code });
+    if (ready) {
+      finishedRef.current = false;
+      setProgress({ phase: 'loading', message: 'Preparing to join group…' });
+      setRetry((value) => value + 1);
+    }
+  };
+  const refused = progress.phase === 'error' && progress.message === REFUSED_JOIN_MESSAGE;
+  const asksCode =
+    (ready && (progress.phase === 'code' || refused)) ||
+    (!ready && !token && (publicGroup === 'secret' || publicGroup === 'absent'));
   const joinExplicitly = () => {
     clearWorkerGroupAutoJoinCancellation({ workerUrl, sessionSlug, sessionId, groupId });
     finishedRef.current = false;
@@ -206,9 +254,18 @@ function AutoJoinIntent({
       // Only a join waiting for sign-in moves into the interview's Groups section; joining and its outcome show here.
       groupId={!ready && !done ? groupId : undefined}
       groupLabel={!ready && !done ? groupLabel : undefined}
-      message={!ready && !done ? 'Will be joined upon sign-in' : progress.message}
+      message={!ready && !done ? (asksCode ? NEEDS_CODE_MESSAGE : 'Will be joined upon sign-in') : progress.message}
       isError={progress.phase === 'error'}
     >
+      {asksCode && !done ? (
+        <WorkerGroupCodeField
+          groupLabel={groupLabel}
+          formClassName={styles.codeForm}
+          inputClassName={styles.codeInput}
+          buttonClassName={styles.secondaryButton}
+          onSubmit={submitCode}
+        />
+      ) : null}
       {cancelled ? (
         <button type="button" className={styles.secondaryButton} onClick={joinExplicitly}>
           Join {groupLabel}
@@ -224,7 +281,7 @@ function AutoJoinIntent({
           Dismiss
         </button>
       ) : null}
-      {ready && progress.phase === 'error' ? (
+      {ready && progress.phase === 'error' && !refused ? (
         <button type="button" className={styles.secondaryButton} onClick={() => setRetry((value) => value + 1)}>
           Retry
         </button>
@@ -261,6 +318,7 @@ export default function WorkerGroupAutoJoin(props: Props) {
       location,
       resolveWorkerGroupAutoJoinContext(configRef.current, props.sessionSlug),
     );
+    removeGroupInviteFromAddress();
     if (!incoming) return;
     setIntent((previous) => {
       if (
@@ -268,7 +326,8 @@ export default function WorkerGroupAutoJoin(props: Props) {
         consumedKey.current !== autoJoinIntentKey(previous) &&
         previous.groupId === incoming.groupId &&
         previous.sessionSlug === incoming.sessionSlug &&
-        previous.workerOrigin === incoming.workerOrigin
+        previous.workerOrigin === incoming.workerOrigin &&
+        (!incoming.token || incoming.token === previous.token)
       )
         return previous;
       savePendingAutoJoin(incoming);
