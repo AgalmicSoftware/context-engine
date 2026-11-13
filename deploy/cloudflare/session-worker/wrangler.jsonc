@@ -7,6 +7,14 @@
     "global_fetch_strictly_public"
   ],
   "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  },
   "kv_namespaces": [
     {
       "binding": "GROUP_KV"
