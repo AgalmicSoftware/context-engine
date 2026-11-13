@@ -28,14 +28,33 @@ function canonicalAbsolutePath(value) {
   }
 }
 
+// The compiler holds every typed test in memory at once: between 2 and 2.5 GB
+// of heap today. Node's default heap on a small CI runner is about 2 GB, and
+// the compiler was killed there, so it is given its own, whatever NODE_OPTIONS says.
+const COMPILER_HEAP_MB = 4096;
+
 function runCompiler({ clientDir, tscPath, args }) {
-  const result = spawnSync(process.execPath, [tscPath, ...args], {
+  const result = spawnSync(process.execPath, [`--max-old-space-size=${COMPILER_HEAP_MB}`, tscPath, ...args], {
     cwd: clientDir,
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
   });
   if (result.error) throw result.error;
   return result;
+}
+
+/**
+ * How a compiler run ended, in words. A null status means a signal killed it
+ * (SIGABRT is Node running out of heap), which the status alone never says.
+ */
+export function describeCompilerExit({ status, signal, stderr, stdout }) {
+  const how = status === null ? `was killed by ${signal || 'a signal'}` : `exited ${status}`;
+  const lines = (text) => String(text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  // Node reports a fatal error on stderr; tsc prints errors that name no file on stdout.
+  const said = lines(stderr).find((line) => /FATAL ERROR|out of memory/i.test(line))
+    || lines(stderr).slice(-3).join(' | ')
+    || lines(stdout).slice(-3).join(' | ');
+  return said ? `${how} (it said: ${said.slice(0, 400)})` : how;
 }
 
 export function parseTypeScriptDiagnostics(output) {
@@ -84,7 +103,9 @@ export function runClientTestTypeGate({
     .split(/\r?\n/)
     .filter(Boolean)
     .map((absolutePath) => canonicalAbsolutePath(path.resolve(clientDir, absolutePath))));
-  const missingInventoryFiles = files.filter((relativePath) => (
+  // A listing that was killed lists nothing; say that, not that every file is missing.
+  const listingKilled = listResult.status === null;
+  const missingInventoryFiles = listingKilled ? [] : files.filter((relativePath) => (
     !listedFiles.has(canonicalAbsolutePath(path.resolve(repoDir, relativePath)))
   ));
 
@@ -97,14 +118,16 @@ export function runClientTestTypeGate({
   const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
   const gains = diagnosticGains(baseline, diagnostics);
   const findings = [];
+  if (listingKilled) findings.push(`typed-test file listing ${describeCompilerExit(listResult)}`);
   if (missingInventoryFiles.length > 0) {
     findings.push(`typed test config omits ${missingInventoryFiles.length} tracked file${missingInventoryFiles.length === 1 ? '' : 's'}: ${missingInventoryFiles.join(', ')}`);
   }
   gains.forEach((gain) => {
     findings.push(`new typed-test diagnostic (${gain.baseCount} -> ${gain.currentCount}): ${gain.signature}`);
   });
-  if (typeResult.status !== 0 && diagnostics.length === 0) {
-    findings.push(`typed-test compiler exited ${typeResult.status} without parseable diagnostics`);
+  // A killed compiler checked only part of the program, whatever it printed first.
+  if (typeResult.status === null || (typeResult.status !== 0 && diagnostics.length === 0)) {
+    findings.push(`typed-test compiler ${describeCompilerExit(typeResult)} without parseable diagnostics`);
   }
   return {
     contract: CLIENT_TEST_TYPE_CONTRACT,
