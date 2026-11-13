@@ -15,6 +15,10 @@ export const corsHeaders = (origin, allowList) => {
   const headers = new Headers({
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Slug, X-Group-Slug, X-Anonymous-Client-Id',
+    // Browsers keep a preflight's answer this long (ten minutes), so a page
+    // polling every 15 seconds stops checking first each time. A header the
+    // list lacks still gets a fresh check.
+    'Access-Control-Max-Age': '600',
     Vary: 'Origin',
   });
   const hasAllowList = allowList != null;
