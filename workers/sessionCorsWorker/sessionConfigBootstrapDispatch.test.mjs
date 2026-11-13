@@ -192,6 +192,7 @@ test('projectPublicWorkerSessionConfig returns canonical fields and recursively 
     riskMatrix: true,
     memberResults: true,
     sessionAgentReady: true,
+    groupJoinChoices: true,
   });
   for (const secret of [
     'sk-never-public',
@@ -249,6 +250,7 @@ test('projectPublicWorkerSessionConfig cannot expose the non-enumerable runtime 
     riskMatrix: true,
     memberResults: true,
     sessionAgentReady: true,
+    groupJoinChoices: true,
   });
   assert.equal(JSON.stringify(projected).includes(secretRpcUrl), false);
 });
@@ -299,6 +301,7 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
     riskMatrix: true,
     memberResults: true,
     sessionAgentReady: true,
+    groupJoinChoices: true,
   });
 });
 
@@ -332,6 +335,7 @@ test('projectPublicWorkerSessionConfig publishes only the versioned Agent Sessio
     riskMatrix: true,
     memberResults: true,
     sessionAgentReady: true,
+    groupJoinChoices: true,
   });
   assert.equal(JSON.stringify(projected).includes('must-not-publish'), false);
 });
@@ -432,6 +436,7 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
       riskMatrix: true,
       memberResults: true,
       sessionAgentReady: true,
+      groupJoinChoices: true,
     },
   );
   assert.equal(findForbiddenWorkerConfigSecretPath({ keyProvider: 'worker_secret' }), '');

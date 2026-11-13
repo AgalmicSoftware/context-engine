@@ -130,6 +130,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     riskMatrix: false,
     memberResults: false,
     sessionAgentReady: false,
+    groupJoinChoices: false,
   });
 
   assert.deepEqual(projected, {
@@ -145,6 +146,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     riskMatrix: true,
     memberResults: true,
     sessionAgentReady: true,
+    groupJoinChoices: true,
   });
 });
 
