@@ -1,4 +1,5 @@
-import { CONTEXT_TEXT_ROLE, contextRoleOf, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { CONTEXT_ROLE, CONTEXT_SOURCE_LIMITS, CONTEXT_TEXT_ROLE, contextRoleOf, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import { markStorageBackupWrite } from './storageBackupRevision.js';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import {
@@ -63,7 +64,7 @@ import {
   writeStorageResourceHidden,
   writeStorageResourceOwner,
 } from './storageResourceOwnership.js';
-import { checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt } from './sessionWriteCoordinator.js';
+import { checkCoordinatedAuthRateLimit, checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt } from './sessionWriteCoordinator.js';
 import { executeCoordinatedStoragePublication, SUPERSEDED_AUTHORITY_ERROR } from './sessionConfigAuthority.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
@@ -174,6 +175,8 @@ export const storageIndexPutOptions = (metadata) => {
   const responder = resource === 'responses' ? trim(metadata?.responder).toLowerCase() : '';
   return responder ? { metadata: { responder } } : undefined;
 };
+// Long enough to outlast a session, so its count of adds doesn't reset.
+const CONTEXT_ADD_WINDOW_MS = 366 * 24 * 60 * 60 * 1000;
 const safeGroupId = (value) => trim(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
 const normalizeGroupIdList = (value) => {
   let raw = value;
@@ -1744,6 +1747,25 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   } catch (error) {
     if (error?.status === 503) return responseJson(deps, { error: error.message }, 503, baseHeaders);
     throw error;
+  }
+  // Each person, an agent included, adds at most CONTEXT_SOURCE_LIMITS.perAdder
+  // context sources to a session; admins are not limited. The session
+  // coordinator counts each add once it is ready to store, after the backup
+  // mark a busy retry would repeat; a removal, or a store that fails after
+  // counting, gives none back. The count is kept per session id, so a session
+  // reset under the same link starts afresh. Refreshing a link is an admin's,
+  // so never counted.
+  if (contextCheck.role === CONTEXT_ROLE && !contextUploaderIsAdmin) {
+    const counted = await (deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit)({
+      env, slug, route: 'context-add', identity: `${trim(config?.sessionId || config?.sessionIdHex)}:${uploader}`, limit: CONTEXT_SOURCE_LIMITS.perAdder, windowMs: CONTEXT_ADD_WINDOW_MS, now: deps?.now,
+    });
+    if (counted?.ok !== true) return responseJson(deps, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: 'context_count_unavailable' }, 503, baseHeaders);
+    if (counted.allowed !== true) {
+      return responseJson(deps, {
+        error: `You’ve added ${CONTEXT_SOURCE_LIMITS.perAdder} context items to this session, the most one person may add. A session admin can add more.`,
+        reason: 'context_adder_limit',
+      }, 403, baseHeaders);
+    }
   }
   // Every answer takes a receipt, which also counts it against the person's limits;
   // without a usable request id it gets one of its own and is never replayed.

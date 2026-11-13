@@ -191,6 +191,16 @@ from its PDF and takes no place of its own. Rows stored before 0.9.9 carry no
 adder or time in their list entry and count as the oldest participants'. The
 page lists up to 500.
 
+**Adds per person:** each signed-in person, an agent included, adds at most 20
+context items (files and links) to a session; admins are not limited. The
+session coordinator counts each add just before it is stored, so an add that
+then fails still counts, and removing an item does not give its place back.
+The count belongs to the session, so a reset under the same link starts it
+afresh. The 21st is refused with 403 `context_adder_limit`
+("You've added 20 context items to this session, the most one person may add.
+A session admin can add more."); when the count can't be reached the add is
+refused as busy (503, `context_count_unavailable`) and stores nothing.
+
 ## Templates
 
 A template carries the notes and page links (`sessionContext`) and lists each

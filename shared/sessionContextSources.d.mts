@@ -26,6 +26,7 @@ export const CONTEXT_SOURCE_LIMITS: Readonly<{
   urlChars: number;
   lockedGroups: number;
   adderNameChars: number;
+  perAdder: number;
 }>;
 
 export const CONTEXT_FILE_TYPES: Readonly<{

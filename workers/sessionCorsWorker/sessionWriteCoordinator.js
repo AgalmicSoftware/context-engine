@@ -159,7 +159,8 @@ const RESULTS_ANALYSIS_RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 50
 const RUNNING_LEASE_MS = 65_000;
 const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
 const AUTH_NONCE_MAC_KEY = 'auth-nonce-mac-key';
-const MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
+// Daily limits use a day; a session's count of context adds outlasts the session.
+const MAX_AUTH_RATE_WINDOW_MS = 400 * 24 * 60 * 60 * 1000;
 const WRAPPED_SESSION_KEY_FIELDS = [
   'alg',
   'createdAt',
