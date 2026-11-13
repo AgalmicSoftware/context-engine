@@ -15,6 +15,7 @@ import {
   noteWorkerAccessChanged,
 } from './workerAuth.js';
 import { getCorsProxyUrlOrThrow } from './corsProxy.js';
+import { invalidateClientAuthGeneration } from '../session/clientAuthGeneration';
 import {
   markWorkerCanonicalSessionBootstrapVerified,
   upsertWorkerCanonicalSessionBootstrap,
@@ -1653,6 +1654,132 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     const retryAuthedHeaders = new Headers(global.fetch.mock.calls[6][1].headers);
     expect(retryAuthedHeaders.get('Authorization')).toBe('Bearer token-2');
     expect(mockProviderRequest.mock.calls.filter(([payload]) => payload?.method === 'eth_accounts')).toHaveLength(1);
+  });
+
+  it('sends a route refused signed out signed in from then on, until sign-in state changes', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    global.fetch = jest.fn(async (url, init = {}) => {
+      const path = new URL(String(url)).pathname;
+      if (path === '/auth/nonce') return jsonResp(200, { nonce: 'nonce-1' });
+      if (path === '/auth/login') return jsonResp(200, { token: 'token-1', exp });
+      if (path === '/auth/logout') return jsonResp(200, { ok: true });
+      return new Headers(init.headers).get('Authorization')
+        ? jsonResp(200, { refs: [] })
+        : jsonResp(401, { error: 'Missing Authorization header.' });
+    });
+    const context = { account: TEST_ADDRESS, providerLike: 'wagmi', chainId: 84532 };
+    const list = (url, extra = {}) =>
+      fetchWorkerWithAuth(
+        url,
+        { method: 'GET' },
+        {
+          sessionSlug: 'members',
+          workerUrl: 'https://worker.example',
+          preferAnonymous: true,
+          context,
+          ...extra,
+        },
+      );
+    const sent = () =>
+      global.fetch.mock.calls
+        .filter(([url]) => /\/storage\//.test(String(url)))
+        .map(([url, init]) => {
+          const { pathname, search } = new URL(String(url));
+          return `${pathname}${search} ${new Headers(init.headers).has('Authorization')}`;
+        });
+
+    await list('https://worker.example/storage/list?resource=responses');
+    await list('https://worker.example/storage/list?resource=responses&cursor=next');
+    // Another resource on the same route may be public, so it is tried signed out first.
+    await list('https://worker.example/storage/list?resource=questions');
+    expect(sent()).toEqual([
+      '/storage/list?resource=responses false',
+      '/storage/list?resource=responses true',
+      '/storage/list?resource=responses&cursor=next true',
+      '/storage/list?resource=questions false',
+      '/storage/list?resource=questions true',
+    ]);
+
+    // Once the sign-in has expired and the request may not ask for another, it goes signed out as before.
+    const later = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 2 * 3600 * 1000);
+    try {
+      global.fetch.mockClear();
+      const expired = await list('https://worker.example/storage/list?resource=responses', { prompt: false });
+      expect(expired.status).toBe(401);
+      expect(sent()).toEqual(['/storage/list?resource=responses false']);
+    } finally {
+      later.mockRestore();
+    }
+
+    // Signing out ends what this tab learned.
+    clearAllWorkerSessionTokens();
+    global.fetch.mockClear();
+    await list('https://worker.example/storage/list?resource=responses');
+    expect(sent()).toEqual(['/storage/list?resource=responses false', '/storage/list?resource=responses true']);
+  });
+
+  describe('a remembered route', () => {
+    const context = { account: TEST_ADDRESS, providerLike: 'wagmi', chainId: 84532 };
+    const read = (url) =>
+      fetchWorkerWithAuth(
+        url,
+        { method: 'GET' },
+        { sessionSlug: 'mixed', workerUrl: 'https://worker.example', preferAnonymous: true, context },
+      );
+    const sent = () =>
+      global.fetch.mock.calls.map(([url, init]) => {
+        const { pathname, search } = new URL(String(url));
+        return `${pathname}${search} ${new Headers(init.headers).has('Authorization')}`;
+      });
+    const serve = (anonymous) =>
+      jest.fn(async (url, init = {}) => {
+        const { pathname, search } = new URL(String(url));
+        if (pathname === '/auth/nonce') return jsonResp(200, { nonce: 'nonce-1' });
+        if (pathname === '/auth/login')
+          return jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 });
+        if (new Headers(init.headers).get('Authorization')) return jsonResp(200, { ok: true });
+        return anonymous(`${pathname}${search}`);
+      });
+
+    // Blob reads share one key whatever their id, so a public blob is not held to a private one's sign-in.
+    it('is tried signed out again once its token has lapsed', async () => {
+      global.fetch = serve((path) =>
+        path === '/storage/read?id=public'
+          ? jsonResp(200, { ok: true })
+          : jsonResp(401, { error: 'Missing Authorization header.' }),
+      );
+      await read('https://worker.example/storage/read?id=private');
+      const later = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 2 * 3600 * 1000);
+      try {
+        global.fetch.mockClear();
+        expect((await read('https://worker.example/storage/read?id=public')).ok).toBe(true);
+        expect(sent()).toEqual(['/storage/read?id=public false']);
+      } finally {
+        later.mockRestore();
+      }
+    });
+
+    it('is not learned from a rate limit', async () => {
+      global.fetch = serve(() => jsonResp(429, { error: 'Rate limit exceeded.' }));
+      await read('https://worker.example/storage/list?resource=responses');
+      global.fetch.mockClear();
+      await read('https://worker.example/storage/list?resource=responses');
+      expect(sent()[0]).toBe('/storage/list?resource=responses false');
+    });
+
+    it('is not learned when sign-in state changed during the request', async () => {
+      const served = serve(() => jsonResp(401, { error: 'Missing Authorization header.' }));
+      global.fetch = jest.fn(async (url, init = {}) => {
+        if (/\/storage\//.test(String(url)) && new Headers(init.headers).get('Authorization')) {
+          invalidateClientAuthGeneration();
+        }
+        return served(url, init);
+      });
+      await read('https://worker.example/storage/list?resource=responses');
+      global.fetch.mockClear();
+      await read('https://worker.example/storage/list?resource=responses');
+      expect(sent()[0]).toBe('/storage/list?resource=responses false');
+    });
   });
 
   it('does not retry worker login when authenticated storage read is denied by SBT gate', async () => {

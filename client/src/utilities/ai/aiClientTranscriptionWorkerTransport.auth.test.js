@@ -129,11 +129,11 @@ describe('transcription through worker authentication', () => {
     await expect(upload()).resolves.toBe('session key transcript');
 
     const uploads = global.fetch.mock.calls.filter(([url]) => url.endsWith('/transcribe'));
-    expect(uploads).toHaveLength(4);
+    // The tab remembers the refusal, so the second upload is sent signed in at once.
+    expect(uploads).toHaveLength(3);
     expect(uploads.map(([, options]) => new Headers(options.headers).get('Authorization'))).toEqual([
       null,
       'Bearer fixture-holder-token',
-      null,
       'Bearer fixture-holder-token',
     ]);
     for (const [, options] of uploads) {
