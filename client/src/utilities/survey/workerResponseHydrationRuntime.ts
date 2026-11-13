@@ -19,6 +19,7 @@ export type WorkerResponseHydrationLoader = (options: {
   startCursor?: string | null;
   onPartial?: (resumeCursor?: string) => void;
   onListed?: (storageRefIds: ReadonlySet<string>) => void;
+  ownResponses?: boolean;
 }) => Promise<WorkerCanonicalResponseRow[]>;
 
 export type WorkerResponseHydrationRun = {
@@ -203,4 +204,68 @@ export const hydrateWorkerCanonicalResponses = async ({
   if (shouldStop()) return;
 
   markReady(partial);
+};
+
+type OwnWorkerResponseOptions = Pick<
+  WorkerResponseHydrationOptions,
+  | 'sessionSlug'
+  | 'sessionConfig'
+  | 'run'
+  | 'loadWorkerResponses'
+  | 'getAccount'
+  | 'getProviderLike'
+  | 'getCurrentSessionConfig'
+  | 'shouldAbort'
+  | 'updateQuestionsCacheAtomic'
+  | 'updateUserCacheAtomic'
+>;
+
+// The saved-answers pass needs only the reader's own answers, so it lists those
+// (mine=true, read in bulk) instead of every answer again. Its rows merge in and
+// drop nothing, leaving completeness to the full listing. Resolves to false when
+// the own listing could not be used, such as on a Worker older than it.
+export const hydrateOwnWorkerResponses = async ({
+  sessionSlug,
+  sessionConfig,
+  run,
+  loadWorkerResponses,
+  getAccount,
+  getProviderLike,
+  getCurrentSessionConfig,
+  shouldAbort,
+  updateQuestionsCacheAtomic,
+  updateUserCacheAtomic,
+}: OwnWorkerResponseOptions): Promise<boolean> => {
+  const targetIsCurrent = (): boolean =>
+    !shouldAbort() &&
+    workerCanonicalSessionTargetMatches({
+      expected: run.identity,
+      sessionConfig: getCurrentSessionConfig(),
+      sessionSlug,
+      reader: getAccount(),
+    });
+  const workerHydration = await import('./workerResponseHydration.js');
+  const loadRows = loadWorkerResponses || workerHydration.loadWorkerResponses;
+  let rows: WorkerCanonicalResponseRow[];
+  try {
+    rows = await loadRows({
+      account: getAccount(),
+      providerLike: getProviderLike(),
+      sessionSlug,
+      sessionConfig,
+      ownResponses: true,
+    });
+  } catch {
+    return false;
+  }
+  if (!targetIsCurrent()) return true;
+  await updateQuestionsCacheAtomic((current) =>
+    targetIsCurrent()
+      ? workerHydration.mergeWorkerQuestionResponses(current, rows, sessionSlug, run.identity)
+      : current || {},
+  );
+  await updateUserCacheAtomic((current) =>
+    targetIsCurrent() ? workerHydration.mergeWorkerUserResponses(current, rows, run.identity) : current || {},
+  );
+  return true;
 };

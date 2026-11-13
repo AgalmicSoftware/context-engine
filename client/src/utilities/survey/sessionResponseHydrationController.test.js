@@ -439,6 +439,45 @@ describe('createSessionResponseHydrationController', () => {
     expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
   });
 
+  it('fills the reader’s saved answers from their own listing, not a second full one', async () => {
+    const sessionConfig = createWorkerCanonicalSessionConfig({ slug: 'demo-sh' });
+    const own = {
+      questionId: QUESTION_ID_B,
+      responder: RESPONDER_LOWER,
+      response: { questionID: QUESTION_ID_B, type: 'binary', answer: { value: false } },
+      storageRefId: 'own-ref',
+      timestamp: 100,
+    };
+    const loadWorkerResponses = jest.fn(async ({ ownResponses }) => (ownResponses ? [own] : []));
+    const host = createMockHost({
+      chainId: null,
+      getSessionCfg: jest.fn(() => sessionConfig),
+      scanScopeNoop: jest.fn(() => true),
+      loadWorkerResponses,
+    });
+    const controller = createSessionResponseHydrationController(host);
+    await controller.fetchQuestionResponsesChunkedForGroup('demo-sh');
+    const nonce = host.getStateSnapshot().questionResponsesNonce;
+    loadWorkerResponses.mockClear();
+
+    await controller.refreshQuestionResponses([QUESTION_ID_B], { slug: 'demo-sh', responder: RESPONDER_LOWER });
+    expect(loadWorkerResponses).toHaveBeenCalledTimes(1);
+    expect(loadWorkerResponses).toHaveBeenCalledWith(expect.objectContaining({ ownResponses: true }));
+    expect(host.getStored('questionsCache', 'demo-sh').worker.questionResponses[QUESTION_ID_B]).toEqual({
+      [RESPONDER_LOWER]: expect.objectContaining({ answer: { value: false } }),
+    });
+    expect(host.getStateSnapshot()).toMatchObject({ isResponsesCacheReady: true, questionResponsesNonce: nonce + 1 });
+
+    // A Worker that can't list one person's answers gets the full listing, as before.
+    loadWorkerResponses.mockClear();
+    loadWorkerResponses.mockImplementation(async ({ ownResponses }) => {
+      if (ownResponses) throw new Error('This Worker could not verify your complete saved answers.');
+      return [];
+    });
+    await controller.refreshQuestionResponses([QUESTION_ID_B], { slug: 'demo-sh', responder: RESPONDER_LOWER });
+    expect(loadWorkerResponses.mock.calls.map(([options]) => !!options.ownResponses)).toEqual([true, false]);
+  });
+
   it('starts same-slug Worker B independently, clears empty B, and discards delayed Worker A responses', async () => {
     const sessionConfigA = createWorkerCanonicalSessionConfig();
     const sessionConfigB = createWorkerCanonicalSessionConfig({

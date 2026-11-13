@@ -20,6 +20,7 @@ import {
 } from './responseRecency';
 import { mergeResponseHydrationInitOptions, type ResponseHydrationInitOptions } from './responseHydrationRunOptions';
 import {
+  hydrateOwnWorkerResponses,
   hydrateWorkerCanonicalResponses,
   resolveWorkerResponseHydrationRun,
   type WorkerResponseHydrationLoader,
@@ -1671,10 +1672,38 @@ export const createSessionResponseHydrationController = (
     opts: RefreshQuestionResponsesOptions = {},
   ): Promise<void> => {
     const slug = normalizeSessionSlug((opts?.slug ?? getActiveSessionSlug()) || '');
-    if (
-      resolveWorkerResponseHydrationRun({ sessionConfig: getSessionCfg(slug), sessionSlug: slug, reader: getAccount() })
-    ) {
-      // Worker refreshes update responses only; there is no chain question scan to restart.
+    const workerRun = resolveWorkerResponseHydrationRun({
+      sessionConfig: getSessionCfg(slug),
+      sessionSlug: slug,
+      reader: getAccount(),
+    });
+    if (workerRun) {
+      const reader = String(getAccount() || '').toLowerCase();
+      // The saved-answers pass asks for the reader's own answers: list only those,
+      // not every answer a second time. Worker refreshes have no chain scan to restart.
+      if (
+        reader &&
+        String(opts?.responder || '').toLowerCase() === reader &&
+        (await hydrateOwnWorkerResponses({
+          sessionSlug: slug,
+          sessionConfig: getSessionCfg(slug) as CacheRecord,
+          run: workerRun,
+          loadWorkerResponses: host.loadWorkerResponses,
+          getAccount,
+          getProviderLike,
+          getCurrentSessionConfig: () => getSessionCfg(slug),
+          shouldAbort: () => _destroyed || !isMounted(),
+          updateQuestionsCacheAtomic: (updater) =>
+            host.updateQuestionsCacheAtomic(slug, (current) => updater(current) as QuestionCache),
+          updateUserCacheAtomic: (updater) =>
+            host.updateUserCacheAtomic(slug, (current) => updater(current) as UserCache),
+        }))
+      ) {
+        if (!_destroyed && isMounted()) {
+          setState((prev) => ({ questionResponsesNonce: Number(prev.questionResponsesNonce || 0) + 1 }));
+        }
+        return;
+      }
       await fetchQuestionResponsesChunkedForGroup(slug);
       return;
     }
