@@ -55,6 +55,8 @@ export const createMcpServer = ({
   tools = [],
   log = () => {},
   toolTimeoutMs = DEFAULT_TOOL_TIMEOUT_MS,
+  // Told the client's own clientInfo when it connects.
+  onInitialize = () => {},
 } = {}) => {
   const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
   let protocolVersion = LATEST_PROTOCOL_VERSION;
@@ -135,6 +137,11 @@ export const createMcpServer = ({
       case 'initialize': {
         const requested = params?.protocolVersion;
         protocolVersion = SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : LATEST_PROTOCOL_VERSION;
+        try {
+          onInitialize({ clientInfo: isRecord(params?.clientInfo) ? params.clientInfo : {} });
+        } catch (error) {
+          log(`initialize: ${describeError(error)}`);
+        }
         return resultResponse(id, {
           protocolVersion,
           capabilities: { tools: { listChanged: false } },

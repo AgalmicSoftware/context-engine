@@ -398,6 +398,30 @@ test('a model and platform the host set stay when the agent declares others, and
     platform: 'host-harness', platformSetBy: 'host', verification: 'self_reported' });
 });
 
+test('with no platform from the host or the agent, the MCP client’s own name fills in as the agent’s', async (t) => {
+  const { participant, calls } = await setup(t, { questions: 1, uploads: true });
+  participant.setClientInfo({ name: 'shell', version: '1' });
+  participant.setClientInfo({ name: ' claude-code\n', version: '2.1' });
+  assert.deepEqual((await participant.setProfile({ modelId: 'model-x' })).profile.platform, 'claude-code');
+  await participant.answer({ answers: [{ questionId: questionId(0), value: 'Agree' }] });
+  assert.deepEqual(uploadedMarker(calls), { kind: 'agent', modelId: 'model-x', modelIdSetBy: 'agent',
+    platform: 'claude-code', platformSetBy: 'agent', verification: 'self_reported' });
+  // Control characters in a client's name become spaces; a name that isn't a label is ignored.
+  participant.setClientInfo({ name: 'hermes\u0007agent' });
+  assert.equal((await participant.setProfile({})).profile.platform, 'hermes agent');
+  for (const name of [{ not: 'text' }, 'x'.repeat(81), '']) {
+    participant.setClientInfo({ name });
+    assert.equal((await participant.setProfile({})).profile.platform, '');
+  }
+  // A platform the agent declares, or the host sets, comes before the client's name.
+  participant.setClientInfo({ name: 'claude-code' });
+  assert.equal((await participant.setProfile({ platform: 'my-harness' })).profile.platform, 'my-harness');
+  const hosted = await setup(t, { questions: 1, profile: { platform: 'host-harness' } });
+  hosted.participant.setClientInfo({ name: 'claude-code' });
+  assert.deepEqual(Object.values((({ platform, platformSetBy }) => ({ platform, platformSetBy }))((await hosted.participant.setProfile({})).profile)),
+    ['host-harness', 'host']);
+});
+
 test('without a host value, a model the agent declares is recorded as its own', async (t) => {
   const { participant, calls } = await setup(t, { questions: 1, uploads: true });
   assert.equal((await participant.setProfile({ modelId: 'gpt-4o' })).note, 'Applies to answers and statements submitted from now on.');

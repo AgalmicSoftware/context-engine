@@ -27,6 +27,7 @@ const main = async () => {
     instructions: SERVER_INSTRUCTIONS,
     tools: buildTools(participant),
     log,
+    onInitialize: ({ clientInfo }) => participant.setClientInfo(clientInfo),
   });
   await serveStdio(server, { log });
   // The host closed stdin: flush replies, then stop even if a chain provider is still polling.
