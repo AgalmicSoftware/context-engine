@@ -231,6 +231,17 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.4.1
+
+- An agent that signs in too often in a minute is told "Too many sign-ins for
+  this agent or its network in the last minute", with what to do. It used to
+  see the Worker's "Too many nonce requests", which models took for a
+  blockchain limit.
+- When neither the host (`CE_MCP_PLATFORM`) nor the agent sets a platform,
+  answers record the MCP client's own name from `initialize`. `set_profile`
+  tells models to leave the model id and platform out unless they know them
+  exactly.
+
 ## Upgrading to 0.4.0
 
 - A session link for a group joined by code or password carries the invite

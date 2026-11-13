@@ -23,7 +23,8 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
-- MCP 0.4.1, a patch: no change in what the tools do; the package is rebuilt with this release's shared session-settings code.
+- MCP 0.4.1. An agent that signs in too often is told "Too many sign-ins" and what to do, instead of a "nonce" message that models mistook for a blockchain limit.
+- Answers record the MCP client's own name as the platform when neither the host nor the agent sets one, and `set_profile` tells models never to guess a model id.
 
 ### Local tooling
 
