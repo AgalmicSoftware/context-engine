@@ -128,7 +128,7 @@ test('a context listing reaches sources past many library files and reads only c
   let reads = 0;
   const get = h.kv.get;
   h.kv.get = async (key) => {
-    if (key.includes(':docsContext:')) reads += 1;
+    reads += [key].flat().filter((name) => name.includes(':docsContext:')).length;
     return get(key);
   };
   // As the browser does: at most five pages, each following the last one's cursor.

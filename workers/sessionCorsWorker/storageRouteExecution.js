@@ -2199,8 +2199,8 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     // Hidden markers also cover a version whose own flag a hide has not
     // written yet, such as one uploaded in another region during the hide.
     if (isOwnedStorageResource(resource)) hiddenIds = await listHiddenStorageResourceIds({ index, slug, resource });
-    // An own-answer page may hold up to 10,000 older rows with no author, so
-    // it reads them in bulk gets of 100 and keeps only rows that may be the
+    // Rows are read in bulk gets of 100. An own-answer page may hold up to
+    // 10,000 older rows with no author, so it keeps only rows that may be the
     // requester's; a row it can't parse is kept, to fail the page below.
     const othersRow = (raw) => {
       try {
@@ -2210,16 +2210,12 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
         return false;
       }
     };
-    for (let offset = 0; mine && offset < keys.length; offset += KV_BULK_GET_KEYS) {
-      const batch = keys.slice(offset, offset + KV_BULK_GET_KEYS).map((keyEntry) => trim(keyEntry?.name || keyEntry)).filter(Boolean);
+    const names = keys.map((keyEntry) => trim(keyEntry?.name || keyEntry)).filter(Boolean);
+    for (let offset = 0; offset < names.length; offset += KV_BULK_GET_KEYS) {
+      const batch = names.slice(offset, offset + KV_BULK_GET_KEYS);
       const got = await index.get(batch);
-      rows.push(...batch.map((name) => ({ name, raw: got?.get?.(name) ?? null })).filter(({ raw }) => typeof raw !== 'string' || !othersRow(raw)));
-    }
-    for (let offset = 0; !mine && offset < keys.length; offset += 8) {
-      rows.push(...await Promise.all(keys.slice(offset, offset + 8).map(async (keyEntry) => {
-        const name = trim(keyEntry?.name || keyEntry);
-        return { name, raw: name ? await index.get(name) : null };
-      })));
+      rows.push(...batch.map((name) => ({ name, raw: got?.get?.(name) ?? null }))
+        .filter(({ raw }) => !mine || typeof raw !== 'string' || !othersRow(raw)));
     }
   } catch {
     return responseJson(deps, { error: 'Cloudflare storage index metadata is unavailable.' }, 503, baseHeaders);

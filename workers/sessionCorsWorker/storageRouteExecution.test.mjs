@@ -116,6 +116,7 @@ const createMockR2 = () => {
 			});
 		},
 		async get(key) {
+			if (Array.isArray(key)) return new Map(key.map((name) => [name, store.get(name) || null]));
 			return store.get(key) || null;
 		},
 		async delete(key) {
@@ -3691,6 +3692,7 @@ test('storageRoute returns bounded cursor pages and filters every page independe
 			};
 		},
 		async get(key) {
+			if (Array.isArray(key)) return new Map(key.map((name) => [name, rows.get(name) || null]));
 			return rows.get(key) || null;
 		},
 	};
@@ -4734,35 +4736,33 @@ test('resource names cannot alias list prefixes or bypass response policy', asyn
   assert.deepEqual((await listed.json()).items, []);
 });
 
-test('storage lists read index rows concurrently with a bounded batch', async () => {
-  let active = 0;
-  let maximum = 0;
-  let listCalls = 0;
-  const keys = Array.from({ length: 24 }, (_, i) => ({ name: `ce-storage:session-a:questions:${i}` }));
-  const env = { CE_STORAGE_INDEX_KV: {
-    list: async ({ prefix }) => {
-      if (prefix.startsWith('ce-storage-hidden:')) return { keys: [], list_complete: true };
-      listCalls += 1;
-      return { keys, list_complete: true };
-    },
-    get: async () => {
-      active += 1;
-      maximum = Math.max(active, maximum);
-      await new Promise((resolve) => setTimeout(resolve, 1));
-      active -= 1;
-      return null;
-    },
-  } };
-  const response = await storageRoute({
-    path: '/storage/list', method: 'GET', env, slug: 'session-a',
-    config: { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } },
-    request: new Request('https://worker.example/storage/list?resource=questions'), deps: { json },
-  });
-  assert.equal(response.status, 200);
-  assert.equal(listCalls, 1);
-  assert.ok(maximum > 1, 'index reads must overlap');
-  assert.ok(maximum <= 8, 'index reads must remain bounded');
-  assert.equal(active, 0);
+test('a list page reads its rows a hundred to a KV call, not one by one', async () => {
+  const account = '0x' + '11'.repeat(20);
+  const keys = Array.from({ length: 250 }, (_, i) => ({ name: `ce-storage:session-a:responses:cf_response_${i}` }));
+  const run = async (query) => {
+    const calls = [];
+    const env = { CE_STORAGE_INDEX_KV: {
+      list: async ({ prefix, limit }) => (prefix.startsWith('ce-storage-hidden:')
+        ? { keys: [], list_complete: true }
+        : { keys: keys.slice(0, limit), list_complete: true }),
+      get: async (key) => {
+        calls.push(Array.isArray(key) ? key.length : 1);
+        const row = (name) => JSON.stringify({ id: name.split(':').pop(), backend: 'cloudflare', resource: 'responses', responder: account });
+        return Array.isArray(key) ? new Map(key.map((name) => [name, row(name)])) : row(key);
+      },
+    } };
+    const response = await storageRoute({
+      path: '/storage/list', method: 'GET', env, slug: 'session-a', uploaderAddress: account,
+      config: { sessionId: WORKER_GROUP_SESSION_ID, storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } },
+      request: new Request(`https://worker.example/storage/list?resource=responses&limit=100${query}`), deps: { json },
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).items.length, query ? 250 : 100);
+    return calls;
+  };
+  // Before, each row was its own read: 100 for a page, 250 for an own-answer scan.
+  assert.deepEqual(await run(''), [100]);
+  assert.deepEqual(await run('&mine=true'), [100, 100, 50]);
 });
 
 test('own-response listing uses authenticated ownership, preserves public rows, and fails closed on unreadable metadata', async () => {
@@ -5497,7 +5497,7 @@ const membershipListingFixture = ({ count = 100, groups, check, conditions = fal
   }));
   let calls = 0;
   const env = {
-    CE_STORAGE_INDEX_KV: { get: async (key) => rows.get(key), list: async () => ({ keys: [...rows.keys()].map((name) => ({ name })), list_complete: true }) },
+    CE_STORAGE_INDEX_KV: { get: async (key) => (Array.isArray(key) ? new Map(key.map((name) => [name, rows.get(name)])) : rows.get(key)), list: async () => ({ keys: [...rows.keys()].map((name) => ({ name })), list_complete: true }) },
     CE_SESSION_COORDINATOR: { idFromName: (name) => name, get: () => ({ fetch: async (_url, init) => {
       calls += 1;
       const result = check(JSON.parse(init.body).groupId);
