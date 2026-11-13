@@ -20,7 +20,10 @@ export type InterviewSettings = {
   groupSuggestionData: GroupSuggestionDataKind[];
   showFidelityResults: boolean;
   fidelityMinimumPeople: number;
+  recordingQuestionCount: number;
+  recordingQuestionTiming: 'chunk' | 'end';
 };
+export const MAX_RECORDING_QUESTION_COUNT: number;
 export const DEFAULT_INTERVIEW_SETTINGS: Readonly<InterviewSettings>;
 export function normalizeInterviewSettings(value?: unknown): InterviewSettings;
 export function validInterviewSettings(value?: unknown): boolean;

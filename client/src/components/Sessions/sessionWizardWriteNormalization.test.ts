@@ -1053,6 +1053,32 @@ describe('sessionWizardWriteNormalization', () => {
     },
   );
 
+  test.each([
+    [{}, {}],
+    [{ recordingQuestionCount: 3, recordingQuestionTiming: 'end' }, {}],
+    [
+      { recordingQuestionCount: 5, recordingQuestionTiming: 'chunk' },
+      { recordingQuestionCount: 5, recordingQuestionTiming: 'chunk' },
+    ],
+    [{ recordingQuestionCount: 2 }, { recordingQuestionCount: 2 }],
+  ])('publishes group recording question settings only when changed (%j)', (interviewMode, published) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'recording-questions',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode,
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // Defaults are left out, so older Session Workers, which refuse the keys, still accept the save.
+    expect({
+      recordingQuestionCount: payload.interviewMode.recordingQuestionCount,
+      recordingQuestionTiming: payload.interviewMode.recordingQuestionTiming,
+    }).toEqual({ recordingQuestionCount: undefined, recordingQuestionTiming: undefined, ...published });
+  });
+
   test('write payload builders reject invalid results analysis settings', () => {
     const invalidResultsAnalysis = {
       version: 1,

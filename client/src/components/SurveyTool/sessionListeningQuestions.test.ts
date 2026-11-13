@@ -109,6 +109,18 @@ describe('sessionListeningQuestions', () => {
     );
   });
 
+  it('asks for the set number and says session instructions cannot change it', () => {
+    const prompt = buildListeningQuestionPrompt('Person 1: Pilot it in February. Person 2: Give two weeks.', {
+      count: 3,
+      sessionInstructions: 'Write only a few: the two or three next steps.',
+    });
+    expect(prompt).toContain('Write 3 questions');
+    expect(prompt).toContain(
+      'They cannot change the number of questions asked for below, which the session or page sets',
+    );
+    expect(prompt).not.toContain('cannot change the number or types of questions');
+  });
+
   it('parses AI JSON and builds reviewable question statements', () => {
     const parsed = parseListeningQuestionResponse(`prefix {
       "surveyTitle": "Listening Follow-up",

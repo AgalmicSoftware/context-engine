@@ -29,10 +29,14 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   groupSuggestionData: Object.freeze(['country', 'work', 'interests']),
   showFidelityResults: false,
   fidelityMinimumPeople: 5,
+  recordingQuestionCount: 3,
+  recordingQuestionTiming: 'end',
 });
 // At most half of a person's AI drafts can be hidden, so most stay useful to them.
 const MAX_HIDDEN_DRAFT_SHARE = 0.5;
 const MAX_FIDELITY_MINIMUM_PEOPLE = 50;
+export const MAX_RECORDING_QUESTION_COUNT = 10;
+const RECORDING_QUESTION_TIMINGS = ['chunk', 'end'];
 export const normalizeInterviewSettings = (value = {}) => {
   const source = value && typeof value === 'object' ? value : {};
   return {
@@ -84,6 +88,11 @@ export const normalizeInterviewSettings = (value = {}) => {
     fidelityMinimumPeople: Number.isInteger(source.fidelityMinimumPeople)
       ? Math.max(1, Math.min(MAX_FIDELITY_MINIMUM_PEOPLE, source.fidelityMinimumPeople))
       : DEFAULT_INTERVIEW_SETTINGS.fidelityMinimumPeople,
+    // The most questions a group recording drafts each time: once when the recording stops, or after every chunk.
+    recordingQuestionCount: Number.isInteger(source.recordingQuestionCount)
+      ? Math.max(1, Math.min(MAX_RECORDING_QUESTION_COUNT, source.recordingQuestionCount))
+      : DEFAULT_INTERVIEW_SETTINGS.recordingQuestionCount,
+    recordingQuestionTiming: source.recordingQuestionTiming === 'chunk' ? 'chunk' : 'end',
   };
 };
 export const validInterviewSettings = (value = {}) => {
@@ -126,6 +135,18 @@ export const validInterviewSettings = (value = {}) => {
     (!Number.isInteger(value.fidelityMinimumPeople) ||
       value.fidelityMinimumPeople < 1 ||
       value.fidelityMinimumPeople > MAX_FIDELITY_MINIMUM_PEOPLE)
+  )
+    return false;
+  if (
+    value.recordingQuestionCount !== undefined &&
+    (!Number.isInteger(value.recordingQuestionCount) ||
+      value.recordingQuestionCount < 1 ||
+      value.recordingQuestionCount > MAX_RECORDING_QUESTION_COUNT)
+  )
+    return false;
+  if (
+    value.recordingQuestionTiming !== undefined &&
+    !RECORDING_QUESTION_TIMINGS.includes(value.recordingQuestionTiming)
   )
     return false;
   return [

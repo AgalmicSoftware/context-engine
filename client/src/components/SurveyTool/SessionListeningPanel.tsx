@@ -32,6 +32,7 @@ import { SessionListeningWaveform } from './SessionListeningWaveform';
 export { SessionListeningWaveform } from './SessionListeningWaveform';
 import { generateQuestionsFromListeningTranscript, LISTENING_QUESTION_COUNT } from './sessionListeningQuestions';
 import type { QuestionDrafts } from '../../utilities/audio/recordingChunkStore';
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 
 type SessionListeningPanelProps = Record<string, unknown> & {
   sessionSlug?: string;
@@ -312,6 +313,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     failedCount > 0 ||
     Boolean(recorder.errorMessage || generationError);
   const isRecorderSessionActive = recorder.isRecording || recorder.isPaused || recorder.isStopping;
+  // A group recording drafts the session's number of questions after each chunk, or once it stops.
+  const { recordingQuestionCount, recordingQuestionTiming } = normalizeInterviewSettings(sessionConfig?.interviewMode);
+  const groupRecording = panelMode === 'recordGroup';
+  const draftAtEnd = groupRecording && recordingQuestionTiming === 'end';
   const isCapturing = isRecorderSessionActive || recorder.isBusy;
   const isBusy = isCapturing || isClosing;
   useEffect(() => {
@@ -435,6 +440,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       generationInFlightRef.current = true;
       // Every prompt drafted so far, and the host's edits of them.
       const { prompts: drafted, questions: shown } = keptRef.current;
+      // Once at the end, the recording's number is a total: Record more then Stop adds what is left, at least one.
+      const count = !groupRecording
+        ? LISTENING_QUESTION_COUNT
+        : draftAtEnd && auto
+          ? Math.max(1, recordingQuestionCount - drafted.length)
+          : recordingQuestionCount;
       const existingPrompts = [...new Set([...drafted, ...shown.map(getGeneratedQuestionPrompt)])].filter(Boolean);
       setIsGenerating(true);
       setGenerationError('');
@@ -447,7 +458,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           context,
           workerUrl,
           defaultTags,
-          count: LISTENING_QUESTION_COUNT,
+          count,
           sessionInstructions: getSessionInstructions(sessionConfig),
           sourceTypeOverride: 'transcript',
           multiSpeakerHintOverride: 'likely_multiple_speakers',
@@ -475,14 +486,36 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         }
       }
     },
-    [canGenerate, context, defaultTags, keepDrafts, recorder.transcript, sessionConfig, sessionSlug, workerUrl],
+    [
+      canGenerate,
+      context,
+      defaultTags,
+      draftAtEnd,
+      groupRecording,
+      keepDrafts,
+      recorder.transcript,
+      recordingQuestionCount,
+      sessionConfig,
+      sessionSlug,
+      workerUrl,
+    ],
   );
 
   useEffect(() => {
-    if (panelMode !== 'recordGroup') return;
+    if (!groupRecording) return;
     if (!latestSuccessfulTranscriptAt || !canGenerate) return;
+    // Once at the end waits for Stop and the last chunk; a recording reopened stopped drafts once, here.
+    if (draftAtEnd && isRecorderSessionActive) return;
     void handleGenerateQuestions({ auto: true });
-  }, [canGenerate, handleGenerateQuestions, latestSuccessfulTranscriptAt, panelMode, trimmedTranscript]);
+  }, [
+    canGenerate,
+    draftAtEnd,
+    groupRecording,
+    handleGenerateQuestions,
+    isRecorderSessionActive,
+    latestSuccessfulTranscriptAt,
+    trimmedTranscript,
+  ]);
 
   const handleClear = (discardAudio = false) => {
     recorder.clearDraft(discardAudio);
@@ -806,7 +839,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       <CEConfirmDialog
         isOpen={confirmStop}
         title="Stop recording?"
-        body="Stop ends the recording and closes once its audio has uploaded."
+        body={
+          draftAtEnd
+            ? 'Stop ends the recording and closes once its audio has uploaded. Its questions are drafted when you reopen it.'
+            : 'Stop ends the recording and closes once its audio has uploaded.'
+        }
         confirmLabel="Stop"
         cancelLabel="Keep recording"
         onCancel={() => setConfirmStop(false)}

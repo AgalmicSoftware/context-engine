@@ -91,6 +91,35 @@ it('edits the share of hidden AI drafts, defaulting to off', () => {
   expect(screen.getByLabelText(label)).toHaveDisplayValue('30%');
 });
 
+it('sets how many questions a group recording drafts and when, defaulting to at most 3, once at the end', () => {
+  const onChange = jest.fn();
+  const count = 'Group recording questions';
+  const timing = 'When group recording questions are written';
+  const { rerender } = render(
+    <InterviewSettingsFields value={{ steeringPrompt: 'Listen first.' }} onChange={onChange} />,
+  );
+  expect(screen.getByRole('combobox', { name: count })).toHaveValue('3');
+  expect(screen.getByRole('combobox', { name: count })).toHaveDisplayValue('up to 3');
+  expect(screen.getByLabelText(timing)).toHaveDisplayValue('once, at the end');
+  // How many and when are one setting under one "?".
+  expect(screen.getByRole('group', { name: count })).toContainElement(screen.getByLabelText(timing));
+  expect(screen.getByRole('combobox', { name: count })).toHaveAccessibleDescription(
+    /only questions the discussion clearly supports .* so fewer or none is normal/i,
+  );
+  fireEvent.change(screen.getByRole('combobox', { name: count }), { target: { value: '5' } });
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ recordingQuestionCount: 5, steeringPrompt: 'Listen first.' }),
+  );
+  rerender(<InterviewSettingsFields value={onChange.mock.lastCall[0]} onChange={onChange} />);
+  fireEvent.change(screen.getByLabelText(timing), { target: { value: 'chunk' } });
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ recordingQuestionCount: 5, recordingQuestionTiming: 'chunk' }),
+  );
+  rerender(<InterviewSettingsFields value={onChange.mock.lastCall[0]} onChange={onChange} />);
+  expect(screen.getByRole('combobox', { name: count })).toHaveValue('5');
+  expect(screen.getByLabelText(timing)).toHaveDisplayValue('after each part');
+});
+
 it('no longer offers the retired group suggestions box, and keeps a stored value as it is', () => {
   const onChange = jest.fn();
   const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} />);

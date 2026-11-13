@@ -6,6 +6,7 @@ import SessionWizardInfoTooltip from './SessionWizardInfoTooltip';
 import { Input, Label } from 'reactstrap';
 import {
   DEFAULT_INTERVIEW_SETTINGS,
+  MAX_RECORDING_QUESTION_COUNT,
   normalizeInterviewSettings,
   type GroupSuggestionDataKind,
 } from '../../../../shared/interviewSettings.mjs';
@@ -64,6 +65,8 @@ const OPENING_HELP =
 const OWNER_OPENING_HELP = 'The question every voice interview opens with, up to 1,200 characters.';
 const STEERING_HELP =
   'Extra instructions for the AI interviewer, such as what to explore or how to speak, up to 3,000 characters. They are saved in the session’s public settings, so anyone can read them.';
+const RECORDING_QUESTIONS_HELP =
+  'The most draft questions the AI writes from a group recording, and when. It writes only questions the discussion clearly supports and the session doesn’t already ask, so fewer or none is normal. Once, at the end: when the recording stops; recording more afterwards can add one more. After each part: every three minutes, from the conversation so far. Changing it needs a Session Worker from 0.9.6 on.';
 const GROWTH_HELP =
   'How many questions must be added, as a share of those there were, counted since the last opening or interview update and rounded up; at 20%, 42 questions need nine more.';
 
@@ -284,6 +287,35 @@ export default function InterviewSettingsFields({
           aria-describedby={setupHelpId(`${id}-steering`)}
           onChange={(e) => change('steeringPrompt', e.target.value)}
         />
+      </HelpField>
+      <HelpField htmlFor={`${id}-recording-count`} label="Group recording questions" help={RECORDING_QUESTIONS_HELP}>
+        {/* How many and when are one setting, under one "?". */}
+        <div role="group" aria-label="Group recording questions" style={ROW}>
+          <Input
+            id={`${id}-recording-count`}
+            type="select"
+            style={{ width: 'auto' }}
+            value={String(settings.recordingQuestionCount)}
+            aria-describedby={setupHelpId(`${id}-recording-count`)}
+            onChange={(e) => change('recordingQuestionCount', Number(e.target.value))}
+          >
+            {Array.from({ length: MAX_RECORDING_QUESTION_COUNT }, (_, index) => (
+              <option key={index} value={String(index + 1)}>
+                up to {index + 1}
+              </option>
+            ))}
+          </Input>
+          <Input
+            type="select"
+            style={{ width: 'auto' }}
+            aria-label="When group recording questions are written"
+            value={settings.recordingQuestionTiming}
+            onChange={(e) => change('recordingQuestionTiming', e.target.value === 'end' ? 'end' : 'chunk')}
+          >
+            <option value="end">once, at the end</option>
+            <option value="chunk">after each part</option>
+          </Input>
+        </div>
       </HelpField>
       {(
         [
