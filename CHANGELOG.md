@@ -14,13 +14,14 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
-- A session can set a separate daily limit for signed-in AI calls (`limits.aiPerWalletPerDay`): `/ai`, Session Agent questions and Agent HTTP's AI share one count per person. A cap on AI spend no longer stops answers or reads; empty or 0 falls back to the general limit. It counts signed-in calls only: where a session opens AI to signed-out visitors, those calls fall under the per-network limit. Saved from Settings (`set-limits`) it signs no one out; a limit changed in a full settings save (`set-config`) signs everyone out, as before.
+- A session can set a separate daily limit for signed-in AI calls (`limits.aiPerWalletPerDay`): `/ai`, Session Agent questions and Agent HTTP's AI share one count per person. A cap on AI spend no longer stops answers or reads; empty or 0 falls back to the general limit. A call refused before any AI runs is not counted. It counts signed-in calls only: where a session opens AI to signed-out visitors, those calls fall under the per-network limit. Saved from Settings (`set-limits`) it signs no one out; a limit changed in a full settings save (`set-config`) signs everyone out, as before.
+- `/capabilities` reports `ai_daily_limit_v1` when the Worker honours the AI daily limit.
 - Admin diagnostics show how many stored question and answer versions an AI build reads, against its limit of 10,000, and a build over the limit says so in plain words.
 - A rate limit that cannot be reached answers "busy, retry" (`503`) instead of "Rate limit exceeded.", so the site and the MCP try again. The Worker logs a line when its limit, sign-in or receipt object does not answer.
-- Restoring a backup keeps everyone who turned the Session Agent off opted out. Backups made before this release carry no opt-outs.
+- Restoring a backup keeps everyone who turned the Session Agent off opted out. Backups made before this release carry no opt-outs. A backup lists who opted out, so keep backups private.
 - An admin saving a setting that does not affect access no longer refuses group joins and leaves already under way.
 - A session with more than 300 context items no longer leaves the AI with none of them. The AI takes 300, the admins' first and then the oldest, and the Worker logs how many were left out. Items stored by earlier releases are still read.
-- New Session Workers keep their logs: the deployment template and the deploy helper turn Cloudflare's logs on, for every request.
+- New Session Workers keep the Worker's own log lines: the deployment template and the deploy helper turn Cloudflare's logs on, with per-request logs off, so no request address is kept. Warnings about sign-in checks no longer name the signer's address.
 
 ### Agents and MCP
 
