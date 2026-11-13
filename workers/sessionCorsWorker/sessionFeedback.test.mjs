@@ -319,7 +319,8 @@ test('only full admins delete feedback; results admins are refused, and signed c
 // What reads a session's work, AI Views, the atlas, the risk matrix, the
 // Session Agent, the fidelity report, exports and backups, reads fixed
 // resources and prefixes. Only the feedback modules, the coordinator's router
-// and its call list may name feedback's storage or its coordinator path.
+// and its call list may name feedback's storage or its coordinator path, and
+// every storage listing names a prefix, so none sweeps feedback in unnamed.
 test('nothing but the feedback modules names feedback’s storage or imports them', async () => {
   const root = new URL('../../', import.meta.url);
   const named = new Set(['sessionFeedback.js', 'sessionFeedbackRoute.js', 'sessionWriteCoordinator.js', 'sessionConfigAuthority.js']
@@ -335,6 +336,10 @@ test('nothing but the feedback modules names feedback’s storage or imports the
       scanned += 1;
       if (!named.has(path)) assert.ok(!text.includes('session-feedback'), `${path} names feedback's storage`);
       if (!importers.has(path)) assert.ok(!/sessionFeedback(Route)?\.js['"]/.test(text), `${path} imports feedback`);
+      for (const call of text.matchAll(/\.list\(/g)) {
+        const args = text.slice(call.index, call.index + 300).split(/\)\s*;|\)\)/)[0];
+        assert.ok(args.includes('prefix'), `${path} lists storage without a prefix: ${args.slice(0, 80)}`);
+      }
     }
   }
   assert.ok(scanned > 100, `only ${scanned} sources scanned`);
