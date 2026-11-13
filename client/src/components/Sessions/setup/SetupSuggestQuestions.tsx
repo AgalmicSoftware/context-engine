@@ -9,7 +9,7 @@ import { SUGGESTED_QUESTION_COUNT, hasSuggestionContext, suggestSetupQuestions }
 import type { SetupDraft, SetupQuestion } from './setupSectionTypes';
 import styles from './SessionSetup.module.scss';
 
-const ABOUT = `Drafts ${SUGGESTED_QUESTION_COUNT} questions from this page’s context with your OpenAI key, following the question prompt and tag suggestions under AI. It reads the name, description and context, link titles and addresses (not the linked pages), and the files you added, admins-only ones too, so check each draft. Drafts join the list above, where you can edit or remove them; none reach the session before Create.`;
+const ABOUT = `Drafts up to ${SUGGESTED_QUESTION_COUNT} questions from this page’s context with your OpenAI key, following the question prompt and tag suggestions under AI, and none when nothing in the context clearly supports one. It reads the name, description and context, link titles and addresses (not the linked pages), and the files you added, admins-only ones too, so check each draft. Drafts join the list above, where you can edit or remove them; none reach the session before Create.`;
 
 type Props = {
   draft: SetupDraft;

@@ -34,7 +34,9 @@ describe('Suggest questions on /new', () => {
     );
     const button = screen.getByRole('button', { name: 'Suggest questions' });
     expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleDescription(/^Drafts 5 questions from this page’s context with your OpenAI key/);
+    expect(button).toHaveAccessibleDescription(
+      /^Drafts up to 5 questions from this page’s context with your OpenAI key/,
+    );
     expect(screen.getByRole('button', { name: 'About Suggest questions' })).toBeInTheDocument();
     expect(screen.getByTestId('ce-setup-suggest-status')).toHaveTextContent(
       'Add an OpenAI key under AI to get suggestions.',
