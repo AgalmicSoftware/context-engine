@@ -571,6 +571,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
     return {
       title: document.title,
       rootChildren: root ? root.children.length : 0,
+      agentNoteLeft: !!document.getElementById('ce-agent-note'),
       bodyText,
       bodyTextLength: bodyText.length,
       bodyTextPreview: bodyText.slice(0, 240),
@@ -636,6 +637,10 @@ function summarizeFailures(results) {
     }
     if (result.rootChildren < 1) {
       failures.push(`${result.route}: #root rendered no children`);
+    }
+    // The started app removes index.html's note for agents that fetch without running it.
+    if (result.agentNoteLeft) {
+      failures.push(`${result.route}: the note for AI agents is still on the page`);
     }
     if (result.bodyTextLength < 1) {
       failures.push(`${result.route}: no visible body text`);

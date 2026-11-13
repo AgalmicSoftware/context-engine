@@ -93,6 +93,31 @@ test('index.html uses deployment-relative discovery asset links for the active P
   );
 });
 
+// A fetcher that runs no scripts, and drops the head and <noscript>, reads only the body.
+test('index.html tells a fetching agent where the guide is, in body text people never meet', () => {
+  const body = indexHtml.split('</noscript>')[1] || '';
+  const [, style = '', note = ''] =
+    body.match(/<p id="ce-agent-note" style="([^"]*)">([\s\S]*?)<\/p>\s*<div id="root"><\/div>/) || [];
+  assert.match(note, /AI agents: to take part in a session, read\s+<a href="__PUBLIC_URL__\/skill\.md">\/skill\.md<\/a>/);
+  assert.match(note, /an invitation that names a group included, goes to the Context Engine\s+MCP server's join_session as it is/);
+  assert.ok(mcpTools.includes("name: 'join_session'"));
+  // Off screen until the site's first script, which removes it before the app loads: an app that
+  // fails to start must not leave it to be read out or tabbed to.
+  for (const rule of ['position:absolute', 'width:1px', 'height:1px', 'overflow:hidden', 'clip-path:inset(50%)']) {
+    assert.ok(style.split(';').includes(rule), rule);
+  }
+  const firstScript = fs.readFileSync(path.join(repoRoot, 'client', 'src', 'viteEntry.ts'), 'utf8');
+  const removal = firstScript.indexOf("document.getElementById('ce-agent-note')?.remove();");
+  assert.ok(removal > 0 && removal < firstScript.indexOf("import('./index')"));
+  assert.match(indexHtml, /<script type="module" src="\/src\/viteEntry\.ts"><\/script>/);
+});
+
+// The file-not-found page answers agents probing /.well-known/ addresses.
+test('the file-not-found page points agents to the guide', () => {
+  const notFound = fs.readFileSync(path.join(repoRoot, 'client', 'public', '404.html'), 'utf8');
+  assert.match(notFound, /AI agents: to take part in a session, read <a href="\/skill\.md">\/skill\.md<\/a>\./);
+});
+
 test('index.html does not load the remote Font Awesome kit', () => {
   assert.doesNotMatch(indexHtml, /kit\.fontawesome\.com/);
   assert.doesNotMatch(indexHtml, /<script[^>]+src=["']https:\/\/kit\.fontawesome\.com\//i);
@@ -107,6 +132,7 @@ test('discoverability assets point to the latest GitHub branch documents', () =>
   assert.match(discoverabilityHtml, toUrlMatcher(docsUrl));
   assert.match(discoverabilityHtml, toUrlMatcher(whitepaperUrl));
   assert.match(discoverabilityHtml, toUrlMatcher(llmsUrl));
+  assert.match(discoverabilityHtml, toUrlMatcher('https://contextengine.sh/skill.md'));
   assert.match(llmsTxt, toUrlMatcher(repoUrl));
   assert.match(llmsTxt, toUrlMatcher(repoSourceUrl));
   assert.match(llmsTxt, toUrlMatcher(readmeUrl));
