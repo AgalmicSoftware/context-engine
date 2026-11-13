@@ -1,3 +1,5 @@
+import { rateLimitRefusal } from './rateLimitRefusal.js';
+
 export const evaluateAuthenticatedRoutePreflight = async ({
   scopes,
   scope,
@@ -59,7 +61,7 @@ export const evaluateAuthenticatedRoutePreflight = async ({
     return {
       ok: false,
       tokenHasScope,
-      response: deps?.json?.({ error: 'Rate limit exceeded.' }, 429, headers),
+      response: rateLimitRefusal(rateAllowed, deps?.json, headers),
     };
   }
 

@@ -3687,7 +3687,10 @@ export const coordinateResponseUploadReceipt = async ({ env, slug, responder, op
       body: JSON.stringify({ ...payload, responder: toTrimmedString(responder).toLowerCase(), diagnostics: { slug: normalizedSlug, owner } }),
     });
     const body = await response.json();
-    if (!isObjectRecord(body) || (!response.ok && ![409, 422, 503].includes(response.status))) return unavailable;
+    if (!isObjectRecord(body) || (!response.ok && ![409, 422, 503].includes(response.status))) {
+      logCoordinatorFailure(`upload-receipts/${operation}`, new Error('Unexpected reply.'), { status: response.status });
+      return unavailable;
+    }
     if (response.ok && (operation !== 'reserve' ? body.ok !== true
       : !(body.kind === 'execute' && toTrimmedString(body.attemptId)) && !(body.kind === 'replay' && body.storageRef?.id))) return unavailable;
     const priorStorageIds = body.priorStorageIds ?? [];
@@ -3695,7 +3698,8 @@ export const coordinateResponseUploadReceipt = async ({ env, slug, responder, op
         (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)) ||
           !Array.isArray(priorStorageIds) || !priorStorageIds.every(isSafeCloudflareStorageRefId))) return unavailable;
     return { ...body, status: response.status };
-  } catch {
+  } catch (error) {
+    logCoordinatorFailure(`upload-receipts/${operation}`, error);
     return unavailable;
   }
 };
@@ -3712,13 +3716,18 @@ const callAuthStateCoordinator = async ({
   path,
   payload,
 } = {}) => {
+  // The rate-limit and sign-in objects: say in the log why one did not answer.
+  const unavailable = (error, extra) => {
+    logCoordinatorFailure(path, error, extra);
+    return { ...AUTH_STATE_UNAVAILABLE };
+  };
   let stub;
   try {
     stub = await resolveCoordinatorStub(env, identity);
-  } catch {
-    return { ...AUTH_STATE_UNAVAILABLE };
+  } catch (error) {
+    return unavailable(error);
   }
-  if (!stub?.fetch) return { ...AUTH_STATE_UNAVAILABLE };
+  if (!stub?.fetch) return unavailable(new Error('No coordinator binding.'));
   try {
     const response = await stub.fetch(`https://session-coordinator.internal${path}`, {
       method: 'POST',
@@ -3726,13 +3735,13 @@ const callAuthStateCoordinator = async ({
       body: JSON.stringify(payload),
     });
     const body = await response.json().catch(() => null);
-    if (!body || typeof body !== 'object') return { ...AUTH_STATE_UNAVAILABLE };
+    if (!body || typeof body !== 'object') return unavailable(new Error('No JSON reply.'), { status: response.status });
     return {
       ...body,
       status: response.status,
     };
-  } catch {
-    return { ...AUTH_STATE_UNAVAILABLE };
+  } catch (error) {
+    return unavailable(error);
   }
 };
 
