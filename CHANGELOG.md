@@ -41,7 +41,7 @@ All notable changes to this project will be documented in this file.
 - The agent guide, `llms.txt` and the MCP README say a browser invitation link can be given to `join_session` as it is. The npm README's links are full addresses.
 - `list_questions` and `get_session` return without waiting more than 8 seconds for the agent's earlier answers, and a new agent skips that lookup. `get_results` returns within about 40 seconds, marked partial when cut short. `list_questions` returns up to 100 questions and says how to get any more.
 - An answer call that saved nothing is reported to the host as an error. A quadratic answer sent in the wrong shape says to send a list of votes. With everything answered, `list_questions` says so and how to see your answers.
-- The MCP sends a group join again when the session was too busy for it, and tells the agent plainly when a join is busy or refused.
+- The MCP sends a group join again when the session was too busy for it, and tells the agent plainly when a join is busy or refused. A busy join says the membership is unconfirmed and that joining again is harmless.
 - An agent's list calls wait for its earlier answers only on the first call, and drop the "still being looked up" note once every question shows an answer.
 - A model id or platform set by the host can no longer be changed by `set_profile`; answers record who set each.
 - The agent's key can come from `CE_MCP_PRIVATE_KEY`, for hosts that keep no files between runs.
