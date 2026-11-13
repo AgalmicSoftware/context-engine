@@ -7,7 +7,7 @@ import {
   contextTagValue,
   isAdminsOnlyAccess,
 } from '../../shared/sessionContextSources.mjs';
-import { buildSessionContextPrompt } from '../../shared/sessionContextText.mjs';
+import { buildSessionContextPrompt, SESSION_CONTEXT_TEXT_LIMITS } from '../../shared/sessionContextText.mjs';
 import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
 import { buildIndexPrefix, readContextSourceBytes, readContextSourceRow } from './storageRouteExecution.js';
@@ -16,6 +16,8 @@ import { jsonByteLength } from './storageScanBudget.js';
 // How much one AI prompt's reading list may cost: rows looked at (chosen from
 // the key list before any is read), list pages (40,000 keys, after which the
 // rest are not looked at), row bytes, and sources read.
+// Reading also stops once the texts fill the caller's block (totalChars): a
+// source can be a 1 MB read and a decryption, and the block holds far less.
 export const CONTEXT_READ_LIMITS = Object.freeze({ rows: 300, listPages: 40, metadataBytes: 1024 * 1024, sources: 16 });
 const MAX_READ_BYTES = 1024 * 1024;
 const LIST_PAGE = 1000;
@@ -122,14 +124,18 @@ export const contextReadingOrder = (rows) => {
 /**
  * The context sources every participant may read, as texts for the shared
  * prompt block: link snapshots, text files, and the AI's reading of each PDF
- * (an unread PDF gives no text), in contextReadingOrder. The Worker's own AI
- * features act for participants, so admins-only items never reach them.
- * `readable(row)` narrows or widens that to one person's access; `principal`
- * names who the read is for in the envelope audit; files added by
- * `leaveOutUploaders` (lower-case addresses) are left out, with the AI's
- * readings of them.
+ * (an unread PDF gives no text), in contextReadingOrder, until they fill
+ * `totalChars`. The Worker's own AI features act for participants, so
+ * admins-only items never reach them. `readable(row)` narrows or widens that
+ * to one person's access; `principal` names who the read is for in the
+ * envelope audit; files added by `leaveOutUploaders` (lower-case addresses)
+ * are left out, with the AI's readings of them. `leftOut` counts the sources
+ * with text not read for lack of room, and the rows not looked at, which may
+ * include some this reader could not have read.
  */
-export const loadParticipantContextSources = async ({ env, slug, config, deps, readable, principal, leaveOutUploaders } = {}) => {
+export const loadParticipantContextSources = async ({
+  env, slug, config, deps, readable, principal, leaveOutUploaders, totalChars = SESSION_CONTEXT_TEXT_LIMITS.totalChars,
+} = {}) => {
   const warn = typeof deps?.log?.warn === 'function' ? deps.log.warn : console.warn;
   let listed = { rows: [], leftOut: 0 };
   try {
@@ -137,7 +143,7 @@ export const loadParticipantContextSources = async ({ env, slug, config, deps, r
   } catch {
     // The AI call goes ahead without context, but the operator should know why.
     warn('[context] sources left out of an AI prompt', { slug, reason: 'storage unavailable' });
-    return [];
+    return { sources: [], leftOut: 0 };
   }
   if (listed.leftOut > 0) {
     warn('[context] sources left out of an AI prompt', { slug, reason: [...new Set(listed.stopped)].join(', '), leftOut: listed.leftOut });
@@ -158,10 +164,17 @@ export const loadParticipantContextSources = async ({ env, slug, config, deps, r
       contextTagValue(reading.tags, TAGS.derivedFrom) === pdf.id && await canRead(reading) ? reading : null;
   };
   const sources = [];
-  const ordered = contextReadingOrder(visible.filter((row) => contextRoleOf(row.tags) === CONTEXT_ROLE));
-  for (const row of ordered) {
-    if (sources.length >= CONTEXT_READ_LIMITS.sources) break;
-    if (leaveOutUploaders?.has(lower(row.uploader))) continue;
+  const ordered = contextReadingOrder(visible.filter((row) => contextRoleOf(row.tags) === CONTEXT_ROLE))
+    .filter((row) => !leaveOutUploaders?.has(lower(row.uploader)));
+  let chars = 0;
+  let leftOut = listed.leftOut;
+  for (const [position, row] of ordered.entries()) {
+    if (sources.length >= CONTEXT_READ_LIMITS.sources || chars >= totalChars) {
+      // A PDF the AI never read has no text to leave out.
+      leftOut += ordered.slice(position)
+        .filter((rest) => rest.contentType !== CONTEXT_FILE_TYPES.pdf || readings.has(rest.id) || rest.contextReadingId).length;
+      break;
+    }
     const isPdf = row.contentType === CONTEXT_FILE_TYPES.pdf;
     const textRow = isPdf ? await readingOf(row) : row;
     if (!textRow) continue;
@@ -185,12 +198,13 @@ export const loadParticipantContextSources = async ({ env, slug, config, deps, r
       }
     }
     sources.push({ title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isPdf });
+    chars += Math.min(text.trim().length, SESSION_CONTEXT_TEXT_LIMITS.itemChars);
   }
-  return sources;
+  return { sources, leftOut };
 };
 
 /** The session's context block for an AI acting for any participant; '' when none. */
 export const buildParticipantContextPrompt = async ({ env, slug, config, deps, totalChars } = {}) => {
-  const sources = await loadParticipantContextSources({ env, slug, config, deps });
+  const { sources } = await loadParticipantContextSources({ env, slug, config, deps, totalChars });
   return buildSessionContextPrompt({ sessionContext: config?.sessionContext, sources, totalChars }).text;
 };

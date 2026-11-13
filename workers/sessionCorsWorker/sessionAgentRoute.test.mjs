@@ -169,6 +169,36 @@ test('General answers read the context, open files and visible results, never an
   for (const piece of ['GROUP notes', 'ANSWER']) assert.doesNotMatch(member.prompt, new RegExp(piece));
 });
 
+test('an answer says when some of the session’s context wasn’t read', async () => {
+  const h = await seeded();
+  const fitted = await ask(h);
+  assert.equal(fitted.body.note, undefined, 'all of it fitted');
+  // Three long notes: the Session Agent reads at most 8,000 characters of context.
+  for (const name of ['one', 'two', 'three']) {
+    await idOf(await h.uploadFile({ name: `${name}.md`, type: 'text/markdown', bytes: encode(`${name.toUpperCase()} `.repeat(1500)) }));
+  }
+  // What isn't needed isn't read: the third note's bytes are never fetched.
+  const read = [];
+  const get = h.r2.get;
+  h.r2.get = async (key) => {
+    const object = await get(key);
+    if (object) read.push(new TextDecoder().decode(await object.arrayBuffer()).slice(0, 5));
+    return object;
+  };
+  const crowded = await ask(h);
+  h.r2.get = get;
+  assert.equal(crowded.status, 200);
+  assert.equal(crowded.body.note, 'Some of the session’s context wasn’t read: the Session Agent reads at most 8,000 characters or 16 items of it.');
+  assert.doesNotMatch(crowded.prompt, /THREE/);
+  assert.ok(read.includes('ONE O') && !read.includes('THREE'), JSON.stringify(read));
+  // Everything read, but the session's own notes leave no room for a source.
+  const notes = await seeded();
+  notes.state.config.sessionContext.paragraphs = Array.from({ length: 4 }, (_, i) => `NOTE ${i} `.repeat(300).slice(0, 1990));
+  const full = await ask(notes);
+  assert.equal(full.body.note, 'Some of the session’s context wasn’t read: the Session Agent reads at most 8,000 characters or 16 items of it.');
+  assert.doesNotMatch(full.prompt, /OPEN agenda/);
+});
+
 test('the session’s own gate comes first: someone it keeps out may not ask, whatever the audiences say', async () => {
   // Everyone signed in gets Detailed answers, on a session only the salon group may view.
   const h = await seeded({ audiences: [{ who: everyone, answers: 'detailed' }], minAnswers: 1 });

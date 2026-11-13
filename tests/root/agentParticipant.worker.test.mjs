@@ -1081,7 +1081,7 @@ test('an agent adds a file, a link and a note that everyone sees as its own, and
     { name: path.basename(notes), kind: 'file', addedBy: kamiAddress, adder: ['agent', 'Test Kami'], adminsOnly: false },
     { name: 'On names.md', kind: 'file', addedBy: kamiAddress, adder: ['agent', 'Test Kami'], adminsOnly: false },
   ]);
-  const forAi = await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() });
+  const { sources: forAi } = await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() });
   assert.deepEqual(Object.fromEntries(forAi.map(({ title, text }) => [title, text])), {
     Essay: 'Essay What neighbours owe each other.',
     [path.basename(notes)]: '# Notes\n\nResidents asked for evening sessions.',
@@ -1091,7 +1091,7 @@ test('an agent adds a file, a link and a note that everyone sees as its own, and
   // Admins only: stored for them alone, and left out of what the AI reads for everyone.
   const hidden = await kami.participant.addContext({ text: 'For the hosts.', adminsOnly: true });
   assert.equal(hidden.visibleTo, 'the session’s admins');
-  assert.equal((await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() })).length, 3);
+  assert.equal((await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() })).sources.length, 3);
 });
 
 // The agent's view of a session from before an admin's change, which the Worker already has.

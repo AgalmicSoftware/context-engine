@@ -366,5 +366,7 @@ export const buildSessionAgentMessages = ({ setting, style, question, material =
       // Every answer a count covers, and otherwise each one quoted.
       answers: answers.reduce((count, group) => count + (group.counts ? group.answered : group.written?.length || 0), 0),
     },
+    // Context items that didn't fit the block, for the reply's note.
+    contextOmitted: context.omitted,
   };
 };

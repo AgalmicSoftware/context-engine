@@ -170,6 +170,8 @@ what it left out.
 | Voice interviewer instructions (browser) | what the participant may read | 6,000 |
 | Interview opening (Worker) | what every participant may read | 4,000 |
 | Results analysis (Worker) | what every participant may read | 12,000 |
+| Debate atlas and risk matrix builds (Worker) | what every participant may read | 6,000 |
+| Session Agent (Worker) | what its answer style lets the asker read | 8,000 |
 
 The Worker's features act for all participants, so they never use admins-only
 items, items with a narrower access than the session's, or items it cannot
@@ -184,12 +186,15 @@ rows, the admins' first, then the oldest; more than that leaves the newest
 out, never all of them, and the Worker logs how many. Past 40,000 rows only
 the first 40,000 listed are looked at, and rows that can't be fetched leave
 only themselves out. They read sources in
-this order, up to 16: what admins added, oldest first, then everyone else's,
-each person's oldest in turn, in the order people first added, so one
-person's many notes never crowd out everyone else's. A PDF's reading is found
-from its PDF and takes no place of its own. Rows stored before 0.9.9 carry no
-adder or time in their list entry and count as the oldest participants'. The
-page lists up to 500.
+this order until the texts fill the feature's block above, and at most 16,
+since each read can be a megabyte to fetch and decrypt: what admins added,
+oldest first, then everyone else's, each person's oldest in turn, in the order
+people first added, so one person's many notes never crowd out everyone
+else's. A PDF's reading is found from its PDF and takes no place of its own.
+Rows stored before 0.9.9 carry no adder or time in their list entry and count
+as the oldest participants'. The page lists up to 500. Of the Worker's
+features, only the Session Agent says when context was left out (its reply's
+`note`); the others leave it out silently.
 
 **Adds per person:** each signed-in person, an agent included, adds at most 20
 context items (files and links) to a session; admins are not limited. The

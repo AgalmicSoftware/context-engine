@@ -4,7 +4,7 @@ import {
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 import { isModelAllowed, normalizeAiRequestPayload } from './aiRequestNormalization.js';
-import { forEveryone, loadParticipantContextSources } from './contextSourceLoader.js';
+import { CONTEXT_READ_LIMITS, forEveryone, loadParticipantContextSources } from './contextSourceLoader.js';
 import {
   evaluateResultsAnalysisViewerEligibility,
   loadWorkerCanonicalResultsAnalysisSource,
@@ -146,9 +146,9 @@ const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, 
 // results, built from everyone's answers, are read as the Results page shows them.
 const gatherMaterial = async ({ env, slug, config, setting, address, scopes, asker, access, optedOut, deps }) => {
   const detailed = asker.answers === 'detailed';
-  const [sources, results, answers] = await Promise.all([
+  const [context, results, answers] = await Promise.all([
     loadParticipantContextSources({
-      env, slug, config, deps, principal: lower(address), leaveOutUploaders: optedOut,
+      env, slug, config, deps, principal: lower(address), leaveOutUploaders: optedOut, totalChars: SESSION_AGENT_LIMITS.contextChars,
       // A General asker reads the files open to everyone the session admits;
       // each read checks the session's own gate again, as a file read does.
       readable: detailed ? access.canRead : async (row) => forEveryone(row, config) && access.canRead(row),
@@ -159,8 +159,9 @@ const gatherMaterial = async ({ env, slug, config, setting, address, scopes, ask
     }) : [],
   ]);
   return {
-    material: { sessionContext: config?.sessionContext, sources, results, answers: Array.isArray(answers) ? answers : [] },
+    material: { sessionContext: config?.sessionContext, sources: context.sources, results, answers: Array.isArray(answers) ? answers : [] },
     answersUnavailable: answers === TOO_MANY_STORED ? 'too_many' : answers === null,
+    contextLeftOut: context.leftOut,
   };
 };
 
@@ -260,21 +261,27 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   const refused = await preflight.count?.();
   if (refused) return refused;
   const optedOut = new Set(optOuts.body.addresses);
-  const { material, answersUnavailable } = await gatherMaterial({
+  const { material, answersUnavailable, contextLeftOut } = await gatherMaterial({
     env, slug, config, setting, address, scopes: currentScopes, asker, access, optedOut, deps,
   });
   const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
   if (!payment?.ok) return json({ error: payment?.error || 'This answer needs payment first.', reason: 'session_agent_payment_required' }, 402);
-  const { messages, read } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
+  const { messages, read, contextOmitted } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
   const reply = await askAi({ messages, config, secrets: secretContext.secrets, address, scopes: currentScopes, headers, deps });
   if (!reply.ok) return json(reply.body, reply.status);
+  const notes = [
+    answersUnavailable === 'too_many'
+      ? `Members’ answers weren’t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} question and answer versions, the most the Session Agent can read at once.`
+      : answersUnavailable ? 'Members’ answers couldn’t be read for this answer.' : '',
+    contextLeftOut > 0 || contextOmitted > 0
+      ? `Some of the session’s context wasn’t read: the Session Agent reads at most ${SESSION_AGENT_LIMITS.contextChars.toLocaleString('en-US')} characters or ${CONTEXT_READ_LIMITS.sources} items of it.`
+      : '',
+  ].filter(Boolean);
   return json({
     answer: reply.answer,
     answers: asker.answers,
     audience: asker.audience,
     read,
-    ...(answersUnavailable ? { note: answersUnavailable === 'too_many'
-      ? `Members’ answers weren’t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} question and answer versions, the most the Session Agent can read at once.`
-      : 'Members’ answers couldn’t be read for this answer.' } : {}),
+    ...(notes.length ? { note: notes.join(' ') } : {}),
   });
 };
