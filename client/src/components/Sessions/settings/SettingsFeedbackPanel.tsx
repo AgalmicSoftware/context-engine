@@ -51,7 +51,7 @@ const failed = (failure: unknown, fallback: string): string =>
   failure instanceof Error && failure.message ? failure.message : fallback;
 
 export default function SettingsFeedbackPanel({ admin, children = null }: Props) {
-  // Not read until asked: reading takes the admin's signature.
+  // Not read until asked: reading may ask the admin to sign in to the Worker.
   const [messages, setMessages] = useState<FeedbackMessage[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -70,9 +70,11 @@ export default function SettingsFeedbackPanel({ admin, children = null }: Props)
   };
 
   const load = () => run(async () => setMessages(await listFeedback(admin)), 'Couldn’t read the feedback. Try again.');
-  const remove = (ids: string[]) =>
+  // All of them is everything up to the newest one listed: a message that arrived since stays, unread.
+  const remove = (listed: FeedbackMessage[], all = false) =>
     run(async () => {
-      await deleteFeedback(admin, ids);
+      const ids = listed.map((message) => message.id);
+      await deleteFeedback(admin, all ? { through: ids[0] } : { ids });
       setConfirmingAll(false);
       setMessages((current) => (current || []).filter((message) => !ids.includes(message.id)));
     }, 'Not deleted. Try again.');
@@ -127,7 +129,7 @@ export default function SettingsFeedbackPanel({ admin, children = null }: Props)
             className={styles.button}
             disabled={busy}
             data-testid="ce-settings-feedback-delete-all-confirm"
-            onClick={() => void remove(messages.map((message) => message.id))}
+            onClick={() => void remove(messages, true)}
           >
             Delete all
           </button>{' '}
@@ -150,10 +152,7 @@ export default function SettingsFeedbackPanel({ admin, children = null }: Props)
               <p className={styles.hint}>{details(message)}</p>
               {message.contact ? (
                 <p className={styles.hint}>
-                  May be contacted:{' '}
-                  {[message.contact.reachMe, message.contact.displayName, message.contact.address]
-                    .filter(Boolean)
-                    .join(' · ')}
+                  May be contacted: {[message.contact.reachMe, message.contact.address].filter(Boolean).join(' · ')}
                 </p>
               ) : null}
               <button
@@ -161,7 +160,7 @@ export default function SettingsFeedbackPanel({ admin, children = null }: Props)
                 className={styles.button}
                 disabled={busy}
                 aria-label={`Delete the message sent ${sentAt(message.createdAt)}`}
-                onClick={() => void remove([message.id])}
+                onClick={() => void remove([message])}
               >
                 Delete
               </button>

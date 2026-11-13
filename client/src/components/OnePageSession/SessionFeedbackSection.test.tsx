@@ -1,14 +1,17 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import SessionFeedbackSection, { feedbackView } from './SessionFeedbackSection';
-import { feedbackOffered, sendFeedback } from '../../domains/worker/sessionFeedbackPorts';
+import SessionFeedbackSection from './SessionFeedbackSection';
+import { feedbackOffered, feedbackView, sendFeedback } from '../../domains/worker/sessionFeedbackPorts';
 
 jest.mock('../../domains/worker/sessionFeedbackPorts', () => ({
   FEEDBACK_TEXT_MAX: 2000,
   FEEDBACK_REACH_MAX: 200,
   feedbackOffered: jest.fn(),
   sendFeedback: jest.fn(),
+  feedbackView: jest.requireActual<typeof import('../../domains/worker/sessionFeedbackPorts')>(
+    '../../domains/worker/sessionFeedbackPorts',
+  ).feedbackView,
 }));
 
 const offered = jest.mocked(feedbackOffered);

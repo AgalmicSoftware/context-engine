@@ -29,6 +29,7 @@ const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const ADMIN: FeedbackAdmin = {
   workerOrigin: 'https://worker.example',
   sessionSlug: 'salon',
+  sessionConfig: { slug: 'salon' },
   sessionIdHex: '0x01',
   account: ADMIN_ADDRESS,
   chainId: 1,
@@ -50,7 +51,7 @@ const message = (id: string, extra: Partial<FeedbackMessage> = {}): FeedbackMess
 const showMessages = async (messages: FeedbackMessage[]) => {
   list.mockResolvedValue(messages);
   render(<SettingsFeedbackPanel admin={ADMIN} />);
-  // Reading takes the admin's signature, so nothing is read until asked.
+  // Reading may ask the admin to sign in to the Worker, so nothing is read until asked.
   expect(list).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Show messages' }));
   await waitFor(() => expect(list).toHaveBeenCalledWith(ADMIN));
@@ -64,7 +65,7 @@ describe('SettingsFeedbackPanel', () => {
   it('lists each message with what came with it, as plain text', async () => {
     await showMessages([
       message('a', { text: '<img src=x onerror=alert(1)> https://evil.example' }),
-      message('b', { signedIn: true, contact: { address: '0xdef', displayName: '', reachMe: 'sam on Signal' } }),
+      message('b', { signedIn: true, contact: { address: '0xdef', reachMe: 'sam on Signal' } }),
     ]);
     const rows = within(await screen.findByTestId('ce-settings-feedback-list')).getAllByRole('listitem');
     expect(rows).toHaveLength(2);
@@ -110,7 +111,7 @@ describe('SettingsFeedbackPanel', () => {
     await showMessages([message('a'), message('b'), message('c')]);
     const rows = within(await screen.findByTestId('ce-settings-feedback-list')).getAllByRole('listitem');
     fireEvent.click(within(rows[1]).getByRole('button', { name: /^Delete the message sent/ }));
-    await waitFor(() => expect(remove).toHaveBeenCalledWith(ADMIN, ['b']));
+    await waitFor(() => expect(remove).toHaveBeenCalledWith(ADMIN, { ids: ['b'] }));
     await waitFor(() => expect(screen.queryByText('Message b')).not.toBeInTheDocument());
     expect(screen.getByText('Message a')).toBeInTheDocument();
 
@@ -120,7 +121,7 @@ describe('SettingsFeedbackPanel', () => {
     expect(screen.getByText(/Delete the 2 messages listed\? This can’t be undone\./)).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('ce-settings-feedback-delete-all-confirm'));
     // Exactly the ones listed: a message that arrived since stays, unread.
-    await waitFor(() => expect(remove).toHaveBeenLastCalledWith(ADMIN, ['a', 'c']));
+    await waitFor(() => expect(remove).toHaveBeenLastCalledWith(ADMIN, { through: 'a' }));
     expect(await screen.findByText('No feedback yet.')).toBeInTheDocument();
   });
 

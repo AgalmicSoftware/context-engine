@@ -8,6 +8,7 @@ import {
   FEEDBACK_REACH_MAX,
   FEEDBACK_TEXT_MAX,
   feedbackOffered,
+  feedbackView,
   sendFeedback,
   type FeedbackDraft,
 } from '../../domains/worker/sessionFeedbackPorts';
@@ -31,9 +32,6 @@ const screenClass = (): FeedbackDraft['screen'] => {
   if (width < 640) return 'phone';
   return width < 1024 ? 'tablet' : 'desktop';
 };
-
-/** The open part of the page as a short name. Never an address: links carry group ids, invites and prefills. */
-export const feedbackView = (view: string): string => view.replace(/[^A-Za-z0-9:_-]/g, '').slice(0, 80) || 'session';
 
 type HelpProps = { id: string; label: string; text: string };
 

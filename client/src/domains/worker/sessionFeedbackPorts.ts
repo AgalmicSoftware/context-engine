@@ -34,12 +34,14 @@ export type FeedbackMessage = {
   appRelease: string;
   workerRelease: string;
   signedIn: boolean;
-  contact: { address: string; displayName: string; reachMe: string } | null;
+  /** Only for a sender who asked to be contacted; the address only when they were signed in. */
+  contact: { address: string; reachMe: string } | null;
 };
 
 export type FeedbackAdmin = {
   workerOrigin: string;
   sessionSlug: string;
+  sessionConfig: unknown;
   sessionIdHex: string;
   account: string;
   provider?: unknown;
@@ -62,9 +64,18 @@ const workerBase = async (options: FeedbackOptions): Promise<string> =>
     .trim()
     .replace(/\/+$/, '');
 
-/** True when the session's admins left the Feedback box on and its Worker takes feedback (from 0.9.8). */
+/** The open part of the page as a short name. Never an address: links carry group ids, invites and prefills. */
+export const feedbackView = (view: string): string => view.replace(/[^A-Za-z0-9:_-]/g, '').slice(0, 80) || 'session';
+
+/**
+ * True when the session is run by its Worker, its admins left the Feedback box on, and the Worker takes
+ * feedback (from 0.9.8). An on-chain session has no place for its admins to read it, so it is never offered.
+ */
 export const feedbackOffered = async (options: FeedbackOptions): Promise<boolean> => {
-  if (asRecord(options.sessionConfig).feedbackEnabled === false) return false;
+  const config = asRecord(options.sessionConfig);
+  // The Worker's own test of a session it runs, so the page and the Worker never disagree.
+  const workerRun = asRecord(asRecord(config.sessionModeProfile).authority).mode === 'worker_canonical';
+  if (config.feedbackEnabled === false || !workerRun) return false;
   try {
     const capabilities = await readWorkerCapabilities(await workerBase(options), options.sessionSlug);
     return capabilities.features.includes(FEEDBACK_FEATURE);
@@ -155,11 +166,7 @@ const messageOf = (value: unknown): FeedbackMessage => {
     appRelease: toStr(row.appRelease),
     workerRelease: toStr(row.workerRelease),
     signedIn: row.signedIn === true,
-    contact: contact && {
-      address: toStr(contact.address),
-      displayName: toStr(contact.displayName),
-      reachMe: toStr(contact.reachMe),
-    },
+    contact: contact && { address: toStr(contact.address), reachMe: toStr(contact.reachMe) },
   };
 };
 
@@ -167,12 +174,28 @@ const messageOf = (value: unknown): FeedbackMessage => {
 const PAGE = 100;
 const LIST_PAGES_MAX = 20;
 
-/** Every stored message, newest first. Only a full admin's signature is accepted. */
+/**
+ * Every stored message, newest first. Read with the admin's sign-in, which the Worker checks; no page takes a
+ * signature, of which a person may make only a few a minute.
+ */
 export const listFeedback = async (admin: FeedbackAdmin): Promise<FeedbackMessage[]> => {
+  const base = admin.workerOrigin.replace(/\/+$/, '');
   const messages: FeedbackMessage[] = [];
   let cursor = '';
   for (let page = 0; page < LIST_PAGES_MAX; page += 1) {
-    const result = await adminPost(admin, 'feedback/list', cursor ? { limit: PAGE, cursor } : { limit: PAGE });
+    const query = new URLSearchParams({ slug: admin.sessionSlug, limit: String(PAGE), ...(cursor ? { cursor } : {}) });
+    const response = await fetchWorkerWithAuth(
+      `${base}/admin/feedback?${query}`,
+      { method: 'GET' },
+      {
+        ...session({ sessionSlug: admin.sessionSlug, sessionConfig: admin.sessionConfig, account: admin.account }),
+        workerUrl: base,
+      },
+    );
+    const result = asRecord(await response.json().catch(() => ({})));
+    if (!response.ok) {
+      throw new Error(toStr(result.error) || `The Session Worker couldn’t list the feedback (${response.status}).`);
+    }
     if (Array.isArray(result.messages))
       messages.push(...result.messages.map(messageOf).filter((message) => message.id));
     cursor = toStr(result.cursor);
@@ -181,11 +204,15 @@ export const listFeedback = async (admin: FeedbackAdmin): Promise<FeedbackMessag
   return messages;
 };
 
-/** Deletes the named messages, and only those: one that arrived since they were listed stays to be read. */
-export const deleteFeedback = async (admin: FeedbackAdmin, ids: string[]): Promise<void> => {
-  for (let start = 0; start < ids.length; start += PAGE) {
-    await adminPost(admin, 'feedback/delete', { ids: ids.slice(start, start + PAGE) });
-  }
+/**
+ * Deletes the named messages (100 at most), or every message up to and including one: the newest listed, so
+ * "all" is one signature and a message that arrived since stays to be read.
+ */
+export const deleteFeedback = async (
+  admin: FeedbackAdmin,
+  what: { ids: string[] } | { through: string },
+): Promise<void> => {
+  await adminPost(admin, 'feedback/delete', what);
 };
 
 // A spreadsheet runs a cell that starts with one of these as a formula; feedback is strangers' text.
@@ -207,7 +234,6 @@ export const feedbackCsv = (messages: FeedbackMessage[]): string =>
       'Signed in',
       'Reach me',
       'Address',
-      'Name',
     ],
     ...messages.map((message) => [
       message.createdAt,
@@ -220,7 +246,6 @@ export const feedbackCsv = (messages: FeedbackMessage[]): string =>
       message.signedIn ? 'yes' : 'no',
       message.contact?.reachMe || '',
       message.contact?.address || '',
-      message.contact?.displayName || '',
     ]),
   ]
     .map((row) => row.map(csvCell).join(','))

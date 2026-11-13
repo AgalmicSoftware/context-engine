@@ -26,7 +26,8 @@ const fetchWorker = jest.mocked(fetchWorkerWithAuth);
 const adminPost = jest.mocked(postSignedAdminWorkerRequest);
 const capabilities = jest.mocked(readWorkerCapabilities);
 
-const SIGNED_IN = { sessionSlug: 'salon', sessionConfig: { slug: 'salon' }, account: '0xabc' };
+const WORKER_RUN = { slug: 'salon', sessionModeProfile: { authority: { mode: 'worker_canonical' } } };
+const SIGNED_IN = { sessionSlug: 'salon', sessionConfig: WORKER_RUN, account: '0xabc' };
 const VISITOR = { ...SIGNED_IN, account: '' };
 const DRAFT: FeedbackDraft = {
   text: 'The map was hard to read.',
@@ -38,6 +39,7 @@ const DRAFT: FeedbackDraft = {
 const ADMIN: FeedbackAdmin = {
   workerOrigin: 'https://worker.example',
   sessionSlug: 'salon',
+  sessionConfig: { slug: 'salon' },
   sessionIdHex: '0x01',
   account: '0xabc',
   chainId: 1,
@@ -77,8 +79,14 @@ describe('sessionFeedbackPorts', () => {
 
     capabilities.mockClear();
     capabilities.mockResolvedValue({ legacy: false, features: ['session_feedback'] });
-    await expect(feedbackOffered({ ...SIGNED_IN, sessionConfig: { feedbackEnabled: false } })).resolves.toBe(false);
-    // Turned off, the Worker isn't even asked.
+    await expect(
+      feedbackOffered({ ...SIGNED_IN, sessionConfig: { ...WORKER_RUN, feedbackEnabled: false } }),
+    ).resolves.toBe(false);
+    // An on-chain session's admins have nowhere to read feedback, so it is never offered there.
+    const onChain = { slug: 'salon', sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } } };
+    await expect(feedbackOffered({ ...SIGNED_IN, sessionConfig: onChain })).resolves.toBe(false);
+    await expect(feedbackOffered({ ...SIGNED_IN, sessionConfig: { slug: 'salon' } })).resolves.toBe(false);
+    // Turned off or on chain, the Worker isn't even asked.
     expect(capabilities).not.toHaveBeenCalled();
 
     workerUrl.mockRejectedValue(new Error('no Worker'));
@@ -160,39 +168,58 @@ describe('sessionFeedbackPorts', () => {
     await expect(sendFeedback(DRAFT, VISITOR)).rejects.toThrow('Not sent. Try again.');
   });
 
-  it('reads every page of messages for an admin, newest first as the Worker gives them', async () => {
-    adminPost
-      .mockResolvedValueOnce({ data: { messages: [stored('b'), stored('a')], cursor: 'next' } } as never)
-      .mockResolvedValueOnce({
-        data: { messages: [stored('0', { contact: { address: '0xdef', displayName: '', reachMe: '@sam' } }), {}] },
-      } as never);
+  it('reads every page of messages with the admin’s sign-in, newest first as the Worker gives them', async () => {
+    fetchWorker
+      .mockResolvedValueOnce(response(200, { messages: [stored('b'), stored('a')], cursor: 'a' }))
+      .mockResolvedValueOnce(
+        response(200, {
+          messages: [stored('0', { contact: { address: '0xdef', reachMe: '@sam' } }), {}],
+        }),
+      );
     const messages = await listFeedback(ADMIN);
     expect(messages.map((message) => message.id)).toEqual(['b', 'a', '0']);
     expect(messages[0].contact).toBeNull();
-    expect(messages[2].contact).toEqual({ address: '0xdef', displayName: '', reachMe: '@sam' });
-    expect(adminPost.mock.calls.map(([args]) => [args.path, args.body])).toEqual([
-      ['/admin/feedback/list', { sessionId: '0x01', limit: 100 }],
-      ['/admin/feedback/list', { sessionId: '0x01', limit: 100, cursor: 'next' }],
+    expect(messages[2].contact).toEqual({ address: '0xdef', reachMe: '@sam' });
+    expect(fetchWorker.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
+      ['https://worker.example/admin/feedback?slug=salon&limit=100', 'GET'],
+      ['https://worker.example/admin/feedback?slug=salon&limit=100&cursor=a', 'GET'],
     ]);
+    expect(fetchWorker.mock.calls[0][2]).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'salon',
+        sessionConfig: ADMIN.sessionConfig,
+        context: { account: '0xabc' },
+      }),
+    );
+    // No page is a signed admin action: a person may sign only a few of those a minute.
+    expect(adminPost).not.toHaveBeenCalled();
   });
 
   it('stops reading at what the Worker can store, whatever cursor it keeps giving', async () => {
-    adminPost.mockResolvedValue({ data: { messages: [stored('a')], cursor: 'again' } } as never);
+    fetchWorker.mockImplementation(async () => response(200, { messages: [stored('a')], cursor: 'again' }));
     await expect(listFeedback(ADMIN)).resolves.toHaveLength(20);
-    expect(adminPost).toHaveBeenCalledTimes(20);
+    expect(fetchWorker).toHaveBeenCalledTimes(20);
   });
 
-  it('deletes the named messages, a hundred to a call, and never asks for all', async () => {
+  it('says in the Worker’s words why the list can’t be read', async () => {
+    fetchWorker.mockResolvedValueOnce(response(403, { error: 'Only this session’s admins can read feedback.' }));
+    await expect(listFeedback(ADMIN)).rejects.toThrow('Only this session’s admins can read feedback.');
+    fetchWorker.mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      json: async () => Promise.reject(new Error('html')),
+    } as never);
+    await expect(listFeedback(ADMIN)).rejects.toThrow('The Session Worker couldn’t list the feedback (502).');
+  });
+
+  it('deletes named messages, or everything up to one, in a single signed call', async () => {
     adminPost.mockResolvedValue({ data: { deleted: 1 } } as never);
-    const ids = Array.from({ length: 150 }, (_, index) => `m${index}`);
-    await deleteFeedback(ADMIN, ids);
-    expect(adminPost.mock.calls.map(([args]) => args.path)).toEqual([
-      '/admin/feedback/delete',
-      '/admin/feedback/delete',
+    await deleteFeedback(ADMIN, { ids: ['b'] });
+    await deleteFeedback(ADMIN, { through: 'c' });
+    expect(adminPost.mock.calls.map(([args]) => [args.path, args.body])).toEqual([
+      ['/admin/feedback/delete', { ids: ['b'], sessionId: '0x01' }],
+      ['/admin/feedback/delete', { through: 'c', sessionId: '0x01' }],
     ]);
-    expect(adminPost.mock.calls.map(([args]) => (args.body?.ids as string[]).length)).toEqual([100, 50]);
-    // "All" on the Worker would take messages that arrived after the list was read, unread.
-    expect(adminPost.mock.calls.some(([args]) => 'all' in (args.body || {}))).toBe(false);
   });
 
   it('writes a CSV a spreadsheet opens as text, whatever was typed', () => {
@@ -200,16 +227,16 @@ describe('sessionFeedbackPorts', () => {
       {
         ...stored('a'),
         text: 'Said "no", then\nleft',
-        contact: { address: '0xdef', displayName: 'Sam', reachMe: '=HYPERLINK("https://evil.example")' },
+        contact: { address: '0xdef', reachMe: '=HYPERLINK("https://evil.example")' },
       } as FeedbackMessage,
       { ...stored('b'), text: '+1 for the map', signedIn: false, contact: null } as FeedbackMessage,
     ]);
     const [header, first] = csv.split('\r\n');
-    expect(header).toBe('Sent,Feedback,View,Theme,Screen,App release,Worker release,Signed in,Reach me,Address,Name');
+    expect(header).toBe('Sent,Feedback,View,Theme,Screen,App release,Worker release,Signed in,Reach me,Address');
     // A quoted cell keeps its line break; a cell that would run as a formula starts with an apostrophe.
     expect(first).toBe(
-      '2026-11-24T10:00:00.000Z,"Said ""no"", then\nleft",questions,civic,desktop,0.9.8,0.9.8,yes,"\'=HYPERLINK(""https://evil.example"")",0xdef,Sam',
+      '2026-11-24T10:00:00.000Z,"Said ""no"", then\nleft",questions,civic,desktop,0.9.8,0.9.8,yes,"\'=HYPERLINK(""https://evil.example"")",0xdef',
     );
-    expect(csv).toContain("\r\n2026-11-24T10:00:00.000Z,'+1 for the map,questions,civic,desktop,0.9.8,0.9.8,no,,,\r\n");
+    expect(csv).toContain("\r\n2026-11-24T10:00:00.000Z,'+1 for the map,questions,civic,desktop,0.9.8,0.9.8,no,,\r\n");
   });
 });

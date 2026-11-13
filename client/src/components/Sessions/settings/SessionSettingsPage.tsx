@@ -657,11 +657,12 @@ const SessionSettingsPage = ({
             </p>
           }
         />
-        {!onChain && workerTakesFeedback ? (
+        {capabilities.isWorkerCanonical && workerTakesFeedback ? (
           <SettingsFeedbackPanel
             admin={{
               workerOrigin,
               sessionSlug,
+              sessionConfig: saved,
               sessionIdHex: resolveWorkerCanonicalSessionIdHex(saved),
               account,
               provider,
