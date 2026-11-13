@@ -79,6 +79,13 @@ test('Netlify builds the client from the repository-root deployment contract', (
   assert.ok(wellKnownRule > 0 && wellKnownRule < spaFallback, '/.well-known/ 404 precedes the SPA fallback');
   // Agents read the guide at /skill.md, which the SPA fallback would answer with the app.
   assert.ok(agentGuideRule > 0 && agentGuideRule < spaFallback, '/skill.md rewrite precedes the SPA fallback');
+  // Addresses an agent guesses for the guide go to it, not to the app's page, empty until it runs.
+  for (const guess of ['/agents', '/agents.md', '/agent-guide']) {
+    const rule = config.search(
+      new RegExp(`from\\s*=\\s*"${guess.replace('.', '\\.')}"\\s*to\\s*=\\s*"/skill\\.md"\\s*status\\s*=\\s*302`),
+    );
+    assert.ok(rule > 0 && rule < spaFallback, `${guess} redirect precedes the SPA fallback`);
+  }
   // A forced rule would shadow real hashed files.
   assert.doesNotMatch(config, /force\s*=/);
   // The 404 target must exist, and it stays a static page that the CSP allows.
@@ -94,6 +101,9 @@ test('Netlify builds the client from the repository-root deployment contract', (
       '/assets/* /404.html 404',
       '/.well-known/* /404.html 404',
       '/skill.md /agent-guide.md 200',
+      '/agents /skill.md 302',
+      '/agents.md /skill.md 302',
+      '/agent-guide /skill.md 302',
       '/* /index.html 200',
       '',
     ].join('\n'),

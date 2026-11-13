@@ -206,6 +206,9 @@ manual deploys; keep the two files identical:
 /assets/* /404.html 404
 /.well-known/* /404.html 404
 /skill.md /agent-guide.md 200
+/agents /skill.md 302
+/agents.md /skill.md 302
+/agent-guide /skill.md 302
 /* /index.html 200
 ```
 
@@ -238,6 +241,21 @@ The connected-build equivalent is:
   status = 200
 
 [[redirects]]
+  from = "/agents"
+  to = "/skill.md"
+  status = 302
+
+[[redirects]]
+  from = "/agents.md"
+  to = "/skill.md"
+  status = 302
+
+[[redirects]]
+  from = "/agent-guide"
+  to = "/skill.md"
+  status = 302
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
@@ -248,7 +266,9 @@ Keep specific legacy redirects above the SPA fallback rule in both files. The
 `client/public/404.html`) instead of the SPA HTML. It is not forced, so files
 that exist are still served. `/.well-known/` addresses also return 404, and
 `/skill.md`, the guide for AI agents, serves `client/public/agent-guide.md`; the
-dev and preview servers follow that rewrite too.
+dev and preview servers follow that rewrite too. `/agents`, `/agents.md` and
+`/agent-guide`, addresses an agent might guess, redirect to `/skill.md`; a
+fetcher that runs no JavaScript would otherwise get the app's empty page.
 
 For rollback, use Netlify's deploy history to republish the previous known-good
 production deploy, then correct `main` normally. A frontend rollback does not

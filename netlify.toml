@@ -37,6 +37,23 @@
   to = "/agent-guide.md"
   status = 200
 
+# Addresses an agent guesses for the guide; the app would answer them with a page
+# that is empty until it runs.
+[[redirects]]
+  from = "/agents"
+  to = "/skill.md"
+  status = 302
+
+[[redirects]]
+  from = "/agents.md"
+  to = "/skill.md"
+  status = 302
+
+[[redirects]]
+  from = "/agent-guide"
+  to = "/skill.md"
+  status = 302
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
