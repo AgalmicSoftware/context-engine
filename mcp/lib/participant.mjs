@@ -317,11 +317,21 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     state = await updateAgentState(config.stateDir, mutate);
   };
 
-  const profile = () => ({
-    displayName: trim(state?.profile?.displayName ?? config.profile.displayName),
-    modelId: trim(state?.profile?.modelId ?? config.profile.modelId),
-    platform: trim(state?.profile?.platform ?? config.profile.platform),
-  });
+  // A model or platform the host set is kept over one the agent declares, and
+  // the answer records say which of the two set it.
+  const profile = () => {
+    const hostModelId = trim(config.profile.modelId);
+    const hostPlatform = trim(config.profile.platform);
+    const modelId = hostModelId || trim(state?.profile?.modelId);
+    const platform = hostPlatform || trim(state?.profile?.platform);
+    return {
+      displayName: trim(state?.profile?.displayName ?? config.profile.displayName),
+      modelId,
+      platform,
+      ...(modelId ? { modelIdSetBy: hostModelId ? 'host' : 'agent' } : {}),
+      ...(platform ? { platformSetBy: hostPlatform ? 'host' : 'agent' } : {}),
+    };
+  };
 
   // Sign in as the link's web app only when the agent already trusts it.
   const trustedOriginsFor = (preferred) =>
@@ -811,10 +821,17 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (displayName !== undefined) next.displayName = normalizeLabel(displayName, 'displayName');
       if (modelId !== undefined) next.modelId = normalizeLabel(modelId, 'modelId');
       if (platform !== undefined) next.platform = normalizeLabel(platform, 'platform');
+      const kept = ['modelId', 'platform'].filter((field) => field in next && trim(config.profile[field]));
+      kept.forEach((field) => delete next[field]);
       await saveState((fresh) => {
         fresh.profile = { ...fresh.profile, ...next };
       });
-      return { profile: profile(), note: 'Applies to answers and statements submitted from now on.' };
+      return {
+        profile: profile(),
+        note: kept.length
+          ? `Your host set ${kept.join(' and ')}, which stay${kept.length > 1 ? '' : 's'} as it set ${kept.length > 1 ? 'them' : 'it'}. The rest applies to answers and statements submitted from now on.`
+          : 'Applies to answers and statements submitted from now on.',
+      };
     },
 
     async joinSession({ link, worker, session, inviteCode, groupPassword, claimPassword } = {}) {

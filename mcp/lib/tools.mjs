@@ -43,7 +43,7 @@ export const buildTools = (participant) => [
     name: 'set_profile',
     title: 'Set display profile',
     description:
-      'Set the display name shown beside your answers in session reports (for example your handle), and the self-reported model and platform recorded with them.',
+      'Set the display name shown beside your answers in session reports (for example your handle), and the self-reported model and platform recorded with them. A model or platform your host already set stays as it set it.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -16,7 +16,7 @@ const { slug, sessionId, corsWorkerUrl } = fixture.config;
 const GROUP_ID = 'e478b073-5b03-4ba3-9cb0-d31977f61af4';
 const questionId = (index) => `0x${(index + 1).toString(16).padStart(64, '0')}`;
 
-const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplete: true }), keyMadeHere = false, now, config = fixture.config, everyone, seedState, groupLabel = 'AI agents', uploads = false, waitMs = 50, onJoin } = {}) => {
+const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplete: true }), keyMadeHere = false, now, config = fixture.config, everyone, seedState, groupLabel = 'AI agents', uploads = false, waitMs = 50, onJoin, profile = {} } = {}) => {
   const stateDir = await mkdtemp(join(tmpdir(), 'ce-agent-list-'));
   t.after(() => rm(stateDir, { recursive: true, force: true }));
   // A key made with this state marks it; a key from elsewhere does not.
@@ -28,7 +28,7 @@ const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplet
   const payloads = new Map(Array.from({ length: questions }, (_, index) => [`q${index}`, {
     id: questionId(index), type: 'binary', prompt: `Statement ${index + 1}`, sessionSlug: slug, sessionId,
   }]));
-  const fetchImpl = async (input) => {
+  const fetchImpl = async (input, init = {}) => {
     const url = new URL(input);
     const path = url.pathname;
     if (path === '/session-config') return Response.json({ config });
@@ -54,13 +54,14 @@ const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplet
     if (path === '/storage/upload') {
       if (!uploads) return Response.json({ error: 'Temporarily unavailable.' }, { status: 500 });
       calls.uploads = (calls.uploads || 0) + 1;
+      (calls.uploaded ||= []).push(JSON.parse(init.body));
       return Response.json({ storageRef: { backend: 'cloudflare', resource: 'responses', id: `a${calls.uploads}`, createdAt: new Date().toISOString() } });
     }
     throw new Error(`Unexpected route: ${path}`);
   };
   const participant = createParticipant({
     wallet,
-    config: { stateDir, profile: {}, appOrigin: 'https://contextengine.sh', trustedAppOrigins: ['https://contextengine.sh'] },
+    config: { stateDir, profile, appOrigin: 'https://contextengine.sh', trustedAppOrigins: ['https://contextengine.sh'] },
     fetchImpl,
     ...(now ? { now } : {}),
     ownAnswerWaitMs: waitMs,
@@ -302,4 +303,31 @@ test('a join with no answer says it may not have gone through and how to check',
   const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID });
   assert.equal(reply.result.isError, true);
   assert.match(reply.result.content[0].text, /may not have gone through\. Call get_session to see whether you are in it/);
+});
+
+const uploadedMarker = (calls) => {
+  const { data } = calls.uploaded.at(-1);
+  return JSON.parse(data).participant;
+};
+
+test('a model and platform the host set stay when the agent declares others, and answers say who set them', async (t) => {
+  // An earlier visit's declared model gives way too.
+  const { participant, calls } = await setup(t, { questions: 1, uploads: true, profile: { modelId: 'host-model', platform: 'host-harness' },
+    seedState: (state) => { state.profile = { modelId: 'earlier-declared' }; } });
+  assert.equal((await participant.setProfile({})).profile.modelId, 'host-model');
+  const set = await participant.setProfile({ displayName: 'wren', modelId: 'gpt-4o', platform: 'openai' });
+  assert.equal(set.profile.modelId, 'host-model');
+  assert.equal(set.profile.platform, 'host-harness');
+  assert.equal(set.profile.displayName, 'wren');
+  assert.match(set.note, /Your host set modelId and platform, which stay as it set them/);
+  await participant.answer({ answers: [{ questionId: questionId(0), value: 'Agree' }] });
+  assert.deepEqual(uploadedMarker(calls), { kind: 'agent', modelId: 'host-model', modelIdSetBy: 'host',
+    platform: 'host-harness', platformSetBy: 'host', verification: 'self_reported' });
+});
+
+test('without a host value, a model the agent declares is recorded as its own', async (t) => {
+  const { participant, calls } = await setup(t, { questions: 1, uploads: true });
+  assert.equal((await participant.setProfile({ modelId: 'gpt-4o' })).note, 'Applies to answers and statements submitted from now on.');
+  await participant.answer({ answers: [{ questionId: questionId(0), value: 'Agree' }] });
+  assert.deepEqual(uploadedMarker(calls), { kind: 'agent', modelId: 'gpt-4o', modelIdSetBy: 'agent', verification: 'self_reported' });
 });

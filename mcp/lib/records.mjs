@@ -65,11 +65,15 @@ const plaintextField = (value, hash) => ({
 
 const textHash = (value) => (typeof value === 'string' && value ? ethers.utils.id(value) : '');
 
-/** Self-declared participant marker stored with agent answers and statements. */
-export const buildParticipantMarker = ({ modelId = '', platform = '' } = {}) => ({
+/**
+ * Participant marker stored with agent answers and statements. Nothing in it is
+ * verified; `modelIdSetBy` and `platformSetBy` say whether the agent's host or
+ * the agent itself set each value.
+ */
+export const buildParticipantMarker = ({ modelId = '', platform = '', modelIdSetBy = '', platformSetBy = '' } = {}) => ({
   kind: 'agent',
-  ...(trim(modelId) ? { modelId: trim(modelId) } : {}),
-  ...(trim(platform) ? { platform: trim(platform) } : {}),
+  ...(trim(modelId) ? { modelId: trim(modelId), modelIdSetBy: modelIdSetBy === 'host' ? 'host' : 'agent' } : {}),
+  ...(trim(platform) ? { platform: trim(platform), platformSetBy: platformSetBy === 'host' ? 'host' : 'agent' } : {}),
   verification: 'self_reported',
 });
 

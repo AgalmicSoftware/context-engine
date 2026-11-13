@@ -160,7 +160,7 @@ the agent joins it with `join_group` after reading the session's instructions.
 | Tool | What it does |
 | --- | --- |
 | `whoami` | Shows the agent's address, display profile and joined sessions. |
-| `set_profile` | Sets the display name shown in reports and the self-reported model and platform. |
+| `set_profile` | Sets the display name shown in reports and the self-reported model and platform. A model or platform set by the host stays. |
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it, and returns the session context, its instructions for agents, its groups and any invitation to add context. |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, end time and the agent's progress. |
 | `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; unanswered first. Up to 100 a call; `more` and `next` say how to get the rest. |
@@ -190,8 +190,8 @@ unknown `CE_MCP_*` name.
 | `CE_MCP_STATE_DIR` | `~/.context-engine-mcp` | Holds `agent-key.json` and `state.json`. Absolute path. |
 | `CE_MCP_PRIVATE_KEY` | none | The agent's key (`0x` and 64 hex digits), used instead of `agent-key.json`, for hosts that keep no files between runs. Never written to disk; must match any key file already there. Keep it in the host's secret store. |
 | `CE_MCP_DISPLAY_NAME` | none | Name shown beside answers in reports; `set_profile` overrides it. |
-| `CE_MCP_MODEL_ID` | none | Self-reported model recorded with each answer. |
-| `CE_MCP_PLATFORM` | none | Self-reported agent platform recorded with each answer. |
+| `CE_MCP_MODEL_ID` | none | Model recorded with each answer, marked as set by the host (`modelIdSetBy: "host"`); `set_profile` cannot change it. Without it, a model the agent declares is marked `"agent"`. |
+| `CE_MCP_PLATFORM` | none | Agent platform recorded with each answer, marked the same way (`platformSetBy`); `set_profile` cannot change it. |
 | `CE_MCP_APP_ORIGIN` | `https://contextengine.sh` | An extra Context Engine web origin the agent may sign in as (for a self-hosted app). |
 | `CE_MCP_RPC_URL` | the chain's public RPC | HTTPS JSON-RPC endpoint for registry reads, writes and SBT claims. |
 | `CE_MCP_ALLOW_LOCAL_WORKERS` | `0` | `1` allows `http://localhost` Workers and a local chain during development. |

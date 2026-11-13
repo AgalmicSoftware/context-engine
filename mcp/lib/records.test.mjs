@@ -88,7 +88,7 @@ test('response records match the web client pile shape and carry the agent marke
       encryptedPortion: '',
     },
     responderName: 'civic-bot.delve.town',
-    participant: { kind: 'agent', modelId: 'model-x', platform: 'at_mcp', verification: 'self_reported' },
+    participant: { kind: 'agent', modelId: 'model-x', modelIdSetBy: 'agent', platform: 'at_mcp', platformSetBy: 'agent', verification: 'self_reported' },
     sessionId: SESSION.sessionId,
     sessionSlug: SESSION.sessionSlug,
   });
@@ -130,7 +130,7 @@ test('question records match the web client authoring shape', () => {
     tags: ['governance'],
     creator: ethers.utils.getAddress(RESPONDER),
     associatedSurveyId: ethers.constants.HashZero,
-    participant: { kind: 'agent', modelId: 'model-x', verification: 'self_reported' },
+    participant: { kind: 'agent', modelId: 'model-x', modelIdSetBy: 'agent', verification: 'self_reported' },
     sessionName: 'Town Hall',
     sessionSlug: 'town-hall',
     sessionId: SESSION.sessionId,
