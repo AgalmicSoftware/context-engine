@@ -245,14 +245,16 @@ const GROUP_REFUSALS = {
 // Group answers that a few seconds' wait clears; the client has already resent a join.
 const BUSY_GROUP_REASONS = new Set(['worker_group_coordination_unavailable', 'worker_group_membership_state_pending', 'worker_group_mutation_ambiguous']);
 
-// A busy or unanswered change says what the agent's membership now is, so a
-// model neither stops trying nor believes it joined.
+// A busy or unanswered change may still land later, so it says the agent's
+// membership is unconfirmed and that repeating the call is harmless.
 const groupRefusal = (error, id, tool) => {
   if (!(error instanceof WorkerRequestError)) return error;
   if (Object.hasOwn(GROUP_REFUSALS, error.code)) return new Error(GROUP_REFUSALS[error.code](id));
   const joining = tool === 'join_group';
   if (error.status === 503 && (BUSY_GROUP_REASONS.has(error.code) || !error.code || error.code === SESSION_COORDINATOR_UNAVAILABLE)) {
-    return new Error(`The session was too busy to finish ${joining ? 'joining' : 'leaving'} group "${id}", so you are ${joining ? 'not' : 'still'} in it. Wait a few seconds and call ${tool} again.`);
+    return new Error(joining
+      ? `The session was too busy to confirm that you joined group "${id}", so you may not be in it yet. Wait a few seconds and call join_group again: repeating it is harmless, and it succeeds at once if you are already in.`
+      : `The session was too busy to confirm that you left group "${id}", so you may still be in it. Wait a few seconds and call leave_group again: if you have already left, it says you aren’t a member.`);
   }
   if (!error.status) {
     return new Error(`No answer came back about ${joining ? 'joining' : 'leaving'} group "${id}", so it may not have gone through. Call get_session to see whether you are in it, or call ${tool} again: repeating it is harmless.`);

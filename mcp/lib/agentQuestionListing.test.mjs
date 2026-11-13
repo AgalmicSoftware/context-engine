@@ -295,7 +295,7 @@ test('a join still busy after its retries says the agent is not in the group and
   assert.equal(reply.result.isError, true);
   assert.equal(joins, 4);
   assert.match(reply.result.content[0].text,
-    new RegExp(`too busy to finish joining group "${GROUP_ID}", so you are not in it\\. Wait a few seconds and call join_group again\\.`));
+    new RegExp(`too busy to confirm that you joined group "${GROUP_ID}", so you may not be in it yet\\. Wait a few seconds and call join_group again: repeating it is harmless`));
 });
 
 test('a join with no answer says it may not have gone through and how to check', async (t) => {
