@@ -237,10 +237,11 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
     return json({ error: `A question can be at most ${SESSION_AGENT_LIMITS.questionChars} characters.` }, 400);
   }
   // The /ai route's checks: the current AI scope, which every asker needs,
-  // then its rate limit.
+  // then its rate limit, counted once nothing below can refuse the question.
   const preflight = await deps.evaluateAuthenticatedRoutePreflight({
     scopes, scope: 'ai', route: 'ai', allowWithoutScope: true, config, env, slug, address, limit: resolveAiDailyLimit(config), headers,
     deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: deps.json },
+    countLater: true,
   });
   if (!preflight?.ok) return preflight?.response || json({ error: 'Current authorization check failed.' }, 403);
   const currentScopes = { ...scopes, ai: preflight.tokenHasScope === true };
@@ -256,6 +257,8 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   // Who opted out is read on every question, so no answer goes ahead without it.
   const optOuts = await store(env, slug, 'list');
   if (!optOuts.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
+  const refused = await preflight.count?.();
+  if (refused) return refused;
   const optedOut = new Set(optOuts.body.addresses);
   const { material, answersUnavailable } = await gatherMaterial({
     env, slug, config, setting, address, scopes: currentScopes, asker, access, optedOut, deps,

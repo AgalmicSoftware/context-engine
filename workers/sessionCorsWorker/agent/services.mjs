@@ -164,19 +164,21 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
     async ai(payload) {
       await current();
       if (!ctx.scopes?.ai) throw authorityError('agent_ai_scope_denied');
-      const allowed = await deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: 'ai', limit: resolveAiDailyLimit(ctx.config) });
-      if (allowed === null) throw authorityError('agent_ai_rate_unavailable', 503);
-      if (!allowed) throw authorityError('agent_ai_rate_limited', 429);
       const key = ctx.sessionId;
       if ((activeAi.get(key) || 0) >= 2) throw authorityError('agent_ai_busy', 429);
       const model = resolveSessionAiModel(ctx.config, { taskType: payload.taskType || 'analysis' });
       const proxy = { openai: proxyOpenAI, anthropic: proxyAnthropic, openrouter: proxyOpenRouter }[model.provider];
       if (!proxy) throw authorityError('agent_ai_provider_unavailable', 503);
-      const secrets = await deps.getSessionSecrets(env, ctx.slug);
       const safe = { ...payload, model: model.model, taskType: payload.taskType || 'analysis' };
       delete safe.apiKey; delete safe.rpcKey;
+      // The slot is taken before the call is counted, so a call refused as
+      // busy costs nothing from the day's AI calls.
       activeAi.set(key, (activeAi.get(key) || 0) + 1);
       try {
+        const allowed = await deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: 'ai', limit: resolveAiDailyLimit(ctx.config) });
+        if (allowed === null) throw authorityError('agent_ai_rate_unavailable', 503);
+        if (!allowed) throw authorityError('agent_ai_rate_limited', 429);
+        const secrets = await deps.getSessionSecrets(env, ctx.slug);
         const response = await proxy({ payload: safe, secrets, config: ctx.config, baseHeaders: {}, deps: { fetch: boundedAgentFetch(deps.fetch || fetch) } });
         const body = await response.json();
         if (!response.ok) throw authorityError('agent_ai_request_failed', response.status);

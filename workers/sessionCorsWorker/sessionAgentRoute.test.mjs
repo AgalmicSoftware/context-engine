@@ -273,6 +273,17 @@ test('questions count against the AI daily limit, not the general one', async ()
   assert.deepEqual(seen, [{ route: 'ai', limit: 15 }]);
 });
 
+test('a question refused before any AI runs costs nothing from the day', async () => {
+  const h = await seeded();
+  const refusals = [
+    await ask(h, { address: MEMBER, current: { ai: false } }),
+    await ask(h, { deps: { getSessionSecrets: async () => null } }),
+    await ask(h, { deps: { callSessionAgentOptOutStore: async () => ({ ok: false, status: 503, body: {} }) } }),
+  ];
+  assert.deepEqual(refusals.map((refused) => [refused.status, refused.calls.rate]), [[403, []], [503, []], [503, []]]);
+  assert.deepEqual((await ask(h)).calls.rate, ['ai']);
+});
+
 test('questions share the /ai rate limit', async () => {
   const limited = await ask(await seeded(), { deps: { checkRateLimit: async () => false } });
   assert.equal(limited.status, 429);

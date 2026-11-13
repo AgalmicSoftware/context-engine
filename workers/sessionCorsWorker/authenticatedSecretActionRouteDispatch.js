@@ -183,6 +183,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         computeScopesForLogin: deps?.computeScopesForLogin,
         json: deps?.json,
       },
+      countLater: true,
     });
     if (!preflight?.ok) {
       return {
@@ -217,6 +218,9 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         response: deps?.json?.(aiRequest.requestApiKey ? { error: 'Model not allowed for provider' } : AI_MODEL_NOT_ALLOWED, aiRequest.requestApiKey ? 400 : 403, headers),
       };
     }
+    // Counted only now, so a call refused above costs nothing from the day's AI calls.
+    const refused = await preflight.count?.();
+    if (refused) return { handled: true, response: refused };
     if (provider === 'anthropic') {
       return {
         handled: true,

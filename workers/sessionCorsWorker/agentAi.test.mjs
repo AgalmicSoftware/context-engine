@@ -45,12 +45,25 @@ test('text AI answers an unreachable count as busy, not as the day’s limit use
   const f = fixture({ rate: () => null, fetchImpl: async () => { throw new Error('Must not call'); } });
   await assert.rejects(f.services.ai({ prompt: 'Fixture' }), (error) => error.reason === 'agent_ai_rate_unavailable' && error.status === 503);
 });
-test('text AI limits concurrent calls per session and frees the slot on completion', async () => {
-  const releases = []; const f = fixture({ fetchImpl: () => new Promise(resolve => releases.push(() => resolve(Response.json({ output_text: 'done' })))) });
-  const a = f.services.ai({ prompt: 'A' }), b = f.services.ai({ prompt: 'B' });
+test('text AI limits concurrent calls per session, counting none it turns away, and frees the slot on completion', async () => {
+  let counted = 0; let allow = true;
+  const releases = []; const f = fixture({
+    rate: () => { counted++; return allow; },
+    fetchImpl: () => new Promise(resolve => releases.push(() => resolve(Response.json({ output_text: 'done' })))),
+  });
+  // All three at once: the slots are taken before anything is awaited.
+  const a = f.services.ai({ prompt: 'A' }), b = f.services.ai({ prompt: 'B' }), c = f.services.ai({ prompt: 'C' });
+  await assert.rejects(c, error => error.reason === 'agent_ai_busy');
   while (releases.length < 2) await new Promise(resolve => setTimeout(resolve, 1));
-  await assert.rejects(f.services.ai({ prompt: 'C' }), error => error.reason === 'agent_ai_busy');
+  assert.equal(counted, 2, 'a busy refusal costs nothing from the day');
   releases.splice(0).forEach(release => release()); await Promise.all([a, b]);
+  // A call over the day's limit frees its slot too.
+  allow = false;
+  for (const prompt of ['D', 'E', 'F']) await assert.rejects(f.services.ai({ prompt }), error => error.reason === 'agent_ai_rate_limited');
+  allow = true;
+  const g = f.services.ai({ prompt: 'G' });
+  while (releases.length < 1) await new Promise(resolve => setTimeout(resolve, 1));
+  releases.splice(0).forEach(release => release()); await g;
 });
 test('poster calls use the coordinated budget and duplicate in-flight runs share one generation', async () => {
   let calls = 0; const f = fixture({ rate: false, fetchImpl: async () => { calls++; } });
