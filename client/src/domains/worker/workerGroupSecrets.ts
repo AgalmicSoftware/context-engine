@@ -9,7 +9,7 @@ import {
 } from '../../../../shared/workerGroupJoin.mjs';
 import { buildWorkerGroupAutoJoinPath } from './workerGroupAutoJoin';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
-import { setWorkerGroupPassword, type PostSignedWorkerGroupRequest, type WorkerGroup } from './workerGroupPorts';
+import { setWorkerGroupPassword, type PostSignedWorkerGroupRequest } from './workerGroupPorts';
 
 // The browser side of a group's secrets: it makes them, carries them in a link's fragment (never sent to a
 // server) and turns them into what a join sends. Neither a password nor a claim code reaches the Worker.
@@ -107,7 +107,7 @@ export const saveWorkerGroupPassword = async ({
   sessionId: string;
   sessionSlug: string;
   postSignedRequest: PostSignedWorkerGroupRequest;
-}): Promise<WorkerGroup> => {
+}) => {
   const signer = await workerGroupPasswordSigner(password, sessionId, groupId);
-  return (await setWorkerGroupPassword({ groupId, sessionId, sessionSlug, postSignedRequest, signer })).group;
+  return setWorkerGroupPassword({ groupId, sessionId, sessionSlug, postSignedRequest, signer });
 };

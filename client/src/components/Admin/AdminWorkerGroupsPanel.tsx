@@ -314,13 +314,15 @@ const AdminWorkerGroupsPanel = ({
         if (!password) return result;
         // The group exists before its password does; until the password is set, it admits no one.
         try {
-          passwordSaved = await saveWorkerGroupPassword({
+          const created = savedGroup(result);
+          const saved = await saveWorkerGroupPassword({
             password,
-            groupId: String(savedGroup(result).groupId),
+            groupId: String(created.groupId),
             sessionId: normalizedSessionId,
             sessionSlug: normalizedSessionSlug,
             postSignedRequest: postExactSignedRequest,
           });
+          passwordSaved = { ...created, passwordSet: saved.passwordSet } as WorkerGroup;
           return { ...result, group: passwordSaved };
         } catch {
           return result;

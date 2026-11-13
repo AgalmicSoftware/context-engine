@@ -16,7 +16,7 @@ jest.mock('../../domains/worker/workerGroupSecrets', () => {
     ...actual,
     saveWorkerGroupPassword: jest.fn(
       ({ password: _password, ...request }: Parameters<MockSecrets['saveWorkerGroupPassword']>[0]) =>
-        ports.setWorkerGroupPassword({ ...request, signer: `0x${'2'.repeat(40)}` }).then(({ group }) => group),
+        ports.setWorkerGroupPassword({ ...request, signer: `0x${'2'.repeat(40)}` }),
     ),
   };
 });
@@ -669,7 +669,7 @@ describe('AdminWorkerGroupsPanel', () => {
           return respond({ group: group({ joinMode, listed, passwordSet: false }) });
         }
         if (action === 'groups/password/set')
-          return respond({ group: group({ joinMode: 'group_password', passwordSet: true }) });
+          return respond({ groupId: 'salon', passwordSet: true, signerSetAt: '2026-11-12T00:00:00.000Z' });
         throw new Error(`unexpected ${action}`);
       });
       renderPanel(postSignedRequest);

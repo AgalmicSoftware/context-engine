@@ -1105,9 +1105,9 @@ export const setWorkerGroupPassword = ({ signer, ...request }: AdminGroupRequest
     body: { groupId: toStringValue(request.groupId), signer },
     ...request,
   }).then((payload) => {
-    const group = normalizeGroup(payload.group, request.sessionSlug);
-    if (!group) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
-    return { ...payload, group };
+    if (payload.groupId !== toStringValue(request.groupId).toLowerCase() || payload.passwordSet !== true)
+      throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+    return { groupId: payload.groupId, passwordSet: true as const, signerSetAt: toStringValue(payload.signerSetAt) };
   });
 
 export const normalizeWorkerGroupsAdminPayload = (payload: unknown, sessionSlug?: unknown): WorkerGroup[] =>

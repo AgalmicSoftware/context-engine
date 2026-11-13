@@ -1423,10 +1423,18 @@ describe('worker group ports', () => {
         { groupId: 'salon', hashes: ['b'.repeat(64)], sessionId: SESSION_ID },
       ]);
 
-      const password = signed({ group: { ...base, joinMode: 'group_password', passwordSet: true } });
+      const signerSetAt = '2026-11-12T00:00:00.000Z';
+      const password = signed({ groupId: 'salon', passwordSet: true, signerSetAt });
       const signer = '0x0000000000000000000000000000000000000002';
       const saved = await setWorkerGroupPassword({ ...request, signer, postSignedRequest: password });
-      expect(saved.group.passwordSet).toBe(true);
+      expect(saved).toEqual({ groupId: 'salon', passwordSet: true, signerSetAt });
+      await expect(
+        setWorkerGroupPassword({
+          ...request,
+          signer,
+          postSignedRequest: signed({ groupId: 'other', passwordSet: true }),
+        }),
+      ).rejects.toThrow('worker_group_response_group_invalid');
       expect(password).toHaveBeenCalledWith({
         action: 'groups/password/set',
         path: '/admin/groups/password/set',
