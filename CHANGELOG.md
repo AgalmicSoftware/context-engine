@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - A rate limit that cannot be reached answers "busy, retry" (`503`) instead of "Rate limit exceeded.", so the site and the MCP try again. The Worker logs a line when its limit, sign-in or receipt object does not answer.
 - Restoring a backup keeps everyone who turned the Session Agent off opted out. Backups made before this release carry no opt-outs.
 - An admin saving a setting that does not affect access no longer refuses group joins and leaves already under way.
+- A session with more than 300 context items no longer leaves the AI with none of them. The AI takes 300, the admins' first and then the oldest, and the Worker logs how many were left out. Items stored by earlier releases are still read.
 - New Session Workers keep their logs: the deployment template and the deploy helper turn Cloudflare's logs on, for every request.
 
 ### Agents and MCP
