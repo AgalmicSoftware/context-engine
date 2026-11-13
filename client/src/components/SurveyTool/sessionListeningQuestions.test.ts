@@ -3,6 +3,7 @@ import {
   buildListeningQuestionPrompt,
   buildListeningQuestionStatements,
   generateQuestionsFromListeningTranscript,
+  LISTENING_TRANSCRIPT_PART_CHARS,
   parseListeningQuestionResponse,
 } from './sessionListeningQuestions';
 import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
@@ -119,6 +120,56 @@ describe('sessionListeningQuestions', () => {
       'They cannot change the number of questions asked for below, which the session or page sets',
     );
     expect(prompt).not.toContain('cannot change the number or types of questions');
+  });
+
+  it('drafts a discussion too long for one call in parts, then picks the set number from all of them', async () => {
+    const reply = (prompts: string[]) =>
+      JSON.stringify({
+        surveyTitle: 'Breakout',
+        questions: prompts.map((prompt) => ({ prompt, questionType: 'binary', tags: [] })),
+      });
+    mockCallAI
+      .mockResolvedValueOnce(reply(['Early step?', 'Early trade-off?', 'Early pilot?']))
+      .mockResolvedValueOnce(reply(['Late step?', 'Late trade-off?', 'Late pilot?']))
+      .mockResolvedValueOnce(reply(['Final one?', 'Final two?', 'Final three?']));
+    // Three quarters of a part each, so the whole needs two.
+    const talk = (said: string) =>
+      Array.from({ length: Math.ceil((LISTENING_TRANSCRIPT_PART_CHARS * 0.75) / (said.length + 1)) }, () => said).join(
+        '\n',
+      );
+    const transcript = `${talk('Person 1: Pilot AI summaries in February.')}\n${talk('Person 2: Pay a resident panel.')}`;
+
+    const result = await generateQuestionsFromListeningTranscript(transcript, { count: 3 });
+
+    const prompts = mockCallAI.mock.calls.map(([prompt]) => String(prompt));
+    expect(prompts).toHaveLength(3);
+    expect(prompts[0]).toContain('Source type: transcript, part 1 of 2 of one discussion.');
+    expect(prompts[0]).toContain('Pilot AI summaries in February.');
+    expect(prompts[1]).toContain('Source type: transcript, part 2 of 2 of one discussion.');
+    expect(prompts[1]).toContain('Pay a resident panel.');
+    expect(prompts[1]).not.toContain('Pilot AI summaries');
+    for (const part of prompts.slice(0, 2)) expect(part.length).toBeLessThan(LISTENING_TRANSCRIPT_PART_CHARS + 10_000);
+    // The last pass reads every part's candidates, not the transcript, and asks for the set number.
+    expect(prompts[2]).toContain('Source type: candidate questions from one recorded discussion.');
+    expect(prompts[2]).toContain('1. (binary) Early step?');
+    expect(prompts[2]).toContain('6. (binary) Late pilot?');
+    expect(prompts[2]).toContain('Choose and merge them into the strongest questions for the whole discussion');
+    expect(prompts[2]).toContain('Write 3 questions');
+    expect(prompts[2]).not.toContain('Pay a resident panel.');
+    expect(result.statements.map((statement) => statement.prompt)).toEqual([
+      'Final one?',
+      'Final two?',
+      'Final three?',
+    ]);
+  });
+
+  it('drafts a discussion that fits in one call', async () => {
+    mockCallAI.mockResolvedValueOnce(JSON.stringify({ surveyTitle: 'Breakout', questions: [] }));
+    await generateQuestionsFromListeningTranscript('Person 1: Pilot AI summaries in February.\n'.repeat(100), {
+      count: 3,
+    });
+    expect(callAI).toHaveBeenCalledTimes(1);
+    expect(String(mockCallAI.mock.calls[0][0])).toContain('Source type: transcript.');
   });
 
   it('parses AI JSON and builds reviewable question statements', () => {

@@ -11,6 +11,10 @@ import {
 } from './SurveyGenerator/surveyGeneratorHelpers';
 
 export const LISTENING_QUESTION_COUNT = 5;
+// About 30,000 tokens, two hours or more of talk; a longer discussion is drafted in parts, then once over those.
+export const LISTENING_TRANSCRIPT_PART_CHARS = 120_000;
+const COMBINE_PARTS_INSTRUCTIONS =
+  'The source lists candidate questions drafted from each part of one long discussion, in order. Choose and merge them into the strongest questions for the whole discussion, drawing only on these candidates.';
 
 export const LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS = [
   'Weigh the whole recorded conversation, its early, middle and late parts alike, and choose its most contested or debate-worthy claims.',
@@ -38,6 +42,7 @@ export type ListeningQuestionGenerationOptions = {
   sourceTypeOverride?: string;
   multiSpeakerHintOverride?: string;
   existingQuestionPrompts?: unknown[];
+  combineParts?: boolean;
 };
 
 export type ListeningQuestionGenerationResult = {
@@ -56,6 +61,7 @@ export const buildListeningQuestionPrompt = (
     sourceTypeOverride = 'transcript',
     multiSpeakerHintOverride = 'likely_multiple_speakers',
     existingQuestionPrompts = [],
+    combineParts = false,
   }: ListeningQuestionGenerationOptions = {},
 ) => {
   const existingPrompts = Array.isArray(existingQuestionPrompts)
@@ -73,6 +79,7 @@ export const buildListeningQuestionPrompt = (
     : '';
   const listeningInstructions = [
     LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS,
+    combineParts ? COMBINE_PARTS_INSTRUCTIONS : '',
     duplicateAvoidanceInstructions,
     String(sessionInstructions || '').trim(),
   ]
@@ -128,17 +135,11 @@ export const buildListeningQuestionStatements = (
     generateQuestionId: generateListeningQuestionId,
   });
 
-export const generateQuestionsFromListeningTranscript = async (
-  transcript: unknown,
-  opts: ListeningQuestionGenerationOptions = {},
+const draftListeningQuestions = async (
+  source: string,
+  opts: ListeningQuestionGenerationOptions,
 ): Promise<ListeningQuestionGenerationResult> => {
-  const text = String(transcript || '').trim();
-  if (text.length < 50) {
-    throw new Error('Transcript is too short to generate questions.');
-  }
-
-  const prompt = buildListeningQuestionPrompt(text, opts);
-  const rawOutput = await callAI(prompt, {
+  const rawOutput = await callAI(buildListeningQuestionPrompt(source, opts), {
     sessionSlug: opts.sessionSlug,
     sessionConfig: opts.sessionConfig,
     context: opts.context,
@@ -150,4 +151,54 @@ export const generateQuestionsFromListeningTranscript = async (
   const raw = parseListeningQuestionResponse(rawOutput);
   const { statements, surveyTitle } = buildListeningQuestionStatements(raw, opts);
   return { statements, surveyTitle, raw };
+};
+
+// Whole lines, each part at most `limit` characters; a longer line is cut.
+const transcriptParts = (text: string, limit: number) => {
+  const parts: string[] = [];
+  let part = '';
+  for (const line of text.split('\n')) {
+    for (let start = 0; start < Math.max(line.length, 1); start += limit) {
+      const piece = line.slice(start, start + limit);
+      if (part && part.length + piece.length + 1 > limit) {
+        parts.push(part);
+        part = '';
+      }
+      part = part ? `${part}\n${piece}` : piece;
+    }
+  }
+  return part ? [...parts, part] : parts;
+};
+
+export const generateQuestionsFromListeningTranscript = async (
+  transcript: unknown,
+  opts: ListeningQuestionGenerationOptions = {},
+): Promise<ListeningQuestionGenerationResult> => {
+  const text = String(transcript || '').trim();
+  if (text.length < 50) {
+    throw new Error('Transcript is too short to generate questions.');
+  }
+  const parts = transcriptParts(text, LISTENING_TRANSCRIPT_PART_CHARS);
+  if (parts.length === 1) return draftListeningQuestions(text, opts);
+  // Each part offers candidates, and one last pass picks from all of them, so the whole discussion counts.
+  const drafts = await Promise.all(
+    parts.map((part, index) =>
+      draftListeningQuestions(part, {
+        ...opts,
+        sourceTypeOverride: `transcript, part ${index + 1} of ${parts.length} of one discussion`,
+      }),
+    ),
+  );
+  const candidates = drafts
+    .flatMap((draft) => draft.statements)
+    .map(
+      (statement, index) =>
+        `${index + 1}. (${statement.type}${statement.options?.length ? `: ${statement.options.join(' / ')}` : ''}) ${statement.prompt}`,
+    )
+    .join('\n');
+  return draftListeningQuestions(candidates, {
+    ...opts,
+    sourceTypeOverride: 'candidate questions from one recorded discussion',
+    combineParts: true,
+  });
 };
