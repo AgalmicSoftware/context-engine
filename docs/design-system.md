@@ -171,7 +171,7 @@ Explorer tabs use blue selected/hover text
 and dark inactive icons on the light header. On narrow Minimal phones, the
 selected label is 20px and the tab icons are 22px, with 44px minimum touch targets.
 Expanded Explorer controls, group
-names, Context corpus cards, Risk Matrix details, and Debate Map labels use
+names, Context corpus cards, Risk Matrix details, and Debate Atlas labels use
 explicit light-surface text pairs. Stats leaderboard addresses, detail dialogs,
 and group filter controls also use these pairs. Debate details use light argument cards,
 historical-case briefs, badges, and question previews. Existing answering, results, privacy, and
@@ -307,7 +307,7 @@ At compact widths, Classic 95 uses the same question-action overflow trigger
 as Context Engine when pending answers make room for Submit necessary. Its
 menu opens above the toolbar on a raised surface.
 
-The Debate Map keeps its dark-glass look in Context Engine. Under the
+The Debate Atlas keeps its dark-glass look in Context Engine. Under the
 desktop-window profile it is drawn as a Windows 95 program instead: the UI font
 in the case its labels are written, raised gray toolbar and tree controls with
 the chosen view pressed on a light dither, sunken white canvases, and navy title
@@ -545,7 +545,7 @@ For Minimal Explorer tab labels, session choice-state contrast, clear control, c
 readability, and login-size regression smoke, start a local server with demo surfaces
 enabled and run `BASE_URL=http://127.0.0.1:3000 npm run ai:test-theme:civic`.
 The smoke covers desktop and mobile Explorer cards and all five expanded tools,
-including the eight Context corpus categories, Risk Matrix details, and Debate Map
+including the eight Context corpus categories, Risk Matrix details, and Debate Atlas
 circle/tree/list views and expanded historical-case briefs with question previews.
 Stats checks cover the expanded participant list, detail dialogs, group filters,
 session scope labels, session filters and clearing, and session totals, links, and keyboard scrolling through

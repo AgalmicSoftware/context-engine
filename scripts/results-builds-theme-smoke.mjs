@@ -267,7 +267,7 @@ async function inspectStates(page, control, name, target) {
 
 export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', theme = '' } = {}) {
   const nav = page.getByTestId('ce-session-results-view-nav');
-  await nav.getByRole('button', { name: 'Debate Map', exact: true }).click();
+  await nav.getByRole('button', { name: 'Debate Atlas', exact: true }).click();
   const atlas = page.getByTestId('ce-session-debate-atlas');
   await atlas.waitFor();
   await page.getByTestId('ce-atlas-node').first().waitFor();

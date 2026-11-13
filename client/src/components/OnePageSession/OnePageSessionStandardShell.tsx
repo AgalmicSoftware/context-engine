@@ -192,7 +192,7 @@ const renderSectionHeading = (title: React.ReactNode, subtitle?: React.ReactNode
   </span>
 );
 
-const DEBATE_ATLAS_VIEW_OPTION: ResultsViewOption = { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' };
+const DEBATE_ATLAS_VIEW_OPTION: ResultsViewOption = { key: 'debateAtlas', label: 'Debate Atlas', icon: '🗺️' };
 const RISK_MATRIX_VIEW_OPTION: ResultsViewOption = { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' };
 
 const buildResultsViewOptions = (
@@ -395,7 +395,7 @@ export default function OnePageSessionStandardShell({
       helpId: buildAtlasHelpId,
       label: 'Build atlas',
       busyLabel: 'Building atlas…',
-      help: 'Builds a debate atlas from the responses right now, with a political compass for each category and topic. Takes a few minutes. Everyone who sees Results sees it, and earlier builds stay to compare.',
+      help: 'Builds a debate atlas from the responses right now: the categories and topics people raised, the positions in each, and where everyone stands. Takes a few minutes. Everyone who sees Results sees it, and earlier builds stay to compare.',
     },
     {
       kind: 'risk-matrix' as const,

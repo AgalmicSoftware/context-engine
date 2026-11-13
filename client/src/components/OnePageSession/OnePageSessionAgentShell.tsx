@@ -223,7 +223,7 @@ const OnePageSessionAgentShell = ({
                   aria-pressed={mode === 'debateAtlas'}
                   onClick={() => onResultsModeChange('debateAtlas')}
                 >
-                  Debate Map
+                  Debate Atlas
                 </button>
               </div>
             </div>
@@ -272,7 +272,7 @@ const OnePageSessionAgentShell = ({
               <div className={styles.agentListEmpty}>No participant-visible results are available yet.</div>
             ) : null}
             {mode === 'debateAtlas' ? (
-              <Suspense fallback={<LazyFallback label="Loading debate map prompt..." minHeight="20vh" />}>
+              <Suspense fallback={<LazyFallback label="Loading debate atlas prompt..." minHeight="20vh" />}>
                 <AgentDebateMapPanel questions={agentQuestions} results={agentResults} />
               </Suspense>
             ) : null}

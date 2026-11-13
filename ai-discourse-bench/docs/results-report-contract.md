@@ -12,7 +12,7 @@ run claims:
   from or implied by the OSS `ai-discourse-corpus`, while the same benchmark
   method can be applied to other topics;
 - that an optional equal-budget quadratic-importance pass can prioritize
-  questions and determine Debate Map prominence;
+  questions and determine Debate Atlas prominence;
 - a top-left `model-opinions-bench` technical identifier followed by the
   generation time; and
 - an accessible topic selector with `AI Futures & Policy` as the only current
@@ -75,7 +75,7 @@ centering remains on the surrounding standalone `main` element. The standalone
 shell also
 uses the live `only screen` Results responsive breakpoints, including the
 1024px Results-button grid, so the mode controls wrap like the client surface,
-keeps the live emoji mode icons for Report / Debate Map / Breakdown / Risk
+keeps the live emoji mode icons for Report / Debate Atlas / Breakdown / Risk
 Matrix, and applies a Results-header scroll offset for direct hash links.
 Nested Report-mode links such as question anchors
 open their containing collapsible section and scroll to the exact target. The
@@ -99,12 +99,12 @@ empty `heading` slot before the disclaimer, but does not inject the benchmark
 title as `sessionInfo`; the benchmark identity belongs in the browser title,
 Summary stats, exports, and JSON payloads. The
 standalone `miniSectionContent` contains the same inner Results mode host used
-by `OnePageSession`, and Debate Map, Breakdown, Risk Matrix, and Raw Results
+by `OnePageSession`, and Debate Atlas, Breakdown, Risk Matrix, and Raw Results
 render beside the Polis report there rather than inside the Polis frame or
 Polis-style Hide/Show section chrome. They also avoid extra visible pane
 headings or wrapper-card styling; the active Results mode button provides the
 visible label, while the pane title/subtitle are retained as DOM metadata.
-The Debate Map pane keeps the live embedded `80vh` scroll shell, live
+The Debate Atlas pane keeps the live embedded `80vh` scroll shell, live
 view-mode button/control/icon/title-icon styling without standalone reset
 overrides, static-only disabled ARIA states, or browser `title` tooltips on
 the segmented mode buttons, and live inline legend styling
@@ -120,7 +120,7 @@ import payload, and aggregate raw material. Provider-level run records remain in
 the separate run artifact. The native Context Engine export preserves
 `importance`, `debateAtlas`, and `riskMatrix` so the `/benchmarks` route can
 render the same prominence and analysis inputs without reconstructing them.
-Packed Debate Map labels use a generated mobile font-size variable rather than
+Packed Debate Atlas labels use a generated mobile font-size variable rather than
 the standalone-only `overflow-wrap:anywhere` fallback, so narrow side-window
 views preserve word boundaries like the live DebateMap module.
 Its modal header and view-mode controls intentionally keep the base
@@ -135,9 +135,9 @@ button keeps the same modal-header absolute positioning, transparent reset,
 control. The
 modal demo-results nav keeps one active pill at all times, initialized to the
 underlying Results mode (`Report` for direct `#snapshot-json` links) and
-updated when Raw Results opens from Debate Map, Breakdown, or Risk Matrix.
+updated when Raw Results opens from Debate Atlas, Breakdown, or Risk Matrix.
 Its visible view labels mirror the OnePageSession Results switcher, including
-`Debate Map` for the atlas-backed pane, while retaining the existing atlas data
+`Debate Atlas` for the atlas-backed pane, while retaining the existing atlas data
 attributes used by the client modal wiring.
 Report-mode `pdfIgnore`, `showWhenPdf`, print, and `pdfMode` visibility rules,
 including hiding the live `beeTooltip` surface in PDF mode, also mirror
@@ -322,7 +322,7 @@ lossy because model/question means are discretized.
 `schemas/ce-benchmark-results-v1.schema.json`. It preserves model participants,
 declared and observed provenance, statements, complete model/question summary
 distributions, uncertainty intervals, wording sensitivity, similarity details,
-coverage, graph inputs, breakdowns, quadratic importance, Debate Map inputs,
+coverage, graph inputs, breakdowns, quadratic importance, Debate Atlas inputs,
 Risk Matrix inputs, and integrity state. This distribution-preserving contract
 is the preferred substrate for eventual native Context Engine rendering.
 Unsupported derived opinion-group labels are withheld using the shared
@@ -484,7 +484,7 @@ freeform `analysisSections`. An issue-area id must resolve to a deterministic or
 generated topic circle, and every linked question id must resolve to the source
 report.
 
-The standalone Debate Map pane renders the selected topic circles inside an
+The standalone Debate Atlas pane renders the selected topic circles inside an
 embedded DebateMap-style shell: view-mode controls, inline legend, a packed
 atlas title pill, the live `80vh` embedded scroll wrapper, live embedded atlas
 cursor/touch behavior, and packed `atlasNode` / `packedAtlasNode` bubbles with
@@ -530,7 +530,7 @@ node ./bin/ai-discourse-bench.mjs export-analysis-input \
 
 That artifact has `kind:
 ai_discourse_bench_second_pass_analysis_input` and contains participant summaries,
-question summaries, current deterministic topic circles, requested Debate Map
+question summaries, current deterministic topic circles, requested Debate Atlas
 outputs, modal-ready issue-area targets with suggested tags and measured
 metrics, risk-matrix target cells, the source report hash, and the expected
 overlay schema. The prompt
@@ -588,6 +588,6 @@ hash; mismatched overlays are rejected. `scenarios` render as live-style atlas s
 separate scenario rail at the top of the clicked square popup, with fields such
 as `atlasNodeId`, `atlasNodeLabel`,
 `title`, `summary`, `valence`, `timeHorizon`, `primaryMechanism`, and optional
-historical anchors. This keeps debate-map topics, compasses, risk narratives,
+historical anchors. This keeps Debate Atlas topics, compasses, risk narratives,
 and richer cell popups as a second-pass AI overlay rather than part of the raw
 benchmark run.

@@ -2591,7 +2591,7 @@ const DebateMap = ({
       <div className={styles.debateMap}>
         {!embedded && (
           <div className={styles.headerRow}>
-            <h1 className={styles.title}>Debate Map</h1>
+            <h1 className={styles.title}>Debate Atlas</h1>
             <Legend />
           </div>
         )}

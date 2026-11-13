@@ -80,7 +80,7 @@ jest.mock('../../utilities/ui/notify.js', () => ({
 jest.mock('../DemoViews/DebateHUD/PoliticalCompassView', () => ({
   __esModule: true,
   StandalonePoliticalCompass: ({ compass }: any) => (
-    <div data-testid="atlas-compass">{compass?.xAxis?.label || 'Political Compass'}</div>
+    <div data-testid="atlas-compass">{compass?.xAxis?.label || 'Where everyone stands'}</div>
   ),
 }));
 
@@ -283,7 +283,7 @@ describe('DebateMap', () => {
     localStorage.removeItem('bookmarkedNodes');
   });
 
-  it('renders the standalone heading as Debate Map', () => {
+  it('renders the standalone heading as Debate Atlas', () => {
     render(
       <MemoryRouter>
         <DebateMapComponent
@@ -296,7 +296,7 @@ describe('DebateMap', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('heading', { name: /^Debate Map$/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Debate Atlas$/i })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /^AI Policy Atlas$/i })).not.toBeInTheDocument();
   });
 
@@ -461,7 +461,7 @@ describe('DebateMap', () => {
     fireEvent.click(getDebateViewModeButton('list'));
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /^Debate Map$/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /^Debate Atlas$/i })).toBeInTheDocument();
       expect(screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE).length).toBeGreaterThan(0);
     });
   });

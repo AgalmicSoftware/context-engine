@@ -116,6 +116,15 @@ describe('PoliticalCompass tooltip hover behavior', () => {
     expect(screen.queryByTestId('ce-political-compass-tooltip')).toBeNull();
   });
 
+  it('titles a compass without an axis name by what it shows', () => {
+    render(
+      <StandalonePoliticalCompass compass={{ ...createCompass(), xAxis: { ...createCompass().xAxis, label: '' } }} />,
+    );
+
+    expect(screen.getByText('Where everyone stands')).toBeInTheDocument();
+    expect(screen.queryByText(/political compass/i)).not.toBeInTheDocument();
+  });
+
   it('keeps the inline name label fallback when a point has no comment', () => {
     render(<StandalonePoliticalCompass compass={createCompass()} compact={false} />);
     mockWrapperRect();

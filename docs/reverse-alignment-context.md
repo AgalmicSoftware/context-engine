@@ -18,8 +18,8 @@ The three areas and their connections are editorial navigation. Discussion
 prompts are invitations for the session, not quotes from the source or
 submitted participant responses.
 
-`rxc-ra-test` currently offers **Report** and **Raw Results**. Its Debate Map is
-hidden until it is ready to return; a previously selected map falls back to
+`rxc-ra-test` currently offers **Report** and **Raw Results**. Its Debate Atlas is
+hidden until it is ready to return; a previously selected atlas falls back to
 Report. Context navigation remains available. The report omits the retired
 answer-or-skip/voice-interview and endorsement instructions from this session’s
 description, including older Worker and cached metadata. The remaining description
@@ -27,7 +27,7 @@ is preserved in the report and its PDF capture. This display correction does not
 rewrite the saved Worker configuration.
 
 `rxc-test` offers **Report** and **Raw Results**, and Report opens by default.
-Like the other sessions here, it shows **Debate Map** only once a debate atlas
+Like the other sessions here, it shows **Debate Atlas** only once a debate atlas
 has been built for it, and **Risk Matrix** only once a risk matrix has. Raw Results continues to open the detailed results view.
 
 These test sessions open only from their Worker links,

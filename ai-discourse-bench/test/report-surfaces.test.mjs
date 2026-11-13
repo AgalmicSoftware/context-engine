@@ -207,7 +207,7 @@ test('publication intro explains the benchmark and does not overstate preview ar
   assert.doesNotMatch(html, /How to read these results/);
   assert.doesNotMatch(html, /aidb-publication-note/);
   assert.doesNotMatch(html, /Publication status:/);
-  assert.match(html, /questions about AI futures and policy, drawn from or implied by the OSS <strong>ai-discourse-corpus<\/strong>\. The same benchmark method can be applied to any topic\. An optional quadratic-importance mode gives every model the same credit budget to prioritize questions; those allocations determine Debate Map prominence when present\./);
+  assert.match(html, /questions about AI futures and policy, drawn from or implied by the OSS <strong>ai-discourse-corpus<\/strong>\. The same benchmark method can be applied to any topic\. An optional quadratic-importance mode gives every model the same credit budget to prioritize questions; those allocations determine Debate Atlas prominence when present\./);
   assert.match(html, /<div class="aidb-benchmark-topic-fact"><dt><label for="aidb-benchmark-topic">Benchmark topic<\/label><\/dt><dd><select id="aidb-benchmark-topic" aria-describedby="aidb-benchmark-topic-description" data-ce-benchmark-topic-selector><option value="ai-futures-policy" selected>AI Futures &amp; Policy<\/option><\/select><\/dd><\/div>/);
   assert.doesNotMatch(html, /class="aidb-benchmark-topic-control"/);
   assert.match(html, /<div class="aidb-benchmark-fact-number"><dt>Questions<\/dt><dd>1<\/dd><\/div>/);
@@ -282,7 +282,7 @@ test('publication intro explains the benchmark and does not overstate preview ar
   assert.doesNotMatch(hostileHtml, /<img src=x onerror=alert\(1\)>/);
 });
 
-test('quadratic importance allocations control Debate Map prominence without changing stance results', async () => {
+test('quadratic importance allocations control Debate Atlas prominence without changing stance results', async () => {
   const questionBank = {
     benchmarkId: 'importance-report',
     runPlan: { repeatsPerPolarity: 1 },
@@ -704,7 +704,7 @@ test('All Questions gives each model one averaged vote and preserves invalid raw
   assert.doesNotMatch(html, /This describes response direction, not correctness/);
 });
 
-test('Debate Map uses stable model colors on a separate mean-stance axis', async () => {
+test('Debate Atlas uses stable model colors on a separate mean-stance axis', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -767,7 +767,7 @@ test('Debate Map uses stable model colors on a separate mean-stance axis', async
   assert.match(html, /if \(lockedAtlasModelId === modelId\) \{\s*lockedAtlasModelId = '';\s*hoveredAtlasModelId = '';\s*focusedAtlasModelId = '';\s*if \(modelCard\.blur\) modelCard\.blur\(\);\s*\} else \{\s*lockedAtlasModelId = modelId;/);
 });
 
-test('Debate Map model repeat stability stays separate from polarity sensitivity', async () => {
+test('Debate Atlas model repeat stability stays separate from polarity sensitivity', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -801,7 +801,7 @@ test('Debate Map model repeat stability stays separate from polarity sensitivity
   assert.equal(report.polisReport.byQuestion[question.id].wordingSensitivity.meanAbsoluteShift, 2);
 });
 
-test('Debate Map contributor context distinguishes partial model coverage', async () => {
+test('Debate Atlas contributor context distinguishes partial model coverage', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -884,7 +884,7 @@ test('Summary stats count averaged model/question responses without multiplying 
   assert.doesNotMatch(html, /<span class="statLabel">Responses\/Participant Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.50<\/span>/);
 });
 
-test('analysis overlay populates risk matrix popups and Debate Map generated surfaces', async () => {
+test('analysis overlay populates risk matrix popups and Debate Atlas generated surfaces', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -1339,7 +1339,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html.slice(modeSurfacesStart), /id="snapshot-json"[\s\S]*class="ce-report-section ce-results-mode-pane aidb-mode-pane aidb-raw-results-modal-pane|class="ce-report-section ce-results-mode-pane aidb-mode-pane aidb-raw-results-modal-pane[\s\S]*id="snapshot-json"/);
   assert.doesNotMatch(html.slice(modeSurfacesStart), /ce-results-mode-pane aidb-view-section/);
   assert.doesNotMatch(html.slice(modeSurfacesStart), /class="ce-results-mode-pane-header"/);
-  assert.match(html, /data-ce-pane-title="Debate Map"/);
+  assert.match(html, /data-ce-pane-title="Debate Atlas"/);
   assert.match(html, /data-ce-pane-subtitle="Circle prominence currently reflects question count; quadratic importance allocations can replace this fallback"/);
   assert.match(html, /class="[^"]*aidb-raw-results-modal-pane/);
   assert.doesNotMatch(html, /class="[^"]*aidb-raw-results-modal-pane resultsModal/);
@@ -1394,7 +1394,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="modal-header modalHeader"[\s\S]*<h2 class="modalTitle">Question Results<\/h2>[\s\S]*data-ce-close-raw-results/);
   assert.match(html, /class="demoResultsViewNav" aria-label="Demo results views" data-testid="ce-surveyresults-demo-view-nav"/);
   assert.match(html, /class="demoResultsViewButton demoResultsViewButtonActive" aria-pressed="true" data-ce-raw-demo-view="report" data-testid="ce-surveyresults-demo-view-report">Report<\/button>/);
-  assert.match(html, /class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="debate-atlas" data-testid="ce-surveyresults-demo-view-atlas">Debate Map<\/button>/);
+  assert.match(html, /class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="debate-atlas" data-testid="ce-surveyresults-demo-view-atlas">Debate Atlas<\/button>/);
   assert.match(html, /class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="breakdown" data-testid="ce-surveyresults-demo-view-breakdown">Breakdown<\/button>/);
   assert.match(html, /class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="risk-matrix" data-testid="ce-surveyresults-demo-view-riskMatrix">Risk Matrix<\/button>/);
   assert.doesNotMatch(html, /class="demoResultsViewButton demoResultsViewButtonActive" aria-pressed="true">Raw<\/button>/);
@@ -1582,7 +1582,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.sectionHeaderViewModeButton\[aria-pressed="true"\]/);
   assert.match(html, /rgba\(77, 255, 164, 0\.7\)/);
   assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">🧾<\/span><span class="sectionHeaderViewModeLabel">Report<\/span>/);
-  assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">🗺️<\/span><span class="sectionHeaderViewModeLabel">Debate Map<\/span>/);
+  assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">🗺️<\/span><span class="sectionHeaderViewModeLabel">Debate Atlas<\/span>/);
   assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">📊<\/span><span class="sectionHeaderViewModeLabel">Breakdown<\/span>/);
   assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">⚠️<\/span><span class="sectionHeaderViewModeLabel">Risk Matrix<\/span>/);
   assert.match(html, /class="sectionHeaderViewModeButton" data-ce-open-raw-results>/);
@@ -1958,7 +1958,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /card\.querySelector\('\[data-ce-question-body\]'\)/);
   assert.doesNotMatch(html, /class="question-explorer"/);
   assert.doesNotMatch(html, /class="question-detail"/);
-  assert.match(html, /Debate Map/);
+  assert.match(html, /Debate Atlas/);
   assert.match(html, /id="debate-atlas"[\s\S]*class="ce-report-section ce-results-mode-pane aidb-mode-pane aidb-debate-atlas-pane"/);
   assert.doesNotMatch(html, /ce-results-dark-pane/);
   assert.doesNotMatch(html, /ce-results-scroll-pane/);
@@ -2583,7 +2583,7 @@ test('All Questions Invalid is the question aggregate, including models not run 
   const html = renderHtmlReport(report);
   assert.equal(report.polisReport.byQuestion[question.id].invalid, 2);
 
-  // The row, the bar segment and the Debate Map legend share one Invalid count.
+  // The row, the bar segment and the Debate Atlas legend share one Invalid count.
   assert.match(questionVoteSummaries(html), /<strong>Responses:<\/strong> 1 \/\s*<strong>Invalid:<\/strong> 2\s*<\/span>/);
   const row = html.match(new RegExp(`id="question-${question.id}"[\\s\\S]*?data-ce-atlas-question-distribution[^>]*>`))?.[0];
   assert.ok(row);

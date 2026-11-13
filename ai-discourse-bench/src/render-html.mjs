@@ -1834,7 +1834,7 @@ const renderBenchmarkIntroduction = (report, publication) => {
       </div>
       <button type="button" class="aidb-benchmark-download pdfIgnore" data-ce-benchmark-download title="Download benchmark report" aria-label="Download benchmark report">${renderFontAwesomeIcon('download')}</button>
     </div>
-    <p class="aidb-benchmark-lead" id="aidb-benchmark-topic-description">This edition maps where AI models agree, disagree, remain unsure, and change under reversed wording across questions about AI futures and policy, drawn from or implied by the OSS <strong>ai-discourse-corpus</strong>. The same benchmark method can be applied to any topic. An optional quadratic-importance mode gives every model the same credit budget to prioritize questions; those allocations determine Debate Map prominence when present.</p>
+    <p class="aidb-benchmark-lead" id="aidb-benchmark-topic-description">This edition maps where AI models agree, disagree, remain unsure, and change under reversed wording across questions about AI futures and policy, drawn from or implied by the OSS <strong>ai-discourse-corpus</strong>. The same benchmark method can be applied to any topic. An optional quadratic-importance mode gives every model the same credit budget to prioritize questions; those allocations determine Debate Atlas prominence when present.</p>
     <dl class="aidb-benchmark-facts" aria-label="Benchmark run summary">
       <div class="aidb-benchmark-fact-number"><dt>Questions</dt><dd>${escapeHtml(report.counts?.questions ?? 0)}</dd></div>
       <div class="aidb-benchmark-fact-number"><dt>Model participants</dt><dd>${escapeHtml(report.counts?.models ?? 0)}</dd></div>
@@ -3097,7 +3097,7 @@ const renderAtlasIssueTemplate = (issueArea, index) => {
   >
     <div class="atlasIssueModalTags">
       <span class="atlasIssueDepthTag ${escapeHtml(depthClass)}">Issue area</span>
-      ${issueArea.tags.map((tag) => `<button type="button" class="atlasIssueTag" data-ce-atlas-modal-tag="${escapeHtml(tag)}" title="Filter the Debate Map by ${escapeHtml(tag)}">${escapeHtml(formatDisplayLabel(tag) || tag)}</button>`).join('')}
+      ${issueArea.tags.map((tag) => `<button type="button" class="atlasIssueTag" data-ce-atlas-modal-tag="${escapeHtml(tag)}" title="Filter the Debate Atlas by ${escapeHtml(tag)}">${escapeHtml(formatDisplayLabel(tag) || tag)}</button>`).join('')}
       ${issueArea.confidence ? `<span class="atlasIssueTag atlasIssueConfidence">AI confidence: ${escapeHtml(issueArea.confidence)}</span>` : ''}
     </div>
     <div class="atlasIssueOverview">
@@ -3186,7 +3186,7 @@ const renderDebateAtlas = (report) => {
   const issueTemplates = issueAreas.map(renderAtlasIssueTemplate).join('');
   return renderModePane({
     id: 'debate-atlas',
-    title: 'Debate Map',
+    title: 'Debate Atlas',
     subtitle: importanceAvailable
       ? 'Circle prominence reflects equal-budget quadratic importance allocations from model participants'
       : 'Circle prominence currently reflects question count; quadratic importance allocations can replace this fallback',
@@ -3196,7 +3196,7 @@ const renderDebateAtlas = (report) => {
         <div class="debateMap">
           <div class="controls">
             <div class="primaryControls">
-              <div class="viewModeSwitch" aria-label="Debate map view mode">
+              <div class="viewModeSwitch" aria-label="Debate atlas view mode">
                 <button type="button" data-testid="ce-debate-view-mode" data-ce-view-mode="circles" class="active">${renderFontAwesomeIcon('circle', 'debateViewModeIcon')} Circles</button>
                 <button type="button" data-testid="ce-debate-view-mode" data-ce-view-mode="list">${renderFontAwesomeIcon('list', 'debateViewModeIcon')} List</button>
                 <span class="viewModeSeparator" aria-hidden="true"></span>
@@ -3316,7 +3316,7 @@ const renderQuestionExplorer = (report) => {
     const label = `#${index + 1}`;
     // Like the live row, count only answering participants. Models without a
     // valid averaged answer keep the benchmark's Invalid label, as in the
-    // Debate Map legend, instead of the live No response.
+    // Debate Atlas legend, instead of the live No response.
     const responses = agree + unsure + disagree;
     const anchors = [...(question.sourceAnchors || []), ...(question.agentVillageAnchors || [])]
       .map((anchor) => anchor.idOrUrl || anchor.corpus || anchor.sourceType || '')
@@ -3401,7 +3401,7 @@ const renderSnapshotJson = (report) => {
   const renderedDebateTopics = normalizeAnalysisTopicCircles(report);
   const sectionRows = [
     ['report', 'Report', 'Available', `${report.counts?.questions || 0} statements / ${report.counts?.models || 0} participants`],
-    ['debate-atlas', 'Debate Map', 'Available', `${renderedDebateTopics.length} topic circles`],
+    ['debate-atlas', 'Debate Atlas', 'Available', `${renderedDebateTopics.length} topic circles`],
     ['breakdown', 'Breakdown', 'Available', `${Object.keys(report.breakdown || {}).length} model trait dimensions`],
     ['risk-matrix', 'Risk Matrix', 'Available', `${report.riskMatrix?.facets?.length || 0} risk facets`],
     ['snapshot-json', 'Snapshot JSON', 'Available', 'Embedded inert report snapshot'],
@@ -3431,7 +3431,7 @@ const renderSnapshotJson = (report) => {
         <div class="modalHeaderControls">
           <div class="demoResultsViewNav" aria-label="Demo results views" data-testid="ce-surveyresults-demo-view-nav">
             <button type="button" class="demoResultsViewButton demoResultsViewButtonActive" aria-pressed="true" data-ce-raw-demo-view="report" data-testid="ce-surveyresults-demo-view-report">Report</button>
-            <button type="button" class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="debate-atlas" data-testid="ce-surveyresults-demo-view-atlas">Debate Map</button>
+            <button type="button" class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="debate-atlas" data-testid="ce-surveyresults-demo-view-atlas">Debate Atlas</button>
             <button type="button" class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="breakdown" data-testid="ce-surveyresults-demo-view-breakdown">Breakdown</button>
             <button type="button" class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="risk-matrix" data-testid="ce-surveyresults-demo-view-riskMatrix">Risk Matrix</button>
           </div>
@@ -4919,7 +4919,7 @@ export const renderHtmlReport = (inputReport) => {
         <div class="sectionHeaderActionsScroller resultsModeActionsScroller">
           <div class="sectionHeaderActions resultsModeActions" data-testid="ce-session-results-view-nav">
             <button type="button" class="sectionHeaderViewModeButton sectionHeaderViewModeButtonActive" data-ce-report-view-mode="report" aria-pressed="true" title="Report"><span class="sectionHeaderViewModeIcon" aria-hidden="true">🧾</span><span class="sectionHeaderViewModeLabel">Report</span></button>
-            <button type="button" class="sectionHeaderViewModeButton" data-ce-report-view-mode="debate-atlas" aria-pressed="false" title="Debate Map"><span class="sectionHeaderViewModeIcon" aria-hidden="true">🗺️</span><span class="sectionHeaderViewModeLabel">Debate Map</span></button>
+            <button type="button" class="sectionHeaderViewModeButton" data-ce-report-view-mode="debate-atlas" aria-pressed="false" title="Debate Atlas"><span class="sectionHeaderViewModeIcon" aria-hidden="true">🗺️</span><span class="sectionHeaderViewModeLabel">Debate Atlas</span></button>
             <button type="button" class="sectionHeaderViewModeButton" data-ce-report-view-mode="breakdown" aria-pressed="false" title="Breakdown"><span class="sectionHeaderViewModeIcon" aria-hidden="true">📊</span><span class="sectionHeaderViewModeLabel">Breakdown</span></button>
             <button type="button" class="sectionHeaderViewModeButton" data-ce-report-view-mode="risk-matrix" aria-pressed="false" title="Risk Matrix"><span class="sectionHeaderViewModeIcon" aria-hidden="true">⚠️</span><span class="sectionHeaderViewModeLabel">Risk Matrix</span></button>
             <button type="button" class="sectionHeaderViewModeButton" data-ce-open-raw-results>${renderFontAwesomeIcon('expand')}Raw Results</button>

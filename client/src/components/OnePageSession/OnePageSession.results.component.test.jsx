@@ -1047,7 +1047,7 @@ describe('OnePageSession results routing', () => {
       expect(screen.getByRole('button', { name: /^Circles$/i })).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('button', { name: /^Debate Map$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Debate Atlas$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Breakdown$/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Circles$/i }));
 
@@ -1257,7 +1257,7 @@ describe('OnePageSession results routing', () => {
   });
 
   it.each(['rxc-test', 'rxc-ra-test'])(
-    'shows %s its own context, with no built-in atlas or pre-filled Debate Map',
+    'shows %s its own context, with no built-in atlas or pre-filled Debate Atlas',
     async (slug) => {
       const props = buildProps();
       const sessionRef = React.createRef();
@@ -1369,7 +1369,7 @@ describe('OnePageSession results routing', () => {
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
     };
 
-    it.each(['rxc-test', 'rxc-ra-test', 'edge'])('shows the built atlas as Debate Map on %s', async (slug) => {
+    it.each(['rxc-test', 'rxc-ra-test', 'edge'])('shows the built atlas as Debate Atlas on %s', async (slug) => {
       mockDebateAtlasState = atlasState();
       renderSession(slug);
       const nav = screen.getByTestId('ce-session-results-view-nav');
@@ -1377,8 +1377,8 @@ describe('OnePageSession results routing', () => {
         within(nav)
           .getAllByRole('button')
           .map((button) => button.textContent.trim()),
-      ).toEqual(['🧾Report', '🗺️Debate Map', 'Raw Results']);
-      fireEvent.click(within(nav).getByRole('button', { name: 'Debate Map' }));
+      ).toEqual(['🧾Report', '🗺️Debate Atlas', 'Raw Results']);
+      fireEvent.click(within(nav).getByRole('button', { name: 'Debate Atlas' }));
       const view = await screen.findByTestId('ce-session-debate-atlas');
       expect(within(view).getByRole('heading', { name: 'Salon atlas' })).toBeVisible();
       expect(view).toHaveTextContent('12 responses · 4 participants');
@@ -1395,7 +1395,7 @@ describe('OnePageSession results routing', () => {
     it('shows a built atlas in place of the demo atlas on a demo session', async () => {
       mockDebateAtlasState = atlasState();
       renderSession('demo');
-      fireEvent.click(await screen.findByRole('button', { name: /^Debate Map$/i }));
+      fireEvent.click(await screen.findByRole('button', { name: /^Debate Atlas$/i }));
       await screen.findByTestId('ce-session-debate-atlas');
       expect(mockDebateMap).toHaveBeenCalled();
       expect(
@@ -1403,7 +1403,7 @@ describe('OnePageSession results routing', () => {
       ).toBe(true);
     });
 
-    it('offers Build atlas to those who may build and opens Debate Map when it finishes', async () => {
+    it('offers Build atlas to those who may build and opens Debate Atlas when it finishes', async () => {
       const startBuild = jest.fn(async () => true);
       mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, startBuild });
       const sessionRef = React.createRef();
@@ -2278,7 +2278,7 @@ describe('OnePageSession results routing', () => {
     expect(reportButton).not.toHaveTextContent('🐝');
   });
 
-  it('orders Debate Map ahead of Breakdown in the demo results mode switcher', async () => {
+  it('orders Debate Atlas ahead of Breakdown in the demo results mode switcher', async () => {
     const props = buildProps();
 
     render(<OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />);
@@ -2286,7 +2286,7 @@ describe('OnePageSession results routing', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
     const reportButton = await screen.findByRole('button', { name: /^Report$/i });
-    const debateMapButton = screen.getByRole('button', { name: /^Debate Map$/i });
+    const debateMapButton = screen.getByRole('button', { name: /^Debate Atlas$/i });
     const breakdownButton = screen.getByRole('button', { name: /^Breakdown$/i });
     const riskMatrixButton = screen.getByRole('button', { name: /^Risk Matrix$/i });
 
@@ -2313,7 +2313,7 @@ describe('OnePageSession results routing', () => {
         .getAllByRole('button')
         .slice(0, 4)
         .map((button) => button.getAttribute('title') || button.textContent?.trim()),
-    ).toEqual(['Report', 'Debate Map', 'Breakdown', 'Risk Matrix']);
+    ).toEqual(['Report', 'Debate Atlas', 'Breakdown', 'Risk Matrix']);
 
     const polisButton = screen.getByRole('button', { name: /^Report$/i });
     const analysisButton = screen.getByRole('button', { name: /^Breakdown$/i });

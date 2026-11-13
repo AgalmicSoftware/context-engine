@@ -59,7 +59,7 @@ and generated diagrams together under `ai-discourse-bench/`.
      joint embedding when eligible pairs lack sufficient overlap. Measured
      edges survive; available groups remain exploratory.
    - Optional importance repeats are averaged within each model before models
-     are equally weighted. Topic rollups then control Debate Map prominence;
+     are equally weighted. Topic rollups then control Debate Atlas prominence;
      reports without allocations fall back to question-count sizing.
 
 6. **Rendering target**

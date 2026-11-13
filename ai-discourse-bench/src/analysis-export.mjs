@@ -229,7 +229,7 @@ export const buildSecondPassAnalysisInput = (report = {}) => {
       requestedOutputs: {
         cells: 'Generate popup-ready analysis for aggregate cell ids such as Capabilities_vs_Labor.',
         subcells: 'Optionally generate deeper subcell ids in Category.Subcategory.Category.Subcategory form.',
-        links: 'Use linkedQuestionIds and linkedTopicIds so popups can point back into the report and Debate Map.',
+        links: 'Use linkedQuestionIds and linkedTopicIds so popups can point back into the report and Debate Atlas.',
         scenarios: 'Optional atlas scenario cards for risk cells where a generated topic/compass overlap clarifies the interaction.',
       },
     },

@@ -444,6 +444,10 @@ describe('SessionSettingsPage', () => {
     fireEvent.click(screen.getByTestId('ce-setup-more-results'));
     const list = screen.getByTestId('ce-setting-results-admins-list');
     expect(within(list).getByText(existing)).toBeInTheDocument();
+    // Results admins build all three of the Worker's Results views, so the help names them.
+    expect(
+      screen.getByText(/^They can build the debate atlas, risk matrix and AI Views in Results\./),
+    ).toBeInTheDocument();
     // A stored list in other letter case is not an edit.
     expect(screen.queryByTestId('ce-settings-content-changes')).not.toBeInTheDocument();
 

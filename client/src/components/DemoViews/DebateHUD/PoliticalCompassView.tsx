@@ -380,7 +380,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
             letterSpacing: '-0.01em',
           }}
         >
-          {compass.xAxis.label || 'Political Compass'}
+          {compass.xAxis.label || 'Where everyone stands'}
         </div>
       </div>
 
