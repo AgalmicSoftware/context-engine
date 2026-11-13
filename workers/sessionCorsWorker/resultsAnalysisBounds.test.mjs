@@ -35,7 +35,7 @@ test('canonical analysis fails clearly before an unbounded history scan complete
   const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a', config });
   assert.equal(source.ok, false);
   assert.equal(source.status, 503);
-  assert.match(source.error, /AI builds read at most 10,000 stored question and answer versions at once, and this session stores more \(each saved change to an answer counts\)\. No report was made/);
+  assert.match(source.error, /AI builds read at most 10,000 stored question and answer versions at once, and this session stores more\. No report was made/);
   assert.ok(history.operations <= 800);
   assert.equal(source.snapshot, undefined);
 });

@@ -132,7 +132,7 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
       const uploadReceipts = await readUploadReceiptDiagnostics({ env, slug: targetSlug, cursor });
       // Counted on the first page only; null when the count can't be read.
       const storedVersions = cursor ? undefined
-        : await (deps?.countResultsScanRows || countResultsScanRows)({ env, slug: targetSlug }).catch(() => null);
+        : await (deps?.countResultsScanRows || countResultsScanRows)({ env, slug: targetSlug, config }).catch(() => null);
       return deps?.json?.({
         ok: true, type: 'ce_session_diagnostics', version: 1,
         observedAtMs: typeof deps?.now === 'function' ? deps.now() : Date.now(),

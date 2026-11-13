@@ -73,6 +73,7 @@ import { DRAFT_TEXT_PATHS, draftTextRoute } from './draftTextRoute.js';
 import { checkContextSourceUpload, contextSourceListFields } from './contextSourcePolicy.js';
 import { contextSourceRoute } from './contextSourceRoute.js';
 import { toStr } from './stringCoercion.js';
+import { answerVersionStamp } from './answerVersionStamp.js';
 import {
   isStorageReadLimitError, jsonByteLength, parseStorageExportCursor, readStorageBytesBounded,
   STORAGE_EXPORT_PAGE_LIMITS, StorageReadLimitError, storageExportCursor,
@@ -173,7 +174,14 @@ export const storageIndexPutOptions = (metadata) => {
     };
   }
   const responder = resource === 'responses' ? trim(metadata?.responder).toLowerCase() : '';
-  return responder ? { metadata: { responder } } : undefined;
+  if (!responder) return undefined;
+  // A stamped readable answer also lists its question, session and time, so
+  // AI builds read only each person's latest answer to each question.
+  const readable = metadata.encrypted !== true && metadata.payloadEncrypted !== true;
+  // Untrimmed: a question id cut at 128 characters may end in a space.
+  const questionId = readable ? toStr(metadata.answerQuestionId) : '';
+  const sessionId = trim(metadata.answerSessionId);
+  return { metadata: { responder, ...(questionId && sessionId ? { questionId, sessionId, createdAt: trim(metadata.createdAt) } : {}) } };
 };
 // Long enough to outlast a session, so its count of adds doesn't reset.
 const CONTEXT_ADD_WINDOW_MS = 366 * 24 * 60 * 60 * 1000;
@@ -1704,6 +1712,10 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
       ...(accessConditions?.conditions?.length ? { accessConditions } : {}),
       ...(envelope ? { envelope } : {}),
       storageLayer,
+      // A readable answer says which question it answers, for its list entry.
+      ...(resource === 'responses' && trim(uploaderAddress) && payload.payloadEncrypted !== true &&
+        payloadAccess.encryption !== PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE
+        ? answerVersionStamp({ payload: parsedPayload, slug, config }) : {}),
     };
     assertNoCloudflarePrivateMaterial({
       id,
@@ -2314,6 +2326,70 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
 // operation, and refuses a bulk reply over 25 MB.
 const KV_BULK_GET_KEYS = 100;
 const KV_BULK_REPLY_BYTES = 16 * 1024 * 1024;
+
+// An answer key's stamped list entry (storageIndexPutOptions), or null, with
+// `older: true` when the same person has a newer stamped answer to the same
+// question in `entries`, by the build's order: time, then storage id.
+export const listedAnswerVersions = (entries, { prefix, sessionId }) => {
+  const versions = entries.map(({ name, metadata }) => {
+    const key = trim(name);
+    if (!sessionId || !toStr(metadata?.questionId) || !trim(metadata?.responder) || trim(metadata?.sessionId) !== sessionId) return null;
+    return { key, id: key.slice(prefix.length), questionId: toStr(metadata.questionId), responder: trim(metadata.responder),
+      createdAt: trim(metadata.createdAt), rowTime: Date.parse(trim(metadata.createdAt)) || 0, older: false };
+  });
+  const newest = new Map();
+  const group = (version) => `${version.questionId}\n${version.responder}`;
+  for (const version of versions) {
+    if (!version) continue;
+    const current = newest.get(group(version));
+    if (!current || version.rowTime > current.rowTime || (version.rowTime === current.rowTime && version.id > current.id)) newest.set(group(version), version);
+  }
+  for (const version of versions) if (version && newest.get(group(version)) !== version) version.older = true;
+  return versions;
+};
+
+// Every stored answer for an AI build, leaving unread a person's older answers
+// to a question when list entries show a newer one (storageIndexPutOptions).
+// Keys are listed 1,000 a call; the rest are read 100 a call, strictly, as
+// listCloudflareMetadataRows reads them. An older answer comes back in its
+// place in key order as `{ key, listed }`, so the build still weighs it.
+// Rows without a stamp, such as those written before stamps, are all read.
+export const listLatestResponseRows = async ({ index, slug, sessionId, budget }) => {
+  const prefix = buildIndexPrefix({ slug, resource: 'responses' });
+  const entries = [];
+  let cursor = '';
+  const seenCursors = new Set();
+  do {
+    budget.operation();
+    const listed = await index.list({ prefix, ...(cursor ? { cursor } : {}), limit: MINE_LIST_KV_KEYS });
+    const keys = (Array.isArray(listed?.keys) ? listed.keys : []).filter((keyEntry) => trim(keyEntry?.name));
+    budget.listed(keys.length);
+    entries.push(...keys);
+    cursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
+    if (listed?.list_complete === false && (!cursor || seenCursors.has(cursor))) throw new Error('Cloudflare storage list cursor is unavailable or did not advance.');
+    if (cursor) seenCursors.add(cursor);
+  } while (cursor);
+  const versions = listedAnswerVersions(entries, { prefix, sessionId });
+  const older = (version) => version?.older === true;
+  const toRead = entries.map((entry, i) => (older(versions[i]) ? null : trim(entry.name))).filter(Boolean);
+  const read = new Map();
+  for (let offset = 0; offset < toRead.length; offset += KV_BULK_GET_KEYS) {
+    const batch = toRead.slice(offset, offset + KV_BULK_GET_KEYS);
+    budget.rows(batch.length);
+    budget.operation();
+    const got = await index.get(batch);
+    for (const key of batch) {
+      const raw = got?.get?.(key) ?? null;
+      if (raw != null) budget.metadata(raw);
+      const metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!isObj(metadata) || !trim(metadata.id)) throw new Error('Storage metadata is missing or invalid.');
+      read.set(key, metadata);
+    }
+  }
+  return entries.map((entry, i) => (older(versions[i])
+    ? { key: versions[i].key, listed: versions[i] }
+    : { key: trim(entry.name), metadata: read.get(trim(entry.name)) }));
+};
 
 // `skipKey` passes over a listed key, from its list metadata, without reading it.
 // A budgeted scan reads each listed page in one bulk get.

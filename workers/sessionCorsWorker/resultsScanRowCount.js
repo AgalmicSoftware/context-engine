@@ -1,31 +1,43 @@
 import { RESULTS_ANALYSIS_SCAN_LIMITS } from './storageScanBudget.js';
-import { buildIndexPrefix, getStorageIndexBinding } from './storageRouteExecution.js';
+import { buildIndexPrefix, getStorageIndexBinding, listedAnswerVersions } from './storageRouteExecution.js';
+import { buildSessionIdOf } from './answerVersionStamp.js';
 import { hiddenStorageResourcePrefix } from './storageResourceOwnership.js';
 
 const LIST_PAGE = 1000;
+const MAX_LISTS = 60;
 
 // The rows an AI build reads in one pass: every stored version of every
-// question and answer, and each hidden-question mark. Counted from key lists
-// alone, and only until the count passes the limit, so at most a dozen lists.
-export const countResultsScanRows = async ({ env, slug } = {}) => {
+// question, each hidden-question mark, and every answer except a person's
+// older answers to a question that list entries show (listedAnswerVersions).
+// Counted from key lists alone, so at most 60 lists.
+export const countResultsScanRows = async ({ env, slug, config } = {}) => {
   const index = getStorageIndexBinding(env);
   const limit = RESULTS_ANALYSIS_SCAN_LIMITS.rows;
+  const over = { count: limit + 1, limit, overLimit: true };
+  const responses = buildIndexPrefix({ slug, resource: 'responses' });
   let count = 0;
   let lists = 0;
   for (const prefix of [
     buildIndexPrefix({ slug, resource: 'questions' }),
-    buildIndexPrefix({ slug, resource: 'responses' }),
+    responses,
     hiddenStorageResourcePrefix({ slug, resource: 'questions' }),
   ]) {
+    const entries = [];
     let cursor = '';
     do {
-      if (++lists > 20) throw new Error('Stored rows could not be counted.');
+      if (++lists > MAX_LISTS) throw new Error('Stored rows could not be counted.');
       const listed = await index.list({ prefix, limit: LIST_PAGE, ...(cursor ? { cursor } : {}) });
-      count += Array.isArray(listed?.keys) ? listed.keys.length : 0;
-      if (count > limit) return { count: limit + 1, limit, overLimit: true };
+      const keys = Array.isArray(listed?.keys) ? listed.keys : [];
+      if (prefix === responses) entries.push(...keys);
+      else count += keys.length;
+      if (count > limit) return over;
+      if (entries.length > RESULTS_ANALYSIS_SCAN_LIMITS.listed) return over;
       cursor = listed?.list_complete === false ? String(listed?.cursor || '') : '';
       if (listed?.list_complete === false && !cursor) throw new Error('Stored rows could not be counted.');
     } while (cursor);
+    count += listedAnswerVersions(entries, { prefix: responses, sessionId: buildSessionIdOf(config) })
+      .filter((version) => version?.older !== true).length;
+    if (count > limit) return over;
   }
   return { count, limit, overLimit: false };
 };

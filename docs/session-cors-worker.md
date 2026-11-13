@@ -743,6 +743,17 @@ Admin test panel:
   10,000 stored question and answer versions at once…"), and the Session Agent's
   Detailed answers note the same limit; `GET /admin/diagnostics` returns the
   count as `storedVersions`.
+  An answer stored with one question and this session's id (not a survey
+  bundle, and readable by the Worker) lists that question, the session id and
+  its time in its KV list entry. A build lists answer keys 1,000 at a time and
+  leaves unread every stamped answer that the same person later replaced with
+  a stamped answer to the same question; those count against a separate limit
+  of 50,000 listed answers, not the 10,000 rows. They still take part, unread,
+  in choosing each person's latest answer, so a build comes out as if every
+  version were read. If one would be chosen (its newer answer did not read as
+  stamped), the build reads every version instead. Answers stored before
+  0.9.10 carry no stamp and are all read, as before. At 50 people, 40 questions
+  and 600 changed answers, one build fell from 82 KV calls to 51.
   Larger histories require a future bounded background snapshot/current-version
   index. This guard covers Worker storage history, not the separate existing
   admin-snapshot contract.
@@ -2914,9 +2925,10 @@ Signed login/bootstrap requests:
   use the stale projection to retain access.
   The first page (no cursor) also has `storedVersions: { count, limit, overLimit }`:
   how many stored question and answer versions, with hidden-question marks, an AI
-  build would read, against its 10,000-row limit (every saved change to an answer
-  counts). It is counted from key lists and stops just past the limit, so an
-  over-limit session shows `limit + 1`; it is `null` when the count can't be read.
+  build would read, against its 10,000-row limit (a replaced stamped answer
+  does not count; every saved change to an answer stored before 0.9.10 does).
+  It is counted from key lists, so an over-limit session shows `limit + 1`; it
+  is `null` when the count can't be read.
   The card shows it as "N of 10,000", "More than 10,000" or "Couldn't be
   counted", and from 8,000 says what stops past the limit.
   Receipt counts are sampled from up to 25 participant coordinators per page;
