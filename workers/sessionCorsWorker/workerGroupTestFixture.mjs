@@ -69,10 +69,12 @@ export const createSlowKv = (values, { delayMs = 5 } = {}) => {
       values.set(key, value);
     }),
     delete: (key) => kv.call(() => { values.delete(key); }),
-    list: ({ prefix = '' } = {}) => kv.call(() => ({
-      keys: [...values.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })),
-      list_complete: true,
-    })),
+    // Pages as Cloudflare KV does: sorted names, at most `limit`, with a cursor.
+    list: ({ prefix = '', limit = 1000, cursor = '' } = {}) => kv.call(() => {
+      const names = [...values.keys()].filter((name) => name.startsWith(prefix) && name > cursor).sort();
+      const keys = names.slice(0, limit).map((name) => ({ name }));
+      return names.length > limit ? { keys, list_complete: false, cursor: keys.at(-1).name } : { keys, list_complete: true };
+    }),
   };
   return kv;
 };
