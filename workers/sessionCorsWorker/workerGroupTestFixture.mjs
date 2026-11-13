@@ -23,9 +23,10 @@ export const createDurableStorage = () => {
     get: async (key) => structuredClone(store.get(key)),
     put: async (key, value) => { store.set(key, structuredClone(value)); },
     delete: async (key) => store.delete(key),
-    list: async ({ prefix = '', startAfter = '', limit = Infinity } = {}) => new Map([...store]
-      .filter(([key]) => key.startsWith(prefix) && (!startAfter || key > startAfter))
-      .sort(([left], [right]) => (left < right ? -1 : 1))
+    // As the runtime's list: `end` is exclusive, and `reverse` lists from the end.
+    list: async ({ prefix = '', startAfter = '', end = '', reverse = false, limit = Infinity } = {}) => new Map([...store]
+      .filter(([key]) => key.startsWith(prefix) && (!startAfter || key > startAfter) && (!end || key < end))
+      .sort(([left], [right]) => (left < right ? -1 : 1) * (reverse ? -1 : 1))
       .slice(0, limit)
       .map(([key, value]) => [key, structuredClone(value)])),
     transaction: (callback) => {
@@ -34,7 +35,8 @@ export const createDurableStorage = () => {
         const result = await callback({
           get: async (key) => structuredClone(staged.get(key)),
           put: async (key, value) => { staged.set(key, structuredClone(value)); },
-          delete: async (key) => staged.delete(key),
+          // One key, or an array of keys answered with how many were there.
+          delete: async (key) => (Array.isArray(key) ? key.filter((name) => staged.delete(name)).length : staged.delete(key)),
         });
         store.clear();
         for (const [key, value] of staged) store.set(key, value);

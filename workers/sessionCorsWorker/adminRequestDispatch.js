@@ -56,6 +56,7 @@ import { generateResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
 import { buildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
 import { buildRiskMatrix, RISK_MATRIX_BUILD_ACTION } from './riskMatrixBuild.js';
 import { canBuildResults } from './resultsBuild.js';
+import { callSessionFeedbackStore } from './sessionFeedbackRoute.js';
 
 const RESULTS_BUILDER_ACTIONS = new Set([
   DEBATE_ATLAS_BUILD_ACTION,
@@ -289,6 +290,19 @@ export const dispatchAdminRequest = async ({
     } catch (error) {
       return deps?.json?.({ error: error?.message || 'Storage visibility update failed.' }, 500, headers);
     }
+  }
+
+  // Feedback is read and cleared by full admins only: it isn't a results action.
+  if (action === 'feedback/list' || action === 'feedback/delete') {
+    const privateHeaders = withPrivateNoStoreHeaders(headers);
+    const listing = action === 'feedback/list';
+    const result = await (deps?.callSessionFeedbackStore || callSessionFeedbackStore)(
+      env, targetSlug, listing ? 'list' : 'delete', listing ? { cursor: body?.cursor, limit: body?.limit } : { ids: body?.ids, all: body?.all },
+    );
+    if (result?.ok) return deps?.json?.(result.body, 200, privateHeaders);
+    return result?.status === 400
+      ? deps?.json?.({ error: listing ? 'That page of feedback can’t be read.' : 'Name the messages to delete, or all of them.', reason: result.body?.reason }, 400, privateHeaders)
+      : deps?.json?.({ error: 'Feedback couldn’t be reached just now. Try again shortly.', reason: 'feedback_unavailable' }, 503, privateHeaders);
   }
 
   if (action === 'refresh-interview-opening') {

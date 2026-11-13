@@ -6,6 +6,7 @@ import { createWorkerRuntime } from './worker.js';
 import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 import { storageRoute } from './storageRouteExecution.js';
 import { exportSessionBackup as exportPage } from './sessionBackup.js';
+import { sendSessionFeedback } from './sessionFeedbackRoute.js';
 import { STORAGE_EXPORT_PAGE_LIMITS } from './storageScanBudget.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { workerGroupBackupPrefixes, coordinateWorkerGroupBackup, executeCoordinatedWorkerGroupMutation } from './workerGroups.js';
@@ -124,6 +125,22 @@ test('backup pages preserve all storage records and chunk payloads larger than a
   assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith('ce-import-chunk:')).length, 0);
   const restoredEnvelope = JSON.parse(await target.kv.get(`ce-storage-payload:${slug}:${id}`));
   assert.deepEqual(Buffer.from(restoredEnvelope.payloadBase64url, 'base64url'), bytes);
+});
+
+test('feedback is never a storage resource and never enters a backup', async () => {
+  const { env, kv } = fixture();
+  const text = 'Feedback marker 7d1c: the atlas was hard to find.';
+  const sent = await sendSessionFeedback({
+    env, slug, config: {}, body: { text, view: 'results', theme: 'civic', screen: 'desktop', contact: { reachMe: 'marker-7d1c on Signal' } },
+    identity: 'anon:203.0.113.9', checkRateLimit: async () => true, release: '0.9.8',
+  });
+  assert.equal(sent.status, 200, JSON.stringify(sent));
+  const listed = await callSessionConfigCoordinator({ env, slug, path: 'session-feedback/list' });
+  assert.equal(listed.body.messages[0].text, text);
+  assert.ok(![...kv.values.values()].some((value) => String(value).includes('7d1c')));
+  const pages = await allPages(env);
+  assert.equal(pages.at(-1).manifest.complete, true);
+  assert.ok(!JSON.stringify(pages).includes('7d1c'));
 });
 
 test('restore refuses missing or altered pages, foreign keys, and mismatched session ids', async () => {

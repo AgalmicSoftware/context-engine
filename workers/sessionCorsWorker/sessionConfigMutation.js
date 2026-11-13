@@ -75,6 +75,9 @@ const validResultsAnalysisSettingsConfig = (config) => {
 
 const validPileAutoAdvanceConfig = (config) =>
   !hasOwn(config, 'pileAutoAdvanceEnabled') || typeof config.pileAutoAdvanceEnabled === 'boolean';
+// The Feedback box: absent means on.
+const validFeedbackConfig = (config) =>
+  !hasOwn(config, 'feedbackEnabled') || typeof config.feedbackEnabled === 'boolean';
 
 const validInterviewModeConfig = (config) => {
   if (hasOwn(config, 'interviewModeEnabled') && typeof config.interviewModeEnabled !== 'boolean') return false;
@@ -327,6 +330,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (!validPileAutoAdvanceConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid pile auto-advance config.' };
     }
+    if (!validFeedbackConfig(incomingConfig)) {
+      return { ok: false, status: 400, error: 'feedbackEnabled must be true or false.' };
+    }
     if (!validInterviewModeConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid interview mode config.' };
     }
@@ -442,6 +448,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   }
   if (!validPileAutoAdvanceConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid pile auto-advance config.' };
+  }
+  if (!validFeedbackConfig(mergedConfig)) {
+    return { ok: false, status: 400, error: 'feedbackEnabled must be true or false.' };
   }
   if (!validInterviewModeConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid interview mode config.' };

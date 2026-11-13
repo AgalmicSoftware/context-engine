@@ -37,6 +37,9 @@ export const resolveTopLevelRouteSelection = ({
 
   if (path === '/interview/starter' && method === 'POST') return { kind: 'interview-starter' };
 
+  // Signed in, feedback is an ordinary signed-in route; signed out, it names its session with ?slug=.
+  if (path === '/feedback' && method === 'POST' && !hasTrimmedAuthorization) return { kind: 'feedback' };
+
   if (path === '/session-config' && method === 'GET') {
     return { kind: 'session-config' };
   }

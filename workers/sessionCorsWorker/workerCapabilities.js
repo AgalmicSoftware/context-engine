@@ -16,6 +16,7 @@ export const FEATURES = Object.freeze([
   'response_upload_receipts',
   'results_analysis_retry_v1',
   'session_backup_v1',
+  'session_feedback',
   'storage_read_batch_v1',
   'upload_authority_stamps',
   'worker_groups',
@@ -23,7 +24,7 @@ export const FEATURES = Object.freeze([
 
 /* global __CE_RELEASE_VERSION__ */
 // scripts/worker-bundle.mjs sets this from package.json; unbundled source reports null.
-const workerRelease = () => (
+export const workerRelease = () => (
   typeof __CE_RELEASE_VERSION__ === 'string' && __CE_RELEASE_VERSION__ ? __CE_RELEASE_VERSION__ : null
 );
 
