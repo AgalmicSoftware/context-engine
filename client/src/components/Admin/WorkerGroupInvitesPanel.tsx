@@ -39,7 +39,7 @@ const download = (content: string, fileName: string) => {
   link.href = url;
   link.download = fileName;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 };
 
 // One-use links are shown once, as on chain: the Worker keeps only their hashes.
