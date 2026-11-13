@@ -6,6 +6,21 @@ const SESSION_ID = '0x11111111111111111111111111111111';
 const ADDRESS = '0x00000000000000000000000000000000000000aa';
 
 describe('WorkerParticipantGroupCreatePanel', () => {
+  it("bounds the member limit by the session's most members in a group", () => {
+    render(
+      <WorkerParticipantGroupCreatePanel
+        sessionId={SESSION_ID}
+        sessionConfig={{ groupMemberCeiling: 300 }}
+        participantAddress={ADDRESS}
+        sessionSlug="demo-sh"
+        workerToken="participant-token"
+        workerUrl="https://demo-sh-worker.example/"
+      />,
+    );
+    expect(screen.getByLabelText('Member limit')).toHaveAttribute('placeholder', 'Up to 300');
+    expect(screen.getByLabelText('Member limit')).toHaveAttribute('max', '300');
+  });
+
   it('creates only through the bearer-authenticated participant route and refreshes groups', async () => {
     const onGroupsChanged = jest.fn();
     const fetchImpl = jest.fn(async (_input?: RequestInfo | URL, init?: RequestInit) => {

@@ -539,57 +539,62 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.getByRole('button', { name: 'Leave Members' })).toBeInTheDocument();
   });
 
-  it('uses only an infinity icon for an unlimited group capacity', async () => {
-    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
-      const pathname = new URL(String(input)).pathname;
-      if (pathname.endsWith('/groups/my-memberships')) {
+  // Joins stop at the lower of the two, as on the Worker.
+  it.each([undefined, 5000])(
+    "shows the session's most members in a group for a group limit of %s",
+    async (memberLimit) => {
+      const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+        const pathname = new URL(String(input)).pathname;
+        if (pathname.endsWith('/groups/my-memberships')) {
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              sessionId: SESSION_ID,
+              sessionSlug: 'alpha',
+              memberships: [
+                {
+                  group: {
+                    groupId: 'unlimited',
+                    sessionSlug: 'alpha',
+                    label: 'Unlimited',
+                    memberLimit,
+                    joinMode: 'admin_add',
+                    memberVisibility: 'admin_only',
+                  },
+                  member: { sessionSlug: 'alpha', principalKey: 'evm:0xaa' },
+                  memberCount: 1,
+                },
+              ],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
         return new Response(
           JSON.stringify({
             ok: true,
             sessionId: SESSION_ID,
             sessionSlug: 'alpha',
-            memberships: [
-              {
-                group: {
-                  groupId: 'unlimited',
-                  sessionSlug: 'alpha',
-                  label: 'Unlimited',
-                  joinMode: 'admin_add',
-                  memberVisibility: 'admin_only',
-                },
-                member: { sessionSlug: 'alpha', principalKey: 'evm:0xaa' },
-                memberCount: 1,
-              },
-            ],
+            groups: [],
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
-      }
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          sessionId: SESSION_ID,
-          sessionSlug: 'alpha',
-          groups: [],
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
+      });
+
+      render(
+        <WorkerGroupMembershipPanel
+          envelope={envelope}
+          selectedGroupId="unlimited"
+          sessionConfig={{ groupMemberCeiling: 250 }}
+          fetchImpl={fetchImpl as typeof fetch}
+        />,
       );
-    });
 
-    render(
-      <WorkerGroupMembershipPanel
-        envelope={envelope}
-        selectedGroupId="unlimited"
-        fetchImpl={fetchImpl as typeof fetch}
-      />,
-    );
-
-    expect(await screen.findByTestId('ce-worker-group-detail')).toBeInTheDocument();
-    expect(screen.getByText('Members:')).toBeInTheDocument();
-    expect(screen.getByTitle('Unlimited')).toBeInTheDocument();
-    expect(screen.queryByText(/\/\s*Unlimited/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'View Unlimited members' })).not.toBeInTheDocument();
-  });
+      expect(await screen.findByTestId('ce-worker-group-detail')).toBeInTheDocument();
+      expect(screen.getByText('Members:')).toBeInTheDocument();
+      expect(screen.getByTestId('ce-worker-group-detail')).toHaveTextContent('1 / 250');
+      expect(screen.queryByTitle('Unlimited')).not.toBeInTheDocument();
+    },
+  );
 
   it('opens a permission-visible member list and renders safe participant identities', async () => {
     const fetchImpl = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -1361,7 +1366,7 @@ describe('WorkerGroupMembershipPanel', () => {
     await waitFor(() => expect(nextMembershipRead).toBeNull());
     fireEvent.click(screen.getByRole('button', { name: 'Join Racing reviewers' }));
     expect(await screen.findByRole('button', { name: 'Leave Racing reviewers' })).toBeInTheDocument();
-    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:8 \/$/);
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:8 \/ 1000$/);
 
     await act(async () => {
       stalePreJoinGroups.resolve(groupsResponse(7));
@@ -1369,7 +1374,7 @@ describe('WorkerGroupMembershipPanel', () => {
       await Promise.resolve();
     });
     expect(screen.getByRole('button', { name: 'Leave Racing reviewers' })).toBeInTheDocument();
-    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:8 \/$/);
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:8 \/ 1000$/);
 
     const stalePreLeaveGroups = createResponseDeferred();
     const stalePreLeaveMemberships = createResponseDeferred();
@@ -1380,7 +1385,7 @@ describe('WorkerGroupMembershipPanel', () => {
     await waitFor(() => expect(nextMembershipRead).toBeNull());
     fireEvent.click(screen.getByRole('button', { name: 'Leave Racing reviewers' }));
     expect(await screen.findByRole('button', { name: 'Join Racing reviewers' })).toBeInTheDocument();
-    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:7 \/$/);
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:7 \/ 1000$/);
 
     await act(async () => {
       stalePreLeaveGroups.resolve(groupsResponse(8));
@@ -1388,7 +1393,7 @@ describe('WorkerGroupMembershipPanel', () => {
       await Promise.resolve();
     });
     expect(screen.getByRole('button', { name: 'Join Racing reviewers' })).toBeInTheDocument();
-    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:7 \/$/);
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:7 \/ 1000$/);
     expect(fetchImpl).toHaveBeenCalledTimes(8);
   });
 
@@ -1445,12 +1450,12 @@ describe('WorkerGroupMembershipPanel', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Join Counted reviewers' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Joined Counted reviewers.');
-    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:6 \/$/);
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:6 \/ 1000$/);
 
     fireEvent.click(screen.getByRole('button', { name: 'Leave Counted reviewers' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Left Counted reviewers.');
     expect(screen.getByRole('button', { name: 'Join Counted reviewers' })).toBeInTheDocument();
-    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:5 \/$/);
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:5 \/ 1000$/);
     expect(membershipReadCount).toBe(1);
     expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
@@ -1578,7 +1583,7 @@ describe('WorkerGroupMembershipPanel', () => {
       />,
     );
     expect(await screen.findByRole('button', { name: 'Leave Remount reviewers' })).toBeInTheDocument();
-    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:1 \/$/);
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:1 \/ 1000$/);
     first.unmount();
     joined = false;
     render(
@@ -1589,7 +1594,7 @@ describe('WorkerGroupMembershipPanel', () => {
       />,
     );
     expect(await screen.findByRole('button', { name: 'Join Remount reviewers' })).toBeInTheDocument();
-    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:0 \/$/);
+    expect(screen.getByText('Members:').parentElement).toHaveTextContent(/^Members:0 \/ 1000$/);
     expect(membershipReadCount).toBe(2);
   });
 

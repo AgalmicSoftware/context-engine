@@ -20,10 +20,7 @@ import {
   WorkerGroupMemberLimitHelp,
 } from './WorkerGroupJoinChoiceHelp';
 import { generateWorkerGroupPassphrase } from '../SBTs/createSbtGroupPasswordHelpers';
-import {
-  WORKER_GROUP_MEMBER_CEILING_DEFAULT,
-  workerGroupPasswordProblem,
-} from '../../../../shared/workerGroupJoin.mjs';
+import { workerGroupPasswordProblem } from '../../../../shared/workerGroupJoin.mjs';
 import styles from './WorkerGroupCreateForm.module.scss';
 
 type WorkerGroupCreateFormProps = {
@@ -58,7 +55,8 @@ type WorkerGroupCreateFormProps = {
   groupPassword?: string;
   onGroupPasswordChange?: (value: string) => void;
   /** The session's most members in a group. */
-  memberLimitMax?: number;
+  // The session's "Most members in a group": the largest limit, and what a blank limit means.
+  memberLimitMax: number;
   memberVisibility?: WorkerGroupMemberVisibility;
   memberVisibilityTestId?: string;
   removalAuth?: WorkerGroupRemovalAuth;
@@ -153,7 +151,7 @@ const WorkerGroupCreateForm = ({
   onListedChange,
   groupPassword = '',
   onGroupPasswordChange,
-  memberLimitMax = WORKER_GROUP_MEMBER_CEILING_DEFAULT,
+  memberLimitMax,
   label,
   labelTestId,
   memberVisibility = 'session',
@@ -629,7 +627,7 @@ const WorkerGroupCreateForm = ({
                 max={memberLimitMax}
                 step="1"
                 value={memberLimit}
-                placeholder="Unlimited"
+                placeholder={`Up to ${memberLimitMax.toLocaleString('en-US')}`}
                 aria-label="Member limit"
                 onChange={(event) => onMemberLimitChange?.(event.target.value)}
               />

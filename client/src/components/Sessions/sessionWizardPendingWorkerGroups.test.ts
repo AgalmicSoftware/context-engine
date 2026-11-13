@@ -2,6 +2,7 @@ import {
   buildPendingWorkerGroupInput,
   createPendingWorkerGroupDraft,
   normalizePendingWorkerGroupDrafts,
+  resolveDraftGroupMemberCeiling,
   validatePendingWorkerGroupDrafts,
 } from './sessionWizardPendingWorkerGroups';
 
@@ -105,37 +106,60 @@ describe('sessionWizardPendingWorkerGroups', () => {
 
   it('blocks publishing when a queued group no longer has a name', () => {
     expect(
-      validatePendingWorkerGroupDrafts([
-        { groupId: 'group-1', label: '', description: '', joinMode: 'open', memberVisibility: 'session' },
-      ]),
+      validatePendingWorkerGroupDrafts(
+        [{ groupId: 'group-1', label: '', description: '', joinMode: 'open', memberVisibility: 'session' }],
+        1000,
+      ),
     ).toContain('Group 1 needs a name.');
   });
 
   it('rejects unsafe rich metadata before publishing', () => {
     expect(
-      validatePendingWorkerGroupDrafts([
-        {
-          groupId: 'group-1',
-          label: 'Research',
-          imageUrl: 'http://images.example.test/group.png',
-          tags: ['Research', 'research'],
-          documentURLs: ['http://docs.example.test/brief'],
-          memberLimit: '0',
-          joinEndsAt: '2020-01-01T00:00',
-          adminAddress: 'not-an-address',
-          joinMode: 'open',
-          memberVisibility: 'session',
-        },
-      ]),
+      validatePendingWorkerGroupDrafts(
+        [
+          {
+            groupId: 'group-1',
+            label: 'Research',
+            imageUrl: 'http://images.example.test/group.png',
+            tags: ['Research', 'research'],
+            documentURLs: ['http://docs.example.test/brief'],
+            memberLimit: '0',
+            joinEndsAt: '2020-01-01T00:00',
+            adminAddress: 'not-an-address',
+            joinMode: 'open',
+            memberVisibility: 'session',
+          },
+        ],
+        1000,
+      ),
     ).toEqual(
       expect.arrayContaining([
         'Group 1 image must use a public HTTPS URL.',
         'Group 1 tags must be unique, non-empty, and 64 characters or fewer.',
         'Group 1 references must be unique public HTTPS URLs.',
-        'Group 1 member limit must be a whole number from 1 to 1000.',
+        'Group 1 member limit must be a whole number from 1 to 1,000, the most members in a group.',
         'Group 1 join deadline must be in the future.',
         'Group 1 admin address must be a valid Ethereum address.',
       ]),
     );
+  });
+
+  it('bounds member limits by the session ceiling typed on /new, not a fixed 1,000', () => {
+    const group = (memberLimit: string) => [
+      {
+        groupId: 'group-1',
+        label: 'Room',
+        description: '',
+        joinMode: 'open',
+        memberVisibility: 'session',
+        memberLimit,
+      },
+    ];
+    expect(validatePendingWorkerGroupDrafts(group('2000'), resolveDraftGroupMemberCeiling('5000'))).toEqual([]);
+    expect(validatePendingWorkerGroupDrafts(group('200'), resolveDraftGroupMemberCeiling('50'))).toEqual([
+      'Group 1 member limit must be a whole number from 1 to 50, the most members in a group.',
+    ]);
+    expect(['', ' ', 'abc', '0', '20000'].map(resolveDraftGroupMemberCeiling)).toEqual([1000, 1000, 1000, 1000, 1000]);
+    expect(resolveDraftGroupMemberCeiling(250)).toBe(250);
   });
 });

@@ -45,6 +45,7 @@ const renderEncryptionPanel = (props: Partial<EncryptionPanelProps> = {}) =>
       t={t}
       renderSessionWizardInfoTooltip={() => null}
       launchCreateSbtModal={() => {}}
+      pendingWorkerGroupMemberCeiling={1000}
       activeCreateSbtTargetGateId="gate-1"
       activeCreateSbtTargetGate={{ id: 'gate-1', label: 'Gate A' }}
       encryptionGates={[

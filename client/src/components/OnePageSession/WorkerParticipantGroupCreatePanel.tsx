@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { readWorkerGroupMemberCeiling } from '@ce-shared/workerGroupJoin.mjs';
 import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpload';
 import {
   createWorkerGroupAsParticipant,
@@ -163,6 +164,7 @@ const WorkerParticipantGroupCreatePanel = ({
         tags={tags}
         documentURLs={documentURLs}
         memberLimit={memberLimit}
+        memberLimitMax={readWorkerGroupMemberCeiling(sessionConfig)}
         joinEndsAt={joinEndsAt}
         adminAddress={participantAddress}
         adminAddressReadOnly={true}

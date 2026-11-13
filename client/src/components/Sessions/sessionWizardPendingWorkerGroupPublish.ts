@@ -15,6 +15,7 @@ import type { AnyRecord } from '../shellTypes';
 import {
   buildPendingWorkerGroupInput,
   normalizePendingWorkerGroupDrafts,
+  resolveDraftGroupMemberCeiling,
   validatePendingWorkerGroupDrafts,
   type PendingWorkerGroupDraft,
 } from './sessionWizardPendingWorkerGroups';
@@ -81,7 +82,9 @@ export const publishPendingWorkerGroupDrafts = async ({
   postSignedRequestImpl = postSignedAdminWorkerRequest,
   uploadImageImpl = uploadWorkerGroupImage,
 }: PublishPendingWorkerGroupsInput): Promise<{ created: number; reused: number }> => {
-  const issues = validatePendingWorkerGroupDrafts(drafts);
+  // The /new draft, where the ceiling is still the text typed in.
+  const ceiling = resolveDraftGroupMemberCeiling((sessionConfig as AnyRecord | undefined)?.groupMemberCeiling);
+  const issues = validatePendingWorkerGroupDrafts(drafts, ceiling);
   if (issues.length) throw new Error(issues[0]);
   const normalizedDrafts = normalizePendingWorkerGroupDrafts(drafts);
   const defaultTags = normalizeWorkerGroupDefaultTags(sessionConfig);

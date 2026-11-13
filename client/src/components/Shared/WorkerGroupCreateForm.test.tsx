@@ -13,11 +13,13 @@ const mockReadCompactImageClipboard = readCompactImageClipboard as jest.MockedFu
 >;
 
 const Harness = ({
+  memberLimitMax = 1000,
   deferImageUpload = false,
   onImageFileUpload = async () => 'https://demo-sh-worker.example/storage/read?id=cf_group_image',
   onSubmit = () => {},
   submitLabel,
 }: {
+  memberLimitMax?: number;
   deferImageUpload?: boolean;
   onImageFileUpload?: (file: Blob) => Promise<string>;
   onSubmit?: (preparedImageUrl?: string) => void;
@@ -40,6 +42,7 @@ const Harness = ({
       tags={tags}
       documentURLs={documentURLs}
       memberLimit={memberLimit}
+      memberLimitMax={memberLimitMax}
       joinEndsAt={joinEndsAt}
       adminAddress={adminAddress}
       label=""
@@ -182,6 +185,16 @@ describe('WorkerGroupCreateForm image chooser', () => {
     expect(screen.getByRole('button', { name: 'Create Group' })).toBeDisabled();
   });
 
+  it("bounds the member limit by the session's most members in a group, and says so when blank", () => {
+    render(<Harness memberLimitMax={5000} />);
+    const limit = screen.getByLabelText('Member limit');
+    expect(limit).toHaveAttribute('placeholder', 'Up to 5,000');
+    fireEvent.change(limit, { target: { value: '2000' } });
+    expect(screen.getByRole('button', { name: 'Create Group' })).toBeEnabled();
+    fireEvent.change(limit, { target: { value: '5001' } });
+    expect(screen.getByRole('button', { name: 'Create Group' })).toBeDisabled();
+  });
+
   it('lets admins and participants choose who can remove members, explained behind a "?"', async () => {
     const onRemovalAuthChange = jest.fn();
     const renderForm = (participantDefaults: boolean, removalAuth?: WorkerGroupRemovalAuth) => (
@@ -193,6 +206,7 @@ describe('WorkerGroupCreateForm image chooser', () => {
         imageUrl=""
         label=""
         labelTestId="label"
+        memberLimitMax={1000}
         participantDefaults={participantDefaults}
         removalAuth={removalAuth}
         sessionSlug="demo-sh"

@@ -6,7 +6,15 @@ import { createPendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroup
 describe('SessionWorkerGroupDraftsPanel', () => {
   it('queues a named group and exposes editable access defaults', () => {
     const onAdd = jest.fn();
-    render(<SessionWorkerGroupDraftsPanel drafts={[]} onAdd={onAdd} onRemove={jest.fn()} onUpdate={jest.fn()} />);
+    render(
+      <SessionWorkerGroupDraftsPanel
+        memberCeiling={1000}
+        drafts={[]}
+        onAdd={onAdd}
+        onRemove={jest.fn()}
+        onUpdate={jest.fn()}
+      />,
+    );
 
     fireEvent.change(screen.getByTestId('ce-new-worker-group-name'), { target: { value: 'Research team' } });
     fireEvent.click(screen.getByTestId('ce-new-worker-group-add'));
@@ -20,7 +28,13 @@ describe('SessionWorkerGroupDraftsPanel', () => {
     const draft = createPendingWorkerGroupDraft('Research team', { groupId: 'research-team' });
     const onUpdate = jest.fn();
     render(
-      <SessionWorkerGroupDraftsPanel drafts={[draft]} onAdd={jest.fn()} onRemove={jest.fn()} onUpdate={onUpdate} />,
+      <SessionWorkerGroupDraftsPanel
+        memberCeiling={1000}
+        drafts={[draft]}
+        onAdd={jest.fn()}
+        onRemove={jest.fn()}
+        onUpdate={onUpdate}
+      />,
     );
 
     expect(screen.getByLabelText('Image URL')).toBeInTheDocument();
@@ -54,6 +68,7 @@ describe('SessionWorkerGroupDraftsPanel', () => {
       ]);
       return (
         <SessionWorkerGroupDraftsPanel
+          memberCeiling={1000}
           drafts={drafts}
           onAdd={jest.fn()}
           onRemove={jest.fn()}
@@ -95,6 +110,7 @@ describe('SessionWorkerGroupDraftsPanel', () => {
     const onRemove = jest.fn();
     const { rerender } = render(
       <SessionWorkerGroupDraftsPanel
+        memberCeiling={1000}
         drafts={[alpha, beta]}
         onAdd={jest.fn()}
         onRemove={onRemove}
@@ -105,6 +121,7 @@ describe('SessionWorkerGroupDraftsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Collapse Group 2: Beta team' }));
     rerender(
       <SessionWorkerGroupDraftsPanel
+        memberCeiling={1000}
         drafts={[beta, alpha]}
         onAdd={jest.fn()}
         onRemove={onRemove}
@@ -129,7 +146,13 @@ describe('SessionWorkerGroupDraftsPanel', () => {
     ];
     const onUpdate = jest.fn();
     render(
-      <SessionWorkerGroupDraftsPanel drafts={drafts} onAdd={jest.fn()} onRemove={jest.fn()} onUpdate={onUpdate} />,
+      <SessionWorkerGroupDraftsPanel
+        memberCeiling={1000}
+        drafts={drafts}
+        onAdd={jest.fn()}
+        onRemove={jest.fn()}
+        onUpdate={onUpdate}
+      />,
     );
 
     const selects = screen.getAllByLabelText('Who can remove members');
