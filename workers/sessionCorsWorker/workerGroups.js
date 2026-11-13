@@ -67,12 +67,13 @@ export const normalizeWorkerGroupId = (value) => {
 };
 
 // Whether a group shows in group lists to people who aren't its members. A
-// Public URL ('open') group always does: anyone may join it. A group stored
-// before the setting existed keeps the visibility it had: listed only when its
-// members were visible to the whole session.
+// Public URL ('open') group does: anyone may join it. A group stored before
+// the setting existed keeps the visibility it had, open or not: listed only
+// when its members were visible to the whole session.
 export const resolveWorkerGroupListed = ({ joinMode, memberVisibility, listed } = {}) =>
-	joinMode === WORKER_GROUP_JOIN_MODES.OPEN ||
-	(typeof listed === 'boolean' ? listed : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION);
+	typeof listed === 'boolean'
+		? listed || joinMode === WORKER_GROUP_JOIN_MODES.OPEN
+		: memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
 
 export const isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim(value));
 
@@ -407,8 +408,13 @@ const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps
 		return { ok: false, status: 400, reason: 'invalid_group_listed' };
 	}
 	// Stored only as chosen; an open group's forced listing applies on read, so
-	// it doesn't stick if the group later stops being open.
-	const listed = Object.prototype.hasOwnProperty.call(input, 'listed') ? input.listed : existing?.listed;
+	// it doesn't stick if the group later stops being open. A new group always
+	// stores it, so only groups from before the setting read the old rule.
+	const listed = Object.prototype.hasOwnProperty.call(input, 'listed')
+		? input.listed
+		: existing
+			? existing.listed
+			: memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
 	const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
 	if (!removalAuth) return { ok: false, status: 400, reason: 'invalid_removal_auth' };
 	const label = trim(input.label || existing?.label);
@@ -1209,7 +1215,9 @@ export const listWorkerGroups = async ({
 		authorityByGroupId.set(groupId, {
 			joinMode,
 			memberVisibility,
-			listed: resolveWorkerGroupListed({ joinMode, memberVisibility, listed: authority?.listed }),
+			// The catalog has already applied the listing rule; applying it again
+			// would list an open group an older Worker hid.
+			listed: authority?.listed === true,
 			memberCount,
 			isMember: authority?.isMember === true,
 			...(admin && isObj(authority?.admin) ? { adminDetails: authority.admin } : {}),

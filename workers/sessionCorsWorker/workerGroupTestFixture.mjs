@@ -79,7 +79,7 @@ export const createSlowKv = (values, { delayMs = 5 } = {}) => {
   return kv;
 };
 
-export const createFixture = async ({ memberLimit, groupMemberCeiling, joinMode = 'open', listed } = {}) => {
+export const createFixture = async ({ memberLimit, groupMemberCeiling, joinMode = 'open', listed, memberVisibility } = {}) => {
   const sessionConfig = { slug: 'fixture', adminAddress: ADMIN, sessionId: SESSION_ID,
     ...(groupMemberCeiling ? { groupMemberCeiling } : {}) };
   const values = new Map([['session:fixture:config', JSON.stringify(sessionConfig)]]);
@@ -104,7 +104,7 @@ export const createFixture = async ({ memberLimit, groupMemberCeiling, joinMode 
     principal: principal(index) })).groups?.map((group) => group.groupId);
   const created = await mutate({ operation: 'create', principal: undefined,
     input: { groupId: 'salon', label: 'Salon', joinMode, ...(memberLimit ? { memberLimit } : {}),
-      ...(listed === undefined ? {} : { listed }) } });
+      ...(listed === undefined ? {} : { listed }), ...(memberVisibility ? { memberVisibility } : {}) } });
   assert.equal(created.ok, true, JSON.stringify(created));
   const join = (index, credential) => mutate({ operation: 'join', principal: principal(index), actorPrincipal: principal(index),
     ...(credential ? { credential } : {}) });

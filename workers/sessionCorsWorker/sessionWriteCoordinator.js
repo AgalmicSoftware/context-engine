@@ -1527,7 +1527,8 @@ export class SessionWriteCoordinator {
         active: true,
         joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
         memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
-        listed: resolveWorkerGroupListed(group),
+        // As stored, so a group from before the setting keeps reading the old rule.
+        listed: typeof group?.listed === 'boolean' ? group.listed : undefined,
         removalAuth: toTrimmedString(group?.removalAuth).toLowerCase() || 'both',
         memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
         joinEndsAt: toTrimmedString(group?.joinEndsAt),
@@ -1585,7 +1586,8 @@ export class SessionWriteCoordinator {
         active: true,
         joinMode,
         memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
-        listed: resolveWorkerGroupListed(group),
+        // As stored, so a group from before the setting keeps reading the old rule.
+        listed: typeof group?.listed === 'boolean' ? group.listed : undefined,
         removalAuth: toTrimmedString(group?.removalAuth).toLowerCase() || 'both',
         memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
         joinEndsAt: toTrimmedString(group?.joinEndsAt),

@@ -7,6 +7,7 @@ import { Wallet } from 'ethers';
 
 import { hashOneUseSecret, workerGroupJoinStatement } from '../../shared/workerGroupJoin.mjs';
 import { SESSION_ID, createFixture, principal } from './workerGroupTestFixture.mjs';
+import { listWorkerGroups } from './workerGroups.js';
 
 const SIGNER = `0x${'5c'.repeat(20)}`;
 const codes = (count, seed = 0) => Array.from({ length: count }, (_, index) => (seed * 1000 + index + 1).toString(16).padStart(32, '0'));
@@ -402,4 +403,38 @@ test('a person out of guesses still joins open groups, even with a stray code', 
   assert.equal((await f.mutate({ operation: 'create', input: { groupId: 'open', label: 'Open', joinMode: 'open' } })).ok, true);
   assert.equal((await f.mutate({ operation: 'join', groupId: 'open', principal: principal(1), actorPrincipal: principal(1),
     credential: { secret: codes(1)[0] } })).ok, true);
+});
+
+test('an open group an older Worker hid from lists stays hidden until an admin lists it', async () => {
+  const f = await createFixture({ joinMode: 'open', memberVisibility: 'members' });
+  // Stored as an older Worker stored it: no listing choice in either copy.
+  const kvKey = [...f.values.keys()].find((key) => key.startsWith('ce-worker-group:') && key.endsWith(':salon'));
+  const { listed: _kv, ...kvGroup } = JSON.parse(f.values.get(kvKey));
+  f.values.set(kvKey, JSON.stringify(kvGroup));
+  const [stateKey, state] = [...f.groupState.store].find(([, value]) => value === f.groupRecord());
+  const { listed: _state, ...olderState } = state;
+  f.groupState.store.set(stateKey, olderState);
+  const strangerSees = async () => {
+    const result = await listWorkerGroups({ env: f.env, slug: 'fixture', sessionId: SESSION_ID,
+      actorPrincipalResult: { principal: principal(7) }, expectedGroupCount: 1 });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    return result.groups.map((group) => group.groupId);
+  };
+  assert.deepEqual(await strangerSees(), []);
+  // An edit that doesn't name the choice keeps the old visibility.
+  assert.equal((await f.mutate({ operation: 'update', input: { memberLimit: 30 } })).ok, true);
+  assert.deepEqual(await strangerSees(), []);
+  assert.equal((await f.mutate({ operation: 'update', input: { listed: true } })).ok, true);
+  assert.deepEqual(await strangerSees(), ['salon']);
+});
+
+test('a new group stores its listing, so member visibility never moves it; an open one is always listed', async () => {
+  const strangerSees = async (f) => (await listWorkerGroups({ env: f.env, slug: 'fixture', sessionId: SESSION_ID,
+    actorPrincipalResult: { principal: principal(7) }, expectedGroupCount: 1 })).groups.map((group) => group.groupId);
+  const open = await createFixture({ joinMode: 'open', memberVisibility: 'members' });
+  assert.deepEqual(await strangerSees(open), ['salon']);
+  const added = await createFixture({ joinMode: 'admin_add', memberVisibility: 'session' });
+  assert.deepEqual(await strangerSees(added), ['salon']);
+  assert.equal((await added.mutate({ operation: 'update', input: { memberVisibility: 'members' } })).ok, true);
+  assert.deepEqual(await strangerSees(added), ['salon']);
 });

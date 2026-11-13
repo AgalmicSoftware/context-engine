@@ -1490,10 +1490,11 @@ never memberships, member identities, member counts, or unlisted groups.
 Each group is listed or unlisted (`listed`, "Show in the group list"). A
 listed group shows in every group list the caller may see; an unlisted one
 shows only to its members and admins, and in no signed-out discovery. An open
-group is always listed, since anyone may join it. `memberVisibility` governs
-only who sees the member list, no longer whether the group shows. A group
-stored without `listed` reads as listed only if it is open or its members were
-visible to the whole session, so groups hidden before stay hidden. Private, gated, and encrypted
+group created with this setting is always listed, since anyone may join it.
+`memberVisibility` governs only who sees the member list, no longer whether the
+group shows. A group stored without `listed`, open or not, reads as listed only
+if its members were visible to the whole session, so groups hidden before stay
+hidden until an admin lists them. Private, gated, and encrypted
 modes otherwise keep discovery authenticated. This flow never opens the
 legacy SBT deployment form and does not request a contract address, chain, RPC,
 gas, or burn policy. A

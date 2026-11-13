@@ -2465,6 +2465,7 @@ test('participant and admin group lists use authoritative activity and visibilit
 			label: 'restricted',
 			joinMode: 'admin_add',
 			memberVisibility: 'admin_only',
+			listed: false,
 		},
 		actorPrincipal: actor,
 	});
