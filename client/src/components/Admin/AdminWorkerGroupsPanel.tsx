@@ -628,7 +628,6 @@ const AdminWorkerGroupsPanel = ({
                 Links: {group.invites.unused} unused, {group.invites.used} used
               </span>
             ) : null}
-            {group.guessLimited ? <span role="alert">Closed to password joins after too many wrong tries.</span> : null}
             <span>Visible to {group.memberVisibility.replace('_', ' ')}</span>
             <span>Who can remove members: {WORKER_GROUP_REMOVAL_AUTH_LABELS[group.removalAuth || 'both']}</span>
             {group.tags?.length ? <span>Tags: {group.tags.join(', ')}</span> : null}

@@ -43,7 +43,6 @@ export type WorkerGroup = {
   updatedAt?: string;
   // Only admins see these.
   passwordSet?: boolean;
-  guessLimited?: boolean;
   invites?: WorkerGroupInviteCounts;
 };
 export type WorkerGroupInviteCounts = { unused: number; used: number; revoked: number };
@@ -392,7 +391,6 @@ const normalizeGroup = (
     createdAt: toStringValue(source.createdAt) || undefined,
     updatedAt: toStringValue(source.updatedAt) || undefined,
     ...(typeof source.passwordSet === 'boolean' ? { passwordSet: source.passwordSet } : {}),
-    ...(typeof source.guessLimited === 'boolean' ? { guessLimited: source.guessLimited } : {}),
     ...(normalizeInviteCounts(source.invites) ? { invites: normalizeInviteCounts(source.invites)! } : {}),
   };
 };

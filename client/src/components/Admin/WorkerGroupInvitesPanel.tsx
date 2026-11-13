@@ -283,8 +283,7 @@ function GroupPassword({ group, sessionId, sessionSlug, workerUrl, postSignedReq
         sessionSlug,
         postSignedRequest,
       });
-      // A new password also clears the wrong-guess count, so the group opens again at once.
-      onGroupChanged({ ...saved, guessLimited: false });
+      onGroupChanged(saved);
       setRevealed(password);
       setPassword('');
     } catch (error) {
@@ -296,12 +295,6 @@ function GroupPassword({ group, sessionId, sessionSlug, workerUrl, postSignedReq
   return (
     <>
       <div>{group.passwordSet ? 'A password is set.' : 'No password yet: no one can join until one is set.'}</div>
-      {group.guessLimited ? (
-        <div role="alert">
-          Closed to password joins after too many wrong tries in the last hour. A new password opens it again at once;
-          the old one stops working.
-        </div>
-      ) : null}
       <div className={styles.formRow}>
         <Input
           type="text"

@@ -1311,7 +1311,7 @@ describe('worker group ports', () => {
         {
           groups: [
             { ...base, joinMode: 'one_use', listed: false, invites: { unused: 3, used: 1, revoked: 0 } },
-            { ...base, groupId: 'pw', joinMode: 'group_password', passwordSet: true, guessLimited: true },
+            { ...base, groupId: 'pw', joinMode: 'group_password', passwordSet: true },
             { ...base, groupId: 'big', joinMode: 'open', memberLimit: 10000 },
             { ...base, groupId: 'too-big', joinMode: 'open', memberLimit: 10001 },
             { ...base, groupId: 'odd', joinMode: 'code' },
@@ -1322,7 +1322,7 @@ describe('worker group ports', () => {
       );
       expect(groups.map((group) => group.groupId)).toEqual(['salon', 'pw', 'big']);
       expect(groups[0]).toMatchObject({ listed: false, invites: { unused: 3, used: 1, revoked: 0 } });
-      expect(groups[1]).toMatchObject({ passwordSet: true, guessLimited: true });
+      expect(groups[1]).toMatchObject({ passwordSet: true });
       expect(groups[2].memberLimit).toBe(10000);
       expect(isWorkerGroupListed(groups[0])).toBe(false);
       // Without the setting, a group is listed when the whole session sees its members, as the Worker resolves it.
