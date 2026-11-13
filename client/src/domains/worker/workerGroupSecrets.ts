@@ -92,12 +92,6 @@ export const buildWorkerGroupJoinCredentials = async ({
   return null;
 };
 
-/** Whether a token could be used to join: a password or a one-use claim code. */
-export const isUsableWorkerGroupToken = (token: string): boolean => {
-  const kind = parseGroupInviteToken(token)?.kind;
-  return kind === 'password' || kind === 'one_use';
-};
-
 /** A Group Password token can be handed on (as a recording's claims do); a one-use code would be spent. */
 export const isSharableWorkerGroupToken = (token: string): boolean => parseGroupInviteToken(token)?.kind === 'password';
 
