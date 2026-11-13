@@ -16,8 +16,8 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
-- Session Workers take feedback about the app at `POST /feedback`, from anyone on the session page, signed in or not. A message is text only, at most 2,000 characters, and names its sender only when they ask to be contacted. A person can send 5 a day; a session takes 200 a day and stores 2,000.
-- Full admins read, page through and delete feedback at `admin/feedback/list` and `admin/feedback/delete`; results admins cannot. Feedback never reaches AI Views, the atlas, the Risk Matrix, the Session Agent, the fidelity report, exports or backups.
+- Session Workers take feedback about the app at `POST /feedback`, from anyone on the session page, signed in or not. A message is text only, at most 2,000 characters, and names its sender only when they ask to be contacted. A person can send 5 a day; a session takes 200 a day and stores 2,000. Only sessions a Worker runs take feedback; an on-chain session takes none.
+- Full admins read and page through feedback with their sign-in (`GET /admin/feedback`), and clear it with one signed delete; results admins and agent keys cannot. Feedback never reaches AI Views, the atlas, the Risk Matrix, the Session Agent, the fidelity report, exports or backups.
 - A session's `feedbackEnabled` setting, on unless set, turns the Feedback box off; turning it off signs no one out.
 
 ### Agents and MCP
