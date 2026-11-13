@@ -19,7 +19,9 @@ const SIGNER = /^0x[0-9a-f]{40}$/i;
 
 export const WORKER_GROUP_INVITE_LIST_MAX = 250;
 
-export const workerGroupInvitePrefix = (groupId) => `worker-group-invite-v1:${encodeURIComponent(groupId)}:`;
+// Under the group authority's prefix, so session backups and restores carry
+// codes with the groups they belong to. Group ids are never reused.
+export const workerGroupInvitePrefix = (groupId) => `worker-group-capacity-invite-v3:${encodeURIComponent(groupId)}:`;
 export const workerGroupInviteKey = (groupId, hash) => `${workerGroupInvitePrefix(groupId)}${hash}`;
 
 /** A group state's code counts, zero when it has none yet. */

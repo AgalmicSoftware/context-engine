@@ -13,6 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 import { selectCanonicalStorageVersions } from '../../shared/storage/canonicalStorageVersions.mjs';
+import { hashOneUseSecret } from '../../shared/workerGroupJoin.mjs';
 import { getSessionSecrets, putSessionConfig, putSessionSecrets } from './sessionConfigSecretsStore.js';
 import { updateSessionSecretsAfterLitRepair } from './sessionLitAuthorizationCoordinator.js';
 import { decryptSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
@@ -501,6 +502,11 @@ test(`restore drill preserves reads, authority, groups and secrets (R2 ${sourceR
     data: JSON.stringify({ questionID: hiddenId, answer: { value: 'Group answer' } }),
   } });
   const large = await a.clients[0].upload({ resource: 'docsContext', data: JSON.stringify({ text: 'z'.repeat(5 * 1024 * 1024) }) });
+  // One-use codes travel with their group: a spent code stays spent.
+  const [spentCode, freshCode] = ['1'.repeat(32), '2'.repeat(32)];
+  await a.signed('groups/create', { group: { groupId: 'by-code', label: 'By code', joinMode: 'one_use' } });
+  await a.signed('groups/invites/add', { groupId: 'by-code', hashes: [await hashOneUseSecret(spentCode), await hashOneUseSecret(freshCode)] });
+  await a.clients[1].request('/groups/join', { method: 'POST', auth: true, body: { sessionId, groupId: 'by-code', secret: spentCode } });
   const pages = [];
   let cursor = '';
   do { const page = await a.signed('export-session-backup', { cursor }); pages.push(page); cursor = page.nextCursor; } while (cursor);
@@ -545,6 +551,10 @@ test(`restore drill preserves reads, authority, groups and secrets (R2 ${sourceR
     assert.equal(document.text.length, 5 * 1024 * 1024);
     const members = await b.signed('groups/list-members', { groupId: 'reviewers' });
     assert.deepEqual(members.members.map((member) => member.principal.address).sort(), [owner.address.toLowerCase(), participant.address.toLowerCase()].sort());
+    assert.deepEqual((await b.signed('groups/invites/list', { groupId: 'by-code' })).counts, { unused: 1, used: 1, revoked: 0 });
+    const joinByCode = (secret) => b.clients[2].request('/groups/join', { method: 'POST', auth: true, body: { sessionId, groupId: 'by-code', secret } });
+    await assert.rejects(joinByCode(spentCode), (error) => error.status === 403);
+    assert.equal((await joinByCode(freshCode)).ok, true);
     await b.clients[0].request('/ai', { method: 'POST', auth: true, body: { provider: 'openai', prompt: 'Use restored credentials.' } });
     assert.equal(b.calls.length, 1);
     await b.signed('groups/remove-member', { groupId: 'reviewers', principal: { kind: 'evm_address', address: participant.address } });

@@ -126,7 +126,7 @@ export const importWorkerGroupBackup = async (coordinator, payload) => {
     if (typeof key !== 'string' || seen.has(key)) fail('Invalid or duplicate group backup key.', 400);
     seen.add(key);
     if (key.startsWith('worker-group-capacity-')) {
-      if (!/^(worker-group-capacity-meta-v3|worker-group-capacity-(group|member)-v3:.+)$/.test(key) || !object(value) ||
+      if (!/^(worker-group-capacity-meta-v3|worker-group-capacity-(group|member|invite)-v3:.+)$/.test(key) || !object(value) ||
           value.pending || ['creating', 'updating', 'deleting', 'reserved', 'removing'].includes(value.phase || value.state) ||
           (key === 'worker-group-capacity-meta-v3' && (value.slug !== slug || value.sessionId !== sessionId))) fail('Invalid group authority backup.', 400);
     } else if (typeof value !== 'string') fail('Invalid group backup value.', 400);
