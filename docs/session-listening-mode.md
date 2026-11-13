@@ -102,10 +102,14 @@ the fixed two-line realtime preamble and before the opening question. Empty
 values are omitted.
 
 In Group Conversation mode, the recorder keeps the captured transcript when the participant records more.
-When an eligible completed transcript segment is available and no transcription chunk is pending, the client asks
-the configured session AI to draft questions automatically. The part completed last decides: text pasted or
-uploaded after the last transcribed chunk waits for **Generate questions**, while a chunk that finishes
-transcribing after such text still drafts automatically. New drafts append to the existing editor, while exact
+The client asks the configured session AI to draft questions on its own, as `recordingQuestionCount` and
+`recordingQuestionTiming` set. By default it drafts up to three, once, when the recording stops and its last part
+is transcribed; a recording closed on **Stop** drafts when it is reopened, and recording more and stopping again
+drafts what is left of `recordingQuestionCount`, at least one. Set to **after each part**, it drafts up to the count after every
+transcribed three-minute part, from the conversation so far. It writes only questions the discussion clearly
+supports and the session doesn't already ask, so fewer or none is normal. The part completed last decides: text
+pasted or uploaded after the last transcribed part waits for **Generate questions**, while a part that finishes
+transcribing after such text still drafts on its own. New drafts append to the existing editor, while exact
 ID or prompt duplicates are skipped and prior generated prompts are included as avoidance context. Manual retry
 remains available after a generation error; the client does not auto-retry unchanged transcript text in a loop.
 
@@ -120,9 +124,12 @@ Session `interviewMode` settings are available under **Participation** on `/new`
 | `questionGrowthPercent` | `20` | Additions needed since the last successful generation or conversation update, rounded up to at least one. |
 | `followNewQuestions` | `false` | Check the public question catalog every 30 seconds during active recording and append qualifying additions to the interviewer's context. |
 | `suggestQuestions` | `false` | Propose up to three new respondent-grounded question drafts when preparing responses. Drafts may be freeform, rating, binary, multichoice or quadratic; multichoice and quadratic drafts include suggested options for review. On, the voice interviewer also closes by asking what else should be asked and which session question the responder would most like others to answer; off, it skips both. |
+| `recordingQuestionCount` | `3` | The most draft questions a Group Conversation recording asks for, from 1 to 10 (**Group recording questions**). Changing it needs a Session Worker from 0.9.6 on. |
+| `recordingQuestionTiming` | `end` | When those drafts are written: `end` once the recording stops, `chunk` after each transcribed three-minute part. Changing it needs a Session Worker from 0.9.6 on. |
 | `allowManualRefresh` | `true` | Enable **Regenerate interview opening** for session admins. |
 | `shareDraftChangesByDefault` | `true` | Initially check **Share for research**, beside **AI submission info**, for new responses. Participants can change the checkbox before submission; saved per-question choices take precedence. |
 | `researchDetail` | `minimal` | What a shared draft comparison keeps: `minimal` has no AI notes or drafted text; `full` adds them and drafts for skipped questions. `full` needs a Session Worker newer than 0.8.0. |
+| `keepDraftTextForAdmins` | `false` | At minimal detail, keep the AI's drafted answer and comment for config admins to download, for people who allow it. Needs a Session Worker from 0.9.6 on; see [AI draft text for admins](session-interview-research.md#ai-draft-text-for-admins). |
 | `hiddenDraftShare` | `0` | Share of each participant's AI-prefill drafts, up to 0.5, hidden until they answer, while they share draft changes. Above 0 it needs a Session Worker newer than 0.8.0. |
 | `showFidelityScore` | `false` | After someone submits AI-prefill drafts, show them privately how well their AI predicted them. Needs a Session Worker newer than 0.8.0. |
 | `suggestGroups` | `false` | Retired in 0.9.1: still accepted in saved configs, but nothing reads it. Group matching follows `joinMatchingGroups`. |

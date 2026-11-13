@@ -144,7 +144,7 @@ untrusted data.
 
 ## Keeping your answers and files out
 
-Everyone's answers and files are in until they say otherwise. In the Group
+Everyone's answers and files are in until they say otherwise. In the Session
 Agent's dialog, turning off **Use my answers and files** keeps them out of every
 answer from the next question on. The files stay in the session's file list, and
 answers already given can't be taken back. The published results still count

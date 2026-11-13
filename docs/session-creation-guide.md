@@ -556,7 +556,7 @@ The core session metadata:
   for any of the groups set up under Access and identity, chosen in its
   **Visible to** dropdown; they are added after **Create**, when PDFs can be read by the session's AI and
   the links' pages read for it. See [Session context](session-context-sources.md).
-- **Suggest questions**, under the Questions list, drafts five questions from
+- **Suggest questions**, under the Questions list, drafts up to five questions from
   the name, description, context text, link titles and addresses (it doesn't
   open the pages), and the files added to Context, admins-only ones too. It
   follows **Question prompt** and **Tag suggestions** under AI, skips questions
@@ -566,8 +566,9 @@ The core session metadata:
   text, and PDFs with **Analyze with the session’s AI** on go in as files, up to
   32 MB together; the page names any it leaves out. The context is marked as
   untrusted material, as the session page's question generator marks it.
-  Drafts join the list, where you can edit or remove them; nothing reaches the
-  session before **Create**.
+  It drafts only what the context clearly supports, so fewer or none is a
+  normal result, and with none the page says so. Drafts join the list, where
+  you can edit or remove them; nothing reaches the session before **Create**.
 - **Colors**, under **Appearance** in Basics: `Context Engine`, `Ocean`, or
   `Amber`. This controls only documented session accents/chrome and does not
   change the app theme.

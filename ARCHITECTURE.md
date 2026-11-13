@@ -25,7 +25,7 @@ flowchart LR
   Hosted --> NativeDeploy["Native Deploy to Cloudflare<br/>token-free dashboard handoff"]
   DeployHelper --> Worker["Creator-owned per-session Worker<br/>worker_canonical authority"]
   NativeDeploy --> Worker
-  Worker --> Cloudflare["Worker KV / Cloudflare payload storage<br/>public results by default; worker_envelope optional"]
+  Worker --> Cloudflare["Worker KV / Cloudflare payload storage<br/>results for signed-in members by default; public or worker_envelope optional"]
   Worker --> AI["Selected AI provider"]
   Passkey["Passkey-derived EOA<br/>signing/admin identity"] --> Worker
 
