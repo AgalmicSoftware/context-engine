@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.7] - 2026-11-13
 
+### Client — available when the site deploys
+
+- On the Admin page, each group on a Session Worker has **Who can join**: One-use URLs, Group Password, Public URL, or Admin adds members, with the detail behind a "?". The choices appear once the session's Worker runs this release; on an older Worker the form is as before.
+- One-use URLs: an admin generates 1 to 500 links, with an optional expiry. They are shown once, to copy or export as CSV, and listed afterwards by the start of their hash with **Revoke** and **Revoke all unused**. Only hashes of the links reach the Worker.
+- Group Password: an admin sets, generates or replaces a password, shown once with **Copy password** and a link with or without it. Only the signer made from the password reaches the Worker. A password a joiner could not type back is refused with the reason.
+- **Show in the group list** keeps a group out of the list. A group's card says how people join, "Not in the group list", "No password yet: no one can join.", how many links are left, and warns after too many wrong passwords.
+- A link's invite leaves the address bar at once and is never kept in history, logs or copied links. A listed group that needs a password or a code takes one typed into the Groups section. A refused join says one sentence and offers the field again, and a refused invite is never sent again.
+- A claim link from a group recording carries the recorder's group password, never a one-use code. A group joined by one-use links says each person needs their own invite.
+- `/new` and Settings have **Most members in a group** (1 to 10,000). Settings offers it once the session's Worker runs this release.
+- An on-chain group's open join choice is labelled **Public URL**.
+
 ### Workers — requires redeployment
 
 - An admin chooses how people join a group on a Session Worker: anyone with the link, one-use codes, a group password, or only people an admin adds. For a group joined by code or password, the group's id in a link no longer admits anyone. Admins add, list and revoke codes at `groups/invites/add`, `groups/invites/list` and `groups/invites/revoke`, and set a password at `groups/password/set`; a password is never sent or stored, only the signer made from it.
