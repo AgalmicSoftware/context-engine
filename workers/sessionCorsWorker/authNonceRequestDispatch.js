@@ -128,9 +128,11 @@ export const dispatchAuthNonceRequest = async ({
   // of old stored nonces does not make an unsigned issue result usable.
   const issuedNonce = typeof issueResult?.nonce === 'string' ? issueResult.nonce.trim() : '';
   if (!issueResult?.ok || !issuedNonce) {
+    const status = Number(issueResult?.status || 0) >= 400 ? Number(issueResult.status) : 503;
     return deps?.json?.(
-      { error: issueResult?.error || 'Authorization state coordination is unavailable.' },
-      Number(issueResult?.status || 0) >= 400 ? Number(issueResult.status) : 503,
+      // Asking for another nonce changes nothing, so a busy one may be asked again.
+      { error: issueResult?.error || 'Authorization state coordination is unavailable.', ...(status === 503 ? { retryable: true } : {}) },
+      status,
       headers,
     );
   }

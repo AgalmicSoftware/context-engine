@@ -1577,6 +1577,16 @@ again is a no-op that finishes an interrupted join, so the website and the MCP
 send it again after a short wait. A busy or timed-out join may still have landed;
 joining again then succeeds at once, even when the group is full.
 
+Every busy answer with that sentence, from any route, also carries
+`retryable: true`, so a client may send a request that is safe to repeat again.
+The sentence also covers a coordinator reply that was lost after the work was
+done, so only a request whose repeat does no harm should be sent again. `isRetryableBusy` and
+`coordinatorRetryDelayMs` in `shared/sessionCoordinatorBusy.mjs` are the shared
+rule; they also accept the sentence alone, as Workers before 0.9.10 send it. A
+busy nonce request (`503`) is marked `retryable: true` too. A busy sign-in (`/auth/login`)
+is marked `retryable: false`, since its nonce may already be spent: signing in
+starts again from a new nonce instead.
+
 Member reads and roster pages use only canonical session-identity keys. Legacy
 slug-only or case-folded membership rows are ignored and never migrated during
 reads. Roster pagination does not write membership records or indexes, so a

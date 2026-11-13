@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { markRetryableBusy } from './retryableBusy.js';
 import rpcDefaults from '../../shared/rpcDefaults.cjs';
 import { createWorkerLowLevelHelpersWithWorkerDeps } from './workerLowLevelHelperBinding.js';
 import { createWorkerRouteRuntimeWithWorkerDeps } from './workerRouteRuntimeBinding.js';
@@ -262,7 +263,7 @@ export const createWorkerRuntime = (env, overrides = {}) => {
     workerLowLevelHelpers,
     workerRouteRuntime,
     workerAuthGateUtils: workerRouteRuntime.workerAuthGateUtils,
-    fetch: workerRouteRuntime.fetch,
+    fetch: async (...args) => markRetryableBusy(await workerRouteRuntime.fetch(...args)),
     queue: workerRouteRuntime.queue,
   };
 

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { Wallet } from 'ethers';
 import { SESSION_CONFIG_COORDINATION_ERROR } from './sessionConfigAuthority.js';
+import { isRetryableBusy } from '../../shared/sessionCoordinatorBusy.mjs';
 import {
   SESSION_ID, SLUG, createSessionEnv, fetchWorker, login, makeRequest, readJson, uploadJson,
 } from './sessionWorkerRuntimeFixture.mjs';
@@ -39,6 +40,9 @@ test('a coordinator too busy to mark an answer before its write gets the busy re
   const busy = await s.send();
   assert.equal(busy.status, 503, JSON.stringify(busy.body));
   assert.equal(busy.body.error, SESSION_CONFIG_COORDINATION_ERROR);
+  // The Worker says it is safe to send again, which the retry shows.
+  assert.equal(busy.body.retryable, true);
+  assert.equal(isRetryableBusy(busy.status, busy.body), true);
   assert.equal(await s.stored(), 0);
 
   const retried = await s.send();

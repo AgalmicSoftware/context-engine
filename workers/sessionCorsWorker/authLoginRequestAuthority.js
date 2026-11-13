@@ -159,10 +159,13 @@ export const resolveAuthLoginRequestAuthority = async ({
 
   const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address.toLowerCase(), siwe?.nonce);
   if (!nonceResult?.ok) {
+    // The nonce may be spent even when the answer is busy, so the same
+    // signature is never sent again: signing in starts afresh.
+    const busy = Number(nonceResult?.status || 0) >= 500;
     return {
       ok: false,
       response: deps?.json?.(
-        { error: nonceResult?.error },
+        { error: nonceResult?.error, ...(busy ? { retryable: false } : {}) },
         Number(nonceResult?.status || 0) >= 500 ? Number(nonceResult.status) : 400,
         headers,
       ),

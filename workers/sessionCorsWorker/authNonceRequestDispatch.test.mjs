@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { isRetryableBusy } from '../../shared/sessionCoordinatorBusy.mjs';
 import assert from 'node:assert/strict';
 
 import { dispatchAuthNonceRequest } from './authNonceRequestDispatch.js';
@@ -605,6 +606,8 @@ test('dispatchAuthNonceRequest refuses successful issue results without a signed
   assert.equal(result.status, 503);
   assert.equal(result.body.nonce, undefined);
   assert.equal(result.body.error, 'Authorization state coordination is unavailable.');
+  // Asking again for a nonce is harmless, so clients may.
+  assert.equal(isRetryableBusy(result.status, result.body), true);
 });
 
 test('dispatchAuthNonceRequest preserves production fail-closed behavior for old or unavailable coordinators', async () => {
@@ -634,10 +637,28 @@ test('dispatchAuthNonceRequest keeps a coordinator error status', async () => {
     deps: createNonceDeps({ issueNonce: async () => ({ ok: false, status: 0 }) }),
   });
   assert.deepEqual(result, {
-    body: { error: 'Authorization state coordination is unavailable.' },
+    body: { error: 'Authorization state coordination is unavailable.', retryable: true },
     status: 503,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
   });
+  // A refusal is not busy, so it is never marked to be sent again.
+  const refused = await dispatchAuthNonceRequest({
+    request: { json: async () => createNonceBody(), headers: new Headers({ Origin: 'https://allowed.example' }) },
+    env: {},
+    baseHeaders: {},
+    slug: '',
+    deps: createNonceDeps({ issueNonce: async () => ({ ok: false, status: 409, error: 'Nonce refused.' }) }),
+  });
+  assert.deepEqual([refused.status, refused.body], [409, { error: 'Nonce refused.' }]);
+  // A fault other than busy is not marked safe to repeat.
+  const broken = await dispatchAuthNonceRequest({
+    request: { json: async () => createNonceBody(), headers: new Headers({ Origin: 'https://allowed.example' }) },
+    env: {},
+    baseHeaders: {},
+    slug: '',
+    deps: createNonceDeps({ issueNonce: async () => ({ ok: false, status: 500, error: 'Nonce store failed.' }) }),
+  });
+  assert.deepEqual([broken.status, broken.body], [500, { error: 'Nonce store failed.' }]);
 });
 
 test('dispatchAuthNonceRequest preserves missing-slug failure before CORS and nonce storage', async () => {
