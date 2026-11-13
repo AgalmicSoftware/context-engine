@@ -16,7 +16,7 @@ const { slug, sessionId, corsWorkerUrl } = fixture.config;
 const GROUP_ID = 'e478b073-5b03-4ba3-9cb0-d31977f61af4';
 const questionId = (index) => `0x${(index + 1).toString(16).padStart(64, '0')}`;
 
-const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplete: true }), keyMadeHere = false, now, config = fixture.config, everyone, seedState, groupLabel = 'AI agents', uploads = false, waitMs = 50 } = {}) => {
+const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplete: true }), keyMadeHere = false, now, config = fixture.config, everyone, seedState, groupLabel = 'AI agents', uploads = false, waitMs = 50, onJoin } = {}) => {
   const stateDir = await mkdtemp(join(tmpdir(), 'ce-agent-list-'));
   t.after(() => rm(stateDir, { recursive: true, force: true }));
   // A key made with this state marks it; a key from elsewhere does not.
@@ -38,6 +38,7 @@ const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplet
       return Response.json({ groups: [{ groupId: GROUP_ID, label: groupLabel, joinMode: 'open', memberCount: 0 }] });
     }
     if (path === '/groups/my-memberships') return Response.json({ memberships: [] });
+    if (path === '/groups/join' && onJoin) return onJoin();
     if (path === '/storage/read') return Response.json(payloads.get(url.searchParams.get('id')));
     if (path === '/storage/list' && url.searchParams.get('resource') === 'questions') {
       return Response.json({ items: [...payloads.keys()].map((id, index) => ({
@@ -280,3 +281,25 @@ test('an answer whose transaction may have gone through is not called a failure'
   assert.equal(uncertain.result.structuredContent.reconciliationRequired, true);
 });
 
+const callTool = (participant, name, args) => createMcpServer({ serverInfo: { name: 'test', version: '1' }, tools: buildTools(participant), log: () => {} })
+  .handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
+
+test('a join still busy after its retries says the agent is not in the group and to call again', { timeout: 20_000 }, async (t) => {
+  let joins = 0;
+  const { participant } = await setup(t, { onJoin: () => {
+    joins += 1;
+    return Response.json({ error: 'Session config coordination is unavailable; retry.', reason: 'worker_group_coordination_unavailable' }, { status: 503 });
+  } });
+  const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID });
+  assert.equal(reply.result.isError, true);
+  assert.equal(joins, 4);
+  assert.match(reply.result.content[0].text,
+    new RegExp(`too busy to finish joining group "${GROUP_ID}", so you are not in it\\. Wait a few seconds and call join_group again\\.`));
+});
+
+test('a join with no answer says it may not have gone through and how to check', async (t) => {
+  const { participant } = await setup(t, { onJoin: () => { throw new TypeError('fetch failed'); } });
+  const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID });
+  assert.equal(reply.result.isError, true);
+  assert.match(reply.result.content[0].text, /may not have gone through\. Call get_session to see whether you are in it/);
+});

@@ -16,6 +16,7 @@ import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } fro
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
+import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
 // The Session Worker shows these sessions' answers to every signed-in member.
@@ -241,8 +242,23 @@ const GROUP_REFUSALS = {
   worker_group_leave_denied: (id) => `Group "${id}" doesn’t let members leave.`,
 };
 
-const groupRefusal = (error, id) =>
-  error instanceof WorkerRequestError && Object.hasOwn(GROUP_REFUSALS, error.code) ? new Error(GROUP_REFUSALS[error.code](id)) : error;
+// Group answers that a few seconds' wait clears; the client has already resent a join.
+const BUSY_GROUP_REASONS = new Set(['worker_group_coordination_unavailable', 'worker_group_membership_state_pending', 'worker_group_mutation_ambiguous']);
+
+// A busy or unanswered change says what the agent's membership now is, so a
+// model neither stops trying nor believes it joined.
+const groupRefusal = (error, id, tool) => {
+  if (!(error instanceof WorkerRequestError)) return error;
+  if (Object.hasOwn(GROUP_REFUSALS, error.code)) return new Error(GROUP_REFUSALS[error.code](id));
+  const joining = tool === 'join_group';
+  if (error.status === 503 && (BUSY_GROUP_REASONS.has(error.code) || !error.code || error.code === SESSION_COORDINATOR_UNAVAILABLE)) {
+    return new Error(`The session was too busy to finish ${joining ? 'joining' : 'leaving'} group "${id}", so you are ${joining ? 'not' : 'still'} in it. Wait a few seconds and call ${tool} again.`);
+  }
+  if (!error.status) {
+    return new Error(`No answer came back about ${joining ? 'joining' : 'leaving'} group "${id}", so it may not have gone through. Call get_session to see whether you are in it, or call ${tool} again: repeating it is harmless.`);
+  }
+  return error;
+};
 
 // `olderLink` is a link to a Worker whose features couldn't be read, which may be
 // one from before participants' links: it refuses one as any change from a participant.
@@ -1214,7 +1230,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
       checkpoint();
       await ctx.client.joinGroup(id, { signal }).catch((error) => {
-        throw groupRefusal(error, id);
+        throw groupRefusal(error, id, 'join_group');
       });
       return { session: ctx.info.slug, joinedGroup: id };
     },
@@ -1227,7 +1243,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
       checkpoint();
       await ctx.client.leaveGroup(id, { signal }).catch((error) => {
-        throw groupRefusal(error, id);
+        throw groupRefusal(error, id, 'leave_group');
       });
       return { session: ctx.info.slug, leftGroup: id };
     },

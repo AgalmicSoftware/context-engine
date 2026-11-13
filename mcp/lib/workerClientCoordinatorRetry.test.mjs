@@ -47,17 +47,17 @@ test('a busy group join is sent again; leaving a group is sent once', async (t) 
   t.mock.timers.reset();
 
   const leave = setup(t, 1);
-  await assert.rejects(leave.settle(leave.client.leaveGroup('salon')), /coordination is unavailable/);
+  await assert.rejects(leave.settle(leave.client.leaveGroup('salon')), /session is busy and this request did not go through; nothing changed/);
   assert.deepEqual(leave.sent, ['/groups/leave']);
 });
 
 test('a write without a request id is sent once, and retries stop after three', async (t) => {
   const once = setup(t, 1);
-  await assert.rejects(once.settle(once.client.upload({ resource: 'questions', data: { id: 'q1' } })), /coordination is unavailable/);
+  await assert.rejects(once.settle(once.client.upload({ resource: 'questions', data: { id: 'q1' } })), /session is busy/);
   assert.deepEqual(once.sent, ['/storage/upload']);
   t.mock.timers.reset();
 
   const stuck = setup(t, 10);
-  await assert.rejects(stuck.settle(stuck.client.listAll({ resource: 'responses' })), /coordination is unavailable/);
+  await assert.rejects(stuck.settle(stuck.client.listAll({ resource: 'responses' })), /Wait a few seconds and try again/);
   assert.equal(stuck.sent.length, 4);
 });

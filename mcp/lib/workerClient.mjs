@@ -46,6 +46,10 @@ const explainFailure = (status, error, path) => {
   if (status === 404 && path.startsWith('/session-config')) return 'No hosted session with that name exists on this Worker.';
   if (status === 410) return 'This session has ended and no longer accepts answers.';
   if (status === 429) return `Rate limited by the Worker (${detail || '429'}). Wait a minute and retry.`;
+  // Sent after the client's own retries ran out; the Worker refused before doing anything.
+  if (status === 503 && error === SESSION_COORDINATOR_UNAVAILABLE) {
+    return 'The session is busy and this request did not go through; nothing changed. Wait a few seconds and try again.';
+  }
   return detail || `Worker request failed (${status}).`;
 };
 
