@@ -5,6 +5,7 @@ import {
   projectPublicWorkerSessionConfig,
   selectDeployWorkerSessionConfigFields,
 } from './workerSessionConfig.mjs';
+import { WORKER_SUPPORT_FIELDS } from '../../shared/workerSessionPublicConfig.mjs';
 
 const workerProfile = ({
   onChainSbt = false,
@@ -148,6 +149,15 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     sessionAgentReady: true,
     groupJoinChoices: true,
   });
+});
+
+// Sites read these to decide what an existing Worker can do, and Create's
+// readback skips them, so a new one is added to the shared list alone.
+test('a public config read sets every "this Worker supports X" field, and no other is true', () => {
+  assert.deepEqual([...WORKER_SUPPORT_FIELDS],
+    ['setConfigMergesAi', 'debateAtlas', 'riskMatrix', 'memberResults', 'sessionAgentReady', 'groupJoinChoices']);
+  const projected = projectPublicWorkerSessionConfig({ slug: 'session-a' });
+  assert.deepEqual(Object.keys(projected).filter((key) => projected[key] === true).sort(), [...WORKER_SUPPORT_FIELDS].sort());
 });
 
 test('instructions for AI agents are public and kept at deploy', () => {

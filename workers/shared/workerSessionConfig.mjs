@@ -1,13 +1,8 @@
 import { projectPublicAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import {
-  DEBATE_ATLAS_FIELD,
-  SESSION_AGENT_READY_FIELD,
-  GROUP_JOIN_CHOICES_FIELD,
-  MEMBER_RESULTS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
-  RISK_MATRIX_FIELD,
-  SET_CONFIG_MERGES_AI_FIELD,
+  WORKER_SUPPORT_FIELDS,
 } from '../../shared/workerSessionPublicConfig.mjs';
 
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -317,13 +312,9 @@ export const findForbiddenWorkerConfigSecretPath = (config, path = 'config') => 
 export const projectPublicWorkerSessionConfig = (config) => {
   const projected = selectFields(isObj(config) ? config : {}, PUBLIC_WORKER_CONFIG_FIELDS);
   if (projected.agentHttp) projected.agentHttp = projectPublicAgentConfig(projected.agentHttp);
-  // This code's set-config merges `ai` (mergeSetConfigAi); older Workers lack the field.
-  projected[SET_CONFIG_MERGES_AI_FIELD] = true;
-  projected[DEBATE_ATLAS_FIELD] = true;
-  projected[RISK_MATRIX_FIELD] = true;
-  projected[MEMBER_RESULTS_FIELD] = true;
-  projected[SESSION_AGENT_READY_FIELD] = true;
-  projected[GROUP_JOIN_CHOICES_FIELD] = true;
+  // What this code supports, such as merging `ai` on set-config (mergeSetConfigAi);
+  // older Workers lack these fields.
+  for (const field of WORKER_SUPPORT_FIELDS) projected[field] = true;
   return projected;
 };
 
