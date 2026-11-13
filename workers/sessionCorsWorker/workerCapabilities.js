@@ -7,6 +7,8 @@ import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRo
 
 export const FEATURES = Object.freeze([
   'agent_http_v1',
+  // limits.aiPerWalletPerDay is honoured; older Workers store it and ignore it.
+  'ai_daily_limit_v1',
   'context_sources_v1',
   'draft_text_v1',
   'envelope_export_identity_v1',

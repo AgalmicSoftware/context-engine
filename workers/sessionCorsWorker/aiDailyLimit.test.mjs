@@ -7,6 +7,7 @@ import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretAct
 import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
 import { evaluateAuthenticatedRoutePreflight } from './authenticatedRoutePreflight.js';
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
+import { dispatchWorkerCapabilities } from './workerCapabilities.js';
 
 const json = (body, status, headers) => ({ body, status, headers });
 const both = { limits: { perWalletPerDay: 400, aiPerWalletPerDay: 15 } };
@@ -87,6 +88,11 @@ test('an /ai call refused before any AI runs costs nothing from the day', async 
     },
   });
   assert.equal(over.response.status, 429);
+});
+
+test('a Worker that honours the AI limit says so, so Settings offers it only there', async () => {
+  const response = await dispatchWorkerCapabilities({ request: new Request('https://worker.example/capabilities') });
+  assert.ok((await response.json()).features.includes('ai_daily_limit_v1'));
 });
 
 test('a set or saved AI limit must be a whole number, or empty', () => {
