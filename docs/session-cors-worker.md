@@ -2903,6 +2903,8 @@ Signed login/bootstrap requests:
   build would read, against its 10,000-row limit (every saved change to an answer
   counts). It is counted from key lists and stops just past the limit, so an
   over-limit session shows `limit + 1`; it is `null` when the count can't be read.
+  The card shows it as "N of 10,000", "More than 10,000" or "Couldn't be
+  counted", and from 8,000 says what stops past the limit.
   Receipt counts are sampled from up to 25 participant coordinators per page;
   `complete` and `cursor` distinguish partial totals, and the card can load more.
   Cursors use a deployment-secret-derived HMAC and a private continuation map;

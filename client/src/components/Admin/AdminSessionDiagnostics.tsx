@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from 'reactstrap';
+import {
+  STORED_VERSIONS_FIELD,
+  isStoredVersionsDiagnostics,
+  type StoredVersionsDiagnostics,
+} from '@ce-shared/sessionDiagnostics.mjs';
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts';
 import styles from './AdminPage.module.scss';
 
@@ -21,6 +26,8 @@ type Diagnostics = {
     retriesExhausted: boolean;
   };
   configProjection: { pending: boolean; sinceMs: number | null };
+  // First page only, from Workers that count it; null when the Worker couldn't.
+  [STORED_VERSIONS_FIELD]?: StoredVersionsDiagnostics | null;
 };
 type Props = {
   workerUrl: string;
@@ -57,10 +64,19 @@ const isDiagnostics = (value: unknown): value is Diagnostics => {
     nullableNumber(analysis.nextAttemptAtMs) &&
     typeof analysis.retriesExhausted === 'boolean' &&
     typeof projection.pending === 'boolean' &&
-    nullableNumber(projection.sinceMs)
+    nullableNumber(projection.sinceMs) &&
+    (!(STORED_VERSIONS_FIELD in body) || isStoredVersionsDiagnostics(body[STORED_VERSIONS_FIELD]))
   );
 };
 const timestamp = (value: number | null, empty: string) => (value === null ? empty : new Date(value).toLocaleString());
+const formatCount = (value: number) => value.toLocaleString('en-US');
+// Every AI build reads all stored versions at once, so it stops past the limit; warn from 80%.
+const storedVersionsNote = ({ count, limit, overLimit }: StoredVersionsDiagnostics) =>
+  overLimit
+    ? `Over the limit: AI Views, the atlas and the risk matrix can't be built, and the Session Agent's Detailed answers leave out members' answers. Every saved change to an answer counts.`
+    : count >= limit * 0.8
+      ? `Close to the limit: past ${formatCount(limit)}, AI Views, the atlas and the risk matrix can't be built, and the Session Agent's Detailed answers leave out members' answers. Every saved change to an answer counts.`
+      : '';
 
 const AdminSessionDiagnostics = ({
   workerUrl,
@@ -112,6 +128,8 @@ const AdminSessionDiagnostics = ({
       const data = prior
         ? {
             ...body,
+            // Later pages carry receipts only; the count stays from the first.
+            [STORED_VERSIONS_FIELD]: previous[STORED_VERSIONS_FIELD],
             uploadReceipts: {
               ...counts,
               pendingLeases: prior.pendingLeases + counts.pendingLeases,
@@ -174,6 +192,18 @@ const AdminSessionDiagnostics = ({
             <dd>{timestamp(snapshot.analysis.nextAttemptAtMs, 'Not scheduled')}</dd>
             <dt>Automatic retries exhausted</dt>
             <dd>{snapshot.analysis.retriesExhausted ? 'Yes — automatic retries have stopped' : 'No'}</dd>
+            {snapshot[STORED_VERSIONS_FIELD] !== undefined && (
+              <>
+                <dt>Stored question and answer versions</dt>
+                <dd data-testid="ce-admin-diagnostics-stored-versions">
+                  {snapshot[STORED_VERSIONS_FIELD] === null
+                    ? 'Couldn’t be counted'
+                    : snapshot[STORED_VERSIONS_FIELD].overLimit
+                      ? `More than ${formatCount(snapshot[STORED_VERSIONS_FIELD].limit)}`
+                      : `${formatCount(snapshot[STORED_VERSIONS_FIELD].count)} of ${formatCount(snapshot[STORED_VERSIONS_FIELD].limit)}`}
+                </dd>
+              </>
+            )}
             <dt>Config projection repair</dt>
             <dd>
               {snapshot.configProjection.pending
@@ -181,6 +211,11 @@ const AdminSessionDiagnostics = ({
                 : 'Not pending'}
             </dd>
           </dl>
+          {snapshot[STORED_VERSIONS_FIELD] && storedVersionsNote(snapshot[STORED_VERSIONS_FIELD]) && (
+            <p role="status" className={styles.inlineResourceStatus}>
+              {storedVersionsNote(snapshot[STORED_VERSIONS_FIELD])}
+            </p>
+          )}
           {!snapshot.uploadReceipts.complete && (
             <>
               <p className={styles.inlineResourceStatus}>
