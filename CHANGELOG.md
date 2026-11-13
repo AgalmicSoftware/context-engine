@@ -39,6 +39,7 @@ All notable changes to this project will be documented in this file.
 
 ### Local tooling
 
+- MCP publication works after CI on `main` is re-run with "Re-run failed jobs": the publisher takes the newest package that run uploaded, from the same commit, checked against its receipt and source hashes. Re-run within 24 hours, because CI keeps the Worker candidate for one day.
 - The agent fidelity report scores interview, typed-note and group-recording drafts on their own rows, never in the AI-prefill score, and adds breakdowns by model and by context used. `--predictions` writes an optional pseudonymous per-draft CSV with whether each answer and comment changed. Rows by condition (shown, hidden, made separately) and by group are withheld together with the origin, platform, model and context rows, and per-person rows name only a shown origin.
 - The same script turns an admin's AI draft text download into pseudonymous input for clustering tools (`--draft-text` with `--clio`), leaving out text whose latest saved response no longer carries the person's agreement.
 
