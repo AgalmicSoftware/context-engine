@@ -351,10 +351,28 @@ describe('session interview protocol', () => {
     });
     expect(instructions).toContain('What is your uncommon AI view?');
     expect(instructions).toContain('Ask useful follow-ups');
-    expect(instructions).toContain('ask what topics or questions the responder thinks should be asked more');
     expect(instructions).toContain('one question at a time');
-    expect(instructions).toContain('which session question they would most like to see other people answer');
     expect(instructions).not.toContain('important insight');
+  });
+
+  it('asks the closing questions only when the session drafts new questions from interviews', () => {
+    const questions = [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }];
+    const closing = [
+      'ask what topics or questions the responder thinks should be asked more',
+      'which session question they would most like to see other people answer',
+    ];
+    const ending = 'Do not introduce an automatic timer or end the session without the responder’s cue.';
+    const on = buildRealtimeInterviewInstructions({ questions, suggestQuestions: true });
+    for (const line of closing) expect(on).toContain(line);
+    // Off, as by default: nothing is made from the answers, so the interviewer doesn't spend time on them.
+    for (const off of [
+      buildRealtimeInterviewInstructions({ questions }),
+      buildRealtimeInterviewInstructions({ questions, suggestQuestions: false }),
+    ]) {
+      for (const line of closing) expect(off).not.toContain(line);
+      expect(off).toContain(ending);
+    }
+    expect(on).toContain(ending);
   });
 
   it('includes exact rating endpoint labels in realtime question instructions', () => {

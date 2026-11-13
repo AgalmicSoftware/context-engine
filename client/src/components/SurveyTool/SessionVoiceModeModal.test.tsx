@@ -1250,6 +1250,34 @@ describe('SessionVoiceModeModal', () => {
     expect(within(paste).getByRole('alert')).toHaveTextContent('different session');
   });
 
+  it.each([
+    [{ suggestQuestions: true }, true],
+    [{}, false],
+  ])(
+    'gives the voice interviewer the closing questions only when interviews suggest questions (%j)',
+    async (interviewMode, asks) => {
+      let instructions = '';
+      mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+        instructions = options.instructions;
+        options.onRecordingState?.('recording');
+        return {
+          mediaStream: {} as MediaStream,
+          stop: jest.fn(async () => ({ transcript: '', turns: [] })),
+          pause: jest.fn(),
+          resume: jest.fn(),
+          getTranscript: () => '',
+        };
+      });
+      render(<SessionVoiceModeModal {...baseProps} mode="interview" sessionConfig={{ interviewMode }} />);
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+      await screen.findByLabelText('Pause interview');
+      expect(instructions.includes('which session question they would most like to see other people answer')).toBe(
+        asks,
+      );
+      expect(instructions).toContain('end the session without the responder’s cue');
+    },
+  );
+
   it('after a submit, a voice interview adds drafts only for new questions and keeps updating submitted ones', async () => {
     let instructions = '';
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
