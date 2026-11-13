@@ -78629,12 +78629,14 @@ var init_sessionFeedback = __esm({
         const record4 = payload.record;
         if (!record4 || typeof record4 !== "object") return refuse(400, "feedback_invalid");
         return storage.transaction(async (transaction) => {
-          const counts = countsOf(await transaction.get(META_KEY), nowMs);
+          const meta = await transaction.get(META_KEY);
+          const counts = countsOf(meta, nowMs);
           if (counts.stored >= SESSION_FEEDBACK_LIMITS.stored) return refuse(409, "feedback_full");
           if (counts.today >= SESSION_FEEDBACK_LIMITS.perSessionPerDay) return refuse(429, "feedback_session_limit");
-          const createdAt = new Date(nowMs).toISOString();
+          const atMs = Math.max(nowMs, (Number(meta?.lastMs) || 0) + 1);
+          const createdAt = new Date(atMs).toISOString();
           await transaction.put(`${PREFIX2}${createdAt}:${randomHex3(8)}`, { ...record4, createdAt });
-          await transaction.put(META_KEY, { day: counts.day, stored: counts.stored + 1, today: counts.today + 1 });
+          await transaction.put(META_KEY, { day: counts.day, stored: counts.stored + 1, today: counts.today + 1, lastMs: atMs });
           return json6({ ok: true });
         });
       }
@@ -78654,17 +78656,17 @@ var init_sessionFeedback = __esm({
         });
       }
       if (operation === "delete") {
-        let deleted;
-        if (payload.all === true && payload.ids == null) {
-          deleted = 0;
+        const { ids, through } = payload;
+        let deleted = 0;
+        if (ids == null && typeof through === "string" && ID.test(through)) {
+          const end = `${PREFIX2}${through}\0`;
           for (let round = 0; round < 2 * Math.ceil(SESSION_FEEDBACK_LIMITS.stored / DELETE_BATCH); round += 1) {
-            const keys = [...(await storage.list({ prefix: PREFIX2, limit: DELETE_BATCH })).keys()];
+            const keys = [...(await storage.list({ prefix: PREFIX2, end, limit: DELETE_BATCH })).keys()];
             if (!keys.length) break;
             deleted += await removeKeys(storage, keys);
           }
         } else {
-          const ids = payload.ids;
-          if (payload.all != null || !Array.isArray(ids) || ids.length < 1 || ids.length > SESSION_FEEDBACK_LIMITS.page || !ids.every((id2) => typeof id2 === "string" && ID.test(id2))) {
+          if (through != null || !Array.isArray(ids) || ids.length < 1 || ids.length > SESSION_FEEDBACK_LIMITS.page || !ids.every((id2) => typeof id2 === "string" && ID.test(id2))) {
             return refuse(400, "feedback_invalid");
           }
           deleted = await removeKeys(storage, [...new Set(ids)].map((id2) => PREFIX2 + id2));
@@ -104546,8 +104548,10 @@ var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 =
 };
 
 // workers/sessionCorsWorker/sessionFeedbackRoute.js
+init_sessionSlugResolution();
+init_workerCanonicalAuthority();
 var FEEDBACK_PATH = "/feedback";
-var FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2e3, reachMeChars: 200, nameChars: 80, bodyBytes: 8192 });
+var FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2e3, reachMeChars: 200, bodyBytes: 8192 });
 var SCREENS = /* @__PURE__ */ new Set(["phone", "tablet", "desktop"]);
 var VIEW = /^[A-Za-z0-9:_-]{1,80}$/;
 var THEME = /^[a-z0-9-]{1,40}$/;
@@ -104576,12 +104580,10 @@ var normalizeFeedback = (body, { address: address3 = "" } = {}) => {
   let contact;
   if (!absent(body.contact)) {
     const reachMe = plain(body.contact?.reachMe);
-    const displayName = plain(body.contact?.displayName);
     if (typeof body.contact !== "object" || !reachMe || reachMe.length > FEEDBACK_LIMITS.reachMeChars) {
       return invalid3(`How to reach you must be 1 to ${FEEDBACK_LIMITS.reachMeChars} characters.`);
     }
-    if (displayName.length > FEEDBACK_LIMITS.nameChars) return invalid3(`A name can be at most ${FEEDBACK_LIMITS.nameChars} characters.`);
-    contact = { ...address3 ? { address: address3 } : {}, ...displayName ? { displayName } : {}, reachMe };
+    contact = { ...address3 ? { address: address3 } : {}, reachMe };
   }
   return {
     ok: true,
@@ -104608,7 +104610,7 @@ var sendSessionFeedback = async ({
   release = workerRelease(),
   store = callSessionFeedbackStore
 } = {}) => {
-  if (config?.feedbackEnabled === false) {
+  if (config?.feedbackEnabled === false || !isWorkerCanonicalSessionConfig(config)) {
     return { status: 403, body: { error: "This session isn\u2019t taking feedback.", reason: "feedback_off" } };
   }
   const normalized = normalizeFeedback(body, { address: String(address3 || "").toLowerCase() });
@@ -104620,12 +104622,30 @@ var sendSessionFeedback = async ({
   const refusal2 = STORE_REFUSALS[saved.body?.reason];
   return refusal2 ? { status: refusal2.status, body: { error: refusal2.error, reason: saved.body.reason } } : { status: 503, body: { error: "Feedback couldn\u2019t be saved just now. Try again shortly.", reason: "feedback_unavailable" } };
 };
+var querySlugOf = (request) => {
+  try {
+    const params = new URL(request.url).searchParams;
+    return params.get("sessionSlug") ?? params.get("slug");
+  } catch {
+    return null;
+  }
+};
 var dispatchAnonymousFeedbackRequest = async ({ request, env, slugHint, baseHeaders, deps, constants }) => {
-  const resolved = deps.resolveRequestSlugWithoutToken({ request, env, slugHint });
+  const querySlug = querySlugOf(request);
+  let slugRequest = request;
+  if (querySlug != null && !request.headers.has("x-session-slug")) {
+    const headers2 = new Headers(request.headers);
+    headers2.set("x-session-slug", querySlug);
+    slugRequest = new Request(request.url, { headers: headers2 });
+  }
+  const resolved = deps.resolveRequestSlugWithoutToken({ request: slugRequest, env, slugHint });
   if (!resolved?.ok || !resolved.explicitSlugProvided) {
     return deps.json({ error: resolved?.error || constants?.missingSlugError }, 400, baseHeaders);
   }
   const slug = resolved.slug;
+  if (querySlug != null && normalizeWorkerSessionSlug(querySlug) !== slug) {
+    return deps.json({ error: constants?.sessionConfigNotFoundError }, 404, baseHeaders);
+  }
   let config;
   try {
     ({ config } = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug, cache: true }));
@@ -106391,17 +106411,16 @@ var dispatchAdminRequest = async ({
       return deps?.json?.({ error: error?.message || "Storage visibility update failed." }, 500, headers2);
     }
   }
-  if (action === "feedback/list" || action === "feedback/delete") {
+  if (action === "feedback/delete") {
     const privateHeaders = withPrivateNoStoreHeaders2(headers2);
-    const listing = action === "feedback/list";
     const result = await (deps?.callSessionFeedbackStore || callSessionFeedbackStore)(
       env,
       targetSlug,
-      listing ? "list" : "delete",
-      listing ? { cursor: body?.cursor, limit: body?.limit } : { ids: body?.ids, all: body?.all }
+      "delete",
+      { ids: body?.ids, through: body?.through }
     );
     if (result?.ok) return deps?.json?.(result.body, 200, privateHeaders);
-    return result?.status === 400 ? deps?.json?.({ error: listing ? "That page of feedback can\u2019t be read." : "Name the messages to delete, or all of them.", reason: result.body?.reason }, 400, privateHeaders) : deps?.json?.({ error: "Feedback couldn\u2019t be reached just now. Try again shortly.", reason: "feedback_unavailable" }, 503, privateHeaders);
+    return result?.status === 400 ? deps?.json?.({ error: "Name the messages to delete.", reason: result.body?.reason }, 400, privateHeaders) : deps?.json?.({ error: "Feedback couldn\u2019t be reached just now. Try again shortly.", reason: "feedback_unavailable" }, 503, privateHeaders);
   }
   if (action === "refresh-interview-opening") {
     try {
@@ -106892,7 +106911,9 @@ var dispatchAdminResultsAnalysisStatusRequest = async ({
   baseHeaders,
   slug,
   deps,
-  diagnostics = false
+  diagnostics = false,
+  // Feedback is read with the sign-in token, so paging spends no sign-in nonces.
+  feedback = false
 } = {}) => {
   request = requestWithQuerySlugHeader(request);
   const auth = await deps?.requireAuth?.({
@@ -106902,6 +106923,9 @@ var dispatchAdminResultsAnalysisStatusRequest = async ({
     slugHint: slug
   });
   if (!auth?.ok) return auth?.response;
+  if (feedback && auth.payload?.agentSource) {
+    return deps?.json?.({ error: "Only the session\u2019s admins can read feedback." }, 403, withPrivateNoStoreHeaders3(baseHeaders));
+  }
   const targetSlug = auth.slug || slug;
   let snapshot;
   if (diagnostics) {
@@ -106926,10 +106950,19 @@ var dispatchAdminResultsAnalysisStatusRequest = async ({
   const config = context.config;
   const headers2 = withPrivateNoStoreHeaders3(context.headers);
   const address3 = toTrimmedString18(auth.payload?.sub, deps).toLowerCase();
-  const isAdmin = diagnostics ? await deps?.validateAdmin?.({ env, slug: targetSlug, address: address3, config, body: {} }) : await canBuildResults({ env, slug: targetSlug, config, address: address3, validateAdmin: deps?.validateAdmin });
+  const isAdmin = diagnostics || feedback ? await deps?.validateAdmin?.({ env, slug: targetSlug, address: address3, config, body: {} }) : await canBuildResults({ env, slug: targetSlug, config, address: address3, validateAdmin: deps?.validateAdmin });
   if (!isAdmin) {
     await recordAuthFailure4({ env, deps });
-    return deps?.json?.({ error: "Admin authorization failed." }, 403, headers2);
+    return deps?.json?.({ error: feedback ? "Only the session\u2019s admins can read feedback." : "Admin authorization failed." }, 403, headers2);
+  }
+  if (feedback) {
+    const params = new URL(request.url).searchParams;
+    const result = await (deps?.callSessionFeedbackStore || callSessionFeedbackStore)(env, targetSlug, "list", {
+      cursor: params.get("cursor"),
+      ...params.has("limit") ? { limit: params.get("limit") } : {}
+    });
+    if (result?.ok) return deps?.json?.(result.body, 200, headers2);
+    return result?.status === 400 ? deps?.json?.({ error: "That page of feedback can\u2019t be read.", reason: result.body?.reason }, 400, headers2) : deps?.json?.({ error: "Feedback couldn\u2019t be reached just now. Try again shortly.", reason: "feedback_unavailable" }, 503, headers2);
   }
   if (diagnostics) {
     try {
@@ -108717,6 +108750,7 @@ var resolveTopLevelRouteSelection = ({
     return { kind: "admin-results-analysis-status" };
   }
   if (path === "/admin/diagnostics" && method === "GET") return { kind: "admin-session-diagnostics" };
+  if (path === "/admin/feedback" && method === "GET") return { kind: "admin-feedback-list" };
   if (path === "/results-analysis/artifact" && method === "GET") {
     return { kind: "results-analysis-artifact" };
   }
@@ -109102,9 +109136,10 @@ var createWorkerRouteShellWithWorkerDeps = ({
           }
         });
       }
-      if (routeSelection.kind === "admin-results-analysis-status" || routeSelection.kind === "admin-session-diagnostics") {
+      if (["admin-results-analysis-status", "admin-session-diagnostics", "admin-feedback-list"].includes(routeSelection.kind)) {
         return await dispatchAdminResultsAnalysisStatusRequest2({
           diagnostics: routeSelection.kind === "admin-session-diagnostics",
+          feedback: routeSelection.kind === "admin-feedback-list",
           request,
           env,
           baseHeaders: routeBaseHeaders,
