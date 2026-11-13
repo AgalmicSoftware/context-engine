@@ -10,6 +10,8 @@ import {
   inviteIdOfHash,
   isOneUseSecretHash,
   parseGroupInviteToken,
+  readWorkerGroupMemberCeiling,
+  workerOffersGroupJoinChoices,
   workerGroupJoinStatement,
 } from '../../shared/workerGroupJoin.mjs';
 
@@ -95,4 +97,14 @@ test('a password signs a join only for its session, group and address', async ()
     `ContextEngine.WorkerGroup.Join:1\nsession:${sessionId.toLowerCase()}\ngroup:${groupId}\naddress:${address}`,
   );
   await assert.rejects(keys.signerOf({ password: 'short', sessionId, groupId }));
+});
+
+test('reads the session ceiling and the Worker capability', () => {
+  assert.equal(readWorkerGroupMemberCeiling({}), 1000);
+  assert.equal(readWorkerGroupMemberCeiling({ groupMemberCeiling: 10000 }), 10000);
+  for (const bad of [0, 10001, 2.5, '500'])
+    assert.equal(readWorkerGroupMemberCeiling({ groupMemberCeiling: bad }), 1000);
+  assert.equal(workerOffersGroupJoinChoices({ groupJoinChoices: true }), true);
+  assert.equal(workerOffersGroupJoinChoices({ groupJoinChoices: 'yes' }), false);
+  assert.equal(workerOffersGroupJoinChoices(null), false);
 });

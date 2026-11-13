@@ -13,6 +13,23 @@ export const WORKER_GROUP_INVITE_BATCH_MAX = 500;
 // The Worker never shows the password's signer, so guessing is online and rate-limited.
 export const WORKER_GROUP_PASSWORD_MIN_LENGTH = 8;
 export const WORKER_GROUP_INVITE_FRAGMENT_KEY = 'groupInvite';
+// Set by a Worker that offers these choices on every public config read (never stored), like `memberResults`.
+export const WORKER_GROUP_JOIN_CHOICES_FIELD = 'groupJoinChoices';
+// The session setting for the most members a group may have.
+export const WORKER_GROUP_MEMBER_CEILING_FIELD = 'groupMemberCeiling';
+
+export const isWorkerGroupMemberCeiling = (value) =>
+  Number.isSafeInteger(value) && value >= 1 && value <= WORKER_GROUP_MEMBER_CEILING_MAX;
+
+/** A session config's member ceiling, or the default when it has none. */
+export const readWorkerGroupMemberCeiling = (config) => {
+  const value = config && typeof config === 'object' ? config[WORKER_GROUP_MEMBER_CEILING_FIELD] : undefined;
+  return isWorkerGroupMemberCeiling(value) ? value : WORKER_GROUP_MEMBER_CEILING_DEFAULT;
+};
+
+/** Whether the session's Worker offers One-use URLs, Group Password and unlisted groups. */
+export const workerOffersGroupJoinChoices = (config) =>
+  !!config && typeof config === 'object' && config[WORKER_GROUP_JOIN_CHOICES_FIELD] === true;
 
 const PASSWORD_PREFIX = 'gp:';
 const INVITE_PREFIX = 'inv:';
