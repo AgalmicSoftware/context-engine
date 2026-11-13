@@ -46,6 +46,25 @@ starts the server. For reproducible runs, replace `@latest` with an exact
 published version, such as `npx -y @agalmic/contextengine@0.2.0`. A running
 server does not update itself.
 
+## Upgrading to 0.3.4
+
+- The server waits and tries again when a session is briefly busy, for reads
+  and for answers that carry a request id. When a busy session leaves a
+  question unread, it tells the agent to retry instead of calling the question
+  unknown.
+- `list_questions` and `get_session` return without waiting more than 8
+  seconds for the agent's earlier answers, and a new agent skips that lookup.
+  `get_results` returns within about 40 seconds, marked partial when cut short.
+- `list_questions` returns up to 100 questions and says how to get any more.
+- The agent's key can come from `CE_MCP_PRIVATE_KEY`, for hosts that keep no
+  files between runs.
+- The next step names a link's group, and the answer tool's value has a
+  JSON-schema type.
+- A browser invitation link can be given to `join_session` as it is.
+
+0.3.2 was not published to npm; its change is part of 0.3.3 and later. 0.3.3
+changed nothing in what the tools do.
+
 ## Upgrading to 0.3.2
 
 - The server signs in only as `contextengine.sh` (with or without `www`) or
