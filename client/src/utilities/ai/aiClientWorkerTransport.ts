@@ -1,5 +1,6 @@
 import {
   fitReasoningEffort,
+  interviewMapOutputTokens,
   isOpenAiReasoningModel,
   takesReasoningEffort,
   usesOpenAiResponsesApi,
@@ -53,8 +54,16 @@ export const buildAiWorkerRequestPlan = ({
   const usesResponsesApi = usesOpenAiResponsesApi({ provider, model });
   const usesCompletionTokens = !usesResponsesApi && isOpenAiReasoningModel(model);
   const messages = Array.isArray(opts.messages) ? opts.messages : [{ role: 'user', content: prompt }];
-  // Claude counts its thinking toward max_tokens, so it gets the larger default.
-  const maxTokens = opts.max_tokens ?? opts.maxTokens ?? (provider === 'anthropic' ? 32768 : 16384);
+  // Interview mapping asks for what its model takes. Otherwise Claude, which
+  // counts its thinking toward max_tokens, gets the larger default.
+  const maxTokens =
+    opts.max_tokens ??
+    opts.maxTokens ??
+    (taskType === 'interview-map'
+      ? interviewMapOutputTokens(model, provider)
+      : provider === 'anthropic'
+        ? 32768
+        : 16384);
   const maxOutputTokens = opts.max_output_tokens ?? (usesResponsesApi ? maxTokens : undefined);
   const maxCompletionTokens = opts.max_completion_tokens ?? (usesCompletionTokens ? maxTokens : undefined);
   // A JSON schema goes only to OpenAI and Claude; other providers rely on the prompt's description.
@@ -147,12 +156,16 @@ export const resolveAiWorkerEndpoint = (corsWorkerUrl: unknown): AiWorkerEndpoin
   };
 };
 
+export const AI_REPLY_EMPTY = 'The AI returned an empty reply; it may have run out of room. Try again.';
+
 export const parseAiWorkerCompletion = (data: unknown): string => {
   const record = asRecord(data);
   if (record.completion) return record.completion as string;
   const content = Array.isArray(record.content) ? record.content : [];
   const first = asRecord(content[0]);
   if (first.text) return first.text as string;
+  // A model that reasons can spend its whole reply limit before writing anything.
+  if (record.completion === '') throw new Error(AI_REPLY_EMPTY);
   throw new Error('Unexpected AI response format');
 };
 

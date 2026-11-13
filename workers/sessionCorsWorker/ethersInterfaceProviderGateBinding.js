@@ -73,6 +73,8 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     return faucetSbtGateInterface;
   };
 
+  // True or false, or null when the chain couldn't be asked. Callers that
+  // test only for true fail closed either way.
   const checkSbtGate = async ({ sbtAddresses, address, rpcUrl, mode, chainId, rpcUrlIsPrivate = false, chainAttestationCache }) => {
     if (!Array.isArray(sbtAddresses) || sbtAddresses.length === 0) return true;
     if (!rpcUrl) return false;
@@ -96,7 +98,7 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
         status: attestation.status,
         code: attestation.code,
       });
-      return false;
+      return null;
     }
     const iface = getErc721Interface();
     const errors = [];
@@ -112,7 +114,7 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
             args: [address],
           });
           const bal = Array.isArray(decoded) ? decoded[0] : decoded;
-          return isPositiveBalance(bal);
+          return Boolean(isPositiveBalance(bal));
         } catch (err) {
           const safeFailure = buildSafeRpcFailure({
             rpcUrl,
@@ -127,7 +129,7 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
             ...(safeFailure.code != null ? { code: safeFailure.code } : {}),
             error: safeFailure.error,
           });
-          return false;
+          return null;
         }
       }),
     );
@@ -138,8 +140,12 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
         errors,
       });
     }
-    if (mode === 1 || mode === 'all') return checks.every(Boolean);
-    return checks.some(Boolean);
+    // One contract's definite answer can settle it; otherwise an unread one leaves it unknown.
+    const all = mode === 1 || mode === 'all';
+    if (all && checks.includes(false)) return false;
+    if (!all && checks.includes(true)) return true;
+    if (checks.includes(null)) return null;
+    return all;
   };
 
   return {

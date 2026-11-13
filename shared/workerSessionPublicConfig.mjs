@@ -40,6 +40,7 @@ export const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'workerAuthority',
   'groupCreationPolicy',
   'contextAdditionPolicy',
+  'sessionAgent',
   'linkedWorkerGroups',
   'storageProfile',
   'ai',
@@ -72,3 +73,7 @@ export const RISK_MATRIX_FIELD = 'riskMatrix';
 // Set the same way: this Worker shows every answer to signed-in members under
 // the session_member_full results visibility, which older Workers refuse.
 export const MEMBER_RESULTS_FIELD = 'memberResults';
+
+// Set the same way: this Worker answers the Session Agent and accepts its
+// `sessionAgent` setting, which older Workers refuse.
+export const SESSION_AGENT_READY_FIELD = 'sessionAgentReady';

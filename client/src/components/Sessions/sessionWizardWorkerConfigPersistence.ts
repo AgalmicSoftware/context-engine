@@ -1,5 +1,6 @@
 import {
   DEBATE_ATLAS_FIELD,
+  SESSION_AGENT_READY_FIELD,
   MEMBER_RESULTS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
@@ -68,7 +69,7 @@ const isRetryableConfigReadStatus = (status: number): boolean =>
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
 // The Worker sets these public fields itself: the authorization epoch and the
 // publication marker on writes, and response field encryption and the
-// merges-ai, debate-atlas, risk-matrix and member-results fields on every
+// merges-ai, debate-atlas, risk-matrix, member-results and Session Agent fields on every
 // read. They are not config the wizard writes, so the readback check skips them.
 const WORKER_MANAGED_PUBLIC_CONFIG_FIELDS = Object.freeze([
   'authzEpoch',
@@ -78,6 +79,7 @@ const WORKER_MANAGED_PUBLIC_CONFIG_FIELDS = Object.freeze([
   DEBATE_ATLAS_FIELD,
   RISK_MATRIX_FIELD,
   MEMBER_RESULTS_FIELD,
+  SESSION_AGENT_READY_FIELD,
 ]);
 // Only a finalizing write claims a revision. Before that, a stored revision
 // (such as one the deploy helper staged) is not part of the checked config.
@@ -199,6 +201,8 @@ const pickFields = (source: UnknownRecord, fields: readonly string[]): UnknownRe
 const buildExpectedPublicConfig = (config: UnknownRecord, ignoredFields: readonly string[]): UnknownRecord =>
   PUBLIC_WORKER_CONFIG_FIELDS.reduce<UnknownRecord>((expected, key) => {
     if (ignoredFields.includes(key) || !Object.prototype.hasOwnProperty.call(config, key)) return expected;
+    // A Session Agent of null is off, as no setting is (see the readback below).
+    if (key === 'sessionAgent' && config.sessionAgent === null) return expected;
     if (key === 'ai') {
       const ai =
         config.ai && typeof config.ai === 'object' && !Array.isArray(config.ai) ? (config.ai as UnknownRecord) : {};
@@ -272,6 +276,8 @@ const buildComparableActualPublicConfig = ({
   ignoredFields.forEach((key) => {
     delete comparableConfig[key];
   });
+  // The Worker stores an off Session Agent as no setting; null means the same.
+  if (comparableConfig.sessionAgent === null) delete comparableConfig.sessionAgent;
   // The critical-field check has already matched this URL's origin; a
   // trailing slash or letter case does not change the Worker it names.
   comparableConfig.corsWorkerUrl = workerOrigin;
@@ -321,12 +327,14 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
   return clonePublicConfig(candidate);
 };
 
-// set-config merges fields, so blank instructions for AI agents are sent as ''
-// to clear stored ones. Older Workers refuse the field, so '' is sent only when
-// the Worker's config already has it. A Worker with no config answers 404. Any
-// other failed read stops before signing: leaving the field out could keep
-// stored instructions, and would change the revision a retry signs.
-export const withStoredAgentInstructionsCleared = async <T extends UnknownRecord>({
+// set-config merges fields, so a config that leaves out its instructions for AI
+// agents or its Session Agent must clear stored ones, with '' and null. Older
+// Workers refuse either field, so each clear is sent only when the Worker's
+// config already has the field. A Worker with no config answers 404. Any other
+// failed read stops before signing: leaving a field out could keep what is
+// stored, and would change the revision a retry signs.
+const CLEARED_WHEN_LEFT_OUT = { agentInstructions: '', sessionAgent: null } as const;
+export const withLeftOutFieldsCleared = async <T extends UnknownRecord>({
   config,
   workerOrigin,
   slug,
@@ -338,12 +346,10 @@ export const withStoredAgentInstructionsCleared = async <T extends UnknownRecord
   fetchImpl: SessionWizardWorkerConfigFetchPort;
 }): Promise<T> => {
   const profile = config.sessionModeProfile as { authority?: { mode?: unknown } } | undefined;
-  if (
-    Object.prototype.hasOwnProperty.call(config, 'agentInstructions') ||
-    profile?.authority?.mode !== 'worker_canonical'
-  ) {
-    return config;
-  }
+  const leftOut = Object.keys(CLEARED_WHEN_LEFT_OUT).filter(
+    (field) => !Object.prototype.hasOwnProperty.call(config, field),
+  ) as Array<keyof typeof CLEARED_WHEN_LEFT_OUT>;
+  if (!leftOut.length || profile?.authority?.mode !== 'worker_canonical') return config;
   let response: Response;
   try {
     response = await fetchImpl(`${workerOrigin}/session-config`, {
@@ -362,9 +368,9 @@ export const withStoredAgentInstructionsCleared = async <T extends UnknownRecord
     );
   }
   const stored = getPublicConfigFromResponse(await readResponseJson(response));
-  return Object.prototype.hasOwnProperty.call(stored, 'agentInstructions')
-    ? { ...config, agentInstructions: '' }
-    : config;
+  return leftOut
+    .filter((field) => Object.prototype.hasOwnProperty.call(stored, field))
+    .reduce<T>((cleared, field) => ({ ...cleared, [field]: CLEARED_WHEN_LEFT_OUT[field] }), config);
 };
 
 const assertReachableWorkerCanonicalProfile = (profile: unknown, context: string): SessionModeProfile => {
@@ -482,7 +488,7 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
 
   const preparedConfig = clonePublicConfig(config);
   assertReachableWorkerCanonicalProfile(preparedConfig.sessionModeProfile, 'Prepared worker config');
-  const publicConfig = await withStoredAgentInstructionsCleared({
+  const publicConfig = await withLeftOutFieldsCleared({
     config: preparedConfig,
     workerOrigin,
     slug: normalizedSlug,

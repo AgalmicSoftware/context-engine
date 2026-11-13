@@ -1,0 +1,196 @@
+/* @file SessionAgentModal.module.scss: the Session Agent dialog. */
+
+// The setup page's surface and text, a pair every theme keeps readable. The
+// theme's `.modal-content` rule outranks a plain class, as for the interview.
+.content {
+  overflow: hidden;
+  background: var(--ce-surface) !important;
+  color: var(--ce-panel-text) !important;
+}
+
+// The theme's title bar. Its title and × take the bar's text colour, and so
+// does the ×'s focus ring: the theme's ring is black on Classic 95's navy bar.
+.content .header {
+  align-items: center;
+  padding: 14px 16px;
+
+  :global(.modal-title) {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: inherit;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  :global(.btn-close) {
+    width: 32px;
+    height: 32px;
+    margin: 0 0 0 auto;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    color: inherit;
+    opacity: 1;
+
+    &:focus-visible {
+      outline-color: currentColor;
+    }
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+
+  p {
+    margin: 0;
+  }
+}
+
+// An outline in the bar's own text colour, so it reads wherever the title does.
+.badge {
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.hint {
+  color: var(--ce-panel-text-muted);
+  font-size: 0.82rem;
+}
+
+.error {
+  color: var(--ce-status-danger-text);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.styleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+// The "?"s keep the dialog's text colour in every state: as links they
+// would otherwise take the global link and hover colours.
+.helpLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover,
+  &:focus,
+  &:active {
+    color: inherit;
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  margin: 0;
+  font-weight: 600;
+}
+
+// The setup page's field colours, which outrank the theme's: its text
+// colour is for the page, and fails on the field's fill in dark themes.
+.question {
+  min-height: 84px;
+  resize: vertical;
+  background: var(--ce-input-bg) !important;
+  border-color: var(--ce-input-border-strong) !important;
+  color: var(--ce-panel-text) !important;
+  -webkit-text-fill-color: var(--ce-panel-text);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+
+  // The hint takes the room the Ask button leaves, so they share a line.
+  .hint {
+    flex: 1 1 200px;
+  }
+}
+
+// The accent pair, which every theme keeps readable, in each state.
+.ask {
+  padding: 6px 16px;
+  background: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled),
+  &:focus-visible,
+  &:active:not(:disabled) {
+    background: var(--ce-action-accent-hover);
+    color: var(--ce-action-accent-text);
+  }
+
+  // Muted text rather than opacity, so the label stays readable.
+  &:disabled {
+    border-style: dashed;
+    background: transparent;
+    color: var(--ce-panel-text-muted);
+    cursor: not-allowed;
+  }
+}
+
+.answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8, 8px);
+}
+
+.answerText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ce-card-border);
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .error {
+    flex-basis: 100%;
+  }
+}

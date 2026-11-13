@@ -33,6 +33,27 @@ export const usesOpenAiResponsesApi = ({ provider = '', model = '', endpoint = '
   return route === 'responses' || route.includes('/responses') || isGpt5Or6(toModelLeaf(model));
 };
 
+// Models whose provider documents room for a 32,000-token reply: GPT-5 and
+// GPT-6 (128,000), the o-series (100,000), GPT-4.1 (32,768) and Claude from 4.5
+// on (64,000 or more). GPT-4o and the GPT-5 chat models stop at 16,384, and a
+// model this doesn't name is assumed to stop sooner too. OpenRouter spells
+// Claude versions with a dot (claude-sonnet-4.5).
+const takesLongReply = (model) => {
+  const leaf = toModelLeaf(model);
+  if (/-chat(?:$|-)/.test(leaf)) return false;
+  return isGpt5Or6(leaf) || isOSeries(leaf) || /^gpt-4\.1(?:$|-)/.test(leaf) ||
+    /^claude-(?:opus|sonnet|haiku|fable|mythos)-(?:[5-9]|4[.-][5-9])(?:$|[.-])/.test(leaf);
+};
+
+// The reply room interview mapping asks for. The reply drafts an answer to
+// every question, and a model's reasoning counts toward the same limit, so a
+// long question list overflowed 8,000 and lost every draft. A model without
+// the room keeps 8,000, which every model has taken so far, and so does a
+// custom endpoint, whose model is whatever the endpoint says it is.
+export const interviewMapOutputTokens = (model, provider = '') => (
+  String(provider || '').trim().toLowerCase() !== 'custom' && takesLongReply(model) ? 32000 : 8000
+);
+
 // GPT-4o, GPT-4.1, GPT-5, GPT-6 and Claude models read images.
 export const takesImageInput = (model) => /^(?:gpt-(?:4o|4\.1|[56])(?:$|[.-])|claude-)/.test(toModelLeaf(model));
 

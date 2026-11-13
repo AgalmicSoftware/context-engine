@@ -771,6 +771,40 @@ describe('sessionWizardWriteNormalization', () => {
     expect(build(' Join the open group.\n')).toHaveProperty('agentInstructions', 'Join the open group.');
   });
 
+  test('buildSessionWizardWorkerConfigPayload sends the Session Agent as the Worker stores it, and leaves it out when off', () => {
+    const build = (
+      sessionAgent: unknown,
+      preset: Parameters<typeof cloneSessionModePreset>[0] = SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
+    ) =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'session-agent',
+        draft: { sessionModeProfile: cloneSessionModePreset(preset), sessionAgent },
+        workerUrl: 'https://worker.example',
+      });
+    const everyone = {
+      who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] },
+      answers: 'general',
+    };
+    const salon = (groupId: string) => ({
+      who: { match: 'any', conditions: [{ kind: 'worker_group', groupIds: [groupId] }] },
+      answers: 'detailed',
+    });
+
+    expect(build({ audiences: [salon(' Salon '), everyone], instructions: { general: ' ' } }).sessionAgent).toEqual({
+      audiences: [salon('salon'), everyone],
+    });
+    // Older Workers refuse the field; the config writers clear a stored Session Agent.
+    expect(build(undefined)).not.toHaveProperty('sessionAgent');
+    expect(build(null)).not.toHaveProperty('sessionAgent');
+    expect(() => build({ audiences: [{ ...everyone, answers: 'everything' }] })).toThrow(
+      'Fix the Session Agent: Audience 1 must get General or Detailed answers.',
+    );
+    // Only a session on a Session Worker has a Session Agent.
+    expect(build({ audiences: [everyone] }, SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED)).not.toHaveProperty(
+      'sessionAgent',
+    );
+  });
+
   test('buildSessionWizardWorkerConfigPayload keeps only SBT defaults and Group Factory for explicit hybrid mode', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;

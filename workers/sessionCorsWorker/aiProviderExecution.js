@@ -129,13 +129,19 @@ export const proxyAnthropic = async ({
     response_format,
   } = payload || {};
   const claudeModel = model || DEFAULT_ANTHROPIC_MODEL;
+  // Anthropic takes the system prompt as its own field, not as a message.
+  const system = (Array.isArray(messages) ? messages : [])
+    .filter((message) => message?.role === 'system')
+    .map((message) => toStr(message.content))
+    .join('\n\n');
   // No temperature: current Claude models refuse it (Opus 5.5 and Fable 5.1 any value,
   // Sonnet and Haiku 5.5 anything but the default), so they sample at their default.
   const body = messages
     ? {
         model: claudeModel,
         max_tokens: max_tokens ?? 4096,
-        messages,
+        ...(system ? { system } : {}),
+        messages: Array.isArray(messages) ? messages.filter((message) => message?.role !== 'system') : messages,
       }
     : {
         model: claudeModel,

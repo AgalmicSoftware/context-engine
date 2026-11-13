@@ -628,6 +628,10 @@ const evaluateAgentGrantScopeCondition = ({ condition, authScopes }) => {
     : { ok: false, reason: 'agent_grant_scope_denied', condition: { kind: 'agent_grant_scope', scope } };
 };
 
+// An SBT rule the chain can't be asked about is an outage, not a no, so
+// another rule or audience can't stand in for it.
+const sbtUnavailable = (reason, condition) => ({ ok: false, outcome: 'unavailable', status: 503, reason, condition });
+
 const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress, deps }) => {
   const address = normalizeAddress(requesterAddress);
   if (!address) return { ok: false, reason: 'missing_principal' };
@@ -652,15 +656,16 @@ const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress
   try {
     gateConfig = await resolveStorageGateRuntimeConfig({ config, deps });
   } catch {
-    return { ok: false, reason: 'sbt_rpc_secret_unavailable' };
+    return sbtUnavailable('sbt_rpc_secret_unavailable', { kind: 'sbt_onchain', chainId });
   }
   const rpcUrls = typeof deps?.resolveRpcUrlListForGate === 'function'
     ? deps.resolveRpcUrlListForGate(gateConfig, chainId)
     : [];
   if (!rpcUrls.length || typeof deps?.checkSbtGate !== 'function') {
-    return { ok: false, reason: 'missing_sbt_rpc' };
+    return sbtUnavailable('missing_sbt_rpc', { kind: 'sbt_onchain', chainId });
   }
   const mode = normalizeGateMode(condition.anyOrAll || condition.mode || condition.match);
+  let unanswered = 0;
   for (const rpcUrl of rpcUrls) {
     const ok = await deps.checkSbtGate({
       sbtAddresses,
@@ -685,8 +690,11 @@ const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress
         },
       };
     }
+    if (ok === null) unanswered += 1;
   }
-  return { ok: false, reason: 'sbt_onchain_denied', condition: { kind: 'sbt_onchain', chainId, anyOrAll: mode } };
+  const checked = { kind: 'sbt_onchain', chainId, anyOrAll: mode };
+  if (unanswered === rpcUrls.length) return sbtUnavailable('sbt_onchain_unavailable', checked);
+  return { ok: false, reason: 'sbt_onchain_denied', condition: checked };
 };
 
 const checkWorkerGroupMembership = async ({
@@ -1015,7 +1023,9 @@ const authorizeCloudflareStorageAccess = async ({
   const payloadConditions = normalizeAccessConditionDocument(metadata.accessConditions || metadata.envelope?.accessConditions);
   if (!payloadConditions?.conditions?.length ||
       JSON.stringify(payloadConditions) === JSON.stringify(resolvePayloadAccessControl(config).conditions)) return sessionAccess;
-  return authorizeCloudflareStorageGate({ ...args, metadata });
+  // The row's own rule, which its uploader wrote: a list tells it apart from the session's gate.
+  const ownAccess = await authorizeCloudflareStorageGate({ ...args, metadata });
+  return ownAccess.ok ? ownAccess : { ...ownAccess, ownRule: true };
 };
 
 const authorizeCloudflareStorageGate = async ({
@@ -1052,6 +1062,8 @@ const authorizeCloudflareStorageGate = async ({
     }
     return {
       ok: false,
+      // An SBT rule the chain can't answer, as opposed to a membership outage.
+      ...(conditionResult.outcome === 'unavailable' && conditionResult.condition?.kind === 'sbt_onchain' ? { chainUnavailable: true } : {}),
       response: responseJson(deps, {
         error: 'Access denied: Cloudflare storage conditions failed.',
         reason: conditionResult.reason,
@@ -1209,6 +1221,29 @@ export const authorizeCloudflareStorageResourceRead = async ({
   baseHeaders,
   deps: createStorageRouteGateDeps({ config, env, slug, deps }),
 });
+
+// One person's checks within one request, sharing their group and chain
+// lookups: whether an access-condition document admits them, whether they
+// may read a stored row, as a list or read of it would decide, and whether
+// the session's own gate admits them, as a read of its questions would.
+export const createRequesterAccessChecks = ({ env, config, slug, requesterAddress = '', authScopes, deps } = {}) => {
+  const gateDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+  return {
+    sessionGate: async () => {
+      const result = await authorizeCloudflareStorageAccess({
+        env, config, slug, resource: 'questions', requesterAddress, authScopes, metadata: { resource: 'questions' }, deps: gateDeps,
+      });
+      // A gate that couldn't be checked just now is told apart from one that refused.
+      return { ok: result.ok === true, unavailable: result.ok !== true && (result.chainUnavailable === true || result.response?.status >= 500) };
+    },
+    admits: (document) => evaluateAccessConditionDocument({
+      document, source: 'request', env, slug, config, requesterAddress, authScopes, deps: gateDeps,
+    }),
+    canRead: async (metadata) => (await authorizeCloudflareStorageAccess({
+      env, config, slug, resource: trim(metadata?.resource) || 'docsContext', requesterAddress, authScopes, metadata, deps: gateDeps,
+    })).ok === true,
+  };
+};
 
 const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, baseHeaders, deps }) => {
   const policy = payload?.uploadPolicy;
@@ -2138,9 +2173,14 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
       baseHeaders,
       deps,
     });
-    // A denied own answer is not evidence of an empty answer history.
+    // A denied own answer is not evidence of an empty answer history. An outage
+    // of the session's gate or of group membership fails the page. A row whose
+    // own SBT rule the chain can't answer hides only that row: its uploader
+    // wrote the rule, and could otherwise fail the list for everyone by naming
+    // a chain or contract that never answers.
     if (!itemAccess.ok) {
-      if (mine || itemAccess.response.status >= 500) return itemAccess.response;
+      const ownChainRule = itemAccess.ownRule === true && itemAccess.chainUnavailable === true;
+      if (mine || (itemAccess.response.status >= 500 && !ownChainRule)) return itemAccess.response;
       continue;
     }
     const owned = isOwnedStorageResource(storageRef.resource);

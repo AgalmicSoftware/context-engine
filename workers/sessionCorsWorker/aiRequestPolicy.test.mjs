@@ -69,7 +69,7 @@ for (const adapter of adapters) {
     for (const [taskType, requested, expected] of [
       ['generate', 32768, 16000], ['analysis', 7000, 7000], ['interview-map', 8000, 8000],
       ['summarize', 1200, 1200], ['interview-opening', 2000, 2000], ['interview-opening', 8000, 2000], ['rewrite', 64000, 16000], ['rank', 64000, 16000], ['summarize', 32768, 16000],
-      ['compare', 16384, 16000], ['categorize', 16384, 16000], ['unknown-task', 64000, 2048],
+      ['compare', 16384, 16000], ['categorize', 16384, 16000], ['session-agent', 16000, 3000], ['unknown-task', 64000, 2048],
     ]) {
       const { calls } = await invoke(adapter, { taskType, max_output_tokens: requested });
       assert.equal(calls[0].body.max_tokens, expected, taskType);
@@ -98,6 +98,36 @@ test('Responses and reasoning limits converge aliases and cap saved task/global 
     assert.equal(result.calls[0].body.reasoning?.effort ?? result.calls[0].body.reasoning_effort, 'low');
     assert.equal(result.calls[0].body.max_output_tokens ?? result.calls[0].body.max_completion_tokens, 20);
   }
+});
+
+test('interview mapping gets a long reply only on a model documented to take one', async () => {
+  const bound = (provider, model, requested) => boundSessionAiRequest({
+    provider, config: configFor(provider, model), payload: { taskType: 'interview-map', model, max_tokens: requested },
+  }).payload.max_tokens;
+  for (const [provider, model] of [
+    ['openai', 'gpt-6.1-terra'], ['openai', 'gpt-6.1-sol'], ['openai', 'gpt-6-astra'], ['openai', 'gpt-5'],
+    ['openai', 'gpt-4.1'], ['openai', 'o4-mini'], ['anthropic', 'claude-opus-5-5'], ['anthropic', 'claude-sonnet-5-5'],
+    ['anthropic', 'claude-haiku-4-5'], ['anthropic', 'claude-opus-4-5-20251101'], ['openrouter', 'openai/gpt-6.1-sol'],
+    ['openrouter', 'anthropic/claude-opus-5-5'], ['openrouter', 'anthropic/claude-sonnet-4.5'], ['openrouter', 'anthropic/claude-opus-5.5'],
+  ]) {
+    assert.equal(bound(provider, model, 64000), 32000, model);
+    assert.equal(bound(provider, model, 12000), 12000, model);
+  }
+  for (const [provider, model] of [
+    ['openai', 'gpt-4o'], ['openai', 'gpt-4o-mini'], ['openai', 'gpt-5-chat-latest'], ['anthropic', 'claude-opus-4-1'],
+    ['anthropic', 'claude-sonnet-4-20250514'], ['openrouter', 'anthropic/claude-opus-4.1'],
+    ['openrouter', 'meta-llama/llama-3.3-70b-instruct'], ['custom', 'configured-model'],
+    // A custom endpoint's model is whatever the endpoint says it is.
+    ['custom', 'gpt-6.1-sol'], ['custom', 'claude-opus-5-5'],
+  ]) assert.equal(bound(provider, model, 64000), 8000, `${provider} ${model}`);
+  // The bound reaches the provider: Claude counts its thinking toward it.
+  const claude = adapters[1];
+  const { calls } = await invoke(claude, { taskType: 'interview-map', model: 'claude-opus-5-5', max_tokens: 32000 },
+    configFor('anthropic', 'claude-opus-5-5'));
+  assert.equal(calls[0].body.max_tokens, 32000);
+  const responses = await invoke(adapters[0], { taskType: 'interview-map', model: 'gpt-6.1-terra', max_output_tokens: 32000 },
+    configFor('openai', 'gpt-6.1-terra'));
+  assert.equal(responses.calls[0].body.max_output_tokens, 32000);
 });
 
 test('interview mapping may use medium effort on a low-effort session', () => {

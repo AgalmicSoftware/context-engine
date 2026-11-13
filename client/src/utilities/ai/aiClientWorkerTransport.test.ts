@@ -1,4 +1,5 @@
 import {
+  AI_REPLY_EMPTY,
   buildAiWorkerRequestPlan,
   parseAiWorkerCompletion,
   readAiWorkerFirstMessageContentLength,
@@ -87,6 +88,11 @@ describe('aiClientWorkerTransport', () => {
     expect(() => parseAiWorkerCompletion({ content: [] })).toThrow('Unexpected AI response format');
   });
 
+  it('says an empty reply is empty, in words a person can act on', () => {
+    expect(() => parseAiWorkerCompletion({ completion: '', raw: { status: 'incomplete' } })).toThrow(AI_REPLY_EMPTY);
+    expect(AI_REPLY_EMPTY).toMatch(/empty reply.*try again/i);
+  });
+
   it('reads the first message content length for logging without assuming shape', () => {
     expect(readAiWorkerFirstMessageContentLength([{ content: 'hello' }])).toBe(5);
     expect(readAiWorkerFirstMessageContentLength([{ content: ['hello', 'there'] }])).toBe(2);
@@ -144,6 +150,31 @@ it('sends the higher interview mapping effort even when the session default is l
     reasoning_effort: 'medium',
     service_tier: 'default',
   });
+});
+
+it('asks for a long interview mapping reply only from a model documented to take one', () => {
+  const budget = (provider: string, model: string, opts = {}) => {
+    const plan = buildAiWorkerRequestPlan({ ai: { provider, model }, taskType: 'interview-map', opts });
+    return plan.requestBody[plan.tokenBudgetKey];
+  };
+  expect(budget('openai', 'gpt-6.1-terra')).toBe(32000);
+  expect(budget('openai', 'gpt-6.1-sol')).toBe(32000);
+  expect(budget('anthropic', 'claude-opus-5-5')).toBe(32000);
+  expect(budget('anthropic', 'claude-sonnet-5-5')).toBe(32000);
+  expect(budget('openrouter', 'openai/gpt-6-astra')).toBe(32000);
+  // A model with no documented room keeps the reply size every model takes.
+  expect(budget('openai', 'gpt-4o')).toBe(8000);
+  expect(budget('openai', 'gpt-5-chat-latest')).toBe(8000);
+  expect(budget('openrouter', 'meta-llama/llama-3.3-70b-instruct')).toBe(8000);
+  expect(budget('custom', 'configured-model')).toBe(8000);
+  // A custom endpoint's model is whatever it says it is, and OpenRouter spells Claude versions with a dot.
+  expect(budget('custom', 'gpt-6.1-sol')).toBe(8000);
+  expect(budget('openrouter', 'anthropic/claude-sonnet-4.5')).toBe(32000);
+  // A caller's own number still wins, and other tasks keep their defaults.
+  expect(budget('openai', 'gpt-6.1-terra', { maxTokens: 500 })).toBe(500);
+  expect(
+    buildAiWorkerRequestPlan({ ai: { provider: 'openai', model: 'gpt-6.1-terra' }, taskType: 'generate' }).maxTokens,
+  ).toBe(16384);
 });
 
 it('sends the new GPT-6 models to Responses with an effort each accepts', () => {

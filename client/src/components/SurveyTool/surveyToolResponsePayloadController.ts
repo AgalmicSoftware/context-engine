@@ -3,6 +3,7 @@ import {
   buildInterviewChangedFields,
   buildSelectedInterviewResearch,
   buildUnselectedInterviewResearch,
+  INTERVIEW_DRAFT_ORIGINS,
   isTextInterviewQuestion,
   type InterviewResearchTier,
 } from './sessionInterviewResearch';
@@ -328,9 +329,7 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       interviewProvenanceRecord.researchTier === 'minimal' || interviewProvenanceRecord.researchTier === 'full'
         ? interviewProvenanceRecord.researchTier
         : null;
-    const draftOrigin = ['external_prefill', 'voice_interview', 'typed_context'].includes(
-      String(interviewProvenanceRecord.draftOrigin),
-    )
+    const draftOrigin = (INTERVIEW_DRAFT_ORIGINS as string[]).includes(String(interviewProvenanceRecord.draftOrigin))
       ? String(interviewProvenanceRecord.draftOrigin)
       : null;
     const confidenceMeaning = ['keep', 'support'].includes(String(interviewProvenanceRecord.confidenceMeaning))

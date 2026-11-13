@@ -24,6 +24,7 @@ const AI_TASKS = Object.freeze([
   { key: 'interview-map', label: 'Interview mapping' },
   { key: 'interview-opening', label: 'Interview opening' },
   { key: 'context-read', label: 'Reading context files' },
+  { key: 'session-agent', label: 'Session Agent' },
 ]);
 const EFFORTS = ['low', 'medium', 'high'];
 const taskLabel = (key: string) => AI_TASKS.find((task) => task.key === key)?.label || key;
@@ -59,12 +60,22 @@ type Props = Omit<SetupSectionProps, 'mode' | 'conflicts'> & {
   lockedReason: string;
   /** Where the provider keys are changed. */
   keys?: React.ReactNode;
+  /** Who may ask the Session Agent, for a session on a Session Worker. */
+  sessionAgent?: React.ReactNode;
 };
 
 // The settings page's AI section: the same fields setup writes, plus the
 // per-task effort and transcription model. A saved model or effort that is
 // not offered stays selected, and nothing changes until the admin picks.
-export const SettingsAiSection = ({ draft, onChange, open, onToggle, lockedReason, keys = null }: Props) => {
+export const SettingsAiSection = ({
+  draft,
+  onChange,
+  open,
+  onToggle,
+  lockedReason,
+  keys = null,
+  sessionAgent = null,
+}: Props) => {
   const { models, provider, fast, thinking, transcription, effort, taskEffort } = readAi(draft);
   const [newTask, setNewTask] = useState('');
   const unusedTasks = AI_TASKS.filter((task) => !(task.key in taskEffort));
@@ -125,7 +136,13 @@ export const SettingsAiSection = ({ draft, onChange, open, onToggle, lockedReaso
     <SetupSection
       sectionKey="ai"
       title="AI"
-      summary={[describeModels(draft), effort ? `${effort} effort` : ''].filter(Boolean).join(' · ')}
+      summary={[
+        describeModels(draft),
+        effort ? `${effort} effort` : '',
+        sessionAgent && draft.sessionAgent ? 'Session Agent on' : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')}
       open={open}
       onToggle={onToggle}
       quick={keys}
@@ -260,6 +277,7 @@ export const SettingsAiSection = ({ draft, onChange, open, onToggle, lockedReaso
           onChange={(event) => onChange(['defaultTags'], event.target.value)}
         />
       </SetupField>
+      {sessionAgent}
     </SetupSection>
   );
 };

@@ -38,11 +38,13 @@ const summarizeAi = (draft: SetupSectionProps['draft']): string =>
 type AiProps = SetupSectionProps & {
   /** /new: the provider key inputs, which stay visible (keys are never saved). */
   keys?: React.ReactNode;
+  /** Who may ask the Session Agent, for a session on a Session Worker. */
+  sessionAgent?: React.ReactNode;
 };
 
 const REASONING_EFFORTS = ['low', 'medium', 'high'];
 
-export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null }: AiProps) => {
+export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null, sessionAgent = null }: AiProps) => {
   const { provider, fast, thinking } = readModels(draft);
   const ai = asRecord(draft.ai);
   const setProvider = (next: string) => {
@@ -77,7 +79,16 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null }:
     );
   };
   return (
-    <SetupSection sectionKey="ai" title="AI" summary={summarizeAi(draft)} open={open} onToggle={onToggle} quick={keys}>
+    <SetupSection
+      sectionKey="ai"
+      title="AI"
+      summary={[summarizeAi(draft), sessionAgent && draft.sessionAgent ? 'Session Agent on' : '']
+        .filter(Boolean)
+        .join(' · ')}
+      open={open}
+      onToggle={onToggle}
+      quick={keys}
+    >
       <SetupField
         id="ce-setup-ai-provider"
         label="Provider"
@@ -145,6 +156,7 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null }:
           onChange={(event) => onChange(['defaultTags'], event.target.value)}
         />
       </SetupField>
+      {sessionAgent}
     </SetupSection>
   );
 };

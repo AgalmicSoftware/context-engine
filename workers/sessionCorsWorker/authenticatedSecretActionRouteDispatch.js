@@ -4,6 +4,7 @@ import { DEFAULT_AI_MODEL, DEFAULT_ANTHROPIC_MODEL } from '../../shared/aiDefaul
 import { isModelAllowed } from './aiRequestNormalization.js';
 import { executeSessionLitChipotleAction } from './chipotleClient.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
+import { SESSION_AGENT_PATHS, dispatchSessionAgentRoute } from './sessionAgentRoute.js';
 
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return DEFAULT_ANTHROPIC_MODEL;
@@ -33,6 +34,12 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
   scopes,
   deps,
 } = {}) => {
+  if (SESSION_AGENT_PATHS.includes(path)) {
+    return {
+      handled: true,
+      response: await dispatchSessionAgentRoute({ path, body, config, slug, address, env, limit, headers, scopes, deps }),
+    };
+  }
   const isFaucetAction = action === 'request_test_eth';
   const isAiAction = path === '/ai' || action === 'ai';
   const isLitChipotleAction = path === '/lit/chipotle-action' || action === 'lit_chipotle_execute';

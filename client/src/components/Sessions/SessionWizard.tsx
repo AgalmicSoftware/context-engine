@@ -114,6 +114,7 @@ import { defaultSessionSetupProfile, editSessionSetupProfile } from './setup/ses
 import SetupSlugPreview from './setup/SetupSlugPreview';
 import SetupWorkerQuick from './setup/SetupWorkerQuick';
 import { SetupWithAi } from './setup/SetupWithAi';
+import SetupSessionAgent, { describeSessionAgentProblem } from './setup/SetupSessionAgent';
 import SessionHostedFaucetControl from './SessionHostedFaucetControl';
 import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
 import {
@@ -2664,9 +2665,14 @@ const SessionWizard = ({
     sessionModeRequirements.usesWorkerRuntime && !deployVerifiedInUi && !canUseSponsoredAutoDeployNow;
   const missingSecrets = needsWorkerDeploy && workerSecretsEnabled ? getMissingWorkerSecretsForDeploy() : [];
   const contextProblem = describeContextProblem(draft);
+  // Only a session on a Session Worker has a Session Agent.
+  const sessionAgentProblem = sessionModeRequirements.isWorkerCanonical
+    ? describeSessionAgentProblem(draft.sessionAgent)
+    : '';
   const missingInputs = [
     toStr(draft.sessionName).trim() ? '' : 'Enter a session name.',
     contextProblem ? `Fix the context: ${contextProblem}` : '',
+    sessionAgentProblem ? `Fix the Session Agent: ${sessionAgentProblem}` : '',
     needsWorkerDeploy && !toStr(deployForm.apiToken).trim()
       ? 'Enter your Cloudflare API token, or verify a Worker you deployed from the Cloudflare dashboard.'
       : '',
@@ -2960,6 +2966,22 @@ const SessionWizard = ({
               <SetupVoiceKeyNote />
             ) : null}
           </>
+        ) : null
+      }
+      sessionAgent={
+        sessionModeRequirements.isWorkerCanonical ? (
+          <SetupSessionAgent
+            value={draft.sessionAgent}
+            onChange={(next) => updateDraftValue(['sessionAgent'], next)}
+            groups={contextFileGroups.flatMap(({ groupId, label }) =>
+              label.trim() ? [{ groupId, label: label.trim() }] : [],
+            )}
+            sbtChainId={
+              sessionModeRequirements.publish.deployPendingSbts
+                ? Number(draft.networkChainId || registryChainId || 0) || 0
+                : 0
+            }
+          />
         ) : null
       }
       sponsoredStatusProps={{

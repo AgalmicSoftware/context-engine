@@ -32,7 +32,7 @@ const scanBudget = () => {
 
 // Readable by everyone the session admits: its own access exactly, with no
 // admins-only or group rule. Anything narrower, or unreadable here, is left out.
-const forEveryone = (row, config) =>
+export const forEveryone = (row, config) =>
   row.payloadEncrypted !== true &&
   !(Array.isArray(row.groupIds) && row.groupIds.length) &&
   !isAdminsOnlyAccess(row.accessConditions) &&
@@ -44,9 +44,12 @@ const createdAtOf = (row) => Date.parse(row.createdAt) || 0;
  * The context sources every participant may read, as texts for the shared
  * prompt block: link snapshots, text files, and the AI's reading of each PDF
  * (an unread PDF gives no text). The Worker's own AI features act for
- * participants, so admins-only items never reach them.
+ * participants, so admins-only items never reach them. `readable(row)`
+ * narrows or widens that to one person's access; `principal` names who the
+ * read is for in the envelope audit; files added by `leaveOutUploaders`
+ * (lower-case addresses) are left out, with the AI's readings of them.
  */
-export const loadParticipantContextSources = async ({ env, slug, config, deps } = {}) => {
+export const loadParticipantContextSources = async ({ env, slug, config, deps, readable, principal, leaveOutUploaders } = {}) => {
   let rows = [];
   try {
     rows = await listContextSourceRows({ env, slug, budget: scanBudget() });
@@ -59,7 +62,10 @@ export const loadParticipantContextSources = async ({ env, slug, config, deps } 
     });
     return [];
   }
-  const visible = rows.filter((row) => forEveryone(row, config)).sort((a, b) => createdAtOf(a) - createdAtOf(b));
+  const canRead = readable || ((row) => forEveryone(row, config));
+  const visible = [];
+  for (const row of rows) if (await canRead(row)) visible.push(row);
+  visible.sort((a, b) => createdAtOf(a) - createdAtOf(b));
   const readings = new Map();
   visible
     .filter((row) => contextRoleOf(row.tags) === CONTEXT_TEXT_ROLE)
@@ -68,12 +74,13 @@ export const loadParticipantContextSources = async ({ env, slug, config, deps } 
   for (const row of visible) {
     if (sources.length >= MAX_SOURCES) break;
     if (contextRoleOf(row.tags) !== CONTEXT_ROLE) continue;
+    if (leaveOutUploaders?.has(String(row.uploader || '').trim().toLowerCase())) continue;
     const isPdf = row.contentType === CONTEXT_FILE_TYPES.pdf;
     const textRow = isPdf ? readings.get(row.id) : row;
     if (!textRow) continue;
     let bytes = null;
     try {
-      bytes = await readContextSourceBytes({ env, config, slug, metadata: textRow, maxBytes: MAX_READ_BYTES, deps });
+      bytes = await readContextSourceBytes({ env, config, slug, metadata: textRow, maxBytes: MAX_READ_BYTES, principal, deps });
     } catch {
       bytes = null;
     }

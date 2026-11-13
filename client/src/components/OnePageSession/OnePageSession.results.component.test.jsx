@@ -103,6 +103,13 @@ jest.mock('../../utilities/docLibrary/useSessionContextSources', () => ({
   useSessionContextSources: () => mockContextSources.current || emptyContextSources(),
 }));
 jest.mock('../Sessions/setup/ContextSourcesPanel', () => () => <div data-testid="mock-context-sources-panel" />);
+// The Session Agent's dialog asks the Worker how it would answer; tests answer for it.
+const mockSessionAgentStatus = jest.fn();
+jest.mock('./sessionAgentRequests', () => ({
+  readSessionAgentStatus: (...args) => mockSessionAgentStatus(...args),
+  askSessionAgent: jest.fn(),
+  setSessionAgentOptOut: jest.fn(),
+}));
 
 jest.mock('../SurveyTool/SurveyPage', () => (props) => {
   mockSurveyPage(props);
@@ -1636,15 +1643,16 @@ describe('OnePageSession results routing', () => {
       url: 'https://example.org/essay',
       adminsOnly: false,
     };
-    const renderSession = async (sources, isAdmin) => {
+    const renderSession = async (sources, isAdmin, overrides = {}) => {
       mockContextSources.current = { ...emptyContextSources(), supported: true, isAdmin, sources };
-      const props = buildProps();
-      render(
+      const props = { ...buildProps(), ...overrides };
+      const view = render(
         <MemoryRouter initialEntries={['/session/edge']}>
           <OnePageSession {...props} slug="edge" />
         </MemoryRouter>,
       );
       expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+      return view;
     };
 
     it('keeps the Context section from participants while there is no context', async () => {
@@ -1678,21 +1686,81 @@ describe('OnePageSession results routing', () => {
       expect(screen.queryByTestId('ce-session-context-sources')).not.toBeInTheDocument();
     });
 
-    it('gives admins a Group Agent placeholder that says it is coming', async () => {
-      await renderSession([], true);
+    const sessionAgent = {
+      audiences: [
+        { who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' },
+      ],
+    };
+    const withSessionAgent = (overrides = {}) => ({
+      sessionConfig: { ...buildProps().sessionConfig, sessionAgent },
+      ...overrides,
+    });
+
+    it('lets anyone signed in ask the Session Agent once an admin turns it on', async () => {
+      mockSessionAgentStatus.mockResolvedValue({ on: true, answers: 'general', audience: 0, optedOut: false });
+      // A participant with nothing to read still gets the Context section, for the Session Agent.
+      await renderSession([], false, withSessionAgent({ account: '0xabc', loginComplete: true }));
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
-      fireEvent.click(screen.getByTestId('ce-group-agent-open'));
-      const dialog = await screen.findByRole('dialog', { name: 'Group Agent' });
-      expect(dialog).toHaveTextContent('Coming soon');
+      fireEvent.click(screen.getByTestId('ce-session-agent-open'));
+      const dialog = await screen.findByRole('dialog', { name: 'Session Agent' });
+      expect(await within(dialog).findByText('You get General answers.')).toBeInTheDocument();
+      expect(mockSessionAgentStatus).toHaveBeenCalledWith({
+        sessionSlug: 'edge',
+        sessionConfig: expect.objectContaining({ sessionAgent }),
+        account: '0xabc',
+      });
       fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     });
 
-    it('keeps the Group Agent placeholder from participants', async () => {
-      await renderSession([file, link], false);
+    it('closes the Session Agent when its person switches account or signs out', async () => {
+      mockSessionAgentStatus.mockResolvedValue({ on: true, answers: 'general', audience: 0, optedOut: false });
+      const signedIn = withSessionAgent({ account: '0xabc', loginComplete: true });
+      const view = await renderSession([], false, signedIn);
+      const show = (overrides) =>
+        view.rerender(
+          <MemoryRouter initialEntries={['/session/edge']}>
+            <OnePageSession {...buildProps()} {...overrides} slug="edge" />
+          </MemoryRouter>,
+        );
+      const open = async () => {
+        fireEvent.click(screen.getByTestId('ce-session-agent-open'));
+        await screen.findByRole('dialog', { name: 'Session Agent' });
+      };
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      await open();
+      // Another account never sees the last one's answer.
+      show({ ...signedIn, account: '0xdef' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      await open();
+      // Signing out closes it, and signing back in doesn't open it again.
+      show({ ...signedIn, loginComplete: false });
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      const checks = mockSessionAgentStatus.mock.calls.length;
+      show(signedIn);
+      expect(await screen.findByTestId('ce-session-agent-open')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(mockSessionAgentStatus).toHaveBeenCalledTimes(checks);
+    });
+
+    it('says by the title that the Session Agent is on, even to someone signed out', async () => {
+      await renderSession([file, link], false, withSessionAgent());
+      expect(screen.getByTestId('ce-session-agent-notice-page')).toHaveAttribute(
+        'href',
+        expect.stringMatching(/README\.md#session-agent$/),
+      );
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       expect(screen.getByTestId('ce-session-context-sources')).toBeInTheDocument();
-      expect(screen.queryByTestId('ce-group-agent-open')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
+      expect(mockSessionAgentStatus).not.toHaveBeenCalled();
+    });
+
+    it('shows no Session Agent while it is off, even to admins', async () => {
+      await renderSession([], true, { account: '0xabc', loginComplete: true });
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      expect(screen.getByTestId('ce-session-context-manage')).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-session-agent-notice-page')).not.toBeInTheDocument();
     });
   });
 

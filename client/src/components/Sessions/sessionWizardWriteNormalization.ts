@@ -3,6 +3,7 @@ import { normalizeHostedFaucetSelection } from './sessionWizardHostedFaucet';
 import { DEFAULT_TRANSCRIPTION_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { validateSessionContext, type SessionContext } from '@ce-shared/sessionContext.mjs';
+import { validateSessionAgent } from '@ce-shared/sessionAgent.mjs';
 import { withoutNewInterviewDefaults } from '../../utilities/session/interviewModeWrite';
 import {
   normalizeResultsAnalysisSettings,
@@ -493,6 +494,12 @@ export const buildSessionWizardWorkerConfigPayload = ({
     // field; the config writers send '' when the Worker's config already has it.
     const agentInstructions = trimString(resolvedDraft.agentInstructions);
     if (agentInstructions) next.agentInstructions = agentInstructions;
+    // In the form the Worker stores, so the readback matches. Off is left out,
+    // as older Workers refuse the field; the config writers send null when the
+    // Worker's config already has one.
+    const sessionAgent = validateSessionAgent(resolvedDraft.sessionAgent ?? null);
+    if (!sessionAgent.ok) throw new Error(`Fix the Session Agent: ${sessionAgent.errors[0].message}`);
+    if (sessionAgent.value) next.sessionAgent = sessionAgent.value;
     if (usesOnChainSbt) {
       next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
       next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(resolvedDraft.defaultFeaturedSBTs);

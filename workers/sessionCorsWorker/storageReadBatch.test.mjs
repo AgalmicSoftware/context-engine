@@ -142,6 +142,25 @@ test('a batch stops reading once it holds 8 MiB and leaves the rest to single re
   assert.equal((await call(`/storage/read?id=${ids[6]}`)).status, 200);
 });
 
+test('an answer whose own rule the chain cannot answer hides only itself from a list', async () => {
+  const { env, participants } = await seed({ people: 2, questions: 1 });
+  const [author, reader] = participants;
+  // No RPC is set up for this chain, so the rule can be neither passed nor failed.
+  const accessConditions = { match: 'any', conditions: [{ kind: 'sbt_onchain', contract: `0x${'c'.repeat(40)}`, chainId: 31337 }] };
+  const gated = await readJson(await fetchWorker(makeRequest('/storage/upload', { method: 'POST', token: author.token, body: {
+    data: { questionID: 'q-0', answer: { value: 'Disagree', encrypted: false }, ...session }, contentType: 'application/json', resource: 'responses', accessConditions,
+  } }), env));
+  assert.equal(gated.status, 200, JSON.stringify(gated.body));
+  const { call } = signedOut(env);
+  const single = await call(`/storage/read?id=${gated.body.storageRef.id}`, { token: reader.token });
+  assert.equal(single.status, 503, 'the row itself is an outage to retry');
+  const listed = await call('/storage/list?resource=responses&limit=100', { token: reader.token });
+  assert.equal(listed.status, 200, JSON.stringify(listed.body));
+  const ids = listed.body.items.map((item) => item.storageRef.id);
+  assert.equal(ids.length, 2, 'everyone else still lists the other answers');
+  assert.equal(ids.includes(gated.body.storageRef.id), false);
+});
+
 test('a batch takes 1 to 100 distinct valid ids, and reports a missing one on its own', async () => {
   const { env } = await seed({ people: 1, questions: 1 });
   const { call } = signedOut(env);

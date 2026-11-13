@@ -787,25 +787,41 @@ describe('bundled app-theme contrast', () => {
     );
   });
 
-  // The Group Agent's launcher paints the session chrome pair itself, so it reads on any section background, and its
-  // dialog paints the setup page's surface.
-  test.each(registry.themes.map(({ id }) => id))('%s keeps the Group Agent placeholder readable', (themeId) => {
+  // The Session Agent's launcher paints the session chrome pair itself, so it reads on any section background, and its
+  // dialog paints the setup page's surface, which everything inside reads on.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the Session Agent readable', (themeId) => {
     const values = themeValues(css, themeId);
     const paint = painter(values);
     const onePageCss = compileModule('components/OnePageSession/OnePageSession.module.scss');
-    const agentCss = compileModule('components/OnePageSession/GroupAgentModal.module.scss');
+    const agentCss = compileModule('components/OnePageSession/SessionAgentModal.module.scss');
     const canvas = parseColor(values.canvas);
-    const ratio = (rule: Record<string, string>) => {
-      const fill = composite(paint(rule.background ?? 'transparent'), canvas);
+    const ratio = (rule: Record<string, string>, under = canvas) => {
+      const fill = composite(paint(rule.background ?? 'transparent'), under);
       return Number(contrastRatio(composite(paint(rule.color), fill), fill).toFixed(2));
     };
+    const dialog = composite(paint(moduleRule(agentCss, '.content').background), canvas);
+    // A state's rule on top of the control's own, as the browser applies them.
+    const inDialog = (selector: string, base = selector) =>
+      [selector, ratio({ ...moduleRule(agentCss, base), ...moduleRule(agentCss, selector) }, dialog)] as const;
     const ratios = [
       ...['', ':hover', ':focus-visible', ':active'].map(
-        (state) => [`.groupAgentButton${state}`, ratio(moduleRule(onePageCss, `.groupAgentButton${state}`))] as const,
+        (state) =>
+          [`.sessionAgentButton${state}`, ratio(moduleRule(onePageCss, `.sessionAgentButton${state}`))] as const,
       ),
       ['.content', ratio(moduleRule(agentCss, '.content'))] as const,
+      inDialog('.hint'),
+      inDialog('.error'),
+      ...['', ':hover:not(:disabled)', ':focus-visible', ':active:not(:disabled)', ':disabled'].map((state) =>
+        inDialog(`.ask${state}`, '.ask'),
+      ),
+      inDialog('.question'),
     ];
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+    // The badge takes the title bar's text colour and the "?"s the dialog's, in every state.
+    const inherits = ['.badge', '.helpLink', '.helpLink:hover', '.helpLink:focus', '.helpLink:active'];
+    expect(inherits.map((selector) => [selector, moduleRule(agentCss, selector).color])).toEqual(
+      inherits.map((selector) => [selector, 'inherit']),
+    );
   });
 
   // A file's Visible to paints its own fills, so it reads on any panel, including the transcript box that places it;

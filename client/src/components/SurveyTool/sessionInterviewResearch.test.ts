@@ -305,6 +305,19 @@ describe('interview draft origin', () => {
     [{ revisions: [{ modelId: 'gpt-realtime' }] }, packet, null, 'voice_interview'],
     [{ revisions: [{ modelId: 'gpt-realtime' }] }, null, null, 'voice_interview'],
     [{ revisions: [{ modelId: 'gpt-x' }] }, null, { modelId: 'direct-user-context' }, 'typed_context'],
+    [{ revisions: [{ modelId: 'gpt-x', origin: 'group_recording' }] }, packet, null, 'group_recording'],
+    [
+      { revisions: [{ modelId: 'gpt-x', origin: 'group_recording' }] },
+      null,
+      { modelId: 'direct-user-context' },
+      'group_recording',
+    ],
+    [
+      { revisions: [{ modelId: 'gpt-x' }, { modelId: 'gpt-x', origin: 'group_recording' }] },
+      null,
+      null,
+      'voice_interview',
+    ],
   ])('labels %j', (value, prefill, source, expected) => {
     expect(resolveInterviewDraftOrigin(value, prefill, source)).toBe(expected);
   });

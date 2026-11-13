@@ -1,3 +1,4 @@
+import { sessionAgentSettingOf, validateSessionAgent } from '@ce-shared/sessionAgent.mjs';
 import { normalizeInterviewSettings } from '@ce-shared/interviewSettings.mjs';
 import { isRealtimeInterviewModel } from '@ce-shared/realtimeInterviewConfig.mjs';
 import { normalizeResultsAnalysisSettings } from '@ce-shared/resultsAnalysisSettings.mjs';
@@ -17,6 +18,7 @@ import {
 } from '@ce-shared/sessionConfigEdits.mjs';
 import {
   DEBATE_ATLAS_FIELD,
+  SESSION_AGENT_READY_FIELD,
   MEMBER_RESULTS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   SET_CONFIG_MERGES_AI_FIELD,
@@ -55,6 +57,10 @@ export const workerTakesResultsAdmins = (config: unknown): boolean => asRecord(c
 
 /** True when the session's Worker shows every answer to signed-in members; older ones refuse that visibility. */
 export const workerShowsMemberResults = (config: unknown): boolean => asRecord(config)[MEMBER_RESULTS_FIELD] === true;
+
+/** True when the session's Worker answers the Session Agent; older ones refuse its setting. */
+export const workerAnswersSessionAgent = (config: unknown): boolean =>
+  asRecord(config)[SESSION_AGENT_READY_FIELD] === true;
 
 const storedResultsAdmins = (value: unknown): string[] =>
   Array.isArray(value) ? value.map((address) => text(address).trim().toLowerCase()).filter(Boolean) : [];
@@ -127,6 +133,8 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     autoFeatureSBTsBySessionSlug: resolveSessionWizardAutoFeatureBySessionSlug(source) !== false,
     lists: Object.fromEntries(LIST_KEYS.map((key) => [key, formatSettingsList(source[key])])),
     resultsAdminAddresses: storedResultsAdmins(source.resultsAdminAddresses),
+    // Off is null; a setting a writer would refuse reads as off.
+    sessionAgent: sessionAgentSettingOf(source.sessionAgent),
     ...buildSessionSettingsChainDraft(source),
   };
 };
@@ -245,6 +253,12 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
     CURATED_ID_LIST_KEYS.forEach((key) => {
       values[key] = idList(before, draft, key);
     });
+  }
+  // Only a session on a Session Worker has a Session Agent; null turns it off.
+  if (!onChain) {
+    const sessionAgent = validateSessionAgent(draft.sessionAgent ?? null);
+    if (!sessionAgent.ok) throw new Error(`Session Agent: ${sessionAgent.errors[0].message}`);
+    values.sessionAgent = sessionAgent.value;
   }
   if (!onChain && workerTakesResultsAdmins(before)) {
     const resultsAdmins = storedResultsAdmins(draft.resultsAdminAddresses);
@@ -432,6 +446,7 @@ const LABELS: Record<string, string> = {
   contextAdditionPolicy: 'Who can add files to context',
   resultsAnalysis: 'Results analysis',
   resultsAdminAddresses: 'Results admins',
+  sessionAgent: 'Session Agent',
   ai: 'AI models and effort',
   sessionModeProfile: 'Access, results and hosting',
   storageProfile: 'Storage access',

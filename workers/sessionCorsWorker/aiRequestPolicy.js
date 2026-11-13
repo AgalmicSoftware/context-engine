@@ -1,9 +1,10 @@
 import { DEFAULT_AI_MODEL, GROUP_TRANSCRIPTION_MODEL, TRANSCRIPTION_FALLBACK_MODEL } from '../../shared/aiDefaults.mjs';
+import { interviewMapOutputTokens } from '../../shared/aiModelFamily.mjs';
 import { isChatReasoningModel, usesOpenAiResponsesApi } from './aiModelParams.js';
 
 const trim = (value) => typeof value === 'string' ? value.trim() : '';
 const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'compare', 'categorize', 'interview-map', 'interview-opening', 'context-read']);
+const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'compare', 'categorize', 'interview-map', 'interview-opening', 'context-read', 'session-agent']);
 const taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : '';
 const modelEntry = (entry, provider, fallback = DEFAULT_AI_MODEL) => {
   const obj = record(entry);
@@ -48,14 +49,17 @@ export const isSessionTranscriptionModelAllowed = ({ config, provider, model, gr
 // These are per-call ceilings, not allowances. Labels are caller-controlled but
 // can select only these bounded operations, never a caller-supplied maximum.
 // Built-ins using the common 16,384-token (Anthropic 32,768) transport
-// default retain up to 16,000; reports and interview tasks keep smaller bounds.
+// default retain up to 16,000; reports and the interview opening keep smaller
+// bounds. Interview mapping's bound depends on its model (interviewMapOutputTokens).
 const operationCeilings = Object.freeze({
   generate: 16000, rewrite: 16000, summarize: 16000, rank: 16000, compare: 16000, categorize: 16000,
-  analysis: 7000, 'interview-map': 8000,
+  analysis: 7000,
   // One short question, but models that think spend part of the cap on thinking.
   'interview-opening': 2000,
   // A context PDF's text, read once by an admin's request.
   'context-read': 8000,
+  // One Session Agent answer of at most 150 words, thinking included.
+  'session-agent': 3000,
 });
 const tokenFields = ['max_tokens', 'max_completion_tokens', 'max_output_tokens', 'max_tokens_to_sample', 'maxTokens'];
 const effortOrder = ['none', 'minimal', 'low', 'medium', 'high'];
@@ -81,7 +85,9 @@ export const boundSessionAiRequest = ({ payload = {}, provider, config, requestK
   const reasoning = isChatReasoningModel({ model }) ||
     (models.thinking.provider === provider && models.thinking.model === model);
   const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
-  const ceiling = operationCeilings[task] || (reasoning || responses ? 16000 : 2048);
+  const ceiling = task === 'interview-map'
+    ? interviewMapOutputTokens(model, provider)
+    : operationCeilings[task] || (reasoning || responses ? 16000 : 2048);
   const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {
     const value = payload[key];
     return typeof value === 'number' && Number.isFinite(value) && value >= 1 ? Math.floor(value) : ceiling;

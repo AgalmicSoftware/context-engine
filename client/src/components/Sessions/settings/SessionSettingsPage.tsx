@@ -4,6 +4,8 @@ import { Input } from 'reactstrap';
 import wizardStyles from '../SessionWizard.module.scss';
 import styles from '../setup/SessionSetup.module.scss';
 import ContextSourcesPanel from '../setup/ContextSourcesPanel';
+import SetupSessionAgent from '../setup/SetupSessionAgent';
+import { useContextGroups } from '../../../utilities/docLibrary/useContextGroups';
 import { normalizeSessionContext } from '@ce-shared/sessionContext.mjs';
 import { templateContextFiles, type ContextSource } from '../../../utilities/docLibrary/contextSources';
 import { SessionTemplateActions, SetupQuestionsPublisher } from '../setup/SessionTemplateTools';
@@ -47,6 +49,7 @@ import {
   rebaseSessionSettingsDraft,
   usesSbtDefaults,
   workerMergesAi,
+  workerAnswersSessionAgent,
   workerShowsMemberResults,
   workerTakesResultsAdmins,
   type SessionSettingsSave,
@@ -92,6 +95,8 @@ const CLOSED: Record<SetupSectionKey, boolean> = {
 
 const AI_LOCKED_REASON =
   'They are read-only here: this Session Worker is older and would drop the AI settings this page can’t see. Update the Worker to edit them.';
+const SESSION_AGENT_LOCKED_REASON =
+  'The Session Agent can’t be turned on here yet: this Session Worker is older and refuses it. Update the Worker to use it.';
 const LISTS_LOCKED_REASON =
   'The ID lists are read-only here: this Session Worker is older and refuses them. Update the Worker to edit them.';
 
@@ -161,6 +166,8 @@ const SessionSettingsPage = ({
   const [retrySync, setRetrySync] = useState<OnChainWorkerSync | null>(null);
   // The session's files, listed by name in an exported template.
   const [contextSources, setContextSources] = useState<ContextSource[]>([]);
+  // The groups a Session Agent audience can name.
+  const groups = useContextGroups({ sessionSlug, sessionConfig: saved, account, enabled: !onChain });
 
   // A fresh copy replaces the "before" every edit is compared with. Unless
   // the edits were just saved, the admin's edits are kept on top of it.
@@ -606,6 +613,20 @@ const SessionSettingsPage = ({
           open={openSections.ai}
           onToggle={() => setOpenSections((prev) => ({ ...prev, ai: !prev.ai }))}
           lockedReason={onChain || workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
+          sessionAgent={
+            onChain ? null : workerAnswersSessionAgent(saved) ? (
+              <SetupSessionAgent
+                value={draft.sessionAgent}
+                onChange={(next) => updateDraft(['sessionAgent'], next)}
+                groups={groups}
+                sbtChainId={usesSbtDefaults(draft) ? Number(saved?.networkChainId) || 0 : 0}
+              />
+            ) : (
+              <p className={styles.hint} data-testid="ce-settings-session-agent-locked">
+                {SESSION_AGENT_LOCKED_REASON}
+              </p>
+            )
+          }
           keys={
             <p className={styles.hint}>
               API keys live on the Session Worker. Change them in{' '}

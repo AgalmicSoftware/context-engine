@@ -2158,7 +2158,10 @@ Runtime:
 Storage listing authorization reuses each distinct group membership result only
 within the current request. A real denial omits the record; an unavailable
 membership service fails the entire page with a retryable 503 and no completeness
-claim. Later requests check membership again.
+claim. Later requests check membership again. An `sbt_onchain` rule the chain
+can't answer, because no RPC URL serves its chain, the session's RPC secret can't
+be read or no endpoint answers, is unavailable in the same way rather than a
+denial.
 
 ## Session authority model
 
@@ -2798,7 +2801,12 @@ Signed login/bootstrap requests:
     `generate`, `rewrite`, `summarize` (including audio discussions), `rank`,
     `compare`, and `categorize` each allow up to 16,000 tokens. Smaller fixed
     ceilings are `analysis`: 7,000 (HTML report sections and Worker Results),
-    `interview-map`: 8,000, `context-read`: 8,000, and `interview-opening`: 2,000. The smallest
+    `context-read`: 8,000, and `interview-opening`: 2,000. `interview-map`, which
+    drafts an answer to every question in one reply, allows 32,000 on a model
+    whose provider documents room for it (GPT-5, GPT-6, the o-series, GPT-4.1
+    and Claude from 4.5 on, by `interviewMapOutputTokens` in
+    `shared/aiModelFamily.mjs`) and 8,000 on any other model and on every
+    custom-endpoint model. The smallest
     valid requested value among `max_tokens`, `max_completion_tokens`,
     `max_output_tokens`, `max_tokens_to_sample`, and `maxTokens` is used, bounded
     by that ceiling. Invalid values cannot remove the ceiling. Task labels can
@@ -2828,6 +2836,11 @@ Signed login/bootstrap requests:
   - Route scope disables fail before the request-`apiKey` bypass.
   - Provider inference:
     omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI. When both provider and model are omitted on a session-funded request, the Worker selects the saved fast model (or thinking model when `modelType: thinking`), including its provider.
+- `POST /session-agent/ask` answers a question to the Session Agent
+  through the session's own AI, under the `/ai` scope check and rate limit.
+  `POST /session-agent/status` says how the signed-in person would be answered,
+  and `POST /session-agent/opt-out` stores their choice to keep their answers and
+  files out of it. See [session-agent.md](session-agent.md).
 - `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>[&ticket=<ticket>]`
   (`/agent/interview-brief` remains a compatibility alias)
   - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or

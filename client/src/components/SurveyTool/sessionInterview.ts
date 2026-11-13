@@ -109,6 +109,8 @@ export type InterviewPredictionRevision = {
   conviction?: number;
   evidence?: string;
   confidence?: number;
+  // Set when the mapping that made this version read someone's claimed part of a group recording.
+  origin?: 'group_recording';
 };
 
 export type InterviewDraftResponse = {
@@ -125,6 +127,8 @@ export type InterviewDraftResponse = {
   predictionCondition?: 'shown' | 'blind';
   blindAnswer?: unknown;
   revealedAt?: number;
+  // From the mapping, when it read someone's claimed part of a group recording; review moves it into the version.
+  origin?: 'group_recording';
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -626,15 +630,26 @@ ${reconsideration.ownContext || '(none)'}`
     : ''
 }${extraData}`;
 
+// Shown in place of a JSON parser's message; the person can generate the drafts again.
+export const INTERVIEW_REPLY_UNREADABLE =
+  'The AI’s reply was cut off or unreadable, so no drafts were made. Try generating them again; if it keeps happening, tell the session’s host.';
+
 export const parseInterviewDraftResponses = (
   raw: unknown,
   questions: InterviewQuestion[],
 ): InterviewDraftResponse[] => {
   const text = toTrimmedString(raw);
   const json = text.match(/\{[\s\S]*\}/)?.[0] || '';
-  if (!json) throw new Error('AI response did not contain a JSON object.');
-  const parsed = asRecord(JSON.parse(json));
-  return normalizeDraftCandidates(parsed.responses, questions).filter((response) => response.confidence !== undefined);
+  let parsed: unknown = null;
+  try {
+    parsed = json ? JSON.parse(json) : null;
+  } catch {
+    // A reply that ran out of room stops mid-object.
+  }
+  if (!parsed) throw new Error(INTERVIEW_REPLY_UNREADABLE);
+  return normalizeDraftCandidates(asRecord(parsed).responses, questions).filter(
+    (response) => response.confidence !== undefined,
+  );
 };
 
 export const readImportedInterviewDraftResponses = (
@@ -731,7 +746,6 @@ export const mapInterviewEvidenceToResponses = async ({
       reasoningEffort: 'medium',
       service_tier: 'default',
       response_format: { type: 'json_object' },
-      maxTokens: 8000,
     },
   );
   const responses = parseInterviewDraftResponses(raw, questions);
@@ -780,5 +794,8 @@ export const mapInterviewEvidenceToResponses = async ({
       }).statements,
     );
   }
-  return responses;
+  // Only a claimed part of a group recording brings answers to reconsider; research tells it from a solo interview.
+  return reconsideration
+    ? responses.map((response) => ({ ...response, origin: 'group_recording' as const }))
+    : responses;
 };
