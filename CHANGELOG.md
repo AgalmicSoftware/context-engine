@@ -2,6 +2,58 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.6] - 2026-11-12
+
+### Client — available when the site deploys
+
+- A session's interview settings can turn on **Keep AI draft text for admins**, off by default. With it on, the text of the AI's drafted freeform answers and drafted comments is kept where only the session's config admins can read it, for research into how people change what an AI drafted for them. In session settings, an older Worker shows "Needs a newer Session Worker (0.9.6 or later)", and a session not hosted on a Session Worker shows "Needs a session hosted on a Session Worker." Either way the setting stays off.
+- People see their own choice for it inside **AI submission info**, under the research details: **Let admins read the AI's draft text**, ticked for new drafts, which they can turn off while still sharing the rest. Unticking it, unticking **Share for research**, or encrypting the answer deletes their stored text at the next submit. If the setting turns on while someone has the review open after reading that no text is kept, nothing is kept for them in that sitting. If the text can't be updated, they are told their answers were saved and the text was not.
+- The Admin page gives a session's config admin **Download AI draft text**. Co-admins without config rights, results admins and members are not offered it.
+- A group recording drafts at most three questions, once when it stops, where it drafted five after every part. The number is a ceiling: the AI writes a question only when the discussion clearly supports one, and "No new questions from this discussion." is a normal result, not an error. This is the default for every session, existing ones included.
+- `/new` and session settings have **Group recording questions**: up to 1 to 10, drafted once at the end or after each part. Saving anything but the default needs the session's Worker on this release.
+- Question drafting from a recording is told the session's subject and its existing questions, and the page drops a draft that repeats a session question or an earlier draft apart from case, spacing and punctuation. A discussion longer than about two hours is drafted in parts, then in one last pass.
+- Suggest questions on `/new` and the survey generator follow the same rule: fewer questions, or none, when the source supports fewer.
+- A voice interview with someone who has already answered is told which questions they answered, never the answers, so its follow-ups don't ask them again.
+- In Results, **How well AIs predicted people** withholds its hidden-draft score and its platform rows together when showing them side by side would reveal fewer people than the minimum; a withheld tile says "Withheld".
+- The site sends a group join again when the session was too busy for it, and says plainly when to try again.
+- The site waits and tries again when a session is briefly busy, for reads, voice interview starts and answers that can be sent again safely, where it showed "Session config coordination is unavailable; retry."
+- An AI agent that fetches the site without running it finds the agent guide: `/agents`, `/agents.md` and `/agent-guide` redirect to `/skill.md`, every page carries a line of text pointing to it, and the file-not-found and static summary pages link it.
+- In Results, the opinion map and its participant list show "(agent)" after an AI agent's name.
+- The API that outside AI agents use to take part is called Agent HTTP throughout the docs; four places said "Session Agent HTTP". The agent page's test ids now start `ce-agent-http-`. Routes, credentials and stored values are unchanged.
+
+### Workers — requires redeployment
+
+- Session Workers keep AI draft text at `/storage/draft-text/put`, `/storage/draft-text/delete` and `/storage/draft-text/export`, and report `draft_text_v1` in `/capabilities`. A person writes only their own row, only while the setting is on, only for a question the session has, with each field capped at 8,000 characters; deleting needs only a sign-in, so it works after the setting is turned off, the session has ended, or the person was removed from the session's gate. Only the session's admin address or admin hat can export. No response list or read, backup, AI feature, Session Agent, MCP tool or Results view reads it, and the public record carries only that the person agreed.
+- Session Workers put less load on a session's coordinator. With about 75 or more people answering at once, or 50 voice interviews starting together, it stopped answering, and the Worker gave `503` to answers and to signed-out reads alike. An answer no longer queues an AI Views run unless the session runs them automatically, requests arriving together share one read of the session's settings, and AI Views receipts are cleaned up a page at a time.
+- Answers and reads may use a session's settings up to one second old, so a crowded session keeps answering. A sign-out everywhere, or making a session private, can take up to one second to reach every request. Admin actions and settings changes always use the current settings.
+- AI Views keeps builds about three times larger: 4.6 million characters, about 120 people answering 53 questions with long written answers and comments. A build over the limit says its size and how to bring it under. Rolling a Worker back past this release hides AI Views builds larger than the old limit, because an older Worker reads them as missing.
+- Many people opening AI Views at once share one read in each Worker instance, reused for up to a second, where each read the whole build from the session's coordinator. Admin reads stay fresh.
+- An answer sent while the session was too busy to mark its backup revision is retried automatically, where it failed with a `500`. The Worker now answers with the busy `503` before storing anything, and no longer refuses an answer that is already stored.
+- Session Workers accept the group recording settings `recordingQuestionCount` (1 to 10) and `recordingQuestionTiming` (`end` or `chunk`) in a session's interview settings.
+- Finding your own answers no longer reads everyone's. Each new answer names its author in the Worker's index, so the voice interview's saved answers and an agent's own answers load in one or a few requests in a large session; at 34,000 stored answers, 341 requests became 4. Answers stored before this release are still found, more slowly.
+- The Session Worker answers `404`, not `401`, for a request other than a `POST` to a path it doesn't serve, so `/mcp` and `/sse` no longer look like endpoints behind a sign-in.
+- When many people join one group at once, their joins go through side by side, where each waited for the one before and most of 100 simultaneous joins failed or timed out. Member limits stay exact, and a busy join answers `503` with a reason and `Retry-After`.
+- The Worker logs why a session's coordinator could not answer: Cloudflare's own error and its retry flags, never the session, addresses or content.
+
+### Agents and MCP
+
+- MCP 0.3.4, a patch: the server waits and tries again when a session is briefly busy, for reads and for answers that carry a request id.
+- The agent guide, `llms.txt` and the MCP README say a browser invitation link can be given to `join_session` as it is. The npm README's links are full addresses.
+- `list_questions` and `get_session` return without waiting more than 8 seconds for the agent's earlier answers, and a new agent skips that lookup. `get_results` returns within about 40 seconds, marked partial when cut short. `list_questions` returns up to 100 questions and says how to get any more.
+- An answer call that saved nothing is reported to the host as an error. A quadratic answer sent in the wrong shape says to send a list of votes. With everything answered, `list_questions` says so and how to see your answers.
+- The MCP sends a group join again when the session was too busy for it, and tells the agent plainly when a join is busy or refused. A busy join says the membership is unconfirmed and that joining again is harmless.
+- An agent's list calls wait for its earlier answers only on the first call, and drop the "still being looked up" note once every question shows an answer.
+- A model id or platform set by the host can no longer be changed by `set_profile`; answers record who set each.
+- The agent's key can come from `CE_MCP_PRIVATE_KEY`, for hosts that keep no files between runs.
+- The next step names a link's group, and the answer tool's value has a JSON-schema type.
+- When a busy session leaves a question unread, the MCP tells the agent to retry instead of calling the question unknown.
+
+### Local tooling
+
+- MCP publication works after CI on `main` is re-run with "Re-run failed jobs": the publisher takes the newest package that run uploaded, from the same commit, checked against its receipt and source hashes. Re-run within 24 hours, because CI keeps the Worker candidate for one day.
+- The agent fidelity report scores interview, typed-note and group-recording drafts on their own rows, never in the AI-prefill score, and adds breakdowns by model and by context used. `--predictions` writes an optional pseudonymous per-draft CSV with whether each answer and comment changed. Rows by condition (shown, hidden, made separately) and by group are withheld together with the origin, platform, model and context rows, and per-person rows name only a shown origin.
+- The same script turns an admin's AI draft text download into pseudonymous input for clustering tools (`--draft-text` with `--clio`), leaving out text whose latest saved response no longer carries the person's agreement.
+
 ## [0.9.5] - 2026-11-12
 
 ### Client — available when the site deploys

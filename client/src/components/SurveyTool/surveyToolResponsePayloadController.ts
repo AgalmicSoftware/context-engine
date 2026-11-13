@@ -291,7 +291,8 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const interviewSource = asRecord(interviewProvenanceRecord.source);
     const researchCoverage = buildSubmittedResearchCoverage(interviewSource.researchCoverage);
     // A saved name or timestamp alone is not consent to AI attribution.
-    const { includeAiProvenance, includePredictionComparison } = resolveConsentFlags(interviewProvenanceRecord);
+    const { includeAiProvenance, includePredictionComparison, includeDraftText } =
+      resolveConsentFlags(interviewProvenanceRecord);
     const originalPrediction = asRecord(interviewProvenanceRecord.originalPrediction);
     const submissionValueSnapshot = asRecord(interviewProvenanceRecord.submissionValueSnapshot);
     const responderName = String(interviewProvenanceRecord.responderName || '')
@@ -418,6 +419,10 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
             ...(includePredictionComparison && researchTier && draftOrigin ? { draftOrigin } : {}),
             ...(includePredictionComparison && researchTier ? { predictionCondition } : {}),
             ...(includePredictionComparison && researchTier && confidenceMeaning ? { confidenceMeaning } : {}),
+            // Only the consent is public; the text itself is kept apart, for config admins only.
+            ...(includePredictionComparison && researchTier === 'minimal' && includeDraftText
+              ? { draftTextConsent: true }
+              : {}),
             ...(includePredictionComparison && researchTier && blindFields && selectedInterviewResearch
               ? { blindAnswer: selectedInterviewResearch.blindAnswer, revealedAt: blindFields.revealedAt }
               : {}),

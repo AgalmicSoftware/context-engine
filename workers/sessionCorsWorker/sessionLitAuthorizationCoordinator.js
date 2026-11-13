@@ -5,6 +5,7 @@ import { sha256Hex } from '../shared/deployHelperCore.mjs';
 import { buildEncryptedSessionSecretsEnvelope, decryptSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import { readCommittedSessionSecrets, commitSessionSecrets, repairPendingSessionSecretsProjection } from './sessionSecretsAuthority.js';
 import { resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
+import { forgetSessionConfig } from './sessionConfigAuthority.js';
 
 const SIGNER_RECORD = 'session-lit-authorization-signer-v1';
 const SETUP_RECORD = 'session-lit-authorization-pending-v1';
@@ -318,6 +319,9 @@ const callCoordinator = async ({ env, slug, path, ...payload }) => {
     return { ok: response.ok && body?.ok === true, status: response.status, body };
   } catch {
     return { ok: false, status: 503, body: { error: COORDINATION_ERROR } };
+  } finally {
+    // Lit setup can change the session's config; this isolate must not reuse its copy.
+    forgetSessionConfig(env, slug);
   }
 };
 

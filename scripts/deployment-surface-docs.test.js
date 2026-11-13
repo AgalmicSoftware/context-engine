@@ -177,7 +177,7 @@ test('architecture docs inventory Session Worker agents and encrypted-envelope e
   assert.match(spec, /\/telegram\/agent\/api\/\*/);
   assert.match(spec, /ce-agent-access\/SKILL\.md/);
   assert.match(spec, /\/admin\/abuse-summary/);
-  assert.match(overview, /SessionAgent -.->\|policy-enabled direct submit\| Contracts/);
+  assert.match(overview, /AgentHttp -.->\|policy-enabled direct submit\| Contracts/);
   assert.match(overview, /Surveys contract[\s\S]{0,120}remain canonical/);
 });
 

@@ -18,6 +18,7 @@ import {
   workerGroupMembersMayLeave,
 } from './workerGroupPorts';
 import * as workerAuth from '../../utilities/worker/workerAuth.js';
+import { SESSION_COORDINATOR_UNAVAILABLE } from '../../utilities/worker/coordinatorRetry';
 
 const WORKER_URL = 'https://session-worker.example';
 const WORKER_TOKEN = 'worker-jwt-only';
@@ -602,6 +603,29 @@ describe('worker group ports', () => {
       },
       body: JSON.stringify({ groupId: 'reviewers', sessionId: SESSION_ID }),
     });
+
+    // A crowd joining at once can find the session busy: the join is sent again.
+    const busyOnce = jest.fn(async (input?: RequestInfo | URL, init?: RequestInit) =>
+      busyOnce.mock.calls.length === 1
+        ? new Response(JSON.stringify({ error: SESSION_COORDINATOR_UNAVAILABLE }), { status: 503 })
+        : successfulFetch(input, init),
+    );
+    jest.useFakeTimers();
+    try {
+      const joining = joinWorkerGroup({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        groupId: 'reviewers',
+        fetchImpl: busyOnce,
+      });
+      await jest.runAllTimersAsync();
+      await expect(joining).resolves.toMatchObject({ ok: true, memberCount: 1 });
+    } finally {
+      jest.useRealTimers();
+    }
+    expect(busyOnce).toHaveBeenCalledTimes(2);
 
     const deniedFetch = jest.fn(
       async (_input?: RequestInfo | URL, _init?: RequestInit) =>

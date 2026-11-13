@@ -4,6 +4,7 @@
 const NEWER_INTERVIEW_DEFAULTS: Record<string, unknown> = {
   shareDraftChangesByDefault: true,
   researchDetail: 'minimal',
+  keepDraftTextForAdmins: false,
   hiddenDraftShare: 0,
   showFidelityScore: false,
   suggestGroups: false,
@@ -11,6 +12,8 @@ const NEWER_INTERVIEW_DEFAULTS: Record<string, unknown> = {
   groupSuggestionData: ['country', 'work', 'interests'],
   showFidelityResults: false,
   fidelityMinimumPeople: 5,
+  recordingQuestionCount: 3,
+  recordingQuestionTiming: 'end',
 };
 
 export const withoutNewInterviewDefaults = (interviewMode: Record<string, unknown>): Record<string, unknown> => {

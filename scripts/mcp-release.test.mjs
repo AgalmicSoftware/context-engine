@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { PACKAGE, REPOSITORY, TARBALL, RECEIPT, collectInputs, inspectPackage,
-  integrity, publicationDecision, stagePackage, validateRun, verifyArtifact } from './mcp-release-artifacts.mjs';
+  integrity, publicationDecision, selectPackageAttempt, stagePackage, validateRun, verifyArtifact } from './mcp-release-artifacts.mjs';
 import { publishVerified, readRegistry } from './publish-mcp.mjs';
 
 const SHA = 'a'.repeat(40);
@@ -99,9 +99,14 @@ test('artifact verification binds tarball, version, complete local bundle inputs
   const staged = stagePackage({ root, tarball: join(root, 'source.tgz'), output: directory, env: {
     GITHUB_SHA: commit, GITHUB_REPOSITORY: REPOSITORY, GITHUB_REF: 'refs/heads/main', GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2',
   } });
-  const verify = (run = goodRun(commit)) => verifyArtifact({ root, directory, run });
+  const verify = (run = goodRun(commit), packageAttempt = '2') => verifyArtifact({ root, directory, run, packageAttempt });
   assert.equal(verify().integrity, integrity(readFileSync(join(root, 'source.tgz'))));
-  assert.throws(() => verify({ ...goodRun(commit), run_attempt: 3 }), /runAttempt mismatch/);
+  // A later attempt that re-ran only failed jobs publishes the package attempt 2 tested.
+  assert.equal(verify({ ...goodRun(commit), run_attempt: 3 }).runAttempt, '2');
+  assert.throws(() => verify(goodRun(commit), '1'), /runAttempt mismatch/);
+  assert.throws(() => verify({ ...goodRun(commit), run_attempt: 1 }), /newer than the CI attempt/);
+  assert.throws(() => verify({ ...goodRun(commit), id: 124 }), /runId mismatch/);
+  assert.throws(() => verifyArtifact({ root, directory, run: goodRun(commit) }));
   write('shared/questions/types.mjs', 'changed');
   assert.throws(verify, /source input mismatch/); write('shared/questions/types.mjs', 'fixture');
   write(`output/${TARBALL}`, archive([], { version: '0.1.3' }));
@@ -110,6 +115,25 @@ test('artifact verification binds tarball, version, complete local bundle inputs
   assert.throws(verify, /integrity/); write(`output/${RECEIPT}`, JSON.stringify(staged));
   write('mcp/package-lock.json', JSON.stringify({ version: '0.1.3', packages: { '': { version: '0.1.3' } } }));
   assert.throws(verify);
+});
+
+test('publication takes the newest package this run uploaded, never a stale or foreign one', () => {
+  const pkg = (attempt, patch = {}) => ({ name: `mcp-package-${SHA}-${attempt}`, expired: false,
+    workflow_run: { id: 123, head_sha: SHA }, ...patch });
+  const listing = (...artifacts) => ({ total_count: artifacts.length, artifacts });
+  const select = (artifacts, runAttempt = '2') => selectPackageAttempt(listing(...artifacts), { sourceCommit: SHA, runAttempt });
+  const other = { name: 'worker-bundles-x', expired: false, workflow_run: { id: 123, head_sha: SHA } };
+  assert.equal(select([pkg(1), other]), '1', 'failed jobs re-run: attempt 1 built the package');
+  assert.equal(select([pkg(1), pkg(2)]), '2', 'all jobs re-run: the newest package wins');
+  assert.equal(select([pkg(2), pkg(1)]), '2', 'GitHub lists the newest artifact first');
+  assert.equal(select([pkg(2)], '2'), '2');
+  assert.throws(() => select([pkg(1), pkg(3)]), /newer than the CI attempt/);
+  assert.throws(() => select([other]), /no tested MCP package/);
+  assert.throws(() => select([pkg(1, { expired: true })]), /expired; re-run all CI jobs/);
+  assert.throws(() => select([pkg(1, { workflow_run: { id: 123, head_sha: 'b'.repeat(40) } })]), /another commit/);
+  assert.throws(() => select([pkg('2x')]));
+  assert.throws(() => select([pkg(0)]));
+  assert.throws(() => selectPackageAttempt({ total_count: 101, artifacts: [pkg(1)] }, { sourceCommit: SHA, runAttempt: '2' }), /incomplete/);
 });
 
 test('release decisions are idempotent and never overwrite a version or downgrade latest', () => {
@@ -222,7 +246,8 @@ test('workflow publishes only the CI artifact, defaults to dry-run and serialize
   assert.match(workflow, /id-token: write/);
   assert.doesNotMatch(workflow, /contents: write|npm (?:ci|install|pack)|secrets\.|cache:/);
   assert.match(workflow, /run-id: \$\{\{ steps.run.outputs.runId \}\}/);
-  assert.match(workflow, /mcp-package-\$\{\{ steps.run.outputs.sourceCommit \}\}-\$\{\{ steps.run.outputs.runAttempt \}\}/);
+  assert.match(workflow, /mcp-package-\$\{\{ steps.run.outputs.sourceCommit \}\}-\$\{\{ steps.run.outputs.packageAttempt \}\}/);
+  assert.equal(workflow.match(/MCP_PACKAGE_ATTEMPT: \$\{\{ steps.run.outputs.packageAttempt \}\}/g)?.length, 2);
   assert.match(ci, /MCP_RELEASE_OUTPUT: \$\{\{ runner.temp \}\}\/mcp-release/);
   assert.match(ci, /mcp-package-\$\{\{ github.sha \}\}-\$\{\{ github.run_attempt \}\}/);
 });

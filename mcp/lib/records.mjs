@@ -65,11 +65,15 @@ const plaintextField = (value, hash) => ({
 
 const textHash = (value) => (typeof value === 'string' && value ? ethers.utils.id(value) : '');
 
-/** Self-declared participant marker stored with agent answers and statements. */
-export const buildParticipantMarker = ({ modelId = '', platform = '' } = {}) => ({
+/**
+ * Participant marker stored with agent answers and statements. Nothing in it is
+ * verified; `modelIdSetBy` and `platformSetBy` say whether the agent's host or
+ * the agent itself set each value.
+ */
+export const buildParticipantMarker = ({ modelId = '', platform = '', modelIdSetBy = '', platformSetBy = '' } = {}) => ({
   kind: 'agent',
-  ...(trim(modelId) ? { modelId: trim(modelId) } : {}),
-  ...(trim(platform) ? { platform: trim(platform) } : {}),
+  ...(trim(modelId) ? { modelId: trim(modelId), modelIdSetBy: modelIdSetBy === 'host' ? 'host' : 'agent' } : {}),
+  ...(trim(platform) ? { platform: trim(platform), platformSetBy: platformSetBy === 'host' ? 'host' : 'agent' } : {}),
   verification: 'self_reported',
 });
 
@@ -90,6 +94,10 @@ export const buildResponseRecord = ({
 }) => {
   if (!isRecord(question) || !trim(question.id)) return fail('Unknown question.');
   if (isLockedQuestion(question)) return fail('This question is locked to certain members; agents cannot answer locked questions yet.');
+  // Models often send votes keyed by option; say what shape is wanted.
+  if (question.type === 'quadratic' && !Array.isArray(value)) {
+    return fail('Quadratic answers are a list of signed whole-number votes, one per option in the question’s order, such as [2, -1, 0]: send the list, not an object keyed by option.');
+  }
   const answer = normalizeAnswerValue(question, value);
   if (!answer.ok) return answer;
   const note = trim(comment);

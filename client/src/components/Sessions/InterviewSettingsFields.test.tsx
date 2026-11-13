@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
-import InterviewSettingsFields from './InterviewSettingsFields';
+import InterviewSettingsFields, { DRAFT_TEXT_NEEDS_NEWER_WORKER } from './InterviewSettingsFields';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 it('exposes conservative generation defaults and an editable owner opening', () => {
   const onChange = jest.fn();
@@ -89,6 +89,35 @@ it('edits the share of hidden AI drafts, defaulting to off', () => {
   // A share set elsewhere still shows as what it is.
   rerender(<InterviewSettingsFields value={{ hiddenDraftShare: 0.3 }} onChange={onChange} />);
   expect(screen.getByLabelText(label)).toHaveDisplayValue('30%');
+});
+
+it('sets how many questions a group recording drafts and when, defaulting to at most 3, once at the end', () => {
+  const onChange = jest.fn();
+  const count = 'Group recording questions';
+  const timing = 'When group recording questions are written';
+  const { rerender } = render(
+    <InterviewSettingsFields value={{ steeringPrompt: 'Listen first.' }} onChange={onChange} />,
+  );
+  expect(screen.getByRole('combobox', { name: count })).toHaveValue('3');
+  expect(screen.getByRole('combobox', { name: count })).toHaveDisplayValue('up to 3');
+  expect(screen.getByLabelText(timing)).toHaveDisplayValue('once, at the end');
+  // How many and when are one setting under one "?".
+  expect(screen.getByRole('group', { name: count })).toContainElement(screen.getByLabelText(timing));
+  expect(screen.getByRole('combobox', { name: count })).toHaveAccessibleDescription(
+    /only questions the discussion clearly supports .* so fewer or none is normal/i,
+  );
+  fireEvent.change(screen.getByRole('combobox', { name: count }), { target: { value: '5' } });
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ recordingQuestionCount: 5, steeringPrompt: 'Listen first.' }),
+  );
+  rerender(<InterviewSettingsFields value={onChange.mock.lastCall?.[0]} onChange={onChange} />);
+  fireEvent.change(screen.getByLabelText(timing), { target: { value: 'chunk' } });
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ recordingQuestionCount: 5, recordingQuestionTiming: 'chunk' }),
+  );
+  rerender(<InterviewSettingsFields value={onChange.mock.lastCall?.[0]} onChange={onChange} />);
+  expect(screen.getByRole('combobox', { name: count })).toHaveValue('5');
+  expect(screen.getByLabelText(timing)).toHaveDisplayValue('after each part');
 });
 
 it('no longer offers the retired group suggestions box, and keeps a stored value as it is', () => {
@@ -393,6 +422,7 @@ it('explains each setting behind its own "?", not in text under it', () => {
   const explained = {
     'Share AI draft changes for research by default': /choices already saved stay as they are/,
     'AI draft research detail': /Minimal keeps none of the AI’s notes/,
+    'Keep AI draft text for admins': /stays until each person withdraws it\. Session backups leave it out/,
     'Hidden AI drafts': /how much seeing a draft sways answers/,
     'Interview voice model': /OpenAI live model/,
     'Opening question': /Owner-written: every interview opens with your question/,
@@ -412,4 +442,34 @@ it('explains each setting behind its own "?", not in text under it', () => {
   }
   expect(screen.queryByText(/^Sets the initial research-sharing checkbox/)).not.toBeInTheDocument();
   expect(screen.queryByText(/^Additions accumulate since/)).not.toBeInTheDocument();
+});
+
+describe('keeping AI draft text for admins', () => {
+  const label = 'Keep AI draft text for admins';
+
+  it('is off by default, offered only at minimal detail, and saved when turned on', () => {
+    const onChange = jest.fn();
+    const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} />);
+    expect(screen.getByLabelText(label)).toHaveValue('false');
+    fireEvent.change(screen.getByLabelText(label), { target: { value: 'true' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ keepDraftTextForAdmins: true }));
+    rerender(<InterviewSettingsFields value={{ researchDetail: 'full' }} onChange={onChange} />);
+    expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+  });
+
+  it('says an older Worker needs updating, and still lets it be turned off', () => {
+    const { rerender } = render(
+      <InterviewSettingsFields value={{}} onChange={jest.fn()} draftTextUnavailable={DRAFT_TEXT_NEEDS_NEWER_WORKER} />,
+    );
+    expect(screen.getByLabelText(label)).toBeDisabled();
+    expect(screen.getByText('Needs a newer Session Worker (0.9.6 or later).')).toBeInTheDocument();
+    rerender(
+      <InterviewSettingsFields
+        value={{ keepDraftTextForAdmins: true }}
+        onChange={jest.fn()}
+        draftTextUnavailable={DRAFT_TEXT_NEEDS_NEWER_WORKER}
+      />,
+    );
+    expect(screen.getByLabelText(label)).toBeEnabled();
+  });
 });

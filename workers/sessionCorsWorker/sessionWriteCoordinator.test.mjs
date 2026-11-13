@@ -2297,7 +2297,7 @@ test('SessionWriteCoordinator stores results-analysis drafts outside request led
 		reservationKey: 'rk-oversized',
 		attemptId: 'attempt-1',
 		success: true,
-		receipt: { ok: true, draft: { ...largeDraft, draftId: 'draft-too-large', artifact: { large: 'z'.repeat(1_700_000) } } },
+		receipt: { ok: true, draft: { ...largeDraft, draftId: 'draft-too-large', artifact: { large: 'z'.repeat(4_700_000) } } },
 	});
 	assert.equal(oversizedResult.ok, false);
 	assert.equal(oversizedResult.status, 413);
@@ -2306,6 +2306,7 @@ test('SessionWriteCoordinator stores results-analysis drafts outside request led
 	assert.equal(preserved.jobState, 'failed');
 	assert.equal(preserved.active, null);
 	assert.equal(preserved.lastFailure.status, 413);
+	assert.match(preserved.lastFailure.error, /^AI Views could not be saved: its answers and views come to 4\.9 million characters, over its limit of 4\.6 million .*Hidden questions are left out of AI Views/);
 	assert.equal(store.get('results-analysis-v1').requests['req-oversized'].state, 'failed');
 });
 

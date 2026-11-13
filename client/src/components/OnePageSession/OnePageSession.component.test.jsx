@@ -306,7 +306,7 @@ describe('OnePageSession view gating', () => {
     );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_AGENT_SIGN_IN_NOTICE)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.AGENT_HTTP_SIGN_IN_NOTICE)).not.toBeInTheDocument();
   });
 
   it('renders agent surfaces after token login and restores the web page after logout', async () => {
@@ -467,17 +467,17 @@ describe('OnePageSession view gating', () => {
       />,
     );
 
-    expect(await screen.findByTestId('ce-session-agent-questions')).toHaveTextContent(
+    expect(await screen.findByTestId('ce-agent-http-questions')).toHaveTextContent(
       /Should the client render Agent questions/i,
     );
-    expect(await screen.findByTestId('ce-session-agent-report-approx')).toHaveTextContent(/Approximate report/i);
+    expect(await screen.findByTestId('ce-agent-http-report-approx')).toHaveTextContent(/Approximate report/i);
     expect(await screen.findByTestId('ce-session-worker-groups')).toHaveTextContent(/Worker members/i);
     expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('ce-session-agent-logout'));
+    fireEvent.click(screen.getByTestId('ce-agent-http-logout'));
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-session-agent-questions')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-agent-http-questions')).not.toBeInTheDocument();
   });
 
   it('keeps /session/demo in the normal shell when stale session-meta belongs to another slug', () => {

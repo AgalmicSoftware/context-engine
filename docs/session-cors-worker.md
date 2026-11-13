@@ -669,6 +669,18 @@ Admin test panel:
   check happens before scanning storage, so another submission does not repeat
   a failing history scan. Each retry reloads the session's authoritative config,
   so a disabled AI scope or changed policy stops it.
+- AI Views keeps its views and every answer they cover (written answers up to
+  4,000 characters and comments up to 2,000) in the session's coordinator
+  object, up to about 4.6 million characters. At 53 questions each that is
+  about 480 people giving short answers (a short comment on one in ten), about
+  260 with a few written answers, or about 120 with ten long written answers
+  (1,500 characters) and long comments on half the answers; if every answer
+  and comment were as long as allowed, about 700 answers. A larger build fails with `413` and says how
+  large it was; the last AI Views stays. Hidden questions are left out of AI
+  Views, so hiding long written-answer questions it does not need brings a
+  build under the limit. Each Worker instance shares one read of the stored
+  views among the people opening them and may reuse it for up to a second; a
+  new build shows at once through the instance that made it.
 - Generated-results AI calls inherit the session's existing AI provider/model
   routing, especially the analysis/thinking assignment. They do not hardcode a
   separate provider or model. Inputs are submitted responses only; Circles is
@@ -1491,6 +1503,17 @@ that scope after the default session gate passes, and session configuration may
 still disable it explicitly. The legacy `arweave` compatibility scope applies
 only to storage routes. Group membership is visible to the worker/operator by
 design. This is the same trust domain as worker-enforced gates.
+
+Joins, leaves, and membership reads for different people run side by side in
+the session's group coordinator, one at a time per person, so a room joining one
+group at once is not served in single file. Group creates, edits, deletes,
+backups, and the recovery of a stranded group change still run alone, and no
+session config change lands while a group change is committing. A join that
+finds the coordinator busy answers `503` with
+`Session config coordination is unavailable; retry.` and its `reason`; joining
+again is a no-op that finishes an interrupted join, so the website and the MCP
+send it again after a short wait. A busy or timed-out join may still have landed;
+joining again then succeeds at once, even when the group is full.
 
 Member reads and roster pages use only canonical session-identity keys. Legacy
 slug-only or case-folded membership rows are ignored and never migrated during
@@ -2389,7 +2412,7 @@ The Worker checks these in order:
 - Route context: `404 Session config not found.` and fail-closed CORS rejection. Malformed or stale token authorization epochs return `401`. Config/token pairs with no epoch count as epoch zero until the first effective config update.
 - Scope and rate limit: per-scope `403 Token missing ... scope.` and `429 Rate limit exceeded.`. Outside `worker_canonical` sessions, `request_test_eth` may continue without the token's faucet scope when an SBT proof payload is present or the request funds the authenticated wallet. Every protected route re-evaluates the current default gate and its own resource gate; signed and current scope must both allow ordinary access, and policy-read failures return `403` before side effects.
 - Secrets: `401 Session secrets not configured.` before authenticated `ai`, `transcribe`, `arweave/upload`, and `request_test_eth` run.
-- Dispatch: secret path routes (`POST /transcribe`, `POST /arweave/upload`) run before JSON parsing. After `Expected application/json.` / `Invalid JSON.` checks, non-secret actions (`fetch_url`, `fetch_image`) run before secret actions (`/ai`, `request_test_eth`). AI dispatches to `anthropic`, `openai`, `openrouter` or `custom`; others get `400`. Anything else gets `404 Not found.`.
+- Dispatch: secret path routes (`POST /transcribe`, `POST /arweave/upload`) run before JSON parsing. After `Expected application/json.` / `Invalid JSON.` checks, non-secret actions (`fetch_url`, `fetch_image`) run before secret actions (`/ai`, `request_test_eth`). AI dispatches to `anthropic`, `openai`, `openrouter` or `custom`; others get `400`. Anything else gets `404 Not found.`. A request other than a POST to a path that is no route gets that `404` before the sign-in check, since the answer is the same either way; a POST may name its action in the body at any path, so it is checked for sign-in first.
 
 Anonymous exception (AI/transcribe/realtime interview only):
 
@@ -3281,11 +3304,14 @@ payloads are read. Session and per-payload authorization still apply; unavailabl
 metadata or denied own payloads fail the lookup rather than imply an empty history.
 The ordinary public listing contract and its UI cap are unchanged.
 
-This reuses the existing metadata index and requires no data migration. The own
-lookup follows all pages, including beyond the public UI's 100-page cap, and
-reads only the participant's payloads, in batches of eight. Metadata scanning
-still scales with total stored response versions; this is not a new per-user
-index. It uses the same Worker timestamp and storage-reference ordering as the
+This reuses the existing metadata index and requires no data migration. Each
+answer's index row carries its author in KV list metadata, so the own lookup
+passes over other people's answers without reading them: one request scans up
+to 10,000 index keys, 1,000 per KV list call, and reads only the participant's
+rows in bulk. Rows written before answers carried their author are read and
+checked as before, so older sessions stay correct, only slower. Each row read is
+still checked against the verified requester, whatever its list metadata says.
+The lookup follows all pages, including beyond the public UI's 100-page cap. It uses the same Worker timestamp and storage-reference ordering as the
 public cache to select the latest edits. Closing the interview or changing its
 identity cancels the in-flight lookup. Failures show **Retry saved answers** and
 do not enable submission. An older Worker lacking the scope/completeness fields

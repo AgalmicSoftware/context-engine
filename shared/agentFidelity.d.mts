@@ -71,6 +71,28 @@ export type SessionFidelityPair = FidelityPair & {
   origin: string;
   platform: string;
   modelId: string;
+  // Past chats, memories and connected sources the AI said it used, as one of CONTEXT_BUCKETS.
+  context: string;
+};
+
+// Every draft, freeform ones too; the changed flags are null when the record doesn't say.
+export type FidelityDraft = {
+  participantId: string;
+  questionId: string;
+  origin: string;
+  condition: FidelityCondition;
+  answerChanged: boolean | null;
+  commentChanged: boolean | null;
+  isAgent: boolean;
+};
+
+export type DraftOriginScore = {
+  predictions: number;
+  shownDrafts: number;
+  mirrorScore: FidelityEstimate;
+  hiddenMirrorScore: FidelityEstimate | null;
+  answersChanged: FidelityEstimate;
+  commentsChanged: FidelityEstimate;
 };
 
 export type FidelityOverview = {
@@ -86,23 +108,49 @@ export type FidelityOverview = {
     overall: FidelityEstimate;
     byCondition: Partial<Record<FidelityCondition, FidelityEstimate>>;
     byType: Record<string, FidelityEstimate>;
-    byOrigin: Record<string, FidelityEstimate>;
-    byPlatform: Record<string, FidelityEstimate>;
+    // Only the dividing tables the caller asked for.
+    byOrigin?: Record<string, FidelityEstimate>;
+    byPlatform?: Record<string, FidelityEstimate>;
+    byModel?: Record<string, FidelityEstimate>;
+    byContext?: Record<string, FidelityEstimate>;
   };
   correctionRate: FidelityEstimate;
   calibration: Partial<Record<FidelityCondition, FidelityCalibration>>;
 };
 
 export function resultsResponseRows(source: unknown): unknown[];
+export function latestResponseEntries(input: { questions?: unknown[]; payloads?: unknown[] }): {
+  entries: Array<{
+    participantId: string;
+    questionId: string;
+    question: { id: string; type: string };
+    entry: Record<string, unknown>;
+    payload: Record<string, unknown>;
+  }>;
+  skipped: { unknownQuestion: number; noParticipant: number };
+};
 export function collectSessionFidelityData(input: { questions?: unknown[]; payloads?: unknown[] }): {
   answers: unknown[];
   pairs: SessionFidelityPair[];
+  drafts: FidelityDraft[];
   skipped: Record<string, number>;
 };
+export const DRAFT_ORIGINS: string[];
+export const CONTEXT_BUCKETS: string[];
+export function contextUsedBucket(coverage: unknown): string;
+export function scoreDraftOrigins(input: {
+  questions?: unknown[];
+  pairs?: SessionFidelityPair[];
+  drafts?: FidelityDraft[];
+  options?: { bootstrapSamples?: number; seed?: number; minParticipants?: number };
+}): Record<string, DraftOriginScore>;
+export type FidelityDividingTable = 'byCondition' | 'byOrigin' | 'byPlatform' | 'byModel' | 'byContext';
+export const DIVIDING_TABLES: readonly FidelityDividingTable[];
 export function scoreFidelityOverview(input: {
   questions?: unknown[];
   pairs?: SessionFidelityPair[];
   options?: { bootstrapSamples?: number; seed?: number; minParticipants?: number };
+  tables?: readonly FidelityDividingTable[];
 }): FidelityOverview;
 export function fidelityPairsFromReview(input: { questions?: unknown[]; reviewed?: FidelityReviewEntry[] }): FidelityPair[];
 export function summarizeParticipantFidelity(input: {

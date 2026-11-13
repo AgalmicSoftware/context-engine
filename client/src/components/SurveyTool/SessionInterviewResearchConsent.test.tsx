@@ -162,3 +162,47 @@ describe('research detail wording', () => {
     expect(screen.getByText(/Unselected drafts, including original and edited values/)).toBeInTheDocument();
   });
 });
+
+describe('AI draft text for admins', () => {
+  const draftTextBox = () => screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_DRAFT_TEXT);
+
+  it('offers its own choice inside the details only where the session keeps the text', () => {
+    const onDraftTextChange = jest.fn();
+    const { rerender } = renderConsent({
+      includeComparison: true,
+      draftText: { checked: true, mixed: false },
+      onDraftTextChange,
+    });
+    expect(draftTextBox()).toBeChecked();
+    expect(
+      screen.getByText(/The session’s admins can read the text of the AI’s drafts.*nobody else can/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/turn this off on its own/)).toBeInTheDocument();
+    expect(screen.queryByText(/Drafted text is not kept/)).not.toBeInTheDocument();
+    fireEvent.click(draftTextBox()!);
+    expect(onDraftTextChange).toHaveBeenCalledWith(false);
+    rerender(
+      <SessionInterviewResearchConsent
+        packet={packet}
+        includeProvenance
+        includeComparison
+        onProvenanceChange={jest.fn()}
+        coverageDetails={[]}
+        selectedCount={1}
+        unselectedCount={2}
+        disabled={false}
+      />,
+    );
+    expect(draftTextBox()).not.toBeInTheDocument();
+    expect(screen.getByText(/Drafted text is not kept/)).toBeInTheDocument();
+  });
+
+  it('says so beside Share for research when the session keeps the text', () => {
+    const { rerender } = render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
+    expect(screen.getByText(/Includes the AI’s predicted answers/)).not.toHaveTextContent(/admins can read/);
+    rerender(<SessionInterviewResearchShare included disabled={false} draftTextOffered onChange={jest.fn()} />);
+    expect(screen.getByText(/Includes the AI’s predicted answers/)).toHaveTextContent(
+      /lets the session’s admins, and nobody else, read the AI’s drafted text; you can turn that off on its own/,
+    );
+  });
+});

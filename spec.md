@@ -569,7 +569,7 @@ Worker API (selected endpoints):
 
 Agent HTTP API families (selected):
 - `/api/agent/*`: Canonical scoped agent contract; supported routes and
-  credential requirements are listed in the Session Agent HTTP reference.
+  credential requirements are listed in the Agent HTTP reference.
 - `/api/agent/skill`: Current runtime instructions from
   `workers/sessionCorsWorker/agent/skills/ce-agent-access/SKILL.md`. The old
   `/telegram/agent/api/*` prefix is retired and returns 404.

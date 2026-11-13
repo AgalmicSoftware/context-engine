@@ -81,6 +81,48 @@ it('only invites requested revisions when all questions are already answered', (
   expect(instructions).not.toContain('Ask this opening question immediately');
 });
 
+it('invites revisions when every question is answered, and otherwise lists answered prompts within a bound', () => {
+  const all = normalizeInterviewQuestions(pool);
+  expect(buildRealtimeInterviewInstructions({ questions: all, answeredQuestions: all })).toContain(
+    'Ask which earlier answer, if any, the responder wants to change',
+  );
+  const many = normalizeInterviewQuestions(
+    Array.from({ length: 60 }, (_, index) => ({
+      id: `a${index}`,
+      prompt: `${'Long answered prompt '.repeat(12)}${index}?`,
+      type: 'freeform',
+    })),
+  );
+  const instructions = buildRealtimeInterviewInstructions({ questions: all.slice(0, 1), answeredQuestions: many });
+  expect(instructions).not.toContain('Ask which earlier answer');
+  const list = instructions.slice(instructions.indexOf('Already answered (reference only'));
+  expect(list.split('\n\n')[0].length).toBeLessThanOrEqual(4000);
+  expect(instructions).toContain(`[${all[0].id}]`);
+});
+
+it('gives the answered list only the room the open questions leave', () => {
+  const rows = (prefix: string, length: number) =>
+    normalizeInterviewQuestions(
+      Array.from({ length }, (_, index) => ({
+        id: `${prefix}${index}`,
+        prompt: `${'A long open question about council budgets '.repeat(6)}${index}?`,
+        type: 'freeform',
+      })),
+    );
+  const full = {
+    questions: rows('o', 120),
+    steeringPrompt: 's'.repeat(3000),
+    sessionContext: 'c'.repeat(6000),
+    previousTranscript: 'Interviewer: Why?\nResponder: Because.\n'.repeat(400),
+  };
+  const omitted = (text: string) => Number(/(\d+) question rows omitted/.exec(text)?.[1]);
+  const without = buildRealtimeInterviewInstructions(full);
+  const withAnswered = buildRealtimeInterviewInstructions({ ...full, answeredQuestions: rows('a', 60) });
+  // Only the one-sentence steer costs room; the list itself takes what is left, so at most one row more is omitted.
+  expect(omitted(withAnswered)).toBeLessThanOrEqual(omitted(without) + 1);
+  expect(withAnswered.length).toBeLessThanOrEqual(31_500);
+});
+
 it('preserves the original eligible duplicate selection before sorting', async () => {
   const duplicatePool = [
     ...pool,

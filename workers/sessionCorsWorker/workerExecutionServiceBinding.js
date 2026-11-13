@@ -170,6 +170,8 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
       isAddress: deps?.isAddress,
       getAddress: deps?.getAddress,
       putSessionConfig: deps?.putSessionConfig,
+      // Draft text export: only whoever may change the session config.
+      validateAdmin: deps?.validateAdmin,
       readResourceGateOnChain: deps?.readResourceGateOnChain,
       resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
       toRegistrySessionSlug: deps?.toRegistrySessionSlug,

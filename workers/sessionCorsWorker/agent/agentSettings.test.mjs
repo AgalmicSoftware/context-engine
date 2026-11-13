@@ -8,7 +8,7 @@ import {
   normalizeAgentSettingsPatch,
 } from './agentSettings.mjs';
 
-test('default session agent settings include question cadence preferences', () => {
+test('default Agent HTTP settings include question cadence preferences', () => {
   const defaults = defaultAgentSettings({});
   assert.equal(defaults.questionsPerBatch, 3);
   assert.equal(defaults.digestFrequency, 'weekly');

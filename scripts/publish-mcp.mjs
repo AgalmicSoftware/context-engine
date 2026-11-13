@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { PACKAGE, REPOSITORY, TARBALL, publicationDecision, validateRun, verifyArtifact } from './mcp-release-artifacts.mjs';
+import { PACKAGE, REPOSITORY, TARBALL, publicationDecision, selectPackageAttempt, validateRun, verifyArtifact }
+  from './mcp-release-artifacts.mjs';
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const gh = (path) => JSON.parse(execFileSync('gh', ['api', `repos/${REPOSITORY}/${path}`], {
@@ -74,6 +75,7 @@ async function main() {
     const run = gh(`actions/runs/${runId}`);
     const expected = validateRun(run, gh('branches/main').commit.sha);
     assert.equal(String(run.id), runId);
+    expected.packageAttempt = selectPackageAttempt(gh(`actions/runs/${runId}/artifacts?per_page=100`), expected);
     writeFileSync(resolve(process.env.RUNNER_TEMP, 'mcp-ci-run.json'), JSON.stringify(run));
     for (const [key, value] of Object.entries(expected)) appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
     return;
@@ -82,11 +84,11 @@ async function main() {
   assert(args.length === 1 && ['--dry-run', '--publish'].includes(args[0]));
   const run = readJson(resolve(process.env.RUNNER_TEMP, 'mcp-ci-run.json'));
   const directory = resolve(process.env.RUNNER_TEMP, 'mcp-release');
-  const receipt = verifyArtifact({ root: process.cwd(), directory, run });
+  const receipt = verifyArtifact({ root: process.cwd(), directory, run, packageAttempt: process.env.MCP_PACKAGE_ATTEMPT });
   const checkSource = () => {
     const freshRun = gh(`actions/runs/${run.id}`);
     const expected = validateRun(freshRun, gh('branches/main').commit.sha);
-    assert.equal(expected.runAttempt, receipt.runAttempt, 'CI was rerun; use the newest successful attempt');
+    assert.equal(expected.runAttempt, String(run.run_attempt), 'CI was rerun; use the newest successful attempt');
     assert.equal(expected.sourceCommit, receipt.sourceCommit);
   };
   const status = await publishVerified({

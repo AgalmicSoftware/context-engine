@@ -1,3 +1,4 @@
+import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -2910,4 +2911,31 @@ test('the KV removal checks the setting on a fresh request and finishes a replay
 	assert.doesNotMatch(kv.store.get(memberRecord), /"removedAt"/);
 	assert.equal((await executeWorkerGroupMutation({ ...leave, resume: true })).ok, true);
 	assert.match(kv.store.get(memberRecord), /"removedAt"/);
+});
+
+test('a busy join answers with the text clients wait on and send again; a refusal does not', async () => {
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: createMockKv() });
+	const join = (result) => workerGroupsRoute({
+		path: '/groups/join',
+		method: 'POST',
+		request: new Request('https://worker.example/groups/join', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ groupId: 'open-review' }),
+		}),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		baseHeaders: {},
+		deps: { json, executeCoordinatedWorkerGroupMutation: async () => result },
+	});
+	const busy = await join({ ok: false, status: 503, reason: 'worker_group_coordination_unavailable' });
+	assert.equal(busy.status, 503);
+	assert.deepEqual(busy.body, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: 'worker_group_coordination_unavailable' });
+	assert.equal(busy.headers.get('Retry-After'), '1');
+	const stuck = await join({ ok: false, status: 503, reason: 'worker_group_capacity_reconciliation_required' });
+	assert.equal(stuck.body.error, 'Worker group request failed.');
+	const refused = await join({ ok: false, status: 403, reason: 'worker_group_join_denied' });
+	assert.equal(refused.status, 403);
+	assert.equal(refused.body.error, 'Worker group request failed.');
 });

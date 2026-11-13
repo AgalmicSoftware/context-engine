@@ -8,7 +8,9 @@ import { getVoiceCredits } from './questions/quadraticAllocation.mjs';
 import { normalizeRatingScale, ratingStepFor } from './questions/ratingScale.mjs';
 import { readStoredRating } from './questions/storedRating.mjs';
 
-export const FIDELITY_METHOD_VERSION = 'ce-agent-fidelity-v1';
+// v2: the report's headline scores only predictions made before the person spoke; other draft origins get rows of
+// their own.
+export const FIDELITY_METHOD_VERSION = 'ce-agent-fidelity-v2';
 
 // shown: the person reviewed the AI's draft before answering.
 // blind: the draft stayed hidden until the person answered (randomized).
@@ -260,6 +262,30 @@ const readPlatform = (value) => {
   const platform = lower(value);
   return platform === 'chatgpt' || platform === 'claude' ? platform : platform ? 'other' : 'unknown';
 };
+// The model that made the first draft: its own revision says so for every origin (a voice draft's provenance
+// source can be the person's prefill packet); the self-reported source is the fallback.
+const readModelId = (provenance, source) => {
+  const revisions = provenance.predictionRevisions ?? provenance.predictionComparison?.revisions;
+  const first = Array.isArray(revisions) && isRecord(revisions[0]) ? text(revisions[0].modelId) : '';
+  return (first && first !== 'unknown' ? first : text(source.modelId)).slice(0, 80) || 'unknown';
+};
+// How much of the person's own material their AI said it drew on: past chats, memories and connected sources
+// used. A count the AI left out (null) adds nothing; with none reported the draft is 'not reported'.
+const CONTEXT_COUNTS = ['historyChatsUsed', 'memoryItemsUsed', 'connectedSourcesUsed'];
+export const CONTEXT_BUCKETS = ['not reported', 'none', '1-9', '10-49', '50+'];
+export const contextUsedBucket = (coverage) => {
+  const counts = isRecord(coverage)
+    ? CONTEXT_COUNTS.map((key) => numberOrNull(coverage[key])).filter((count) => count !== null && count >= 0)
+    : [];
+  if (!counts.length) return 'not reported';
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  return total === 0 ? 'none' : total < 10 ? '1-9' : total < 50 ? '10-49' : '50+';
+};
+// Whether the person's submitted answer or comment differs from the AI's draft, as recorded at submit.
+const changedField = (provenance, field) => {
+  const fields = provenance.changedFields ?? provenance.predictionComparison?.changedFields;
+  return Array.isArray(fields) ? fields.includes(field) : null;
+};
 const toMs = (value) => {
   const number = numberOrNull(value);
   if (number !== null) return number < 1e12 ? number * 1000 : number;
@@ -325,16 +351,14 @@ export const resultsResponseRows = (source) => {
 };
 
 /**
- * Reads stored session responses into final answers (everyone) and
- * prediction pairs (responses that kept their AI draft comparison). Only each
- * person's latest record for a question counts, so withdrawing research
- * consent or encrypting an answer later replaces what was shared before.
- * Latest is the order the Worker or the chain recorded rows in, or else the
- * input order; payload timestamps are never compared.
+ * Each person's latest stored response entry per question, as
+ * { participantId, questionId, question, entry, payload }. Latest is the order
+ * the Worker or the chain recorded rows in, or else the input order; payload
+ * timestamps are never compared.
  */
-export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {}) => {
+export const latestResponseEntries = ({ questions = [], payloads = [] } = {}) => {
   const questionMap = mapQuestions(questions);
-  const skipped = { unknownQuestion: 0, noParticipant: 0, unreadableAnswer: 0, unreadablePrediction: 0, freeformWithoutText: 0 };
+  const skipped = { unknownQuestion: 0, noParticipant: 0 };
   const records = [];
   for (const item of payloads) {
     for (const { entry, payload, row } of entriesOf(item)) {
@@ -353,9 +377,22 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       records.push({ participantId, questionId: question.id, question, entry, payload, recordedAt: recordedAt(row) });
     }
   }
+  return { entries: latestByKey(records).map(({ recordedAt: _recordedAt, ...record }) => record), skipped };
+};
+
+/**
+ * Reads stored session responses into final answers (everyone) and
+ * prediction pairs (responses that kept their AI draft comparison). Only each
+ * person's latest record for a question counts, so withdrawing research
+ * consent or encrypting an answer later replaces what was shared before.
+ */
+export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {}) => {
+  const latest = latestResponseEntries({ questions, payloads });
+  const skipped = { ...latest.skipped, unreadableAnswer: 0, unreadablePrediction: 0, freeformWithoutText: 0 };
   const answers = [];
   const pairs = [];
-  for (const { participantId, questionId, question, entry, payload } of latestByKey(records)) {
+  const drafts = [];
+  for (const { participantId, questionId, question, entry, payload } of latest.entries) {
     const final = normalizeFidelityAnswer(question, entry.answer);
     if (final === null) {
       skipped.unreadableAnswer += 1;
@@ -366,6 +403,18 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
     const provenance = isRecord(entry.interviewProvenance) ? entry.interviewProvenance : null;
     const original = provenance && (provenance.originalPrediction ?? provenance.predictionComparison?.original);
     if (!isRecord(original)) continue;
+    const condition = CONDITIONS.includes(provenance.predictionCondition) ? provenance.predictionCondition : 'shown';
+    const origin = inferDraftOrigin(provenance);
+    // Every draft, freeform ones too, for how often people changed what the AI drafted.
+    drafts.push({
+      participantId,
+      questionId,
+      origin,
+      condition,
+      answerChanged: changedField(provenance, 'answer'),
+      commentChanged: changedField(provenance, 'additionalComments'),
+      isAgent,
+    });
     // Minimal research records keep no drafted text, so freeform predictions arrive empty.
     if (question.type === 'freeform' && original.answer === null) {
       skipped.freeformWithoutText += 1;
@@ -376,7 +425,6 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       skipped.unreadablePrediction += 1;
       continue;
     }
-    const condition = CONDITIONS.includes(provenance.predictionCondition) ? provenance.predictionCondition : 'shown';
     // In the blind condition the measured answer is the one given before the
     // draft was revealed; a later change is recorded but not scored.
     const blindAnswer =
@@ -388,9 +436,10 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       participantId,
       questionId,
       condition,
-      origin: inferDraftOrigin(provenance),
+      origin,
       platform: readPlatform(source.platform),
-      modelId: text(source.modelId) || 'unknown',
+      modelId: readModelId(provenance, source),
+      context: contextUsedBucket(source.researchCoverage),
       prediction,
       actual: blindAnswer ?? final,
       confidence: readDraftConfidence(original.confidence),
@@ -406,7 +455,7 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       isAgent,
     });
   }
-  return { answers, pairs, skipped };
+  return { answers, pairs, drafts, skipped };
 };
 
 /**
@@ -433,6 +482,7 @@ export const collectWrappedFidelityPairs = ({ questions = [], rows = [] } = {}) 
       origin: 'wrapped_agent',
       platform: 'wrapped',
       modelId: text(row.model) || 'unknown',
+      context: 'not reported',
       prediction,
       actual,
       confidence: readPercentConfidence(row.agent_confidence),
@@ -497,13 +547,16 @@ const estimate = (values, options) => {
  * does, the smallest key behind a set that is too small is withheld.
  * `keysByPerson` lists each person's keys.
  */
-export const reportableKeys = (keysByPerson, min) => {
+export const reportableKeys = (keysByPerson, min, total = []) => {
+  if (keysByPerson.length < min) return [];
   const kept = new Set(keysByPerson.flat());
   const sizeOf = (key) => keysByPerson.filter((keys) => keys.includes(key)).length;
+  // `total` lists keys whose row is the total itself (on every draft of every person), so they divide no one.
+  const everyone = new Set(total);
   for (;;) {
     const sets = new Map();
     for (const keys of keysByPerson) {
-      const signature = JSON.stringify([...new Set(keys.filter((key) => kept.has(key)))].sort());
+      const signature = JSON.stringify([...new Set(keys.filter((key) => kept.has(key) && !everyone.has(key)))].sort());
       sets.set(signature, (sets.get(signature) ?? 0) + 1);
     }
     const small = [...sets].find(([, size]) => size < min);
@@ -766,15 +819,60 @@ const breakdown = (people, keyOf, valueOf, options) => {
 // Platforms and draft origins mostly divide people rather than their drafts,
 // so like groups, a key is also withheld when subtracting it from the total,
 // or from the other keys, would leave fewer than the minimum.
-const peopleBreakdown = (people, keyOf, valueOf, options) => {
-  const reportable = new Set(reportableKeys(people.map((person) => person.pairs.map(keyOf)), options.minParticipants));
+// `reportable` lists the keys that may be shown, when several breakdowns are withheld together.
+const peopleBreakdown = (people, keyOf, valueOf, options, reportable = null) => {
+  const shown = reportable ?? new Set(reportableKeys(people.map((person) => person.pairs.map(keyOf)), options.minParticipants));
   return Object.fromEntries(
     Object.entries(breakdown(people, keyOf, valueOf, options)).map(([key, result]) => [
       key,
-      reportable.has(key) ? result : withheld(result.participants),
+      shown.has(key) ? result : withheld(result.participants),
     ]),
   );
 };
+// Origin, platform, model and context each divide the same people, and a model sits inside its platform, so
+// subtracting one table's row from another's could reveal a few people's score. Each person counts whole, under the
+// key that made most of their drafts, so the rows split people (not drafts) and are withheld together, with the
+// condition rows (Session Wrapped people have only 'separate') and groups, which divide people too.
+const DIVIDING = {
+  byOrigin: (pair) => pair.origin,
+  byPlatform: (pair) => pair.platform,
+  byModel: (pair) => pair.modelId ?? 'unknown',
+  byContext: (pair) => pair.context ?? 'not reported',
+};
+const mainKey = (pairs, keyOf) => {
+  const counts = new Map();
+  for (const pair of pairs) counts.set(keyOf(pair), (counts.get(keyOf(pair)) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
+};
+export const DIVIDING_TABLES = Object.freeze(['byCondition', ...Object.keys(DIVIDING)]);
+// The keys each table may show, worked out together over `tables` (and groups, when `groupsOf` is given).
+// Only tables that are shown need to be in it: one that is never shown cannot be subtracted.
+const jointlyReportable = (people, settings, tables, groupsOf = null) => {
+  const keysOf = {
+    byCondition: (person) => [...new Set(person.pairs.map((pair) => pair.condition))],
+    ...Object.fromEntries(Object.entries(DIVIDING).map(([name, keyOf]) => [name, (person) => [mainKey(person.pairs, keyOf)]])),
+    byGroup: (person) => groupsOf(person.participantId),
+  };
+  const families = [...tables, ...(groupsOf ? ['byGroup'] : [])];
+  const keysByPerson = people.map((person) => families.flatMap((name) => keysOf[name](person).map((key) => JSON.stringify([name, key]))));
+  // A row everyone is in is the total itself, so it divides no one.
+  const total = [...new Set(keysByPerson.flat())].filter((key) => keysByPerson.every((keys) => keys.includes(key)));
+  const kept = reportableKeys(keysByPerson, settings.minParticipants, total).map((key) => JSON.parse(key));
+  return Object.fromEntries(families.map((name) => [name, new Set(kept.filter(([of]) => of === name).map(([, key]) => key))]));
+};
+const dividingBreakdowns = (people, settings, reportable) =>
+  Object.fromEntries(
+    Object.keys(reportable)
+      .filter((name) => name !== 'byGroup')
+      .map((name) => {
+        if (name === 'byCondition') {
+          const rows = breakdown(people, (pair) => pair.condition, meanSimilarity, settings);
+          return [name, Object.fromEntries(Object.entries(rows).map(([key, row]) => [key, reportable[name].has(key) ? row : withheld(row.participants)]))];
+        }
+        const main = new Map(people.map((person) => [person.participantId, mainKey(person.pairs, DIVIDING[name])]));
+        return [name, peopleBreakdown(people, (pair) => main.get(pair.participantId), meanSimilarity, settings, reportable[name])];
+      }),
+  );
 const meanSimilarity = (pairs) => mean(pairs.map((pair) => pair.similarity));
 const matchRate = (pairs) => mean(pairs.map((pair) => (pair.match ? 1 : 0)));
 
@@ -870,13 +968,11 @@ const coverageOf = ({ pairs, scored, measured, people, settings }) => ({
   excludedAgentPredictions: settings.includeAgents ? 0 : pairs.filter((pair) => pair.isAgent).length,
 });
 // Mirror Scores, the correction rate and calibration: each person counts once.
-const coreScores = (people, settings) => ({
+const coreScores = (people, settings, reportable) => ({
   mirrorScore: {
     overall: estimate(people.map((person) => meanSimilarity(person.pairs)), settings),
-    byCondition: breakdown(people, (pair) => pair.condition, meanSimilarity, settings),
     byType: breakdown(people, (pair) => pair.question.type, meanSimilarity, settings),
-    byOrigin: peopleBreakdown(people, (pair) => pair.origin, meanSimilarity, settings),
-    byPlatform: peopleBreakdown(people, (pair) => pair.platform, meanSimilarity, settings),
+    ...dividingBreakdowns(people, settings, reportable),
   },
   correctionRate: estimate(
     people.map((person) => {
@@ -895,7 +991,7 @@ const coreScores = (people, settings) => ({
  * baselines and typicality); `groups` maps participant ids to group ids (for
  * example position groups or the `src` link they arrived through).
  */
-export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], groups = {}, options = {} } = {}) => {
+export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], groups = {}, pseudonyms = null, options = {} } = {}) => {
   const settings = settingsFrom(options);
   const questionMap = mapQuestions(questions);
   const allowed = allowedBy(settings);
@@ -933,13 +1029,14 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
     };
   });
   const people = peopleOf(withBaselines);
-  const core = coreScores(people, settings);
+  const reportable = jointlyReportable(people, settings, DIVIDING_TABLES, groupsOf);
+  const core = coreScores(people, settings, reportable);
   const perPerson = (valueOf) => estimate(people.map((person) => valueOf(person.pairs)), settings);
   const groupSizes = new Map();
   for (const person of people) {
     for (const group of groupsOf(person.participantId)) groupSizes.set(group, (groupSizes.get(group) ?? 0) + 1);
   }
-  const reportedGroups = reportableKeys(people.map((person) => groupsOf(person.participantId)), settings.minParticipants);
+  const reportedGroups = [...reportable.byGroup].sort();
 
   // Unusual views: how similar each person's own answers are to everyone
   // else's, across every question they answered.
@@ -1077,13 +1174,15 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
     // people; groups are listed only when they meet the minimum.
     participants: enough
       ? people.map((person, index) => ({
-          id: `p${String(index + 1).padStart(3, '0')}`,
+          id: pseudonyms?.get(person.participantId) ?? `p${String(index + 1).padStart(3, '0')}`,
           predictions: person.pairs.length,
           mirrorScore: meanSimilarity(person.pairs),
           exactMatchRate: matchRate(person.pairs),
           typicality: typicality.get(person.participantId) ?? null,
           groups: groupsOf(person.participantId).filter((group) => reportedGroups.includes(group)),
-          origins: [...new Set(person.pairs.map((pair) => pair.origin))].sort(),
+          // Only the origin the person counts under in the origin table, and only when that row is shown,
+          // so a withheld row cannot be rebuilt from these.
+          origins: [mainKey(person.pairs, DIVIDING.byOrigin)].filter((origin) => reportable.byOrigin.has(origin)),
         }))
       : [],
   };
@@ -1095,7 +1194,7 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
  * of people and are too slow to rerun in the browser; what it returns matches
  * the same parts of scoreAgentFidelity.
  */
-export const scoreFidelityOverview = ({ questions = [], pairs = [], options = {} } = {}) => {
+export const scoreFidelityOverview = ({ questions = [], pairs = [], options = {}, tables = DIVIDING_TABLES } = {}) => {
   const settings = settingsFrom(options);
   const scored = scorePairs(pairs.filter(allowedBy(settings)), mapQuestions(questions));
   const measured = scored.filter((pair) => pair.similarity !== null);
@@ -1104,8 +1203,55 @@ export const scoreFidelityOverview = ({ questions = [], pairs = [], options = {}
     method: FIDELITY_METHOD_VERSION,
     options: { ...settings, excludeParticipants: settings.excludeParticipants.length },
     coverage: coverageOf({ pairs, scored, measured, people, settings }),
-    ...coreScores(people, settings),
+    // `tables` lists the dividing tables the caller shows; only those are withheld together, and only they are returned.
+    ...coreScores(people, settings, jointlyReportable(people, settings, tables.filter((name) => DIVIDING_TABLES.includes(name)))),
   };
+};
+
+// Where drafts come from, in report order.
+export const DRAFT_ORIGINS = ['external_prefill', 'voice_interview', 'typed_context', 'group_recording', 'wrapped_agent', 'unknown'];
+
+/**
+ * Each draft origin on its own row, never pooled: an AI prefill predicts the person from what their assistant
+ * knows, while interview, typed-context and recording drafts restate what the person just said, so they measure
+ * how faithfully it was captured. Per origin: the Mirror Score, the hidden-draft score, and how often people
+ * changed the answer (and comment) of a draft they were shown, freeform answers included. Rows that divide people
+ * are withheld like the platform rows.
+ */
+export const scoreDraftOrigins = ({ questions = [], pairs = [], drafts = [], options = {} } = {}) => {
+  const settings = settingsFrom(options);
+  const allowed = allowedBy(settings);
+  const people = peopleOf(scorePairs(pairs.filter(allowed), mapQuestions(questions)).filter((pair) => pair.similarity !== null));
+  const byOrigin = (list, valueOf) => peopleBreakdown(list, (item) => item.origin, valueOf, settings);
+  const mirror = byOrigin(people, meanSimilarity);
+  const hiddenPeople = people
+    .map((person) => ({ ...person, pairs: person.pairs.filter((pair) => pair.condition === 'blind') }))
+    .filter((person) => person.pairs.length);
+  const hidden = byOrigin(hiddenPeople, meanSimilarity);
+  const shownDrafts = drafts.filter(allowed).filter((draft) => draft.condition === 'shown');
+  const share = (field) => (list) => {
+    const known = list.filter((draft) => draft[field] !== null);
+    return known.length ? mean(known.map((draft) => (draft[field] ? 1 : 0))) : null;
+  };
+  const editors = peopleOf(shownDrafts);
+  const answersChanged = byOrigin(editors, share('answerChanged'));
+  const commentsChanged = byOrigin(editors, share('commentChanged'));
+  const scoredCount = (origin) => people.reduce((sum, person) => sum + person.pairs.filter((pair) => pair.origin === origin).length, 0);
+  const origins = new Set([...people.flatMap((person) => person.pairs), ...shownDrafts].map((item) => item.origin));
+  const order = [...DRAFT_ORIGINS.filter((origin) => origins.has(origin)), ...[...origins].filter((origin) => !DRAFT_ORIGINS.includes(origin)).sort()];
+  return Object.fromEntries(
+    order.map((origin) => [
+      origin,
+      {
+        predictions: scoredCount(origin),
+        shownDrafts: shownDrafts.filter((draft) => draft.origin === origin).length,
+        mirrorScore: mirror[origin] ?? withheld(0),
+        hiddenMirrorScore: hidden[origin] ?? null,
+        answersChanged: answersChanged[origin] ?? withheld(0),
+        commentsChanged: commentsChanged[origin] ?? withheld(0),
+      },
+    ]),
+  );
 };
 
 /**

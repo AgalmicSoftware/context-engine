@@ -17,12 +17,12 @@ const noopClick: React.MouseEventHandler<HTMLAnchorElement> = (event) => {
 const AgentBucketCards = ({ cards, onReconnect }: AgentBucketCardsProps): React.ReactElement => {
   if (cards === null) {
     return (
-      <section className={styles.agentListPanel} data-testid="ce-session-agent-buckets">
+      <section className={styles.agentListPanel} data-testid="ce-agent-http-buckets">
         <div className={styles.agentListEmpty}>Reconnect to refresh groups.</div>
         <button
           type="button"
           className={styles.agentSecondaryButton}
-          data-testid="ce-session-agent-buckets-reconnect"
+          data-testid="ce-agent-http-buckets-reconnect"
           onClick={onReconnect}
         >
           Reconnect
@@ -33,14 +33,14 @@ const AgentBucketCards = ({ cards, onReconnect }: AgentBucketCardsProps): React.
 
   if (!cards.length) {
     return (
-      <section className={styles.agentListPanel} data-testid="ce-session-agent-buckets">
+      <section className={styles.agentListPanel} data-testid="ce-agent-http-buckets">
         <div className={styles.agentListEmpty}>No group buckets are available for this participant.</div>
       </section>
     );
   }
 
   return (
-    <section className={styles.agentListPanel} data-testid="ce-session-agent-buckets">
+    <section className={styles.agentListPanel} data-testid="ce-agent-http-buckets">
       <div className={styles.agentBucketGrid}>
         {cards.map((card) => {
           const selected = card.options.filter((option) => option.selected);
@@ -67,7 +67,7 @@ const AgentBucketCards = ({ cards, onReconnect }: AgentBucketCardsProps): React.
                 <label className={styles.agentBucketSelect}>
                   <span>{card.categoryLabel}</span>
                   <select
-                    data-testid="ce-session-agent-bucket-select"
+                    data-testid="ce-agent-http-bucket-select"
                     value={selected[0]?.optionId || ''}
                     onChange={() => undefined}
                   >

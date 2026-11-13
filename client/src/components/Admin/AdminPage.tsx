@@ -54,6 +54,7 @@ import AdminStorageVisibilityPanel from './AdminStorageVisibilityPanel';
 import AdminWorkerCapabilities from './AdminWorkerCapabilities';
 import AdminSessionDiagnostics from './AdminSessionDiagnostics';
 import AdminSessionBackupPanel from './AdminSessionBackupPanel';
+import AdminDraftTextPanel from './AdminDraftTextPanel';
 import { resolveAdminCapabilityRoute, resolveAdminSessionRecoveryMessage } from './adminPageCapabilityRoutingHelpers';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
@@ -2622,6 +2623,14 @@ const AdminPageRuntime = ({
           canAdminWorker={canAdminWorker}
           postSignedRequest={postSignedAdminRequest}
         />
+        {selectedConfig && isWorkerCanonicalSession ? (
+          <AdminDraftTextPanel
+            workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+            sessionSlug={normalizeSlug(selectedSlug)}
+            sessionConfig={selectedConfig}
+            canAdminWorker={canAdminWorker}
+          />
+        ) : null}
 
         <AdminPageWorkerSecretsPanel
           workerSecretsOpen={workerSecretsOpen}

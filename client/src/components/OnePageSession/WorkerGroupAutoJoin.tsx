@@ -15,6 +15,7 @@ import {
   isWorkerGroupAutoJoinCancelled,
   rememberWorkerGroupAutoJoinCancellation,
 } from '../../domains/worker/workerGroupAutoJoinPreference';
+import { BUSY_WORKER_GROUP_JOIN_MESSAGE, isBusyWorkerGroupError } from '../../domains/worker/workerGroupBusy';
 import WorkerGroupAutoJoinNotice from './WorkerGroupAutoJoinNotice';
 import styles from './WorkerGroupAutoJoinNotice.module.scss';
 
@@ -36,6 +37,7 @@ const subscribeLocation = (notify: () => void) => {
 };
 const readLocation = () => `${window.location.pathname}${window.location.search}`;
 const autoJoinErrorMessage = (error: unknown): string => {
+  if (isBusyWorkerGroupError(error)) return BUSY_WORKER_GROUP_JOIN_MESSAGE;
   const reason = error instanceof Error ? error.message : '';
   if (reason === 'worker_group_member_cap_exceeded' || reason === 'worker_group_session_cap_exceeded')
     return 'This group has reached its member limit.';

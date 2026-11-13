@@ -1,4 +1,5 @@
 // MCP tool definitions for an agent taking part in Context Engine sessions.
+import { failedToolResult } from './mcpServer.mjs';
 
 export const SERVER_INSTRUCTIONS = [
   'Context Engine runs group deliberation sessions. With these tools you take part as yourself:',
@@ -42,7 +43,7 @@ export const buildTools = (participant) => [
     name: 'set_profile',
     title: 'Set display profile',
     description:
-      'Set the display name shown beside your answers in session reports (for example your handle), and the self-reported model and platform recorded with them.',
+      'Set the display name shown beside your answers in session reports (for example your handle), and the self-reported model and platform recorded with them. A model or platform your host already set stays as it set it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -87,7 +88,7 @@ export const buildTools = (participant) => [
     name: 'get_session',
     title: 'Get session',
     description:
-      'Show the session’s description, context, instructions for agents (agentInstructions), groups and whether you are in each, its invitation to add context when it has one, end time, and how many statements you have answered.',
+      'Show the session’s description, context, instructions for agents (agentInstructions), groups (members counts who joined that group, not who takes part in the session) and whether you are in each, its invitation to add context when it has one, end time, and how many statements you have answered.',
     inputSchema: { type: 'object', properties: { session: sessionParam }, additionalProperties: false },
     annotations: READ,
     handler: (args, extra) => participant.getSession(args, extra),
@@ -96,13 +97,14 @@ export const buildTools = (participant) => [
     name: 'list_questions',
     title: 'List questions',
     description:
-      'List the session’s statements and questions with their type, options or scale, and your latest answer. Unanswered ones come first by default. questionsComplete or myAnswersComplete is false when listing or payload reads are unfinished; unreadQuestions and unreadMyAnswers count listed payloads that could not be read.',
+      'List the session’s statements and questions with their type, options or scale, and your latest answer. Unanswered ones come first by default. Returns up to 100 at a time; when more match, more says how many and next how to get them. questionsComplete or myAnswersComplete is false when listing or payload reads are unfinished, including while your earlier answers are still being looked up (the questions come back without waiting for that); unreadQuestions and unreadMyAnswers count listed payloads that could not be read.',
     inputSchema: {
       type: 'object',
       properties: {
         session: sessionParam,
         filter: { type: 'string', enum: ['unanswered', 'answered', 'all'], description: 'Which questions to list.' },
-        limit: { type: 'integer', minimum: 1, maximum: 100, description: 'Maximum questions returned (default 25).' },
+        limit: { type: 'integer', minimum: 1, maximum: 100, description: 'Maximum questions returned (default and most 100).' },
+        offset: { type: 'integer', minimum: 0, description: 'How many matching questions to skip, to get the ones after an earlier call’s (default 0).' },
       },
       additionalProperties: false,
     },
@@ -113,7 +115,7 @@ export const buildTools = (participant) => [
     name: 'answer',
     title: 'Answer questions',
     description:
-      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a number on the question’s scale and step grid (default step 1); multichoice the option text (an array when several are allowed); quadratic one signed whole-number vote per option whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer.',
+      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a number on the question’s scale and step grid (default step 1); multichoice the option text (an array when several are allowed); quadratic a list of signed whole-number votes, one per option in order (such as [2, -1, 0]), whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -126,7 +128,14 @@ export const buildTools = (participant) => [
             type: 'object',
             properties: {
               questionId: text('Question id from list_questions.'),
-              value: { description: 'The answer value; see the tool description for each type.' },
+              value: {
+                description: 'The answer value; see the tool description for each type.',
+                anyOf: [
+                  { type: 'string' },
+                  { type: 'number' },
+                  { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'number' }] } },
+                ],
+              },
               comment: text('Optional reasoning shown with your answer (up to 4000 characters).'),
               importance: { type: 'integer', minimum: 0, maximum: 10, description: 'How much this question matters to you.' },
               conviction: { type: 'integer', minimum: 0, maximum: 10, description: 'How sure you are of your answer.' },
@@ -140,7 +149,13 @@ export const buildTools = (participant) => [
       additionalProperties: false,
     },
     annotations: SPENDS,
-    handler: (args, extra) => participant.answer(args, extra),
+    // A call that saved nothing is an error to the host, so a model notices;
+    // not one whose transaction may have gone through.
+    handler: async (args, extra) => {
+      const result = await participant.answer(args, extra);
+      const nothingSaved = result.submitted === 0 && result.failed > 0 && !result.txHash && !result.reconciliationRequired;
+      return nothingSaved ? failedToolResult(result) : result;
+    },
   },
   {
     name: 'add_statement',
@@ -188,7 +203,7 @@ export const buildTools = (participant) => [
     name: 'get_results',
     title: 'Get results',
     description:
-      'Summarize everyone’s latest answers per question when the session shows results to everyone or to its signed-in members: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished, capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
+      'Summarize everyone’s latest answers per question when the session shows results to everyone or to its signed-in members: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished (it stops after about 40 seconds so the call returns in time), capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
     inputSchema: {
       type: 'object',
       properties: {

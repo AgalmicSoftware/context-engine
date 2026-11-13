@@ -7,6 +7,12 @@ import { buildFieldEncryptionWorkGroups, verifyEncryptionIntegrity } from './sur
 import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import { syncDraftText } from './sessionInterviewDraftText';
+
+jest.mock('./sessionInterviewDraftText', () => ({
+  ...jest.requireActual<Record<string, unknown>>('./sessionInterviewDraftText'),
+  syncDraftText: jest.fn(async () => undefined),
+}));
 
 const envelopeFixture = (overrides: Record<string, unknown> = {}) =>
   JSON.stringify({
@@ -222,6 +228,38 @@ describe('surveyQuestionsSubmitRuntime', () => {
     context.inst._getEffectiveDraftSlug.mockReturnValue('different-session');
     await runtime.encryptAndUpload();
     expect(context.inst._submitOperationId).not.toBe(second);
+  });
+
+  it('deletes withdrawn AI draft text even when the session changes during the upload', async () => {
+    jest.mocked(syncDraftText).mockClear();
+    const context = createContext();
+    // The session no longer keeps text, but the earlier saved answer did; this submit withdraws it.
+    context.propsRef.current.sessionConfig = { interviewMode: { keepDraftTextForAdmins: false } };
+    context.stateRef.current.editBaseline = { interviewProvenance: { q1: { draftTextConsent: true } } };
+    context.submitSurveyResponse.mockImplementationOnce(async () => {
+      context.inst._getEffectiveDraftSlug.mockReturnValue('next-session');
+      context.stateRef.current.editBaseline = {};
+      return { __ceQuestionResponses: [{ questionID: 'q1', interviewProvenance: {} }] };
+    });
+    const outcome = await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    expect(outcome).toEqual(expect.objectContaining({ status: 'stale' }));
+    expect(jest.mocked(syncDraftText)).toHaveBeenCalledWith(
+      { put: [], remove: ['q1'] },
+      expect.objectContaining({ sessionSlug: 'draft-edge' }),
+    );
+  });
+
+  it('leaves AI draft text alone when another account signs in during the upload', async () => {
+    jest.mocked(syncDraftText).mockClear();
+    const context = createContext();
+    context.propsRef.current.sessionConfig = { interviewMode: { keepDraftTextForAdmins: true } };
+    context.submitSurveyResponse.mockImplementationOnce(async () => {
+      context.propsRef.current.account = '0xdef';
+      return { __ceQuestionResponses: [{ questionID: 'q1', interviewProvenance: {} }] };
+    });
+    const outcome = await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    expect(outcome).toEqual(expect.objectContaining({ status: 'stale' }));
+    expect(jest.mocked(syncDraftText)).not.toHaveBeenCalled();
   });
 
   it('builds Lit encryption options from recipient gates and current hooks', () => {

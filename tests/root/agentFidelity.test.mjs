@@ -5,12 +5,14 @@ import {
   answerSimilarity,
   collectSessionFidelityData,
   collectWrappedFidelityPairs,
+  contextUsedBucket,
   inferDraftOrigin,
   normalizeFidelityAnswer,
   normalizeFidelityQuestion,
   reportableKeys,
   resultsResponseRows,
   scoreAgentFidelity,
+  scoreDraftOrigins,
   scoreFidelityOverview,
   fidelityPairsFromReview,
   summarizeParticipantFidelity,
@@ -829,4 +831,284 @@ test('minimal freeform predictions are counted as unscored, not unreadable', () 
   });
   assert.equal(pairs.length, 0);
   assert.deepEqual([skipped.freeformWithoutText, skipped.unreadablePrediction], [1, 0]);
+});
+
+test('the drafting model and the context it used come from the draft itself', () => {
+  const coverage = (historyChatsUsed, memoryItemsUsed = null, connectedSourcesUsed = null) => ({
+    historyChatsUsed,
+    memoryItemsUsed,
+    connectedSourcesUsed,
+  });
+  const { pairs } = collectSessionFidelityData({
+    questions,
+    payloads: [
+      {
+        responder: '0xfff0000000000000000000000000000000000006',
+        response: {
+          responses: [
+            // A voice draft's source can be the person's prefill packet; its own revision names the interview model.
+            entry('qb1', 'Agree', predicted('Agree', 0.8, {
+              predictionRevisions: [{ revision: 1, modelId: 'interview-model' }],
+              source: { platform: 'claude', modelId: 'claude-test', researchCoverage: coverage(3) },
+            })),
+            entry('qb2', 'Agree', predicted('Agree', 0.8, { predictionRevisions: [{ revision: 1, modelId: 'unknown' }] })),
+          ],
+        },
+      },
+    ],
+  });
+  const of = (questionId) => pairs.find((pair) => pair.questionId === questionId);
+  assert.deepEqual([of('qb1').modelId, of('qb1').context], ['interview-model', '1-9']);
+  assert.deepEqual([of('qb2').modelId, of('qb2').context], ['claude-test', 'not reported'], 'an unknown revision falls back on the source');
+  assert.equal(contextUsedBucket(null), 'not reported');
+  assert.equal(contextUsedBucket(coverage(null)), 'not reported', 'counts the AI left out are not zero');
+  assert.equal(contextUsedBucket(coverage(-2)), 'not reported');
+  assert.equal(contextUsedBucket(coverage(0, 0, 0)), 'none');
+  assert.equal(contextUsedBucket(coverage(0, null)), 'none');
+  assert.equal(contextUsedBucket(coverage(9)), '1-9');
+  assert.equal(contextUsedBucket(coverage(5, 5)), '10-49');
+  assert.equal(contextUsedBucket(coverage(49, null, 1)), '50+');
+});
+
+test('every draft records whether its answer or comment changed, freeform ones too', () => {
+  const { drafts, pairs } = collectSessionFidelityData({
+    questions,
+    payloads: [
+      {
+        responder: '0xeee0000000000000000000000000000000000005',
+        response: {
+          responses: [
+            entry('qf', 'My answer', predicted(null, 0.5, { draftOrigin: 'voice_interview', changedFields: ['answer'] })),
+            entry('qb1', 'Agree', predicted('Agree', 0.5, {
+              draftOrigin: 'group_recording',
+              predictionCondition: 'blind',
+              predictionComparison: { changedFields: ['additionalComments'] },
+            })),
+            entry('qb2', 'Agree', predicted('Agree', 0.5)),
+          ],
+        },
+      },
+    ],
+  });
+  assert.equal(pairs.length, 2, 'the minimal freeform draft is not scored');
+  const of = (questionId) => drafts.find((draft) => draft.questionId === questionId);
+  assert.deepEqual(
+    [of('qf').origin, of('qf').condition, of('qf').answerChanged, of('qf').commentChanged],
+    ['voice_interview', 'shown', true, false],
+  );
+  assert.deepEqual([of('qb1').origin, of('qb1').condition, of('qb1').answerChanged, of('qb1').commentChanged], ['group_recording', 'blind', false, true]);
+  assert.deepEqual([of('qb2').answerChanged, of('qb2').commentChanged], [null, null], 'records without the list say nothing');
+});
+
+test('each draft origin is scored on its own row, withheld like platforms', () => {
+  // Common-view people's AIs prefill their view; unusual-view people are interviewed, and the interview gets them wrong.
+  const voice = (person) => person.group === 'unusual';
+  const pairs = pairsFor(
+    (person) => (voice(person) ? 'Agree' : person.view),
+    (person, questionId) => ({
+      origin: voice(person) ? 'voice_interview' : 'external_prefill',
+      ...(questionId === 'qb4' ? { condition: 'blind' } : {}),
+    }),
+  );
+  const draftsOf = (pair) => ({ ...pair, answerChanged: pair.prediction !== pair.actual, commentChanged: false });
+  const drafts = [
+    ...pairs.map(draftsOf),
+    // A freeform voice draft one person rewrote, an agent's change and an excluded person's change.
+    { participantId: people[6].id, questionId: 'qf', origin: 'voice_interview', condition: 'shown', answerChanged: true, commentChanged: true },
+    { participantId: '0xagent', questionId: 'qb1', origin: 'external_prefill', condition: 'shown', answerChanged: true, isAgent: true },
+    { participantId: people[0].id.toUpperCase(), questionId: 'qf', origin: 'external_prefill', condition: 'shown', answerChanged: true },
+  ];
+  const options = { bootstrapSamples: 50, minParticipants: 3, excludeParticipants: [people[0].id] };
+  const rows = scoreDraftOrigins({ questions, pairs, drafts, options });
+  assert.deepEqual(Object.keys(rows), ['external_prefill', 'voice_interview']);
+  const prefill = rows.external_prefill;
+  assert.deepEqual([prefill.predictions, prefill.shownDrafts, prefill.mirrorScore.value, prefill.mirrorScore.participants], [20, 15, 1, 5]);
+  assert.equal(prefill.hiddenMirrorScore.value, 1);
+  assert.equal(prefill.answersChanged.value, 0, 'agents and excluded people are left out');
+  const interview = rows.voice_interview;
+  assert.deepEqual([interview.mirrorScore.value, interview.hiddenMirrorScore.value, interview.mirrorScore.participants], [0, 0, 4]);
+  // Three of three shown choice drafts changed for each, and one person's freeform answer too.
+  assert.equal(interview.answersChanged.value, 1);
+  assert.ok(Math.abs(interview.commentsChanged.value - 1 / 16) < 1e-12, 'one comment in four shown drafts for one of four people');
+  // With a minimum of 5 the four interviewed people are too few, and the prefill row would be the rest of them.
+  const strict = scoreDraftOrigins({ questions, pairs, drafts, options: { ...options, minParticipants: 5 } });
+  assert.deepEqual(strict.voice_interview.mirrorScore, { value: null, interval: null, participants: 4, suppressed: true });
+  assert.equal(strict.external_prefill.mirrorScore.suppressed, true);
+  assert.equal(strict.external_prefill.answersChanged.suppressed, true);
+});
+
+test('Mirror Scores break down by the drafting model and the context it used', () => {
+  const pairs = pairsFor(
+    (person) => (person.group === 'common' ? person.view : 'Agree'),
+    (person) => (person.group === 'common' ? { modelId: 'model-a', context: '1-9' } : { modelId: 'model-b', context: undefined }),
+  );
+  const report = scoreAgentFidelity({ questions, pairs, answers: answersFor(), options: fast });
+  assert.deepEqual([report.mirrorScore.byModel['model-a'].value, report.mirrorScore.byModel['model-b'].value], [1, 0]);
+  assert.equal(report.mirrorScore.byContext['1-9'].participants, 6);
+  assert.equal(report.mirrorScore.byContext['not reported'].value, 0, 'a draft without context is not reported');
+  // Five people on one model: the other's one person could be worked out from the total.
+  const lone = pairsFor((person) => person.view, (person) => ({ modelId: person === people[9] ? 'model-b' : 'model-a' }));
+  const withheld = scoreAgentFidelity({ questions, pairs: lone, answers: answersFor(), options: fast });
+  assert.equal(withheld.mirrorScore.byModel['model-a'].suppressed, true);
+});
+
+test('a minimum of 1 withholds nothing that has people behind it', () => {
+  // One person's hidden draft and one person's 35% band, which a minimum of 5 withholds.
+  const pairs = pairsFor(
+    (person, questionId) => (questionId === 'qb2' ? 'Agree' : person.view),
+    (person, questionId) => ({
+      platform: person === people[9] ? 'chatgpt' : 'claude',
+      modelId: person === people[9] ? 'model-b' : 'model-a',
+      ...(person === people[0] && questionId === 'qb4' ? { condition: 'blind' } : {}),
+      ...(person === people[0] && questionId === 'qb1' ? { confidence: 0.35 } : {}),
+    }),
+  );
+  const groups = Object.fromEntries(people.map((person, index) => [person.id, index === 9 ? 'one' : 'rest']));
+  const options = { bootstrapSamples: 50, minParticipants: 1 };
+  const report = scoreAgentFidelity({ questions, pairs, answers: answersFor(), groups, options });
+  const origins = scoreDraftOrigins({ questions, pairs, drafts: pairs.map((pair) => ({ ...pair, answerChanged: false, commentChanged: false })), options });
+  const withheld = [];
+  const walk = (node, at) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.suppressed && node.participants > 0 && !node.equallyTypical) withheld.push(at);
+    for (const [key, value] of Object.entries(node)) walk(value, `${at}.${key}`);
+  };
+  walk(report, 'report');
+  walk(origins, 'origins');
+  assert.deepEqual(withheld, []);
+  assert.equal(report.mirrorScore.byPlatform.chatgpt.participants, 1);
+  assert.equal(report.mirrorScore.byGroup.one.participants, 1);
+  assert.equal(report.mirrorScore.byCondition.blind.participants, 1);
+  assert.equal(report.participants.length, 10);
+});
+
+test('a model or context row is withheld when another table would let it be subtracted out', () => {
+  // Claude: seven on one model, three on another; ChatGPT: six and six. Each model row alone is big enough or not,
+  // but Claude's platform row minus its larger model's row would be the three people's score.
+  const crowd = Array.from({ length: 22 }, (_, index) => ({
+    id: `0x${String(index + 100).padStart(40, '0')}`,
+    platform: index < 10 ? 'claude' : 'chatgpt',
+    modelId: index < 7 ? 'sonnet' : index < 10 ? 'opus' : index < 16 ? 'gpt-a' : 'gpt-b',
+  }));
+  const pairs = crowd.flatMap((person) =>
+    statements.map((questionId) => ({
+      participantId: person.id,
+      questionId,
+      condition: 'shown',
+      origin: 'external_prefill',
+      platform: person.platform,
+      modelId: person.modelId,
+      prediction: person.modelId === 'opus' ? 'Disagree' : 'Agree',
+      actual: 'Agree',
+      confidence: 0.9,
+    })),
+  );
+  const { mirrorScore } = scoreAgentFidelity({ questions, pairs, options: { bootstrapSamples: 50, minParticipants: 5 } });
+  assert.equal(mirrorScore.byModel.opus.suppressed, true);
+  assert.ok(
+    mirrorScore.byPlatform.claude.suppressed || mirrorScore.byModel.sonnet.suppressed,
+    'Claude minus Sonnet would be the three Opus users',
+  );
+  // Keys everyone shares only repeat the total, so they are shown and don't hide the rest.
+  assert.equal(mirrorScore.byContext['not reported'].participants, 22);
+  assert.equal(mirrorScore.byContext['not reported'].suppressed, undefined);
+  // Nor can the total minus every shown row leave a few people.
+  const shownKey = (person) => !mirrorScore.byPlatform[person.platform].suppressed || !mirrorScore.byModel[person.modelId].suppressed;
+  const uncovered = crowd.filter((person) => !shownKey(person)).length;
+  assert.ok(uncovered === 0 || uncovered >= 5, `${uncovered} people left over`);
+  assert.equal(mirrorScore.byPlatform.chatgpt.value, 1);
+});
+
+test('each person counts whole under their main model, so a row everyone is in is the total', () => {
+  // All six used model-a, but two had half their drafts from model-b: the total minus model-a's row would be
+  // those two people's model-b score.
+  const six = people.slice(0, 6);
+  const pairsOf = (mixed) =>
+    six.flatMap((person, index) =>
+      statements.map((questionId, at) => {
+        const other = mixed && index < 2 && at < 2;
+        return {
+          participantId: person.id,
+          questionId,
+          condition: 'shown',
+          origin: 'external_prefill',
+          platform: 'claude',
+          modelId: other ? 'model-b' : 'model-a',
+          prediction: other ? 'Disagree' : 'Agree',
+          actual: 'Agree',
+          confidence: 0.9,
+        };
+      }),
+    );
+  const options = { bootstrapSamples: 50, minParticipants: 5 };
+  // Each person counts whole under the model that wrote most of their drafts; the two mixed people had two of
+  // each, and the tie goes to model-a, so its row is everyone, the same as the total.
+  const mixed = scoreAgentFidelity({ questions, pairs: pairsOf(true), options }).mirrorScore;
+  assert.deepEqual(Object.keys(mixed.byModel), ['model-a']);
+  assert.equal(mixed.byModel['model-a'].value, mixed.byPlatform.claude.value);
+  const single = scoreAgentFidelity({ questions, pairs: pairsOf(false), options }).mirrorScore;
+  assert.equal(single.byModel['model-a'].value, 1, 'one model for every draft is the total, so it is shown');
+  assert.equal(single.byPlatform.claude.value, 1);
+});
+
+// One person per entry, four statements each; `score` is the share of drafts that match.
+const crowdPairs = (crowd) =>
+  crowd.flatMap((person, index) =>
+    statements.map((questionId, at) => ({
+      participantId: `0x${String(index + 500).padStart(40, '0')}`,
+      questionId,
+      condition: person.condition ?? 'shown',
+      origin: person.origin ?? 'external_prefill',
+      platform: person.platform ?? 'claude',
+      modelId: person.modelId ?? 'model-a',
+      prediction: at < (person.score ?? 1) * 4 ? 'Agree' : 'Disagree',
+      actual: 'Agree',
+      confidence: 0.9,
+    })),
+  );
+
+test('Results withholds platforms only against the tables it shows', () => {
+  // Ten people on each platform, models split seven and three inside each: the model rows would let the platform
+  // rows be subtracted down to three people, but Results shows no model rows, so its platforms can be shown.
+  const crowd = ['claude', 'chatgpt'].flatMap((platform) =>
+    Array.from({ length: 10 }, (_, index) => ({ platform, modelId: `${platform}-${index < 7 ? 'a' : 'b'}` })),
+  );
+  const input = { questions, pairs: crowdPairs(crowd), options: { bootstrapSamples: 50, minParticipants: 5 } };
+  const full = scoreFidelityOverview(input).mirrorScore;
+  assert.equal(full.byModel['claude-b'].suppressed, true);
+  const results = scoreFidelityOverview({ ...input, tables: ['byCondition', 'byPlatform'] }).mirrorScore;
+  assert.equal(results.byPlatform.claude.value, 1);
+  assert.equal(results.byPlatform.chatgpt.value, 1);
+  assert.equal(results.byModel, undefined, 'a table not asked for is not returned');
+});
+
+test('the separate-condition row is withheld with the origin rows it would reveal', () => {
+  // Four prefill people and five Session Wrapped people: the total minus the Wrapped people's 'separate' row would
+  // be the four prefill people's score, which the origin row withholds.
+  const crowd = [
+    ...Array.from({ length: 4 }, () => ({ score: 0.5 })),
+    ...Array.from({ length: 5 }, () => ({ condition: 'separate', origin: 'wrapped_agent', platform: 'wrapped', score: 1 })),
+  ];
+  const report = scoreAgentFidelity({ questions, pairs: crowdPairs(crowd), options: { bootstrapSamples: 50, minParticipants: 5 } });
+  assert.equal(report.mirrorScore.overall.participants, 9);
+  assert.equal(report.mirrorScore.byOrigin.external_prefill.suppressed, true);
+  assert.equal(report.mirrorScore.byCondition.separate.suppressed, true);
+  // Per-person rows name no origin whose row is withheld.
+  assert.equal(report.participants.length, 9);
+  assert.deepEqual([...new Set(report.participants.flatMap((person) => person.origins))], []);
+});
+
+test('group rows are withheld with the platform rows they would reveal', () => {
+  // Seven on Claude, five of them in one invite group: Claude minus the group would be two people.
+  const crowd = [
+    ...Array.from({ length: 7 }, (_, index) => ({ platform: 'claude', score: index < 5 ? 1 : 0.5 })),
+    ...Array.from({ length: 6 }, () => ({ platform: 'chatgpt' })),
+  ];
+  const pairs = crowdPairs(crowd);
+  const groups = Object.fromEntries(crowd.slice(0, 5).map((_, index) => [`0x${String(index + 500).padStart(40, '0')}`, 'invite']));
+  const { mirrorScore } = scoreAgentFidelity({ questions, pairs, groups, options: { bootstrapSamples: 50, minParticipants: 5 } });
+  assert.ok(
+    mirrorScore.byPlatform.claude.suppressed || !mirrorScore.byGroup.invite,
+    'Claude minus the invite group would be two people',
+  );
 });

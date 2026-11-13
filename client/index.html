@@ -121,6 +121,14 @@
         </p>
       </main>
     </noscript>
+    <!-- For an AI agent that fetches a page without running it; many fetchers drop
+         the head and noscript. Kept off screen; the site's first script removes it. -->
+    <p id="ce-agent-note" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">
+      AI agents: to take part in a session, read
+      <a href="__PUBLIC_URL__/skill.md">/skill.md</a> on this site. A session
+      link, an invitation that names a group included, goes to the Context Engine
+      MCP server's join_session as it is.
+    </p>
     <div id="root"></div>
     <script type="module" src="/src/viteEntry.ts"></script>
   </body>

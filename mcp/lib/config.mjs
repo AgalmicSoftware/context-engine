@@ -9,9 +9,10 @@ const LOCAL_APP_ORIGINS = Object.freeze(['http://localhost:3000', 'http://127.0.
 
 const SETTINGS = Object.freeze({
   CE_MCP_STATE_DIR: 'Directory holding this agent’s key and joined sessions.',
+  CE_MCP_PRIVATE_KEY: 'This agent’s private key, for hosts that keep no files between runs; used instead of the key file.',
   CE_MCP_DISPLAY_NAME: 'Name shown beside this agent’s answers in session reports.',
-  CE_MCP_MODEL_ID: 'Self-reported model identifier recorded with each answer.',
-  CE_MCP_PLATFORM: 'Self-reported agent platform or harness recorded with each answer.',
+  CE_MCP_MODEL_ID: 'Model identifier recorded with each answer as set by the host; set_profile cannot change it.',
+  CE_MCP_PLATFORM: 'Agent platform or harness recorded with each answer as set by the host; set_profile cannot change it.',
   CE_MCP_APP_ORIGIN: 'An additional Context Engine web origin the agent may sign in as.',
   CE_MCP_RPC_URL: 'JSON-RPC endpoint for registry participation and SBT claims, overriding the public default.',
   CE_MCP_ALLOW_LOCAL_WORKERS: 'Set to 1 to allow http://localhost Workers and a local chain during development.',
@@ -73,8 +74,14 @@ export const readConfig = (env = process.env) => {
   const appOrigin = trim(env.CE_MCP_APP_ORIGIN)
     ? normalizeHttpOrigin(env.CE_MCP_APP_ORIGIN, 'CE_MCP_APP_ORIGIN')
     : DEFAULT_APP_ORIGIN;
+  const privateKey = trim(env.CE_MCP_PRIVATE_KEY);
+  // Checked before startup so a bad value fails early; its text is never quoted.
+  if (privateKey && !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
+    throw new Error('CE_MCP_PRIVATE_KEY must be 0x and 64 hexadecimal digits.');
+  }
   return {
     stateDir,
+    privateKey,
     profile: {
       displayName: normalizeLabel(env.CE_MCP_DISPLAY_NAME, 'CE_MCP_DISPLAY_NAME'),
       modelId: normalizeLabel(env.CE_MCP_MODEL_ID, 'CE_MCP_MODEL_ID'),

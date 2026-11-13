@@ -523,6 +523,38 @@ describe('saving the edit page through the Session Worker', () => {
     expect(off.result.config.interviewMode).not.toHaveProperty('groupSuggestionData');
   });
 
+  it('saves how many questions a group recording drafts, and when, and the Worker refuses values out of range', () => {
+    const edit = (changes) => (draft) => {
+      draft.interviewMode = { ...draft.interviewMode, ...normalizeInterviewSettings(draft.interviewMode), ...changes };
+    };
+    const stored = publishedSession();
+    expect(stored.interviewMode).not.toHaveProperty('recordingQuestionCount');
+    expect(stored.interviewMode).not.toHaveProperty('recordingQuestionTiming');
+    const perChunk = editAndSave(stored, edit({ recordingQuestionCount: 5, recordingQuestionTiming: 'chunk' }));
+    expect(perChunk.result).toMatchObject({ ok: true });
+    expect(perChunk.result.config.interviewMode).toMatchObject({
+      recordingQuestionCount: 5,
+      recordingQuestionTiming: 'chunk',
+    });
+    expect(
+      normalizeInterviewSettings(projectPublicWorkerSessionConfig(perChunk.result.config).interviewMode),
+    ).toMatchObject({ recordingQuestionCount: 5, recordingQuestionTiming: 'chunk' });
+    for (const wrong of [
+      { recordingQuestionCount: 11 },
+      { recordingQuestionCount: 2.5 },
+      { recordingQuestionTiming: 'sometimes' },
+    ]) {
+      const result = workerSave(stored, { interviewMode: { ...stored.interviewMode, ...wrong } });
+      expect(result).toMatchObject({ ok: false });
+    }
+    const back = editAndSave(
+      perChunk.result.config,
+      edit({ recordingQuestionCount: 3, recordingQuestionTiming: 'end' }),
+    );
+    expect(back.save.patch.interviewMode).not.toHaveProperty('recordingQuestionCount');
+    expect(back.result.config.interviewMode).not.toHaveProperty('recordingQuestionTiming');
+  });
+
   it('saves the Session Agent as the Worker stores it, without signing anyone out, and turns it off with null', () => {
     const stored = publishedSession();
     expect(stored).not.toHaveProperty('sessionAgent');

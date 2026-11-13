@@ -1695,9 +1695,9 @@ export const recordInterviewProvenance = (
   consentOverrides?: InterviewConsentOverrides,
 ) => {
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
-  const sessionResearchDetail = normalizeInterviewSettings(
+  const { researchDetail: sessionResearchDetail, keepDraftTextForAdmins } = normalizeInterviewSettings(
     (engine.props?.sessionConfig as { interviewMode?: unknown } | undefined)?.interviewMode,
-  ).researchDetail;
+  );
   // Full detail only when the session asks for it and the participant was shown it.
   const researchTier =
     sessionResearchDetail === 'full' && consentOverrides?.researchDetail !== 'minimal' ? 'full' : 'minimal';
@@ -1747,6 +1747,12 @@ export const recordInterviewProvenance = (
           const comparison =
             consentOverrides?.includePredictionComparison ??
             (consentOverrides && saved ? flags.includePredictionComparison : includePredictionComparison);
+          // Drafted text is kept for admins only at minimal detail; at full it is already in the record.
+          const draftText =
+            comparison &&
+            keepDraftTextForAdmins &&
+            researchTier === 'minimal' &&
+            (consentOverrides?.includeDraftText ?? (consentOverrides && saved ? flags.includeDraftText : true));
           const name =
             consentOverrides && saved && consentOverrides.includeResponderName === undefined
               ? String(saved.responderName || '')
@@ -1758,6 +1764,7 @@ export const recordInterviewProvenance = (
             version: 1,
             includeAiProvenance: ai,
             includePredictionComparison: comparison,
+            ...(draftText ? { includeDraftText: true } : {}),
             ...(ai
               ? {
                   source: normalizedSource,

@@ -66,7 +66,7 @@ describe('setup question suggestions', () => {
     expect(before).toContain('Write for residents, not experts.');
     expect(before).toContain('- The library should open on Sundays.');
     expect(prompt).toContain(
-      'Write 5 questions, using only these types: binary,freeform,rating,multichoice,quadratic.',
+      'Write at most 5 questions, using only these types: binary,freeform,rating,multichoice,quadratic.',
     );
     expect(prompt).toContain('Suggested tags: budget, library.');
   });
@@ -127,6 +127,14 @@ describe('setup question suggestions', () => {
       },
     ]);
     expect(() => readSuggestedQuestions({ output: [] })).toThrow('The AI sent no questions. Try again.');
+  });
+
+  it('takes no drafts as an answer, and only unusable drafts as an error', () => {
+    const sent = (questions: unknown[]) => ({ output_text: JSON.stringify({ surveyTitle: 'Drafts', questions }) });
+    expect(readSuggestedQuestions(sent([]))).toEqual([]);
+    expect(() => readSuggestedQuestions(sent([{ prompt: ' ', questionType: 'binary' }]))).toThrow(
+      'The AI sent no usable questions. Try again.',
+    );
   });
 
   it('needs context: text, links or a file the AI reads', () => {

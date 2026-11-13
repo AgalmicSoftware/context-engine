@@ -14,7 +14,7 @@ import { resolveAdminRequestAuthority } from './adminRequestAuthority.js';
 import { buildAdminActionBodyHash } from './adminTypedData.mjs';
 import { updateSessionSecretsAfterLitRepair, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization } from './sessionLitAuthorizationCoordinator.js';
 import { ethers } from 'ethers';
-import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
+import { SESSION_CONFIG_CACHE_MS, readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { createOutboundUrlSafetyHelpersWithWorkerDeps } from './outboundUrlSafetyBinding.js';
 
 const ACTOR_A = `0x${'aa'.repeat(20)}`;
@@ -649,7 +649,7 @@ test('public ungated storage routes require coordinator availability and report 
   }
 });
 
-test('anonymous storage and artifact reads use current gates despite stale public KV policy', async () => {
+test('anonymous storage and artifact reads use current gates despite stale public KV policy', async (t) => {
   const config = { slug: 'fixture', adminAddress: ACTOR_A,
     storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
   const f = createFixture(config);
@@ -670,6 +670,9 @@ test('anonymous storage and artifact reads use current gates despite stale publi
   f.kv.set('session:fixture:config', JSON.stringify(config));
   for (const path of paths) assert.equal((await shell.fetch(new Request(`https://worker.example${path}`), f.env)).status, 401);
   assert.equal(released, 3);
+  // Signed-out reads may reuse a config for a second; once it expires, an outage fails closed.
+  const later = Date.now() + SESSION_CONFIG_CACHE_MS + 1;
+  t.mock.method(Date, 'now', () => later);
   f.env.CE_SESSION_COORDINATOR.get = () => { throw new Error('synthetic coordination outage'); };
   for (const path of paths) assert.equal((await shell.fetch(new Request(`https://worker.example${path}`), f.env)).status, 503);
   assert.equal(released, 3);

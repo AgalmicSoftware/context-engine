@@ -55,7 +55,7 @@ flowchart LR
 |-------|-------------|--------------|-----------------|
 | **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
 | **Session Worker** | Auth, canonical config, AI proxy, transcription, storage routes, controlled URL/image fetch, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
-| **Session Agent HTTP** | Scoped Agent HTTP, submission queue, Session Wrapped, and atomically coordinated one-time invite exchange | Integrated domain modules using canonical Session Worker authority | `workers/sessionCorsWorker/agent/` |
+| **Agent HTTP** | Scoped `/api/agent/*` routes, submission queue, Session Wrapped, and atomically coordinated one-time invite exchange | Integrated domain modules using canonical Session Worker authority | `workers/sessionCorsWorker/agent/` |
 | **Cloudflare storage** | Worker KV config, secrets, payloads and indexes (Worker-encrypted when selected), and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
@@ -321,8 +321,11 @@ match current config and re-evaluates the current default plus route-specific
 gate. Registry gate changes therefore take effect on the next request;
 authority-sensitive config changes invalidate previously issued tokens, while
 content edits such as the session's name, context, agent instructions or
-interview settings sign no one out (`shared/sessionConfigEdits.mjs`). The
-mandatory Session coordinator
+interview settings sign no one out (`shared/sessionConfigEdits.mjs`). A sign-out
+everywhere, or making a session private, can take up to one second to reach
+every request: answers and reads by people the config does not name may reuse a
+Worker instance's config read for that long, while admin actions and config
+changes always read it fresh. The mandatory Session coordinator
 Durable Object serializes nonce issue/consume and per-route counters across
 isolates; nonce state is stored only in the coordinator, without redundant KV mirrors.
 

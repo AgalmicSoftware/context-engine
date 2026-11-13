@@ -420,7 +420,7 @@ IndexedDB wallet metadata without a passkey prompt; signing still unlocks the
 wallet first.
 
 Both Settings logout and agent logout share client-auth teardown: Worker tokens
-and all session agent credentials are cleared, pending requests/logins are
+and all Agent HTTP credentials are cleared, pending requests/logins are
 invalidated, mounted views and account state reset, and the saved passkey wallet
 is disconnected. Returning to a session cannot restore authorization until a
 fresh login. This local cleanup does not revoke server tokens.

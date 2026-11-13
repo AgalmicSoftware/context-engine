@@ -16,9 +16,10 @@ const log = (message) => process.stderr.write(`context-engine-mcp: ${message}\n`
 console.log = console.info = console.debug = console.warn = (...args) => console.error(...args);
 
 const main = async () => {
-  const config = readConfig(process.env);
-  const { wallet, created } = await loadOrCreateWallet(config.stateDir);
-  log(`${created ? 'created' : 'loaded'} agent address ${wallet.address} (state: ${config.stateDir})`);
+  // The key goes no further than loading the wallet.
+  const { privateKey, ...config } = readConfig(process.env);
+  const { wallet, created } = await loadOrCreateWallet(config.stateDir, { privateKey });
+  log(`${created ? 'created' : 'loaded'} agent address ${wallet.address} (${privateKey ? 'key from CE_MCP_PRIVATE_KEY, ' : ''}state: ${config.stateDir})`);
   const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const participant = createParticipant({ config, wallet, sbt: createSbtClaimer({ config, wallet }) });
   const server = createMcpServer({

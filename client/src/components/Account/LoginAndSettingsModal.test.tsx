@@ -2019,7 +2019,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 });
 
-test('settings logout clears every session agent credential before a later visit', async () => {
+test('settings logout clears every Agent HTTP credential before a later visit', async () => {
   const expiry = '2035-01-01T00:00:00.000Z';
   const envelopes = ['alpha', 'beta'].map((sessionSlug) => ({
     v: 3 as const,

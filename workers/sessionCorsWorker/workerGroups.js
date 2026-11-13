@@ -1,4 +1,5 @@
-import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
+import { callSessionConfigCoordinator, logCoordinatorFailure } from './sessionConfigAuthority.js';
+import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import { normalizeWorkerGroupUrl } from '../../shared/workerGroupUrl.mjs';
 import {
 	normalizeWorkerSessionSlug,
@@ -1545,6 +1546,13 @@ export const executeWorkerGroupMutation = async ({
 	return { ok: false, status: 400, reason: 'worker_group_mutation_invalid' };
 };
 
+// Group answers that a moment's wait clears; the rest need someone to act.
+const TRANSIENT_WORKER_GROUP_REASONS = new Set([
+	'worker_group_coordination_unavailable',
+	'worker_group_membership_state_pending',
+	'worker_group_mutation_ambiguous',
+]);
+
 const workerGroupCoordinationUnavailable = () => ({
 	ok: false,
 	status: 503,
@@ -1569,19 +1577,24 @@ const callWorkerGroupCoordinator = async ({ env, slug, sessionId, path, payload 
 		return workerGroupCoordinationUnavailable();
 	}
 	if (!stub?.fetch) return workerGroupCoordinationUnavailable();
+	let response = null;
 	try {
-		const response = await stub.fetch(`https://session-coordinator.internal${path}`, {
+		response = await stub.fetch(`https://session-coordinator.internal${path}`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ ...payload, slug: sessionSlug, sessionId: canonicalSessionId }),
 		});
 		const result = await response.json().catch(() => null);
-		if (!result || typeof result !== 'object') return workerGroupCoordinationUnavailable();
+		if (!result || typeof result !== 'object') {
+			logCoordinatorFailure(`worker-groups${path}`, new Error('No JSON reply.'), { status: response.status });
+			return workerGroupCoordinationUnavailable();
+		}
 		return {
 			...result,
 			status: Number(result.status || 0) || response.status,
 		};
-	} catch {
+	} catch (error) {
+		logCoordinatorFailure(`worker-groups${path}`, error, response ? { status: response.status } : {});
 		return workerGroupCoordinationUnavailable();
 	}
 };
@@ -2270,6 +2283,13 @@ export const workerGroupsRoute = async ({
 			principal: actor.principal,
 			actorPrincipal: actor.principal,
 		});
+		// Joining again is a no-op and finishes an interrupted join, so a busy
+		// answer carries the text and the wait clients use to send it again.
+		if (!result.ok && result.status === 503 && TRANSIENT_WORKER_GROUP_REASONS.has(result.reason)) {
+			const headers = new Headers(baseHeaders || {});
+			headers.set('Retry-After', '1');
+			return jsonResponse(deps, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: result.reason || 'worker_group_failed' }, 503, headers);
+		}
 		if (!result.ok) return routeError(deps, result, baseHeaders);
 		if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
 			return routeError(deps, { status: 503, reason: 'worker_group_projection_unavailable' }, baseHeaders);

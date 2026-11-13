@@ -6,6 +6,7 @@ import SessionWizardInfoTooltip from './SessionWizardInfoTooltip';
 import { Input, Label } from 'reactstrap';
 import {
   DEFAULT_INTERVIEW_SETTINGS,
+  MAX_RECORDING_QUESTION_COUNT,
   normalizeInterviewSettings,
   type GroupSuggestionDataKind,
 } from '../../../../shared/interviewSettings.mjs';
@@ -54,6 +55,8 @@ const RESEARCH_SHARING_HELP =
   'Whether the box that shares someone’s AI draft changes for research starts ticked on new answers. Each person can change it before submitting, and choices already saved stay as they are.';
 const RESEARCH_DETAIL_HELP =
   'What a shared draft comparison saves. Minimal keeps none of the AI’s notes or drafted text, which suits public sessions; Full also keeps them and drafts for skipped questions.';
+const DRAFT_TEXT_HELP =
+  'People who share for research can also let this session’s config admins read the AI’s drafted answers and comments; nobody else can, and no AI feature or Results uses it. Each person can turn it off. Turning this off stops collecting; text already kept stays until each person withdraws it. Session backups leave it out, so download it from Admin before deleting the session or restoring it from a backup.';
 const HIDDEN_DRAFTS_HELP =
   'Hides this share of each participant’s AI prefill drafts until they answer, to measure how much seeing a draft sways answers. Only for participants sharing draft changes for research.';
 const VOICE_MODEL_HELP = `The OpenAI live model that holds voice interviews. Keep ${DEFAULT_REALTIME_INTERVIEW_MODEL} unless you need another; the session’s OpenAI key must have access to it.`;
@@ -62,6 +65,8 @@ const OPENING_HELP =
 const OWNER_OPENING_HELP = 'The question every voice interview opens with, up to 1,200 characters.';
 const STEERING_HELP =
   'Extra instructions for the AI interviewer, such as what to explore or how to speak, up to 3,000 characters. They are saved in the session’s public settings, so anyone can read them.';
+const RECORDING_QUESTIONS_HELP =
+  'The most draft questions the AI writes from a group recording, and when. It writes only questions the discussion clearly supports and the session doesn’t already ask, so fewer or none is normal. Once, at the end: when the recording stops; recording more afterwards can add one more. After each part: every three minutes, from the conversation so far. Changing it needs a Session Worker from 0.9.6 on.';
 const GROWTH_HELP =
   'How many questions must be added, as a share of those there were, counted since the last opening or interview update and rounded up; at 20%, 42 questions need nine more.';
 
@@ -115,8 +120,18 @@ type Props = {
   disabled?: boolean;
   // Where voice interviews can be off while these settings show, as in /admin, this turns them on.
   onTurnOnInterviews?: () => void;
+  // Why AI draft text can't be kept for admins here (an older Worker, or no Session Worker); empty when it can.
+  draftTextUnavailable?: string;
 };
-export default function InterviewSettingsFields({ value, onChange, disabled = false, onTurnOnInterviews }: Props) {
+export const DRAFT_TEXT_NEEDS_WORKER = 'Needs a session hosted on a Session Worker.';
+export const DRAFT_TEXT_NEEDS_NEWER_WORKER = 'Needs a newer Session Worker (0.9.6 or later).';
+export default function InterviewSettingsFields({
+  value,
+  onChange,
+  disabled = false,
+  onTurnOnInterviews,
+  draftTextUnavailable = '',
+}: Props) {
   const id = useId();
   const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
   const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
@@ -187,6 +202,23 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
           <option value="full">Full: also the AI&apos;s notes, drafted text and drafts for skipped questions</option>
         </Input>
       </HelpField>
+      {settings.researchDetail === 'minimal' ? (
+        <HelpField htmlFor={`${id}-draft-text`} label="Keep AI draft text for admins" help={DRAFT_TEXT_HELP}>
+          <Input
+            id={`${id}-draft-text`}
+            type="select"
+            value={String(settings.keepDraftTextForAdmins)}
+            // Where it can't be stored, turning it off stays possible.
+            disabled={!!draftTextUnavailable && !settings.keepDraftTextForAdmins}
+            onChange={(e) => change('keepDraftTextForAdmins', e.target.value === 'true')}
+            aria-describedby={setupHelpId(`${id}-draft-text`)}
+          >
+            <option value="false">Off</option>
+            <option value="true">On</option>
+          </Input>
+          {draftTextUnavailable ? <div>{draftTextUnavailable}</div> : null}
+        </HelpField>
+      ) : null}
       <HelpField htmlFor={`${id}-hidden-drafts`} label="Hidden AI drafts" help={HIDDEN_DRAFTS_HELP}>
         <Input
           id={`${id}-hidden-drafts`}
@@ -255,6 +287,35 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
           aria-describedby={setupHelpId(`${id}-steering`)}
           onChange={(e) => change('steeringPrompt', e.target.value)}
         />
+      </HelpField>
+      <HelpField htmlFor={`${id}-recording-count`} label="Group recording questions" help={RECORDING_QUESTIONS_HELP}>
+        {/* How many and when are one setting, under one "?". */}
+        <div role="group" aria-label="Group recording questions" style={ROW}>
+          <Input
+            id={`${id}-recording-count`}
+            type="select"
+            style={{ width: 'auto' }}
+            value={String(settings.recordingQuestionCount)}
+            aria-describedby={setupHelpId(`${id}-recording-count`)}
+            onChange={(e) => change('recordingQuestionCount', Number(e.target.value))}
+          >
+            {Array.from({ length: MAX_RECORDING_QUESTION_COUNT }, (_, index) => (
+              <option key={index} value={String(index + 1)}>
+                up to {index + 1}
+              </option>
+            ))}
+          </Input>
+          <Input
+            type="select"
+            style={{ width: 'auto' }}
+            aria-label="When group recording questions are written"
+            value={settings.recordingQuestionTiming}
+            onChange={(e) => change('recordingQuestionTiming', e.target.value === 'end' ? 'end' : 'chunk')}
+          >
+            <option value="end">once, at the end</option>
+            <option value="chunk">after each part</option>
+          </Input>
+        </div>
       </HelpField>
       {(
         [

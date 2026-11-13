@@ -31,6 +31,10 @@ const URLS = /\b[a-z][\w+.-]*:\/\/[^\s"'`]+/gi;
 // Example links such as /session/<slug> are not endpoints.
 const hostOnly = (url) => (/<\w+>/.test(url) ? url : url.replace(/^([^:]+:\/\/)(?:[^/?#]*@)?([^/?#]*)[\s\S]*$/, '$1$2'));
 
+// A tool's reply that reports nothing done, so the host marks it isError.
+const TOOL_FAILED = Symbol('toolFailed');
+export const failedToolResult = (value) => Object.defineProperty(value, TOOL_FAILED, { value: true });
+
 export const describeError = (error) => {
   const text = String(error?.message || error || '').slice(0, MAX_ERROR_LENGTH);
   const cut = text.search(DIAGNOSTICS);
@@ -68,10 +72,10 @@ export const createMcpServer = ({
       ...(annotations ? { annotations } : {}),
     }));
 
-  const toolResult = (value, isError = false) => {
+  const toolResult = (value, isError = value?.[TOOL_FAILED] === true) => {
     const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
     const result = { content: [{ type: 'text', text }] };
-    if (!isError && isRecord(value) && protocolVersion >= STRUCTURED_CONTENT_SINCE) {
+    if (isRecord(value) && protocolVersion >= STRUCTURED_CONTENT_SINCE) {
       result.structuredContent = value;
     }
     if (isError) result.isError = true;

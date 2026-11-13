@@ -35,19 +35,19 @@ flowchart TD
   Hosted --> NativeTemplate["native Deploy to Cloudflare template<br/>token-free dashboard handoff"]
   NativeTemplate --> HostedWorker
   HostedWorker --> CloudflareStorage["Cloudflare KV payload/index storage<br/>optional existing R2"]
-  AgentClient["Agent/tool client or agent token browser login"] --> SessionAgent["Session Worker agent modules<br/>scoped HTTP and Session Wrapped"]
-  SessionAgent --> HostedWorker
+  AgentClient["Agent/tool client or agent token browser login"] --> AgentHttp["Session Worker agent modules<br/>scoped HTTP and Session Wrapped"]
+  AgentHttp --> HostedWorker
   Trustless --> Contracts["Public EVM contracts<br/>SessionRegistry, Surveys, SBTFactory, CustomSBT"]
   Trustless --> Arweave["Arweave metadata and payloads"]
   Trustless --> WorkerServices["profile-enabled session worker services<br/>AI, auth, fetch, Arweave routes"]
-  SessionAgent --> WorkerServices
-  SessionAgent -.->|policy-enabled direct submit| Contracts
+  AgentHttp --> WorkerServices
+  AgentHttp -.->|policy-enabled direct submit| Contracts
   Company -.-> OrgAdapters["Planned IAM, key release/KMS, storage,<br/>AI, networking, observability adapters"]
   PublicRelease["public release tree"] --> Browser
   PublicRelease --> HostedWorker
   PublicRelease --> NativeTemplate
   PublicRelease --> DeployHelper
-  PublicRelease --> SessionAgent
+  PublicRelease --> AgentHttp
   AggregateCI["successful aggregate CI<br/>tested Worker bytes + provenance"] --> ImmutableWorkerRelease["immutable SHA-keyed Worker release"]
   ImmutableWorkerRelease --> AutomaticLatest["automatic verified Latest<br/>current default-branch tip"]
   ImmutableWorkerRelease --> ProtectedPromotion["manual protected stable/previous<br/>and Latest rollback"]

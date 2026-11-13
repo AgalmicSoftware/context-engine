@@ -107,10 +107,34 @@ const loadOrCreateKey = async (stateDir) => {
   throw new Error(`${keyPath} could not be read or created.`);
 };
 
-/** Loads the agent wallet, creating a fresh key on first use, and binds the state file to it. */
-export const loadOrCreateWallet = async (stateDir) => {
+// A key given in the environment, for hosts that keep no files between runs.
+// It must match any key file already there; it is never written to disk.
+const keyFromEnvironment = async (stateDir, privateKey) => {
+  let wallet;
+  try {
+    wallet = new ethers.Wallet(privateKey);
+  } catch {
+    // Never quote the value.
+    throw new Error('CE_MCP_PRIVATE_KEY is not a valid private key: 0x and 64 hexadecimal digits.');
+  }
+  const keyPath = path.join(stateDir, KEY_FILE);
+  const onDisk = await readKeyFile(keyPath).catch((error) => {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (onDisk && onDisk.address !== wallet.address) {
+    throw new Error(`CE_MCP_PRIVATE_KEY is agent ${wallet.address}, but ${keyPath} holds ${onDisk.address}. Use one identity per state directory.`);
+  }
+  return { wallet, created: false };
+};
+
+/**
+ * Loads the agent wallet, from `privateKey` when given, else from the state
+ * directory, creating a fresh key on first use; binds the state file to it.
+ */
+export const loadOrCreateWallet = async (stateDir, { privateKey = '' } = {}) => {
   await ensureStateDir(stateDir);
-  const loaded = await loadOrCreateKey(stateDir);
+  const loaded = privateKey ? await keyFromEnvironment(stateDir, privateKey) : await loadOrCreateKey(stateDir);
   await withStateWriter(stateDir, async () => {
     const state = await readAgentState(stateDir);
     if (state.address && state.address.toLowerCase() !== loaded.wallet.address.toLowerCase()) {
@@ -119,8 +143,13 @@ export const loadOrCreateWallet = async (stateDir) => {
           `Restore the matching files, or move ${STATE_FILE} aside to start fresh with this key.`,
       );
     }
-    // State written before files were bound to an address adopts the key it is used with.
-    if (!state.address) await writeOwnerOnlyJson(path.join(stateDir, STATE_FILE), { ...state, address: loaded.wallet.address });
+    // State written before files were bound to an address adopts the key it is
+    // used with. A key made with this state has answered only from it.
+    if (!state.address) {
+      await writeOwnerOnlyJson(path.join(stateDir, STATE_FILE), {
+        ...state, address: loaded.wallet.address, ...(loaded.created ? { keyCreatedWithState: true } : {}),
+      });
+    }
   });
   return loaded;
 };
@@ -140,6 +169,7 @@ export const readAgentState = async (stateDir) => {
     version: 1,
     // The agent this state belongs to; its remembered answers are that agent's.
     address: typeof parsed.address === 'string' ? parsed.address : '',
+    ...(parsed.keyCreatedWithState === true ? { keyCreatedWithState: true } : {}),
     profile: isRecord(parsed.profile) ? parsed.profile : {},
     sessions: isRecord(parsed.sessions) ? parsed.sessions : {},
     current: typeof parsed.current === 'string' ? parsed.current : '',

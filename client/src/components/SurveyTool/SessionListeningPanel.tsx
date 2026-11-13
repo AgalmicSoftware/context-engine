@@ -32,6 +32,7 @@ import { SessionListeningWaveform } from './SessionListeningWaveform';
 export { SessionListeningWaveform } from './SessionListeningWaveform';
 import { generateQuestionsFromListeningTranscript, LISTENING_QUESTION_COUNT } from './sessionListeningQuestions';
 import type { QuestionDrafts } from '../../utilities/audio/recordingChunkStore';
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 
 type SessionListeningPanelProps = Record<string, unknown> & {
   sessionSlug?: string;
@@ -63,8 +64,15 @@ const getGeneratedQuestionKey = (question: GeneratedQuestionDraft | null | undef
 
 const getGeneratedQuestionPrompt = (question: GeneratedQuestionDraft | null | undefined): string =>
   String(question?.prompt || '').trim();
+// Case, spacing and punctuation aside, the same question.
+const samePromptKey = (prompt: string) =>
+  prompt
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 
-// Drafted prompts include drafts the host removed or submitted, so none of them comes back.
+// Drafted prompts include drafts the host removed or submitted, and the session's own questions, so none of them
+// comes back.
 const mergeGeneratedQuestionDrafts = (
   previous: GeneratedQuestionDraft[],
   incoming: GeneratedQuestionDraft[],
@@ -72,11 +80,11 @@ const mergeGeneratedQuestionDrafts = (
 ): GeneratedQuestionDraft[] => {
   const seenKeys = new Set(previous.map(getGeneratedQuestionKey).filter(Boolean));
   const seenPrompts = new Set(
-    [...previous.map(getGeneratedQuestionPrompt), ...drafted].map((prompt) => prompt.toLowerCase()).filter(Boolean),
+    [...previous.map(getGeneratedQuestionPrompt), ...drafted].map(samePromptKey).filter(Boolean),
   );
   const additions = incoming.filter((question) => {
     const key = getGeneratedQuestionKey(question);
-    const prompt = getGeneratedQuestionPrompt(question).toLowerCase();
+    const prompt = samePromptKey(getGeneratedQuestionPrompt(question));
     if ((!key && !prompt) || (key && seenKeys.has(key)) || (prompt && seenPrompts.has(prompt))) return false;
     if (key) seenKeys.add(key);
     if (prompt) seenPrompts.add(prompt);
@@ -104,6 +112,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const {
     sessionSlug = '',
     sessionConfig = null,
+    questionPool,
     context,
     workerUrl,
     defaultTags = null,
@@ -185,6 +194,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestionDraft[]>([]);
   const [pendingDraftCount, setPendingDraftCount] = useState<number | null>(null);
   const [generatedTitle, setGeneratedTitle] = useState('');
+  // The last draft added nothing: the discussion supported no new question, which is a result, not an error.
+  const [noNewQuestions, setNoNewQuestions] = useState(false);
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   // The speaker whose code is showing, chosen by their button or their label in the transcript.
@@ -236,6 +247,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       setGeneratedQuestions([]);
       setPendingDraftCount(null);
       setGeneratedTitle('');
+      setNoNewQuestions(false);
       setGenerationError('');
     },
     [handleSubmittingChange],
@@ -312,6 +324,21 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     failedCount > 0 ||
     Boolean(recorder.errorMessage || generationError);
   const isRecorderSessionActive = recorder.isRecording || recorder.isPaused || recorder.isStopping;
+  // A group recording drafts the session's number of questions after each chunk, or once it stops.
+  const { recordingQuestionCount, recordingQuestionTiming } = normalizeInterviewSettings(sessionConfig?.interviewMode);
+  const groupRecording = panelMode === 'recordGroup';
+  const draftAtEnd = groupRecording && recordingQuestionTiming === 'end';
+  const sessionPrompts = useMemo(
+    () =>
+      Array.isArray(questionPool)
+        ? questionPool.map((question) => getGeneratedQuestionPrompt(question as GeneratedQuestionDraft)).filter(Boolean)
+        : [],
+    [questionPool],
+  );
+  const sessionSubject = [sessionConfig?.sessionName, sessionConfig?.sessionInfo]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(': ');
   const isCapturing = isRecorderSessionActive || recorder.isBusy;
   const isBusy = isCapturing || isClosing;
   useEffect(() => {
@@ -435,8 +462,15 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       generationInFlightRef.current = true;
       // Every prompt drafted so far, and the host's edits of them.
       const { prompts: drafted, questions: shown } = keptRef.current;
+      // Once at the end, the recording's number is a total: Record more then Stop adds what is left, at least one.
+      const count = !groupRecording
+        ? LISTENING_QUESTION_COUNT
+        : draftAtEnd && auto
+          ? Math.max(1, recordingQuestionCount - drafted.length)
+          : recordingQuestionCount;
       const existingPrompts = [...new Set([...drafted, ...shown.map(getGeneratedQuestionPrompt)])].filter(Boolean);
       setIsGenerating(true);
+      setNoNewQuestions(false);
       setGenerationError('');
       try {
         // Future optional source path is intentionally disabled for now:
@@ -447,21 +481,27 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           context,
           workerUrl,
           defaultTags,
-          count: LISTENING_QUESTION_COUNT,
+          count,
           sessionInstructions: getSessionInstructions(sessionConfig),
           sourceTypeOverride: 'transcript',
           multiSpeakerHintOverride: 'likely_multiple_speakers',
           existingQuestionPrompts: existingPrompts,
+          sessionQuestionPrompts: sessionPrompts,
+          sessionSubject,
         });
         if (!isMountedRef.current || activeGenerationRequestRef.current !== requestId) return;
         const addDrafts = (previous: GeneratedQuestionDraft[]) =>
-          mergeGeneratedQuestionDrafts(previous, result.statements, drafted);
+          mergeGeneratedQuestionDrafts(previous, result.statements, [...drafted, ...sessionPrompts]);
+        const kept = keptRef.current.questions;
+        const merged = addDrafts(kept);
+        setNoNewQuestions(merged === kept);
         setGeneratedQuestions(addDrafts);
         setGeneratedTitle((previous) => previous || result.surveyTitle);
         // Kept with the recording at once, so drafts held back while a submit publishes are never lost.
+        // Only drafts actually added count towards the recording's number; repeats of session questions don't.
         keepDrafts({
-          questions: addDrafts(keptRef.current.questions),
-          prompts: [...new Set([...drafted, ...result.statements.map(getGeneratedQuestionPrompt).filter(Boolean)])],
+          questions: merged,
+          prompts: [...new Set([...drafted, ...merged.slice(kept.length).map(getGeneratedQuestionPrompt)])],
           draftedTranscript: transcriptSnapshot,
         });
       } catch (error) {
@@ -475,14 +515,43 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         }
       }
     },
-    [canGenerate, context, defaultTags, keepDrafts, recorder.transcript, sessionConfig, sessionSlug, workerUrl],
+    [
+      canGenerate,
+      context,
+      defaultTags,
+      draftAtEnd,
+      groupRecording,
+      keepDrafts,
+      recorder.transcript,
+      recordingQuestionCount,
+      sessionConfig,
+      sessionPrompts,
+      sessionSlug,
+      sessionSubject,
+      workerUrl,
+    ],
   );
 
+  // A new recording starts a new discussion, so an older "no new questions" no longer applies.
   useEffect(() => {
-    if (panelMode !== 'recordGroup') return;
+    if (isRecorderSessionActive) setNoNewQuestions(false);
+  }, [isRecorderSessionActive]);
+
+  useEffect(() => {
+    if (!groupRecording) return;
     if (!latestSuccessfulTranscriptAt || !canGenerate) return;
+    // Once at the end waits for Stop and the last chunk; a recording reopened stopped drafts once, here.
+    if (draftAtEnd && isRecorderSessionActive) return;
     void handleGenerateQuestions({ auto: true });
-  }, [canGenerate, handleGenerateQuestions, latestSuccessfulTranscriptAt, panelMode, trimmedTranscript]);
+  }, [
+    canGenerate,
+    draftAtEnd,
+    groupRecording,
+    handleGenerateQuestions,
+    isRecorderSessionActive,
+    latestSuccessfulTranscriptAt,
+    trimmedTranscript,
+  ]);
 
   const handleClear = (discardAudio = false) => {
     recorder.clearDraft(discardAudio);
@@ -710,6 +779,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             />
           )}
           {isGenerating && <span>{`Generating questions... ${generationElapsedSeconds}s`}</span>}
+          {!isGenerating && noNewQuestions ? <span role="status">No new questions from this discussion.</span> : null}
         </div>
       )}
 
@@ -806,7 +876,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       <CEConfirmDialog
         isOpen={confirmStop}
         title="Stop recording?"
-        body="Stop ends the recording and closes once its audio has uploaded."
+        body={
+          draftAtEnd
+            ? 'Stop ends the recording and closes once its audio has uploaded. Its questions are drafted when you reopen it.'
+            : 'Stop ends the recording and closes once its audio has uploaded.'
+        }
         confirmLabel="Stop"
         cancelLabel="Keep recording"
         onCancel={() => setConfirmStop(false)}

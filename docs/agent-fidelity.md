@@ -59,6 +59,24 @@ Similarity between a prediction and an answer runs from 0 to 1:
 - **Correction rate:** the share of shown choice drafts the person changed.
   Ratings and vote allocations rarely come back exactly, so they count through
   similarity only.
+- **Where drafts came from:** the headline scores only predictions made before
+  the person spoke: AI prefill, and Session Wrapped when given. Voice
+  interview, typed-context and group-recording drafts restate what the person
+  said, so each gets its own row instead (`report.origins`, from
+  `scoreDraftOrigins`): its Mirror Score, its hidden-draft score, and the
+  share of shown drafts each person submitted with a different answer or
+  comment (`changedFields`, freeform answers included, so minimal records
+  count too). These rows measure how faithfully the interview and the mapping
+  captured what people said, not how well an AI knows them.
+- **By model and by context used:** the model is the one the draft's first
+  revision names, else the self-reported source's. Context used adds up the
+  past chats, memories and connected sources the person's AI said it drew on
+  (`source.researchCoverage`): none, 1–9, 10–49 or 50 or more. A count the AI
+  left out (`null`) adds nothing, and a draft with no counts at all, or no
+  coverage, is "not reported". Both are AI-prefill breakdowns, withheld like
+  platforms. In these tables (and by platform and origin) each person counts
+  whole, with all their drafts, under the key that made most of them, so the
+  rows split people rather than drafts.
 - **Cohen's kappa:** exact agreement on choice predictions beyond what chance
   would give. Chance comes from each question's answer shares among the
   predictions and among the answers, and questions are pooled by their number
@@ -126,12 +144,21 @@ Similarity between a prediction and an answer runs from 0 to 1:
     running them.
   - Per-person rows, listed by pseudonym (`p001`…) and never by address, appear
     only when the whole report reaches the minimum.
-- Breakdowns that divide people (by platform, by where the draft came from,
-  and by group) also withhold a row when subtracting it from the total, or
+- Breakdowns that divide people (by platform, model, context used, where the
+  draft came from, and group) also withhold a row when subtracting it from the total, or
   from the other rows, would reveal a result for fewer people than the
   minimum: with six people, five on Claude and one on ChatGPT, a minimum of 5
-  shows neither platform. The smallest row goes first. The benchmark's
-  `compare-answers` applies the same rule to its groups.
+  shows neither platform. The smallest row goes first. A row everyone shares
+  only repeats the total, so it never counts as dividing anyone. Origin,
+  platform, model, context, condition (shown, hidden, made separately) and
+  group rows are checked together, since a model sits inside its platform and
+  Session Wrapped people are the only ones with separate predictions: Claude
+  minus its larger model would otherwise give the smaller one. Per-person rows
+  name only the origin a person counts under, and only when that row is shown.
+  In the command-line report the AI prefill and Session Wrapped
+  rows of "Where drafts came from" follow the headline's own withholding, as
+  the headline pools the two. The benchmark's `compare-answers` applies the
+  same rule to its groups.
   - Withheld groups are not named at all, since a group can be a single
     invite link.
 - The overall calibration figure counts every confidence band, including bands
@@ -177,6 +204,8 @@ This writes `agent-fidelity-report.json` and `agent-fidelity-report.md`.
 | `--exclude <file>` | Addresses to leave out (for example test accounts), one per line. |
 | `--bootstrap`, `--seed`, `--min-participants` | Interval samples, random seed, smallest reported cell. |
 | `--include-agents` | Keep self-declared agent participants. |
+| `--predictions <file.csv>` | Also write one row per scored prediction, for analysis elsewhere (below). |
+| `--draft-text <file> --clio <file.jsonl>` | Turn an admin's AI draft text download into pseudonymous input for clustering tools (below). |
 
 `--responses` takes a JSON array of rows as the Worker stores them:
 `{ "responder": "0x…", "createdAt": "2026-10-02T09:00:00Z", "response": … }`,
@@ -185,6 +214,38 @@ where `response` is the stored payload (one answer entry, or
 chain give `blockNumber`, `transactionIndex` and `logIndex` instead of
 `createdAt`. Bare payloads without a row are read too: their own `responder`
 then names the person, and for each question the later one in the file counts.
+
+`--predictions` writes every scored prediction of every origin as a CSV row:
+the person's pseudonym (the same one as in the report's per-person rows, in an
+order drawn afresh each run), origin, platform, model, context used, group
+(only groups the report names), condition, question, prediction, answer,
+similarity, exact match, confidence, and whether the submitted answer and
+comment differ from the draft (`answer_changed`, `comment_changed`; blank when
+the record doesn't say). Freeform drafts get a row too, with the text, scores
+and AI details blank, so how often people rewrote them can still be counted.
+It has no addresses, names or free text: choice answers keep only the
+question's own options. Excluded people and agents are left out, but no
+minimum applies, so it is de-identified rather than anonymous: keep it with
+the raw export.
+
+`--draft-text` takes the file a config admin downloads with **Download AI draft
+text** on the Admin page, on sessions that keep the AI's drafted text for
+admins (see
+[session-interview-research.md](session-interview-research.md#ai-draft-text-for-admins)).
+`--clio` then writes one JSON line per person, question and field (`answer` or
+`comment`): the AI's draft as an `assistant` message and, when the person's
+latest saved text differs, that text as a `user` message, with `participant`
+(the same pseudonym as `--predictions` in the same run), `question_id`,
+`field`, `origin`, `condition` and `changed` in `metadata`. Every time is the
+download's date at midnight UTC, and no address appears. A field whose latest
+answer or comment is encrypted gets no line, and nor does a draft whose latest
+response no longer carries draft-text consent. The shape suits
+conversation-clustering tools: OpenClio reads it with
+`getConversationFunc=lambda r: r["messages"]`, and Kura reads each line as a
+`Conversation`. They are examples, not dependencies. Neither enforces a
+minimum group size: keep only clusters drawn from at least the report's
+minimum number of people before sharing anything. The output holds
+participants' own words, so keep it as privately as the download.
 
 ## What participants see
 
@@ -206,7 +267,11 @@ the share kept, and the Mirror Score by platform. It scores in a background
 thread, so large sessions don't freeze the page, and gives the same numbers as
 this report's, except that only AI-prefill drafts count (voice and
 typed-context drafts restate what the person said). Every cell follows the
-withholding rules above with the session's minimum, and until the report's
+withholding rules above with the session's minimum, checked over the condition
+and platform rows it shows rather than every table, so its platform rows can
+appear where the report withholds them (don't publish this report's model or
+context rows beside Results, or the two together could reveal a small model's
+score), and until the report's
 responses include AI-prefill drafts from that many people it shows a one-line
 note instead. To set a session up for this, see
 [session-creation-guide.md](session-creation-guide.md#measure-how-well-ai-represents-participants).

@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { TextDecoder, TextEncoder } from 'util';
+import { deserialize, serialize } from 'v8';
 
 // Component suites share the external wallet boundary; auth tests can override it.
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
@@ -19,6 +20,11 @@ if (!global.TextEncoder) {
 
 if (!global.TextDecoder) {
   global.TextDecoder = TextDecoder;
+}
+
+// Browsers, Node and Cloudflare Workers all have structuredClone; jsdom's window does not.
+if (!global.structuredClone) {
+  global.structuredClone = <T>(value: T): T => deserialize(serialize(value));
 }
 
 if (typeof HTMLCanvasElement !== 'undefined') {

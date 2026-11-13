@@ -4,6 +4,7 @@ import {
   type BuildResponsePayloadOptions,
 } from './surveyToolResponsePayloadController';
 import { getConvictionFromSlice, getImportanceFromSlice } from './surveyToolResponseState';
+import { planDraftTextSync } from './sessionInterviewDraftText';
 
 const defaultOpts = (overrides: Partial<BuildResponsePayloadOptions> = {}): BuildResponsePayloadOptions => ({
   isStandalone: false,
@@ -949,5 +950,85 @@ describe('research detail tiers', () => {
     expect(submit(saved).changedFields).toEqual(['answer']);
     const freeformSaved = { ...saved, originalPrediction: { answer: null, confidence: 0.5 }, changedFields: [] };
     expect(submit(freeformSaved, 'freeform', 'Edited later').changedFields).toEqual([]);
+  });
+});
+
+describe('AI draft text kept for admins', () => {
+  const keeping = { interviewMode: { keepDraftTextForAdmins: true } };
+  const record = (extra: Record<string, unknown> = {}) => ({
+    includePredictionComparison: true,
+    includeDraftText: true,
+    researchTier: 'minimal',
+    draftOrigin: 'external_prefill',
+    originalPrediction: { answer: 'Draft text', additionalComments: 'Drafted comment', confidence: 0.5 },
+    ...extra,
+  });
+  const submit = (provenance: Record<string, unknown>, answer: Record<string, unknown> = { value: 'Final text' }) => {
+    const state = {
+      answers: { q1: answer },
+      additionalComments: { q1: { value: 'My note' } },
+      importance: {},
+      conviction: {},
+      interviewProvenance: { q1: provenance },
+    };
+    const response = buildResponsePayload(
+      defaultOpts({ questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Why?' }], surveyResponseState: state }),
+    ).responses![0];
+    return { response, state };
+  };
+  const plan = (
+    { response, state }: ReturnType<typeof submit>,
+    sessionConfig: unknown = keeping,
+    earlier: Record<string, unknown> = {},
+  ) => planDraftTextSync({ sessionConfig, uploaded: [response], drafts: state.interviewProvenance, earlier });
+
+  it('stores the text apart and keeps only the consent in the public record', () => {
+    const submitted = submit(record());
+    const provenance = submitted.response.interviewProvenance as Record<string, unknown>;
+    expect(provenance).toMatchObject({ draftTextConsent: true, predictionComparison: { researchTier: 'minimal' } });
+    expect(JSON.stringify(provenance)).not.toMatch(/Draft text|Drafted comment/);
+    expect(plan(submitted)).toEqual({
+      put: [
+        {
+          questionId: 'q1',
+          aiAnswer: 'Draft text',
+          aiComment: 'Drafted comment',
+          origin: 'external_prefill',
+          condition: 'shown',
+        },
+      ],
+      remove: [],
+    });
+  });
+
+  it('opting out of only the text keeps the minimal record and removes the text', () => {
+    const submitted = submit(record({ includeDraftText: false }));
+    const provenance = submitted.response.interviewProvenance as Record<string, unknown>;
+    expect(provenance.predictionComparison).toMatchObject({ researchTier: 'minimal' });
+    expect(provenance).not.toHaveProperty('draftTextConsent');
+    expect(plan(submitted)).toEqual({ put: [], remove: ['q1'] });
+  });
+
+  it('opting out of research drops both the record and the text', () => {
+    const submitted = submit(record({ includePredictionComparison: false }));
+    expect(submitted.response.interviewProvenance).toBeUndefined();
+    expect(plan(submitted)).toEqual({ put: [], remove: ['q1'] });
+  });
+
+  it('keeps no text for an encrypted answer and removes what was stored', () => {
+    const submitted = submit(record(), { value: 'ciphertext', encrypted: true });
+    expect(plan(submitted)).toEqual({ put: [], remove: ['q1'] });
+  });
+
+  it('keeps no consent marker at full detail, where the text is already in the record', () => {
+    const provenance = submit(record({ researchTier: 'full' })).response.interviewProvenance as Record<string, unknown>;
+    expect(provenance).not.toHaveProperty('draftTextConsent');
+  });
+
+  it('with the setting off, stores nothing and removes only text earlier consent kept', () => {
+    const declined = submit(record({ includeDraftText: false }));
+    expect(plan(declined, {})).toEqual({ put: [], remove: [] });
+    expect(plan(declined, {}, { q1: { draftTextConsent: true } })).toEqual({ put: [], remove: ['q1'] });
+    expect(plan(submit(record()), {})).toEqual({ put: [], remove: [] });
   });
 });

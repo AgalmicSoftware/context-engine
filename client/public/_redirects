@@ -3,4 +3,7 @@
 /assets/* /404.html 404
 /.well-known/* /404.html 404
 /skill.md /agent-guide.md 200
+/agents /skill.md 302
+/agents.md /skill.md 302
+/agent-guide /skill.md 302
 /* /index.html 200

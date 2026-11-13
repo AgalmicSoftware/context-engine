@@ -89,7 +89,9 @@ function Tile({ id, label, help, estimate, detail, minimum }: TileProps) {
         </Help>
       </div>
       {estimate.suppressed ? (
-        <p className={styles.withheld}>Fewer than {minimum} people</p>
+        <p className={styles.withheld}>
+          {estimate.participants < minimum ? `Fewer than ${minimum} people` : 'Withheld'}
+        </p>
       ) : (
         <>
           <p className={styles.value}>{percent(estimate.value)}</p>
@@ -277,7 +279,7 @@ export default function PolisReportFidelitySection({
   // A minimum of 1, which Interview settings call off, withholds nothing.
   const platformWithheld =
     minimum > 1
-      ? ` A platform is withheld when fewer than ${minimum} people used it, or when showing it would let someone work out the score of fewer than ${minimum} others.`
+      ? ` A platform is withheld when fewer than ${minimum} people used it, or when showing it beside the other platforms and the hidden-draft score would let someone work out the score of fewer than ${minimum} others.`
       : '';
   return (
     <section
@@ -320,7 +322,7 @@ export default function PolisReportFidelitySection({
               <Tile
                 id="ce-results-fidelity-hidden"
                 label="Hidden drafts"
-                help="The Mirror Score for drafts kept hidden until the person answered, so seeing the draft couldn't sway them."
+                help={`The Mirror Score for drafts kept hidden until the person answered, so seeing the draft couldn't sway them.${minimum > 1 ? ` Withheld when showing it beside the platforms would let someone work out the score of fewer than ${minimum} people.` : ''}`}
                 estimate={hidden}
                 detail={plural(coverage.byCondition.blind, 'draft')}
                 minimum={minimum}
@@ -364,7 +366,7 @@ export default function PolisReportFidelitySection({
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(mirrorScore.byPlatform).map(([platform, estimate]) => (
+                {Object.entries(mirrorScore.byPlatform ?? {}).map(([platform, estimate]) => (
                   <tr key={platform}>
                     <th scope="row">{platformLabel(platform)}</th>
                     {estimate.suppressed ? (

@@ -1,5 +1,6 @@
 import { buildSiweMessage as buildSharedSiweMessage, normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { describeTestEthOffer } from '../../shared/sessions/testEthOffer.mjs';
+import { COORDINATOR_RETRY_DELAYS_MS, SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 
 // HTTP client for one Worker-hosted session, signing in exactly as the web
 // client does for a passkey participant (client/src/utilities/worker/workerAuth.ts).
@@ -45,6 +46,10 @@ const explainFailure = (status, error, path) => {
   if (status === 404 && path.startsWith('/session-config')) return 'No hosted session with that name exists on this Worker.';
   if (status === 410) return 'This session has ended and no longer accepts answers.';
   if (status === 429) return `Rate limited by the Worker (${detail || '429'}). Wait a minute and retry.`;
+  // Sent after the client's own retries ran out; the Worker refused before doing anything.
+  if (status === 503 && error === SESSION_COORDINATOR_UNAVAILABLE) {
+    return 'The session is busy and this request did not go through; nothing changed. Wait a few seconds and try again.';
+  }
   return detail || `Worker request failed (${status}).`;
 };
 
@@ -151,8 +156,19 @@ export const createWorkerClient = ({
   let features = null;
   let featuresLoadedAt = -Infinity;
 
+  // A busy session coordinator refuses a request before it has any effect.
+  // Reads, answers with a request id (replayed, never stored twice) and group
+  // joins (joining again is a no-op) wait and try again; other writes are sent once.
+  const replaySafe = (path, method, body) => method === 'GET' ||
+    (path === '/storage/upload' && !!body?.requestId) || (path === '/groups/join' && method === 'POST');
+  const waitBeforeRetry = (attempt, signal) => new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error('Stopped before the Worker request was sent.'));
+    const timer = setTimeout(resolve, COORDINATOR_RETRY_DELAYS_MS[attempt] * (0.5 + Math.random()));
+    signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new Error('Stopped before the Worker request was sent.')); }, { once: true });
+  });
+
   // `body` is sent as JSON; `form`, a FormData, as multipart.
-  const request = async (path, { method = 'GET', headers = {}, body, form, auth = false, retried = false, maxBytes = MAX_RESPONSE_BYTES, signal } = {}) => {
+  const request = async (path, { method = 'GET', headers = {}, body, form, auth = false, retried = false, busyRetries = 0, maxBytes = MAX_RESPONSE_BYTES, signal } = {}) => {
     const checkpoint = () => { if (signal?.aborted) throw new Error('Stopped before the Worker request was sent.'); };
     checkpoint();
     if (auth) await ensureToken();
@@ -185,9 +201,14 @@ export const createWorkerClient = ({
       data = raw;
     }
     const error = isRecord(data) ? text(data.error) || text(data.message) : '';
+    if (response.status === 503 && error === SESSION_COORDINATOR_UNAVAILABLE && !form &&
+        busyRetries < COORDINATOR_RETRY_DELAYS_MS.length && replaySafe(path, method, body)) {
+      await waitBeforeRetry(busyRetries, signal);
+      return request(path, { method, headers, body, form, auth, retried, busyRetries: busyRetries + 1, maxBytes, signal });
+    }
     if (response.status === 401 && auth && !retried && (!error || TOKEN_ERROR_RE.test(error))) {
       token = '';
-      return request(path, { method, headers, body, form, auth, retried: true, maxBytes, signal });
+      return request(path, { method, headers, body, form, auth, retried: true, busyRetries, maxBytes, signal });
     }
     if (response.status === 401 && error && !TOKEN_ERROR_RE.test(error)) {
       throw new WorkerRequestError(error.slice(0, MAX_ERROR_DETAIL), { status: 401, code: error });

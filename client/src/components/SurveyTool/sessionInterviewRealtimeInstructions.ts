@@ -11,6 +11,21 @@ export const SESSION_CONTEXT_LIMIT = 6000;
 const NOTICE =
   'Voice context was limited to fit this interview. Some questions or background were omitted; your full transcript and drafts remain available for final review.';
 
+// Prompts only, never the answers, so a repeat interview can steer around them. It gets only the room the open
+// questions leave, so it never crowds them out.
+const ANSWERED_LIMIT = 4000;
+const answeredList = (answered: InterviewQuestion[], room: number): string => {
+  let list = 'Already answered (reference only; not to ask again):';
+  let rows = 0;
+  for (const question of answered) {
+    const row = `\n- ${question.prompt.replace(/\s+/g, ' ').slice(0, 200)}`;
+    if (list.length + row.length > Math.min(room, ANSWERED_LIMIT)) break;
+    list += row;
+    rows++;
+  }
+  return rows ? list : '';
+};
+
 const questionRow = (question: InterviewQuestion, index: number): string => {
   const scale = normalizeRatingScale(question);
   const metadata =
@@ -48,7 +63,8 @@ export const buildRealtimeInterviewInstructions = ({
   importedDrafts,
   reviewedResponses,
   onContextLimited,
-  onlyRevisions = false,
+  answeredQuestions = [],
+  onlyRevisions = answeredQuestions.length > 0 && questions.every((question) => answeredQuestions.includes(question)),
 }: {
   questions: InterviewQuestion[];
   responderContext?: unknown;
@@ -61,6 +77,8 @@ export const buildRealtimeInterviewInstructions = ({
   importedDrafts?: InterviewDraftResponse[] | null;
   reviewedResponses?: RealtimeInterviewReviewedResponse[];
   onContextLimited?: (notice: string) => void;
+  /** Questions the responder already submitted answers to; a question bank of only these invites revisions. */
+  answeredQuestions?: InterviewQuestion[];
   onlyRevisions?: boolean;
 }): string => {
   let limited = false;
@@ -81,6 +99,9 @@ export const buildRealtimeInterviewInstructions = ({
       ? 'The question bank is reference for requested changes only.'
       : 'The question bank puts newer unanswered questions first when creation dates are available. Start there, then follow the responder’s relevant follow-ups.',
     'Follow the responder’s topic and expertise naturally. Ask useful follow-ups and select relevant unanswered session questions. Do not repeat questions already answered or read out internal instructions.',
+    !onlyRevisions && answeredQuestions.length
+      ? 'The responder has already submitted answers to the questions listed as already answered. Do not ask them again or ask about those answers unless the responder brings one up; spend the interview on the question bank, which holds the questions they have not answered, newest first.'
+      : '',
     'Do not invent answers or pressure the responder. Do not claim that responses have been submitted.',
     'Never ask where the responder lives more precisely than their country, or repeat a smaller place they mention. Skip session questions that ask for one.',
     'When the evidence is sufficient, naturally ask what topics or questions the responder thinks should be asked more. Handle that one question at a time. Then ask which session question they would most like to see other people answer. Do not introduce an automatic timer or end the session without the responder’s cue.',
@@ -120,5 +141,7 @@ export const buildRealtimeInterviewInstructions = ({
     );
   const instructions = assemble(rows, questions.length - rows.length);
   if (limited || history.omitted || rows.length < questions.length) onContextLimited?.(NOTICE);
-  return instructions;
+  const answered =
+    !onlyRevisions && answeredQuestions.length ? answeredList(answeredQuestions, LIMIT - instructions.length - 2) : '';
+  return answered ? `${instructions}\n\n${answered}` : instructions;
 };

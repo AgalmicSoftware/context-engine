@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
+import { evaluateAuthenticatedRoutePreflight } from './authenticatedRoutePreflight.js';
 
 test('dispatchAuthenticatedSecretPathRoute ignores unrelated routes', async () => {
   let called = false;
@@ -586,4 +587,35 @@ test('dispatchAuthenticatedSecretPathRoute routes authenticated worker group req
 
   assert.equal(result.handled, true);
   assert.equal(result.response, downstreamResponse);
+});
+
+test('withdrawing AI draft text needs a sign-in but not the storage scope the session gate grants', async () => {
+  const reached = [];
+  const dispatch = (path) => dispatchAuthenticatedSecretPathRoute({
+    path,
+    method: 'POST',
+    request: { headers: new Headers() },
+    config: {},
+    slug: 'session-a',
+    address: '0xabc',
+    env: {},
+    limit: 7,
+    headers: {},
+    // Signed in, but no longer passing the gate.
+    scopes: {},
+    deps: {
+      evaluateAuthenticatedRoutePreflight,
+      computeScopesForLogin: async () => ({ storage: false, arweave: false }),
+      checkRateLimit: async () => true,
+      storageRoute: async ({ path: reachedPath }) => {
+        reached.push(reachedPath);
+        return new Response('ok');
+      },
+      json: (body, status) => new Response(JSON.stringify(body), { status }),
+    },
+  });
+  assert.equal((await dispatch('/storage/draft-text/put')).response.status, 403);
+  assert.equal((await dispatch('/storage/draft-text/export')).response.status, 403);
+  assert.equal((await dispatch('/storage/draft-text/delete')).response.status, 200);
+  assert.deepEqual(reached, ['/storage/draft-text/delete']);
 });

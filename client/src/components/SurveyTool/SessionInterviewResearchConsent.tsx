@@ -26,9 +26,15 @@ type Props = {
   disabled: boolean;
   // The session's interviewMode.researchDetail: what a shared comparison keeps.
   researchDetail?: 'minimal' | 'full';
+  // Keeping the AI's drafted text for admins only, offered when the session keeps it; null when not.
+  draftText?: { checked: boolean; mixed: boolean } | null;
+  onDraftTextChange?: (included: boolean) => void;
   // Further sharing choices, such as the responder name, listed with these.
   children?: React.ReactNode;
 };
+
+const DRAFT_TEXT_NOTE =
+  'The session’s admins can read the text of the AI’s drafts and what you changed; nobody else can. Nothing is kept for answers you encrypt. You can turn this off on its own and still share the rest.';
 
 export default function SessionInterviewResearchConsent({
   packet,
@@ -44,9 +50,13 @@ export default function SessionInterviewResearchConsent({
   unselectedCount,
   disabled,
   researchDetail = 'minimal',
+  draftText = null,
+  onDraftTextChange,
   children,
 }: Props) {
   const minimal = researchDetail === 'minimal';
+  // Mixed saved choices may keep text for some drafts, so the wording doesn't promise none is kept.
+  const keepsText = minimal && !!draftText && (draftText.checked || draftText.mixed);
   const model = packet.source.modelId || 'Unknown model';
   const platform = describeInterviewPlatform(packet.source.platform);
   return (
@@ -116,11 +126,37 @@ export default function SessionInterviewResearchConsent({
                   {selectedCount} selected {selectedCount === 1 ? 'draft' : 'drafts'}:
                 </p>
                 <ul>
-                  <li>The AI’s predicted answers, importance, conviction, and confidence. Drafted text is not kept.</li>
+                  <li>
+                    The AI’s predicted answers, importance, conviction, and confidence.
+                    {keepsText ? '' : ' Drafted text is not kept.'}
+                  </li>
                   <li>{revisionCount} saved prediction versions with model IDs, without drafted text or basis.</li>
                   <li>Which fields changed. Unchanged fields are labeled unchanged, not human agreement.</li>
                 </ul>
-                <p>The AI’s notes, drafted comments, and drafts for questions you skipped are not included.</p>
+                <p>
+                  {keepsText
+                    ? 'The AI’s notes and drafts for questions you skipped are not included.'
+                    : 'The AI’s notes, drafted comments, and drafts for questions you skipped are not included.'}
+                </p>
+                {draftText ? (
+                  <>
+                    <Label check className={styles.provenanceOption}>
+                      <Input
+                        type="checkbox"
+                        checked={draftText.mixed ? false : draftText.checked}
+                        aria-checked={draftText.mixed ? 'mixed' : draftText.checked}
+                        innerRef={(element: HTMLInputElement | null) => {
+                          if (element) element.indeterminate = draftText.mixed;
+                        }}
+                        disabled={disabled}
+                        onChange={(event) => onDraftTextChange?.(event.target.checked)}
+                        data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_DRAFT_TEXT}
+                      />{' '}
+                      <span>Let admins read the AI’s draft text{draftText.mixed ? ' (mixed saved choices)' : ''}</span>
+                    </Label>
+                    <p>{DRAFT_TEXT_NOTE}</p>
+                  </>
+                ) : null}
               </>
             ) : includeComparison ? (
               <>
@@ -172,6 +208,8 @@ type ShareProps = {
   disabled: boolean;
   // The session's interviewMode.researchDetail: what a shared comparison keeps.
   researchDetail?: 'minimal' | 'full';
+  // The session keeps the AI's drafted text for admins when the person agrees.
+  draftTextOffered?: boolean;
   className?: string;
   onChange: (included: boolean) => void;
 };
@@ -182,10 +220,15 @@ export function SessionInterviewResearchShare({
   mixed = false,
   disabled,
   researchDetail = 'minimal',
+  draftTextOffered = false,
   className,
   onChange,
 }: ShareProps) {
   const minimal = researchDetail === 'minimal';
+  const draftTextNote =
+    minimal && draftTextOffered
+      ? ' It also lets the session’s admins, and nobody else, read the AI’s drafted text; you can turn that off on its own in the details.'
+      : '';
   return (
     <span className={[styles.researchConsent, className].filter(Boolean).join(' ')}>
       <Label check className={styles.provenanceOption}>
@@ -216,12 +259,14 @@ export function SessionInterviewResearchShare({
         {minimal
           ? 'Includes the AI’s predicted answers, ratings and confidence, its revision history, and which fields you changed. It excludes the AI’s notes and drafted text, drafts you did not select, encrypted answers, full interview transcripts, and imported conversation history. Edits are not treated as agreement.'
           : 'Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported conversation history are excluded.'}
+        {draftTextNote}
         {mixed ? ' Your saved responses have different choices; ticking or unticking sets them all.' : ''}
       </span>
       <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus" autohide={false}>
         {minimal
           ? 'Records the AI’s predicted answers and confidence and which ones you changed, not its notes or drafted text.'
-          : 'Records draft provenance, revisions, selected status, and changed fields. It excludes encrypted answer text, transcripts, and imported conversation history.'}{' '}
+          : 'Records draft provenance, revisions, selected status, and changed fields. It excludes encrypted answer text, transcripts, and imported conversation history.'}
+        {draftTextNote}{' '}
         <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
           How research data is handled
         </a>

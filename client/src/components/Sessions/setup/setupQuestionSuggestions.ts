@@ -151,11 +151,12 @@ export const readSuggestedQuestions = (
 ): SetupQuestion[] => {
   const match = outputText(data).match(/\{[\s\S]*\}/);
   if (!match) throw new Error('The AI sent no questions. Try again.');
-  const { statements } = buildGeneratedSurveyStatements({
-    aiData: JSON.parse(match[0]),
-    selectedTypes: QUESTION_TYPES,
-    count,
-  });
+  const aiData = JSON.parse(match[0]);
+  const { statements } = buildGeneratedSurveyStatements({ aiData, selectedTypes: QUESTION_TYPES, count });
+  // None is an answer, as the AI writes only what the context supports; only unusable ones are an error.
+  if (!statements.length && Array.isArray(aiData?.questions) && aiData.questions.length) {
+    throw new Error('The AI sent no usable questions. Try again.');
+  }
   return statements.map(({ type, prompt, options, voiceCredits, tags }) => ({
     prompt,
     type,
@@ -198,7 +199,5 @@ export const suggestSetupQuestions = async ({
     const message = text(asRecord(data.error).message).trim();
     throw new Error(`OpenAI couldn’t draft questions (${response.status})${message ? `: ${message}` : '.'}`);
   }
-  const questions = readSuggestedQuestions(data);
-  if (!questions.length) throw new Error('The AI sent no usable questions. Try again.');
-  return { questions, skipped };
+  return { questions: readSuggestedQuestions(data), skipped };
 };

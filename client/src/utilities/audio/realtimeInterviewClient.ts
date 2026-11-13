@@ -1,3 +1,5 @@
+import { withCoordinatorRetry } from '../worker/coordinatorRetry';
+
 export type RealtimeInterviewTurn = {
   itemId: string;
   text: string;
@@ -364,7 +366,7 @@ export const startSessionRealtimeInterview = async ({
     );
     onStatus('Connecting to the interviewer…');
     const response = await run(
-      fetchImpl(`${baseUrl}/realtime/call?slug=${encodeURIComponent(sessionSlug)}`, {
+      withCoordinatorRetry(fetchImpl)(`${baseUrl}/realtime/call?slug=${encodeURIComponent(sessionSlug)}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-session-slug': sessionSlug },
         body: JSON.stringify({ sdp: peer.localDescription?.sdp || offer.sdp || '', instructions }),

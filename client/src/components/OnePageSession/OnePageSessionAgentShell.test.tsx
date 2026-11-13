@@ -71,8 +71,8 @@ describe('OnePageSessionAgentShell', () => {
     );
     expect(resultsSectionRef).not.toHaveBeenCalled();
     view.rerender(<OnePageSessionAgentShell {...baseProps} resultsSectionRef={resultsSectionRef} />);
-    expect(resultsSectionRef).toHaveBeenLastCalledWith(screen.getByTestId('ce-session-agent-results'));
-    expect(screen.getByTestId('ce-session-agent-results')).toHaveAttribute('id', 'report');
+    expect(resultsSectionRef).toHaveBeenLastCalledWith(screen.getByTestId('ce-agent-http-results'));
+    expect(screen.getByTestId('ce-agent-http-results')).toHaveAttribute('id', 'report');
     await screen.findByTestId('agent-question-pile');
     view.unmount();
     expect(resultsSectionRef).toHaveBeenLastCalledWith(null);
@@ -81,7 +81,7 @@ describe('OnePageSessionAgentShell', () => {
   it('states generated AI results are unsupported in the agent shell', async () => {
     render(<OnePageSessionAgentShell {...baseProps} />);
 
-    expect(screen.getByTestId('ce-session-agent-generated-results-unsupported')).toHaveTextContent(
+    expect(screen.getByTestId('ce-agent-http-generated-results-unsupported')).toHaveTextContent(
       'AI-generated Circles, Breakdown, and Risk Matrix views are not available in the agent web shell yet.',
     );
     await screen.findByTestId('agent-question-pile');

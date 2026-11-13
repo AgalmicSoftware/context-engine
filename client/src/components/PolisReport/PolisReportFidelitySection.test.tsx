@@ -23,7 +23,14 @@ const row = (
   responder: string,
   questionId: string,
   answer: string,
-  { platform = 'claude', condition = 'shown', origin = 'external_prefill', confidence = 0.8, claimed = '' } = {},
+  {
+    platform = 'claude',
+    modelId = 'test-model',
+    condition = 'shown',
+    origin = 'external_prefill',
+    confidence = 0.8,
+    claimed = '',
+  } = {},
 ) => ({
   responder,
   questionId,
@@ -34,7 +41,7 @@ const row = (
     answer: { value: answer, encrypted: false },
     interviewProvenance: {
       draftOrigin: origin,
-      source: { platform, modelId: 'test-model' },
+      source: { platform, modelId },
       originalPrediction: { answer: 'Agree', confidence },
       predictionCondition: condition,
       confidenceMeaning: 'keep',
@@ -150,6 +157,36 @@ describe('PolisReportFidelitySection', () => {
     renderSection(sixPeople('claude').flat());
     await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
     expect(screen.getByRole('row', { name: /^Claude/ })).toHaveTextContent(/^Claude83%.*6$/);
+  });
+
+  it('withholds platforms only against what Results shows, not the model rows it leaves out', () => {
+    // Ten people on each platform, models split seven and three inside each.
+    const rows = ['claude', 'chatgpt'].flatMap((platform, at) =>
+      Array.from({ length: 10 }, (_, index) =>
+        ['qb1', 'qb2'].map((questionId) =>
+          row(address(at * 10 + index), questionId, 'Agree', {
+            platform,
+            modelId: `${platform}-${index < 7 ? 'a' : 'b'}`,
+          }),
+        ),
+      ).flat(),
+    );
+    const overview = computeFidelityOverview({ questions, questionResponses: byQuestion(rows), minParticipants: 5 });
+    const byPlatform = overview?.mirrorScore.byPlatform || {};
+    expect(byPlatform['claude'].value).toBe(1);
+    expect(byPlatform['chatgpt'].value).toBe(1);
+  });
+
+  it('says a hidden-draft score from enough people is withheld, not too small', async () => {
+    // Five of seven people had a hidden draft: the total minus it would leave the other two.
+    const rows = Array.from({ length: 7 }, (_, index) => [
+      row(address(index), 'qb1', 'Agree'),
+      row(address(index), 'qb3', 'Agree', { condition: index < 5 ? 'blind' : 'shown' }),
+    ]).flat();
+    renderSection(rows);
+    const tile = await screen.findByRole('group', { name: 'Hidden drafts' });
+    expect(tile).toHaveTextContent('Withheld');
+    expect(tile).not.toHaveTextContent('Fewer than');
   });
 
   it('keeps confidence bands from fewer than 5 people off the chart', async () => {

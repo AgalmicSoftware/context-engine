@@ -51,8 +51,9 @@ const listAll = async (call, token) => {
   }
 };
 
-// Each request still reads the session's current config from its coordinator,
-// so a session made private stops serving answers at once.
+// Each request still reads the session's config from its coordinator, or a
+// copy at most a second old, so a session made private stops serving answers
+// within a second.
 test('a signed-out Results view of 500 answers takes at most 2 Worker requests per 100', async () => {
   const { env, coordinatorCalls } = await seed({ people: 25, questions: 20 });
   const before = coordinatorCalls();

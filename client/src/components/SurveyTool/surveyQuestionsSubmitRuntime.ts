@@ -1,4 +1,5 @@
 import { buildSavedInterviewConsent } from './sessionInterviewConsent';
+import { planDraftTextSync, syncDraftText } from './sessionInterviewDraftText';
 import { getSubmittedWorkerResponseRecency } from '../../utilities/survey/workerResponseRecency';
 import {
   nameQuestionForNotice,
@@ -602,8 +603,32 @@ export const createSurveyQuestionsSubmitRuntime = (
       await verifyEncryption(submitQids, activeSlice);
       setState(buildCurrentStepState(2));
 
+      // Read before the upload: the person may move to another session while it runs.
+      const earlierProvenance = stateRef.current.editBaseline?.interviewProvenance || {};
       // Await the receipt to ensure transaction is confirmed before optimistic update
       const receipt: SurveyQuestionsLegacyValue = await submitSurveyResponse(activeSlice, submitQids, submitContext);
+      // AI draft text for admins follows the consent each uploaded response was saved with. It runs
+      // before the stale check, so a withdrawal that reached storage sends its delete even after the
+      // person moves on. The Worker keys rows by the signer, so it is skipped if someone else signed in.
+      const draftTextConfig = resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props);
+      const signer = (snapshot: SurveyQuestionsLegacyValue) =>
+        snapshot.loginComplete ? `${String(snapshot.account).toLowerCase()}|${snapshot.providerKind}` : '';
+      let draftTextFailed = false;
+      try {
+        if (!signer(submitContext) || signer(submitContext) !== signer(buildSubmitContextSnapshot())) {
+          throw new Error('The signed-in account changed during the upload.');
+        }
+        const plan = planDraftTextSync({
+          sessionConfig: draftTextConfig,
+          uploaded: Array.isArray(receipt?.__ceQuestionResponses) ? receipt.__ceQuestionResponses : [],
+          drafts: activeSlice?.interviewProvenance || {},
+          earlier: earlierProvenance,
+        });
+        await syncDraftText(plan, { sessionConfig: draftTextConfig, sessionSlug: submitContext.effectiveDraftSlug });
+      } catch (error) {
+        surveyLog.warn('[SurveyQuestions] AI draft text update failed:', error);
+        draftTextFailed = true;
+      }
       if (!isSubmitContextCurrent(submitContext)) {
         handleStaleSubmitContext(submitContext);
         return { status: 'stale', message: 'Submission context changed before upload completed.' };
@@ -626,6 +651,13 @@ export const createSurveyQuestionsSubmitRuntime = (
           )
           .filter(Boolean),
       );
+      if (draftTextFailed) {
+        setState(
+          buildSubmissionErrorState(
+            'Your answers were saved, but the AI draft text kept for admins could not be updated.',
+          ),
+        );
+      }
 
       // 1. STOP any pending draft saves immediately
       if (inst._persistTimer) {

@@ -1,4 +1,4 @@
-import { resolveConsentFlags, summarizeConsentChoice, type InterviewConsentOverrides } from './sessionInterviewConsent';
+import { summarizeInterviewConsent, type InterviewConsentOverrides } from './sessionInterviewConsent';
 import { useInterviewSavedAnswers } from './useInterviewSavedAnswers';
 import { getSessionAiSettings } from '../../utilities/ai/aiSettings';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
@@ -231,15 +231,15 @@ export default function SessionInterviewPanel({
     included: boolean;
   } | null>(null);
   const [includeResponderName, setIncludeResponderName] = useState(false);
+  // Like research sharing, kept across signing in to submit, which resets consentOverrides.
+  const [draftTextKept, setDraftTextKept] = useState<{ contextToken: string; included: boolean } | null>(null);
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
   const [submissionInfoOpen, setSubmissionInfoOpen] = useState(false);
   const sessionResearchDetail = normalizeInterviewSettings(sessionConfig?.interviewMode).researchDetail;
-  // What the consent text described. It only ever narrows, so settings that load late can't widen
-  // what someone already agreed to share.
+  // What the consent text described: the research detail, and below whether draft text is kept. Each only
+  // narrows, so settings that load late can't widen what someone already agreed to share.
   const [shownResearchDetail, setShownResearchDetail] = useState(sessionResearchDetail);
-  useEffect(() => {
-    if (sessionResearchDetail === 'minimal') setShownResearchDetail('minimal');
-  }, [sessionResearchDetail]);
+  if (sessionResearchDetail === 'minimal' && shownResearchDetail !== 'minimal') setShownResearchDetail('minimal');
   const [showTranscript, setShowTranscript] = useState(false);
   // The questions an imported AI prefill drafted; its status line counts those still in review.
   const [prefillDraftIds, setPrefillDraftIds] = useState<string[]>([]);
@@ -253,7 +253,11 @@ export default function SessionInterviewPanel({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   // joinMatchingGroups is off by default. On, the AI suggests groups; the ones the person ticks join on submit.
-  const { showFidelityScore, joinMatchingGroups } = normalizeInterviewSettings(sessionConfig?.interviewMode);
+  const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins } = normalizeInterviewSettings(
+    sessionConfig?.interviewMode,
+  );
+  const [draftTextShown, setDraftTextShown] = useState(keepDraftTextForAdmins);
+  if (draftTextShown && !keepDraftTextForAdmins) setDraftTextShown(false);
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
   const [groupJoinRequest, setGroupJoinRequest] = useState(0);
@@ -453,32 +457,20 @@ export default function SessionInterviewPanel({
   const selectedDrafts = drafts.filter((draft) => selected[draft.questionId]);
   const visibleDrafts = drafts.filter((draft) => !removedDraftIds[draft.questionId]);
   const consentDrafts = selectedDrafts.length ? selectedDrafts : drafts;
-  const aiChoice = summarizeConsentChoice(
-    consentDrafts.map((draft) =>
-      savedConsent[draft.questionId]
-        ? resolveConsentFlags(savedConsent[draft.questionId]).includeAiProvenance
-        : hasAiPrefill && includeProvenance,
-    ),
-    consentOverrides.includeAiProvenance,
-  );
-  const comparisonChoice = summarizeConsentChoice(
-    consentDrafts.map((draft) =>
-      savedConsent[draft.questionId]
-        ? resolveConsentFlags(savedConsent[draft.questionId]).includePredictionComparison
-        : includePredictionComparison,
-    ),
-    consentOverrides.includePredictionComparison,
-  );
-  const nameChoice = summarizeConsentChoice(
-    consentDrafts.map((draft) =>
-      savedConsent[draft.questionId] ? !!savedConsent[draft.questionId].responderName : includeResponderName,
-    ),
-    consentOverrides.includeResponderName,
-  );
-  const hasSavedName = consentDrafts.some((draft) => !!savedConsent[draft.questionId]?.responderName);
-  const hasSavedAi = consentDrafts.some(
-    (draft) => resolveConsentFlags(savedConsent[draft.questionId]).includeAiProvenance,
-  );
+  const draftTextOverride = draftTextKept?.contextToken === baseSubmitContextToken ? draftTextKept.included : undefined;
+  const draftTextForwarded = keepDraftTextForAdmins ? (draftTextShown ? draftTextOverride : false) : undefined;
+  const { aiChoice, comparisonChoice, nameChoice, draftTextChoice, hasSavedName, hasSavedAi } =
+    summarizeInterviewConsent({
+      drafts: consentDrafts,
+      saved: savedConsent,
+      overrides: { ...consentOverrides, includeDraftText: draftTextOverride },
+      defaults: {
+        ai: hasAiPrefill && includeProvenance,
+        comparison: includePredictionComparison,
+        name: includeResponderName,
+        draftText: true,
+      },
+    });
 
   const existingResponsesRef = useRef(existingResponseSlice);
   existingResponsesRef.current = existingResponseSlice;
@@ -948,7 +940,7 @@ export default function SessionInterviewPanel({
     try {
       const instructions = buildRealtimeInterviewInstructions({
         questions: openQuestions.length ? openQuestions : questions,
-        onlyRevisions: !openQuestions.length,
+        answeredQuestions: questions.filter((question) => answered(question.id)),
         responderContext: voiceContext,
         openingPrompt: openQuestions.length === questions.length ? interviewOpening.opening : undefined,
         steeringPrompt: interviewOpening.steeringPrompt,
@@ -1018,10 +1010,11 @@ export default function SessionInterviewPanel({
       includeProvenance,
       includeResponderName,
       // Forward the shown detail only when it is narrower than the session's current one.
-      consentOverrides:
-        shownResearchDetail === sessionResearchDetail
-          ? consentOverrides
-          : { ...consentOverrides, researchDetail: shownResearchDetail },
+      consentOverrides: {
+        ...consentOverrides,
+        ...(draftTextForwarded === undefined ? {} : { includeDraftText: draftTextForwarded }),
+        ...(shownResearchDetail === sessionResearchDetail ? {} : { researchDetail: shownResearchDetail }),
+      },
       isInterviewBusy,
       researchAvailable,
       responderContext,
@@ -1065,6 +1058,7 @@ export default function SessionInterviewPanel({
     activeSubmitContextToken,
     authenticatedForSubmit,
     baseSubmitContextToken,
+    draftTextForwarded,
     drafts,
     hasAiPrefill,
     includePredictionComparison,
@@ -1473,6 +1467,10 @@ export default function SessionInterviewPanel({
                           unselectedCount={drafts.filter((draft) => !submittableSelection[draft.questionId]).length}
                           disabled={applying}
                           researchDetail={shownResearchDetail}
+                          draftText={draftTextShown ? draftTextChoice : null}
+                          onDraftTextChange={(included) =>
+                            setDraftTextKept({ contextToken: baseSubmitContextToken, included })
+                          }
                         >
                           {nameOption}
                         </SessionInterviewResearchConsent>
@@ -1487,6 +1485,7 @@ export default function SessionInterviewPanel({
                       mixed={comparisonChoice.mixed}
                       disabled={applying}
                       researchDetail={shownResearchDetail}
+                      draftTextOffered={draftTextShown}
                       onChange={(included) => {
                         setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
                         setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));

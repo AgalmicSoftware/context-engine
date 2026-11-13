@@ -24,8 +24,8 @@ The creation-block lookup is reused for each registry creation timestamp during 
 Reads honor configured start/end blocks, and bounded results retain each answer
 as of the end block. Unavailable historical state is reported as partial.
 
-See [docs/agent-participants.md](../docs/agent-participants.md) for what this
-means for session admins and readers.
+See [Agent Participants](https://github.com/AgalmicSoftware/context-engine/blob/main/docs/agent-participants.md)
+for what this means for session admins and readers.
 
 ## Install
 
@@ -45,6 +45,32 @@ The default command checks for a newer published version each time the host
 starts the server. For reproducible runs, replace `@latest` with an exact
 published version, such as `npx -y @agalmic/contextengine@0.2.0`. A running
 server does not update itself.
+
+## Upgrading to 0.3.4
+
+- The server waits and tries again when a session is briefly busy, for reads
+  and for answers that carry a request id. When a busy session leaves a
+  question unread, it tells the agent to retry instead of calling the question
+  unknown.
+- `list_questions` and `get_session` return without waiting more than 8
+  seconds for the agent's earlier answers, and a new agent skips that lookup.
+  `get_results` returns within about 40 seconds, marked partial when cut short.
+- `list_questions` returns up to 100 questions and says how to get any more.
+- The agent's key can come from `CE_MCP_PRIVATE_KEY`, for hosts that keep no
+  files between runs.
+- The next step names a link's group, and the answer tool's value has a
+  JSON-schema type.
+- An answer call that saved nothing is reported to the host as an error, a
+  quadratic answer in the wrong shape says to send a list of votes, and with
+  everything answered `list_questions` says so and how to see your answers.
+- A group join the session was too busy for is sent again, and a busy or
+  refused join says so plainly.
+- A model id or platform set by the host can no longer be changed by
+  `set_profile`; answers record who set each.
+- A browser invitation link can be given to `join_session` as it is.
+
+0.3.2 was not published to npm; its change is part of 0.3.3 and later. 0.3.3
+changed nothing in what the tools do.
 
 ## Upgrading to 0.3.2
 
@@ -128,15 +154,20 @@ Then ask the agent to join with the session link it was given:
 > Read the session's instructions for agents and its context, then list the
 > questions and answer them as yourself, explaining your reasoning in comments.
 
+Any session link works as it is. An invitation made for a person's browser, such
+as one that opens an interview (`mode=interview`) or names a group
+(`joinGroup=<id>`), joins the same session: `join_session` names the group, and
+the agent joins it with `join_group` after reading the session's instructions.
+
 ## Tools
 
 | Tool | What it does |
 | --- | --- |
 | `whoami` | Shows the agent's address, display profile and joined sessions. |
-| `set_profile` | Sets the display name shown in reports and the self-reported model and platform. |
+| `set_profile` | Sets the display name shown in reports and the self-reported model and platform. A model or platform set by the host stays. |
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it, and returns the session context, its instructions for agents, its groups and any invitation to add context. |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, end time and the agent's progress. |
-| `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; unanswered first. |
+| `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; unanswered first. Up to 100 a call; `more` and `next` say how to get the rest. |
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
 | `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set. |
@@ -161,9 +192,10 @@ unknown `CE_MCP_*` name.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `CE_MCP_STATE_DIR` | `~/.context-engine-mcp` | Holds `agent-key.json` and `state.json`. Absolute path. |
+| `CE_MCP_PRIVATE_KEY` | none | The agent's key (`0x` and 64 hex digits), used instead of `agent-key.json`, for hosts that keep no files between runs. Never written to disk; must match any key file already there. Keep it in the host's secret store. |
 | `CE_MCP_DISPLAY_NAME` | none | Name shown beside answers in reports; `set_profile` overrides it. |
-| `CE_MCP_MODEL_ID` | none | Self-reported model recorded with each answer. |
-| `CE_MCP_PLATFORM` | none | Self-reported agent platform recorded with each answer. |
+| `CE_MCP_MODEL_ID` | none | Model recorded with each answer, marked as set by the host (`modelIdSetBy: "host"`); `set_profile` cannot change it. Without it, a model the agent declares is marked `"agent"`. |
+| `CE_MCP_PLATFORM` | none | Agent platform recorded with each answer, marked the same way (`platformSetBy`); `set_profile` cannot change it. |
 | `CE_MCP_APP_ORIGIN` | `https://contextengine.sh` | An extra Context Engine web origin the agent may sign in as (for a self-hosted app). |
 | `CE_MCP_RPC_URL` | the chain's public RPC | HTTPS JSON-RPC endpoint for registry reads, writes and SBT claims. |
 | `CE_MCP_ALLOW_LOCAL_WORKERS` | `0` | `1` allows `http://localhost` Workers and a local chain during development. |
@@ -176,7 +208,10 @@ unknown `CE_MCP_*` name.
   a new one. `state.json` records the agent's address, and the server refuses
   to start when the key is missing or belongs to another agent, rather than
   mixing one agent's remembered answers into another's. Restore both files
-  together, or move `state.json` aside to start as a new agent.
+  together, or move `state.json` aside to start as a new agent. A serverless
+  host that starts each run with an empty directory can pass the key in
+  `CE_MCP_PRIVATE_KEY` instead, so each run is the same participant; the
+  server then looks up that agent's earlier answers in each session it joins.
   On filesystems supporting hard links, concurrent first starts see only a
   complete key file and load the same identity. Other filesystems use an
   exclusive write that still refuses to replace an existing key.
@@ -229,11 +264,19 @@ unknown `CE_MCP_*` name.
   ended and on-chain sessions refuse it. A session's daily limit for each
   address, when it sets one, counts additions too.
 - **Results reading is bounded.** `get_results` reads up to 10,000 answer
-  records, newest first, 16 at a time (`maxRecords` reads fewer). It caches
-  what it has read and counts answers the way the session report does.
-- **Large sessions.** Listing an agent's own answers scans every answer in
-  the session, so the server also remembers what the agent answered; in very
-  large sessions it says when answers given elsewhere may be missing.
+  records, newest first, 16 at a time (`maxRecords` reads fewer). It lists
+  answers for at most 20 seconds and reads them until 40, then answers with
+  `partial: true`, so it returns within a host's usual 60-second limit. It
+  caches what it has read and counts answers the way the session report does.
+- **Large sessions.** The server also remembers what the agent answered. A
+  tool call waits at most 8 seconds for the agent's earlier answers from the
+  Session Worker; past that, the questions come back with a note, and the
+  lookup finishes for later calls. An agent whose key was made with its state
+  directory skips the lookup in a session it joins for the first time, since
+  it can have answered only from there. If you also run that key elsewhere
+  (for example through `CE_MCP_PRIVATE_KEY`), delete `keyCreatedWithState`
+  from `state.json`, so the lookup runs again. Session Workers from 0.9.6 find a
+  person's own answers without reading everyone's.
 
 The server redacts RPC URLs and transaction data from registry write errors,
 preserves known transaction hashes, and tells callers to check uncertain
@@ -341,8 +384,9 @@ the exact smoke-tested tarball, its integrity and its complete bundle input
 hashes. Once enabled, `publish-mcp.yml` publishes that artifact automatically
 after successful push CI on public `main`. Version selection remains part of
 review: a published version cannot be replaced, and changed package contents
-require a new version. See [MCP release setup](../docs/mcp-releases.md) for
-account configuration, activation and recovery.
+require a new version. See
+[MCP release setup](https://github.com/AgalmicSoftware/context-engine/blob/main/docs/mcp-releases.md)
+for account configuration, activation and recovery.
 
 Worker answer uploads save a pending question, payload digest and request ID in
 `state.json` before sending. Repeating an identical failed call, including after

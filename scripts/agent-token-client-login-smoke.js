@@ -153,7 +153,7 @@ function assertConsoleHasNoRawTokens(consoleMessages) {
 async function waitForAgentQuestions(page) {
   try {
     await page
-      .getByTestId("ce-session-agent-questions")
+      .getByTestId("ce-agent-http-questions")
       .waitFor({ timeout: 30000 });
   } catch (error) {
     const loginError = await page
@@ -536,7 +536,7 @@ async function main() {
     });
     await page.getByTestId("ce-page-session-root").waitFor({ timeout: 30000 });
     await page.getByTestId("ce-session-results-toggle").waitFor({ timeout: 30000 });
-    assert.equal(await page.getByTestId("ce-session-agent-sign-in-notice").count(), 0,
+    assert.equal(await page.getByTestId("ce-agent-http-sign-in-notice").count(), 0,
       "Agent HTTP keeps the normal web session page before token login");
     await page.getByTestId("ce-account-login-button").click();
     await page
@@ -565,28 +565,28 @@ async function main() {
       .first()
       .waitFor({ timeout: 30000 });
     await page
-      .getByTestId("ce-session-agent-buckets")
+      .getByTestId("ce-agent-http-buckets")
       .waitFor({ timeout: 30000 });
     await page.waitForFunction(
       () =>
         document.querySelectorAll(
-          '[data-testid="ce-session-agent-bucket-select"]',
+          '[data-testid="ce-agent-http-bucket-select"]',
         ).length === 1 ||
         document.querySelectorAll(
-          '[data-testid="ce-session-agent-buckets-reconnect"]',
+          '[data-testid="ce-agent-http-buckets-reconnect"]',
         ).length === 1,
       null,
       { timeout: 30000 },
     );
     const bucketSelectCount = await page
-      .getByTestId("ce-session-agent-bucket-select")
+      .getByTestId("ce-agent-http-bucket-select")
       .count();
     const bucketReconnectCount = await page
-      .getByTestId("ce-session-agent-buckets-reconnect")
+      .getByTestId("ce-agent-http-buckets-reconnect")
       .count();
     if (bucketSelectCount === 1) {
       const bucketOptionText = await page
-        .getByTestId("ce-session-agent-bucket-select")
+        .getByTestId("ce-agent-http-bucket-select")
         .evaluate((select) =>
           Array.from(select.querySelectorAll("option"))
             .map((option) => option.textContent || "")
@@ -605,10 +605,10 @@ async function main() {
       );
     }
     await page
-      .getByTestId("ce-session-agent-results")
+      .getByTestId("ce-agent-http-results")
       .waitFor({ timeout: 30000 });
     await page
-      .getByTestId("ce-session-agent-report-approx")
+      .getByTestId("ce-agent-http-report-approx")
       .waitFor({ timeout: 30000 });
     await page.getByTestId("ce-polis-report-root").waitFor({ timeout: 60000 });
     if (await input.count()) {
@@ -628,23 +628,23 @@ async function main() {
       .getByTestId("ce-session-worker-groups")
       .getByText("Fixture reviewers", { exact: true })
       .waitFor();
-    await page.getByTestId("ce-session-agent-question-next").click();
+    await page.getByTestId("ce-agent-http-question-next").click();
     const draftInput = page.getByTestId(
-      "ce-session-agent-question-freeform-textarea",
+      "ce-agent-http-question-freeform-textarea",
     );
     await draftInput.fill("Synthetic local answer draft");
-    await page.getByTestId("ce-session-agent-question-prev").click();
+    await page.getByTestId("ce-agent-http-question-prev").click();
     await page
-      .getByTestId("ce-session-agent-questions")
+      .getByTestId("ce-agent-http-questions")
       .getByText("Agree", { exact: true })
       .click();
     assert.equal(
       await page.getByRole("radio", { name: "Agree", exact: true }).isChecked(),
       true,
     );
-    await page.getByTestId("ce-session-agent-question-submit").click();
+    await page.getByTestId("ce-agent-http-question-submit").click();
     await page.getByText("Already submitted", { exact: true }).waitFor();
-    await page.getByTestId("ce-session-agent-question-next").click();
+    await page.getByTestId("ce-agent-http-question-next").click();
     assert.equal(
       await draftInput.inputValue(),
       "Synthetic local answer draft",
@@ -701,9 +701,9 @@ async function main() {
       "page-memory envelope retains same-tab bucket payloads for rendered group cards",
     );
 
-    await page.getByTestId("ce-session-agent-logout").click();
+    await page.getByTestId("ce-agent-http-logout").click();
     await page.getByTestId("ce-session-results-toggle").waitFor({ timeout: 30000 });
-    assert.equal(await page.getByTestId("ce-session-agent-questions").count(), 0,
+    assert.equal(await page.getByTestId("ce-agent-http-questions").count(), 0,
       "agent logout restores the normal web session page");
     const logoutSnapshot = await scanStorage(page);
     assertNoRawTokens(logoutSnapshot, "logout");

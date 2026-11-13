@@ -7,8 +7,12 @@ import { controlCoordinatorBackupImport, assertNoActiveBackupImport } from './se
 import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
 import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
+import { createOperationQueue } from './operationQueue.js';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
-import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
+import {
+  SESSION_CONFIG_COORDINATION_ERROR, assertExpectedSessionAuthority, forgetResultsAnalysisStatus, forgetSessionConfig,
+  logCoordinatorFailure, shareResultsAnalysisStatusRead,
+} from './sessionConfigAuthority.js';
 import { exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup, controlWorkerGroupBackupImport, BACKUP_GROUP_IMPORT_ACTIVE_KEY } from './sessionBackupCoordinator.js';
 import { importCoordinatorBackupPage } from './sessionBackupImport.js';
 import { normalizeStorageRef, isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
@@ -94,6 +98,8 @@ const RESULTS_ANALYSIS_DRAFT_KEY = 'results-analysis-draft-v1';
 const RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX = 'results-analysis-draft-v1:chunk:';
 const RESULTS_ANALYSIS_AUTO_JOB_KEY = 'results-analysis-auto-job-v1';
 const RESULTS_ANALYSIS_UPLOAD_PREFIX = 'results-analysis-upload-v1:';
+const RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY = 'results-analysis-upload-prune-cursor-v1';
+const RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE = 500;
 const UPLOAD_RECEIPT_PREFIX = 'upload-receipt-v1:';
 const UPLOAD_RECEIPT_LEASE_MS = 120_000;
 const UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -112,8 +118,22 @@ export const MAX_ANSWER_VERSIONS = 20;
 const MAX_UPLOAD_QUESTION_IDS = 1000;
 const MAX_PRIOR_UPLOAD_TARGETS = 8;
 const MAX_RESULTS_ANALYSIS_REQUESTS = 24;
+// An AI Views draft (the views plus every answer they cover) is kept in at
+// most 192 chunks of 24,000 characters, about 4.6 million characters. Each
+// chunk is its own get or put, well inside the session object's limits of
+// 128 keys per call and 8 MB per value.
 const RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24_000;
-const RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 64;
+const RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 192;
+export const RESULTS_ANALYSIS_MAX_DRAFT_CHARS = RESULTS_ANALYSIS_VALUE_CHUNK_CHARS * RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS;
+// The size is rounded up and the limit down, so the one never looks within the other.
+const millionChars = (chars, round = Math.ceil) => (round(chars / 100_000) / 10).toFixed(1);
+const draftTooLargeError = (chars) => Object.assign(new Error(
+  `AI Views could not be saved: its answers and views come to ${millionChars(chars)} million characters, ` +
+  `over its limit of ${millionChars(RESULTS_ANALYSIS_MAX_DRAFT_CHARS, Math.floor)} million (about 120 people answering 53 questions ` +
+  'with long written answers and comments). Hidden questions are left out of AI Views, so hiding long ' +
+  'written-answer questions it does not need, then building again, brings it under the limit. ' +
+  'The last AI Views is unchanged.',
+), { status: 413 });
 const RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES = 48_000;
 const RESULTS_ANALYSIS_RUNNING_LEASE_MS = 14 * 60 * 1000;
 const RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS = 2;
@@ -330,6 +350,8 @@ const workerGroupBackupPendingKey = (mutation, reservation) =>
 // Phases a thrown KV mutation can leave behind, and the mutation each replays.
 const PENDING_WORKER_GROUP_OPERATIONS = Object.freeze({ creating: 'create', updating: 'update', deleting: 'delete' });
 const PENDING_WORKER_GROUP_MEMBER_OPERATIONS = Object.freeze({ reserved: 'add-member', removing: 'remove-member' });
+const WORKER_GROUP_MEMBER_MUTATIONS = new Set(['join', 'add-member', 'remove-member']);
+const NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION = Symbol('needsExclusiveWorkerGroupOperation');
 
 const DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = new Set([
   'invalid_join_mode',
@@ -457,10 +479,10 @@ export class SessionWriteCoordinator {
     this.runResultsAnalysisAutoJob = deps.runResultsAnalysisAutoJob || runQueuedAutomaticResultsAnalysisJob;
     this.activeAttemptId = '';
     this.activeDirectAttemptId = '';
-    this.sessionConfigTail = Promise.resolve();
+    this.sessionConfigQueue = createOperationQueue();
     this.storageVisibilityTail = Promise.resolve();
     this.contextSourceTail = Promise.resolve();
-    this.workerGroupTail = Promise.resolve();
+    this.workerGroupQueue = createOperationQueue();
     this.resultsAnalysisTail = Promise.resolve();
     this.storageOwnerTail = Promise.resolve();
     this.scanLegacyStorageOwnerIds = deps.scanLegacyStorageOwnerIds || scanLegacyStorageOwnerIds;
@@ -487,7 +509,11 @@ export class SessionWriteCoordinator {
   async scheduleUploadReceiptCleanup() {
     const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
     const nextAlarm = Math.min(nextExpiry, await readUploadReceiptRegistrationRetryAt(this), await nextAgentSubmitProjectionAt(this));
-    if (Number.isFinite(nextAlarm) && typeof this.state.storage.setAlarm === 'function') await this.state.storage.setAlarm(nextAlarm);
+    if (!Number.isFinite(nextAlarm) || typeof this.state.storage.setAlarm !== 'function') return;
+    // Keep an earlier alarm another queue set, such as the next page of AI Views receipts.
+    const scheduled = await this.state.storage.getAlarm?.();
+    if (scheduled > (Number(this.now()) || Date.now()) && scheduled <= nextAlarm) return;
+    await this.state.storage.setAlarm(nextAlarm);
   }
 
   async executeUploadReceipt(payload, operation = 'reserve') {
@@ -643,15 +669,22 @@ export class SessionWriteCoordinator {
   }
 
   serializeSessionConfigOperation(operation) {
-    const run = this.sessionConfigTail.then(operation);
-    this.sessionConfigTail = run.catch(() => undefined);
-    return run;
+    return this.sessionConfigQueue.exclusive(operation);
   }
 
   serializeWorkerGroupOperation(operation) {
-    const run = this.workerGroupTail.then(operation);
-    this.workerGroupTail = run.catch(() => undefined);
-    return run;
+    return this.workerGroupQueue.exclusive(operation);
+  }
+
+  // Joins, leaves and membership reads run side by side, one at a time per
+  // person; a room joining one group at once must not wait in single file.
+  // Group changes, backups and the recovery of a stranded group change run
+  // alone: an operation that meets one restarts on its own (`shared` false).
+  runWorkerGroupMemberOperation(principalKey, operation) {
+    return this.workerGroupQueue.shared(principalKey, () => operation(true)).catch((error) => {
+      if (error !== NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION) throw error;
+      return this.serializeWorkerGroupOperation(() => operation(false));
+    });
   }
 
   serializeStorageOwnerOperation(operation) {
@@ -774,11 +807,7 @@ export class SessionWriteCoordinator {
     for (let index = 0; index < serialized.length; index += RESULTS_ANALYSIS_VALUE_CHUNK_CHARS) {
       chunks.push(serialized.slice(index, index + RESULTS_ANALYSIS_VALUE_CHUNK_CHARS));
     }
-    if (chunks.length > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) {
-      const error = new Error('Results analysis draft exceeds durable storage limits.');
-      error.status = 413;
-      throw error;
-    }
+    if (chunks.length > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) throw draftTooLargeError(serialized.length);
     if (chunks.some((chunk) => byteLength(chunk) >= 120_000)) {
       const error = new Error('Results analysis draft chunk exceeds durable storage limits.');
       error.status = 413;
@@ -926,19 +955,29 @@ export class SessionWriteCoordinator {
     return { ...result, scheduled };
   }
 
+  // Each alarm checks one page of receipts and resumes after it next time, so
+  // a session holding thousands of answers never lists them all at once.
   async pruneResultsAnalysisUploadReceipts() {
     const nowMs = Number(this.now()) || Date.now();
-    const nextExpiry = await this.state.storage.transaction(async (transaction) => {
-      let next = Infinity;
-      for (const [key, record] of await transaction.list({ prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX })) {
+    const { nextExpiry, more } = await this.state.storage.transaction(async (transaction) => {
+      const cursor = await transaction.get(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY);
+      const page = await transaction.list({ prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX,
+        ...(cursor?.after ? { startAfter: cursor.after } : {}), limit: RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE });
+      let next = Number(cursor?.next) || Infinity;
+      for (const [key, record] of page) {
         if (record.expiresAt <= nowMs) await transaction.delete(key);
         else next = Math.min(next, record.expiresAt);
       }
-      return next;
+      if (page.size >= RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE) {
+        await transaction.put(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, { after: [...page.keys()].at(-1), next });
+        return { nextExpiry: next, more: true };
+      }
+      if (cursor) await transaction.delete(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY);
+      return { nextExpiry: next, more: false };
     });
-    if (Number.isFinite(nextExpiry) && !await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY)) {
-      await this.scheduleResultsAnalysisAlarm(nextExpiry - nowMs);
-    }
+    if (await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY)) return;
+    if (more) await this.scheduleResultsAnalysisAlarm(1_000);
+    else if (Number.isFinite(nextExpiry)) await this.scheduleResultsAnalysisAlarm(nextExpiry - nowMs);
   }
 
   async recordResultsAnalysisQueueFailure(error, job) {
@@ -1756,13 +1795,14 @@ export class SessionWriteCoordinator {
   // group or member, replay the intent: re-applying is convergent, and an effect
   // an earlier attempt already made counts as done. Reservations recorded before
   // intents existed replay with an empty input.
-  async settleWorkerGroupReservations({ slug, sessionId, groupIds, principal = null }) {
+  async settleWorkerGroupReservations({ slug, sessionId, groupIds, principal = null, shared = false }) {
     const principalDigest = principal ? await sha256Hex(`worker-group-member:${principal.key}`) : '';
     const replayed = [];
     for (const groupId of groupIds) {
       const groupKey = workerGroupCapacityGroupKey(groupId);
       let state = await this.state.storage.get(groupKey);
       const operation = PENDING_WORKER_GROUP_OPERATIONS[state?.phase];
+      if (operation && shared) throw NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION;
       if (operation) {
         const intent = isObjectRecord(state.pending) ? state.pending : {};
         // An unrecorded prior state restores the group with joins still closed.
@@ -1831,7 +1871,8 @@ export class SessionWriteCoordinator {
   }
 
   executeWorkerGroupAuthorization(payload) {
-    return this.serializeWorkerGroupOperation(async () => {
+    const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || '';
+    return this.runWorkerGroupMemberOperation(principalKey, async (shared) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const groupId = normalizeWorkerGroupId(payload?.groupId);
@@ -1847,7 +1888,7 @@ export class SessionWriteCoordinator {
       if (!initialized.ok) {
         return jsonResponse(initialized, initialized.status || 503);
       }
-      const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: [groupId], principal });
+      const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: [groupId], principal, shared });
       if (!settled.ok) return jsonResponse(settled, settled.status || 503);
       const group = await this.getActiveWorkerGroupCapacity(groupId);
       if (!group.ok) return jsonResponse(group, group.status || 404);
@@ -1883,7 +1924,8 @@ export class SessionWriteCoordinator {
   }
 
   executeWorkerGroupCatalog(payload) {
-    return this.serializeWorkerGroupOperation(async () => {
+    const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || '';
+    return this.runWorkerGroupMemberOperation(principalKey, async (shared) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const requestedGroupIds = Array.isArray(payload?.groupIds)
@@ -1913,7 +1955,7 @@ export class SessionWriteCoordinator {
       if (!initialized.ok) {
         return jsonResponse(initialized, initialized.status || 503);
       }
-      const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: uniqueGroupIds, principal });
+      const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: uniqueGroupIds, principal, shared });
       if (!settled.ok) return jsonResponse(settled, settled.status || 503);
       const principalDigest = principal
         ? await sha256Hex(`worker-group-member:${principal.key}`)
@@ -1950,7 +1992,8 @@ export class SessionWriteCoordinator {
   }
 
   executeWorkerGroupMemberships(payload) {
-    return this.serializeWorkerGroupOperation(async () => {
+    const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || '';
+    return this.runWorkerGroupMemberOperation(principalKey, async (shared) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
       const principal = normalizeWorkerGroupPrincipal(payload?.principal);
@@ -1969,7 +2012,7 @@ export class SessionWriteCoordinator {
             return '';
           }
         }).filter(Boolean);
-        const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds, principal });
+        const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds, principal, shared });
         if (!settled.ok) return jsonResponse(settled, settled.status || 503);
       }
       // Re-read settled state; capacity totals below must agree with it.
@@ -2026,10 +2069,12 @@ export class SessionWriteCoordinator {
   }
 
   async executeAuthorizedWorkerGroupMutation(payload) {
-    // Hold the authority queue across the separate group object's commit. Group
-    // mutation/recovery uses only its own durable state and KV; it must not call
-    // back into session config while this queue is held.
-    return this.serializeSessionConfigOperation(async () => {
+    // Hold the authority queue across the separate group object's commit, so
+    // no config change lands mid-commit. Group commits share it with one
+    // another; the group object orders them. Group mutation/recovery uses only
+    // its own durable state and KV; it must not call back into session config
+    // while this queue is held.
+    return this.sessionConfigQueue.shared('', async () => {
       try {
         await this.assertSessionAuthority(payload);
         const { expectedAuthority: _expectedAuthority, ...mutation } = payload;
@@ -2043,169 +2088,180 @@ export class SessionWriteCoordinator {
   }
 
   async executeWorkerGroupMutation(payload) {
-    return this.serializeWorkerGroupOperation(async () => {
-      if (
-        toTrimmedString(payload?.operation).toLowerCase() === 'create' &&
-        isAddressShapedWorkerGroupId(payload?.input?.groupId)
-      ) {
-        return jsonResponse({ ok: false, status: 400, reason: 'invalid_worker_group_id' }, 400);
+    if (WORKER_GROUP_MEMBER_MUTATIONS.has(toTrimmedString(payload?.operation).toLowerCase())) {
+      const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || '';
+      return this.runWorkerGroupMemberOperation(principalKey, (shared) => this.applyWorkerGroupMutation(payload, shared));
+    }
+    return this.serializeWorkerGroupOperation(() => this.applyWorkerGroupMutation(payload, false));
+  }
+
+  async applyWorkerGroupMutation(payload, shared) {
+    if (
+      toTrimmedString(payload?.operation).toLowerCase() === 'create' &&
+      isAddressShapedWorkerGroupId(payload?.input?.groupId)
+    ) {
+      return jsonResponse({ ok: false, status: 400, reason: 'invalid_worker_group_id' }, 400);
+    }
+    const mutation = normalizeWorkerGroupMutation(payload);
+    if (!mutation) {
+      return jsonResponse({
+        ok: false,
+        status: 400,
+        reason: 'worker_group_mutation_invalid',
+      }, 400);
+    }
+    const initialized = await this.initializeWorkerGroupCapacity(mutation.slug, mutation.sessionId);
+    if (!initialized.ok) {
+      return jsonResponse(initialized, initialized.status || 503);
+    }
+    const caps = resolveWorkerGroupCaps(this.env);
+    let groupReservation = null;
+    let memberReservation = null;
+    let updateReservation = null;
+    let deleteReservation = null;
+    let removalReservation = null;
+    let principalDigest = '';
+    let activeGroup = null;
+    const intent = {
+      ...(mutation.operation === 'delete' ? {} : { input: pickWorkerGroupInput(mutation.input) }),
+      ...(mutation.principal ? { principal: mutation.principal } : {}),
+      actorPrincipal: mutation.actorPrincipal,
+    };
+    if (byteLength(JSON.stringify(intent)) > WORKER_GROUP_INTENT_MAX_BYTES) {
+      return jsonResponse({ ok: false, status: 400, reason: 'worker_group_input_too_large' }, 400);
+    }
+    {
+      // A retried create meets its own pending reservation here too.
+      const settled = await this.settleWorkerGroupReservations({
+        slug: mutation.slug,
+        sessionId: mutation.sessionId,
+        groupIds: [mutation.groupId],
+        principal: mutation.principal ? { principal: mutation.principal, key: mutation.principalKey } : null,
+        shared,
+      });
+      if (!settled.ok) return jsonResponse(settled, settled.status || 503);
+      // A retry of the request the settle just finished gets that outcome, not
+      // already-exists or not-found for its own effect. Updates still apply.
+      // A pending member slot always replays as add-member, so it also finishes
+      // a resent join, even if joining has closed since the first attempt.
+      const finished = settled.replayed.find((entry) => entry.result.ok && (entry.operation === mutation.operation &&
+        (mutation.operation === 'delete' ||
+          (mutation.operation === 'remove-member' && entry.principalKey === mutation.principalKey) ||
+          (mutation.operation === 'create' && sameWorkerGroupInput(entry.input, intent.input))) ||
+        (entry.operation === 'add-member' && (mutation.operation === 'join' || mutation.operation === 'add-member') &&
+          entry.principalKey === mutation.principalKey)));
+      if (finished) return this.respondToWorkerGroupMutation(mutation, finished.result);
+    }
+    if (mutation.operation === 'create') {
+      groupReservation = await this.reserveWorkerGroupSlot({
+        slug: mutation.slug,
+        sessionId: mutation.sessionId,
+        groupId: mutation.groupId,
+        maxGroupsPerSession: caps.maxGroupsPerSession,
+        intent,
+      });
+      if (!groupReservation.ok) {
+        return jsonResponse(groupReservation, groupReservation.status || 409);
       }
-      const mutation = normalizeWorkerGroupMutation(payload);
-      if (!mutation) {
+    } else {
+      activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
+      if (!activeGroup.ok) {
+        return jsonResponse(activeGroup, activeGroup.status || 404);
+      }
+      if (
+        mutation.operation === 'join' &&
+        activeGroup.state.joinMode !== 'open'
+      ) {
         return jsonResponse({
           ok: false,
-          status: 400,
-          reason: 'worker_group_mutation_invalid',
-        }, 400);
+          status: 403,
+          reason: 'worker_group_join_denied',
+        }, 403);
       }
-      const initialized = await this.initializeWorkerGroupCapacity(mutation.slug, mutation.sessionId);
-      if (!initialized.ok) {
-        return jsonResponse(initialized, initialized.status || 503);
-      }
-      const caps = resolveWorkerGroupCaps(this.env);
-      let groupReservation = null;
-      let memberReservation = null;
-      let updateReservation = null;
-      let deleteReservation = null;
-      let removalReservation = null;
-      let principalDigest = '';
-      let activeGroup = null;
-      const intent = {
-        ...(mutation.operation === 'delete' ? {} : { input: pickWorkerGroupInput(mutation.input) }),
-        ...(mutation.principal ? { principal: mutation.principal } : {}),
-        actorPrincipal: mutation.actorPrincipal,
-      };
-      if (byteLength(JSON.stringify(intent)) > WORKER_GROUP_INTENT_MAX_BYTES) {
-        return jsonResponse({ ok: false, status: 400, reason: 'worker_group_input_too_large' }, 400);
-      }
-      {
-        // A retried create meets its own pending reservation here too.
-        const settled = await this.settleWorkerGroupReservations({
-          slug: mutation.slug,
-          sessionId: mutation.sessionId,
-          groupIds: [mutation.groupId],
-          principal: mutation.principal ? { principal: mutation.principal, key: mutation.principalKey } : null,
-        });
-        if (!settled.ok) return jsonResponse(settled, settled.status || 503);
-        // A retry of the request the settle just finished gets that outcome, not
-        // already-exists or not-found for its own effect. Updates still apply.
-        const finished = settled.replayed.find((entry) => entry.result.ok && entry.operation === mutation.operation &&
-          (mutation.operation === 'delete' ||
-            (mutation.operation === 'remove-member' && entry.principalKey === mutation.principalKey) ||
-            (mutation.operation === 'create' && sameWorkerGroupInput(entry.input, intent.input))));
-        if (finished) return this.respondToWorkerGroupMutation(mutation, finished.result);
-      }
-      if (mutation.operation === 'create') {
-        groupReservation = await this.reserveWorkerGroupSlot({
-          slug: mutation.slug,
-          sessionId: mutation.sessionId,
-          groupId: mutation.groupId,
-          maxGroupsPerSession: caps.maxGroupsPerSession,
-          intent,
-        });
-        if (!groupReservation.ok) {
-          return jsonResponse(groupReservation, groupReservation.status || 409);
-        }
-      } else {
-        activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
-        if (!activeGroup.ok) {
-          return jsonResponse(activeGroup, activeGroup.status || 404);
-        }
-        if (
-          mutation.operation === 'join' &&
-          activeGroup.state.joinMode !== 'open'
-        ) {
+      if (mutation.operation === 'join') {
+        const joinEndsAt = Date.parse(toTrimmedString(activeGroup.state.joinEndsAt));
+        if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(this.now())) {
           return jsonResponse({
             ok: false,
             status: 403,
-            reason: 'worker_group_join_denied',
+            reason: 'worker_group_join_ended',
           }, 403);
         }
-        if (mutation.operation === 'join') {
-          const joinEndsAt = Date.parse(toTrimmedString(activeGroup.state.joinEndsAt));
-          if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(this.now())) {
+      }
+      if (mutation.operation === 'update') {
+        if (Object.prototype.hasOwnProperty.call(mutation.input, 'memberLimit')) {
+          const requestedMemberLimit = Number(mutation.input.memberLimit);
+          if (
+            Number.isSafeInteger(requestedMemberLimit) &&
+            requestedMemberLimit > 0 &&
+            requestedMemberLimit < Number(activeGroup.state.memberCount || 0)
+          ) {
             return jsonResponse({
               ok: false,
-              status: 403,
-              reason: 'worker_group_join_ended',
-            }, 403);
+              status: 409,
+              reason: 'worker_group_member_limit_below_current',
+            }, 409);
           }
         }
-        if (mutation.operation === 'update') {
-          if (Object.prototype.hasOwnProperty.call(mutation.input, 'memberLimit')) {
-            const requestedMemberLimit = Number(mutation.input.memberLimit);
-            if (
-              Number.isSafeInteger(requestedMemberLimit) &&
-              requestedMemberLimit > 0 &&
-              requestedMemberLimit < Number(activeGroup.state.memberCount || 0)
-            ) {
-              return jsonResponse({
-                ok: false,
-                status: 409,
-                reason: 'worker_group_member_limit_below_current',
-              }, 409);
-            }
-          }
-          updateReservation = await this.beginWorkerGroupUpdate(mutation.groupId, intent);
-          if (!updateReservation.ok) {
-            return jsonResponse(updateReservation, updateReservation.status || 404);
-          }
-        } else if (mutation.operation === 'delete') {
-          deleteReservation = await this.beginWorkerGroupDelete(mutation.groupId, intent);
-          if (!deleteReservation.ok) return jsonResponse(deleteReservation, deleteReservation.status || 404);
+        updateReservation = await this.beginWorkerGroupUpdate(mutation.groupId, intent);
+        if (!updateReservation.ok) {
+          return jsonResponse(updateReservation, updateReservation.status || 404);
         }
+      } else if (mutation.operation === 'delete') {
+        deleteReservation = await this.beginWorkerGroupDelete(mutation.groupId, intent);
+        if (!deleteReservation.ok) return jsonResponse(deleteReservation, deleteReservation.status || 404);
       }
-      if (mutation.operation === 'add-member' || mutation.operation === 'join') {
-        principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
-        memberReservation = await this.reserveWorkerGroupMemberSlot({
-          groupId: mutation.groupId,
-          principalDigest,
-          maxMembersPerGroup: caps.maxMembersPerGroup,
-          intent,
-        });
-        if (!memberReservation.ok) {
-          return jsonResponse(memberReservation, memberReservation.status || 409);
-        }
-      } else if (mutation.operation === 'remove-member') {
-        principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
-        removalReservation = await this.beginWorkerGroupMemberRemoval({
-          groupId: mutation.groupId,
-          principalDigest,
-          remover: mutation.remover,
-          intent,
-        });
-        if (!removalReservation.ok) {
-          return jsonResponse(removalReservation, removalReservation.status || 404);
-        }
+    }
+    if (mutation.operation === 'add-member' || mutation.operation === 'join') {
+      principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
+      memberReservation = await this.reserveWorkerGroupMemberSlot({
+        groupId: mutation.groupId,
+        principalDigest,
+        maxMembersPerGroup: caps.maxMembersPerGroup,
+        intent,
+      });
+      if (!memberReservation.ok) {
+        return jsonResponse(memberReservation, memberReservation.status || 409);
       }
+    } else if (mutation.operation === 'remove-member') {
+      principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
+      removalReservation = await this.beginWorkerGroupMemberRemoval({
+        groupId: mutation.groupId,
+        principalDigest,
+        remover: mutation.remover,
+        intent,
+      });
+      if (!removalReservation.ok) {
+        return jsonResponse(removalReservation, removalReservation.status || 404);
+      }
+    }
 
-      const reservation = groupReservation || updateReservation || deleteReservation || memberReservation || removalReservation;
-      await this.state.storage.put(workerGroupBackupPendingKey(mutation, reservation), true);
-      let result;
-      try {
-        result = await executeWorkerGroupMutation({
-          env: this.env,
-          ...mutation,
-          capacityAuthorized: true,
-        });
-      } catch {
-        // KV may have accepted a write before surfacing an error. Retain the
-        // reservation, with its intent, until a later operation replays it.
-        return jsonResponse({
-          ok: false,
-          status: 503,
-          reason: 'worker_group_mutation_ambiguous',
-        }, 503);
-      }
+    const reservation = groupReservation || updateReservation || deleteReservation || memberReservation || removalReservation;
+    await this.state.storage.put(workerGroupBackupPendingKey(mutation, reservation), true);
+    let result;
+    try {
+      result = await executeWorkerGroupMutation({
+        env: this.env,
+        ...mutation,
+        capacityAuthorized: true,
+      });
+    } catch {
+      // KV may have accepted a write before surfacing an error. Retain the
+      // reservation, with its intent, until a later operation replays it.
+      return jsonResponse({
+        ok: false,
+        status: 503,
+        reason: 'worker_group_mutation_ambiguous',
+      }, 503);
+    }
 
-      await this.completeWorkerGroupReservation(
-        mutation,
-        result,
-        reservation,
-      );
-      if (!result.ok) return jsonResponse(result, result.status || 400);
-      return this.respondToWorkerGroupMutation(mutation, result);
-    });
+    await this.completeWorkerGroupReservation(
+      mutation,
+      result,
+      reservation,
+    );
+    if (!result.ok) return jsonResponse(result, result.status || 400);
+    return this.respondToWorkerGroupMutation(mutation, result);
   }
 
   async respondToWorkerGroupMutation(mutation, result) {
@@ -2291,7 +2347,8 @@ export class SessionWriteCoordinator {
         const safeError = legacySessionConfigMigrationError();
         return jsonResponse({ error: safeError.message, reason: safeError.reason }, 503);
       }
-      return jsonResponse({ error: 'Session config coordination is unavailable; retry.' }, 503);
+      logCoordinatorFailure('coordinator/session-config/current', error);
+      return jsonResponse({ error: SESSION_CONFIG_COORDINATION_ERROR }, 503);
     }
   }
 
@@ -3571,6 +3628,8 @@ export const getOrCreateCoordinatedStorageEnvelopeSessionKey = async ({
       ? 'Session config projection is pending; retry.'
       : 'Session config coordination failed.');
   }
+  // A new key is written into the config; later reads here must see it.
+  if (result.created) forgetSessionConfig(env, slug);
   return result;
 };
 
@@ -3610,6 +3669,9 @@ export const executeCoordinatedSessionConfigMutation = async ({
       status: 503,
       body: { error: 'Session config coordination failed; retry.' },
     };
+  } finally {
+    // The admin who made a change must see it at once, not a cached copy.
+    forgetSessionConfig(env, slug);
   }
   const result = await response.json().catch(() => ({}));
   return response.ok && result?.ok === true
@@ -3686,7 +3748,11 @@ export const checkCoordinatedLegacyStorageOwner = async ({ env, config, slug, re
   }
 };
 
-export const readCoordinatedResultsAnalysisStatus = async ({ env, slug } = {}) => {
+// `shared`: an AI Views view, which joins this isolate's read in flight and may
+// reuse one up to a second old; a finished draft never changes, and a new one
+// built through this isolate shows at once. The result is frozen.
+export const readCoordinatedResultsAnalysisStatus = async ({ env, slug, shared = false } = {}) => {
+  if (shared) return shareResultsAnalysisStatusRead({ env, slug, cache: true, read: () => readCoordinatedResultsAnalysisStatus({ env, slug }) });
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) return { ok: false, status: 503, error: 'Results analysis coordination is unavailable.' };
@@ -3703,7 +3769,9 @@ export const readCoordinatedResultsAnalysisStatus = async ({ env, slug } = {}) =
   }
 };
 
-export const reserveCoordinatedResultsAnalysis = async ({ env, slug, reservation } = {}) => {
+// A reservation or a finished run changes the status, so this isolate's
+// shared copy is dropped once the call returns.
+const reserveResultsAnalysisCall = async ({ env, slug, reservation } = {}) => {
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) return { kind: 'failed', status: 503, error: 'Results analysis coordination is unavailable.' };
@@ -3719,7 +3787,15 @@ export const reserveCoordinatedResultsAnalysis = async ({ env, slug, reservation
   }
 };
 
-export const finalizeCoordinatedResultsAnalysis = async ({ env, slug, finalization } = {}) => {
+export const reserveCoordinatedResultsAnalysis = async (args = {}) => {
+  try { return await reserveResultsAnalysisCall(args); } finally { forgetResultsAnalysisStatus(args.env, args.slug); }
+};
+
+export const finalizeCoordinatedResultsAnalysis = async (args = {}) => {
+  try { return await finalizeResultsAnalysisCall(args); } finally { forgetResultsAnalysisStatus(args.env, args.slug); }
+};
+
+const finalizeResultsAnalysisCall = async ({ env, slug, finalization } = {}) => {
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) return { ok: false, status: 503, error: 'Results analysis coordination is unavailable.' };

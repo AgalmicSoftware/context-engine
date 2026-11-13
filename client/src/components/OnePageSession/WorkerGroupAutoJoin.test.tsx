@@ -424,6 +424,31 @@ describe('WorkerGroupAutoJoin', () => {
     expect(joins()).toHaveLength(2);
   });
 
+  it('waits out a busy session, then says so and keeps the join retryable', async () => {
+    const initial = fetchMock.getMockImplementation();
+    const busy = () =>
+      new Response(
+        JSON.stringify({
+          error: 'Session config coordination is unavailable; retry.',
+          reason: 'worker_group_coordination_unavailable',
+        }),
+        { status: 503 },
+      );
+    fetchMock.mockImplementation(async (url: RequestInfo | URL) =>
+      String(url).includes('/groups/join') ? busy() : initial!(url),
+    );
+    render(<WorkerGroupAutoJoin {...props} />);
+    await tick(10000);
+    // The first try and three waits and retries, then a plain message.
+    expect(joins()).toHaveLength(4);
+    expect(screen.getByRole('alert')).toHaveTextContent('Many people are joining at once. Try again in a moment.');
+    expect(window.location.search).toContain('joinGroup');
+    fetchMock.mockImplementation(initial!);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await tick();
+    expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
+  });
+
   it('invalidates old authentication when the account changes', async () => {
     let resolveOld: (token: string) => void = () => {};
     getToken.mockImplementationOnce(

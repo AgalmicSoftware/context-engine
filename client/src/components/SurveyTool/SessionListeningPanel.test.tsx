@@ -105,6 +105,8 @@ const buildRecorder = (overrides: Record<string, unknown> = {}) => ({
   saveSpeakerMerges: jest.fn(),
   ...overrides,
 });
+// Drafting after each chunk, while recording, as sessions could before drafting once at the end was the default.
+const PER_CHUNK = { interviewMode: { recordingQuestionCount: 5, recordingQuestionTiming: 'chunk' } };
 const nextFrame = () => act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
 
 describe('SessionListeningPanel', () => {
@@ -663,7 +665,9 @@ describe('SessionListeningPanel', () => {
         segments: [{ id: 's1', index: 0, status: 'complete', text: firstTranscript, completedAt: 2 }],
       }),
     );
-    const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    const { rerender } = render(
+      <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+    );
     await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
 
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
@@ -676,7 +680,9 @@ describe('SessionListeningPanel', () => {
         ],
       }),
     );
-    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    rerender(
+      <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+    );
     expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -690,7 +696,9 @@ describe('SessionListeningPanel', () => {
     });
     const firstMountId = screen.getByTestId('mock-create-questions').getAttribute('data-mount-id');
 
-    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    rerender(
+      <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+    );
     await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-count', '2'));
     expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-mount-id', firstMountId || '');
@@ -716,7 +724,9 @@ describe('SessionListeningPanel', () => {
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
       buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
     );
-    const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    const { rerender } = render(
+      <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+    );
     const drafts = await screen.findByTestId('mock-create-questions');
     expect(drafts).toHaveAttribute('data-submit-disabled', 'false');
     expect(drafts).toHaveAttribute('data-submit-label', 'Submit questions');
@@ -727,7 +737,9 @@ describe('SessionListeningPanel', () => {
         segments: [firstSegment, { id: 's2', index: 1, status: 'complete', text: 'Later.', completedAt: 5 }],
       }),
     );
-    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    rerender(
+      <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+    );
     await waitFor(() =>
       expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-submit-disabled', 'true'),
     );
@@ -772,7 +784,9 @@ describe('SessionListeningPanel', () => {
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
         buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
       );
-      const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      const { rerender } = render(
+        <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+      );
 
       fireEvent.click(await screen.findByRole('button', { name: '1 new draft question' }));
       const drafts = screen.getByRole('region', { name: 'Draft questions' });
@@ -787,7 +801,9 @@ describe('SessionListeningPanel', () => {
           segments: [firstSegment, { id: 's2', index: 1, status: 'complete', text: 'Later.', completedAt: 5 }],
         }),
       );
-      rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      rerender(
+        <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+      );
       fireEvent.click(await screen.findByRole('button', { name: '2 new draft questions' }));
       // The first of the new drafts, not the top of the list.
       expect(scrollIntoView.mock.contexts[1]).toBe(screen.getByText('How should trust be measured?'));
@@ -834,7 +850,9 @@ describe('SessionListeningPanel', () => {
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
         buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
       );
-      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      render(
+        <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+      );
 
       await screen.findByRole('button', { name: '1 new draft question' });
       const [{ onChange, target }] = observers;
@@ -885,7 +903,9 @@ describe('SessionListeningPanel', () => {
         ],
         raw: { questions: [] },
       });
-      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      render(
+        <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+      );
       await waitFor(() =>
         expect(screen.getByTestId('mock-create-questions')).toHaveAttribute(
           'data-prompts',
@@ -912,7 +932,9 @@ describe('SessionListeningPanel', () => {
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
         buildRecorder({ scope: 'a', transcript, segments: [segment], questionDrafts: kept, saveQuestionDrafts }),
       );
-      const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      const { rerender } = render(
+        <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+      );
       await screen.findByTestId('mock-create-questions');
       const other = 'Another recording discussed school meals, transport passes, library hours and park lighting.';
       mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
@@ -929,7 +951,9 @@ describe('SessionListeningPanel', () => {
           saveQuestionDrafts,
         }),
       );
-      rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      rerender(
+        <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
+      );
       await waitFor(() =>
         expect(screen.getByTestId('mock-create-questions')).toHaveAttribute(
           'data-prompts',
@@ -1233,6 +1257,263 @@ describe('SessionListeningPanel', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE));
     await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2));
     expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-count', '1');
+  });
+
+  describe('a session that drafts group recording questions once, at the end', () => {
+    const atEnd = { interviewMode: { recordingQuestionCount: 3, recordingQuestionTiming: 'end' } };
+    const first = 'Person 1: The council should pilot AI summaries in the February budget consultation.';
+    const second = 'Person 2: Residents need two weeks to correct how the summary represents them.';
+    const chunk = (id: string, index: number, text: string) => ({
+      id,
+      index,
+      status: 'complete',
+      text,
+      startedAt: index + 1,
+      completedAt: index + 2,
+    });
+    const drafts = (prompts: string[]) => ({
+      surveyTitle: 'Breakout',
+      statements: prompts.map((prompt, index) => ({ id: `q${index}`, type: 'binary', prompt, tags: [] })),
+      raw: { questions: [] },
+    });
+    const panel = () => (
+      <SessionListeningPanel sessionSlug="demo" sessionConfig={atEnd} panelMode="recordGroup" embeddedInModal />
+    );
+
+    it('drafts nothing while recording, then the set number once from the whole discussion when it stops', async () => {
+      const transcript = `${first}\n${second}`;
+      const recording = { transcript, segments: [chunk('s1', 0, first), chunk('s2', 1, second)] };
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ ...recording, status: 'recording', isRecording: true }),
+      );
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValue(drafts(['A?', 'B?', 'C?']));
+      const { rerender } = render(panel());
+      await nextFrame();
+      expect(generateQuestionsFromListeningTranscript).not.toHaveBeenCalled();
+      // Stopping, and paused, still wait.
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ ...recording, status: 'paused', isPaused: true }),
+      );
+      rerender(panel());
+      await nextFrame();
+      expect(generateQuestionsFromListeningTranscript).not.toHaveBeenCalled();
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(recording));
+      rerender(panel());
+      await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
+        transcript,
+        expect.objectContaining({ count: 3 }),
+      );
+      expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-count', '3');
+      rerender(panel());
+      await nextFrame();
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+    });
+
+    it('drafts nothing again when a stopped recording is reopened with its drafts', async () => {
+      const transcript = `${first}\n${second}`;
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          transcript,
+          segments: [chunk('s1', 0, first), chunk('s2', 1, second)],
+          questionDrafts: {
+            questions: drafts(['A?', 'B?', 'C?']).statements,
+            prompts: ['A?', 'B?', 'C?'],
+            draftedTranscript: transcript,
+          },
+        }),
+      );
+      render(panel());
+      expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-count', '3');
+      await nextFrame();
+      expect(generateQuestionsFromListeningTranscript).not.toHaveBeenCalled();
+    });
+
+    it('adds what is left of the number, at least one, when more is recorded after it stopped', async () => {
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          transcript: `${first}\n${second}`,
+          segments: [chunk('s1', 0, first), chunk('s2', 1, second)],
+          questionDrafts: {
+            questions: drafts(['A?', 'B?', 'C?']).statements,
+            prompts: ['A?', 'B?', 'C?'],
+            draftedTranscript: first,
+          },
+        }),
+      );
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValue(drafts(['D?']));
+      render(panel());
+      await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
+        `${first}\n${second}`,
+        expect.objectContaining({ count: 1, existingQuestionPrompts: ['A?', 'B?', 'C?'] }),
+      );
+    });
+
+    it('says when closing mid-recording that its questions come when it is reopened', async () => {
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: first, segments: [chunk('s1', 0, first)], status: 'recording', isRecording: true }),
+      );
+      render(
+        <SessionListeningPanel
+          sessionSlug="demo"
+          sessionConfig={atEnd}
+          panelMode="recordGroup"
+          embeddedInModal={false}
+          onClose={jest.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByLabelText('Close listening panel'));
+      expect(await screen.findByText(/Its questions are drafted when you reopen it\./)).toBeInTheDocument();
+    });
+
+    it('counts only the drafts it added, and drops "no new questions" once recording resumes', async () => {
+      const asked = 'Should the council pilot AI summaries?';
+      const pooled = () => (
+        <SessionListeningPanel
+          sessionSlug="demo"
+          sessionConfig={atEnd}
+          questionPool={[{ id: 's-1', type: 'binary', prompt: asked }]}
+          panelMode="recordGroup"
+          embeddedInModal
+        />
+      );
+      const once = { transcript: first, segments: [chunk('s1', 0, first)] };
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(once));
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts([asked]));
+      const { rerender } = render(pooled());
+      expect(await screen.findByText('No new questions from this discussion.')).toBeInTheDocument();
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ ...once, status: 'recording', isRecording: true }),
+      );
+      rerender(pooled());
+      await waitFor(() => expect(screen.queryByText('No new questions from this discussion.')).toBeNull());
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['D?']));
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: `${first}\n${second}`, segments: [chunk('s1', 0, first), chunk('s2', 1, second)] }),
+      );
+      rerender(pooled());
+      await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2));
+      // The repeat of a session question added nothing, so all three are still to come.
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenLastCalledWith(
+        `${first}\n${second}`,
+        expect.objectContaining({ count: 3 }),
+      );
+    });
+
+    it('drafts once after a failure only when Generate is pressed, with the set number', async () => {
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: `${first}\n${second}`, segments: [chunk('s1', 0, first), chunk('s2', 1, second)] }),
+      );
+      mockGenerateQuestionsFromListeningTranscript
+        .mockRejectedValueOnce(new Error('AI unavailable'))
+        .mockResolvedValueOnce(drafts(['A?', 'B?', 'C?']));
+      const { rerender } = render(panel());
+      expect(await screen.findByRole('alert')).toHaveTextContent('AI unavailable');
+      rerender(panel());
+      await nextFrame();
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE));
+      await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2));
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ count: 3 }),
+      );
+    });
+  });
+
+  it('by default drafts at most three, once the recording stops', async () => {
+    const transcript = 'Person 1: The council should pilot AI summaries in the February budget consultation.';
+    const recording = {
+      transcript,
+      segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1, completedAt: 2 }],
+    };
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({ ...recording, status: 'recording', isRecording: true }),
+    );
+    mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
+      surveyTitle: '',
+      statements: [],
+      raw: { questions: [] },
+    });
+    const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    await nextFrame();
+    expect(generateQuestionsFromListeningTranscript).not.toHaveBeenCalled();
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(recording));
+    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    await waitFor(() =>
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
+        transcript,
+        expect.objectContaining({ count: 3 }),
+      ),
+    );
+  });
+
+  it('says plainly when a discussion gives no new question, and drafts none the session already asks', async () => {
+    const transcript = 'Person 1: The council should pilot AI summaries in the February budget consultation.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1, completedAt: 2 }],
+      }),
+    );
+    // The same question as the session's, but for case and punctuation.
+    mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
+      surveyTitle: 'Breakout',
+      statements: [{ id: 'q1', type: 'binary', prompt: 'should the council pilot AI summaries', tags: [] }],
+      raw: { questions: [] },
+    });
+    render(
+      <SessionListeningPanel
+        sessionSlug="demo"
+        sessionConfig={{ sessionName: 'Reverse Alignment', sessionInfo: 'Democracy and AI.' }}
+        questionPool={[{ id: 's-1', type: 'binary', prompt: 'Should the council pilot AI summaries?' }]}
+        panelMode="recordGroup"
+        embeddedInModal
+      />,
+    );
+    expect(await screen.findByText('No new questions from this discussion.')).toHaveAttribute('role', 'status');
+    expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
+      transcript,
+      expect.objectContaining({
+        sessionQuestionPrompts: ['Should the council pilot AI summaries?'],
+        sessionSubject: 'Reverse Alignment: Democracy and AI.',
+      }),
+    );
+    expect(screen.queryByTestId('mock-create-questions')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+  });
+
+  it('drafts the set number after each part while recording, when the session asks for that', async () => {
+    const transcript = 'Person 1: The council should pilot AI summaries in the February budget consultation.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        status: 'recording',
+        isRecording: true,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1, completedAt: 2 }],
+      }),
+    );
+    mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
+      surveyTitle: 'Breakout',
+      statements: [{ id: 'q1', type: 'binary', prompt: 'A?', tags: [] }],
+      raw: { questions: [] },
+    });
+    render(
+      <SessionListeningPanel
+        sessionSlug="demo"
+        sessionConfig={{ interviewMode: { recordingQuestionCount: 2, recordingQuestionTiming: 'chunk' } }}
+        panelMode="recordGroup"
+        embeddedInModal
+      />,
+    );
+    await waitFor(() =>
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
+        transcript,
+        expect.objectContaining({ count: 2 }),
+      ),
+    );
   });
 
   it('shows a stopped recorder ahead of an earlier question-generation error', async () => {

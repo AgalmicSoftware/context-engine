@@ -16,6 +16,7 @@ import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } fro
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
+import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
 // The Session Worker shows these sessions' answers to every signed-in member.
@@ -29,6 +30,18 @@ const OWN_ANSWER_DEADLINE_MS = 60_000;
 // One scan of the agent's own answers is reused this long; answers it gives
 // meanwhile come from its local record.
 const OWN_ANSWER_SCAN_MAX_AGE_MS = 10 * 60 * 1000;
+// An unfinished scan of a Session Worker is reused for a minute before another
+// starts, as an unread record is.
+const OWN_ANSWER_RETRY_MS = 60_000;
+// A tool call waits this long for that scan, then answers without it; the
+// scan finishes for later calls. Hosts often give a tool call 60 seconds.
+const OWN_ANSWER_WAIT_MS = 8_000;
+// get_results lists answers for at most this long, then reads them until the
+// second limit, so it returns within a host's usual 60 seconds.
+const RESULTS_LIST_DEADLINE_MS = 20_000;
+const RESULTS_READ_DEADLINE_MS = 40_000;
+// list_questions returns up to this many questions a call.
+const MAX_LISTED_QUESTIONS = 100;
 // A Worker lists answers without their question, so results read every listed
 // one: a 30-question salon of 80 people, some changing answers, lists ~2,900.
 const MAX_RESULT_RECORDS = 10000;
@@ -180,11 +193,13 @@ const instructionsOf = (config) => {
   };
 };
 
-// `member` is whether the agent is in the link's group, or null when its groups couldn't be read.
-const nextStep = ({ instructions, linkGroup, member = null }) => {
+// `member` is whether the agent is in the link's group, or null when its groups
+// couldn't be read; `groupName` is that group's name when it is listed.
+const nextStep = ({ instructions, linkGroup, groupName = '', member = null }) => {
   const read = instructions ? 'Read the session’s instructions for agents and the context' : 'Read the context';
   if (!linkGroup) return `${read}, then call list_questions and answer.`;
-  const named = `The link names group "${linkGroup}"`;
+  // A group's name is written by its creator, so it is quoted as data.
+  const named = groupName ? `The link names the group ${JSON.stringify(groupName)} (${linkGroup})` : `The link names group "${linkGroup}"`;
   if (member) {
     const other = instructions
       ? ' If the instructions ask you to be in another group instead, join that one with join_group and leave this one with leave_group.'
@@ -195,6 +210,20 @@ const nextStep = ({ instructions, linkGroup, member = null }) => {
     ? 'call join_group for the group the instructions ask you to join, if any'
     : 'join it with join_group';
   return `${read}. ${named}${member === false ? ', which you haven’t joined' : ''}: ${join}. Then call list_questions and answer.`;
+};
+
+// Says plainly what a list_questions call left out and how to get it.
+const pageNotes = (matching, start, max, filter) => {
+  const shown = Math.max(0, Math.min(max, matching - start));
+  const left = Math.max(0, matching - start - shown);
+  return {
+    shown,
+    ...(start ? { offset: start } : {}),
+    ...(left ? { more: left, next: filter === 'unanswered'
+      ? `${left} more not shown. Answer these, then call list_questions again; answered ones drop out of this list, so start again from offset 0.`
+      : `${left} more not shown: call list_questions with filter "${filter}" and offset ${start + shown}.` } : {}),
+    ...(start && start >= matching && matching ? { pageNote: `offset ${start} is past the ${matching} matching questions; call again from offset 0.` } : {}),
+  };
 };
 
 const WHO_CAN_END_MEMBERSHIP = {
@@ -213,8 +242,25 @@ const GROUP_REFUSALS = {
   worker_group_leave_denied: (id) => `Group "${id}" doesn’t let members leave.`,
 };
 
-const groupRefusal = (error, id) =>
-  error instanceof WorkerRequestError && Object.hasOwn(GROUP_REFUSALS, error.code) ? new Error(GROUP_REFUSALS[error.code](id)) : error;
+// Group answers that a few seconds' wait clears; the client has already resent a join.
+const BUSY_GROUP_REASONS = new Set(['worker_group_coordination_unavailable', 'worker_group_membership_state_pending', 'worker_group_mutation_ambiguous']);
+
+// A busy or unanswered change may still land later, so it says the agent's
+// membership is unconfirmed and that repeating the call is harmless.
+const groupRefusal = (error, id, tool) => {
+  if (!(error instanceof WorkerRequestError)) return error;
+  if (Object.hasOwn(GROUP_REFUSALS, error.code)) return new Error(GROUP_REFUSALS[error.code](id));
+  const joining = tool === 'join_group';
+  if (error.status === 503 && (BUSY_GROUP_REASONS.has(error.code) || !error.code || error.code === SESSION_COORDINATOR_UNAVAILABLE)) {
+    return new Error(joining
+      ? `The session was too busy to confirm that you joined group "${id}", so you may not be in it yet. Wait a few seconds and call join_group again: repeating it is harmless, and it succeeds at once if you are already in.`
+      : `The session was too busy to confirm that you left group "${id}", so you may still be in it. Wait a few seconds and call leave_group again: if you have already left, it says you aren’t a member.`);
+  }
+  if (!error.status) {
+    return new Error(`No answer came back about ${joining ? 'joining' : 'leaving'} group "${id}", so it may not have gone through. Call get_session to see whether you are in it, or call ${tool} again: repeating it is harmless.`);
+  }
+  return error;
+};
 
 // `olderLink` is a link to a Worker whose features couldn't be read, which may be
 // one from before participants' links: it refuses one as any change from a participant.
@@ -228,17 +274,26 @@ const contextRefusal = (error, { olderLink = false } = {}) => {
   return error;
 };
 
+// While a lookup of earlier answers is still running, it can only fill in
+// questions shown as unanswered; with every question answered here it has
+// nothing left to add. An unread answer still may be newer, so it keeps the note.
+const lookupMoot = (questions, mine) =>
+  mine.pending && !mine.unread && questions.length > 0 && questions.every((question) => mine.has(question.id));
+
 const progressNotes = (questions, mine) => ({
   ...(questions.locked ? { lockedQuestions: questions.locked } : {}),
   ...(questions.complete === false ? { questionsComplete: false } : {}),
   ...(questions.unread ? { unreadQuestions: questions.unread } : {}),
   ...(mine.unread ? { unreadMyAnswers: mine.unread } : {}),
-  ...(mine.complete === false
-    ? { myAnswersComplete: false, note: 'Some answers could not be read or the scan is unfinished; the answers shown may be incomplete.' }
+  ...(mine.complete === false && !lookupMoot(questions, mine)
+    ? { myAnswersComplete: false, note: mine.pending
+      ? 'Your earlier answers are still being looked up, so some you gave may show as unanswered; call again in a minute to see them.'
+      : 'Some answers could not be read or the scan is unfinished; the answers shown may be incomplete.' }
     : {}),
 });
 
-export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), sbt = null, createProvider, sleep, registry = {} }) => {
+export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), sbt = null, createProvider, sleep, registry = {},
+  ownAnswerWaitMs = OWN_ANSWER_WAIT_MS }) => {
   const requestTestEth = createTestEthRequester({ config, wallet, createProvider, now, sleep });
   const sessions = new Map(); // key -> { info, client, records: Map(storageId -> payload), missing: Map(storageId -> time) }
   let state = null;
@@ -264,11 +319,21 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     state = await updateAgentState(config.stateDir, mutate);
   };
 
-  const profile = () => ({
-    displayName: trim(state?.profile?.displayName ?? config.profile.displayName),
-    modelId: trim(state?.profile?.modelId ?? config.profile.modelId),
-    platform: trim(state?.profile?.platform ?? config.profile.platform),
-  });
+  // A model or platform the host set is kept over one the agent declares, and
+  // the answer records say which of the two set it.
+  const profile = () => {
+    const hostModelId = trim(config.profile.modelId);
+    const hostPlatform = trim(config.profile.platform);
+    const modelId = hostModelId || trim(state?.profile?.modelId);
+    const platform = hostPlatform || trim(state?.profile?.platform);
+    return {
+      displayName: trim(state?.profile?.displayName ?? config.profile.displayName),
+      modelId,
+      platform,
+      ...(modelId ? { modelIdSetBy: hostModelId ? 'host' : 'agent' } : {}),
+      ...(platform ? { platformSetBy: hostPlatform ? 'host' : 'agent' } : {}),
+    };
+  };
 
   // Sign in as the link's web app only when the agent already trusts it.
   const trustedOriginsFor = (preferred) =>
@@ -403,8 +468,14 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const stored = isRecord(fresh.sessions[key]) ? fresh.sessions[key] : {};
       // A different session behind the same link starts with no remembered answers.
       const previous = stored.sessionId && stored.sessionId !== ctx.client.sessionId ? {} : stored;
+      // A key made with this state has only ever answered from it, so a session
+      // it joins for the first time holds no earlier answers of its own.
+      // Any earlier entry, here or for this session under another link, rules it out.
+      const first = fresh.keyCreatedWithState === true && !isRecord(fresh.sessions[key]) &&
+        !Object.values(fresh.sessions).some((entry) => isRecord(entry) && entry.sessionId === ctx.client.sessionId);
       fresh.sessions[key] = {
         ...previous,
+        ...(first ? { noEarlierAnswers: true } : {}),
         sessionId: ctx.client.sessionId,
         workerOrigin: ctx.info.workerOrigin,
         ...(ctx.registry ? { kind: 'registry', chainId: ctx.info.chainId || 11155420 } : {}),
@@ -501,10 +572,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   };
 
   /** Records not reached or not readable come back undefined and keep the read incomplete. */
-  const readMany = async (ctx, storageIds) => {
-    const deadline = now() + READ_DEADLINE_MS;
+  // `stopped` defaults to the current tool call's cancellation; a background
+  // read that outlives its call passes its own.
+  const readMany = async (ctx, storageIds, { deadlineMs = READ_DEADLINE_MS, stopped = () => signal?.aborted } = {}) => {
+    const deadline = now() + deadlineMs;
     const payloads = await mapLimit(storageIds, READ_CONCURRENCY, async (storageId) => {
-      if (!ctx.records.has(storageId) && (now() >= deadline || signal?.aborted)) return undefined;
+      if (!ctx.records.has(storageId) && (now() >= deadline || stopped())) return undefined;
       return readCached(ctx, storageId).catch(() => undefined);
     });
     const unread = payloads.filter(payload => payload === undefined).length;
@@ -589,9 +662,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     return questions;
   };
 
-  const toEntries = async (ctx, items) => {
+  const toEntries = async (ctx, items, options) => {
     const rows = items.filter((item) => item.hidden !== true && text(item.storageRef?.id));
-    const { payloads, complete, unread } = await readMany(ctx, rows.map((item) => text(item.storageRef.id)));
+    const { payloads, complete, unread } = await readMany(ctx, rows.map((item) => text(item.storageRef.id)), options);
     const entries = rows.map((item, index) => ({
       storageId: text(item.storageRef.id),
       createdAt: text(item.metadata?.createdAt) || text(item.storageRef?.createdAt),
@@ -606,8 +679,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   // Listing your own answers scans the whole session's answer index, so one
   // scan is reused for a while; answers given since come from the local record.
   const scanMyAnswers = async (ctx) => {
-    if (ctx.ownScan && ctx.ownScan.complete && now() - ctx.ownScan.at < OWN_ANSWER_SCAN_MAX_AGE_MS && ctx.ownScan.sessionId === ctx.client.sessionId && ctx.ownScan.windowKey === ctx.registry?.windowKey) {
-      return ctx.ownScan;
+    const last = ctx.ownScan;
+    const reuseFor = last?.complete ? OWN_ANSWER_SCAN_MAX_AGE_MS : (ctx.registry ? 0 : OWN_ANSWER_RETRY_MS);
+    if (last && now() - last.at < reuseFor && last.sessionId === ctx.client.sessionId && last.windowKey === ctx.registry?.windowKey) {
+      return last;
     }
     if (ctx.registry) {
       const questions = await loadQuestions(ctx);
@@ -619,14 +694,21 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, windowKey: ctx.registry.windowKey, answers, complete, chainOrders, unread: unreadAnswers };
       return ctx.ownScan;
     }
+    // A new agent's own answers are all in its local record, unless an upload's reply was lost.
+    const local = sessionState(ctx);
+    if (local.noEarlierAnswers === true && local.sessionId === ctx.client.sessionId && !ctx.localRecordLost &&
+      !(isRecord(local.pendingUploads) && Object.keys(local.pendingUploads).length)) {
+      ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, answers: new Map(), complete: true, unread: 0 };
+      return ctx.ownScan;
+    }
     const { items, complete: listed } = await ctx.client.listAll('responses', {
       mine: true,
       maxItems: MAX_OWN_ANSWER_ITEMS,
       maxPages: OWN_ANSWER_PAGES,
       deadlineMs: OWN_ANSWER_DEADLINE_MS,
-      signal,
     });
-    const entries = await toEntries(ctx, items);
+    // This scan may outlive the call that started it, so no call's cancellation stops it; its deadlines do.
+    const entries = await toEntries(ctx, items, { stopped: () => false });
     const complete = listed && entries.complete;
     const latest = latestAnswersByQuestion(entries, { sessionSlug: ctx.info.slug, sessionId: ctx.client.sessionId });
     const answers = new Map();
@@ -639,9 +721,40 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     return ctx.ownScan;
   };
 
+  // A Session Worker's scan never holds a tool call past the wait: the call
+  // uses the last scan, or none, and the scan carries on for later calls.
+  const awaitOwnScan = async (ctx) => {
+    if (ctx.registry) return scanMyAnswers(ctx);
+    if (!ctx.ownScanRun) {
+      // A failed scan counts as an unfinished one, so it is retried after the
+      // same minute rather than by every call.
+      const run = scanMyAnswers(ctx).catch(() => {
+        const last = ctx.ownScan?.sessionId === ctx.client.sessionId ? ctx.ownScan : null;
+        ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, answers: last?.answers || new Map(), complete: false, unread: last?.unread || 0 };
+        return ctx.ownScan;
+      }).finally(() => { if (ctx.ownScanRun === run) ctx.ownScanRun = null; });
+      ctx.ownScanRun = run;
+    }
+    // Only the first call waits for a scan; while it runs on, later calls answer at once.
+    const run = ctx.ownScanRun;
+    let waited = null;
+    if (ctx.ownScanWaitedOut !== run) {
+      let timer;
+      waited = await Promise.race([
+        run,
+        new Promise((resolve) => { timer = setTimeout(resolve, ownAnswerWaitMs, null); }),
+      ]);
+      clearTimeout(timer);
+    }
+    if (waited) return waited;
+    ctx.ownScanWaitedOut = run;
+    const last = ctx.ownScan?.sessionId === ctx.client.sessionId ? ctx.ownScan : null;
+    return { answers: last?.answers || new Map(), complete: false, pending: true, unread: last?.unread || 0 };
+  };
+
   const loadMyAnswers = async (ctx) => {
     await ensureReady(ctx);
-    const scan = await scanMyAnswers(ctx);
+    const scan = await awaitOwnScan(ctx);
     const mine = new Map(scan.answers);
     let complete = scan.complete;
     const blocks = new Map();
@@ -676,6 +789,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     });
     mine.complete = complete;
     mine.unread = scan.unread;
+    if (scan.pending) mine.pending = true;
     return mine;
   };
 
@@ -709,10 +823,17 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (displayName !== undefined) next.displayName = normalizeLabel(displayName, 'displayName');
       if (modelId !== undefined) next.modelId = normalizeLabel(modelId, 'modelId');
       if (platform !== undefined) next.platform = normalizeLabel(platform, 'platform');
+      const kept = ['modelId', 'platform'].filter((field) => field in next && trim(config.profile[field]));
+      kept.forEach((field) => delete next[field]);
       await saveState((fresh) => {
         fresh.profile = { ...fresh.profile, ...next };
       });
-      return { profile: profile(), note: 'Applies to answers and statements submitted from now on.' };
+      return {
+        profile: profile(),
+        note: kept.length
+          ? `Your host set ${kept.join(' and ')}, which stay${kept.length > 1 ? '' : 's'} as it set ${kept.length > 1 ? 'them' : 'it'}. The rest applies to answers and statements submitted from now on.`
+          : 'Applies to answers and statements submitted from now on.',
+      };
     },
 
     async joinSession({ link, worker, session, inviteCode, groupPassword, claimPassword } = {}) {
@@ -817,7 +938,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const member = outcome.groups
         ? outcome.groups.some((group) => group.member && group.groupId.toLowerCase() === linkGroup.toLowerCase())
         : null;
-      outcome.next = nextStep({ instructions, linkGroup, member });
+      const groupName = outcome.groups?.find((group) => group.groupId.toLowerCase() === linkGroup.toLowerCase())?.name || '';
+      outcome.next = nextStep({ instructions, linkGroup, groupName, member });
       return outcome;
     },
 
@@ -849,9 +971,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       };
     },
 
-    async listQuestions({ session, filter = 'unanswered', limit = 25 } = {}) {
+    async listQuestions({ session, filter = 'unanswered', limit = MAX_LISTED_QUESTIONS, offset = 0 } = {}) {
       if (!['unanswered', 'answered', 'all'].includes(filter)) throw new Error('filter must be unanswered, answered, or all.');
-      const max = Math.min(Math.max(Number(limit) || 25, 1), 100);
+      const max = Math.min(Math.max(Math.trunc(Number(limit)) || MAX_LISTED_QUESTIONS, 1), MAX_LISTED_QUESTIONS);
+      const start = Math.max(Math.trunc(Number(offset)) || 0, 0);
       const ctx = await resolveSession(session);
       const [questions, mine] = await Promise.all([loadQuestions(ctx), loadMyAnswers(ctx)]);
       const matching = questions.filter((question) =>
@@ -863,7 +986,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         answeredByMe: questions.filter((question) => mine.has(question.id)).length,
         matching: matching.length,
         ...progressNotes(questions, mine),
-        questions: matching.slice(0, max).map((question) => describeQuestion(question, mine.get(question.id))),
+        ...pageNotes(matching.length, start, max, filter),
+        // An empty unanswered list must not read as "nothing answered yet".
+        ...(filter === 'unanswered' && !matching.length && questions.length ? {
+          next: `You have answered all ${questions.length} questions. To see your answers, call list_questions with filter "answered"; answering again replaces an answer, so send one only to change it.`,
+        } : {}),
+        questions: matching.slice(start, start + max).map((question) => describeQuestion(question, mine.get(question.id))),
       };
     },
 
@@ -874,7 +1002,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const sessionConfig = await ensureReady(ctx);
       const endsAt = Date.parse(text(sessionConfig.sessionEndsAt));
       if (Number.isFinite(endsAt) && endsAt <= now()) throw new Error('This session has ended and no longer accepts answers.');
-      const questions = new Map((await loadQuestions(ctx)).map((question) => [question.id, question]));
+      const loaded = await loadQuestions(ctx);
+      const questions = new Map(loaded.map((question) => [question.id, question]));
       const recruitmentSource = text(sessionState(ctx).recruitmentSource);
       const results = [];
       const answered = [];
@@ -892,7 +1021,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         seen.add(questionId);
         const question = questions.get(questionId);
         if (!question) {
-          results.push({ questionId, ok: false, error: 'Unknown question id, or a question locked to certain members; call list_questions.' });
+          // Some questions could not be read just now (a busy session), so this one may exist.
+          results.push({ questionId, ok: false, error: loaded.complete === false
+            ? 'This question could not be read just now; the session may be busy. Retry in a few seconds.'
+            : 'Unknown question id, or a question locked to certain members; call list_questions.' });
           continue;
         }
         let built;
@@ -944,6 +1076,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           answered.push({ questionId, requestId, record: built.record, answeredAt: text(storageRef?.createdAt) || new Date(now()).toISOString() });
           results.push({ questionId, ok: true, answer: built.record.answer.value });
         } catch (error) {
+          // The upload may have been stored without its reply: look up own answers afresh.
+          ctx.ownScan = null;
           results.push({ questionId, ok: false, error: describeError(error) });
         }
       }
@@ -972,6 +1106,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           // Local bookkeeping cannot undo a successful upload or confirmed tx.
           // Keep the successful result so an agent does not repeat remote effects.
           ctx.ownScan = null;
+          ctx.localRecordLost = true;
           warning = 'Answers were submitted, but the local answer history could not be saved. Do not resubmit them to fix this warning.';
         }
       }
@@ -1075,11 +1210,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         listedCount = entries.length;
         unreadAnswers = result.unreadAnswers;
       } else {
-        const result = await ctx.client.listAll('responses', { maxItems: MAX_RESULT_RECORDS, signal });
+        const started = now();
+        const result = await ctx.client.listAll('responses', { maxItems: MAX_RESULT_RECORDS, deadlineMs: RESULTS_LIST_DEADLINE_MS, signal });
         const listed = result.items
           .filter((item) => text(item.storageRef?.id))
           .sort((left, right) => (text(left.metadata?.createdAt) < text(right.metadata?.createdAt) ? 1 : -1));
-        entries = await toEntries(ctx, listed.slice(0, cap));
+        entries = await toEntries(ctx, listed.slice(0, cap), { deadlineMs: Math.max(0, started + RESULTS_READ_DEADLINE_MS - now()) });
         complete = result.complete;
         listedCount = listed.length;
         unreadAnswers = entries.unread;
@@ -1113,7 +1249,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
       checkpoint();
       await ctx.client.joinGroup(id, { signal }).catch((error) => {
-        throw groupRefusal(error, id);
+        throw groupRefusal(error, id, 'join_group');
       });
       return { session: ctx.info.slug, joinedGroup: id };
     },
@@ -1126,7 +1262,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
       checkpoint();
       await ctx.client.leaveGroup(id, { signal }).catch((error) => {
-        throw groupRefusal(error, id);
+        throw groupRefusal(error, id, 'leave_group');
       });
       return { session: ctx.info.slug, leftGroup: id };
     },

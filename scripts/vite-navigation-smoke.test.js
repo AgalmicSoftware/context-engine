@@ -546,6 +546,7 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
       route: '/session/demo',
       status: 200,
       rootChildren: 0,
+      agentNoteLeft: true,
       bodyTextLength: 0,
       styleCount: 0,
       missingText: ['Session'],
@@ -568,6 +569,7 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
 
   assert.deepEqual(failures, [
     '/session/demo: #root rendered no children',
+    '/session/demo: the note for AI agents is still on the page',
     '/session/demo: no visible body text',
     '/session/demo: no stylesheet/style tags detected',
     '/session/demo: missing expected text "Session"',

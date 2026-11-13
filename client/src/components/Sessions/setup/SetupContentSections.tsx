@@ -3,7 +3,10 @@ import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 
-import InterviewSettingsFields from '../InterviewSettingsFields';
+import InterviewSettingsFields, {
+  DRAFT_TEXT_NEEDS_NEWER_WORKER,
+  DRAFT_TEXT_NEEDS_WORKER,
+} from '../InterviewSettingsFields';
 import { SESSION_CONTEXT_LIMITS, isHttpsUrl, validateSessionContext } from '@ce-shared/sessionContext.mjs';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
@@ -565,9 +568,18 @@ export const summarizeParticipation = (draft: SetupSectionProps['draft']): strin
 type ParticipationProps = SetupSectionProps & {
   /** End times and instructions for AI agents apply only to Worker-hosted sessions. */
   workerHosted: boolean;
+  /** False when the session's Worker predates keeping AI draft text for admins. */
+  draftTextSupported?: boolean;
 };
 
-export const SetupParticipationSection = ({ draft, onChange, open, onToggle, workerHosted }: ParticipationProps) => (
+export const SetupParticipationSection = ({
+  draft,
+  onChange,
+  open,
+  onToggle,
+  workerHosted,
+  draftTextSupported,
+}: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
     title="Participation"
@@ -588,6 +600,9 @@ export const SetupParticipationSection = ({ draft, onChange, open, onToggle, wor
         value={draft.interviewMode}
         onChange={(value) => onChange(['interviewMode'], value)}
         onTurnOnInterviews={() => onChange(['interviewModeEnabled'], true)}
+        draftTextUnavailable={
+          !workerHosted ? DRAFT_TEXT_NEEDS_WORKER : draftTextSupported === false ? DRAFT_TEXT_NEEDS_NEWER_WORKER : ''
+        }
       />
     ) : null}
     <SetupField id="ce-setup-group-creation" label="Who can create groups" help={GROUP_CREATION_HELP}>
