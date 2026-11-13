@@ -6,10 +6,22 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- A session page has a collapsed **Feedback** section below Results, where anyone, signed in or not, can say what worked in the app and what didn't. It goes to the session's admins and is no part of answers, Results or exports. A message is anonymous unless **You may contact me** is ticked. The section shows only on a Session Worker running this release.
+- Settings has a **Feedback** section for full admins, to read the messages, download them as a CSV and delete them, and a **Feedback box** setting, on by default.
 - Risk Matrix: the detail grid for two areas labels its columns and rows, has a key, frames every square (an empty one says "No notes"), shows each balance with an arrow and its note count, and its column and row headings highlight, with a **Clear** button.
 - Every Results view shows when it was made in the same place, top right: built views always show their **Version**, even with one build, and AI Views show when they were generated. AI Views' titles and its Breakdown interpretation are readable in the civic and classic themes.
 - Results: when a session holds more answers than one load reads, a Report that fails to load says so, that trying again can take minutes, and what an admin can do.
 - A group on a Session Worker starts on a generated three-word password, selected so an admin can type their own; **Generate new** makes three words too. On-chain groups keep five words. A right password always gets in and wrong tries are not limited, so a hand-typed password should be long and uncommon.
+
+### Workers — requires redeployment
+
+- Session Workers take feedback about the app at `POST /feedback`, from anyone on the session page, signed in or not. A message is text only, at most 2,000 characters, and names its sender only when they ask to be contacted. A person can send 5 a day; a session takes 200 a day and stores 2,000.
+- Full admins read, page through and delete feedback at `admin/feedback/list` and `admin/feedback/delete`; results admins cannot. Feedback never reaches AI Views, the atlas, the Risk Matrix, the Session Agent, the fidelity report, exports or backups.
+- A session's `feedbackEnabled` setting, on unless set, turns the Feedback box off; turning it off signs no one out.
+
+### Local tooling
+
+- `npm run ai:test-theme:feedback` checks the Feedback section by keyboard in each theme at phone and desktop widths.
 
 ## [0.9.7] - 2026-11-13
 
