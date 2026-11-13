@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faExternalLinkAlt, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './RiskMatrix.module.scss';
+import RiskMatrixDetail from './RiskMatrixDetail';
 import RiskMatrixGeneratedSeverity, {
   type RiskMatrixSeverityAssessment,
   type RiskMatrixSeverityAxes,
@@ -84,8 +85,6 @@ type RiskMatrixState = {
   activeSubcategoryY: string | null;
   hoveredRowIndex: number | null;
   hoveredColIndex: number | null;
-  hoveredSubRowIndex: number | null;
-  hoveredSubColIndex: number | null;
   openCommentGroups: Record<RiskValence, boolean>;
 };
 
@@ -296,8 +295,6 @@ const buildInitialRiskMatrixState = (
     activeSubcategoryY: restoreState?.activeSubcategoryY ?? derivedSelectionState?.activeSubcategoryY ?? null,
     hoveredRowIndex: null,
     hoveredColIndex: null,
-    hoveredSubRowIndex: null,
-    hoveredSubColIndex: null,
     openCommentGroups: {
       opportunity: true,
       risk: true,
@@ -410,13 +407,13 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     return `${catX} versus ${catY}, ${leaning} balance ${formatRiskMatrixValue(value)}. Open aggregated notes.`;
   };
 
-  getSubCellAriaLabel = (catX: string, subX: string, catY: string, subY: string, value: number) => {
-    if (value === 0) {
-      return `${catX} ${subX} versus ${catY} ${subY}, ${this.getEmptySignalLabel()}. Open detailed notes.`;
-    }
+  getSubCellAriaLabel = (catX: string, subX: string, catY: string, subY: string, value: number, notes: number) => {
+    const place = `${catX} ${subX} versus ${catY} ${subY}`;
+    if (notes === 0) return `${place}, ${this.getEmptySignalLabel()}. Open detailed notes.`;
 
-    const leaning = value > 0 ? 'opportunity' : 'risk';
-    return `${catX} ${subX} versus ${catY} ${subY}, ${leaning} balance ${formatRiskMatrixValue(value)}. Open detailed notes.`;
+    const leaning = value > 0 ? 'opportunity' : value < 0 ? 'risk' : 'even';
+    const count = notes === 1 ? '1 note' : `${notes} notes`;
+    return `${place}, ${leaning} balance ${formatRiskMatrixValue(value)}, ${count}. Open detailed notes.`;
   };
 
   openModalForCell = (selectedCellId: string, statePatch: Partial<RiskMatrixState> = {}) => {
@@ -538,18 +535,6 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     this.setState({
       hoveredRowIndex: null,
       hoveredColIndex: null,
-    });
-
-  handleSubCellMouseEnter = (rowIndex: number, colIndex: number) =>
-    this.setState({
-      hoveredSubRowIndex: rowIndex,
-      hoveredSubColIndex: colIndex,
-    });
-
-  handleSubCellMouseLeave = () =>
-    this.setState({
-      hoveredSubRowIndex: null,
-      hoveredSubColIndex: null,
     });
 
   getColorByValue = (value: number) => {
@@ -682,212 +667,29 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     );
   };
 
-  renderSubcategorySelectors = () => {
-    const { activeCategoryX, activeCategoryY, activeSubcategoryX, activeSubcategoryY } = this.state;
-
-    const categories = this.getCategories();
-    const categoryX = categories.find((cat) => cat.name === activeCategoryX);
-    const categoryY = categories.find((cat) => cat.name === activeCategoryY);
-
-    if (!categoryX || !categoryY) return null;
-
-    return (
-      <div className={styles.selectorGrid}>
-        <div className={styles.selectorPanel}>
-          <h4 className={styles.selectorTitle}>{activeCategoryX}</h4>
-
-          <div className={styles.selectorButtonRow}>
-            {categoryX.subcategories.map((sub) => (
-              <button
-                key={`selector-x-${sub}`}
-                type="button"
-                className={clsx(styles.selectorButton, activeSubcategoryX === sub && styles.selectorButtonActive)}
-                data-testid={`ce-risk-matrix-selector-x-${toTestIdFragment(sub)}`}
-                aria-pressed={activeSubcategoryX === sub}
-                onClick={() => this.handleSubcategoryXClick(sub)}
-              >
-                {sub}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              className={clsx(styles.selectorButton, styles.selectorButtonClear)}
-              data-testid="ce-risk-matrix-selector-x-clear"
-              onClick={() => this.handleSubcategoryXClick(null)}
-              disabled={!activeSubcategoryX}
-            >
-              Clear X
-            </button>
-          </div>
-        </div>
-
-        <div className={styles.selectorPanel}>
-          <h4 className={styles.selectorTitle}>{activeCategoryY}</h4>
-
-          <div className={styles.selectorButtonRow}>
-            {categoryY.subcategories.map((sub) => (
-              <button
-                key={`selector-y-${sub}`}
-                type="button"
-                className={clsx(styles.selectorButton, activeSubcategoryY === sub && styles.selectorButtonActive)}
-                data-testid={`ce-risk-matrix-selector-y-${toTestIdFragment(sub)}`}
-                aria-pressed={activeSubcategoryY === sub}
-                onClick={() => this.handleSubcategoryYClick(sub)}
-              >
-                {sub}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              className={clsx(styles.selectorButton, styles.selectorButtonClear)}
-              data-testid="ce-risk-matrix-selector-y-clear"
-              onClick={() => this.handleSubcategoryYClick(null)}
-              disabled={!activeSubcategoryY}
-            >
-              Clear Y
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   renderSubGrid = () => {
-    const {
-      activeCategoryX,
-      activeCategoryY,
-      activeSubcategoryX,
-      activeSubcategoryY,
-      hoveredSubColIndex,
-      hoveredSubRowIndex,
-    } = this.state;
-
+    const { activeCategoryX, activeCategoryY, activeSubcategoryX, activeSubcategoryY } = this.state;
     const categories = this.getCategories();
     const categoryX = categories.find((cat) => cat.name === activeCategoryX);
     const categoryY = categories.find((cat) => cat.name === activeCategoryY);
-
     if (!categoryX || !categoryY) return null;
-    const activeCategoryXKey = activeCategoryX || '';
-    const activeCategoryYKey = activeCategoryY || '';
-
-    const demo = this.isDemo();
-    const subcategoriesX = categoryX.subcategories;
-    const subcategoriesY = categoryY.subcategories;
-    const numSubX = subcategoriesX.length;
-    const numSubY = subcategoriesY.length;
 
     return (
-      <section className={styles.sectionCard} data-testid="ce-risk-matrix-subgrid">
-        <div className={styles.subgridHeader}>
-          <h3 className={styles.sectionTitle}>
-            {activeCategoryY} x {activeCategoryX}
-          </h3>
-          <p className={styles.subgridSummary}>
-            {demo
-              ? 'Refine to sub-overlaps, compare seeded notes, and open the atlas-linked scenarios attached to each detail cell.'
-              : 'Refine to sub-overlaps and compare the notes in each detail cell.'}
-          </p>
-        </div>
-
-        {this.renderSubcategorySelectors()}
-
-        <div className={styles.gridScroll}>
-          <div
-            className={styles.subgridContainer}
-            style={{
-              gridTemplateColumns: `minmax(140px, 0.85fr) repeat(${numSubX}, minmax(0, 1fr))`,
-              gridTemplateRows: `auto repeat(${numSubY}, minmax(72px, auto))`,
-            }}
-          >
-            <div className={clsx(styles.cell, styles.cornerCell)} style={{ gridColumn: 1, gridRow: 1 }}>
-              Detail
-            </div>
-
-            {subcategoriesX.map((subX, index) => (
-              <button
-                key={`subhead-x-${subX}`}
-                type="button"
-                className={clsx(styles.cell, styles.headerCell, activeSubcategoryX === subX && styles.activeHeaderCell)}
-                style={{ gridColumn: index + 2, gridRow: 1 }}
-                data-testid={`ce-risk-matrix-subheader-x-${toTestIdFragment(subX)}`}
-                aria-pressed={activeSubcategoryX === subX}
-                onClick={() => this.handleSubcategoryXClick(subX)}
-              >
-                {subX}
-              </button>
-            ))}
-
-            {subcategoriesY.map((subY, rowIndex) => (
-              <React.Fragment key={`subrow-${subY}`}>
-                <button
-                  type="button"
-                  className={clsx(
-                    styles.cell,
-                    styles.headerCell,
-                    activeSubcategoryY === subY && styles.activeHeaderCell,
-                  )}
-                  style={{ gridColumn: 1, gridRow: rowIndex + 2 }}
-                  data-testid={`ce-risk-matrix-subheader-y-${toTestIdFragment(subY)}`}
-                  aria-pressed={activeSubcategoryY === subY}
-                  onClick={() => this.handleSubcategoryYClick(subY)}
-                >
-                  {subY}
-                </button>
-
-                {subcategoriesX.map((subX, colIndex) => {
-                  const selectedCellId = `${activeCategoryX}.${subX}.${activeCategoryY}.${subY}`;
-                  const cellComments = this.getCommentsForCell(selectedCellId);
-                  const cellValue = cellComments.reduce((total, entry) => {
-                    const signedValue = (entry.valence === 'risk' ? -1 : 1) * Number(entry.intensity);
-                    return total + signedValue;
-                  }, 0);
-                  const hasValue = cellValue !== 0;
-                  const atlasScenarioCount = demo ? getRiskMatrixAtlasScenarioCountForCell(selectedCellId) : 0;
-                  const isHovered = rowIndex === hoveredSubRowIndex && colIndex === hoveredSubColIndex;
-                  const isHighlighted = subY === activeSubcategoryY || subX === activeSubcategoryX;
-
-                  return (
-                    <button
-                      key={`subcell-${rowIndex}-${colIndex}`}
-                      type="button"
-                      className={clsx(
-                        styles.cell,
-                        styles.gridCell,
-                        !hasValue && styles.emptyCell,
-                        atlasScenarioCount > 0 && styles.gridCellLinked,
-                        isHighlighted && styles.highlighted,
-                        isHovered && hasValue && styles.popOutEffect,
-                      )}
-                      style={{
-                        gridColumn: colIndex + 2,
-                        gridRow: rowIndex + 2,
-                        backgroundColor: this.getColorByValue(cellValue),
-                      }}
-                      data-testid={`ce-risk-matrix-subcell-${toTestIdFragment(activeCategoryXKey)}-${toTestIdFragment(subX)}-vs-${toTestIdFragment(activeCategoryYKey)}-${toTestIdFragment(subY)}`}
-                      aria-label={this.getSubCellAriaLabel(
-                        activeCategoryXKey,
-                        subX,
-                        activeCategoryYKey,
-                        subY,
-                        cellValue,
-                      )}
-                      onMouseEnter={() => this.handleSubCellMouseEnter(rowIndex, colIndex)}
-                      onMouseLeave={this.handleSubCellMouseLeave}
-                      onFocus={() => this.handleSubCellMouseEnter(rowIndex, colIndex)}
-                      onBlur={this.handleSubCellMouseLeave}
-                      onClick={() => this.handleSubCellClick(subY, subX)}
-                    >
-                      {hasValue && <span className={styles.cellValue}>{formatRiskMatrixValue(cellValue)}</span>}
-                    </button>
-                  );
-                })}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      </section>
+      <RiskMatrixDetail
+        columns={categoryX}
+        rows={categoryY}
+        highlightedColumn={activeSubcategoryX}
+        highlightedRow={activeSubcategoryY}
+        demo={this.isDemo()}
+        notesFor={(cellId) => this.getCommentsForCell(cellId)}
+        atlasCountFor={getRiskMatrixAtlasScenarioCountForCell}
+        cellLabel={(subX, subY, value, notes) =>
+          this.getSubCellAriaLabel(categoryX.name, subX, categoryY.name, subY, value, notes)
+        }
+        onHighlightColumn={this.handleSubcategoryXClick}
+        onHighlightRow={this.handleSubcategoryYClick}
+        onOpenCell={this.handleSubCellClick}
+      />
     );
   };
 

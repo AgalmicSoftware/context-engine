@@ -38,18 +38,13 @@ $card-shadow: var(--ce-card-shadow);
   box-shadow: $card-shadow;
 }
 
-.sectionTitle,
-.selectorTitle {
+.sectionTitle {
   margin: 0;
   color: $text;
   line-height: 1.2;
 }
 
 .sectionTitle {
-  font-size: 1rem;
-}
-
-.selectorTitle {
   font-size: 1rem;
 }
 
@@ -305,27 +300,6 @@ button.cell {
   box-shadow: 0 14px 30px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
 }
 
-.selectorGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 16px;
-}
-
-.selectorPanel {
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  border-radius: var(--ce-radius-10);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-}
-
-.selectorButtonRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.selectorButton,
 .modalButton {
   appearance: none;
   display: inline-flex;
@@ -348,34 +322,6 @@ button.cell {
   }
 }
 
-.selectorButton {
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
-  color: $text;
-
-  &:hover {
-    border-color: $accent-border;
-    background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-    transform: translateY(-1px);
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    border-style: dashed;
-    color: $muted-text;
-    transform: none;
-  }
-}
-
-.selectorButtonActive {
-  border-color: $accent-border;
-  background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
-}
-
-.selectorButtonClear {
-  color: $muted-text;
-}
-
 .subgridHeader {
   margin-bottom: 14px;
 }
@@ -385,6 +331,177 @@ button.cell {
   color: $muted-text;
   font-size: 0.88rem;
   line-height: 1.5;
+}
+
+// The detail grid: where one area's sub-sections (columns) meet another's (rows).
+.detailHelp {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  line-height: 1;
+  vertical-align: middle;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.detailLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  color: $text;
+  font-size: 0.85rem;
+
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.detailSwatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid $muted-text;
+  border-radius: 4px;
+}
+
+.detailSwatchOpportunity {
+  background: color-mix(in srgb, var(--ce-risk-opportunity-color, var(--ce-status-success)) 75%, transparent);
+}
+
+.detailSwatchRisk {
+  background: color-mix(in srgb, var(--ce-risk-danger-color, var(--ce-status-danger)) 75%, transparent);
+}
+
+.detailSwatchEmpty {
+  border-style: dashed;
+}
+
+.detailHighlight {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+  color: $text;
+  font-size: 0.88rem;
+}
+
+.detailClear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--ce-radius-pill);
+  background: $card-bg;
+  color: $text;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover::after {
+    border-color: $accent;
+  }
+}
+
+.detailGrid {
+  min-width: 0;
+  gap: 6px;
+  // Room for the focus ring, which the scroll box would clip at its edges.
+  padding: 5px;
+}
+
+.detailAxis {
+  align-self: end;
+  padding: 0 4px;
+  color: $muted-text;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.detailAxisRows {
+  align-self: center;
+}
+
+// Headings, squares and Clear are frameless buttons, so each theme's raised-button chrome (and its focus reset)
+// stays off them; a layer above each draws its frame. Headings get a tick when their column or row is highlighted.
+.detailHeading,
+.detailCell,
+.detailClear {
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid $muted-text;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.detailHeading {
+  min-height: 56px;
+  background: $card-bg;
+  font-size: 0.82rem;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+
+.detailTick {
+  margin-right: 4px;
+}
+
+.detailHeading.activeHeaderCell::after,
+.detailCellHighlighted::after {
+  border: 2px solid $accent;
+}
+
+.detailCell {
+  flex-direction: column;
+  gap: 4px;
+  min-height: 72px;
+}
+
+.detailCellEmpty {
+  background: transparent;
+
+  &::after {
+    border-style: dashed;
+  }
+}
+
+.detailCellEmpty.detailCellHighlighted::after {
+  border-style: dashed;
+}
+
+.detailNoteCount {
+  padding: 1px 8px;
+  border-radius: var(--ce-radius-pill);
+  background: $surface;
+  color: $text;
+  font-size: 0.75rem;
+}
+
+.detailEmptyLabel {
+  color: $muted-text;
+  font-size: 0.78rem;
 }
 
 .riskMatrixBackdrop {
@@ -1221,10 +1338,6 @@ button.cell {
 @media (max-width: 900px) {
   .container {
     padding: 18px 12px 30px;
-  }
-
-  .selectorGrid {
-    grid-template-columns: 1fr;
   }
 
   .atlasScenarioCard {
