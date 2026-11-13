@@ -1,10 +1,12 @@
-// A group's one-use codes and password, as an admin manages them: only hashes
-// and the password's signer are stored, and neither ever comes back out.
+// A group's one-use codes and password: an admin manages them, and a join
+// spends a code or proves the password in the same step that takes its seat.
+// Only hashes and the password's signer are stored; neither comes back out.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Wallet } from 'ethers';
 
-import { hashOneUseSecret } from '../../shared/workerGroupJoin.mjs';
-import { createFixture } from './workerGroupTestFixture.mjs';
+import { hashOneUseSecret, workerGroupJoinStatement } from '../../shared/workerGroupJoin.mjs';
+import { SESSION_ID, createFixture, principal } from './workerGroupTestFixture.mjs';
 
 const SIGNER = `0x${'5c'.repeat(20)}`;
 const codes = (count, seed = 0) => Array.from({ length: count }, (_, index) => (seed * 1000 + index + 1).toString(16).padStart(32, '0'));
@@ -96,4 +98,154 @@ test('only admins see whether a password is set or how many codes a group has', 
   assert.equal(adminView.passwordSet, false);
   const memberView = (await f.catalog(4)).groups[0];
   assert.equal('invites' in memberView || 'admin' in memberView || 'passwordSet' in memberView, false);
+});
+
+const REFUSED = { ok: false, status: 403, reason: 'worker_group_join_refused' };
+const passwordKey = (seed) => new Wallet(`0x${seed.repeat(32)}`);
+const proofFor = (key, index, groupId = 'salon') =>
+  key.signMessage(workerGroupJoinStatement({ sessionId: SESSION_ID, groupId, address: principal(index).address }));
+const inviteState = async (f, hash) => (await f.admin('groups/invites/list')).invites.find((invite) => invite.hash === hash)?.state;
+
+test('twenty people racing with one code: exactly one gets in, and joining again needs no code', async () => {
+  const f = await createFixture({ joinMode: 'one_use' });
+  const [code, spare] = codes(2);
+  await f.admin('groups/invites/add', { hashes: await hashes([code, spare]) });
+  const raced = await Promise.all(Array.from({ length: 20 }, (_, index) => f.join(index, { secret: code })));
+  const admitted = raced.filter((result) => result.ok);
+  assert.equal(admitted.length, 1);
+  assert.ok(raced.filter((result) => !result.ok).every((result) => result.reason === REFUSED.reason));
+  const winner = raced.indexOf(admitted[0]);
+  assert.equal((await f.join(winner)).ok, true);
+  assert.equal((await f.join(winner, { secret: spare })).ok, true);
+  assert.equal(await inviteState(f, await hashOneUseSecret(spare)), 'unused');
+  assert.deepEqual((await f.admin('groups/invites/list')).counts, { unused: 1, used: 1, revoked: 0 });
+  assert.equal(f.groupRecord().memberCount, 1);
+  // Upper-case codes are the same code.
+  assert.equal((await f.join(30, { secret: spare.toUpperCase() })).ok, true);
+});
+
+test('every way in that fails before a valid code or password gets the same refusal', async () => {
+  const f = await createFixture({ joinMode: 'one_use' });
+  const [used, revoked, expiring, fresh] = codes(4);
+  await f.admin('groups/invites/add', { hashes: await hashes([used, revoked, fresh]) });
+  await f.admin('groups/invites/add', { hashes: await hashes([expiring]), expiresAt: new Date(Date.now() + 60).toISOString() });
+  assert.equal((await f.join(1, { secret: used })).ok, true);
+  await f.admin('groups/invites/revoke', { hashes: await hashes([revoked]) });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const password = await createFixture({ joinMode: 'group_password' });
+  const key = passwordKey('11');
+  const closed = await createFixture({ joinMode: 'admin_add' });
+  const refusals = [
+    await f.join(2),
+    await f.join(2, { secret: codes(1, 9)[0] }),
+    await f.join(2, { secret: used }),
+    await f.join(2, { secret: revoked }),
+    await f.join(2, { secret: expiring }),
+    await f.join(2, { secret: 'not-a-code' }),
+    await f.join(2, { proof: await proofFor(key, 2) }),
+    await f.mutate({ operation: 'join', groupId: 'nowhere', principal: principal(2), actorPrincipal: principal(2) }),
+    await password.join(2, { proof: await proofFor(key, 2) }),
+    await closed.join(2, { secret: fresh }),
+  ];
+  await password.admin('groups/password/set', { signer: key.address });
+  refusals.push(
+    await password.join(2),
+    await password.join(2, { proof: await proofFor(passwordKey('22'), 2) }),
+    await password.join(2, { proof: await proofFor(key, 3) }),
+    await password.join(2, { proof: await proofFor(key, 2, 'other') }),
+    await password.join(2, { secret: fresh, proof: await proofFor(key, 2) }),
+  );
+  refusals.forEach((result, index) => assert.deepEqual(result, REFUSED, `refusal ${index}`));
+  assert.equal(await inviteState(f, await hashOneUseSecret(fresh)), 'unused');
+  assert.equal((await password.join(2, { proof: await proofFor(key, 2) })).ok, true);
+});
+
+test('a full or closed group says so only after a valid code, and keeps the code', async () => {
+  const f = await createFixture({ joinMode: 'one_use', memberLimit: 1 });
+  const [first, second] = codes(2);
+  await f.admin('groups/invites/add', { hashes: await hashes([first, second]) });
+  assert.equal((await f.join(1, { secret: first })).ok, true);
+  assert.deepEqual(await f.join(2), REFUSED);
+  assert.equal((await f.join(2, { secret: second })).reason, 'worker_group_member_cap_exceeded');
+  assert.equal(await inviteState(f, await hashOneUseSecret(second)), 'unused');
+  assert.equal((await f.mutate({ operation: 'update', input: { memberLimit: 5, joinEndsAt: new Date(Date.now() - 1000).toISOString() } })).ok, true);
+  assert.deepEqual(await f.join(2), REFUSED);
+  assert.equal((await f.join(2, { secret: second })).reason, 'worker_group_join_ended');
+  assert.equal(await inviteState(f, await hashOneUseSecret(second)), 'unused');
+});
+
+test('thirty password joins against a limit of 25 admit exactly 25; a new password shuts the old one out', async () => {
+  const f = await createFixture({ joinMode: 'group_password', memberLimit: 25 });
+  const key = passwordKey('11');
+  await f.admin('groups/password/set', { signer: key.address });
+  const proofs = await Promise.all(Array.from({ length: 30 }, (_, index) => proofFor(key, index)));
+  const raced = await Promise.all(proofs.map((proof, index) => f.join(index, { proof })));
+  assert.equal(raced.filter((result) => result.ok).length, 25);
+  assert.ok(raced.filter((result) => !result.ok).every((result) => result.reason === 'worker_group_member_cap_exceeded'));
+  assert.equal(f.groupRecord().memberCount, 25);
+  await f.mutate({ operation: 'update', input: { memberLimit: 50 } });
+  await f.admin('groups/password/set', { signer: passwordKey('22').address });
+  assert.deepEqual(await f.join(26, { proof: proofs[26] }), REFUSED);
+  assert.equal((await f.join(27, { proof: await proofFor(passwordKey('22'), 27) })).ok, true);
+  assert.equal(f.groupRecord().memberCount, 26);
+});
+
+test('a join that fails after spending its code gives the code back; a resent one spends nothing more', async () => {
+  const f = await createFixture({ joinMode: 'one_use' });
+  const [code, other] = codes(2);
+  const [hash] = await hashes([code]);
+  await f.admin('groups/invites/add', { hashes: await hashes([code, other]) });
+  // The group's KV record vanishes: a definite failure after the seat was taken.
+  const groupKey = [...f.values.keys()].find((key) => key.startsWith('ce-worker-group:'));
+  const record = f.values.get(groupKey);
+  f.values.delete(groupKey);
+  assert.equal((await f.join(1, { secret: code })).ok, false);
+  f.values.set(groupKey, record);
+  assert.equal(await inviteState(f, hash), 'unused');
+  assert.deepEqual((await f.admin('groups/invites/list')).counts, { unused: 2, used: 0, revoked: 0 });
+  assert.equal(f.groupRecord().memberCount, 0);
+
+  // An answer lost after the code was spent: the resend finishes that join.
+  f.kv.failPut = (key) => key.startsWith('ce-worker-group-member:');
+  assert.equal((await f.join(1, { secret: code })).reason, 'worker_group_mutation_ambiguous');
+  assert.equal((await f.join(1, { secret: code })).ok, true);
+  assert.equal((await f.join(1)).ok, true);
+  assert.deepEqual((await f.admin('groups/invites/list')).counts, { unused: 1, used: 1, revoked: 0 });
+  assert.equal(f.groupRecord().memberCount, 1);
+});
+
+test('no code, proof or password signer is ever written to KV or a pending intent', async () => {
+  const f = await createFixture({ joinMode: 'one_use' });
+  const [code] = codes(1);
+  await f.admin('groups/invites/add', { hashes: await hashes([code]) });
+  f.kv.failPut = (key) => key.startsWith('ce-worker-group-member:');
+  await f.join(1, { secret: code });
+  const password = await createFixture({ joinMode: 'group_password' });
+  const key = passwordKey('11');
+  await password.admin('groups/password/set', { signer: key.address });
+  const proof = await proofFor(key, 1);
+  password.kv.failPut = (name) => name.startsWith('ce-worker-group-member:');
+  await password.join(1, { proof });
+  const stored = JSON.stringify([...f.values, ...f.groupState.store, ...password.values, ...password.groupState.store]);
+  assert.equal(stored.includes(code), false);
+  assert.equal(stored.includes(proof.slice(2, 40)), false);
+  assert.equal(JSON.stringify([...password.values]).includes(key.address.slice(2).toLowerCase()), false);
+});
+
+test('a hundred people join at once with their own codes, or with one password', async () => {
+  const f = await createFixture({ joinMode: 'one_use' });
+  const list = codes(100);
+  await f.admin('groups/invites/add', { hashes: await hashes(list) });
+  const byCode = await Promise.all(list.map((code, index) => f.join(index, { secret: code })));
+  assert.equal(byCode.filter((result) => result.ok).length, 100, JSON.stringify(byCode.find((result) => !result.ok)));
+  assert.equal(f.activeMembers(), 100);
+  assert.deepEqual((await f.admin('groups/invites/list')).counts, { unused: 0, used: 100, revoked: 0 });
+
+  const password = await createFixture({ joinMode: 'group_password' });
+  const key = passwordKey('11');
+  await password.admin('groups/password/set', { signer: key.address });
+  const proofs = await Promise.all(list.map((_, index) => proofFor(key, index)));
+  const byPassword = await Promise.all(proofs.map((proof, index) => password.join(index, { proof })));
+  assert.equal(byPassword.filter((result) => result.ok).length, 100);
+  assert.equal(password.activeMembers(), 100);
 });

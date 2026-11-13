@@ -75,7 +75,7 @@ const racedJoins = async (f, change, refusal) => {
 
 test('a group deleted mid-burst takes no join after it', async () => {
   const f = await createFixture();
-  const admitted = await racedJoins(f, () => f.mutate({ operation: 'delete' }), 'worker_group_not_found');
+  const admitted = await racedJoins(f, () => f.mutate({ operation: 'delete' }), 'worker_group_join_refused');
   assert.equal(f.memberKeys().length, admitted);
 });
 
@@ -111,7 +111,7 @@ test('reads during a burst show each finished join and never a refused one', asy
 test('an edit that closes joining mid-burst admits exactly the joins before it', async () => {
   const f = await createFixture();
   const admitted = await racedJoins(f, () => f.mutate({ operation: 'update', input: { joinMode: 'admin_add' } }),
-    'worker_group_join_denied');
+    'worker_group_join_refused');
   assert.equal(f.groupRecord().memberCount, admitted);
   assert.equal(f.memberKeys().length, admitted);
 });
@@ -125,7 +125,7 @@ test('a resent join finishes an interrupted one, even after joining closes', asy
   assert.equal(resent.ok, true, JSON.stringify(resent));
   assert.equal(resent.memberCount, 1);
   assert.deepEqual(await f.memberships(1), ['salon']);
-  assert.equal((await f.join(2)).reason, 'worker_group_join_denied');
+  assert.equal((await f.join(2)).reason, 'worker_group_join_refused');
 });
 
 test('reads and joins that meet a stranded group change recover it once and all answer', async () => {

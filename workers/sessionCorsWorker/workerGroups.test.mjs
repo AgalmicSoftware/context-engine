@@ -2953,6 +2953,31 @@ test('the KV removal checks the setting on a fresh request and finishes a replay
 	assert.match(kv.store.get(memberRecord), /"removedAt"/);
 });
 
+test('a join hands its code or proof to the coordinator and nothing else', async () => {
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: createMockKv() });
+	const sent = [];
+	const response = await workerGroupsRoute({
+		path: '/groups/join',
+		method: 'POST',
+		request: new Request('https://worker.example/groups/join', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ groupId: 'open-review', secret: 'a'.repeat(32), proof: '0x01', extra: 'kept out' }),
+		}),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		baseHeaders: {},
+		deps: { json, executeCoordinatedWorkerGroupMutation: async (args) => {
+			sent.push(args);
+			return { ok: false, status: 403, reason: 'worker_group_join_refused' };
+		} },
+	});
+	assert.equal(response.status, 403);
+	assert.deepEqual(sent[0].credential, { secret: 'a'.repeat(32), proof: '0x01' });
+	assert.equal(JSON.stringify(sent[0]).includes('kept out'), false);
+});
+
 test('a busy join answers with the text clients wait on and send again; a refusal does not', async () => {
 	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: createMockKv() });
 	const join = (result) => workerGroupsRoute({
@@ -2975,7 +3000,7 @@ test('a busy join answers with the text clients wait on and send again; a refusa
 	assert.equal(busy.headers.get('Retry-After'), '1');
 	const stuck = await join({ ok: false, status: 503, reason: 'worker_group_capacity_reconciliation_required' });
 	assert.equal(stuck.body.error, 'Worker group request failed.');
-	const refused = await join({ ok: false, status: 403, reason: 'worker_group_join_denied' });
+	const refused = await join({ ok: false, status: 403, reason: 'worker_group_join_refused' });
 	assert.equal(refused.status, 403);
 	assert.equal(refused.body.error, 'Worker group request failed.');
 });

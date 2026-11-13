@@ -10,13 +10,19 @@ import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { createOperationQueue } from './operationQueue.js';
 import {
   WORKER_GROUP_INVITE_LIST_MAX,
+  constantTimeEqual,
   normalizeWorkerGroupInviteHashes,
   normalizeWorkerGroupSigner,
+  resolveWorkerGroupJoinCredential,
   workerGroupInviteCounts,
   workerGroupInviteKey,
   workerGroupInvitePrefix,
 } from './workerGroupInvites.js';
-import { WORKER_GROUP_MEMBER_CEILING_DEFAULT, WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mjs';
+import {
+  WORKER_GROUP_JOIN_REFUSED,
+  WORKER_GROUP_MEMBER_CEILING_DEFAULT,
+  WORKER_GROUP_MEMBER_CEILING_MAX,
+} from '../../shared/workerGroupJoin.mjs';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import {
   SESSION_CONFIG_COORDINATION_ERROR, assertExpectedSessionAuthority, forgetResultsAnalysisStatus, forgetSessionConfig,
@@ -412,6 +418,26 @@ const withoutPendingMutation = (state) => {
   const next = { ...state };
   delete next.pending;
   return next;
+};
+
+const WORKER_GROUP_SECRET_JOIN_MODES = new Set(['one_use', 'group_password']);
+const workerGroupJoinRefused = () => ({ ok: false, status: 403, reason: WORKER_GROUP_JOIN_REFUSED });
+
+// Whether a join may take a seat, checked inside the seat's transaction: an
+// open group admits anyone; otherwise only an unused, unexpired code or the
+// password's signer does. Every other case gets the same refusal.
+const admitWorkerGroupJoin = async (transaction, { groupId, groupState, credential, nowMs }) => {
+  if (groupState.joinMode === 'open') return { ok: true };
+  if (groupState.joinMode === 'group_password' && credential?.kind === 'password' && groupState.signer) {
+    return constantTimeEqual(credential.signer, groupState.signer) ? { ok: true } : workerGroupJoinRefused();
+  }
+  if (groupState.joinMode === 'one_use' && credential?.kind === 'one_use') {
+    const key = workerGroupInviteKey(groupId, credential.hash);
+    const invite = await transaction.get(key);
+    const expiresAt = Date.parse(invite?.expiresAt ?? '');
+    if (invite?.state === 'unused' && !(expiresAt <= nowMs)) return { ok: true, spent: { key, invite } };
+  }
+  return workerGroupJoinRefused();
 };
 
 const normalizeWorkerGroupMutation = (payload) => {
@@ -1586,12 +1612,14 @@ export class SessionWriteCoordinator {
     principalDigest,
     memberCeiling,
     intent,
+    join = null,
   }) {
+    const nowMs = Number(this.now());
     return this.state.storage.transaction(async (transaction) => {
       const groupKey = workerGroupCapacityGroupKey(groupId);
       const groupState = await transaction.get(groupKey);
       if (groupState?.phase !== 'active' || groupState.active !== true) {
-        return { ok: false, status: 404, reason: 'worker_group_not_found' };
+        return join ? workerGroupJoinRefused() : { ok: false, status: 404, reason: 'worker_group_not_found' };
       }
       const generation = Math.max(1, Number(groupState.generation || 0));
       const memberKey = workerGroupCapacityMemberKey({
@@ -1610,6 +1638,12 @@ export class SessionWriteCoordinator {
           reason: 'worker_group_membership_state_pending',
         };
       }
+      // A join's code or password is checked, and a code spent, with the seat:
+      // two people holding one code can never both get in.
+      const admitted = join ? await admitWorkerGroupJoin(transaction, { groupId, groupState, credential: join.credential, nowMs }) : { ok: true };
+      if (!admitted.ok) return admitted;
+      const joinEndsAt = Date.parse(toTrimmedString(groupState.joinEndsAt));
+      if (join && joinEndsAt <= nowMs) return { ok: false, status: 403, reason: 'worker_group_join_ended' };
       const configuredMemberLimit = normalizePositiveSafeInteger(groupState.memberLimit);
       const effectiveMemberLimit = configuredMemberLimit
         ? Math.min(configuredMemberLimit, memberCeiling)
@@ -1617,14 +1651,20 @@ export class SessionWriteCoordinator {
       if (Number(groupState.memberCount || 0) >= effectiveMemberLimit) {
         return { ok: false, status: 409, reason: 'worker_group_member_cap_exceeded' };
       }
-      await transaction.put(groupKey, {
-        ...groupState,
-        memberCount: Number(groupState.memberCount || 0) + 1,
-      });
+      const nextGroupState = { ...groupState, memberCount: Number(groupState.memberCount || 0) + 1 };
+      if (admitted.spent) {
+        const { key, invite } = admitted.spent;
+        await transaction.put(key, { ...invite, state: 'used', usedAt: new Date(nowMs).toISOString() });
+        const counts = workerGroupInviteCounts(groupState);
+        nextGroupState.invites = { ...counts, unused: Math.max(0, counts.unused - 1), used: counts.used + 1 };
+      }
+      await transaction.put(groupKey, nextGroupState);
       await transaction.put(memberKey, {
         version: 2,
         state: 'reserved',
         pending: intent,
+        // Which code this seat spent, so a failed join can give it back.
+        ...(admitted.spent ? { spentInvite: admitted.spent.key } : {}),
       });
       return { ok: true, reserved: true, generation, memberKey };
     });
@@ -1647,10 +1687,15 @@ export class SessionWriteCoordinator {
       const groupState = await transaction.get(groupKey);
       const memberState = await transaction.get(memberKey);
       if (groupState?.active && memberState?.state === 'reserved') {
-        await transaction.put(groupKey, {
-          ...groupState,
-          memberCount: Math.max(0, Number(groupState.memberCount || 0) - 1),
-        });
+        const nextGroupState = { ...groupState, memberCount: Math.max(0, Number(groupState.memberCount || 0) - 1) };
+        const invite = memberState.spentInvite ? await transaction.get(memberState.spentInvite) : null;
+        if (invite?.state === 'used') {
+          const { usedAt: _usedAt, ...unused } = invite;
+          await transaction.put(memberState.spentInvite, { ...unused, state: 'unused' });
+          const counts = workerGroupInviteCounts(groupState);
+          nextGroupState.invites = { ...counts, unused: counts.unused + 1, used: Math.max(0, counts.used - 1) };
+        }
+        await transaction.put(groupKey, nextGroupState);
         await transaction.put(memberKey, {
           version: 2,
           state: 'removed',
@@ -2216,27 +2261,11 @@ export class SessionWriteCoordinator {
     } else {
       activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
       if (!activeGroup.ok) {
-        return jsonResponse(activeGroup, activeGroup.status || 404);
-      }
-      if (
-        mutation.operation === 'join' &&
-        activeGroup.state.joinMode !== 'open'
-      ) {
-        return jsonResponse({
-          ok: false,
-          status: 403,
-          reason: 'worker_group_join_denied',
-        }, 403);
-      }
-      if (mutation.operation === 'join') {
-        const joinEndsAt = Date.parse(toTrimmedString(activeGroup.state.joinEndsAt));
-        if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(this.now())) {
-          return jsonResponse({
-            ok: false,
-            status: 403,
-            reason: 'worker_group_join_ended',
-          }, 403);
+        // A join can't tell an unknown group from a wrong code.
+        if (mutation.operation === 'join' && activeGroup.status === 404) {
+          return jsonResponse(workerGroupJoinRefused(), 403);
         }
+        return jsonResponse(activeGroup, activeGroup.status || 404);
       }
       if (mutation.operation === 'update') {
         if (Object.prototype.hasOwnProperty.call(mutation.input, 'memberLimit')) {
@@ -2264,11 +2293,22 @@ export class SessionWriteCoordinator {
     }
     if (mutation.operation === 'add-member' || mutation.operation === 'join') {
       principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
+      // The code or signature is reduced to a hash or signer here and goes no
+      // further: never into the intent, KV or an answer.
+      const credential = mutation.operation === 'join' && WORKER_GROUP_SECRET_JOIN_MODES.has(activeGroup.state.joinMode)
+        ? await resolveWorkerGroupJoinCredential({
+          credential: payload?.credential,
+          sessionId: mutation.sessionId,
+          groupId: mutation.groupId,
+          address: mutation.principal?.address,
+        })
+        : null;
       memberReservation = await this.reserveWorkerGroupMemberSlot({
         groupId: mutation.groupId,
         principalDigest,
         memberCeiling,
         intent,
+        join: mutation.operation === 'join' ? { credential } : null,
       });
       if (!memberReservation.ok) {
         return jsonResponse(memberReservation, memberReservation.status || 409);

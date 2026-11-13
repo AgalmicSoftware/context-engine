@@ -9,7 +9,7 @@ import {
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { workerConfigAllowsAnonymousGroupDiscovery } from '../shared/workerConfigModeValidation.mjs';
 import { toStr } from './stringCoercion.js';
-import { WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mjs';
+import { WORKER_GROUP_JOIN_REFUSED, WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mjs';
 
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -1497,12 +1497,17 @@ export const executeWorkerGroupMutation = async ({
 		if (!group || group.deletedAt) {
 			return { ok: false, status: 404, reason: 'worker_group_not_found' };
 		}
-		if (group.joinMode !== WORKER_GROUP_JOIN_MODES.OPEN) {
-			return { ok: false, status: 403, reason: 'worker_group_join_denied' };
-		}
-		const joinEndsAt = Date.parse(trim(group.joinEndsAt));
-		if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
-			return { ok: false, status: 403, reason: 'worker_group_join_ended' };
+		// The coordinator has already checked the mode, the deadline and any
+		// code or password, with the seat; checking again here could refuse a
+		// join it has admitted.
+		if (!capacityAuthorized) {
+			if (group.joinMode !== WORKER_GROUP_JOIN_MODES.OPEN) {
+				return { ok: false, status: 403, reason: WORKER_GROUP_JOIN_REFUSED };
+			}
+			const joinEndsAt = Date.parse(trim(group.joinEndsAt));
+			if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
+				return { ok: false, status: 403, reason: 'worker_group_join_ended' };
+			}
 		}
 		return addWorkerGroupMember({
 			env,
@@ -1647,6 +1652,7 @@ export const forwardWorkerGroupMutation = async ({
 	actorPrincipal,
 	remover,
 	memberCeiling,
+	credential,
 } = {}) => {
 	return callWorkerGroupCoordinator({
 		env,
@@ -1661,6 +1667,7 @@ export const forwardWorkerGroupMutation = async ({
 			actorPrincipal,
 			remover,
 			memberCeiling,
+			credential,
 		},
 	});
 };
@@ -2280,6 +2287,8 @@ export const workerGroupsRoute = async ({
 			groupId: routeBody.groupId,
 			principal: actor.principal,
 			actorPrincipal: actor.principal,
+			// Only the coordinator reads these; they are never stored or logged.
+			credential: { secret: routeBody.secret, proof: routeBody.proof },
 		});
 		// Joining again is a no-op and finishes an interrupted join, so a busy
 		// answer carries the text and the wait clients use to send it again.

@@ -104,7 +104,8 @@ export const createFixture = async ({ memberLimit, groupMemberCeiling, joinMode 
     input: { groupId: 'salon', label: 'Salon', joinMode, ...(memberLimit ? { memberLimit } : {}),
       ...(listed === undefined ? {} : { listed }) } });
   assert.equal(created.ok, true, JSON.stringify(created));
-  const join = (index) => mutate({ operation: 'join', principal: principal(index), actorPrincipal: principal(index) });
+  const join = (index, credential) => mutate({ operation: 'join', principal: principal(index), actorPrincipal: principal(index),
+    ...(credential ? { credential } : {}) });
   const groupRecord = () => [...groupState.store].find(([key]) => key.endsWith(':salon') && key.includes('group'))?.[1];
   const memberKeys = () => [...values.keys()].filter((key) => key.startsWith('ce-worker-group-member:'));
   const catalog = (index) => readCoordinatedWorkerGroupCatalog({ env, slug: 'fixture', sessionId: SESSION_ID, groupIds: ['salon'],
