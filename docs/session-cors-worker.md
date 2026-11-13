@@ -1698,7 +1698,7 @@ Implemented routes:
   `{ groupId, passwordSet: true, signerSetAt }`. The signer is never returned.
 - The code routes answer 409 `worker_group_join_mode_mismatch` unless the group
   is `one_use`, and `password/set` unless it is `group_password`. Admin group
-  lists add `passwordSet`, `guessLimited`, and, for `one_use` groups,
+  lists add `passwordSet` and, for `one_use` groups,
   `invites: { unused, used, revoked }`.
 - `POST /admin/groups/delete`: admin-signed tombstone. Deletion revokes future `group_gate` and `worker_group` condition checks.
 - `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation. Remove answers 403 `worker_group_removal_denied` when the group's `removalAuth` is `member_only` or `neither`. The verified authority proof is carried to the session config coordinator, which rechecks it and holds its serialization queue while the separate group coordinator commits. Stale proofs return 409 before any group write. Participant create/join/leave use the same check because their JWT admission depends on the session authorization epoch. Already committed group intents recover within the group coordinator without repeating admission or copying session authority into that object.
@@ -1774,18 +1774,17 @@ stored, logged or returned, and never enter a pending intent or KV.
 Every join refused before a valid code or password gets the same answer, 403
 `worker_group_join_refused`: an unknown group, an unlisted or non-open group
 without a valid code or password, a wrong, spent, revoked or expired code, a
-signature for another session, group or address, `admin_add`, and a guessing
-limit. Only after a valid code or password, or on an `open` group, does a join
+signature for another session, group or address, and `admin_add`. Only after a valid code or password, or on an `open` group, does a join
 learn that the group is full (409 `worker_group_member_cap_exceeded`) or
 closed (403 `worker_group_join_ended`); either way the code stays unused.
-Wrong codes and passwords are limited to 10 an hour per person across the
-session, and wrong passwords to 300 an hour per password group, each hour
-counted from its first wrong guess. Past either, that person's code and
-password joins, or that group's password joins, are refused for the rest of
-the hour; admins see `guessLimited`. A new password restarts its group's count. Codes have no per-group limit: a 128-bit
-code can't be guessed, and such a limit would let throwaway accounts shut a
-group. Open groups, existing members, and proofs sent before a password is set
-are unaffected. Codes travel in session backups with their groups, so a spent
+Wrong codes and passwords are not counted or limited: a right code or password
+always gets in, however many wrong tries came before it from anyone, so no one
+can shut a group by guessing. The secret's strength is the protection. A code
+is 128 random bits. A guesser with many throwaway accounts is held back only by
+how fast the session's group coordinator answers joins, at most about 1,000 a
+second, and every try is a billed request. At that rate a generated
+three-word password (2,048³, about 8.6 billion) takes about 50 days on average,
+while a short or common hand-typed password can fall within hours. Codes travel in session backups with their groups, so a spent
 code stays spent after a restore, and a code revoked while a join that spent it
 is still settling comes back revoked if that join fails. Backups also carry a
 password group's signer, from which the password could be guessed offline, so
