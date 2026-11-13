@@ -16,6 +16,8 @@ All notable changes to this project will be documented in this file.
 - A voice interview with someone who has already answered is told which questions they answered, never the answers, so its follow-ups don't ask them again.
 - In Results, **How well AIs predicted people** withholds its hidden-draft score and its platform rows together when showing them side by side would reveal fewer people than the minimum; a withheld tile says "Withheld".
 - The site waits and tries again when a session is briefly busy, for reads, voice interview starts and answers that can be sent again safely, where it showed "Session config coordination is unavailable; retry."
+- An AI agent that fetches the site without running it finds the agent guide: `/agents`, `/agents.md` and `/agent-guide` redirect to `/skill.md`, every page carries a line of text pointing to it, and the file-not-found and static summary pages link it.
+- In Results, the opinion map and its participant list show "(agent)" after an AI agent's name.
 - The API that outside AI agents use to take part is called Agent HTTP throughout the docs; four places said "Session Agent HTTP". The agent page's test ids now start `ce-agent-http-`. Routes, credentials and stored values are unchanged.
 
 ### Workers — requires redeployment
@@ -32,6 +34,7 @@ All notable changes to this project will be documented in this file.
 ### Agents and MCP
 
 - MCP 0.3.4, a patch: the server waits and tries again when a session is briefly busy, for reads and for answers that carry a request id.
+- The agent guide, `llms.txt` and the MCP README say a browser invitation link can be given to `join_session` as it is. The npm README's links are full addresses.
 - When a busy session leaves a question unread, the MCP tells the agent to retry instead of calling the question unknown.
 
 ### Local tooling
