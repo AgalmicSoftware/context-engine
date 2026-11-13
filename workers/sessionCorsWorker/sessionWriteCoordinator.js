@@ -2463,9 +2463,12 @@ export class SessionWriteCoordinator {
       const signer = normalizeWorkerGroupSigner(input.signer);
       if (!signer) return refuse(400, 'invalid_group_password_signer');
       // A new signer voids the old password at once; members who joined stay.
+      // Wrong guesses were at the old password, so the group's count restarts:
+      // an admin can reopen a group that throwaway accounts guessed shut.
       await this.state.storage.transaction(async (transaction) => {
         const state = await transaction.get(groupKey);
         await transaction.put(groupKey, { ...state, signer, signerSetAt: nowIso });
+        await transaction.delete(workerGroupGuessKeys({ groupId }).group);
       });
       await bumpStorageBackupRevision(this.state.storage);
       return jsonResponse({ ok: true, status: 200, groupId, passwordSet: true, signerSetAt: nowIso }, 200);

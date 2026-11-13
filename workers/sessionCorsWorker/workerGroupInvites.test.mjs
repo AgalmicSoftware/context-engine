@@ -313,6 +313,23 @@ test('300 wrong passwords at a group close it to passwords for the hour, and tel
   assert.equal((await f.join(1, { proof: await proofFor(key, 1) })).ok, true);
 });
 
+test('a new password reopens a group that wrong guesses closed', async () => {
+  const f = await createFixture({ joinMode: 'group_password' });
+  await f.admin('groups/password/set', { signer: passwordKey('11').address });
+  const wrong = passwordKey('22');
+  for (let start = 0; start < 300; start += 50) {
+    await Promise.all(Array.from({ length: 50 }, async (_, index) => {
+      const person = 10 + Math.floor((start + index) / 10);
+      return f.join(person, { proof: await proofFor(wrong, person) });
+    }));
+  }
+  assert.equal((await f.admin('groups/list')).groups[0].guessLimited, true);
+  const fresh = passwordKey('33');
+  await f.admin('groups/password/set', { signer: fresh.address });
+  assert.equal((await f.admin('groups/list')).groups[0].guessLimited, false);
+  assert.equal((await f.join(1, { proof: await proofFor(fresh, 1) })).ok, true);
+});
+
 test('wrong codes from many people never close a one-use group to the right code', async () => {
   const f = await createFixture({ joinMode: 'one_use' });
   const [good] = codes(1);

@@ -1780,7 +1780,7 @@ Wrong codes and passwords are limited to 10 an hour per person across the
 session, and wrong passwords to 300 an hour per password group, each hour
 counted from its first wrong guess. Past either, that person's code and
 password joins, or that group's password joins, are refused for the rest of
-the hour; admins see `guessLimited`. Codes have no per-group limit: a 128-bit
+the hour; admins see `guessLimited`. A new password restarts its group's count. Codes have no per-group limit: a 128-bit
 code can't be guessed, and such a limit would let throwaway accounts shut a
 group. Open groups, existing members, and proofs sent before a password is set
 are unaffected. Codes travel in session backups with their groups, so a spent
