@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.10] - 2026-11-13
 
+### Client — available when the site deploys
+
+- Opening a session takes far fewer requests. Measured in a browser on a session of 40 questions and 1,200 answers: a signed-in member's page load went from 114 requests to 65 on a public session, and from 174 to 67 on a members-only one; signed out, from 99 to 60.
+- Your saved answers come from a listing of your own, not everyone's.
+- A members-only session is asked signed in from the start once the tab knows it needs that, instead of being refused signed out first on every read.
+- AI Views refreshes without downloading its answers again unless the build changed: with Results open for a minute, 7.2 MB became 2.5 MB.
+- Questions are read a hundred at a time.
+
 ### Workers — requires redeployment
 
 - Each participant or agent may add 20 context items to a session; admins have no limit. The 21st is refused with a plain sentence.
