@@ -1260,7 +1260,7 @@ test('a Worker that takes no links from participants is invited and asked only f
 test('groups say how joining works and who can end a membership, and a leave the group refuses says so', async (t) => {
   const env = createEnv([groupSessionConfig()]);
   const host = groupHost(env);
-  const names = ['Default', 'Kept by admins', 'Members only', 'Fixed', 'By invitation', 'Closed', 'Full'];
+  const names = ['Default', 'Kept by admins', 'Members only', 'Fixed', 'By invitation', 'By code', 'By password', 'Closed', 'Full'];
   const made = Object.fromEntries(await Promise.all(names.map(async (label) =>
     [label, await createGroup(host, { label, ...(label === 'Full' ? { memberLimit: 1 } : {}) })])));
   await host.request('/groups/join', { method: 'POST', auth: true, body: { sessionId: SESSION_ID, groupId: made.Full.groupId } });
@@ -1278,6 +1278,8 @@ test('groups say how joining works and who can end a membership, and a leave the
         ...group,
         ...(setting[label(group.groupId)] ? { removalAuth: setting[label(group.groupId)] } : {}),
         ...(label(group.groupId) === 'By invitation' ? { joinMode: 'admin_add' } : {}),
+        ...(label(group.groupId) === 'By code' ? { joinMode: 'one_use' } : {}),
+        ...(label(group.groupId) === 'By password' ? { joinMode: 'group_password' } : {}),
         ...(label(group.groupId) === 'Closed' ? { joinEndsAt: '2020-01-01T00:00:00.000Z' } : {}),
       })),
     })));
@@ -1292,6 +1294,8 @@ test('groups say how joining works and who can end a membership, and a leave the
     'Members only': ['Open: join with join_group.', 'Members can leave with leave_group; admins can’t remove them.'],
     Fixed: ['Open: join with join_group.', 'No one can end a membership.'],
     'By invitation': ['Only admins add members.', 'Members can leave with leave_group, and admins can remove them.'],
+    'By code': ['By one-use code: pass it to join_group as invite, unless the session link carried it.', 'Members can leave with leave_group, and admins can remove them.'],
+    'By password': ['By group password: pass it to join_group as invite, unless the session link carried it.', 'Members can leave with leave_group, and admins can remove them.'],
     Closed: ['Joining has closed.', 'Members can leave with leave_group, and admins can remove them.'],
     Full: ['Full.', 'Members can leave with leave_group, and admins can remove them.'],
   });

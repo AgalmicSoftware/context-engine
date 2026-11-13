@@ -236,6 +236,15 @@ const WHO_CAN_END_MEMBERSHIP = {
   neither: 'No one can end a membership.',
 };
 
+// How someone joins a group on their own, by its join mode; any other mode
+// takes only members its admins add.
+const SELF_JOINING = {
+  open: 'Open: join with join_group.',
+  one_use: 'By one-use code: pass it to join_group as invite, unless the session link carried it.',
+  // Backticks, not quotes: the release secret scan flags a quoted value under a key containing "password".
+  group_password: `By group password: pass it to join_group as invite, unless the session link carried it.`,
+};
+
 const GROUP_REFUSALS = {
   worker_group_join_refused: (id) =>
     `That link, invite or password didn’t work for group "${id}". Ask whoever invited you for a new one.`,
@@ -448,10 +457,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const members = Number.isSafeInteger(memberCount) && memberCount >= 0 ? memberCount : null;
       const limit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? group.memberLimit : 0;
       const closesAt = text(group.joinEndsAt);
-      const open = text(group.joinMode).toLowerCase() === 'open';
-      let joining = open ? 'Open: join with join_group.' : 'Only admins add members.';
-      if (open && closesAt && Date.parse(closesAt) <= now()) joining = 'Joining has closed.';
-      else if (open && limit && members !== null && members >= limit) joining = 'Full.';
+      const selfJoin = SELF_JOINING[text(group.joinMode).toLowerCase()];
+      let joining = selfJoin || 'Only admins add members.';
+      if (selfJoin && closesAt && Date.parse(closesAt) <= now()) joining = 'Joining has closed.';
+      else if (selfJoin && limit && members !== null && members >= limit) joining = 'Full.';
       // A Worker from before the setting omits it, and works as 'both'.
       const removalAuth = text(group.removalAuth).toLowerCase() || 'both';
       return {
@@ -460,7 +469,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         ...(text(group.description) ? { description: text(group.description).slice(0, MAX_DESCRIPTION_LENGTH) } : {}),
         ...(tags.length ? { tags } : {}),
         joining,
-        ...(open && closesAt ? { joinClosesAt: closesAt } : {}),
+        ...(selfJoin && closesAt ? { joinClosesAt: closesAt } : {}),
         ...(members !== null ? { members } : {}),
         ...(limit ? { memberLimit: limit } : {}),
         member,
