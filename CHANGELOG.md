@@ -29,6 +29,8 @@ All notable changes to this project will be documented in this file.
 - MCP 0.4.0. `join_group` uses the invite a session link carries (`#groupInvite=…`), or a one-use code or group password passed as `invite`. The server never sends a password: it signs a join statement with a key made from it.
 - Every refused join reads the same, including for a group that does not exist; it used to say "This session has no group". `get_session` and `join_session` say how a code or password group is joined.
 - The first `list_questions` waits at most about 2 seconds for the agent's own earlier answers. A wrong argument shape says what was wrong, with a one-line example. The README says how long a host should allow a tool call.
+- The guide for AI agents (`/skill.md`) now starts from what an agent can do with a session link. An agent that can run commands can take part with nothing set up, and each of Claude Code, Codex, Gemini CLI, Hermes Agent, Cursor and the OpenAI Agents SDK adds the tools in one step. The MCP README says the same.
+- `scripts/mcp-mcpb.mjs` packs the MCP as a Claude Desktop bundle (`.mcpb`), which installs from a double-click and needs no Node. Nothing builds or publishes it yet.
 
 ## [0.9.6] - 2026-11-12
 
