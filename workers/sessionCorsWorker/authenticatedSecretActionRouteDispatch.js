@@ -6,6 +6,7 @@ import { executeSessionLitChipotleAction } from './chipotleClient.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { SESSION_AGENT_PATHS, dispatchSessionAgentRoute } from './sessionAgentRoute.js';
 import { FEEDBACK_PATH, sendSessionFeedback } from './sessionFeedbackRoute.js';
+import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
 
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return DEFAULT_ANTHROPIC_MODEL;
@@ -38,7 +39,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
   if (SESSION_AGENT_PATHS.includes(path)) {
     return {
       handled: true,
-      response: await dispatchSessionAgentRoute({ path, body, config, slug, address, env, limit, headers, scopes, deps }),
+      response: await dispatchSessionAgentRoute({ path, body, config, slug, address, env, headers, scopes, deps }),
     };
   }
   if (path === FEEDBACK_PATH) {
@@ -175,7 +176,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       env,
       slug,
       address,
-      limit,
+      limit: resolveAiDailyLimit(config),
       headers,
       deps: {
         checkRateLimit: deps?.checkRateLimit,

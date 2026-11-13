@@ -260,6 +260,14 @@ test('the payment step sees only who is asking, after the material is fixed, and
   assert.deepEqual(refused.calls.ai, []);
 });
 
+test('questions count against the AI daily limit, not the general one', async () => {
+  const h = await seeded();
+  h.state.config.limits = { perWalletPerDay: 400, aiPerWalletPerDay: 15 };
+  const seen = [];
+  await ask(h, { deps: { checkRateLimit: async ({ route, limit }) => { seen.push({ route, limit }); return true; } } });
+  assert.deepEqual(seen, [{ route: 'ai', limit: 15 }]);
+});
+
 test('questions share the /ai rate limit', async () => {
   const limited = await ask(await seeded(), { deps: { checkRateLimit: async () => false } });
   assert.equal(limited.status, 429);

@@ -13,7 +13,7 @@ function fixture({ secrets = { openaiKey: 'fixture-session-key' }, fetchImpl = a
   agentEnv.AGENT_CONTEXT.address = '0x1111111111111111111111111111111111111111';
   const services = createAgentServices({ env, agentEnv, deps: {
     readCurrentSessionConfig: async () => ({ config, revision: 1 }), computeScopesForLogin: async () => ({ ai: true }),
-    checkRateLimit: async () => rate, getSessionSecrets: async () => secrets, fetch: fetchImpl,
+    checkRateLimit: async (args) => (typeof rate === 'function' ? rate(args) : rate), getSessionSecrets: async () => secrets, fetch: fetchImpl,
   } });
   agentEnv.AGENT_SERVICES = services;
   return { services, config, agentEnv };
@@ -33,6 +33,13 @@ test('missing session text key and rate limits cannot use the optional poster or
     await assert.rejects(f.services.ai({ prompt: 'Fixture', apiKey: 'caller-key' }), error => ['agent_ai_request_failed', 'agent_ai_rate_limited'].includes(error.reason));
   }
   assert.equal(calls, 0);
+});
+test('text AI counts against the AI daily limit, with the /ai route', async () => {
+  const seen = [];
+  const f = fixture({ rate: ({ route, limit }) => { seen.push({ route, limit }); return true; } });
+  f.config.limits = { perWalletPerDay: 400, aiPerWalletPerDay: 15 };
+  await f.services.ai({ prompt: 'Fixture prompt' });
+  assert.deepEqual(seen, [{ route: 'ai', limit: 15 }]);
 });
 test('text AI limits concurrent calls per session and frees the slot on completion', async () => {
   const releases = []; const f = fixture({ fetchImpl: () => new Promise(resolve => releases.push(() => resolve(Response.json({ output_text: 'done' })))) });

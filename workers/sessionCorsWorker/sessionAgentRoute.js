@@ -13,6 +13,7 @@ import {
 import { canOptOut } from './sessionAgentOptOuts.js';
 import { isListedResultsBuilder } from './resultsBuild.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
+import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
 import {
   authorizeCloudflareStorageResourceRead,
   createRequesterAccessChecks,
@@ -191,7 +192,7 @@ const askAi = async ({ messages, config, secrets, address, scopes, headers, deps
 const accessFor = ({ env, config, slug, address, scopes, deps }) =>
   createRequesterAccessChecks({ env, config, slug, requesterAddress: address, authScopes: scopes, deps });
 
-export const dispatchSessionAgentRoute = async ({ path, body, config, slug, address, env, limit, headers, scopes, deps } = {}) => {
+export const dispatchSessionAgentRoute = async ({ path, body, config, slug, address, env, headers, scopes, deps } = {}) => {
   const json = (payload, status = 200) => deps.json(payload, status, headers);
   const setting = sessionAgentSettingOf(config?.sessionAgent);
   const store = deps.callSessionAgentOptOutStore || callOptOutStore;
@@ -233,7 +234,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   // The /ai route's checks: the current AI scope, which every asker needs,
   // then its rate limit.
   const preflight = await deps.evaluateAuthenticatedRoutePreflight({
-    scopes, scope: 'ai', route: 'ai', allowWithoutScope: true, config, env, slug, address, limit, headers,
+    scopes, scope: 'ai', route: 'ai', allowWithoutScope: true, config, env, slug, address, limit: resolveAiDailyLimit(config), headers,
     deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: deps.json },
   });
   if (!preflight?.ok) return preflight?.response || json({ error: 'Current authorization check failed.' }, 403);

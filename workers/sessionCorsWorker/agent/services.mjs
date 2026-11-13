@@ -13,6 +13,7 @@ import { createAgentPagination } from './pagination.mjs';
 import { loadAgentCredentialHash } from './agentCredentials.mjs';
 import { buildSessionEndedResponse } from '../../shared/sessionLifecycle.mjs';
 import { evaluateAuthenticatedRoutePreflight } from '../authenticatedRoutePreflight.js';
+import { resolveAiDailyLimit } from '../aiRateLimitPolicy.js';
 import { createAgentStorage } from './storage.mjs';
 import { persistRecoveryMessage, retainOutcomeForRecovery } from './agentSubmitQueue.mjs';
 
@@ -163,7 +164,7 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
     async ai(payload) {
       await current();
       if (!ctx.scopes?.ai) throw authorityError('agent_ai_scope_denied');
-      if (!await deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, limit: ctx.config.limits?.perWalletPerDay || 0 })) throw authorityError('agent_ai_rate_limited', 429);
+      if (!await deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: 'ai', limit: resolveAiDailyLimit(ctx.config) })) throw authorityError('agent_ai_rate_limited', 429);
       const key = ctx.sessionId;
       if ((activeAi.get(key) || 0) >= 2) throw authorityError('agent_ai_busy', 429);
       const model = resolveSessionAiModel(ctx.config, { taskType: payload.taskType || 'analysis' });
