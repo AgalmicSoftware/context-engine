@@ -109,12 +109,16 @@ describe('sessionFeedbackPorts', () => {
     fetchWorker.mockResolvedValueOnce(response(401, { error: 'Worker login failed (401).' }));
     await sendFeedback(DRAFT, SIGNED_IN);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Nor one a gate turns away before the route is reached.
+    fetchWorker.mockResolvedValueOnce(response(403, { error: 'Not a member of the required group.' }));
+    await sendFeedback(DRAFT, SIGNED_IN);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     // The feedback route's own refusal is final: it is shown, not sent again another way.
     fetchWorker.mockResolvedValueOnce(
       response(403, { error: 'This session isn’t taking feedback.', reason: 'feedback_off' }),
     );
     await expect(sendFeedback(DRAFT, SIGNED_IN)).rejects.toThrow('This session isn’t taking feedback.');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('sends a visitor’s message without a sign-in, naming the session in the address', async () => {

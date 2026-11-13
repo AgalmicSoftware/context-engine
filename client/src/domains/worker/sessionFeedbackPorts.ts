@@ -95,21 +95,26 @@ export const sendFeedback = async (draft: FeedbackDraft, options: FeedbackOption
     body: JSON.stringify(reachMe ? { ...message, contact: { reachMe } } : message),
     referrerPolicy: 'no-referrer',
   };
-  const answer = async (): Promise<Response> => {
+  // A send's outcome: taken, or the feedback route's own reason for refusing it.
+  const read = async (response: Response) => ({ ok: response.ok, why: response.ok ? '' : await refusal(response) });
+  const answer = async () => {
     const base = await workerBase(options);
     if (options.account) {
       const signedIn = await fetchWorkerWithAuth(`${base}/feedback`, init, {
         ...session(options),
         workerUrl: base,
         prompt: false,
-      }).catch(() => null);
-      // Anything but a sign-in the Worker didn't take is the answer; that one is sent again as a visitor's.
-      if (signedIn && signedIn.status !== 401) return signedIn;
+      }).then(read, () => null);
+      // Taken, or refused by the feedback route itself, is the answer. Anything else is a sign-in the
+      // Worker didn't take, and the message goes again as a visitor's.
+      if (signedIn && (signedIn.ok || signedIn.why)) return signedIn;
     }
-    return fetch(`${base}/feedback?slug=${encodeURIComponent(options.sessionSlug)}`, { ...init, credentials: 'omit' });
+    return read(
+      await fetch(`${base}/feedback?slug=${encodeURIComponent(options.sessionSlug)}`, { ...init, credentials: 'omit' }),
+    );
   };
-  const response = await answer().catch(() => null);
-  if (!response?.ok) throw new Error((response && (await refusal(response))) || NOT_SENT);
+  const result = await answer().catch(() => null);
+  if (!result?.ok) throw new Error(result?.why || NOT_SENT);
 };
 
 const adminPost = async (admin: FeedbackAdmin, action: string, body: Record<string, unknown>) => {
