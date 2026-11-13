@@ -475,7 +475,7 @@ describe('WorkerGroupAutoJoin', () => {
       fireEvent.change(screen.getByLabelText(/Group password or claim code for/), {
         target: { value: 'ABCDEF0123456789abcdef0123456789' },
       });
-      fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+      fireEvent.click(screen.getByRole('button', { name: /^Join / }));
       await settle();
       expect(JSON.parse(String(joins()[0][1]?.body))).toEqual({
         groupId: group.groupId,

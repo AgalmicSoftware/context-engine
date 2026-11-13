@@ -50,7 +50,12 @@ export default function WorkerGroupCodeField({
         disabled={disabled}
         onChange={(event) => setValue(event.target.value)}
       />
-      <button type="submit" className={buttonClassName} disabled={disabled || !value.trim()}>
+      <button
+        type="submit"
+        className={buttonClassName}
+        disabled={disabled || !value.trim()}
+        aria-label={`Join ${groupLabel}`}
+      >
         Join
       </button>
       {problem ? (

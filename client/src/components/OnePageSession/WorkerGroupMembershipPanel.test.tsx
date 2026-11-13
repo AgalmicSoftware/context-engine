@@ -1945,9 +1945,10 @@ describe('WorkerGroupMembershipPanel', () => {
       render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
 
       const field = await screen.findByLabelText('Group password or claim code for Salon');
-      expect(screen.queryByRole('button', { name: 'Join Salon' })).not.toBeInTheDocument();
+      // The only Join is the code field's, which waits for a code.
+      expect(screen.getByRole('button', { name: 'Join Salon' })).toBeDisabled();
       fireEvent.change(field, { target: { value: 'A'.repeat(32) } });
-      fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
 
       expect(await screen.findByRole('status')).toHaveTextContent('Joined Salon.');
       const join = fetchImpl.mock.calls.find(([input]) => String(input).endsWith('/groups/join'));
@@ -1963,7 +1964,7 @@ describe('WorkerGroupMembershipPanel', () => {
       fireEvent.change(await screen.findByLabelText('Group password or claim code for Salon'), {
         target: { value: 'b'.repeat(32) },
       });
-      fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
       expect(
         await screen.findByText('That link, invite or password didn’t work. Ask whoever invited you for a new one.'),
       ).toBeInTheDocument();
