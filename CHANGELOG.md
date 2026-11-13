@@ -29,6 +29,10 @@ All notable changes to this project will be documented in this file.
 - A group join refused when no invite was sent says to call `join_session` again with the full link, pass the invite, or check the group's id, instead of blaming an invite.
 - `list_questions` says that by default it lists only unanswered questions, as it always has, and how to list the others.
 
+### Local tooling
+
+- Two Session Worker tests no longer fail by chance: the group-password test picks people the join race really refused, and the backup test looks for whole feedback phrases, not a short marker that random ids can contain.
+
 ## [0.9.8] - 2026-11-14
 
 ### Client — available when the site deploys
