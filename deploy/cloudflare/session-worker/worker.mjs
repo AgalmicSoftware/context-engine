@@ -31402,10 +31402,11 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, TRANSIENT_WORKER_GROUP_REASONS, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_sessionConfigAuthority();
+    init_sessionCoordinatorBusy();
     init_workerGroupUrl();
     init_sessionSlugResolution();
     init_sessionConfigMutation();
@@ -32730,6 +32731,11 @@ var init_workerGroups = __esm({
       }
       return { ok: false, status: 400, reason: "worker_group_mutation_invalid" };
     };
+    TRANSIENT_WORKER_GROUP_REASONS = /* @__PURE__ */ new Set([
+      "worker_group_coordination_unavailable",
+      "worker_group_membership_state_pending",
+      "worker_group_mutation_ambiguous"
+    ]);
     workerGroupCoordinationUnavailable = () => ({
       ok: false,
       status: 503,
@@ -32753,19 +32759,24 @@ var init_workerGroups = __esm({
         return workerGroupCoordinationUnavailable();
       }
       if (!stub?.fetch) return workerGroupCoordinationUnavailable();
+      let response3 = null;
       try {
-        const response3 = await stub.fetch(`https://session-coordinator.internal${path}`, {
+        response3 = await stub.fetch(`https://session-coordinator.internal${path}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, slug: sessionSlug, sessionId: canonicalSessionId })
         });
         const result = await response3.json().catch(() => null);
-        if (!result || typeof result !== "object") return workerGroupCoordinationUnavailable();
+        if (!result || typeof result !== "object") {
+          logCoordinatorFailure(`worker-groups${path}`, new Error("No JSON reply."), { status: response3.status });
+          return workerGroupCoordinationUnavailable();
+        }
         return {
           ...result,
           status: Number(result.status || 0) || response3.status
         };
-      } catch {
+      } catch (error) {
+        logCoordinatorFailure(`worker-groups${path}`, error, response3 ? { status: response3.status } : {});
         return workerGroupCoordinationUnavailable();
       }
     };
@@ -33422,6 +33433,11 @@ var init_workerGroups = __esm({
           principal: actor.principal,
           actorPrincipal: actor.principal
         });
+        if (!result.ok && result.status === 503 && TRANSIENT_WORKER_GROUP_REASONS.has(result.reason)) {
+          const headers2 = new Headers(baseHeaders || {});
+          headers2.set("Retry-After", "1");
+          return jsonResponse(deps, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: result.reason || "worker_group_failed" }, 503, headers2);
+        }
         if (!result.ok) return routeError(deps, result, baseHeaders);
         if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
           return routeError(deps, { status: 503, reason: "worker_group_projection_unavailable" }, baseHeaders);
@@ -73605,15 +73621,15 @@ var init_storageRouteExecution = __esm({
       };
       const finishUpload = async (storageRef, publishedMetadata, publishedBytes, replayed = false) => {
         if (uploadReceipt) {
-          const settled = await coordinateResponseUploadReceipt({
+          const settled2 = await coordinateResponseUploadReceipt({
             env,
             slug,
             responder: uploader,
             operation: "settle",
             payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef }
           });
-          if (!settled?.ok) {
-            if (!replayed && settled?.reason === "upload_attempt_superseded") await withdrawSupersededUpload();
+          if (!settled2?.ok) {
+            if (!replayed && settled2?.reason === "upload_attempt_superseded") await withdrawSupersededUpload();
             return responseJson(deps, { error: "Upload settlement is unavailable; retry.", reason: "upload_receipt_unavailable" }, 503, baseHeaders);
           }
         }
@@ -75237,6 +75253,39 @@ var init_recoveryKeyExport = __esm({
       } catch (error) {
         return reply5({ error: error.status === 409 ? error.message : "Recovery key export is unavailable; retry." }, error.status || 503);
       }
+    };
+  }
+});
+
+// workers/sessionCorsWorker/operationQueue.js
+var settled, createOperationQueue;
+var init_operationQueue = __esm({
+  "workers/sessionCorsWorker/operationQueue.js"() {
+    settled = (promise) => promise.then(() => void 0, () => void 0);
+    createOperationQueue = () => {
+      let exclusiveTail = Promise.resolve();
+      let allTail = Promise.resolve();
+      const keyTails = /* @__PURE__ */ new Map();
+      return {
+        exclusive(operation) {
+          const run = allTail.then(() => operation());
+          exclusiveTail = allTail = settled(run);
+          return run;
+        },
+        shared(key, operation) {
+          const before = key && keyTails.get(key);
+          const run = (before ? Promise.all([exclusiveTail, before]) : exclusiveTail).then(() => operation());
+          const done = settled(run);
+          allTail = Promise.all([allTail, done]).then(() => void 0);
+          if (key) {
+            keyTails.set(key, done);
+            done.then(() => {
+              if (keyTails.get(key) === done) keyTails.delete(key);
+            });
+          }
+          return run;
+        }
+      };
     };
   }
 });
@@ -80672,7 +80721,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet,
   withCoordinatedFaucetWalletTurn: () => withCoordinatedFaucetWalletTurn
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, WORKER_GROUP_MEMBER_MUTATIONS, NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_lib2();
@@ -80684,6 +80733,7 @@ var init_sessionWriteCoordinator = __esm({
     init_sessionDiagnostics();
     init_storageBackupRevision();
     init_recoveryKeyExport();
+    init_operationQueue();
     init_recoveryKey();
     init_sessionConfigAuthority();
     init_sessionBackupCoordinator();
@@ -80901,6 +80951,8 @@ ${expiry}`);
     workerGroupBackupPendingKey = (mutation, reservation) => `${WORKER_GROUP_BACKUP_PENDING_PREFIX}${encodeURIComponent(reservation?.memberKey || mutation.groupId)}`;
     PENDING_WORKER_GROUP_OPERATIONS = Object.freeze({ creating: "create", updating: "update", deleting: "delete" });
     PENDING_WORKER_GROUP_MEMBER_OPERATIONS = Object.freeze({ reserved: "add-member", removing: "remove-member" });
+    WORKER_GROUP_MEMBER_MUTATIONS = /* @__PURE__ */ new Set(["join", "add-member", "remove-member"]);
+    NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION = Symbol("needsExclusiveWorkerGroupOperation");
     DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = /* @__PURE__ */ new Set([
       "invalid_join_mode",
       "join_mode_not_implemented",
@@ -81019,10 +81071,10 @@ ${expiry}`);
         this.runResultsAnalysisAutoJob = deps.runResultsAnalysisAutoJob || runQueuedAutomaticResultsAnalysisJob;
         this.activeAttemptId = "";
         this.activeDirectAttemptId = "";
-        this.sessionConfigTail = Promise.resolve();
+        this.sessionConfigQueue = createOperationQueue();
         this.storageVisibilityTail = Promise.resolve();
         this.contextSourceTail = Promise.resolve();
-        this.workerGroupTail = Promise.resolve();
+        this.workerGroupQueue = createOperationQueue();
         this.resultsAnalysisTail = Promise.resolve();
         this.storageOwnerTail = Promise.resolve();
         this.scanLegacyStorageOwnerIds = deps.scanLegacyStorageOwnerIds || scanLegacyStorageOwnerIds;
@@ -81207,14 +81259,20 @@ ${expiry}`);
         return jsonResponse2({ pendingLeases, oldestPendingAgeMs, settledCount: Math.min(settledCount, MAX_UPLOAD_RECEIPTS) });
       }
       serializeSessionConfigOperation(operation) {
-        const run = this.sessionConfigTail.then(operation);
-        this.sessionConfigTail = run.catch(() => void 0);
-        return run;
+        return this.sessionConfigQueue.exclusive(operation);
       }
       serializeWorkerGroupOperation(operation) {
-        const run = this.workerGroupTail.then(operation);
-        this.workerGroupTail = run.catch(() => void 0);
-        return run;
+        return this.workerGroupQueue.exclusive(operation);
+      }
+      // Joins, leaves and membership reads run side by side, one at a time per
+      // person; a room joining one group at once must not wait in single file.
+      // Group changes, backups and the recovery of a stranded group change run
+      // alone: an operation that meets one restarts on its own (`shared` false).
+      runWorkerGroupMemberOperation(principalKey, operation) {
+        return this.workerGroupQueue.shared(principalKey, () => operation(true)).catch((error) => {
+          if (error !== NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION) throw error;
+          return this.serializeWorkerGroupOperation(() => operation(false));
+        });
       }
       serializeStorageOwnerOperation(operation) {
         const run = this.storageOwnerTail.then(operation);
@@ -82198,22 +82256,23 @@ ${expiry}`);
       // group or member, replay the intent: re-applying is convergent, and an effect
       // an earlier attempt already made counts as done. Reservations recorded before
       // intents existed replay with an empty input.
-      async settleWorkerGroupReservations({ slug, sessionId, groupIds, principal = null }) {
+      async settleWorkerGroupReservations({ slug, sessionId, groupIds, principal = null, shared = false }) {
         const principalDigest = principal ? await sha256Hex(`worker-group-member:${principal.key}`) : "";
         const replayed = [];
         for (const groupId of groupIds) {
           const groupKey2 = workerGroupCapacityGroupKey(groupId);
           let state = await this.state.storage.get(groupKey2);
           const operation = PENDING_WORKER_GROUP_OPERATIONS[state?.phase];
+          if (operation && shared) throw NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION;
           if (operation) {
             const intent = isObjectRecord(state.pending) ? state.pending : {};
             const prior = intent.prior || { ...withoutPendingMutation(state), phase: "active", active: true };
-            const settled2 = await this.replayWorkerGroupMutation(
+            const settled3 = await this.replayWorkerGroupMutation(
               { slug, sessionId, groupId, operation, intent },
               operation === "create" ? { reserved: true } : { ok: true, prior }
             );
-            if (!settled2.ok) return settled2;
-            replayed.push(settled2.replayed);
+            if (!settled3.ok) return settled3;
+            replayed.push(settled3.replayed);
             state = await this.state.storage.get(groupKey2);
           }
           if (!principalDigest || state?.phase !== "active") continue;
@@ -82225,7 +82284,7 @@ ${expiry}`);
           const member = await this.state.storage.get(memberKey2);
           const memberOperation = PENDING_WORKER_GROUP_MEMBER_OPERATIONS[member?.state];
           if (!memberOperation) continue;
-          const settled = await this.replayWorkerGroupMutation(
+          const settled2 = await this.replayWorkerGroupMutation(
             {
               slug,
               sessionId,
@@ -82235,8 +82294,8 @@ ${expiry}`);
             },
             memberOperation === "add-member" ? { reserved: true, memberKey: memberKey2 } : { ok: true, memberKey: memberKey2 }
           );
-          if (!settled.ok) return settled;
-          replayed.push({ ...settled.replayed, principalKey: principal.key });
+          if (!settled2.ok) return settled2;
+          replayed.push({ ...settled2.replayed, principalKey: principal.key });
         }
         return { ok: true, replayed };
       }
@@ -82269,7 +82328,8 @@ ${expiry}`);
         });
       }
       executeWorkerGroupAuthorization(payload) {
-        return this.serializeWorkerGroupOperation(async () => {
+        const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || "";
+        return this.runWorkerGroupMemberOperation(principalKey, async (shared) => {
           const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
           const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
           const groupId = normalizeWorkerGroupId(payload?.groupId);
@@ -82285,8 +82345,8 @@ ${expiry}`);
           if (!initialized.ok) {
             return jsonResponse2(initialized, initialized.status || 503);
           }
-          const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: [groupId], principal });
-          if (!settled.ok) return jsonResponse2(settled, settled.status || 503);
+          const settled2 = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: [groupId], principal, shared });
+          if (!settled2.ok) return jsonResponse2(settled2, settled2.status || 503);
           const group = await this.getActiveWorkerGroupCapacity(groupId);
           if (!group.ok) return jsonResponse2(group, group.status || 404);
           const principalDigest = await sha256Hex(`worker-group-member:${principal.key}`);
@@ -82320,7 +82380,8 @@ ${expiry}`);
         });
       }
       executeWorkerGroupCatalog(payload) {
-        return this.serializeWorkerGroupOperation(async () => {
+        const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || "";
+        return this.runWorkerGroupMemberOperation(principalKey, async (shared) => {
           const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
           const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
           const requestedGroupIds = Array.isArray(payload?.groupIds) ? payload.groupIds.map((groupId) => normalizeWorkerGroupId(groupId)) : [];
@@ -82338,8 +82399,8 @@ ${expiry}`);
           if (!initialized.ok) {
             return jsonResponse2(initialized, initialized.status || 503);
           }
-          const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: uniqueGroupIds, principal });
-          if (!settled.ok) return jsonResponse2(settled, settled.status || 503);
+          const settled2 = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: uniqueGroupIds, principal, shared });
+          if (!settled2.ok) return jsonResponse2(settled2, settled2.status || 503);
           const principalDigest = principal ? await sha256Hex(`worker-group-member:${principal.key}`) : "";
           const groups = [];
           for (const groupId of uniqueGroupIds) {
@@ -82372,7 +82433,8 @@ ${expiry}`);
         });
       }
       executeWorkerGroupMemberships(payload) {
-        return this.serializeWorkerGroupOperation(async () => {
+        const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || "";
+        return this.runWorkerGroupMemberOperation(principalKey, async (shared) => {
           const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
           const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
           const principal = normalizeWorkerGroupPrincipal(payload?.principal);
@@ -82391,8 +82453,8 @@ ${expiry}`);
                 return "";
               }
             }).filter(Boolean);
-            const settled = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds, principal });
-            if (!settled.ok) return jsonResponse2(settled, settled.status || 503);
+            const settled2 = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds, principal, shared });
+            if (!settled2.ok) return jsonResponse2(settled2, settled2.status || 503);
           }
           const entries = await listGroupStates();
           if (!(entries instanceof Map)) {
@@ -82446,7 +82508,7 @@ ${expiry}`);
         });
       }
       async executeAuthorizedWorkerGroupMutation(payload) {
-        return this.serializeSessionConfigOperation(async () => {
+        return this.sessionConfigQueue.shared("", async () => {
           try {
             await this.assertSessionAuthority(payload);
             const { expectedAuthority: _expectedAuthority, ...mutation } = payload;
@@ -82462,149 +82524,155 @@ ${expiry}`);
         });
       }
       async executeWorkerGroupMutation(payload) {
-        return this.serializeWorkerGroupOperation(async () => {
-          if (toTrimmedString10(payload?.operation).toLowerCase() === "create" && isAddressShapedWorkerGroupId(payload?.input?.groupId)) {
-            return jsonResponse2({ ok: false, status: 400, reason: "invalid_worker_group_id" }, 400);
+        if (WORKER_GROUP_MEMBER_MUTATIONS.has(toTrimmedString10(payload?.operation).toLowerCase())) {
+          const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || "";
+          return this.runWorkerGroupMemberOperation(principalKey, (shared) => this.applyWorkerGroupMutation(payload, shared));
+        }
+        return this.serializeWorkerGroupOperation(() => this.applyWorkerGroupMutation(payload, false));
+      }
+      async applyWorkerGroupMutation(payload, shared) {
+        if (toTrimmedString10(payload?.operation).toLowerCase() === "create" && isAddressShapedWorkerGroupId(payload?.input?.groupId)) {
+          return jsonResponse2({ ok: false, status: 400, reason: "invalid_worker_group_id" }, 400);
+        }
+        const mutation = normalizeWorkerGroupMutation(payload);
+        if (!mutation) {
+          return jsonResponse2({
+            ok: false,
+            status: 400,
+            reason: "worker_group_mutation_invalid"
+          }, 400);
+        }
+        const initialized = await this.initializeWorkerGroupCapacity(mutation.slug, mutation.sessionId);
+        if (!initialized.ok) {
+          return jsonResponse2(initialized, initialized.status || 503);
+        }
+        const caps = resolveWorkerGroupCaps(this.env);
+        let groupReservation = null;
+        let memberReservation = null;
+        let updateReservation = null;
+        let deleteReservation = null;
+        let removalReservation = null;
+        let principalDigest = "";
+        let activeGroup = null;
+        const intent = {
+          ...mutation.operation === "delete" ? {} : { input: pickWorkerGroupInput(mutation.input) },
+          ...mutation.principal ? { principal: mutation.principal } : {},
+          actorPrincipal: mutation.actorPrincipal
+        };
+        if (byteLength(JSON.stringify(intent)) > WORKER_GROUP_INTENT_MAX_BYTES) {
+          return jsonResponse2({ ok: false, status: 400, reason: "worker_group_input_too_large" }, 400);
+        }
+        {
+          const settled2 = await this.settleWorkerGroupReservations({
+            slug: mutation.slug,
+            sessionId: mutation.sessionId,
+            groupIds: [mutation.groupId],
+            principal: mutation.principal ? { principal: mutation.principal, key: mutation.principalKey } : null,
+            shared
+          });
+          if (!settled2.ok) return jsonResponse2(settled2, settled2.status || 503);
+          const finished = settled2.replayed.find((entry2) => entry2.result.ok && (entry2.operation === mutation.operation && (mutation.operation === "delete" || mutation.operation === "remove-member" && entry2.principalKey === mutation.principalKey || mutation.operation === "create" && sameWorkerGroupInput(entry2.input, intent.input)) || entry2.operation === "add-member" && (mutation.operation === "join" || mutation.operation === "add-member") && entry2.principalKey === mutation.principalKey));
+          if (finished) return this.respondToWorkerGroupMutation(mutation, finished.result);
+        }
+        if (mutation.operation === "create") {
+          groupReservation = await this.reserveWorkerGroupSlot({
+            slug: mutation.slug,
+            sessionId: mutation.sessionId,
+            groupId: mutation.groupId,
+            maxGroupsPerSession: caps.maxGroupsPerSession,
+            intent
+          });
+          if (!groupReservation.ok) {
+            return jsonResponse2(groupReservation, groupReservation.status || 409);
           }
-          const mutation = normalizeWorkerGroupMutation(payload);
-          if (!mutation) {
+        } else {
+          activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
+          if (!activeGroup.ok) {
+            return jsonResponse2(activeGroup, activeGroup.status || 404);
+          }
+          if (mutation.operation === "join" && activeGroup.state.joinMode !== "open") {
             return jsonResponse2({
               ok: false,
-              status: 400,
-              reason: "worker_group_mutation_invalid"
-            }, 400);
+              status: 403,
+              reason: "worker_group_join_denied"
+            }, 403);
           }
-          const initialized = await this.initializeWorkerGroupCapacity(mutation.slug, mutation.sessionId);
-          if (!initialized.ok) {
-            return jsonResponse2(initialized, initialized.status || 503);
-          }
-          const caps = resolveWorkerGroupCaps(this.env);
-          let groupReservation = null;
-          let memberReservation = null;
-          let updateReservation = null;
-          let deleteReservation = null;
-          let removalReservation = null;
-          let principalDigest = "";
-          let activeGroup = null;
-          const intent = {
-            ...mutation.operation === "delete" ? {} : { input: pickWorkerGroupInput(mutation.input) },
-            ...mutation.principal ? { principal: mutation.principal } : {},
-            actorPrincipal: mutation.actorPrincipal
-          };
-          if (byteLength(JSON.stringify(intent)) > WORKER_GROUP_INTENT_MAX_BYTES) {
-            return jsonResponse2({ ok: false, status: 400, reason: "worker_group_input_too_large" }, 400);
-          }
-          {
-            const settled = await this.settleWorkerGroupReservations({
-              slug: mutation.slug,
-              sessionId: mutation.sessionId,
-              groupIds: [mutation.groupId],
-              principal: mutation.principal ? { principal: mutation.principal, key: mutation.principalKey } : null
-            });
-            if (!settled.ok) return jsonResponse2(settled, settled.status || 503);
-            const finished = settled.replayed.find((entry2) => entry2.result.ok && entry2.operation === mutation.operation && (mutation.operation === "delete" || mutation.operation === "remove-member" && entry2.principalKey === mutation.principalKey || mutation.operation === "create" && sameWorkerGroupInput(entry2.input, intent.input)));
-            if (finished) return this.respondToWorkerGroupMutation(mutation, finished.result);
-          }
-          if (mutation.operation === "create") {
-            groupReservation = await this.reserveWorkerGroupSlot({
-              slug: mutation.slug,
-              sessionId: mutation.sessionId,
-              groupId: mutation.groupId,
-              maxGroupsPerSession: caps.maxGroupsPerSession,
-              intent
-            });
-            if (!groupReservation.ok) {
-              return jsonResponse2(groupReservation, groupReservation.status || 409);
-            }
-          } else {
-            activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
-            if (!activeGroup.ok) {
-              return jsonResponse2(activeGroup, activeGroup.status || 404);
-            }
-            if (mutation.operation === "join" && activeGroup.state.joinMode !== "open") {
+          if (mutation.operation === "join") {
+            const joinEndsAt = Date.parse(toTrimmedString10(activeGroup.state.joinEndsAt));
+            if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(this.now())) {
               return jsonResponse2({
                 ok: false,
                 status: 403,
-                reason: "worker_group_join_denied"
+                reason: "worker_group_join_ended"
               }, 403);
             }
-            if (mutation.operation === "join") {
-              const joinEndsAt = Date.parse(toTrimmedString10(activeGroup.state.joinEndsAt));
-              if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(this.now())) {
+          }
+          if (mutation.operation === "update") {
+            if (Object.prototype.hasOwnProperty.call(mutation.input, "memberLimit")) {
+              const requestedMemberLimit = Number(mutation.input.memberLimit);
+              if (Number.isSafeInteger(requestedMemberLimit) && requestedMemberLimit > 0 && requestedMemberLimit < Number(activeGroup.state.memberCount || 0)) {
                 return jsonResponse2({
                   ok: false,
-                  status: 403,
-                  reason: "worker_group_join_ended"
-                }, 403);
+                  status: 409,
+                  reason: "worker_group_member_limit_below_current"
+                }, 409);
               }
             }
-            if (mutation.operation === "update") {
-              if (Object.prototype.hasOwnProperty.call(mutation.input, "memberLimit")) {
-                const requestedMemberLimit = Number(mutation.input.memberLimit);
-                if (Number.isSafeInteger(requestedMemberLimit) && requestedMemberLimit > 0 && requestedMemberLimit < Number(activeGroup.state.memberCount || 0)) {
-                  return jsonResponse2({
-                    ok: false,
-                    status: 409,
-                    reason: "worker_group_member_limit_below_current"
-                  }, 409);
-                }
-              }
-              updateReservation = await this.beginWorkerGroupUpdate(mutation.groupId, intent);
-              if (!updateReservation.ok) {
-                return jsonResponse2(updateReservation, updateReservation.status || 404);
-              }
-            } else if (mutation.operation === "delete") {
-              deleteReservation = await this.beginWorkerGroupDelete(mutation.groupId, intent);
-              if (!deleteReservation.ok) return jsonResponse2(deleteReservation, deleteReservation.status || 404);
+            updateReservation = await this.beginWorkerGroupUpdate(mutation.groupId, intent);
+            if (!updateReservation.ok) {
+              return jsonResponse2(updateReservation, updateReservation.status || 404);
             }
+          } else if (mutation.operation === "delete") {
+            deleteReservation = await this.beginWorkerGroupDelete(mutation.groupId, intent);
+            if (!deleteReservation.ok) return jsonResponse2(deleteReservation, deleteReservation.status || 404);
           }
-          if (mutation.operation === "add-member" || mutation.operation === "join") {
-            principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
-            memberReservation = await this.reserveWorkerGroupMemberSlot({
-              groupId: mutation.groupId,
-              principalDigest,
-              maxMembersPerGroup: caps.maxMembersPerGroup,
-              intent
-            });
-            if (!memberReservation.ok) {
-              return jsonResponse2(memberReservation, memberReservation.status || 409);
-            }
-          } else if (mutation.operation === "remove-member") {
-            principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
-            removalReservation = await this.beginWorkerGroupMemberRemoval({
-              groupId: mutation.groupId,
-              principalDigest,
-              remover: mutation.remover,
-              intent
-            });
-            if (!removalReservation.ok) {
-              return jsonResponse2(removalReservation, removalReservation.status || 404);
-            }
+        }
+        if (mutation.operation === "add-member" || mutation.operation === "join") {
+          principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
+          memberReservation = await this.reserveWorkerGroupMemberSlot({
+            groupId: mutation.groupId,
+            principalDigest,
+            maxMembersPerGroup: caps.maxMembersPerGroup,
+            intent
+          });
+          if (!memberReservation.ok) {
+            return jsonResponse2(memberReservation, memberReservation.status || 409);
           }
-          const reservation = groupReservation || updateReservation || deleteReservation || memberReservation || removalReservation;
-          await this.state.storage.put(workerGroupBackupPendingKey(mutation, reservation), true);
-          let result;
-          try {
-            result = await executeWorkerGroupMutation({
-              env: this.env,
-              ...mutation,
-              capacityAuthorized: true
-            });
-          } catch {
-            return jsonResponse2({
-              ok: false,
-              status: 503,
-              reason: "worker_group_mutation_ambiguous"
-            }, 503);
+        } else if (mutation.operation === "remove-member") {
+          principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
+          removalReservation = await this.beginWorkerGroupMemberRemoval({
+            groupId: mutation.groupId,
+            principalDigest,
+            remover: mutation.remover,
+            intent
+          });
+          if (!removalReservation.ok) {
+            return jsonResponse2(removalReservation, removalReservation.status || 404);
           }
-          await this.completeWorkerGroupReservation(
-            mutation,
-            result,
-            reservation
-          );
-          if (!result.ok) return jsonResponse2(result, result.status || 400);
-          return this.respondToWorkerGroupMutation(mutation, result);
-        });
+        }
+        const reservation = groupReservation || updateReservation || deleteReservation || memberReservation || removalReservation;
+        await this.state.storage.put(workerGroupBackupPendingKey(mutation, reservation), true);
+        let result;
+        try {
+          result = await executeWorkerGroupMutation({
+            env: this.env,
+            ...mutation,
+            capacityAuthorized: true
+          });
+        } catch {
+          return jsonResponse2({
+            ok: false,
+            status: 503,
+            reason: "worker_group_mutation_ambiguous"
+          }, 503);
+        }
+        await this.completeWorkerGroupReservation(
+          mutation,
+          result,
+          reservation
+        );
+        if (!result.ok) return jsonResponse2(result, result.status || 400);
+        return this.respondToWorkerGroupMutation(mutation, result);
       }
       async respondToWorkerGroupMutation(mutation, result) {
         if (mutation.operation === "add-member" || mutation.operation === "join" || mutation.operation === "remove-member") {
