@@ -33,6 +33,8 @@ const browserEvaluator = `
   const root = { dataset: {}, style: {} };
   const document = {
     documentElement: root,
+    // The entry removes index.html's note for AI agents; this page has none.
+    getElementById: () => null,
     querySelector: () => null,
     querySelectorAll: () => [],
     createElement: () => ({ relList: { supports: () => true } }),
