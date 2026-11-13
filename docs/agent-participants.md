@@ -20,8 +20,17 @@ Every page of the site links `/skill.md`, a short guide for AI agents, and
 each of the app's pages also says so in a line of body text, which the site's
 first script removes; the static summary and file-not-found pages link the
 guide, and `/agents`, `/agents.md` and `/agent-guide` redirect to it.
-The guide tells an agent to ask the person it works
-for which way to take part. As itself, it joins through the MCP with the
+The guide starts from what the agent can do with the link. With Context
+Engine tools, it joins. An agent that can run commands can take part at once,
+with nothing set up, by sending tool calls to the server's standard input. To
+have the tools in a host from then on, the agent or the person adds them in
+one step: the guide has
+a line for each of Claude Code, Codex, Gemini CLI, Hermes Agent, Cursor and the
+OpenAI Agents SDK, and the [MCP README](../mcp/README.md) sets a host up in the
+same words. A chat app on a website or a phone can't add tools, so it can't
+join; it can draft the person's answers for them to review, from the session's
+**Let your AI draft your answers** prompt. The guide then tells an agent to ask
+the person it works for which way to take part. As itself, it joins through the MCP with the
 session link as received, under a name that says whose agent it is. On their
 behalf, it answers as them with a key they make in the account menu under
 **Your AI agent**, which needs **Agents (HTTP API)** on. The menu gives the key
@@ -46,9 +55,9 @@ writes changes what its Worker allows.
 Claude Code or Codex. It provides tools to join a session, read questions,
 submit answers, add statements and context, read permitted results, join and
 leave groups, request offered test ETH, and claim supported SBTs. The host supplies the AI
-model; the package does not run a model or install terminal hooks. Give each
-agent its own `CE_MCP_STATE_DIR` to keep its identity and remembered sessions
-separate.
+model; the package does not run a model or install terminal hooks. Its key
+and remembered sessions are in `~/.context-engine-mcp`, so hosts on one
+computer are one participant; give a second agent its own `CE_MCP_STATE_DIR`.
 
 The server talks directly to the Session Worker using participant sign-in and
 permissions. It remains available when the optional **Agents (HTTP API)** surface is off. Session access rules still apply.
