@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.8] - 2026-11-13
 
+### Client — available when the site deploys
+
+- Risk Matrix: the detail grid for two areas labels its columns and rows, has a key, frames every square (an empty one says "No notes"), shows each balance with an arrow and its note count, and its column and row headings highlight, with a **Clear** button.
+- Results: when a session holds more answers than one load reads, a Report that fails to load says so, that trying again can take minutes, and what an admin can do.
+- A group on a Session Worker starts on a generated three-word password, selected so an admin can type their own; **Generate new** makes three words too. On-chain groups keep five words. A right password always gets in and wrong tries are not limited, so a hand-typed password should be long and uncommon.
+
 ## [0.9.7] - 2026-11-13
 
 ### Client — available when the site deploys
