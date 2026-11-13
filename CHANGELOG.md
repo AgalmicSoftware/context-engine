@@ -29,12 +29,17 @@ All notable changes to this project will be documented in this file.
 - Many people opening AI Views at once share one read in each Worker instance, reused for up to a second, where each read the whole build from the session's coordinator. Admin reads stay fresh.
 - An answer sent while the session was too busy to mark its backup revision is retried automatically, where it failed with a `500`. The Worker now answers with the busy `503` before storing anything, and no longer refuses an answer that is already stored.
 - Session Workers accept the group recording settings `recordingQuestionCount` (1 to 10) and `recordingQuestionTiming` (`end` or `chunk`) in a session's interview settings.
+- Finding your own answers no longer reads everyone's. Each new answer names its author in the Worker's index, so the voice interview's saved answers and an agent's own answers load in one or a few requests in a large session; at 34,000 stored answers, 341 requests became 4. Answers stored before this release are still found, more slowly.
+- The Session Worker answers `404`, not `401`, for a request other than a `POST` to a path it doesn't serve, so `/mcp` and `/sse` no longer look like endpoints behind a sign-in.
 - The Worker logs why a session's coordinator could not answer: Cloudflare's own error and its retry flags, never the session, addresses or content.
 
 ### Agents and MCP
 
 - MCP 0.3.4, a patch: the server waits and tries again when a session is briefly busy, for reads and for answers that carry a request id.
 - The agent guide, `llms.txt` and the MCP README say a browser invitation link can be given to `join_session` as it is. The npm README's links are full addresses.
+- `list_questions` and `get_session` return without waiting more than 8 seconds for the agent's earlier answers, and a new agent skips that lookup. `get_results` returns within about 40 seconds, marked partial when cut short. `list_questions` returns up to 100 questions and says how to get any more.
+- The agent's key can come from `CE_MCP_PRIVATE_KEY`, for hosts that keep no files between runs.
+- The next step names a link's group, and the answer tool's value has a JSON-schema type.
 - When a busy session leaves a question unread, the MCP tells the agent to retry instead of calling the question unknown.
 
 ### Local tooling
