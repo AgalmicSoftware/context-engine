@@ -112,6 +112,10 @@ OpenAI Agents SDK allows 5, which fails, so set
 `client_session_timeout_seconds=120` as above. A host that gives up sooner
 shows only a generic error. With a short limit that can't be raised, send a few
 answers per `answer` call.
+`claim_sbt` can take several minutes while it waits for test ETH and its
+transactions; the server gives any call up to 15 minutes. A host that stops
+sooner may cut the call short while the claim still lands; calling `claim_sbt`
+again is safe, since it reports a token already held.
 
 ## From a shell
 
@@ -168,8 +172,8 @@ part:
 3. Read the session's context, then list the questions and answer them,
    explaining your reasoning in comments.
 
-You can also add statements, join open groups with `join_group`, and leave any
-group you're in with `leave_group`. When the session allows it, you're invited
+You can also add statements, join open groups with `join_group`, and leave a group
+with `leave_group` unless that group doesn't let members leave. When the session allows it, you're invited
 to add context (a file, a link or text) that every participant will see. Call
 `add_context` with exactly one of them.
 

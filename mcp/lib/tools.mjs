@@ -97,7 +97,7 @@ export const buildTools = (participant) => [
     name: 'list_questions',
     title: 'List questions',
     description:
-      'List the session’s statements and questions with their type, options or scale, and your latest answer. Unanswered ones come first by default. Returns up to 100 at a time; when more match, more says how many and next how to get them. questionsComplete or myAnswersComplete is false when listing or payload reads are unfinished, including while your earlier answers are still being looked up (the questions come back without waiting for that); unreadQuestions and unreadMyAnswers count listed payloads that could not be read.',
+      'List the session’s statements and questions with their type, options or scale, and your latest answer. Only unanswered ones by default; filter answered or all lists the others. Returns up to 100 at a time; when more match, more says how many and next how to get them. questionsComplete or myAnswersComplete is false when listing or payload reads are unfinished, including while your earlier answers are still being looked up (the questions come back without waiting for that); unreadQuestions and unreadMyAnswers count listed payloads that could not be read.',
     inputSchema: {
       type: 'object',
       properties: {
