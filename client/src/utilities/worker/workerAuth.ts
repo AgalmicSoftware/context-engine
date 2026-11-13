@@ -72,6 +72,8 @@ const accountLog = createLogger('account');
 
 const LOGIN_GATE_UNAVAILABLE_RETRIES = 2;
 const LOGIN_GATE_UNAVAILABLE_RETRY_BASE_MS = 700;
+// Sign-in waits out a busy session coordinator, as joining does.
+const sendAuthRequest = withCoordinatorRetry((input, init) => fetch(input, init));
 const ADMIN_ACTION_EXPIRATION_WINDOW_SECONDS = 5 * 60;
 export { normalizeWorkerUrl };
 
@@ -830,7 +832,7 @@ export const getWorkerSessionToken = async ({
 
     const performLogin = async () => {
       assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, address);
-      const nonceResp = await fetch(`${resolvedWorkerUrl}/auth/nonce`, {
+      const nonceResp = await sendAuthRequest(`${resolvedWorkerUrl}/auth/nonce`, {
         method: 'POST',
         headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(bindWorkerAuthRequestIdentity({ address, sessionSlug: slug }, sessionId)),
@@ -869,7 +871,7 @@ export const getWorkerSessionToken = async ({
       });
 
       assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, address);
-      const loginResp = await fetch(`${resolvedWorkerUrl}/auth/login`, {
+      const loginResp = await sendAuthRequest(`${resolvedWorkerUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
@@ -1126,6 +1128,15 @@ export const fetchWorkerWithAuth = async (
   let authHeaders: Record<string, string> | null = null;
   let authRequestContext: WorkerTokenRequestContext | null = null;
   let authToken = '';
+  // requireAccount fails the request rather than send under whoever is signed in now: checked before
+  // anyone is asked to sign, and again after sign-in, in case the page and wallet both switched meanwhile.
+  const requiredAccount = normalizeAddress(opts.requireAccount || '');
+  const assertRequiredAccount = (address: unknown) => {
+    if (requiredAccount && normalizeAddress(address) !== requiredAccount) {
+      throw new Error('A different account is signed in now.');
+    }
+  };
+  assertRequiredAccount(getCurrentWorkerAuthStoreAddress());
   try {
     const authResult = await getWorkerAuthHeadersWithMeta({
       sessionSlug: slug,
@@ -1135,6 +1146,7 @@ export const fetchWorkerWithAuth = async (
       allowDemoFallback: opts.allowDemoFallback,
       prompt: opts.prompt,
     });
+    assertRequiredAccount(authResult.requestContext?.address);
     authHeaders = authResult.headers;
     authRequestContext = authResult.requestContext;
     authToken = toStr(authResult.token);

@@ -7,10 +7,11 @@ import { buildFieldEncryptionWorkGroups, verifyEncryptionIntegrity } from './sur
 import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
-import { syncDraftText } from './sessionInterviewDraftText';
+import { resendPendingDraftTextDeletes, syncDraftText } from './sessionInterviewDraftText';
 
 jest.mock('./sessionInterviewDraftText', () => ({
   ...jest.requireActual<Record<string, unknown>>('./sessionInterviewDraftText'),
+  resendPendingDraftTextDeletes: jest.fn(async () => undefined),
   syncDraftText: jest.fn(async () => undefined),
 }));
 
@@ -245,8 +246,23 @@ describe('surveyQuestionsSubmitRuntime', () => {
     expect(outcome).toEqual(expect.objectContaining({ status: 'stale' }));
     expect(jest.mocked(syncDraftText)).toHaveBeenCalledWith(
       { put: [], remove: ['q1'] },
-      expect.objectContaining({ sessionSlug: 'draft-edge' }),
+      expect.objectContaining({ sessionSlug: 'draft-edge', account: '0xabc' }),
     );
+  });
+
+  it('resends kept AI draft text deletes for whoever is signed in, and for no one signed out', () => {
+    jest.mocked(resendPendingDraftTextDeletes).mockClear();
+    const context = createContext();
+    context.propsRef.current.sessionConfig = { interviewMode: {} };
+    createSurveyQuestionsSubmitRuntime(context).resendDraftTextDeletes();
+    expect(jest.mocked(resendPendingDraftTextDeletes)).toHaveBeenCalledWith({
+      sessionConfig: expect.anything(),
+      sessionSlug: 'draft-edge',
+      account: '0xabc',
+    });
+    context.propsRef.current.loginComplete = false;
+    createSurveyQuestionsSubmitRuntime(context).resendDraftTextDeletes();
+    expect(jest.mocked(resendPendingDraftTextDeletes)).toHaveBeenCalledTimes(1);
   });
 
   it('leaves AI draft text alone when another account signs in during the upload', async () => {

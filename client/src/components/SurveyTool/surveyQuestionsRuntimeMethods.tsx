@@ -715,6 +715,7 @@ export const createSurveyQuestionsRuntimeMethods = (
 
     loadBookmarks();
     hydrateGateSbtLabels();
+    resendDraftTextDeletes();
     try {
       const slugSig: SurveyQuestionsLegacyValue = normalizeSessionSlugValue(
         inst._getEffectiveDraftSlug() || resolveEffectiveSlug(propsRef.current),
@@ -825,6 +826,13 @@ export const createSurveyQuestionsRuntimeMethods = (
       inst._jsonPreviewTimer = null;
       inst._draftDirtyQids?.clear();
       setState({ jsonPreview: null, draftPersistenceError: '' });
+    }
+    if (
+      workerTargetChanged ||
+      prevProps.account !== propsRef.current.account ||
+      prevProps.loginComplete !== propsRef.current.loginComplete
+    ) {
+      resendDraftTextDeletes();
     }
     const diffInputsChanged = didEditDiffInputsChange(prevProps, prevState);
     if (diffInputsChanged) {
@@ -1976,6 +1984,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     finishSubmitAttempt,
     handleStaleSubmitContext,
     encryptAndUpload,
+    resendDraftTextDeletes,
   } = createSurveyQuestionsSubmitRuntime({
     ...context,
     canUpdateStateForAsyncSnapshot,

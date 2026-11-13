@@ -17,5 +17,7 @@ export type WorkerFetchAuthOptions = ResolveWorkerTokenRequestContextOptions & {
   preferAnonymous?: boolean;
   // false: never ask the person to unlock their wallet, for requests the page makes by itself.
   prompt?: boolean;
+  // Sends only as this address, failing if another account is signed in.
+  requireAccount?: string;
   retry?: boolean;
 };
