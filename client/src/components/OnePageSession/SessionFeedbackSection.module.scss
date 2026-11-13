@@ -1,0 +1,219 @@
+/* @file SessionFeedbackSection.module.scss: the Feedback section's header button and form. */
+
+// The heading is the page's; the button inside it only adds keyboard use.
+.toggle {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus,
+  &:active {
+    background: transparent;
+    color: inherit;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 4px;
+  }
+}
+
+.agentHeaderRow {
+  display: flex;
+}
+
+// Focused after sending so it is read out; it is not a control, so it shows no ring.
+.thanks:focus {
+  outline: none;
+}
+
+.agentHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+// The "?"s keep their surroundings' text colour in every state.
+.help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+
+  &:hover,
+  &:focus,
+  &:active {
+    background: transparent;
+    color: inherit;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// The setup page's surface and text, a pair every theme keeps readable.
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8, 8px);
+  background: var(--ce-surface);
+  color: var(--ce-panel-text);
+
+  p {
+    margin: 0;
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// The setup page's field colours, which outrank the theme's: its text colour
+// is for the page, and fails on the field's fill in dark themes.
+.field {
+  background: var(--ce-input-bg) !important;
+  border-color: var(--ce-input-border-strong) !important;
+  color: var(--ce-panel-text) !important;
+  -webkit-text-fill-color: var(--ce-panel-text);
+
+  &::placeholder {
+    color: var(--ce-panel-text-muted);
+    -webkit-text-fill-color: var(--ce-panel-text-muted);
+    opacity: 1;
+  }
+}
+
+.text {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.hint {
+  color: var(--ce-panel-text-muted);
+  font-size: 0.85rem;
+}
+
+.contact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+}
+
+.reach {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 420px;
+
+  label {
+    margin: 0;
+    font-weight: 600;
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+// The accent pair, which every theme keeps readable, in each state.
+.send {
+  padding: 6px 18px;
+  background: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled),
+  &:focus-visible,
+  &:active:not(:disabled) {
+    background: var(--ce-action-accent-hover);
+    color: var(--ce-action-accent-text);
+  }
+
+  // Muted text rather than opacity, so the label stays readable.
+  &:disabled {
+    border-style: dashed;
+    background: transparent;
+    color: var(--ce-panel-text-muted);
+    cursor: not-allowed;
+  }
+}
+
+.error {
+  color: var(--ce-status-danger-text);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+// Links keep the panel's text colour: the page's link colour is for another surface.
+.link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover,
+  &:focus,
+  &:active {
+    background: transparent;
+    color: inherit;
+  }
+}

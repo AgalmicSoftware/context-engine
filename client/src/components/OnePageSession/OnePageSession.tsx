@@ -2456,6 +2456,7 @@ class OnePageSession extends Component<any, any> {
           questionResponsesNonce={this.props.questionResponsesNonce}
           questionScanProgress={this.props.questionScanProgress}
           resultsViewMode={this.state.resultsViewMode}
+          sessionConfig={resolvedSessionConfig}
           sessionHeader={sessionHeader}
           sessionInfo={sessionInfo}
           sessionName={sessionName}

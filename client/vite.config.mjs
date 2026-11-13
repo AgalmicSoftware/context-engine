@@ -16,6 +16,7 @@ const postsDir = path.resolve(__dirname, '..', 'posts');
 const knownSessionsPath = path.resolve(__dirname, '..', 'known-sessions.json');
 const redirectsPath = path.resolve(publicDir, '_redirects');
 const groupPasswordDerivationCjsPath = path.resolve(__dirname, '..', 'shared', 'crypto', 'groupPasswordDerivation.cjs');
+const appRelease = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version;
 const themeRegistry = JSON.parse(fs.readFileSync(path.resolve(srcDir, 'scss', 'themes', 'registry.json'), 'utf8'));
 const themeIds = Object.freeze(themeRegistry.themes.map(({ id }) => String(id)));
 const lightThemeIds = themeRegistry.themes.filter(({ colorScheme }) => colorScheme === 'light').map(({ id }) => id);
@@ -612,6 +613,8 @@ export default defineConfig(({ mode }) => {
     envPrefix: ['VITE_', 'REACT_APP_', 'NEXT_PUBLIC_'],
     define: {
       'process.env': JSON.stringify(clientEnv),
+      // Sent with feedback, so its readers know which release it is about.
+      __CE_APP_RELEASE__: JSON.stringify(appRelease),
     },
     plugins: [
       sourceCommonJsCompatibilityPlugin(),
