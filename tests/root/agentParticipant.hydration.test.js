@@ -141,7 +141,8 @@ describe('agent participant records in web client hydration', () => {
 
     const matrix = buildRatingMatrixFromRealData({ [questions.binary.id]: aggregator[questions.binary.id] }, { sessionSlug: SLUG, metadata });
     expect(matrix.matrix).toEqual([[1, -1]]);
-    expect(matrix.displayNamesMap).toEqual({ [agents[0]]: 'bot-0', [agents[1]]: 'bot-1' });
+    // The opinion map marks an AI agent after its name.
+    expect(matrix.displayNamesMap).toEqual({ [agents[0]]: 'bot-0 (agent)', [agents[1]]: 'bot-1 (agent)' });
     const byType = Object.fromEntries(buildReportAnswerQuestions(aggregator, metadata, { sessionSlug: SLUG }).map((question) => [question.type, question]));
     expect(byType.rating.average).toBe(5);
     expect(byType.multichoice.options.map((option) => option.count)).toEqual([2, 1]);
