@@ -143,6 +143,23 @@ test('feedback is never a storage resource and never enters a backup', async () 
   assert.ok(!JSON.stringify(pages).includes('7d1c'));
 });
 
+test('a restore keeps everyone who turned the Session Agent off opted out', async () => {
+  const source = fixture();
+  const people = [`0x${'a'.repeat(40)}`, `0x${'b'.repeat(40)}`];
+  for (const address of people) {
+    const set = await callSessionConfigCoordinator({ env: source.env, slug, path: 'session-agent/set', address, optedOut: true });
+    assert.equal(set.body.optedOut, true);
+  }
+  const [page] = await allPages(source.env);
+  assert.deepEqual(page.coordinator.sessionAgentOptOuts, people);
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  const result = await importPage(target.env, page);
+  assert.equal(result.body.complete, true, JSON.stringify(result));
+  const restored = await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/list' });
+  assert.deepEqual(restored.body.addresses, people);
+});
+
 test('restore refuses missing or altered pages, foreign keys, and mismatched session ids', async () => {
   const source = fixture();
   const [original] = await allPages(source.env);
