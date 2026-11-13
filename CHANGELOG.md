@@ -29,6 +29,7 @@ All notable changes to this project will be documented in this file.
 ### Local tooling
 
 - `npm run ai:test-theme:feedback` checks the Feedback section by keyboard in each theme at phone and desktop widths.
+- The MCP publish workflow waits up to ten minutes, not three, for npm to list a published version, since npm once took four. If it still can't confirm it, the error gives the `npm view` command and the integrity to compare, and says that when they match, the publish went through and a rerun while `main` is unchanged does nothing.
 
 ## [0.9.7] - 2026-11-13
 

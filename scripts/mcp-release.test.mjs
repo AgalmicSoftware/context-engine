@@ -187,7 +187,7 @@ test('ambiguous publish response is reconciled without retrying the upload', asy
     checkSource: () => {}, publish: () => {}, ...fakeClock() }), /provenance/);
 });
 
-test('after publishing, the registry is read for up to three minutes until it lists the version', async () => {
+test('after publishing, the registry is read for up to ten minutes until it lists the version', async () => {
   // npm lists the version a few reads later, one read failing and one still showing the old latest.
   const oldLatest = { ...published, 'dist-tags': { latest: '0.1.0' } };
   const answers = [registry, registry, registry, new Error('registry unavailable (503)'), oldLatest, published];
@@ -202,12 +202,22 @@ test('after publishing, the registry is read for up to three minutes until it li
     publish: () => { publishes++; } }), 'published');
   assert.deepEqual({ publishes, waits: listed.waits }, { publishes: 1, waits: 3 });
 
-  // A version npm never lists is unconfirmed after three minutes, and the upload isn't repeated.
+  // npm once took four minutes to list a published version; that still counts.
+  const slow = fakeClock();
+  assert.equal(await publishVerified({ receipt, checkSource: () => {}, ...slow, publish: () => {},
+    getRegistry: async () => slow.now() < 240_000 ? registry : published }), 'published');
+  assert.equal(slow.now(), 240_000);
+
+  // A version npm never lists is unconfirmed after ten minutes, and the upload isn't repeated.
+  // The error says how to check by hand whether the publish went through.
   const never = fakeClock();
   publishes = 0;
   await assert.rejects(publishVerified({ receipt, checkSource: () => {}, ...never,
-    getRegistry: async () => registry, publish: () => { publishes++; } }), /not confirmed/);
-  assert.deepEqual({ publishes, waits: never.waits, elapsed: never.now() }, { publishes: 1, waits: 18, elapsed: 180_000 });
+    getRegistry: async () => registry, publish: () => { publishes++; } }),
+  (error) => /not confirmed within ten minutes/.test(error.message)
+    && error.message.includes(`npm view ${PACKAGE}@0.1.2 dist.integrity`)
+    && error.message.includes(receipt.integrity) && /while main is unchanged a rerun skips/.test(error.message));
+  assert.deepEqual({ publishes, waits: never.waits, elapsed: never.now() }, { publishes: 1, waits: 60, elapsed: 600_000 });
 
   // A registry down for the whole window says so.
   reads = 0;
@@ -241,6 +251,8 @@ test('workflow publishes only the CI artifact, defaults to dry-run and serialize
   const ci = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
   assert.match(workflow, /workflow_run:\s+branches: \[main\]/);
   assert.match(workflow, /cancel-in-progress: false/);
+  // Room for the ten-minute registry wait after a publish that can take two.
+  assert.ok(Number(workflow.match(/timeout-minutes: (\d+)/)[1]) >= 15, 'job timeout must cover the registry wait');
   assert.match(workflow, /if: vars.MCP_NPM_PUBLISH_ENABLED != 'true'/);
   assert.match(workflow, /if: vars.MCP_NPM_PUBLISH_ENABLED == 'true'/);
   assert.match(workflow, /id-token: write/);

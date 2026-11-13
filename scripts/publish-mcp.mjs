@@ -23,10 +23,10 @@ export async function readRegistry(fetchImpl = fetch) {
   return JSON.parse(text);
 }
 
-// npm can take a while to list a new version, so after publishing the registry
-// is read every ten seconds, for up to three minutes, until it lists this
-// version as latest with provenance. A failed read is tried again.
-const CONFIRM_FOR_MS = 180_000;
+// npm can take minutes to list a new version (four, once), so after publishing
+// the registry is read every ten seconds, for up to ten minutes, until it lists
+// this version as latest with provenance. A failed read is tried again.
+const CONFIRM_FOR_MS = 600_000;
 const CONFIRM_EVERY_MS = 10_000;
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -58,7 +58,10 @@ export async function publishVerified({ receipt, tarball, getRegistry = readRegi
   const existing = after?.versions?.[receipt.version];
   // A last read that failed leaves only an older answer, which confirms nothing.
   if (!existing || readError) {
-    throw new Error('Publish was not confirmed. Inspect the registry before rerunning.', { cause: publishError ?? readError });
+    const name = `${PACKAGE}@${receipt.version}`;
+    throw new Error(`Publish was not confirmed within ten minutes. If \`npm view ${name} dist.integrity\` `
+      + `prints ${receipt.integrity}, it was published; while main is unchanged a rerun skips an identical version.`,
+    { cause: publishError ?? readError });
   }
   assert.equal(existing.dist?.integrity, receipt.integrity, 'published package integrity mismatch');
   assert.equal(after['dist-tags']?.latest, receipt.version, 'published version is not latest');
