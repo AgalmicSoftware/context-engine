@@ -254,7 +254,7 @@ test('public Worker Group discovery follows the public ungated mode independentl
 	assert.equal(listCalls, 2);
 });
 
-test('a join link shows a private session only what members of its group see', async () => {
+test('a join link to a listed group shows a private session its listed groups; others show nothing', async () => {
 	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: createMockKv() });
 	const create = (groupId, input) =>
 		executeCoordinatedWorkerGroupMutation({
@@ -273,6 +273,8 @@ test('a join link shows a private session only what members of its group see', a
 	});
 	await create('circle', { joinMode: 'open', memberVisibility: 'members' });
 	await create('admins', { joinMode: 'open', memberVisibility: 'admin_only' });
+	await create('hidden', { joinMode: 'admin_add', memberVisibility: 'session', listed: false });
+	await create('legacy-private', { joinMode: 'admin_add', memberVisibility: 'members' });
 	// Listed after the closing group's deadline.
 	const now = () => Date.now() + 120_000;
 	const list = (query) =>
@@ -312,23 +314,23 @@ test('a join link shows a private session only what members of its group see', a
 	});
 	const ids = (response) => response.body.groups.map((group) => group.groupId).sort();
 
-	for (const query of ['&joinGroup=salon', '&joinGroup=%20SALON%20']) {
+	// An open group is always listed; the id in a link names a group, it admits no one.
+	for (const query of ['&joinGroup=salon', '&joinGroup=%20SALON%20', '&joinGroup=staff', '&joinGroup=closing', '&joinGroup=circle', '&joinGroup=admins']) {
 		const invited = await list(query);
 		assert.equal(invited.status, 200);
-		assert.deepEqual(ids(invited), ['closing', 'salon', 'staff']);
+		assert.deepEqual(ids(invited), ['admins', 'circle', 'closing', 'salon', 'staff']);
 		assert.deepEqual(ids(invited), ids(memberView));
 		assert.equal(invited.body.sessionId, sessionId);
 		// Never counts, and never who runs a group, which for a participant's group is a participant.
 		assert.ok(invited.body.groups.every((group) => !('memberCount' in group) && !('adminAddress' in group)));
 	}
 	assert.ok(memberView.body.groups.some((group) => group.adminAddress === actor.address.toLowerCase() || group.adminAddress === actor.address));
-	// Only a link to a group someone could join on their own, still open, counts.
+	// A link to an unlisted group, or to none, shows nothing: an unlisted group's
+	// link doesn't even tell a visitor it exists.
 	for (const query of [
 		'',
-		'&joinGroup=staff',
-		'&joinGroup=closing',
-		'&joinGroup=circle',
-		'&joinGroup=admins',
+		'&joinGroup=hidden',
+		'&joinGroup=legacy-private',
 		'&joinGroup=missing',
 		'&joinGroup=salon&joinGroup=staff',
 		'&joinGroup=sal%2Fon',
@@ -357,10 +359,10 @@ test('a join link shows a private session only what members of its group see', a
 		deps: { json, now },
 	});
 	assert.equal(publicList.status, 200);
-	assert.deepEqual(ids(publicList), ['closing', 'salon', 'staff']);
+	assert.deepEqual(ids(publicList), ['admins', 'circle', 'closing', 'salon', 'staff']);
 });
 
-test('only groups someone could join on their own count, for a link or for an AI to suggest', async () => {
+test('an AI suggests only open groups still taking members, and any listed group\'s link counts', async () => {
 	const nowMs = Date.parse('2026-02-03T04:05:06.000Z');
 	const listed = [
 		{ groupId: 'salon', label: 'Salon', joinMode: 'open', memberVisibility: 'session' },
@@ -376,18 +378,18 @@ test('only groups someone could join on their own count, for a link or for an AI
 		listWorkerGroups: async () => ({ ok: true, store: 'kv', groups: listed }),
 	};
 	const joinable = await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: publicWorkerGroupConfig(), slug: 'session-a', deps });
-	assert.deepEqual(joinable.map((group) => group.groupId), ['salon', 'open-later']);
-	for (const inviteGroupId of ['circle', 'staff', 'closed']) {
-		assert.deepEqual(
-			await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', inviteGroupId, deps }),
-			[],
+	assert.deepEqual(joinable.map((group) => group.groupId), ['salon', 'circle', 'open-later']);
+	assert.deepEqual(
+		await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', inviteGroupId: 'missing', deps }),
+		[],
+	);
+	for (const inviteGroupId of ['salon', 'staff', 'closed']) {
+		assert.equal(
+			(await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', inviteGroupId, deps })).length,
+			3,
 			inviteGroupId,
 		);
 	}
-	assert.equal(
-		(await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', inviteGroupId: 'salon', deps })).length,
-		2,
-	);
 	// A failing list shows nothing rather than an error.
 	assert.deepEqual(
 		await listSelfJoinableWorkerGroupsForVisitor({
@@ -1630,6 +1632,61 @@ test('Worker Group routes reject missing or mismatched session ids before coordi
 	assert.equal(mutationCalls, 0);
 });
 
+test('an unlisted group shows only to its members and admins, whatever its member visibility', async () => {
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: createMockKv() });
+	const mutate = (operation, input, extra = {}) =>
+		executeCoordinatedWorkerGroupMutation({ env, slug: 'session-a', operation, input, actorPrincipal: actor, ...extra });
+	await mutate('create', { groupId: 'quiet', label: 'Quiet', joinMode: 'admin_add', memberVisibility: 'session', listed: false });
+	await mutate('create', { groupId: 'shown', label: 'Shown', joinMode: 'admin_add', memberVisibility: 'members', listed: true });
+	// An open group is listed even when asked not to be: anyone may join it.
+	await mutate('create', { groupId: 'lobby', label: 'Lobby', joinMode: 'open', memberVisibility: 'admin_only', listed: false });
+	const invalid = await mutate('create', { groupId: 'odd', label: 'Odd', joinMode: 'admin_add', listed: 'no' });
+	assert.equal(invalid.reason, 'invalid_group_listed');
+	await mutate('add-member', undefined, { groupId: 'quiet', principal: member });
+	const listFor = async (address) => {
+		const response = await workerGroupsRoute({
+			path: '/groups/list',
+			method: 'GET',
+			request: new Request('https://worker.example/groups/list'),
+			env,
+			slug: 'session-a',
+			requesterAddress: address,
+			baseHeaders: {},
+			deps: { json },
+		});
+		assert.equal(response.status, 200);
+		return Object.fromEntries(response.body.groups.map((group) => [group.groupId, group.listed]));
+	};
+	assert.deepEqual(await listFor(member.address), { lobby: true, quiet: false, shown: true });
+	assert.deepEqual(await listFor('0x0000000000000000000000000000000000000bad'), { lobby: true, shown: true });
+	const admin = await dispatchAdminWorkerGroupRequest({
+		action: 'groups/list', body: {}, env, slug: 'session-a', adminAddress: actor.address, headers: {}, deps: { json },
+	});
+	assert.deepEqual(admin.body.groups.map((group) => group.groupId).sort(), ['lobby', 'quiet', 'shown']);
+	// Someone who leaves an unlisted group no longer sees it, and the answer doesn't show it either.
+	const left = await workerGroupsRoute({
+		path: '/groups/leave',
+		method: 'POST',
+		request: new Request('https://worker.example/groups/leave', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ groupId: 'quiet' }),
+		}),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		baseHeaders: {},
+		deps: { json },
+	});
+	assert.equal(left.status, 200);
+	assert.equal(Object.hasOwn(left.body, 'group'), false);
+	assert.equal('quiet' in (await listFor(member.address)), false);
+	// Listing it again shows it to everyone; the choice survives an edit that doesn't name it.
+	await mutate('update', { listed: true }, { groupId: 'quiet' });
+	await mutate('update', { label: 'Quiet room' }, { groupId: 'quiet' });
+	assert.equal((await listFor('0x0000000000000000000000000000000000000bad')).quiet, true);
+});
+
 test('member routes respect visibility and open join mode', async () => {
 	const kv = createMockKv();
 	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
@@ -1663,7 +1720,7 @@ test('member routes respect visibility and open join mode', async () => {
 	assert.equal(visibleResponse.body.sessionId, sessionId);
 	assert.deepEqual(
 		visibleResponse.body.groups.map((group) => group.groupId),
-		['session-visible'],
+		['open-review', 'session-visible'],
 	);
 
 	const joinResponse = await workerGroupsRoute({
@@ -1720,8 +1777,9 @@ test('member routes respect visibility and open join mode', async () => {
 	assert.equal(leaveResponse.body.sessionId, sessionId);
 	assert.equal(leaveResponse.body.groupId, 'open-review');
 	assert.equal(leaveResponse.body.principal.address, member.address);
-	assert.equal(Object.hasOwn(leaveResponse.body, 'group'), false);
-	assert.equal(Object.hasOwn(leaveResponse.body, 'memberCount'), false);
+	// An open group is listed, so someone who left still sees it.
+	assert.equal(leaveResponse.body.group.groupId, 'open-review');
+	assert.equal(leaveResponse.body.memberCount, 0);
 
 	const membershipsAfterLeave = await listWorkerGroupMemberships({
 		env,

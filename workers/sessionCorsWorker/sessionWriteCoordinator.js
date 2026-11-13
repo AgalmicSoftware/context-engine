@@ -64,6 +64,7 @@ import {
   normalizeWorkerGroupPrincipal,
   resolveWorkerGroupBootstrap,
   resolveWorkerGroupCaps,
+  resolveWorkerGroupListed,
   workerGroupRemovalRefusal,
 } from './workerGroups.js';
 
@@ -358,6 +359,7 @@ const DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = new Set([
   'invalid_join_mode',
   'join_mode_not_implemented',
   'invalid_member_visibility',
+  'invalid_group_listed',
   'invalid_removal_auth',
   'invalid_group_label',
   'invalid_group_description',
@@ -374,7 +376,7 @@ const DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = new Set([
 // there and must not inflate the durable intent past its storage limit.
 const WORKER_GROUP_INPUT_FIELDS = Object.freeze([
   'groupId', 'label', 'description', 'imageUrl', 'tags', 'documentURLs',
-  'memberLimit', 'joinEndsAt', 'joinMode', 'memberVisibility', 'removalAuth', 'adminAddress',
+  'memberLimit', 'joinEndsAt', 'joinMode', 'memberVisibility', 'listed', 'removalAuth', 'adminAddress',
 ]);
 const WORKER_GROUP_INTENT_MAX_BYTES = 32 * 1024;
 
@@ -1480,6 +1482,7 @@ export class SessionWriteCoordinator {
         active: true,
         joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
         memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
+        listed: resolveWorkerGroupListed(group),
         removalAuth: toTrimmedString(group?.removalAuth).toLowerCase() || 'both',
         memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
         joinEndsAt: toTrimmedString(group?.joinEndsAt),
@@ -1525,6 +1528,7 @@ export class SessionWriteCoordinator {
         active: true,
         joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
         memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
+        listed: resolveWorkerGroupListed(group),
         removalAuth: toTrimmedString(group?.removalAuth).toLowerCase() || 'both',
         memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
         joinEndsAt: toTrimmedString(group?.joinEndsAt),
@@ -1926,6 +1930,7 @@ export class SessionWriteCoordinator {
           groupId,
           joinMode: group.state.joinMode,
           memberVisibility: group.state.memberVisibility,
+          listed: resolveWorkerGroupListed(group.state),
           memberCount: Number(group.state.memberCount || 0),
         },
       }, 200);
@@ -1987,6 +1992,7 @@ export class SessionWriteCoordinator {
           groupId,
           joinMode: group.state.joinMode,
           memberVisibility: group.state.memberVisibility,
+          listed: resolveWorkerGroupListed(group.state),
           memberCount: Number(group.state.memberCount || 0),
           isMember,
         });
@@ -2067,6 +2073,7 @@ export class SessionWriteCoordinator {
           groupId,
           joinMode: state.joinMode,
           memberVisibility: state.memberVisibility,
+          listed: resolveWorkerGroupListed(state),
           memberCount,
         });
       }
@@ -2299,6 +2306,7 @@ export class SessionWriteCoordinator {
           groupId: mutation.groupId,
           joinMode: postMutationGroup.state.joinMode,
           memberVisibility: postMutationGroup.state.memberVisibility,
+          listed: resolveWorkerGroupListed(postMutationGroup.state),
         },
         memberCount,
       };

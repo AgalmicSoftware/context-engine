@@ -1484,9 +1484,16 @@ Lowering it below a group's current count refuses new joins and removes no one.
 Group discovery is independent: an unsigned `GET /groups/list`
 is accepted when the validated session mode declares public stored results
 over unencrypted, ungated Cloudflare storage, or when it carries a join link's
-`joinGroup` for a group someone could join on their own. It returns only
-`session`-visible group metadata, never memberships, member identities, member
-counts, or groups restricted to admins/members. Private, gated, and encrypted
+`joinGroup` naming a listed group. It returns only listed groups' metadata,
+never memberships, member identities, member counts, or unlisted groups.
+
+Each group is listed or unlisted (`listed`, "Show in the group list"). A
+listed group shows in every group list the caller may see; an unlisted one
+shows only to its members and admins, and in no signed-out discovery. An open
+group is always listed, since anyone may join it. `memberVisibility` governs
+only who sees the member list, no longer whether the group shows. A group
+stored without `listed` reads as listed only if it is open or its members were
+visible to the whole session, so groups hidden before stay hidden. Private, gated, and encrypted
 modes otherwise keep discovery authenticated. This flow never opens the
 legacy SBT deployment form and does not request a contract address, chain, RPC,
 gas, or burn policy. A
@@ -1686,13 +1693,13 @@ Implemented routes:
   Worker-canonical profile declares `public_full_if_storage_public` over
   unencrypted Cloudflare storage with `gate: "none"` and no access conditions.
   On any other session it is allowed only with one `joinGroup=<groupId>` naming
-  an open, session-visible group whose joining hasn't closed, as a join link
-  does; the response is then what that group's members see, less each group's
-  `adminAddress`. Other requests get 403 `worker_group_discovery_not_public`.
-  It returns only redacted, session-visible group metadata. The request must
+  a listed group, as a join link does; the response is then the listed groups,
+  less each group's `adminAddress`. A link to an unlisted or unknown group gets
+  the same 403 `worker_group_discovery_not_public` as any other request. It
+  returns only redacted, listed group metadata. The request must
   include the exact session slug header and canonical session ID. With a Worker
   credential, `GET` remains the authenticated member route and additionally
-  returns member-visible groups for the caller. Authenticated participant and
+  returns the listed groups plus the caller's own unlisted ones. Authenticated participant and
   Admin lists include the coordinator's current `memberCount` only after the
   caller passes that group's visibility check; unsigned discovery never
   includes it. Authenticated `POST` remains supported. `groupCreationPolicy`

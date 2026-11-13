@@ -55,6 +55,14 @@ export const normalizeWorkerGroupId = (value) => {
 	return normalized;
 };
 
+// Whether a group shows in group lists to people who aren't its members. A
+// Public URL ('open') group always does: anyone may join it. A group stored
+// before the setting existed keeps the visibility it had: listed only when its
+// members were visible to the whole session.
+export const resolveWorkerGroupListed = ({ joinMode, memberVisibility, listed } = {}) =>
+	joinMode === WORKER_GROUP_JOIN_MODES.OPEN ||
+	(typeof listed === 'boolean' ? listed : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION);
+
 export const isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim(value));
 
 const encodedPrincipalKeyPart = (value) =>
@@ -387,6 +395,12 @@ const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps
 	}
 	const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
 	if (!memberVisibility) return { ok: false, status: 400, reason: 'invalid_member_visibility' };
+	if (Object.prototype.hasOwnProperty.call(input, 'listed') && typeof input.listed !== 'boolean') {
+		return { ok: false, status: 400, reason: 'invalid_group_listed' };
+	}
+	// Stored only as chosen; an open group's forced listing applies on read, so
+	// it doesn't stick if the group later stops being open.
+	const listed = Object.prototype.hasOwnProperty.call(input, 'listed') ? input.listed : existing?.listed;
 	const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
 	if (!removalAuth) return { ok: false, status: 400, reason: 'invalid_removal_auth' };
 	const label = trim(input.label || existing?.label);
@@ -428,6 +442,7 @@ const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps
 			adminAddress: adminAddress || undefined,
 			joinMode,
 			memberVisibility,
+			listed: typeof listed === 'boolean' ? listed : undefined,
 			removalAuth,
 			updatedAt,
 			...(existing
@@ -917,6 +932,7 @@ const redactGroupForMember = (group) => ({
 	...(group.adminAddress ? { adminAddress: group.adminAddress } : {}),
 	joinMode: group.joinMode,
 	memberVisibility: group.memberVisibility,
+	listed: resolveWorkerGroupListed(group),
 	removalAuth: normalizeRemovalAuth(group.removalAuth),
 	createdAt: group.createdAt,
 	updatedAt: group.updatedAt,
@@ -1184,6 +1200,7 @@ export const listWorkerGroups = async ({
 		authorityByGroupId.set(groupId, {
 			joinMode,
 			memberVisibility,
+			listed: resolveWorkerGroupListed({ joinMode, memberVisibility, listed: authority?.listed }),
 			memberCount,
 			isMember: authority?.isMember === true,
 		});
@@ -1205,12 +1222,11 @@ export const listWorkerGroups = async ({
 			...group,
 			joinMode: authority.joinMode,
 			memberVisibility: authority.memberVisibility,
+			listed: authority.listed,
 		};
-		const mayViewGroup =
-			admin ||
-			authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION ||
-			(authority.isMember && authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS);
-		if (!mayViewGroup) continue;
+		// Member visibility governs only the member list: an unlisted group shows
+		// to its members and admins, a listed one to everyone this list serves.
+		if (!admin && !authority.listed && !authority.isMember) continue;
 		visible.push({
 			...redactGroupForMember(authoritativeGroup),
 			...(includeMemberCount ? { memberCount: authority.memberCount } : {}),
@@ -1332,6 +1348,7 @@ export const listWorkerGroupMembersForPrincipal = async ({
 			...page.group,
 			joinMode,
 			memberVisibility,
+			listed: authority?.listed,
 		}),
 		members: (page.members || []).map(redactWorkerGroupMemberForViewer),
 		memberCount,
@@ -1402,6 +1419,7 @@ export const listWorkerGroupMemberships = async ({ env, slug, sessionId, princip
 				...group,
 				joinMode: authoritativeJoinMode,
 				memberVisibility: authoritativeVisibility,
+				listed: authoritativeGroup?.listed,
 			}),
 			member,
 			memberCount: authoritativeMemberCount,
@@ -1688,17 +1706,12 @@ const participantGroupCreationAllowed = (config) => config?.groupCreationPolicy 
 // Whether someone could join this group on their own right now, as a join link does.
 const isSelfJoinableWorkerGroup = (group, nowMs) => {
 	const joinEndsAt = Date.parse(trim(group?.joinEndsAt));
-	return (
-		group?.joinMode === WORKER_GROUP_JOIN_MODES.OPEN &&
-		group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION &&
-		!(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs)
-	);
+	return group?.joinMode === WORKER_GROUP_JOIN_MODES.OPEN && !(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs);
 };
 
 /**
- * The groups a signed-out visitor may see. A private session shows them only to someone holding a
- * join link to a group they could join on their own, and then only what that group's members see:
- * groups visible to the whole session. Groups shown to their members or admins stay hidden.
+ * The groups a signed-out visitor may see: listed groups only. A private session shows them only to
+ * someone whose join link names a listed group, so an unlisted group's link reveals nothing.
  */
 export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, deps = {} } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
@@ -1732,7 +1745,7 @@ export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGrou
 	if (!result.ok) return result;
 	const nowMs = Number(deps.now?.() || Date.now());
 	if (!invite) return { ok: true, sessionIdentity, store: result.store, groups: result.groups };
-	if (!result.groups.some((group) => group.groupId === invite && isSelfJoinableWorkerGroup(group, nowMs))) {
+	if (!result.groups.some((group) => group.groupId === invite)) {
 		return { ok: false, status: 403, reason: 'worker_group_discovery_not_public' };
 	}
 	// A link shows group names, not who runs each group: a participant's group names its creator.
@@ -2283,7 +2296,8 @@ export const workerGroupsRoute = async ({
 		if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
 			return routeError(deps, { status: 503, reason: 'worker_group_projection_unavailable' }, baseHeaders);
 		}
-		const retainGroup = result.group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
+		// Someone who left still sees a listed group, so the answer keeps it.
+		const retainGroup = result.group?.listed === true;
 		return jsonResponse(
 			deps,
 			{
