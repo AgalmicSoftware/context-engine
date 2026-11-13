@@ -4,6 +4,7 @@ import {
   addWorkerGroupMember,
   createWorkerGroup,
   deleteWorkerGroup,
+  isWorkerGroupListed,
   listWorkerGroupMembers,
   listWorkerGroupsAdmin,
   normalizeWorkerGroupMembersAdminPayload,
@@ -13,6 +14,7 @@ import {
   sanitizeWorkerGroupRequestError,
   updateWorkerGroup,
   workerGroupAdminsMayRemove,
+  workerGroupNeedsSecret,
   type PostSignedWorkerGroupRequest,
   type WorkerGroup,
   type WorkerGroupJoinMode,
@@ -21,17 +23,29 @@ import {
   type WorkerGroupRemovalAuth,
 } from '../../domains/worker/workerGroupPorts';
 import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpload';
+import { saveWorkerGroupPassword } from '../../domains/worker/workerGroupSecrets';
+import { readWorkerGroupMemberCeiling, workerOffersGroupJoinChoices } from '../../../../shared/workerGroupJoin.mjs';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { getWorkerAuthRemoteErrorMessage } from '../../utilities/worker/workerAuthRemoteError';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import WorkerGroupCreateForm from '../Shared/WorkerGroupCreateForm';
 import WorkerGroupImage from '../Shared/WorkerGroupImage';
+import {
+  ALL_WORKER_GROUP_JOIN_MODES,
+  BASIC_WORKER_GROUP_JOIN_MODES,
+  WORKER_GROUP_JOIN_LABELS,
+  WorkerGroupJoinModeHelp,
+  WorkerGroupJoinModeOptions,
+  WorkerGroupListedHelp,
+} from '../Shared/WorkerGroupJoinChoiceHelp';
 import WorkerGroupRemovalAuthHelp, {
   WORKER_GROUP_REMOVAL_AUTH_LABELS,
   WorkerGroupRemovalAuthOptions,
   withRemovalAuthNotice,
 } from '../Shared/WorkerGroupRemovalAuthHelp';
+import WorkerGroupInvitesPanel from './WorkerGroupInvitesPanel';
+import WorkerGroupPasswordReveal from './WorkerGroupPasswordReveal';
 import styles from './AdminPage.module.scss';
 
 type WorkerGroupDraft = {
@@ -44,6 +58,9 @@ type WorkerGroupDraft = {
   joinEndsAt: string;
   adminAddress: string;
   joinMode: WorkerGroupJoinMode;
+  listed: boolean;
+  /** Only while creating a Group Password group; never sent with the group. */
+  groupPassword: string;
   memberVisibility: WorkerGroupMemberVisibility;
   removalAuth: WorkerGroupRemovalAuth;
 };
@@ -76,6 +93,8 @@ const emptyDraft = (adminAddress = '', tags: string[] = []): WorkerGroupDraft =>
   adminAddress,
   // Open to anyone who can see the session: everyone on a public session, participants on a private one.
   joinMode: 'open',
+  listed: true,
+  groupPassword: '',
   memberVisibility: 'session',
   removalAuth: 'both',
 });
@@ -87,7 +106,8 @@ const toLocalDateTimeInput = (value: unknown): string => {
   return offsetDate.toISOString().slice(0, 19);
 };
 
-const buildGroupInput = (draft: WorkerGroupDraft, label: string) => ({
+// A Worker without join choices knows nothing of listing; a Public URL group is always listed.
+const buildGroupInput = (draft: WorkerGroupDraft, label: string, offersChoices: boolean) => ({
   label,
   description: draft.description.trim(),
   imageUrl: draft.imageUrl.trim(),
@@ -97,6 +117,7 @@ const buildGroupInput = (draft: WorkerGroupDraft, label: string) => ({
   joinEndsAt: draft.joinEndsAt ? new Date(draft.joinEndsAt).toISOString() : '',
   adminAddress: draft.adminAddress.trim(),
   joinMode: draft.joinMode,
+  ...(offersChoices ? { listed: draft.joinMode === 'open' || draft.listed } : {}),
   memberVisibility: draft.memberVisibility,
   removalAuth: draft.removalAuth,
 });
@@ -140,10 +161,13 @@ const AdminWorkerGroupsPanel = ({
   createOnly = false,
   onGroupsChanged,
   title = 'Worker access groups',
-  description = 'Manage the supported open and admin-added authorization groups.',
+  description = 'Manage each group, who can join it and its members.',
   sessionName,
 }: AdminWorkerGroupsPanelProps) => {
   const defaultGroupTags = useMemo(() => normalizeWorkerGroupDefaultTags(sessionConfig), [sessionConfig]);
+  const offersChoices = workerOffersGroupJoinChoices(sessionConfig);
+  const joinModes = offersChoices ? ALL_WORKER_GROUP_JOIN_MODES : BASIC_WORKER_GROUP_JOIN_MODES;
+  const memberLimitMax = readWorkerGroupMemberCeiling(sessionConfig);
   const defaultGroupTagsKey = defaultGroupTags.join('\u0000');
   const [groups, setGroups] = useState<WorkerGroup[]>([]);
   const [createDraft, setCreateDraft] = useState<WorkerGroupDraft>(() => emptyDraft('', defaultGroupTags));
@@ -153,6 +177,8 @@ const AdminWorkerGroupsPanel = ({
   const [members, setMembers] = useState<WorkerGroupMember[]>([]);
   const [memberNextCursor, setMemberNextCursor] = useState('');
   const [memberAddressDraft, setMemberAddressDraft] = useState('');
+  const [invitesGroupId, setInvitesGroupId] = useState('');
+  const [revealed, setRevealed] = useState<{ group: WorkerGroup; password: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const signedAccount = String(asRecord(workerAuthContext).account || '').trim();
@@ -234,6 +260,8 @@ const AdminWorkerGroupsPanel = ({
     setMembers([]);
     setMemberNextCursor('');
     setMemberAddressDraft('');
+    setInvitesGroupId('');
+    setRevealed(null);
     setBusy(false);
     setStatus('');
     if (autoLoad && !createOnly) void loadGroups();
@@ -273,15 +301,35 @@ const AdminWorkerGroupsPanel = ({
       return;
     }
     const { removalAuth } = createDraft;
+    const password = offersChoices && createDraft.joinMode === 'group_password' ? createDraft.groupPassword : '';
+    let passwordSaved: WorkerGroup | null = null;
     void runMutation(
-      () =>
-        createWorkerGroup({
-          group: buildGroupInput(createDraft, label),
+      async () => {
+        const result = await createWorkerGroup({
+          group: buildGroupInput(createDraft, label, offersChoices),
           sessionId: normalizedSessionId,
           sessionSlug: normalizedSessionSlug,
           postSignedRequest: postExactSignedRequest,
-        }),
-      (result) => withRemovalAuthNotice('Group created.', removalAuth, savedGroup(result).removalAuth),
+        });
+        if (!password) return result;
+        // The group exists before its password does; until the password is set, it admits no one.
+        try {
+          passwordSaved = await saveWorkerGroupPassword({
+            password,
+            groupId: String(savedGroup(result).groupId),
+            sessionId: normalizedSessionId,
+            sessionSlug: normalizedSessionSlug,
+            postSignedRequest: postExactSignedRequest,
+          });
+          return { ...result, group: passwordSaved };
+        } catch {
+          return result;
+        }
+      },
+      (result) =>
+        password && !passwordSaved
+          ? 'Group created, but its password wasn’t set. Use Password on the group to set it.'
+          : withRemovalAuthNotice('Group created.', removalAuth, savedGroup(result).removalAuth),
       (current, result) => {
         const created = normalizeWorkerGroupsAdminPayload(
           { groups: [asRecord(result).group] },
@@ -290,7 +338,9 @@ const AdminWorkerGroupsPanel = ({
         return created ? [...current.filter((group) => group.groupId !== created.groupId), created] : current;
       },
     ).then((created) => {
-      if (created) setCreateDraft(emptyDraft(signedAccount, defaultGroupTags));
+      if (!created) return;
+      setCreateDraft(emptyDraft(signedAccount, defaultGroupTags));
+      if (passwordSaved) setRevealed({ group: passwordSaved, password });
     });
   };
 
@@ -306,10 +356,15 @@ const AdminWorkerGroupsPanel = ({
       joinEndsAt: toLocalDateTimeInput(group.joinEndsAt),
       adminAddress: group.adminAddress || '',
       joinMode: group.joinMode,
+      listed: isWorkerGroupListed(group),
+      groupPassword: '',
       memberVisibility: group.memberVisibility,
       removalAuth: group.removalAuth || 'both',
     });
   };
+
+  const patchGroup = (patch: Partial<WorkerGroup> & { groupId: string }) =>
+    setGroups((current) => current.map((group) => (group.groupId === patch.groupId ? { ...group, ...patch } : group)));
 
   const handleSave = () => {
     const label = editDraft.label.trim();
@@ -322,7 +377,7 @@ const AdminWorkerGroupsPanel = ({
       () =>
         updateWorkerGroup({
           groupId: editingGroupId,
-          group: buildGroupInput(editDraft, label),
+          group: buildGroupInput(editDraft, label, offersChoices),
           sessionId: normalizedSessionId,
           sessionSlug: normalizedSessionSlug,
           postSignedRequest: postExactSignedRequest,
@@ -444,6 +499,14 @@ const AdminWorkerGroupsPanel = ({
       adminAddress={createDraft.adminAddress}
       joinMode={createDraft.joinMode}
       joinModeTestId="ce-admin-worker-group-create-mode"
+      joinModes={joinModes}
+      listed={createDraft.listed}
+      onListedChange={offersChoices ? (value) => setCreateDraft((draft) => ({ ...draft, listed: value })) : undefined}
+      groupPassword={createDraft.groupPassword}
+      onGroupPasswordChange={
+        offersChoices ? (value) => setCreateDraft((draft) => ({ ...draft, groupPassword: value })) : undefined
+      }
+      memberLimitMax={memberLimitMax}
       label={createDraft.label}
       labelTestId="ce-admin-worker-group-create-label"
       memberVisibility={createDraft.memberVisibility}
@@ -488,7 +551,23 @@ const AdminWorkerGroupsPanel = ({
     />
   );
 
-  if (createOnly) return createForm;
+  const reveal = revealed ? (
+    <WorkerGroupPasswordReveal
+      group={revealed.group}
+      password={revealed.password}
+      sessionSlug={normalizedSessionSlug}
+      workerUrl={normalizedWorkerUrl}
+      onDone={() => setRevealed(null)}
+    />
+  ) : null;
+
+  if (createOnly)
+    return (
+      <>
+        {createForm}
+        {reveal}
+      </>
+    );
 
   return (
     <section className={styles.panel} data-testid="ce-admin-worker-groups">
@@ -510,6 +589,7 @@ const AdminWorkerGroupsPanel = ({
       </div>
 
       {createForm}
+      {reveal}
 
       <div className={styles.grid}>
         {groups.map((group) => (
@@ -529,7 +609,17 @@ const AdminWorkerGroupsPanel = ({
             ) : null}
             <strong>{group.label}</strong>
             <span>{group.description || group.groupId}</span>
-            <span>{group.joinMode === 'open' ? 'Open self-join' : 'Admin adds members'}</span>
+            <span>{WORKER_GROUP_JOIN_LABELS[group.joinMode]}</span>
+            {isWorkerGroupListed(group) ? null : <span>Not in the group list</span>}
+            {group.joinMode === 'group_password' && group.passwordSet === false ? (
+              <span>No password yet: no one can join.</span>
+            ) : null}
+            {group.joinMode === 'one_use' && group.invites ? (
+              <span>
+                Links: {group.invites.unused} unused, {group.invites.used} used
+              </span>
+            ) : null}
+            {group.guessLimited ? <span role="alert">Too many wrong passwords in the last hour.</span> : null}
             <span>Visible to {group.memberVisibility.replace('_', ' ')}</span>
             <span>Who can remove members: {WORKER_GROUP_REMOVAL_AUTH_LABELS[group.removalAuth || 'both']}</span>
             {group.tags?.length ? <span>Tags: {group.tags.join(', ')}</span> : null}
@@ -566,6 +656,21 @@ const AdminWorkerGroupsPanel = ({
               >
                 Members
               </Button>{' '}
+              {offersChoices && workerGroupNeedsSecret(group) ? (
+                <>
+                  <Button
+                    className={styles.subtleActionButton}
+                    size="sm"
+                    color="secondary"
+                    outline
+                    aria-expanded={invitesGroupId === group.groupId}
+                    aria-label={`${group.joinMode === 'one_use' ? 'Invites' : 'Password'} for ${group.label}`}
+                    onClick={() => setInvitesGroupId((current) => (current === group.groupId ? '' : group.groupId))}
+                  >
+                    {group.joinMode === 'one_use' ? 'Invites' : 'Password'}
+                  </Button>{' '}
+                </>
+              ) : null}
               <Button
                 className={styles.dangerActionButton}
                 size="sm"
@@ -594,6 +699,21 @@ const AdminWorkerGroupsPanel = ({
           </div>
         ))}
       </div>
+
+      {(() => {
+        const group = groups.find((candidate) => candidate.groupId === invitesGroupId);
+        return group && workerGroupNeedsSecret(group) ? (
+          <WorkerGroupInvitesPanel
+            key={`${group.groupId}\n${group.joinMode}`}
+            group={group}
+            sessionId={normalizedSessionId}
+            sessionSlug={normalizedSessionSlug}
+            workerUrl={normalizedWorkerUrl}
+            postSignedRequest={postExactSignedRequest}
+            onGroupChanged={patchGroup}
+          />
+        ) : null;
+      })()}
 
       {editingGroupId ? (
         <div className={styles.formRow}>
@@ -664,7 +784,8 @@ const AdminWorkerGroupsPanel = ({
             />
           </FormGroup>
           <FormGroup>
-            <Label for="worker-group-edit-mode">Join mode</Label>
+            <Label for="worker-group-edit-mode">Who can join</Label>
+            <WorkerGroupJoinModeHelp modes={joinModes} />
             <Input
               id="worker-group-edit-mode"
               type="select"
@@ -673,17 +794,30 @@ const AdminWorkerGroupsPanel = ({
                 setEditDraft((draft) => withJoinMode(draft, event.target.value as WorkerGroupJoinMode))
               }
             >
-              <option value="admin_add">Admin adds members</option>
-              <option value="open">Open self-join</option>
+              <WorkerGroupJoinModeOptions modes={joinModes} />
             </Input>
           </FormGroup>
+          {offersChoices && editDraft.joinMode !== 'open' ? (
+            <FormGroup check>
+              <Input
+                id="worker-group-edit-listed"
+                type="checkbox"
+                checked={editDraft.listed}
+                onChange={(event) => setEditDraft((draft) => ({ ...draft, listed: event.target.checked }))}
+              />{' '}
+              <Label check for="worker-group-edit-listed">
+                Show in the group list
+              </Label>
+              <WorkerGroupListedHelp />
+            </FormGroup>
+          ) : null}
           <FormGroup>
             <Label for="worker-group-edit-member-limit">Member limit</Label>
             <Input
               id="worker-group-edit-member-limit"
               type="number"
               min="1"
-              max="1000"
+              max={memberLimitMax}
               value={editDraft.memberLimit}
               onChange={(event) => setEditDraft((draft) => ({ ...draft, memberLimit: event.target.value }))}
             />

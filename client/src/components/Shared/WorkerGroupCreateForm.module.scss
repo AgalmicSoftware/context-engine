@@ -256,6 +256,17 @@
   gap: 10px;
 }
 
+.passwordRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.passwordRow .accessInput {
+  min-width: 0;
+  flex: 1;
+}
+
 .accessRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(190px, 0.55fr);

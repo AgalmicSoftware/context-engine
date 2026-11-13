@@ -8,15 +8,19 @@ import {
   WORKER_GROUP_INVITE_FRAGMENT_KEY,
 } from '../../../../shared/workerGroupJoin.mjs';
 import { buildWorkerGroupAutoJoinPath } from './workerGroupAutoJoin';
+import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
+import { setWorkerGroupPassword, type PostSignedWorkerGroupRequest, type WorkerGroup } from './workerGroupPorts';
 
 // The browser side of a group's secrets: it makes them, carries them in a link's fragment (never sent to a
 // server) and turns them into what a join sends. Neither a password nor a claim code reaches the Worker.
 
 const keys = createWorkerGroupPasswordKeys(ethers);
+// The Worker's canonical session id, the one the group routes send, so the admin and the joiner derive alike.
+const canonical = (sessionId: string) => normalizeWorkerCanonicalSessionIdHex(sessionId) || sessionId;
 
 /** The address the Worker stores for a group password. */
 export const workerGroupPasswordSigner = (password: string, sessionId: string, groupId: string) =>
-  keys.signerOf({ password, sessionId, groupId });
+  keys.signerOf({ password, sessionId: canonical(sessionId), groupId });
 
 /** A group's join link, with its secret in the fragment when there is one. */
 export const buildWorkerGroupInviteLink = ({
@@ -73,7 +77,9 @@ export const buildWorkerGroupJoinCredentials = async ({
   const parsed = parseGroupInviteToken(token);
   if (parsed?.kind === 'one_use') return { secret: parsed.secret };
   if (parsed?.kind === 'password')
-    return { proof: await keys.signJoin({ password: parsed.password, sessionId, groupId, address }) };
+    return {
+      proof: await keys.signJoin({ password: parsed.password, sessionId: canonical(sessionId), groupId, address }),
+    };
   return null;
 };
 
@@ -85,3 +91,21 @@ export const isUsableWorkerGroupToken = (token: string): boolean => {
 
 /** A Group Password token can be handed on (as a recording's claims do); a one-use code would be spent. */
 export const isSharableWorkerGroupToken = (token: string): boolean => parseGroupInviteToken(token)?.kind === 'password';
+
+/** Sets or replaces a Group Password group's password: only its signer address reaches the Worker. */
+export const saveWorkerGroupPassword = async ({
+  password,
+  groupId,
+  sessionId,
+  sessionSlug,
+  postSignedRequest,
+}: {
+  password: string;
+  groupId: string;
+  sessionId: string;
+  sessionSlug: string;
+  postSignedRequest: PostSignedWorkerGroupRequest;
+}): Promise<WorkerGroup> => {
+  const signer = await workerGroupPasswordSigner(password, sessionId, groupId);
+  return (await setWorkerGroupPassword({ groupId, sessionId, sessionSlug, postSignedRequest, signer })).group;
+};

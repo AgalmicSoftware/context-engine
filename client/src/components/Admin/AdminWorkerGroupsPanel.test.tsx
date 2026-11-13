@@ -1,7 +1,25 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createWorkerAuthRemoteError } from '../../utilities/worker/workerAuthRemoteError';
+import type { PostSignedWorkerGroupRequest, SignedWorkerGroupRequestArgs } from '../../domains/worker/workerGroupPorts';
+import { saveWorkerGroupPassword } from '../../domains/worker/workerGroupSecrets';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
+
+// Stretching a password takes far too long in jsdom; workerGroupSecrets.test.ts covers the real derivation.
+jest.mock('../../domains/worker/workerGroupSecrets', () => {
+  type MockSecrets = typeof import('../../domains/worker/workerGroupSecrets');
+  const actual = jest.requireActual<MockSecrets>('../../domains/worker/workerGroupSecrets');
+  const ports = jest.requireActual<typeof import('../../domains/worker/workerGroupPorts')>(
+    '../../domains/worker/workerGroupPorts',
+  );
+  return {
+    ...actual,
+    saveWorkerGroupPassword: jest.fn(
+      ({ password: _password, ...request }: Parameters<MockSecrets['saveWorkerGroupPassword']>[0]) =>
+        ports.setWorkerGroupPassword({ ...request, signer: `0x${'2'.repeat(40)}` }).then(({ group }) => group),
+    ),
+  };
+});
 
 const ADDRESS = '0x00000000000000000000000000000000000000aa';
 const SESSION_ID = '0x11111111111111111111111111111111';
@@ -599,5 +617,125 @@ describe('AdminWorkerGroupsPanel', () => {
 
     expect(screen.getByText('Second-identity reviewers')).toBeInTheDocument();
     expect(screen.queryByText('First-identity reviewers')).not.toBeInTheDocument();
+  });
+
+  describe('join choices', () => {
+    const CHOICES = { groupJoinChoices: true, groupMemberCeiling: 2000 };
+    const respond = (data: Record<string, unknown>) => ({
+      data: { ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', ...data },
+    });
+    const group = (fields: Record<string, unknown>) => ({
+      groupId: 'salon',
+      sessionSlug: 'alpha',
+      label: 'Salon',
+      memberVisibility: 'members',
+      ...fields,
+    });
+    type Request = SignedWorkerGroupRequestArgs;
+    const renderPanel = (
+      postSignedRequest: PostSignedWorkerGroupRequest,
+      sessionConfig: unknown = CHOICES,
+      autoLoad = false,
+    ) =>
+      render(
+        <AdminWorkerGroupsPanel
+          canAdminWorker={true}
+          sessionId={SESSION_ID}
+          sessionConfig={sessionConfig}
+          sessionSlug="alpha"
+          workerUrl="https://session-worker.example"
+          postSignedRequest={postSignedRequest}
+          autoLoad={autoLoad}
+        />,
+      );
+    const optionLabels = () =>
+      Array.from((screen.getByTestId('ce-admin-worker-group-create-mode') as HTMLSelectElement).options).map(
+        (option) => option.textContent,
+      );
+
+    it('offers the on-chain labels only when the Worker has join choices', () => {
+      const { unmount } = renderPanel(jest.fn(), {});
+      expect(optionLabels()).toEqual(['Public URL', 'Admin adds members']);
+      expect(screen.queryByLabelText('Group password')).not.toBeInTheDocument();
+      unmount();
+      renderPanel(jest.fn());
+      expect(optionLabels()).toEqual(['One-use URLs', 'Group Password', 'Public URL', 'Admin adds members']);
+    });
+
+    it('creates a Group Password group, sets its signer and shows the password once', async () => {
+      const postSignedRequest = jest.fn(async ({ action, body }: Request) => {
+        if (action === 'groups/create') {
+          const { joinMode, listed } = body?.group as Record<string, unknown>;
+          return respond({ group: group({ joinMode, listed, passwordSet: false }) });
+        }
+        if (action === 'groups/password/set')
+          return respond({ group: group({ joinMode: 'group_password', passwordSet: true }) });
+        throw new Error(`unexpected ${action}`);
+      });
+      renderPanel(postSignedRequest);
+      fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-mode'), {
+        target: { value: 'group_password' },
+      });
+      fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), { target: { value: 'Salon' } });
+      fireEvent.change(screen.getByLabelText('Group password'), { target: { value: 'short' } });
+      expect(screen.getByRole('button', { name: 'Create Group' })).toBeDisabled();
+      fireEvent.change(screen.getByLabelText('Group password'), { target: { value: 'river-stone-lamp-oak-moss' } });
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Show in the group list' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+
+      const reveal = await screen.findByTestId('ce-admin-worker-group-password-reveal');
+      expect(reveal).toHaveTextContent('river-stone-lamp-oak-moss');
+      const [create, setPassword] = postSignedRequest.mock.calls.map(([request]) => request);
+      expect(create.body?.group).toMatchObject({ joinMode: 'group_password', listed: false });
+      expect(JSON.stringify(create.body)).not.toContain('river-stone');
+      expect(setPassword).toMatchObject({ action: 'groups/password/set', body: { groupId: 'salon' } });
+      expect(saveWorkerGroupPassword).toHaveBeenCalledWith(
+        expect.objectContaining({ password: 'river-stone-lamp-oak-moss', groupId: 'salon', sessionId: SESSION_ID }),
+      );
+      expect(JSON.stringify(setPassword.body)).not.toContain('river-stone');
+    });
+
+    it('makes one-use links shown once and revokes them by hash', async () => {
+      const counts = { unused: 1, used: 1, revoked: 0 };
+      const listed = [
+        { hash: 'a'.repeat(64), state: 'unused' },
+        { hash: 'b'.repeat(64), state: 'used', usedAt: '2026-11-20T10:00:00.000Z' },
+      ];
+      const postSignedRequest = jest.fn(async ({ action, body }: Request) => {
+        if (action === 'groups/list')
+          return respond({ groups: [group({ joinMode: 'one_use', listed: false, invites: counts })] });
+        if (action === 'groups/invites/list') return respond({ groupId: 'salon', invites: listed, counts });
+        if (action === 'groups/invites/add')
+          return respond({ groupId: 'salon', added: 2, counts: { ...counts, unused: 3 } });
+        if (action === 'groups/invites/revoke')
+          return respond({ groupId: 'salon', revoked: 1, counts: { unused: 0, used: 1, revoked: 1 } });
+        throw new Error(`unexpected ${action} ${JSON.stringify(body)}`);
+      });
+      renderPanel(postSignedRequest, CHOICES, true);
+      expect(await screen.findByText('Not in the group list')).toBeInTheDocument();
+      expect(screen.getByText('One-use URLs', { selector: 'span' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Invites for Salon' }));
+      expect(await screen.findByText('aaaaaaaa')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Revoke link bbbbbbbb' })).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText('How many'), { target: { value: '2' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Generate Additional Password Invites' }));
+      const fresh = await screen.findByTestId('ce-admin-worker-group-fresh-invites');
+      const add = postSignedRequest.mock.calls
+        .map(([request]) => request)
+        .find((r) => r.action === 'groups/invites/add');
+      const hashes = add?.body?.hashes as string[];
+      expect(hashes).toHaveLength(2);
+      hashes.forEach((hash) => expect(hash).toMatch(/^[0-9a-f]{64}$/));
+      expect(fresh).toHaveTextContent('they won’t be shown again');
+
+      jest.spyOn(window, 'confirm').mockReturnValue(true);
+      fireEvent.click(screen.getByRole('button', { name: 'Revoke link aaaaaaaa' }));
+      expect(await screen.findByText('1 link revoked.')).toBeInTheDocument();
+      const revoke = postSignedRequest.mock.calls
+        .map(([request]) => request)
+        .find((r) => r.action === 'groups/invites/revoke');
+      expect(revoke?.body).toMatchObject({ groupId: 'salon', hashes: ['a'.repeat(64)] });
+    });
   });
 });
