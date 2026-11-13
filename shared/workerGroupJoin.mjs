@@ -59,6 +59,20 @@ export const parseGroupInviteToken = (text) => {
   return isWorkerGroupPasswordLongEnough(password) ? { kind: 'password', password } : null;
 };
 
+/**
+ * Why an admin's new group password can't be used, or '' when it can. Joiners' text is parsed as a token
+ * (trimmed, a `gp:` prefix dropped, 32 hex characters read as a claim code), so a password must parse back to itself.
+ */
+export const workerGroupPasswordProblem = (password) => {
+  const normalized = normalizePassword(password);
+  if (!isWorkerGroupPasswordLongEnough(normalized)) return `At least ${WORKER_GROUP_PASSWORD_MIN_LENGTH} characters.`;
+  if (normalized !== normalized.trim()) return 'No spaces at the start or end.';
+  const parsed = parseGroupInviteToken(normalized);
+  return parsed?.kind === 'password' && parsed.password === normalized
+    ? ''
+    : 'That reads as a link code. Choose another.';
+};
+
 /** The token a link carries for a password or a one-use claim code. */
 export const formatGroupInviteToken = ({ kind, password, secret }) => {
   if (kind === 'one_use' && typeof secret === 'string' && ONE_USE_SECRET.test(secret)) return secret.toLowerCase();

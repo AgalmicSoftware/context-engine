@@ -21,9 +21,8 @@ import {
 } from './WorkerGroupJoinChoiceHelp';
 import { generateCreateSbtGroupPassphrase } from '../SBTs/createSbtGroupPasswordHelpers';
 import {
-  isWorkerGroupPasswordLongEnough,
   WORKER_GROUP_MEMBER_CEILING_DEFAULT,
-  WORKER_GROUP_PASSWORD_MIN_LENGTH,
+  workerGroupPasswordProblem,
 } from '../../../../shared/workerGroupJoin.mjs';
 import styles from './WorkerGroupCreateForm.module.scss';
 
@@ -384,7 +383,8 @@ const WorkerGroupCreateForm = ({
   const joinEndsAtInvalid = Boolean(joinEndsAt && (!Number.isFinite(joinEndsAtTime) || joinEndsAtTime <= Date.now()));
   const adminAddressInvalid = Boolean(adminAddress.trim() && !/^0x[0-9a-fA-F]{40}$/.test(adminAddress.trim()));
   const asksPassword = joinMode === 'group_password' && !!onGroupPasswordChange;
-  const passwordInvalid = asksPassword && !isWorkerGroupPasswordLongEnough(groupPassword);
+  const passwordProblem = asksPassword ? workerGroupPasswordProblem(groupPassword) : '';
+  const passwordInvalid = Boolean(passwordProblem);
   const submitForm = async () => {
     if (selectedImageFile && !imageUrl.trim()) {
       if (deferImageUpload) {
@@ -693,9 +693,7 @@ const WorkerGroupCreateForm = ({
                 <div className={styles.accessCopy}>
                   <span className={styles.accessLabel}>Group password</span>
                   {passwordInvalid && groupPassword ? (
-                    <span className={styles.accessHelp}>
-                      {`At least ${WORKER_GROUP_PASSWORD_MIN_LENGTH} characters.`}
-                    </span>
+                    <span className={styles.accessHelp}>{passwordProblem}</span>
                   ) : null}
                 </div>
                 <span className={styles.passwordRow}>

@@ -13,6 +13,7 @@ import {
   readWorkerGroupMemberCeiling,
   workerOffersGroupJoinChoices,
   workerGroupJoinStatement,
+  workerGroupPasswordProblem,
 } from '../../shared/workerGroupJoin.mjs';
 
 const sessionId = '0x00112233445566778899AABBCCDDEEFF';
@@ -57,6 +58,15 @@ test('formats tokens that parse back to themselves', () => {
     password: 'five words long',
   });
   assert.throws(() => formatGroupInviteToken({ kind: 'password', password: 'short' }));
+});
+
+test('takes a new password only when a joiner typing it would get it back', () => {
+  for (const password of ['river stone lamp', 'ﬁve words long', 'a'.repeat(31)])
+    assert.equal(workerGroupPasswordProblem(password), '');
+  assert.equal(workerGroupPasswordProblem('short'), 'At least 8 characters.');
+  assert.equal(workerGroupPasswordProblem('river stone lamp '), 'No spaces at the start or end.');
+  for (const password of ['gp:river stone', 'inv:riverstone', 'A'.repeat(32)])
+    assert.equal(workerGroupPasswordProblem(password), 'That reads as a link code. Choose another.');
 });
 
 test('hashes a claim code the same whatever its case', async () => {

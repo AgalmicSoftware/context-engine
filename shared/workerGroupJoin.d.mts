@@ -17,6 +17,7 @@ export function workerOffersGroupJoinChoices(config: unknown): boolean;
 
 export function isWorkerGroupPasswordLongEnough(password: unknown): boolean;
 export function parseGroupInviteToken(text: unknown): WorkerGroupInviteToken | null;
+export function workerGroupPasswordProblem(password: unknown): string;
 export function formatGroupInviteToken(token: {
   kind: 'password' | 'one_use';
   password?: string;

@@ -16,7 +16,7 @@ import {
   oneUseInviteToken,
   saveWorkerGroupPassword,
 } from '../../domains/worker/workerGroupSecrets';
-import { isWorkerGroupPasswordLongEnough, WORKER_GROUP_INVITE_BATCH_MAX } from '../../../../shared/workerGroupJoin.mjs';
+import { WORKER_GROUP_INVITE_BATCH_MAX, workerGroupPasswordProblem } from '../../../../shared/workerGroupJoin.mjs';
 import WorkerGroupPasswordReveal from './WorkerGroupPasswordReveal';
 import { generateCreateSbtGroupPassphrase } from '../SBTs/createSbtGroupPasswordHelpers';
 import styles from './AdminPage.module.scss';
@@ -266,6 +266,7 @@ function GroupPassword({ group, sessionId, sessionSlug, workerUrl, postSignedReq
   const [revealed, setRevealed] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
+  const problem = workerGroupPasswordProblem(password);
   const save = async () => {
     if (
       group.passwordSet &&
@@ -312,14 +313,11 @@ function GroupPassword({ group, sessionId, sessionSlug, workerUrl, postSignedReq
         >
           Generate new
         </Button>
-        <Button
-          color="primary"
-          disabled={busy || !isWorkerGroupPasswordLongEnough(password)}
-          onClick={() => void save()}
-        >
+        <Button color="primary" disabled={busy || Boolean(problem)} onClick={() => void save()}>
           {group.passwordSet ? 'New password' : 'Set password'}
         </Button>
       </div>
+      {password && problem ? <div className={styles.panelSubtitle}>{problem}</div> : null}
       {revealed ? (
         <WorkerGroupPasswordReveal
           group={group}

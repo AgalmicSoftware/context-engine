@@ -6,6 +6,7 @@ import {
   hashOneUseSecret,
   parseGroupInviteToken,
   WORKER_GROUP_INVITE_FRAGMENT_KEY,
+  workerGroupPasswordProblem,
 } from '../../../../shared/workerGroupJoin.mjs';
 import { buildWorkerGroupAutoJoinPath } from './workerGroupAutoJoin';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
@@ -114,6 +115,8 @@ export const saveWorkerGroupPassword = async ({
   sessionSlug: string;
   postSignedRequest: PostSignedWorkerGroupRequest;
 }) => {
+  const problem = workerGroupPasswordProblem(password);
+  if (problem) throw new Error(`Group password: ${problem}`);
   const signer = await workerGroupPasswordSigner(password, sessionId, groupId);
   return setWorkerGroupPassword({ groupId, sessionId, sessionSlug, postSignedRequest, signer });
 };

@@ -679,6 +679,10 @@ describe('AdminWorkerGroupsPanel', () => {
       fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), { target: { value: 'Salon' } });
       fireEvent.change(screen.getByLabelText('Group password'), { target: { value: 'short' } });
       expect(screen.getByRole('button', { name: 'Create Group' })).toBeDisabled();
+      // A joiner's typed text is trimmed, so a password with an edge space could never be entered.
+      fireEvent.change(screen.getByLabelText('Group password'), { target: { value: 'river-stone-lamp ' } });
+      expect(screen.getByText('No spaces at the start or end.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create Group' })).toBeDisabled();
       fireEvent.change(screen.getByLabelText('Group password'), { target: { value: 'river-stone-lamp-oak-moss' } });
       fireEvent.click(screen.getByRole('checkbox', { name: 'Show in the group list' }));
       fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
