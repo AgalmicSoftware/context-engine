@@ -60,6 +60,9 @@ server does not update itself.
   files between runs.
 - The next step names a link's group, and the answer tool's value has a
   JSON-schema type.
+- An answer call that saved nothing is reported to the host as an error, a
+  quadratic answer in the wrong shape says to send a list of votes, and with
+  everything answered `list_questions` says so and how to see your answers.
 - A browser invitation link can be given to `join_session` as it is.
 
 0.3.2 was not published to npm; its change is part of 0.3.3 and later. 0.3.3
