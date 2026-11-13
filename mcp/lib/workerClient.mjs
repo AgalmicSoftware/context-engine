@@ -11,6 +11,9 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 // Stored records are small (the Worker caps a question at 128 KiB).
 const MAX_RECORD_BYTES = 256 * 1024;
+// The Worker stops filling a batch at 8 MB of text, so the last few items and
+// the JSON around them can go a little past it.
+const MAX_BATCH_RESPONSE_BYTES = 12 * 1024 * 1024;
 const TOKEN_REFRESH_MARGIN_SECONDS = 60;
 const SIGN_IN_VALIDITY_MS = 10 * 60 * 1000;
 const MAX_LIST_PAGES = 100;
@@ -23,6 +26,22 @@ const TOKEN_ERROR_RE = /token|expired|stale|sign[- ]?in|unauthori[sz]ed|authoriz
 const MAX_ERROR_DETAIL = 300;
 
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+const encoder = new TextEncoder();
+// A stored record's text as read() gives it: JSON, a JSON string holding JSON, or null.
+const parseRecordText = (raw) => {
+  let data;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+  if (typeof data !== 'string') return data;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+};
 /** Reads text fields from untrusted JSON without ever calling into them. */
 export const text = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -347,6 +366,25 @@ export const createWorkerClient = ({
     return data;
   };
 
+  // Up to 100 stored records in one request, on Workers that list
+  // storage_read_batch_v1. Each id comes back in order as { id, status } and,
+  // when status is 200, the record parsed as read() parses it. An item the
+  // Worker won't send as text, one past the batch's size, or one larger than
+  // a single read takes has no record here: read it on its own.
+  const readBatch = async (ids, { signal } = {}) => {
+    const data = await request('/storage/read-batch', {
+      method: 'POST', auth: true, signal, body: { ids }, maxBytes: MAX_BATCH_RESPONSE_BYTES,
+    });
+    const items = new Map((Array.isArray(data?.items) ? data.items : []).filter(isRecord).map((item) => [text(item.id), item]));
+    return ids.map((id) => {
+      const item = items.get(id);
+      const status = Number(item?.status) || 0;
+      if (status !== 200 || typeof item.text !== 'string') return { id, status: status === 200 ? 0 : status };
+      if (encoder.encode(item.text).length > MAX_RECORD_BYTES) return { id, status: 413 };
+      return { id, status: 200, record: parseRecordText(item.text) };
+    });
+  };
+
   const upload = async ({ resource, data, tags = [], requestId = '', signal }) => {
     const result = await request('/storage/upload', {
       signal,
@@ -416,6 +454,7 @@ export const createWorkerClient = ({
     ensureToken,
     listAll,
     read,
+    readBatch,
     upload,
     uploadForm,
     contextAction,

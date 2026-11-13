@@ -793,6 +793,24 @@ test('an answer is not sent when its retry key cannot be persisted', async (t) =
   assert.equal(storedRecords(env, 'responses').length, 0);
 });
 
+// A record the Worker can't read yet answers 404, whether it is read on its
+// own or in a batch; `onRead` counts each request that asks for it.
+const withUnreadRecord = (fetchWorker, id, { unread, onRead = () => {}, error = 'Payload is not available yet.' }) => async (url, init) => {
+  const { pathname, searchParams } = new URL(url);
+  if (pathname === '/storage/read' && searchParams.get('id') === id) {
+    onRead();
+    if (unread()) return Response.json({ error }, { status: 404 });
+  }
+  if (pathname === '/storage/read-batch' && JSON.parse(init.body).ids.includes(id)) {
+    onRead();
+    if (unread()) {
+      const { items } = await (await fetchWorker(url, init)).json();
+      return Response.json({ items: items.map((item) => (item.id === id ? { id, status: 404, error } : item)) });
+    }
+  }
+  return fetchWorker(url, init);
+};
+
 for (const value of ['Disagree', '']) test(`an unread newer ${value || 'cleared'} answer keeps MCP results and own answers incomplete`, async (t) => {
   const env = createEnv([sessionConfig()]);
   const author = await createAgent(env, 'synthetic-author', []);
@@ -807,13 +825,9 @@ for (const value of ['Disagree', '']) test(`an unread newer ${value || 'cleared'
   let reads = 0;
   let now = Date.now();
   const fetchWorker = workerFetch(env);
-  const reader = await createAgent(env, 'synthetic-reader', [], async (url, init) => {
-    if (new URL(url).pathname === '/storage/read' && new URL(url).searchParams.get('id') === newerId) {
-      reads++;
-      if (unread) return Response.json({ error: 'Payload is not available yet.' }, { status: 404 });
-    }
-    return fetchWorker(url, init);
-  }, { wallet: author.wallet, now: () => now });
+  const reader = await createAgent(env, 'synthetic-reader', [], withUnreadRecord(fetchWorker, newerId, {
+    unread: () => unread, onRead: () => { reads++; },
+  }), { wallet: author.wallet, now: () => now });
   t.after(() => fs.rm(reader.stateDir, { recursive: true, force: true }));
   await reader.participant.joinSession({ link: LINK });
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -891,6 +905,43 @@ test('MCP results count every answer of an 80-person, 30-statement salon', async
   assert.ok(Math.max(...kvOperations.counts) <= 1000, `most KV operations in one request: ${Math.max(...kvOperations.counts)}`);
 });
 
+test('get_results reads stored answers 100 at a time where the Worker offers it, and one at a time where it doesn’t', async (t) => {
+  const env = createEnv([sessionConfig()]);
+  const author = await createAgent(env, 'synthetic-author', []);
+  t.after(() => fs.rm(author.stateDir, { recursive: true, force: true }));
+  await author.participant.joinSession({ link: LINK });
+  const { questionId } = await author.participant.addStatement({ prompt: 'Synthetic batch-read statement.' });
+  await author.participant.answer({ answers: [{ questionId, value: 'Agree' }] });
+  for (let i = 0; i < 249; i++) {
+    plantRecord(env, 'responses', {
+      questionID: questionId, sessionSlug: SLUG, sessionId: SESSION_ID, type: 'binary', answer: { value: 'Agree' }, additional: { value: '' },
+    });
+  }
+  const readsFor = async (fetchImpl) => {
+    const seen = [];
+    const reader = await createAgent(env, 'synthetic-reader', seen, fetchImpl && fetchImpl(seen));
+    t.after(() => fs.rm(reader.stateDir, { recursive: true, force: true }));
+    await reader.participant.joinSession({ link: LINK });
+    seen.length = 0;
+    const results = await reader.participant.getResults();
+    const paths = seen.map((call) => new URL(call.url).pathname);
+    return { results, single: paths.filter((path) => path === '/storage/read').length, batch: paths.filter((path) => path === '/storage/read-batch').length };
+  };
+  const batched = await readsFor(null);
+  // One question and 250 stored answers: one batch for the question, three for the answers.
+  assert.deepEqual([batched.single, batched.batch], [0, 4]);
+  assert.equal(batched.results.partial, false);
+  // A Worker without batch reads: the same results, one record per request, as before.
+  const older = await readsFor((seen) => async (url, init) => {
+    const response = await workerFetch(env, seen)(url, init);
+    if (new URL(url).pathname !== '/capabilities') return response;
+    const body = await response.json();
+    return Response.json({ ...body, features: body.features.filter((feature) => feature !== 'storage_read_batch_v1') });
+  });
+  assert.deepEqual([older.single, older.batch], [251, 0]);
+  assert.deepEqual(older.results, batched.results);
+});
+
 test('a listed unread question is incomplete until its payload can be read', async (t) => {
   const env = createEnv([sessionConfig()]);
   let now = Date.now();
@@ -901,10 +952,7 @@ test('a listed unread question is incomplete until its payload can be read', asy
   const id = plantRecord(env, 'questions', { id: ethers.utils.id('unread-question'), sessionSlug: SLUG, sessionId: SESSION_ID, type: 'binary', prompt: 'Synthetic delayed statement.' });
   let unread = true;
   const fetchWorker = workerFetch(env);
-  const reader = await createAgent(env, 'synthetic-reader', [], async (url, init) => {
-    if (unread && new URL(url).pathname === '/storage/read' && new URL(url).searchParams.get('id') === id) return Response.json({}, { status: 404 });
-    return fetchWorker(url, init);
-  }, { now: () => now });
+  const reader = await createAgent(env, 'synthetic-reader', [], withUnreadRecord(fetchWorker, id, { unread: () => unread }), { now: () => now });
   t.after(() => fs.rm(reader.stateDir, { recursive: true, force: true }));
   await reader.participant.joinSession({ link: LINK });
   for (let attempt = 0; attempt < 2; attempt++) {

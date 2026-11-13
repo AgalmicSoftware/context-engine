@@ -452,7 +452,9 @@ unknown `CE_MCP_*` name.
   ended and on-chain sessions refuse it. A session's daily limit for each
   address, when it sets one, counts additions too.
 - **Results reading is bounded.** `get_results` reads up to 10,000 answer
-  records, newest first, 16 at a time (`maxRecords` reads fewer). It lists
+  records, newest first (`maxRecords` reads fewer): 100 to a request, two
+  requests at a time, from a Worker that offers batch reads, and otherwise
+  one to a request, 16 at a time. Questions are read the same way. It lists
   answers for at most 20 seconds and reads them until 40, then answers with
   `partial: true`, so it returns within a host's usual 60-second limit. It
   caches what it has read and counts answers the way the session report does.

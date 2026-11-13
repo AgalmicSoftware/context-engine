@@ -132,3 +132,37 @@ for (const action of ['upload', 'join', 'faucet', 'arweave']) test(`${action}: c
   await assert.rejects(operation, /Stopped/);
   assert.deepEqual(writes, []);
 });
+
+test('a batch read returns each record as a single read would, and leaves the rest to single reads', async () => {
+  const sent = [];
+  const fetchImpl = async (url, init = {}) => {
+    const path = new URL(url).pathname;
+    if (path === '/session-config') return json({ sessionSlug: 's', config: { sessionId: SESSION_ID } });
+    if (path === '/auth/nonce') return json({ nonce: 'n1abcdefgh' });
+    if (path === '/auth/login') return json({ token: 'e30.sig', exp: 9999999999 });
+    sent.push({ path, ids: JSON.parse(init.body).ids });
+    return json({
+      items: [
+        { id: 'json', status: 200, text: '{"answer":"Agree"}' },
+        { id: 'wrapped', status: 200, text: JSON.stringify('{"answer":"Unsure"}') },
+        { id: 'prose', status: 200, text: 'not json' },
+        { id: 'binary', status: 415, error: 'This item is not text; read it on its own.' },
+        { id: 'gone', status: 404, error: 'Not found.' },
+        { id: 'large', status: 200, text: JSON.stringify({ text: 'x'.repeat(256 * 1024) }) },
+      ],
+    });
+  };
+  const client = createWorkerClient({ workerOrigin: 'https://w.example.dev', slug: 's', trustedOrigins: TRUSTED, wallet: ethers.Wallet.createRandom(), fetchImpl });
+  const ids = ['json', 'wrapped', 'prose', 'binary', 'gone', 'large', 'left-out'];
+  assert.deepEqual(await client.readBatch(ids), [
+    { id: 'json', status: 200, record: { answer: 'Agree' } },
+    { id: 'wrapped', status: 200, record: { answer: 'Unsure' } },
+    { id: 'prose', status: 200, record: null },
+    { id: 'binary', status: 415 },
+    { id: 'gone', status: 404 },
+    // Larger than a single read takes, so it is read on its own and refused there as before.
+    { id: 'large', status: 413 },
+    { id: 'left-out', status: 0 },
+  ]);
+  assert.deepEqual(sent, [{ path: '/storage/read-batch', ids }]);
+});
