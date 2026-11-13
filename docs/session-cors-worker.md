@@ -1748,7 +1748,8 @@ Implemented routes:
   without reloading the collection.
 - `POST /groups/leave`: authenticated self-removal from a current membership,
   when the group's `removalAuth` is `both` or `member_only`; otherwise 403
-  `worker_group_leave_denied`.
+  `worker_group_leave_denied`. Leaving a group you aren't in, or one that
+  doesn't exist, answers 404 `worker_group_member_not_found` either way.
   The Worker derives the principal from the bearer credential and ignores any
   caller-supplied principal, so a participant cannot remove another member. A
   session-visible leave returns the retained group and post-mutation count;

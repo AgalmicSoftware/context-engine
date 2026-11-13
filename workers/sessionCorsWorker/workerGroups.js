@@ -2355,6 +2355,11 @@ export const workerGroupsRoute = async ({
 			actorPrincipal: actor.principal,
 			remover: 'member',
 		});
+		// Leaving a group that doesn't exist reads as leaving one you aren't in,
+		// so the answer never shows whether an unlisted group is there.
+		if (result.reason === 'worker_group_not_found') {
+			return routeError(deps, { status: 404, reason: 'worker_group_member_not_found' }, baseHeaders);
+		}
 		if (!result.ok) return routeError(deps, result, baseHeaders);
 		if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
 			return routeError(deps, { status: 503, reason: 'worker_group_projection_unavailable' }, baseHeaders);

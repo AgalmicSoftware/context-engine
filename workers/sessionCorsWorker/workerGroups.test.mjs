@@ -1684,6 +1684,24 @@ test('an unlisted group shows only to its members and admins, whatever its membe
 	assert.equal(left.status, 200);
 	assert.equal(Object.hasOwn(left.body, 'group'), false);
 	assert.equal('quiet' in (await listFor(member.address)), false);
+	// Leaving it again, or leaving a group that doesn't exist, gets the same answer.
+	const leave = (groupId) => workerGroupsRoute({
+		path: '/groups/leave',
+		method: 'POST',
+		request: new Request('https://worker.example/groups/leave', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ groupId }),
+		}),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		baseHeaders: {},
+		deps: { json },
+	});
+	const [again, nowhere] = [await leave('quiet'), await leave('nowhere')];
+	assert.deepEqual([again.status, again.body.reason], [404, 'worker_group_member_not_found']);
+	assert.deepEqual([nowhere.status, nowhere.body.reason], [again.status, again.body.reason]);
 	// Listing it again shows it to everyone; the choice survives an edit that doesn't name it.
 	await mutate('update', { listed: true }, { groupId: 'quiet' });
 	await mutate('update', { label: 'Quiet room' }, { groupId: 'quiet' });
