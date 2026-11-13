@@ -74,4 +74,22 @@ describe('browser runtime config entrypoint', () => {
       CE_SESSION_SCAN_SLUGS: ['alpha', 'beta'],
     });
   });
+
+  it('takes a link’s group invite out of the address before the router reads it', () => {
+    window.history.replaceState({}, '', '/session/alpha?joinGroup=g1#prefill=x&groupInvite=gp%3Ariver%20stone');
+    let addressAtRender = '';
+    mockRender.mockImplementationOnce(() => {
+      addressAtRender = `${window.location.search}${window.location.hash}`;
+    });
+    let held: string | undefined;
+    jest.isolateModules(() => {
+      require('./index');
+      const { readAutoJoinLink } = require('./domains/worker/workerGroupAutoJoinIntent');
+      const context = { sessionSlug: 'alpha', sessionId: `0x${'1'.repeat(32)}`, workerUrl: 'https://worker.example' };
+      held = readAutoJoinLink('/session/alpha?joinGroup=g1', context)?.token;
+    });
+
+    expect(addressAtRender).toBe('?joinGroup=g1#prefill=x');
+    expect(held).toBe('gp:river stone');
+  });
 });

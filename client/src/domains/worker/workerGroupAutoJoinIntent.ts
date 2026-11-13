@@ -41,13 +41,20 @@ export const readGroupInviteFragment = (hash: string): string => {
 // loses it before the session's Worker is known, so the invitation that forms for that group takes it from here.
 let heldInvite: { sessionSlug: string; groupId: string; token: string } | null = null;
 
-/** Takes the invite out of the address at once, leaving the rest of the fragment as it was. */
+/** Keeps an invite handed over in the page (a recording's claim) for the link's group, never in the address. */
+export const holdGroupInviteForLink = (path: string, token: string) => {
+  const target = readLinkTarget(path);
+  if (target && token) heldInvite = { sessionSlug: target.sessionSlug, groupId: target.groupId, token };
+};
+
+/**
+ * Takes the invite out of the address at once, leaving the rest of the fragment as it was. The app calls it
+ * before the router starts, so the router's own copy of the address never has it.
+ */
 export const removeGroupInviteFromAddress = () => {
   const { pathname, search, hash } = window.location;
   if (!fragmentSegments(hash).some((part) => part.startsWith(INVITE_FRAGMENT))) return;
-  const target = readLinkTarget(`${pathname}${search}`);
-  const token = readGroupInviteFragment(hash);
-  if (target && token) heldInvite = { sessionSlug: target.sessionSlug, groupId: target.groupId, token };
+  holdGroupInviteForLink(`${pathname}${search}`, readGroupInviteFragment(hash));
   const rest = fragmentSegments(hash).filter((part) => part && !part.startsWith(INVITE_FRAGMENT));
   window.history.replaceState(
     window.history.state,

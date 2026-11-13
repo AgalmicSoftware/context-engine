@@ -6,6 +6,7 @@ import {
   toggleSessionVoiceModeModal,
 } from './SurveyPileViewMode';
 import { readHeldClaim, releaseHeldClaim } from './sessionTranscriptClaim';
+import { readAutoJoinLink } from '../../domains/worker/workerGroupAutoJoinIntent';
 
 const makeEngine = (sessionConfig = {}) => ({ props: { sessionConfig }, state: {}, setState: jest.fn() });
 
@@ -76,12 +77,14 @@ describe('a claimed part', () => {
     expect(open('context')).toEqual({ showVoiceModeModal: true, sessionVoiceMode: 'interview' });
   });
 
-  it('puts a handed-on group password in the fragment for the auto-join, never in history state', () => {
+  it('hands a group password on to the auto-join, never through the address or history state', () => {
     window.history.replaceState({}, '', '/session/salon');
     receiveTranscriptClaim(makeEngine(), { ...claim, joinGroup: 'salon-group', joinToken: 'gp:river stone' });
     expect(window.location.search).toBe('?joinGroup=salon-group');
-    expect(window.location.hash).toBe('#groupInvite=gp%3Ariver%20stone');
+    expect(window.location.hash).toBe('');
     expect(JSON.stringify(window.history.state)).not.toContain('river');
+    const context = { sessionSlug: 'salon', sessionId: `0x${'1'.repeat(32)}`, workerUrl: 'https://worker.example' };
+    expect(readAutoJoinLink('/session/salon?joinGroup=salon-group', context)?.token).toBe('gp:river stone');
   });
 
   it('leaves the address alone without a group', () => {

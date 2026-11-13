@@ -3,7 +3,10 @@ import { BrowserRouter } from 'react-router-dom';
 import { initLogging } from 'utilities/logging.js';
 import { initializeRuntimeConfig } from 'utilities/session/runtimeConfig';
 import App from 'components/App';
+import { removeGroupInviteFromAddress } from './domains/worker/workerGroupAutoJoinIntent';
 
+// A link's group invite leaves the address before the router reads it.
+removeGroupInviteFromAddress();
 initializeRuntimeConfig();
 initLogging({ showGuide: process.env.NODE_ENV !== 'production' });
 
