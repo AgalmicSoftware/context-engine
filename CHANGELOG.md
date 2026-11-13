@@ -19,6 +19,10 @@ All notable changes to this project will be documented in this file.
 - Full admins read, page through and delete feedback at `admin/feedback/list` and `admin/feedback/delete`; results admins cannot. Feedback never reaches AI Views, the atlas, the Risk Matrix, the Session Agent, the fidelity report, exports or backups.
 - A session's `feedbackEnabled` setting, on unless set, turns the Feedback box off; turning it off signs no one out.
 
+### Agents and MCP
+
+- MCP 0.4.1, a patch: no change in what the tools do; the package is rebuilt with this release's shared session-settings code.
+
 ### Local tooling
 
 - `npm run ai:test-theme:feedback` checks the Feedback section by keyboard in each theme at phone and desktop widths.
