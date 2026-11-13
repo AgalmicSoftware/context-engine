@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
+- MCP 0.4.2.
 - `list_questions` says that by default it lists only unanswered questions, as it always has, and how to list the others.
 
 ## [0.9.8] - 2026-11-14

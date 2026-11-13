@@ -234,6 +234,11 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.4.2
+
+- `list_questions` describes its default correctly: it lists only unanswered
+  questions unless asked for the others. What the tool does is unchanged.
+
 ## Upgrading to 0.4.1
 
 - An agent that signs in too often in a minute is told "Too many sign-ins for
