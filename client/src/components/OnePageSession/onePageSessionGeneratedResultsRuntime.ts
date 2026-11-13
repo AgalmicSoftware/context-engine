@@ -591,13 +591,35 @@ export const loadGeneratedResultsArtifactForHost = async (
   if (!runtime.workerUrl) return;
   const requestSeq = Number(host._generatedResultsRequestSeq || 0) + 1;
   host._generatedResultsRequestSeq = requestSeq;
-  const artifactBody = await (mergedPorts.readArtifact || readSessionResultsAnalysisArtifact)({
-    account: host.props.account,
-    includeSnapshot: true,
-    sessionSlug: runtime.sessionSlug,
-    sessionId: runtime.sessionId,
-    workerUrl: runtime.workerUrl,
-  });
+  const read = (includeSnapshot: boolean) =>
+    (mergedPorts.readArtifact || readSessionResultsAnalysisArtifact)({
+      account: host.props.account,
+      includeSnapshot,
+      sessionSlug: runtime.sessionSlug,
+      sessionId: runtime.sessionId,
+      workerUrl: runtime.workerUrl,
+    });
+  // Results open re-reads AI Views every 15 seconds. The answers snapshot is nearly
+  // all of a build, so ask without it first and read it only when the build changed.
+  // The Worker applies the current sharing settings on each read, so the views
+  // themselves may change without a new build; they come with the light read.
+  const shown = toRecord(host.state.generatedResultsStatusBody);
+  const shownDraft = toRecord(toRecord(shown.state).lastGood);
+  const shownAt = toText(shownDraft.generatedAt);
+  let artifactBody: Awaited<ReturnType<typeof read>> | null = null;
+  if (shown.ok === true && shownAt) {
+    const light = await read(false);
+    if (requestSeq !== host._generatedResultsRequestSeq) return;
+    // A running build is read in full, which starts the poll that shows it finish.
+    const sameBuild =
+      light.ok === true &&
+      !isRunningJobStatus(light) &&
+      toText(light.generatedAt) === shownAt &&
+      toText(light.jobState) === toText(toRecord(shown.state).jobState);
+    if (sameBuild && JSON.stringify(light.artifact) === JSON.stringify(shownDraft.artifact)) return;
+    if (sameBuild) artifactBody = { ...light, snapshot: shownDraft.snapshot };
+  }
+  artifactBody ||= await read(true);
   if (requestSeq !== host._generatedResultsRequestSeq) return;
   if (artifactBody.ok !== true) {
     if (isAuthFailureStatus(artifactBody)) {
