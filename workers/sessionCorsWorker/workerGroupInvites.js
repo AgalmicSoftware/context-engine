@@ -67,7 +67,9 @@ export const resolveWorkerGroupJoinCredential = async ({ credential, sessionId, 
 			? { kind: 'one_use', hash: await hashOneUseSecret(secret) }
 			: { kind: 'invalid' };
 	}
-	if (typeof proof !== 'string' || !JOIN_PROOF.test(proof) || !address) return { kind: 'invalid' };
+	// A principal with no address can't hold a password proof: nothing to check or count.
+	if (!address) return null;
+	if (typeof proof !== 'string' || !JOIN_PROOF.test(proof)) return { kind: 'invalid' };
 	try {
 		const signer = verifyMessage(workerGroupJoinStatement({ sessionId, groupId, address }), proof);
 		return { kind: 'password', signer: signer.toLowerCase() };

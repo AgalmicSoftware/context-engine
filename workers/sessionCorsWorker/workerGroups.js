@@ -9,7 +9,11 @@ import {
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { workerConfigAllowsAnonymousGroupDiscovery } from '../shared/workerConfigModeValidation.mjs';
 import { toStr } from './stringCoercion.js';
-import { WORKER_GROUP_JOIN_REFUSED, WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mjs';
+import {
+	WORKER_GROUP_JOIN_REFUSED,
+	WORKER_GROUP_MEMBER_CEILING_DEFAULT,
+	WORKER_GROUP_MEMBER_CEILING_MAX,
+} from '../../shared/workerGroupJoin.mjs';
 
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -48,6 +52,12 @@ export const MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
 const WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = 'fresh-template-v2';
 
 const JOIN_MODE_SET = new Set(Object.values(WORKER_GROUP_JOIN_MODES));
+
+// The session's most members in any group: its setting, or the default.
+export const resolveWorkerGroupMemberCeiling = (value) =>
+	Number.isSafeInteger(value) && value >= 1 && value <= WORKER_GROUP_MEMBER_CEILING_MAX
+		? value
+		: WORKER_GROUP_MEMBER_CEILING_DEFAULT;
 
 export const normalizeWorkerGroupId = (value) => {
 	const normalized = trim(value).toLowerCase();
@@ -1317,6 +1327,11 @@ export const listWorkerGroupMembersForPrincipal = async ({
 		return { ok: false, status: 404, reason: 'worker_group_not_found' };
 	}
 	const authority = catalog.groups[0];
+	// To anyone but its members, an unlisted group is as absent as an unknown one;
+	// admins read its members through the signed Admin route.
+	if (authority?.listed !== true && authority?.isMember !== true) {
+		return { ok: false, status: 404, reason: 'worker_group_not_found' };
+	}
 	const memberVisibility = trim(authority?.memberVisibility).toLowerCase();
 	const joinMode = trim(authority?.joinMode).toLowerCase();
 	const memberCount = Number(authority?.memberCount);
@@ -1801,8 +1816,10 @@ export const listSelfJoinableWorkerGroupsForMember = async ({ env, config, slug,
 		if (!listed.ok || !joined.ok) return [];
 		const joinedIds = new Set(joined.memberships.map((membership) => normalizeWorkerGroupId(membership?.group?.groupId)));
 		const nowMs = Number(deps.now?.() || Date.now());
+		const ceiling = resolveWorkerGroupMemberCeiling(config?.groupMemberCeiling);
 		return listed.groups.filter((group) => {
-			const full = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 && group.memberCount >= group.memberLimit;
+			const limit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? Math.min(group.memberLimit, ceiling) : ceiling;
+			const full = group.memberCount >= limit;
 			return isSelfJoinableWorkerGroup(group, nowMs) && !joinedIds.has(group.groupId) && !full;
 		});
 	} catch {

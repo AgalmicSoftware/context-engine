@@ -428,6 +428,9 @@ test('a signed-in person’s AI is offered only open groups they have not joined
 		env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', address, deps, ...overrides,
 	});
 	assert.deepEqual((await offer()).map((group) => group.groupId), ['salon', 'room']);
+	// A group at the session's ceiling is full whatever its own limit.
+	const atCeiling = await offer({ config: { ...privateWorkerGroupConfig(), groupMemberCeiling: 2 } });
+	assert.deepEqual(atCeiling.map((group) => group.groupId), ['salon']);
 	// Listed as that person sees groups, never as an admin.
 	assert.equal(listings[0].admin, false);
 	assert.equal(listings[0].includeMemberCount, true);
@@ -1892,7 +1895,7 @@ test('participant member lists enforce the configured identity visibility and re
 			nextCursor: 'next-page',
 		};
 	};
-	const run = ({ memberVisibility, isMember }) =>
+	const run = ({ memberVisibility, isMember, listed = true }) =>
 		listWorkerGroupMembersForPrincipal({
 			env: {},
 			slug: 'session-a',
@@ -1906,6 +1909,7 @@ test('participant member lists enforce the configured identity visibility and re
 							groupId: 'visible',
 							joinMode: 'open',
 							memberVisibility,
+							listed,
 							memberCount: 2,
 							isMember,
 						},
@@ -1943,7 +1947,11 @@ test('participant member lists enforce the configured identity visibility and re
 		assert.equal(response.status, 403);
 		assert.equal(response.reason, 'worker_group_member_list_forbidden');
 	}
-	assert.equal(listCalls, 2);
+	// An unlisted group answers a non-member exactly as an unknown one does.
+	const unlisted = await run({ memberVisibility: 'session', isMember: false, listed: false });
+	assert.deepEqual(unlisted, { ok: false, status: 404, reason: 'worker_group_not_found' });
+	assert.equal((await run({ memberVisibility: 'session', isMember: true, listed: false })).ok, true);
+	assert.equal(listCalls, 3);
 });
 
 test('participant member-list route binds the authenticated principal and exact session identity', async () => {

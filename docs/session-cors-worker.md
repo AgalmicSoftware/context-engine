@@ -1776,11 +1776,17 @@ limit. Only after a valid code or password, or on an `open` group, does a join
 learn that the group is full (409 `worker_group_member_cap_exceeded`) or
 closed (403 `worker_group_join_ended`); either way the code stays unused.
 Wrong codes and passwords are limited to 10 an hour per person across the
-session and 300 an hour per group, each hour counted from its first wrong
-guess. Past either, that person's or that group's code and password joins are
-refused for the rest of the hour; open groups and existing members are
-unaffected, and admins see `guessLimited`. Codes travel in session backups with
-their groups, so a spent code stays spent after a restore. Every public config
+session, and wrong passwords to 300 an hour per password group, each hour
+counted from its first wrong guess. Past either, that person's code and
+password joins, or that group's password joins, are refused for the rest of
+the hour; admins see `guessLimited`. Codes have no per-group limit: a 128-bit
+code can't be guessed, and such a limit would let throwaway accounts shut a
+group. Open groups, existing members, and proofs sent before a password is set
+are unaffected. Codes travel in session backups with their groups, so a spent
+code stays spent after a restore, and a code revoked while a join that spent it
+is still settling comes back revoked if that join fails. Backups also carry a
+password group's signer, from which the password could be guessed offline, so
+keep them as private as the session's keys. Every public config
 read sets `groupJoinChoices: true`; older Workers lack it and refuse these modes.
 
 **Who can remove members.** Each group's `removalAuth` says who can end a

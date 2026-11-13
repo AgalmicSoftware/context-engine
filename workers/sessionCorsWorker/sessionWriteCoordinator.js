@@ -78,6 +78,7 @@ import {
   normalizeWorkerGroupPrincipal,
   resolveWorkerGroupBootstrap,
   resolveWorkerGroupCaps,
+  resolveWorkerGroupMemberCeiling,
   resolveWorkerGroupListed,
   workerGroupRemovalRefusal,
 } from './workerGroups.js';
@@ -399,12 +400,6 @@ const WORKER_GROUP_INTENT_MAX_BYTES = 32 * 1024;
 
 // The session's most members in a group, as session config passes it; any
 // other value reads as the default.
-const resolveWorkerGroupMemberCeiling = (value) => (
-  Number.isSafeInteger(value) && value >= 1 && value <= WORKER_GROUP_MEMBER_CEILING_MAX
-    ? value
-    : WORKER_GROUP_MEMBER_CEILING_DEFAULT
-);
-
 const pickWorkerGroupInput = (input) => Object.fromEntries(WORKER_GROUP_INPUT_FIELDS
   .filter((key) => isObjectRecord(input) && Object.prototype.hasOwnProperty.call(input, key))
   .map((key) => [key, input[key]]));
@@ -440,8 +435,10 @@ const admitWorkerGroupJoin = async (transaction, { groupId, groupState, credenti
   return workerGroupJoinRefused();
 };
 
-// Wrong codes and passwords allowed an hour: per person, and per group. Past
-// the group's, its code and password joins are refused until the hour is up.
+// Wrong codes and passwords allowed an hour: per person, and, for a password
+// group, per group; past either, those joins are refused until the hour is
+// up. A 128-bit code can't be guessed, so codes have no group limit for
+// throwaway accounts to spend and shut a group with.
 export const WORKER_GROUP_GUESS_WINDOW_MS = 60 * 60 * 1000;
 export const WORKER_GROUP_GUESS_LIMITS = Object.freeze({ person: 10, group: 300 });
 const workerGroupGuessKeys = ({ groupId, principalDigest }) => ({
@@ -1651,19 +1648,21 @@ export class SessionWriteCoordinator {
       }
       // A join's code or password is checked, and a code spent, with the seat:
       // two people holding one code can never both get in.
-      // Only code and password groups receive a credential to guess with.
-      const guessKeys = join?.credential ? workerGroupGuessKeys({ groupId, principalDigest }) : null;
-      const guesses = guessKeys ? {
-        person: await transaction.get(guessKeys.person),
-        group: await transaction.get(guessKeys.group),
-      } : null;
-      if (guesses && Object.entries(WORKER_GROUP_GUESS_LIMITS)
-        .some(([scope, limit]) => workerGroupGuessCount(guesses[scope], nowMs) >= limit)) {
+      // Only code and password groups receive a credential to guess with, and
+      // a password group with no password yet has nothing to guess.
+      const password = groupState.joinMode === 'group_password';
+      const guessScopes = !join?.credential || !WORKER_GROUP_SECRET_JOIN_MODES.has(groupState.joinMode) ||
+        (password && !groupState.signer) ? []
+        : password ? ['person', 'group'] : ['person'];
+      const guessKeys = workerGroupGuessKeys({ groupId, principalDigest });
+      const guesses = {};
+      for (const scope of guessScopes) guesses[scope] = await transaction.get(guessKeys[scope]);
+      if (guessScopes.some((scope) => workerGroupGuessCount(guesses[scope], nowMs) >= WORKER_GROUP_GUESS_LIMITS[scope])) {
         return workerGroupJoinRefused();
       }
       const admitted = join ? await admitWorkerGroupJoin(transaction, { groupId, groupState, credential: join.credential, nowMs }) : { ok: true };
       if (!admitted.ok) {
-        for (const scope of guesses ? Object.keys(guessKeys) : []) {
+        for (const scope of guessScopes) {
           const count = workerGroupGuessCount(guesses[scope], nowMs);
           await transaction.put(guessKeys[scope], { since: count ? guesses[scope].since : nowMs, count: count + 1 });
         }
@@ -1717,10 +1716,12 @@ export class SessionWriteCoordinator {
         const nextGroupState = { ...groupState, memberCount: Math.max(0, Number(groupState.memberCount || 0) - 1) };
         const invite = memberState.spentInvite ? await transaction.get(memberState.spentInvite) : null;
         if (invite?.state === 'used') {
-          const { usedAt: _usedAt, ...unused } = invite;
-          await transaction.put(memberState.spentInvite, { ...unused, state: 'unused' });
+          const { usedAt, revokeOnRestore, ...rest } = invite;
+          // Revoked while this join was settling: it comes back revoked.
+          const state = revokeOnRestore || groupState.invitesRevokedAt >= usedAt ? 'revoked' : 'unused';
+          await transaction.put(memberState.spentInvite, { ...rest, state, ...(state === 'revoked' ? { revokedAt: new Date(Number(this.now())).toISOString() } : {}) });
           const counts = workerGroupInviteCounts(groupState);
-          nextGroupState.invites = { ...counts, unused: counts.unused + 1, used: Math.max(0, counts.used - 1) };
+          nextGroupState.invites = { ...counts, [state]: counts[state] + 1, used: Math.max(0, counts.used - 1) };
         }
         await transaction.put(groupKey, nextGroupState);
         await transaction.put(memberKey, {
@@ -2277,6 +2278,17 @@ export class SessionWriteCoordinator {
           entry.principalKey === mutation.principalKey)));
       if (finished) return this.respondToWorkerGroupMutation(mutation, finished.result);
     }
+    // A join's code or signature is reduced to a hash or signer here and goes
+    // no further: never into the intent, KV or an answer. It is reduced before
+    // the group is looked up, so an unknown group takes as long to refuse.
+    const joinCredential = mutation.operation === 'join'
+      ? await resolveWorkerGroupJoinCredential({
+        credential: payload?.credential,
+        sessionId: mutation.sessionId,
+        groupId: mutation.groupId,
+        address: mutation.principal?.address,
+      })
+      : null;
     if (mutation.operation === 'create') {
       groupReservation = await this.reserveWorkerGroupSlot({
         slug: mutation.slug,
@@ -2323,22 +2335,12 @@ export class SessionWriteCoordinator {
     }
     if (mutation.operation === 'add-member' || mutation.operation === 'join') {
       principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
-      // The code or signature is reduced to a hash or signer here and goes no
-      // further: never into the intent, KV or an answer.
-      const credential = mutation.operation === 'join' && WORKER_GROUP_SECRET_JOIN_MODES.has(activeGroup.state.joinMode)
-        ? await resolveWorkerGroupJoinCredential({
-          credential: payload?.credential,
-          sessionId: mutation.sessionId,
-          groupId: mutation.groupId,
-          address: mutation.principal?.address,
-        })
-        : null;
       memberReservation = await this.reserveWorkerGroupMemberSlot({
         groupId: mutation.groupId,
         principalDigest,
         memberCeiling,
         intent,
-        join: mutation.operation === 'join' ? { credential } : null,
+        join: mutation.operation === 'join' ? { credential: joinCredential } : null,
       });
       if (!memberReservation.ok) {
         return jsonResponse(memberReservation, memberReservation.status || 409);
@@ -2481,31 +2483,39 @@ export class SessionWriteCoordinator {
       const all = input.allUnused === true;
       const hashes = all ? null : normalizeWorkerGroupInviteHashes(input.hashes, { max: WORKER_GROUP_REVOKE_BATCH });
       if (all === (input.hashes != null) || (!all && !hashes)) return refuse(400, 'invalid_group_invites');
-      const keys = all
-        ? [...(await this.state.storage.list({ prefix: workerGroupInvitePrefix(groupId) }))]
-          .filter(([, record]) => record?.state === 'unused').map(([key]) => key)
-        : hashes.map((hash) => workerGroupInviteKey(groupId, hash));
       let revoked = 0;
       let counts = workerGroupInviteCounts(active.state);
-      // In batches, so revoking thousands never builds one oversized transaction.
-      for (let start = 0; start < keys.length; start += WORKER_GROUP_REVOKE_BATCH) {
-        const batch = keys.slice(start, start + WORKER_GROUP_REVOKE_BATCH);
-        counts = await this.state.storage.transaction(async (transaction) => {
-          const state = await transaction.get(groupKey);
-          const next = workerGroupInviteCounts(state);
-          for (const key of batch) {
-            const record = await transaction.get(key);
-            if (record?.state !== 'unused') continue;
-            await transaction.put(key, { ...record, state: 'revoked', revokedAt: nowIso });
-            next.unused = Math.max(0, next.unused - 1);
-            next.revoked += 1;
-            revoked += 1;
-          }
-          await transaction.put(groupKey, { ...state, invites: next });
-          return next;
-        });
+      // A code spent by a join still settling is marked too: if that join
+      // fails, its code comes back revoked, not usable.
+      const revokeBatch = (keys) => this.state.storage.transaction(async (transaction) => {
+        const state = await transaction.get(groupKey);
+        const next = workerGroupInviteCounts(state);
+        for (const key of keys) {
+          const record = await transaction.get(key);
+          if (record?.state === 'used' && !all) await transaction.put(key, { ...record, revokeOnRestore: true });
+          if (record?.state !== 'unused') continue;
+          await transaction.put(key, { ...record, state: 'revoked', revokedAt: nowIso });
+          next.unused = Math.max(0, next.unused - 1);
+          next.revoked += 1;
+          revoked += 1;
+        }
+        await transaction.put(groupKey, { ...state, invites: next, ...(all ? { invitesRevokedAt: nowIso } : {}) });
+        return next;
+      });
+      if (all) {
+        // A page at a time, so a group with many codes never loads them all.
+        let after = '';
+        do {
+          const page = [...await this.state.storage.list({
+            prefix: workerGroupInvitePrefix(groupId), startAfter: after, limit: WORKER_GROUP_REVOKE_BATCH,
+          })];
+          after = page.length === WORKER_GROUP_REVOKE_BATCH ? page.at(-1)[0] : '';
+          counts = await revokeBatch(page.filter(([, record]) => record?.state === 'unused').map(([key]) => key));
+        } while (after);
+      } else {
+        counts = await revokeBatch(hashes.map((hash) => workerGroupInviteKey(groupId, hash)));
       }
-      if (revoked) await bumpStorageBackupRevision(this.state.storage);
+      await bumpStorageBackupRevision(this.state.storage);
       return jsonResponse({ ok: true, status: 200, groupId, revoked, counts }, 200);
     }
     return refuse(400, 'worker_group_mutation_invalid');
