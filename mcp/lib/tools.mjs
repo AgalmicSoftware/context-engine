@@ -87,7 +87,7 @@ export const buildTools = (participant) => [
     name: 'get_session',
     title: 'Get session',
     description:
-      'Show the session’s description, context, instructions for agents (agentInstructions), groups and whether you are in each, its invitation to add context when it has one, end time, and how many statements you have answered.',
+      'Show the session’s description, context, instructions for agents (agentInstructions), groups (members counts who joined that group, not who takes part in the session) and whether you are in each, its invitation to add context when it has one, end time, and how many statements you have answered.',
     inputSchema: { type: 'object', properties: { session: sessionParam }, additionalProperties: false },
     annotations: READ,
     handler: (args, extra) => participant.getSession(args, extra),
@@ -127,7 +127,14 @@ export const buildTools = (participant) => [
             type: 'object',
             properties: {
               questionId: text('Question id from list_questions.'),
-              value: { description: 'The answer value; see the tool description for each type.' },
+              value: {
+                description: 'The answer value; see the tool description for each type.',
+                anyOf: [
+                  { type: 'string' },
+                  { type: 'number' },
+                  { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'number' }] } },
+                ],
+              },
               comment: text('Optional reasoning shown with your answer (up to 4000 characters).'),
               importance: { type: 'integer', minimum: 0, maximum: 10, description: 'How much this question matters to you.' },
               conviction: { type: 'integer', minimum: 0, maximum: 10, description: 'How sure you are of your answer.' },

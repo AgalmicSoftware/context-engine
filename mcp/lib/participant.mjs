@@ -192,11 +192,13 @@ const instructionsOf = (config) => {
   };
 };
 
-// `member` is whether the agent is in the link's group, or null when its groups couldn't be read.
-const nextStep = ({ instructions, linkGroup, member = null }) => {
+// `member` is whether the agent is in the link's group, or null when its groups
+// couldn't be read; `groupName` is that group's name when it is listed.
+const nextStep = ({ instructions, linkGroup, groupName = '', member = null }) => {
   const read = instructions ? 'Read the session’s instructions for agents and the context' : 'Read the context';
   if (!linkGroup) return `${read}, then call list_questions and answer.`;
-  const named = `The link names group "${linkGroup}"`;
+  // A group's name is written by its creator, so it is quoted as data.
+  const named = groupName ? `The link names the group ${JSON.stringify(groupName)} (${linkGroup})` : `The link names group "${linkGroup}"`;
   if (member) {
     const other = instructions
       ? ' If the instructions ask you to be in another group instead, join that one with join_group and leave this one with leave_group.'
@@ -889,7 +891,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const member = outcome.groups
         ? outcome.groups.some((group) => group.member && group.groupId.toLowerCase() === linkGroup.toLowerCase())
         : null;
-      outcome.next = nextStep({ instructions, linkGroup, member });
+      const groupName = outcome.groups?.find((group) => group.groupId.toLowerCase() === linkGroup.toLowerCase())?.name || '';
+      outcome.next = nextStep({ instructions, linkGroup, groupName, member });
       return outcome;
     },
 

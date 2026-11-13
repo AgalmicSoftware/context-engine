@@ -1173,7 +1173,7 @@ test('an agent sees the session’s instructions and groups, joins the group the
   });
   // The link's group is named, not joined, and the next step says to read the instructions first.
   assert.equal(joined.linkGroup, salon.groupId);
-  assert.equal(joined.next, `Read the session’s instructions for agents and the context. The link names group "${salon.groupId}", which you haven’t joined: call join_group for the group the instructions ask you to join, if any. Then call list_questions and answer.`);
+  assert.equal(joined.next, `Read the session’s instructions for agents and the context. The link names the group "Salon" (${salon.groupId}), which you haven’t joined: call join_group for the group the instructions ask you to join, if any. Then call list_questions and answer.`);
   assert.deepEqual(byName(joined.groups)['AI agents'], {
     groupId: agents.groupId,
     name: 'AI agents',
@@ -1197,7 +1197,7 @@ test('an agent sees the session’s instructions and groups, joins the group the
   assert.deepEqual([groups['AI agents'].member, groups['AI agents'].members, groups.Salon.member, groups.Salon.members], [true, 1, false, 0]);
   // A link naming a group the agent is in says so.
   const again = await kami.participant.joinSession({ link: `${LINK}&joinGroup=${agents.groupId}` });
-  assert.equal(again.next, `Read the session’s instructions for agents and the context. The link names group "${agents.groupId}", which you’re already in. If the instructions ask you to be in another group instead, join that one with join_group and leave this one with leave_group. Then call list_questions and answer.`);
+  assert.equal(again.next, `Read the session’s instructions for agents and the context. The link names the group "AI agents" (${agents.groupId}), which you’re already in. If the instructions ask you to be in another group instead, join that one with join_group and leave this one with leave_group. Then call list_questions and answer.`);
   // The session page's member list shows the agent in its group alone.
   const members = async (groupId) =>
     (await host.request(`/groups/members?sessionId=${SESSION_ID}&groupId=${encodeURIComponent(groupId)}`, { auth: true })).memberCount;
