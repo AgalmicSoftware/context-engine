@@ -56,6 +56,24 @@ test('sign-in messages expire after ten minutes and carry the Worker and session
   assert.match(message, /Resources:\n- https:\/\/w\.example\.dev\n- urn:context-engine:session:id:0x00112233445566778899aabbccddeeff$/);
 });
 
+test('too many sign-ins reads as sign-ins, not a blockchain nonce; other limits keep the Worker’s words', async () => {
+  let nonceRefusal = { error: 'Too many nonce requests. Try again shortly.' };
+  const fetchImpl = async (url) => {
+    const path = new URL(url).pathname;
+    if (path === '/session-config') return json({ sessionSlug: 's', config: { sessionId: SESSION_ID } });
+    return json(path === '/auth/nonce' ? nonceRefusal : { error: 'Too many uploads.' }, 429);
+  };
+  const client = createWorkerClient({ workerOrigin: 'https://w.example.dev', slug: 's', trustedOrigins: TRUSTED, wallet: ethers.Wallet.createRandom(), fetchImpl });
+  const signIn = await client.login().then(() => '', (error) => error.message);
+  assert.equal(signIn, 'Too many sign-ins for this agent or its network in the last minute. Wait about a minute, then try again; anything that needed the sign-in was not sent.');
+  assert.doesNotMatch(signIn, /nonce/i);
+  // A busy coordinator is not a sign-in limit, and says so.
+  nonceRefusal = { error: 'Authorization state coordination is unavailable.' };
+  assert.match(await client.login().then(() => '', (error) => error.message), /Authorization state coordination is unavailable/);
+  const other = await client.request('/storage/upload', { method: 'POST', body: {} }).then(() => '', (error) => error.message);
+  assert.equal(other, 'Rate limited by the Worker (Too many uploads.). Wait a minute and retry.');
+});
+
 test('refuses redirects and oversized responses', async () => {
   const wallet = ethers.Wallet.createRandom();
   const redirecting = createWorkerClient({

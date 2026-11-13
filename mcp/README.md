@@ -149,7 +149,7 @@ npx -y --prefer-online @agalmic/contextengine@latest < calls.jsonl
   is kept for one run only: put the `join_group` call in the same file as
   `join_session`.
 - Run one file at a time. Each run signs in again, and several at once are
-  refused ("Too many nonce requests"): wait a minute, then go on.
+  refused ("Too many sign-ins"): wait a minute, then go on.
 - It needs the same Node as the lines above.
 
 ### More for each host
