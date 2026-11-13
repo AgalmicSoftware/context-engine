@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SessionWriteCoordinator, coordinateResponseUploadReceipt } from './sessionWriteCoordinator.js';
 import { readSessionDiagnosticsAuthority, readUploadReceiptDiagnostics } from './sessionDiagnostics.js';
+import { STORED_VERSIONS_FIELD, isStoredVersionsDiagnostics } from '../../shared/sessionDiagnostics.mjs';
 import { dispatchAdminResultsAnalysisStatusRequest } from './adminResultsAnalysisDispatch.js';
 import { resolveTopLevelRouteSelection } from './topLevelRouteSelection.js';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
@@ -123,11 +124,15 @@ test('diagnostics show stored question and answer versions against the AI build 
   const f = await fixture();
   f.env.CE_STORAGE_INDEX_KV = { list: async ({ prefix }) => ({
     keys: prefix === 'ce-storage:fixture:responses:' ? [{ name: `${prefix}a` }, { name: `${prefix}b` }] : [], list_complete: true }) };
-  assert.deepEqual((await (await f.status()).json()).storedVersions, { count: 2, limit: 10_000, overLimit: false });
+  const counted = (await (await f.status()).json())[STORED_VERSIONS_FIELD];
+  assert.deepEqual(counted, { count: 2, limit: 10_000, overLimit: false });
+  // The Admin page checks what it reads with the same shared contract.
+  assert.equal(isStoredVersionsDiagnostics(counted), true);
   // A count that can't be read leaves the rest of the page.
   f.env.CE_STORAGE_INDEX_KV = { list: async () => { throw new Error('Synthetic KV outage'); } };
   const body = await (await f.status()).json();
-  assert.equal(body.storedVersions, null);
+  assert.equal(body[STORED_VERSIONS_FIELD], null);
+  assert.equal(isStoredVersionsDiagnostics(body[STORED_VERSIONS_FIELD]), true);
   assert.equal(body.ok, true);
 });
 

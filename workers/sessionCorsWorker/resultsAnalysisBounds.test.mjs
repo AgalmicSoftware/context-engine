@@ -5,6 +5,7 @@ import { generateResultsAnalysisDraft, loadWorkerCanonicalResultsAnalysisSource,
 import { buildIndexKey, buildPayloadKey, readStoredCloudflarePayloadsBulk } from './storageRouteExecution.js';
 import { RESULTS_ANALYSIS_SCAN_LIMITS } from './storageScanBudget.js';
 import { countResultsScanRows } from './resultsScanRowCount.js';
+import { isStoredVersionsDiagnostics } from '../../shared/sessionDiagnostics.mjs';
 
 const config = {
   sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -41,8 +42,9 @@ test('canonical analysis fails clearly before an unbounded history scan complete
 
 test('the stored-version count stops just past the build limit, and is exact below it', async () => {
   const history = oversizedHistory();
-  assert.deepEqual(await countResultsScanRows({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a' }),
-    { count: RESULTS_ANALYSIS_SCAN_LIMITS.rows + 1, limit: RESULTS_ANALYSIS_SCAN_LIMITS.rows, overLimit: true });
+  const over = await countResultsScanRows({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a' });
+  assert.deepEqual(over, { count: RESULTS_ANALYSIS_SCAN_LIMITS.rows + 1, limit: RESULTS_ANALYSIS_SCAN_LIMITS.rows, overLimit: true });
+  assert.equal(isStoredVersionsDiagnostics(over), true);
   // Key lists only, never the rows themselves.
   assert.ok(history.operations <= 12, `operations: ${history.operations}`);
   const keys = { 'ce-storage:session-a:questions:': 2, 'ce-storage:session-a:responses:': 5, 'ce-storage-hidden:session-a:questions:': 1 };

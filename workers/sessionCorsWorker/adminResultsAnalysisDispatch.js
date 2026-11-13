@@ -10,6 +10,7 @@ import {
 import { canBuildResults } from './resultsBuild.js';
 import { callSessionFeedbackStore } from './sessionFeedbackRoute.js';
 import { countResultsScanRows } from './resultsScanRowCount.js';
+import { STORED_VERSIONS_FIELD } from '../../shared/sessionDiagnostics.mjs';
 
 const toTrimmedString = (value, deps) => {
   if (typeof deps?.toStr === 'function') return deps.toStr(value).trim();
@@ -136,7 +137,7 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
         ok: true, type: 'ce_session_diagnostics', version: 1,
         observedAtMs: typeof deps?.now === 'function' ? deps.now() : Date.now(),
         uploadReceipts, analysis: snapshot.analysis, configProjection: snapshot.configProjection,
-        ...(storedVersions === undefined ? {} : { storedVersions }),
+        ...(storedVersions === undefined ? {} : { [STORED_VERSIONS_FIELD]: storedVersions }),
       }, 200, headers);
     } catch (error) {
       return deps?.json?.({ error: error?.status === 400 ? 'Invalid diagnostics cursor.' : 'Session diagnostics are unavailable; retry.' }, error?.status === 400 ? 400 : 503, headers);
