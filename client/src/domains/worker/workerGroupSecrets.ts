@@ -93,9 +93,6 @@ export const buildWorkerGroupJoinCredentials = async ({
   return null;
 };
 
-/** A Group Password token can be handed on (as a recording's claims do); a one-use code would be spent. */
-export const isSharableWorkerGroupToken = (token: string): boolean => parseGroupInviteToken(token)?.kind === 'password';
-
 /** Sets or replaces a Group Password group's password: only its signer address reaches the Worker. */
 export const saveWorkerGroupPassword = async ({
   password,

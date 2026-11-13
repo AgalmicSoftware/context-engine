@@ -4,9 +4,7 @@ import {
   buildWorkerGroupInviteLink,
   buildWorkerGroupJoinCredentials,
   groupPasswordToken,
-  isSharableWorkerGroupToken,
   makeOneUseInvites,
-  oneUseInviteToken,
   workerGroupPasswordSigner,
 } from './workerGroupSecrets';
 import { hashOneUseSecret, workerGroupJoinStatement } from '../../../../shared/workerGroupJoin.mjs';
@@ -40,7 +38,6 @@ it('makes one-use codes with the hashes the Worker keeps, and exports them with 
   );
   expect(csv.split('\n')[0]).toBe('index,password,inviteLink');
   expect(csv.split('\n')[1]).toBe(`0,${invites[0].secret},"https://x/#groupInvite=${invites[0].secret}"`);
-  expect(isSharableWorkerGroupToken(oneUseInviteToken(invites[0].secret))).toBe(false);
   await expect(
     buildWorkerGroupJoinCredentials({ token: invites[0].secret, sessionId, groupId, address }),
   ).resolves.toEqual({ secret: invites[0].secret });
@@ -48,7 +45,6 @@ it('makes one-use codes with the hashes the Worker keeps, and exports them with 
 
 it('joins with a password’s signature, which only the password’s signer could make', async () => {
   const token = groupPasswordToken('river-stone-lamp-oak-tide');
-  expect(isSharableWorkerGroupToken(token)).toBe(true);
   // A link may carry the group id in another case; the Worker lowercases it, so both sides derive from that.
   const result = await buildWorkerGroupJoinCredentials({ token, sessionId, groupId: groupId.toUpperCase(), address });
   const proof = (result as { proof: string }).proof;

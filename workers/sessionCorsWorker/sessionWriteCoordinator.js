@@ -18,11 +18,7 @@ import {
   workerGroupInviteKey,
   workerGroupInvitePrefix,
 } from './workerGroupInvites.js';
-import {
-  WORKER_GROUP_JOIN_REFUSED,
-  WORKER_GROUP_MEMBER_CEILING_DEFAULT,
-  WORKER_GROUP_MEMBER_CEILING_MAX,
-} from '../../shared/workerGroupJoin.mjs';
+import { WORKER_GROUP_JOIN_REFUSED } from '../../shared/workerGroupJoin.mjs';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import {
   SESSION_CONFIG_COORDINATION_ERROR, assertExpectedSessionAuthority, forgetResultsAnalysisStatus, forgetSessionConfig,

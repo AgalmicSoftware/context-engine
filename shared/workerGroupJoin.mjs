@@ -6,13 +6,13 @@
 import { GROUP_JOIN_CHOICES_FIELD } from './workerSessionPublicConfig.mjs';
 
 export const WORKER_GROUP_JOIN_MODES = Object.freeze(['open', 'one_use', 'group_password', 'admin_add']);
-export const WORKER_GROUP_SECRET_MODES = Object.freeze(['one_use', 'group_password']);
 // Every refusal before a valid secret, so a refusal never shows whether a group exists.
 export const WORKER_GROUP_JOIN_REFUSED = 'worker_group_join_refused';
 export const WORKER_GROUP_MEMBER_CEILING_DEFAULT = 1000;
 export const WORKER_GROUP_MEMBER_CEILING_MAX = 10000;
 export const WORKER_GROUP_INVITE_BATCH_MAX = 500;
-// The Worker never shows the password's signer, so guessing is online and rate-limited.
+// The Worker never shows a password's signer, so a guess can be checked only by sending it to the Worker,
+// after 600,000 rounds of stretching. Wrong tries aren't limited, so a short password is the risk.
 export const WORKER_GROUP_PASSWORD_MIN_LENGTH = 8;
 export const WORKER_GROUP_INVITE_FRAGMENT_KEY = 'groupInvite';
 // The session setting for the most members a group may have.
@@ -100,9 +100,6 @@ export const hashOneUseSecret = async (secret) => {
 };
 
 export const isOneUseSecretHash = (value) => typeof value === 'string' && SECRET_HASH.test(value);
-
-/** The short id the Invites list and revoke use: the first 8 hex characters of the hash. */
-export const inviteIdOfHash = (hash) => String(hash).slice(0, 8);
 
 /** What a password-derived key signs (EIP-191), binding the session, the group and the joiner's address. */
 export const workerGroupJoinStatement = ({ sessionId, groupId, address }) =>
