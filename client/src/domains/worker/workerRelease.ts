@@ -35,3 +35,16 @@ export const readWorkerTakesFeedback = async (
   const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
   return found.features.includes('session_feedback');
 };
+
+export const AI_DAILY_LIMIT_FEATURE = 'ai_daily_limit_v1';
+
+/** Whether the Session Worker counts a separate AI daily limit (0.9.9 on); false when it can't be read. */
+export const readWorkerCountsAiLimit = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> => {
+  if (!workerOrigin) return false;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.features.includes(AI_DAILY_LIMIT_FEATURE);
+};

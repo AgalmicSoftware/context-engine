@@ -41,6 +41,7 @@ import {
 import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/session/sessionWorkerConfigCache';
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
 import {
+  readWorkerCountsAiLimit,
   readWorkerKeepsDraftText,
   readWorkerReleaseLabel,
   readWorkerTakesFeedback,
@@ -224,11 +225,14 @@ const SessionSettingsPage = ({
   const [workerKeepsDraftText, setWorkerKeepsDraftText] = useState<boolean | null>(null);
   // Whether it takes feedback about the app; an older one shows no Feedback section here or button on the session page.
   const [workerTakesFeedback, setWorkerTakesFeedback] = useState(false);
+  // Whether it counts a separate AI daily limit; an older one would store the field and ignore it.
+  const [workerCountsAiLimit, setWorkerCountsAiLimit] = useState(false);
   useEffect(() => {
     let stale = false;
     setWorkerRelease('');
     setWorkerKeepsDraftText(null);
     setWorkerTakesFeedback(false);
+    setWorkerCountsAiLimit(false);
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
       if (!stale) setWorkerRelease(release);
     });
@@ -237,6 +241,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerTakesFeedback(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesFeedback(takes);
+    });
+    void readWorkerCountsAiLimit(workerOrigin, sessionSlug, fetchImpl).then((counts) => {
+      if (!stale) setWorkerCountsAiLimit(counts);
     });
     return () => {
       stale = true;
@@ -646,7 +653,7 @@ const SessionSettingsPage = ({
           open={openSections.ai}
           onToggle={() => setOpenSections((prev) => ({ ...prev, ai: !prev.ai }))}
           lockedReason={onChain || workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
-          dailyLimit={!onChain}
+          dailyLimit={!onChain && workerCountsAiLimit}
           sessionAgent={
             onChain ? null : workerAnswersSessionAgent(saved) ? (
               <SetupSessionAgent

@@ -42,6 +42,13 @@ jest.mock('../../../domains/sessions/registry/sessionRegistryAdminPorts', () => 
   },
 }));
 
+// Whether the Worker counts a separate AI daily limit, as its capabilities say.
+const mockCountsAiLimit = jest.fn();
+jest.mock('../../../domains/worker/workerRelease', () => ({
+  ...(jest.requireActual('../../../domains/worker/workerRelease') as object),
+  readWorkerCountsAiLimit: (...args: unknown[]) => mockCountsAiLimit(...args),
+}));
+
 jest.mock('./sessionSettingsWallet', () => ({
   readSigningWallet: (provider: unknown) => mockReadWallet(provider),
 }));
@@ -111,6 +118,7 @@ describe('SessionSettingsPage', () => {
     jest.clearAllMocks();
     posted = [];
     mockFetchBootstrap.mockResolvedValue(bootstrapOf(workerConfig()));
+    mockCountsAiLimit.mockResolvedValue(true);
     global.fetch = jest.fn(async (url: unknown, init: RequestInit = {}) => {
       posted.push({ url: String(url), body: JSON.parse(String(init.body || '{}')) });
       return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
@@ -394,7 +402,7 @@ describe('SessionSettingsPage', () => {
     renderPage();
     await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
     fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
-    const field = screen.getByTestId('ce-settings-ai-daily-limit');
+    const field = await screen.findByTestId('ce-settings-ai-daily-limit');
     expect(field).toHaveValue(null);
     expect(document.getElementById(field.getAttribute('aria-describedby') || '')).toHaveTextContent(
       'Saving or reading answers, transcription and voice interview connections aren’t counted.',
@@ -418,6 +426,18 @@ describe('SessionSettingsPage', () => {
     ]);
   });
 
+  it('has no AI daily limit on a Worker that does not count one', async () => {
+    mockCountsAiLimit.mockResolvedValue(false);
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
+    });
+    expect(mockCountsAiLimit).toHaveBeenCalledWith(WORKER, 'edit-salon', undefined);
+    expect(document.getElementById('ce-setup-questions-prompt')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-settings-ai-daily-limit')).not.toBeInTheDocument();
+  });
+
   it('says when the other settings saved but the AI limit did not, and shows what was saved', async () => {
     renderPage();
     await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
@@ -431,7 +451,7 @@ describe('SessionSettingsPage', () => {
       } as Response;
     }) as unknown as typeof fetch;
     fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
-    fireEvent.change(screen.getByTestId('ce-settings-ai-daily-limit'), { target: { value: '25' } });
+    fireEvent.change(await screen.findByTestId('ce-settings-ai-daily-limit'), { target: { value: '25' } });
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), { target: { value: 'Reverse Alignment' } });
     mockFetchBootstrap.mockClear();
     mockFetchBootstrap.mockResolvedValue(bootstrapOf(workerConfig({ sessionName: 'Reverse Alignment' })));
