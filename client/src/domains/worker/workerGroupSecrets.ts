@@ -13,7 +13,8 @@ import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/se
 import { setWorkerGroupPassword, type PostSignedWorkerGroupRequest } from './workerGroupPorts';
 
 // The browser side of a group's secrets: it makes them, carries them in a link's fragment (never sent to a
-// server) and turns them into what a join sends. Neither a password nor a claim code reaches the Worker.
+// server) and turns them into what a join sends. A password never reaches the Worker, only its signer and a
+// signature; a claim code is sent once, to join, and the Worker stores only its hash.
 
 const keys = createWorkerGroupPasswordKeys(ethers);
 // The Worker's canonical ids (it lowercases group ids), so the admin and the joiner derive alike.
