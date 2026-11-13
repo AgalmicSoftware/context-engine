@@ -626,6 +626,33 @@ describe('PolisReport cache read options', () => {
     expect(JSON.stringify(result)).not.toContain('test-2');
   });
 
+  it('marks a participant whose answers say an AI agent wrote them', () => {
+    const address = (digit) => `0x${digit.repeat(40)}`;
+    const row = (responder, extra = {}) => ({
+      responder,
+      questionId: 'q1',
+      response: JSON.stringify({ type: 'binary', prompt: 'Q', answer: { value: 'Agree' }, ...extra }),
+    });
+    const agent = { kind: 'agent', verification: 'self_reported' };
+    const result = buildRatingMatrixFromRealData({
+      q1: [
+        row(address('a'), { responderName: "Audrey's Kami", participant: agent }),
+        row(address('b'), { participant: agent }),
+        row(address('c'), { responderName: 'Ada Example' }),
+        row(address('d'), { responderName: 'Not an agent', participant: { kind: 'person' } }),
+        row(address('e')),
+      ],
+    });
+
+    expect(result.displayNamesMap).toEqual({
+      [address('a')]: "Audrey's Kami (agent)",
+      // Without a name, the address as the list shortens it (this file's shortener returns it whole).
+      [address('b')]: `${address('b')} (agent)`,
+      [address('c')]: 'Ada Example',
+      [address('d')]: 'Not an agent',
+    });
+  });
+
   it('counts only readable binary votes as report participants', () => {
     const row = (responder, answer, extra = {}) => ({
       responder,

@@ -24,6 +24,7 @@ import { WORKER_CANONICAL_CACHE_SCOPE_KEY } from '../../utilities/survey/workerC
 import { resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets';
 import { withPolisReportDemoAnswers } from '../../utilities/demo/polisReportDemoAnswers';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
+import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
@@ -910,6 +911,7 @@ export function buildRatingMatrixFromRealData(
   const binaryQuestions: Array<{ qId: string; prompt: string }> = [];
   const promptsMap: StringMap = {};
   const displayNamesMap: StringMap = {};
+  const agents = new Set<string>();
   const votesByQuestion = new Map<string, Map<string, ConcretePolisVote>>();
 
   Object.entries(realQR).forEach(([qId, arr]) => {
@@ -953,7 +955,13 @@ export function buildRatingMatrixFromRealData(
         .replace(/\s+/g, ' ')
         .slice(0, 160);
       if (responderName && !displayNamesMap[responder]) displayNamesMap[responder] = responderName;
+      if (asRecord(parsed.participant).kind === 'agent') agents.add(responder);
     }
+  });
+  // An AI agent's answers say so themselves, unverified. The participant list and the map show it beside the
+  // name, as the context list does.
+  agents.forEach((responder) => {
+    displayNamesMap[responder] = `${displayNamesMap[responder] || getShortenedAddress(responder, false)} (agent)`;
   });
 
   // No usable questions or participants => bail out

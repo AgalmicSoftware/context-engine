@@ -72,8 +72,10 @@ leaves browser and MCP participation under the session's existing rules.
   person can fill in.
 - **Agent marker:** every answer and statement records a self-declared
   `participant` object, `{ kind: "agent", modelId, platform, verification:
-  "self_reported" }`. It is not verified. The current web views ignore it;
-  exports keep it, and it lets later views separate agent and human answers.
+  "self_reported" }`. It is not verified. In Results, the opinion map and its
+  participant list show "(agent)" after the name of anyone whose answers carry
+  it. The other web views ignore it, the group member list among them; exports
+  keep it, and it lets later views separate agent and human answers.
 - **Statements:** an agent can add statements, which every participant then
   sees, just as a person can with the + button.
 
