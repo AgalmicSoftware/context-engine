@@ -53,12 +53,16 @@ export const dispatchSessionFeedbackStore = async (coordinator, operation, paylo
     // The caps and the write share one transaction, so simultaneous sends
     // never pass a cap together.
     return storage.transaction(async (transaction) => {
-      const counts = countsOf(await transaction.get(META_KEY), nowMs);
+      const meta = await transaction.get(META_KEY);
+      const counts = countsOf(meta, nowMs);
       if (counts.stored >= SESSION_FEEDBACK_LIMITS.stored) return refuse(409, 'feedback_full');
       if (counts.today >= SESSION_FEEDBACK_LIMITS.perSessionPerDay) return refuse(429, 'feedback_session_limit');
-      const createdAt = new Date(nowMs).toISOString();
+      // Each message is a millisecond after the last stored, so ids sort in the
+      // order they were stored, and "delete through this id" never reaches a later one.
+      const atMs = Math.max(nowMs, (Number(meta?.lastMs) || 0) + 1);
+      const createdAt = new Date(atMs).toISOString();
       await transaction.put(`${PREFIX}${createdAt}:${randomHex(8)}`, { ...record, createdAt });
-      await transaction.put(META_KEY, { day: counts.day, stored: counts.stored + 1, today: counts.today + 1 });
+      await transaction.put(META_KEY, { day: counts.day, stored: counts.stored + 1, today: counts.today + 1, lastMs: atMs });
       return json({ ok: true });
     });
   }
@@ -81,19 +85,20 @@ export const dispatchSessionFeedbackStore = async (coordinator, operation, paylo
   }
 
   if (operation === 'delete') {
-    let deleted;
-    if (payload.all === true && payload.ids == null) {
-      deleted = 0;
+    const { ids, through } = payload;
+    let deleted = 0;
+    if (ids == null && typeof through === 'string' && ID.test(through)) {
+      // Everything stored at or before `through`, the newest message the admin read.
+      const end = `${PREFIX}${through}\u0000`;
       // Stop only when none are left (another admin may delete a listed batch
       // first), and after enough rounds to clear a full store twice.
       for (let round = 0; round < 2 * Math.ceil(SESSION_FEEDBACK_LIMITS.stored / DELETE_BATCH); round += 1) {
-        const keys = [...(await storage.list({ prefix: PREFIX, limit: DELETE_BATCH })).keys()];
+        const keys = [...(await storage.list({ prefix: PREFIX, end, limit: DELETE_BATCH })).keys()];
         if (!keys.length) break;
         deleted += await removeKeys(storage, keys);
       }
     } else {
-      const ids = payload.ids;
-      if (payload.all != null || !Array.isArray(ids) || ids.length < 1 || ids.length > SESSION_FEEDBACK_LIMITS.page ||
+      if (through != null || !Array.isArray(ids) || ids.length < 1 || ids.length > SESSION_FEEDBACK_LIMITS.page ||
         !ids.every((id) => typeof id === 'string' && ID.test(id))) {
         return refuse(400, 'feedback_invalid');
       }

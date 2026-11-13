@@ -8,6 +8,7 @@ import {
   readResultsAnalysisAdminStatus,
 } from './resultsAnalysisGeneration.js';
 import { canBuildResults } from './resultsBuild.js';
+import { callSessionFeedbackStore } from './sessionFeedbackRoute.js';
 
 const toTrimmedString = (value, deps) => {
   if (typeof deps?.toStr === 'function') return deps.toStr(value).trim();
@@ -65,6 +66,8 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
   slug,
   deps,
   diagnostics = false,
+  // Feedback is read with the sign-in token, so paging spends no sign-in nonces.
+  feedback = false,
 } = {}) => {
   request = requestWithQuerySlugHeader(request);
   const auth = await deps?.requireAuth?.({
@@ -74,6 +77,11 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
     slugHint: slug,
   });
   if (!auth?.ok) return auth?.response;
+  // Feedback holds people's contact details: an agent key, even one minted for
+  // an admin, does not read it.
+  if (feedback && auth.payload?.agentSource) {
+    return deps?.json?.({ error: 'Only the session’s admins can read feedback.' }, 403, withPrivateNoStoreHeaders(baseHeaders));
+  }
 
   const targetSlug = auth.slug || slug;
   let snapshot;
@@ -95,13 +103,25 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
   const headers = withPrivateNoStoreHeaders(context.headers);
 
   const address = toTrimmedString(auth.payload?.sub, deps).toLowerCase();
-  // Results admins also read AI Views status; diagnostics stay with admins.
-  const isAdmin = diagnostics
+  // Results admins also read AI Views status; diagnostics and feedback stay with admins.
+  const isAdmin = diagnostics || feedback
     ? await deps?.validateAdmin?.({ env, slug: targetSlug, address, config, body: {} })
     : await canBuildResults({ env, slug: targetSlug, config, address, validateAdmin: deps?.validateAdmin });
   if (!isAdmin) {
     await recordAuthFailure({ env, deps });
-    return deps?.json?.({ error: 'Admin authorization failed.' }, 403, headers);
+    return deps?.json?.({ error: feedback ? 'Only the session’s admins can read feedback.' : 'Admin authorization failed.' }, 403, headers);
+  }
+
+  if (feedback) {
+    const params = new URL(request.url).searchParams;
+    const result = await (deps?.callSessionFeedbackStore || callSessionFeedbackStore)(env, targetSlug, 'list', {
+      cursor: params.get('cursor'),
+      ...(params.has('limit') ? { limit: params.get('limit') } : {}),
+    });
+    if (result?.ok) return deps?.json?.(result.body, 200, headers);
+    return result?.status === 400
+      ? deps?.json?.({ error: 'That page of feedback can’t be read.', reason: result.body?.reason }, 400, headers)
+      : deps?.json?.({ error: 'Feedback couldn’t be reached just now. Try again shortly.', reason: 'feedback_unavailable' }, 503, headers);
   }
 
   if (diagnostics) {

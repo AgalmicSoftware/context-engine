@@ -74,6 +74,7 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'admin-results-analysis-status' };
   }
   if (path === '/admin/diagnostics' && method === 'GET') return { kind: 'admin-session-diagnostics' };
+  if (path === '/admin/feedback' && method === 'GET') return { kind: 'admin-feedback-list' };
 
   if (path === '/results-analysis/artifact' && method === 'GET') {
     return { kind: 'results-analysis-artifact' };

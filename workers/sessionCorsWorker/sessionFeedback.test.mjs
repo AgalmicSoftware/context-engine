@@ -12,6 +12,7 @@ import { resolveTopLevelRouteSelection } from './topLevelRouteSelection.js';
 import { FEATURES } from './workerCapabilities.js';
 import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretActionRouteDispatch.js';
 import { dispatchAdminRequest } from './adminRequestDispatch.js';
+import { dispatchAdminResultsAnalysisStatusRequest } from './adminResultsAnalysisDispatch.js';
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import { sessionConfigRequiresReauthorization } from '../../shared/sessionConfigEdits.mjs';
 import { projectPublicWorkerSessionConfig } from '../shared/workerSessionConfig.mjs';
@@ -182,12 +183,30 @@ test('admins page newest first, delete some or all, and counts stay true', async
   const one = (await feedback.call({}, 'salon', 'delete', { ids: [first.messages[0].id, first.messages[0].id] })).body;
   assert.deepEqual([one.deleted, one.counts.stored], [1, 4]);
   assert.equal((await feedback.call({}, 'salon', 'delete', { ids: [first.messages[0].id] })).body.deleted, 0);
-  for (const payload of [{}, { ids: [] }, { ids: ['nope'] }, { ids: [first.messages[1].id], all: true }]) {
+  for (const payload of [{}, { ids: [] }, { ids: ['nope'] }, { all: true }, { through: 'nope' }, { ids: [first.messages[1].id], through: first.messages[1].id }]) {
     assert.equal((await feedback.call({}, 'salon', 'delete', payload)).status, 400, JSON.stringify(payload));
   }
-  const all = (await feedback.call({}, 'salon', 'delete', { all: true })).body;
-  assert.deepEqual([all.deleted, all.counts], [4, { stored: 0, today: 5 }]);
+  // Through an id: that message and every older one.
+  const older = (await feedback.call({}, 'salon', 'delete', { through: second.messages[0].id })).body;
+  assert.deepEqual([older.deleted, older.counts.stored], [3, 1]);
+  assert.deepEqual((await feedback.call({}, 'salon', 'list')).body.messages.map((message) => message.text), ['note 3']);
+  const all = (await feedback.call({}, 'salon', 'delete', { through: first.messages[1].id })).body;
+  assert.deepEqual([all.deleted, all.counts], [1, { stored: 0, today: 5 }]);
   assert.equal([...feedback.store.keys()].filter((key) => key.startsWith('session-feedback-v1:')).length, 0);
+});
+
+test('ids sort in the order messages are stored, so deleting through the newest read spares later ones', async () => {
+  const feedback = createStore();
+  const add = (text) => feedback.call({}, 'salon', 'add', { record: { text } });
+  // Three in the same millisecond, then one from a clock that went back.
+  for (const text of ['a', 'b', 'c']) assert.equal((await add(text)).ok, true);
+  const read = (await feedback.call({}, 'salon', 'list')).body.messages;
+  assert.deepEqual(read.map((message) => message.text), ['c', 'b', 'a']);
+  feedback.coordinator.nowMs -= 60_000;
+  assert.equal((await add('arrived after reading')).ok, true);
+  const cleared = (await feedback.call({}, 'salon', 'delete', { through: read[0].id })).body;
+  assert.deepEqual([cleared.deleted, cleared.counts.stored], [3, 1]);
+  assert.deepEqual((await feedback.call({}, 'salon', 'list')).body.messages.map((message) => message.text), ['arrived after reading']);
 });
 
 test('clearing all finishes even when another admin clears a batch first', async () => {
@@ -209,7 +228,8 @@ test('clearing all finishes even when another admin clears a batch first', async
     }
     return page;
   };
-  const all = (await feedback.call({}, 'salon', 'delete', { all: true })).body;
+  const [newest] = (await feedback.call({}, 'salon', 'list', { limit: 1 })).body.messages;
+  const all = (await feedback.call({}, 'salon', 'delete', { through: newest.id })).body;
   assert.deepEqual([all.deleted, all.counts.stored], [2, 0]);
   assert.equal([...feedback.store.keys()].filter((key) => key.startsWith('session-feedback-v1:')).length, 0);
 });
@@ -223,6 +243,9 @@ test('the Worker lists the feature, routes a signed-out send to its own handler 
   assert.deepEqual(resolveTopLevelRouteSelection({ path: '/feedback', method: 'POST', request: request(), deps }), { kind: 'feedback' });
   assert.deepEqual(resolveTopLevelRouteSelection({ path: '/feedback', method: 'POST', request: request('Bearer t'), deps }),
     { kind: 'authenticated' });
+  // Admins read with the sign-in token, so paging spends no sign-in nonces.
+  assert.deepEqual(resolveTopLevelRouteSelection({ path: '/admin/feedback', method: 'GET', request: request('Bearer t'), deps }),
+    { kind: 'admin-feedback-list' });
 
   // Signed in, the sender is the signed-in address, counted as such.
   const limit = createDailyLimit();
@@ -254,11 +277,11 @@ test('the Worker lists the feature, routes a signed-out send to its own handler 
   assert.deepEqual([huge.status, huge.payload.reason], [400, 'feedback_invalid']);
 });
 
-test('only full admins reach the feedback actions; results admins are refused', async () => {
+test('only full admins delete feedback; results admins are refused, and signed calls never list it', async () => {
   const calls = [];
   const validators = [];
   const admin = (action, validateAdmin) => dispatchAdminRequest({
-    request: new Request('https://worker.example/admin/x', { method: 'POST', body: JSON.stringify({ all: true, cursor: 'c', limit: 3 }) }),
+    request: new Request('https://worker.example/admin/x', { method: 'POST', body: JSON.stringify({ through: 'c', cursor: 'c', limit: 3 }) }),
     env: {},
     baseHeaders: {},
     slug: 'salon',
@@ -282,14 +305,11 @@ test('only full admins reach the feedback actions; results admins are refused', 
   assert.equal((await admin('feedback/delete', resultsAdmin)).status, 403);
   assert.equal(calls.length, 0);
   const fullAdmin = async () => true;
-  assert.deepEqual((await admin('feedback/list', fullAdmin)).payload, { ok: true, operation: 'list' });
+  assert.equal((await admin('feedback/list', fullAdmin)).status, 400);
   assert.deepEqual((await admin('feedback/delete', fullAdmin)).payload, { ok: true, operation: 'delete' });
   // The full-admin check itself, never the results builders' wider one.
   assert.ok(validators.every(([used, given]) => used === given));
-  assert.deepEqual(calls, [
-    { slug: 'salon', operation: 'list', payload: { cursor: 'c', limit: 3 } },
-    { slug: 'salon', operation: 'delete', payload: { ids: undefined, all: true } },
-  ]);
+  assert.deepEqual(calls, [{ slug: 'salon', operation: 'delete', payload: { ids: undefined, through: 'c' } }]);
 });
 
 // What reads a session's work, AI Views, the atlas, the risk matrix, the
@@ -300,7 +320,7 @@ test('nothing but the feedback modules names feedback’s storage or imports the
   const root = new URL('../../', import.meta.url);
   const named = new Set(['sessionFeedback.js', 'sessionFeedbackRoute.js', 'sessionWriteCoordinator.js', 'sessionConfigAuthority.js']
     .map((name) => `workers/sessionCorsWorker/${name}`));
-  const importers = new Set(['sessionFeedbackRoute.js', 'sessionWriteCoordinator.js', 'adminRequestDispatch.js',
+  const importers = new Set(['sessionFeedbackRoute.js', 'sessionWriteCoordinator.js', 'adminRequestDispatch.js', 'adminResultsAnalysisDispatch.js',
     'authenticatedSecretActionRouteDispatch.js', 'workerRouteShellBinding.js'].map((name) => `workers/sessionCorsWorker/${name}`));
   let scanned = 0;
   for (const top of ['workers', 'shared', 'mcp/lib', 'mcp/bin']) {
@@ -329,18 +349,58 @@ test('through the whole Worker: people send signed in and out, the admin reads, 
   const nullBody = await send(null);
   assert.deepEqual([nullBody.status, nullBody.body.error], [400, 'Send the feedback as a JSON object.']);
 
-  const listed = await signedAdminRequest({ env, wallet: admin, action: 'feedback/list', body: {} });
+  const read = async (signIn, query = '') => {
+    const response = await fetchWorker(makeRequest(`/admin/feedback?slug=${SLUG}${query}`, { token: signIn }), env);
+    return { ...(await readJson(response.clone())), headers: response.headers };
+  };
+  const plain = ({ status, body }) => ({ status, body });
+  const listed = await read(token, '&limit=100');
   assert.equal(listed.status, 200, JSON.stringify(listed.body));
+  assert.equal(listed.body.cursor, undefined);
   const [signedIn, signedOut] = ['signed in', 'signed out'].map((text) => listed.body.messages.find((message) => message.text === text));
   assert.deepEqual([signedOut.text, signedOut.signedIn, signedOut.contact], ['signed out', false, undefined]);
   assert.deepEqual([signedIn.text, signedIn.signedIn, signedIn.contact],
     ['signed in', true, { address: admin.address.toLowerCase(), reachMe: 'by email' }]);
   assert.equal(signedIn.workerRelease, signedOut.workerRelease);
 
-  for (const action of ['feedback/list', 'feedback/delete']) {
-    const refused = await signedAdminRequest({ env, wallet: resultsAdmin, action, body: { all: true } });
-    assert.equal(refused.status, 403, `${action}: ${JSON.stringify(refused.body)}`);
+  assert.equal(listed.headers.get('cache-control'), 'private, no-store');
+  const newest = listed.body.messages[0].id;
+  const page1 = await read(token, '&limit=1');
+  const page2 = await read(token, `&limit=1&cursor=${encodeURIComponent(page1.body.cursor)}`);
+  assert.deepEqual([...page1.body.messages, ...page2.body.messages].map((message) => message.id), listed.body.messages.map((message) => message.id));
+  assert.equal(page2.body.cursor, undefined);
+  const badPage = await read(token, '&cursor=nope');
+  assert.deepEqual([badPage.status, badPage.headers.get('cache-control')], [400, 'private, no-store']);
+  assert.equal((await read('')).status, 401);
+  for (const wallet of [resultsAdmin, Wallet.createRandom()]) {
+    const refusedRead = await read(await login({ env, wallet }));
+    assert.deepEqual(plain(refusedRead), { status: 403, body: { error: 'Only the session’s admins can read feedback.' } });
+    assert.equal(refusedRead.headers.get('cache-control'), 'private, no-store');
   }
-  const cleared = await signedAdminRequest({ env, wallet: admin, action: 'feedback/delete', body: { all: true } });
+  const refused = await signedAdminRequest({ env, wallet: resultsAdmin, action: 'feedback/delete', body: { through: newest } });
+  assert.equal(refused.status, 403, JSON.stringify(refused.body));
+  const cleared = await signedAdminRequest({ env, wallet: admin, action: 'feedback/delete', body: { through: newest } });
   assert.deepEqual([cleared.status, cleared.body.deleted], [200, 2]);
+  assert.deepEqual((await read(token)).body.messages, []);
+});
+
+test('an agent key, even one minted for an admin, does not read feedback', async () => {
+  const reached = [];
+  const response = await dispatchAdminResultsAnalysisStatusRequest({
+    feedback: true,
+    request: new Request('https://worker.example/admin/feedback?slug=salon'),
+    env: {},
+    baseHeaders: {},
+    slug: 'salon',
+    deps: {
+      requireAuth: async () => ({ ok: true, slug: 'salon', payload: { sub: ADDRESS, agentSource: 'agent-key' } }),
+      validateAdmin: async () => (reached.push('validateAdmin'), true),
+      readCurrentSessionConfig: async () => (reached.push('config'), { config: {} }),
+      callSessionFeedbackStore: async () => (reached.push('store'), { ok: true, body: { messages: [] } }),
+      json: (payload, status, headers) => ({ status, payload, headers }),
+    },
+  });
+  assert.deepEqual([response.status, response.payload.error, response.headers.get('cache-control')],
+    [403, 'Only the session’s admins can read feedback.', 'private, no-store']);
+  assert.deepEqual(reached, []);
 });
