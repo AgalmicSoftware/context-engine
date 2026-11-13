@@ -18,7 +18,7 @@ import {
 } from '../../domains/worker/workerGroupSecrets';
 import { WORKER_GROUP_INVITE_BATCH_MAX, workerGroupPasswordProblem } from '../../../../shared/workerGroupJoin.mjs';
 import WorkerGroupPasswordReveal from './WorkerGroupPasswordReveal';
-import { generateCreateSbtGroupPassphrase } from '../SBTs/createSbtGroupPasswordHelpers';
+import { generateWorkerGroupPassphrase } from '../SBTs/createSbtGroupPasswordHelpers';
 import styles from './AdminPage.module.scss';
 
 type Props = {
@@ -262,7 +262,17 @@ function OneUseInvites({ group, sessionId, sessionSlug, workerUrl, postSignedReq
 }
 
 function GroupPassword({ group, sessionId, sessionSlug, workerUrl, postSignedRequest, onGroupChanged }: Props) {
-  const [password, setPassword] = useState('');
+  // A group with no password starts with a generated one, the strong default; it is
+  // selected on focus so the admin can type their own over it. A group that has one
+  // starts empty, so the field never looks like the current password; so does one
+  // whose state is unknown, so one click can't replace a password unasked.
+  const [password, setPassword] = useState(() => (group.passwordSet === false ? generateWorkerGroupPassphrase() : ''));
+  const [generated, setGenerated] = useState(password);
+  const generate = () => {
+    const next = generateWorkerGroupPassphrase();
+    setPassword(next);
+    setGenerated(next);
+  };
   const [revealed, setRevealed] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -303,14 +313,12 @@ function GroupPassword({ group, sessionId, sessionSlug, workerUrl, postSignedReq
           aria-label="New group password"
           autoComplete="off"
           spellCheck={false}
+          onFocus={(event) => {
+            if (password && password === generated) event.target.select();
+          }}
           onChange={(event) => setPassword(event.target.value)}
         />
-        <Button
-          className={styles.subtleActionButton}
-          color="secondary"
-          outline
-          onClick={() => setPassword(generateCreateSbtGroupPassphrase())}
-        >
+        <Button className={styles.subtleActionButton} color="secondary" outline onClick={generate}>
           Generate new
         </Button>
         <Button color="primary" disabled={busy || Boolean(problem)} onClick={() => void save()}>

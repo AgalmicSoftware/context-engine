@@ -19,7 +19,7 @@ import {
   WorkerGroupListedHelp,
   WorkerGroupMemberLimitHelp,
 } from './WorkerGroupJoinChoiceHelp';
-import { generateCreateSbtGroupPassphrase } from '../SBTs/createSbtGroupPasswordHelpers';
+import { generateWorkerGroupPassphrase } from '../SBTs/createSbtGroupPasswordHelpers';
 import {
   WORKER_GROUP_MEMBER_CEILING_DEFAULT,
   workerGroupPasswordProblem,
@@ -385,6 +385,17 @@ const WorkerGroupCreateForm = ({
   const asksPassword = joinMode === 'group_password' && !!onGroupPasswordChange;
   const passwordProblem = asksPassword ? workerGroupPasswordProblem(groupPassword) : '';
   const passwordInvalid = Boolean(passwordProblem);
+  // Choosing Group Password starts the field with a generated one, the strong default;
+  // it is selected on focus so the admin can type their own over it.
+  const generatedPasswordRef = useRef('');
+  const generatePassword = () => {
+    generatedPasswordRef.current = generateWorkerGroupPassphrase();
+    onGroupPasswordChange?.(generatedPasswordRef.current);
+  };
+  useEffect(() => {
+    if (asksPassword && !groupPassword) generatePassword();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only as the field opens, so clearing it to type stays empty.
+  }, [asksPassword]);
   const submitForm = async () => {
     if (selectedImageFile && !imageUrl.trim()) {
       if (deferImageUpload) {
@@ -705,13 +716,12 @@ const WorkerGroupCreateForm = ({
                     aria-label="Group password"
                     autoComplete="off"
                     spellCheck={false}
+                    onFocus={(event) => {
+                      if (groupPassword && groupPassword === generatedPasswordRef.current) event.target.select();
+                    }}
                     onChange={(event) => onGroupPasswordChange?.(event.target.value)}
                   />
-                  <button
-                    type="button"
-                    className={styles.messageAction}
-                    onClick={() => onGroupPasswordChange?.(generateCreateSbtGroupPassphrase())}
-                  >
+                  <button type="button" className={styles.messageAction} onClick={generatePassword}>
                     Generate new
                   </button>
                 </span>
