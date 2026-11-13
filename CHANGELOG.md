@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - A members-only session is asked signed in from the start once the tab knows it needs that, instead of being refused signed out first on every read.
 - AI Views refreshes without downloading its answers again unless the build changed: with Results open for a minute, 7.2 MB became 2.5 MB.
 - Questions are read a hundred at a time.
+- When a session is busy, the site retries only what the Worker says is safe to send again. A busy sign-in starts over with a new nonce instead of resending one that may be spent; a wallet user may be asked to sign a second time.
 - The QR reader now loads only when you scan, so every first visit downloads about 46 KB less compressed. The Debate Atlas's historical cases load in their own file.
 
 ### Workers — requires redeployment
