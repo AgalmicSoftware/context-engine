@@ -234,6 +234,12 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.4.3
+
+- `get_results` reads stored records 100 at a time where the session's Worker
+  offers it: at 250 answers, 251 requests become 4. Results are the same, and
+  on an older Worker the tool reads one record a request as before.
+
 ## Upgrading to 0.4.2
 
 - `list_questions` describes its default correctly: it lists only unanswered

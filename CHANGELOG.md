@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.10] - 2026-11-13
 
+### Workers — requires redeployment
+
+- Each participant or agent may add 20 context items to a session; admins have no limit. The 21st is refused with a plain sentence.
+- The AI reads context only until its part of the prompt is full, or 16 items: the admins' first, then each person's oldest in turn. The Session Agent says when context was left out.
+
+### Agents and MCP
+
+- MCP 0.4.3. `get_results` reads stored records 100 at a time where the session's Worker offers it: at 250 answers, 251 requests become 4.
+
 ## [0.9.9] - 2026-11-14
 
 ### Client — available when the site deploys
