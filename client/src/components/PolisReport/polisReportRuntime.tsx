@@ -580,6 +580,7 @@ export function readPolisReportCacheContext(
   // Safe cache reads (group-aware dg:* keys)
   const qMap: Record<string, PolisQuestionMeta> = {};
   let workerResponseHydrationStatus = '';
+  let workerResponseOverReadLimit = false;
   const sbtList: Record<string, PolisSbtEntry> = {};
   readSlugs.forEach((readSlug) => {
     const qParsed = peekCacheSync('questionsCache', readSlug, { clone: false });
@@ -606,6 +607,7 @@ export function readPolisReportCacheContext(
       : null;
     if (workerTarget.isWorkerCanonical && readSlug === slug) {
       workerResponseHydrationStatus = String(questionNode?.workerResponseHydrationStatus || '');
+      workerResponseOverReadLimit = questionNode?.workerResponseOverReadLimit === true;
     }
     const scopedQuestions =
       questionNode?.questions && typeof questionNode.questions === 'object'
@@ -622,7 +624,7 @@ export function readPolisReportCacheContext(
     Object.assign(sbtList, scopedSbtList);
   });
 
-  return { qMap, sbtList, workerResponseHydrationStatus };
+  return { qMap, sbtList, workerResponseHydrationStatus, workerResponseOverReadLimit };
 }
 
 export function applyFilterStateToAggregator(

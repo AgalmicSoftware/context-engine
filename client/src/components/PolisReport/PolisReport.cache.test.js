@@ -1119,6 +1119,63 @@ describe('PolisReport cache read options', () => {
     await waitFor(() => expect(onRetryLoad).toHaveBeenCalledTimes(1));
   });
 
+  it('says a session over the read limit is slow to load, and what an admin can do', async () => {
+    const sessionConfig = {
+      slug: 'large-worker',
+      sessionId: `0x${'3'.repeat(32)}`,
+      corsWorkerUrl: 'https://large-worker.example.test',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const onRetryLoad = jest.fn(() => new Promise(() => {}));
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: sessionConfig.slug });
+    cacheScripts.peekCacheSync.mockImplementation((namespace, slug) =>
+      namespace === 'questionsCache' && slug === sessionConfig.slug
+        ? {
+            worker: withWorkerCanonicalCacheIdentity(
+              { questions: {}, workerResponseHydrationStatus: 'loading', workerResponseOverReadLimit: true },
+              identity,
+            ),
+          }
+        : {},
+    );
+    const { unmount } = render(
+      <PolisReport
+        {...baseReportProps}
+        slug={sessionConfig.slug}
+        sessionConfig={sessionConfig}
+        account="0xabc"
+        loginComplete
+        isResponsesCacheReady={false}
+        cacheInitializationError
+        onRetryLoad={onRetryLoad}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This session holds more answers than Results can read at once, so its report is slow to load and may not load.',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('An admin can start a new session for new answers.');
+    expect(screen.queryByLabelText('Loading report')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(onRetryLoad).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Loading, which can take minutes…' })).toBeDisabled();
+
+    // Someone who must log in to read answers is asked to, first.
+    unmount();
+    render(
+      <PolisReport
+        {...baseReportProps}
+        slug={sessionConfig.slug}
+        sessionConfig={sessionConfig}
+        isResponsesCacheReady={false}
+        cacheInitializationError
+        onRetryLoad={onRetryLoad}
+      />,
+    );
+    expect(screen.getByText('Log in to see your answers.')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-report-over-read-limit')).not.toBeInTheDocument();
+  });
+
   describe('a failed load when only signed-in people can read answers', () => {
     const session = (visibility) => ({
       sessionModeProfile: { authority: { mode: 'worker_canonical' }, results: { visibility } },
