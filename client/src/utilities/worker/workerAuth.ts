@@ -65,6 +65,7 @@ import {
 } from './workerAuthSessionIdentity.js';
 import {
   createWorkerAuthRemoteError,
+  isWorkerAuthBusySignIn,
   NONCE_MISMATCH_ERROR,
   ONCHAIN_GATE_UNAVAILABLE_ERROR,
 } from './workerAuthRemoteError.js';
@@ -901,17 +902,17 @@ export const getWorkerSessionToken = async ({
     };
 
     let loginData = null;
-    let retriedNonceMismatch = false;
+    let retriedWithFreshNonce = false;
     for (let attempt = 0; attempt <= LOGIN_GATE_UNAVAILABLE_RETRIES; attempt += 1) {
       try {
         loginData = await performLogin();
         break;
       } catch (err) {
         if (isAbortError(err)) throw err;
-        if (isNonceMismatchError(getErrorMessage(err)) && !retriedNonceMismatch) {
-          // The Worker refused this nonce: it expired, or it was issued for
-          // another wallet or request. Retry once with a fresh nonce.
-          retriedNonceMismatch = true;
+        if ((isNonceMismatchError(getErrorMessage(err)) || isWorkerAuthBusySignIn(err)) && !retriedWithFreshNonce) {
+          // The Worker refused this nonce (it expired, or was issued for another wallet or request),
+          // or was too busy to sign in and may have spent it. Retry once with a fresh nonce.
+          retriedWithFreshNonce = true;
           continue;
         }
         const canRetryGateUnavailable =

@@ -22,6 +22,7 @@ import {
 } from '../session/sessionWorkerConfigCache.js';
 
 const TEST_ADDRESS = '0x00000000000000000000000000000000000000aa';
+const AUTH_STATE_BUSY = 'Authorization state coordination is unavailable.';
 const NEXT_TEST_ADDRESS = '0x00000000000000000000000000000000000000bb';
 const CANONICAL_SESSION_ID = '0x1234567890abcdef1234567890abcdef';
 const NEXT_CANONICAL_SESSION_ID = '0xfedcba0987654321fedcba0987654321';
@@ -547,31 +548,62 @@ describe('workerAuth canonical session resolution', () => {
     expect(JSON.parse(global.fetch.mock.calls[1][1].body)).not.toHaveProperty('sessionId');
   });
 
-  it('signs in through a busy session coordinator, sending each step again', async () => {
-    const busy = () => jsonResp(503, { error: 'Session config coordination is unavailable; retry.' });
-    mockSignMessage.mockClear();
+  it.each([
+    // The nonce check itself was busy, so the nonce may be spent.
+    ['a Worker that marks it unsafe to resend', { error: AUTH_STATE_BUSY, retryable: false }],
+    ['an older Worker', { error: AUTH_STATE_BUSY }],
+    ['an older Worker busy before the nonce check', {}],
+    ['a Worker that marks it, under any sentence', { error: 'Sign-in is busy.', retryable: false }],
+  ])(
+    'signs in through a busy session coordinator on %s, starting a busy sign-in over with a new nonce',
+    async (_label, mark) => {
+      const busy = (extra = {}) =>
+        jsonResp(503, { error: 'Session config coordination is unavailable; retry.', ...extra });
+      mockSignMessage.mockClear();
+      global.fetch = jest
+        .fn()
+        // A busy nonce request as the Worker sends it: safe to send again, under its own sentence.
+        .mockResolvedValueOnce(busy({ error: AUTH_STATE_BUSY, retryable: true }))
+        .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+        .mockResolvedValueOnce(busy(mark))
+        .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-2' }))
+        .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
+
+      await expect(
+        getWorkerSessionToken({
+          sessionConfig: { slug: 'busy-session', corsWorkerUrl: 'https://worker.example' },
+          context: authContext,
+        }),
+      ).resolves.toBe('token-1');
+      expect(global.fetch.mock.calls.map(([url]) => String(url).split('/').pop())).toEqual([
+        'nonce',
+        'nonce',
+        'login',
+        'nonce',
+        'login',
+      ]);
+      // The busy login's nonce may be spent: the second login signs the new one.
+      expect(JSON.parse(global.fetch.mock.calls[4][1].body).message).toContain('nonce-2');
+      expect(mockSignMessage).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('starts a busy sign-in over only once, then says the session is busy', async () => {
+    const busyLogin = () => jsonResp(503, { error: AUTH_STATE_BUSY, retryable: false });
     global.fetch = jest
       .fn()
-      .mockResolvedValueOnce(busy())
       .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
-      .mockResolvedValueOnce(busy())
-      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
+      .mockResolvedValueOnce(busyLogin())
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-2' }))
+      .mockResolvedValueOnce(busyLogin());
 
     await expect(
       getWorkerSessionToken({
         sessionConfig: { slug: 'busy-session', corsWorkerUrl: 'https://worker.example' },
         context: authContext,
       }),
-    ).resolves.toBe('token-1');
-    expect(global.fetch.mock.calls.map(([url]) => String(url).split('/').pop())).toEqual([
-      'nonce',
-      'nonce',
-      'login',
-      'login',
-    ]);
-    // The busy login is sent again as it was: one signature, the same body.
-    expect(global.fetch.mock.calls[3][1].body).toBe(global.fetch.mock.calls[2][1].body);
-    expect(mockSignMessage).toHaveBeenCalledTimes(1);
+    ).rejects.toThrow('The session is busy. Try signing in again in a moment.');
+    expect(global.fetch).toHaveBeenCalledTimes(4);
   });
 
   it('says whether a Worker token is already held, without asking anyone to sign', async () => {
