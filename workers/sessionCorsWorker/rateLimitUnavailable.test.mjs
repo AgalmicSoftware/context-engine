@@ -6,6 +6,8 @@ import { dispatchAnonymousRouteEntry } from './anonymousRouteEntry.js';
 import { createRateLimitFaucetSupportWithWorkerDeps } from './rateLimitFaucetSupportBinding.js';
 import { checkCoordinatedAuthRateLimit, coordinateResponseUploadReceipt } from './sessionWriteCoordinator.js';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
+import { sendSessionFeedback } from './sessionFeedbackRoute.js';
+import { dispatchInterviewBriefRequest } from './interviewBriefDispatch.js';
 
 const json = (body, status, headers) => ({ body, status, headers });
 
@@ -71,4 +73,41 @@ test('an unreachable limit or receipt object leaves one log line', async (t) => 
   assert.match(lines[0], /unavailable.*auth-state\/rate\/check.*overloaded/);
   assert.match(lines[1], /unavailable.*upload-receipts\/reserve.*overloaded/);
   assert.doesNotMatch(lines.join('\n'), /0xabc/);
+});
+
+test('a count object that refuses the request as malformed is a refusal, not busy', async () => {
+  const { checkRateLimit } = createRateLimitFaucetSupportWithWorkerDeps({
+    deps: {
+      toStr: (value) => String(value ?? ''),
+      recordAbuseEvent: async () => {},
+      checkCoordinatedAuthRateLimit: async () => ({ ok: false, status: 400, error: 'Invalid auth rate-limit request.' }),
+    },
+  });
+  assert.equal(await checkRateLimit({ env: {}, slug: 's', address: '0xabc', limit: 5, route: 'ai' }), false);
+});
+
+test('feedback and the interview brief also answer an unreachable count as busy', async () => {
+  const feedback = await sendSessionFeedback({
+    env: {}, slug: 's', identity: '203.0.113.9', body: { text: 'Good session.', view: 'results', theme: 'civic', screen: 'phone' },
+    config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } },
+    checkRateLimit: async () => null, store: async () => { throw new Error('must not store'); },
+  });
+  assert.equal(feedback.status, 503);
+  assert.equal(feedback.body.error, SESSION_COORDINATOR_UNAVAILABLE);
+
+  const brief = await dispatchInterviewBriefRequest({
+    request: new Request('https://worker.example/agent/interview-brief?slug=demo&sessionUrl=https://app.example/session/demo'),
+    env: {},
+    deps: {
+      resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
+      readCurrentSessionConfig: async () => ({ config: { limits: { perAnonymousIpPerDay: 4 } } }),
+      getCorsContext: async () => ({ ok: true, headers: {} }),
+      resolveAnonymousRateIdentity: () => 'anon:example',
+      checkRateLimit: async () => null,
+      loadPublicInterviewQuestions: async () => { throw new Error('must not load'); },
+      json,
+    },
+  });
+  assert.equal(brief.status, 503);
+  assert.equal(brief.body.error, SESSION_COORDINATOR_UNAVAILABLE);
 });

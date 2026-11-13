@@ -332,6 +332,9 @@ test('starter route preserves CORS and rate limits; public callers cannot force 
   assert.equal(f.calls(), 1);
   deps.checkRateLimit = async () => false;
   assert.equal((await dispatchInterviewStarterRequest(args)).status, 429);
+  // A count that can't be reached is busy, so the page sends it again.
+  deps.checkRateLimit = async () => null;
+  assert.equal((await dispatchInterviewStarterRequest(args)).status, 503);
   deps.checkRateLimit = async () => true;
   deps.evaluateAnonymousRouteAccess = async () => ({ ok: false, status: 403 });
   assert.equal((await dispatchInterviewStarterRequest(args)).status, 403);

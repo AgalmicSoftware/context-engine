@@ -41,6 +41,10 @@ test('text AI counts against the AI daily limit, with the /ai route', async () =
   await f.services.ai({ prompt: 'Fixture prompt' });
   assert.deepEqual(seen, [{ route: 'ai', limit: 15 }]);
 });
+test('text AI answers an unreachable count as busy, not as the day’s limit used', async () => {
+  const f = fixture({ rate: () => null, fetchImpl: async () => { throw new Error('Must not call'); } });
+  await assert.rejects(f.services.ai({ prompt: 'Fixture' }), (error) => error.reason === 'agent_ai_rate_unavailable' && error.status === 503);
+});
 test('text AI limits concurrent calls per session and frees the slot on completion', async () => {
   const releases = []; const f = fixture({ fetchImpl: () => new Promise(resolve => releases.push(() => resolve(Response.json({ output_text: 'done' })))) });
   const a = f.services.ai({ prompt: 'A' }), b = f.services.ai({ prompt: 'B' });

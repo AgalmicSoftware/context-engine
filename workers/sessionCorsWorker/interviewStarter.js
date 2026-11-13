@@ -1,6 +1,7 @@
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { STRICT_HTTPS_NO_CREDENTIALS_POLICY } from './outboundUrlSafetyBinding.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
+import { rateLimitRefusal } from './rateLimitRefusal.js';
 import { normalizeInterviewSettings, hasInterviewQuestionGrowth } from '../../shared/interviewSettings.mjs';
 import { resolveSessionAiModel } from './aiRequestPolicy.js';
 import { getKvJson, putKvJson } from './responseKvHelpers.js';
@@ -155,16 +156,14 @@ export const dispatchInterviewStarterRequest = async ({ request, env, slugHint, 
       access?.status || 403,
       cors.headers,
     );
-  if (
-    !(await deps.checkRateLimit({
-      env,
-      slug,
-      address: deps.resolveAnonymousRateIdentity(request),
-      limit: resolveAnonymousIpDailyLimit(config),
-      route: 'interview-starter',
-    }))
-  )
-    return deps.json({ error: 'Rate limit exceeded.' }, 429, cors.headers);
+  const rateAllowed = await deps.checkRateLimit({
+    env,
+    slug,
+    address: deps.resolveAnonymousRateIdentity(request),
+    limit: resolveAnonymousIpDailyLimit(config),
+    route: 'interview-starter',
+  });
+  if (!rateAllowed) return rateLimitRefusal(rateAllowed, deps.json, cors.headers);
   try {
     const headers = new Headers(cors.headers);
     headers.set('cache-control', 'no-store');

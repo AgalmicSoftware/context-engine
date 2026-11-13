@@ -1,5 +1,6 @@
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
+import { rateLimitRefusal } from './rateLimitRefusal.js';
 import { resolveAuthenticatedRouteContext } from './authenticatedRouteContextResolution.js';
 import { evaluateAuthenticatedRoutePreflight } from './authenticatedRoutePreflight.js';
 import { issueInterviewCatalogTicket, verifyInterviewCatalogTicket } from './interviewCatalogTicket.js';
@@ -188,7 +189,7 @@ export const dispatchInterviewBriefRequest = async ({
       limit: resolveAnonymousIpDailyLimit(config),
       route: 'interview-brief',
     });
-    if (!rateAllowed) return deps?.json?.({ error: 'Rate limit exceeded.' }, 429, headers);
+    if (!rateAllowed) return rateLimitRefusal(rateAllowed, deps?.json, headers);
   }
 
   const url = new URL(request.url);

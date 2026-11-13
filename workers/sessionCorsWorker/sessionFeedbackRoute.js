@@ -7,6 +7,7 @@ import { callSessionConfigCoordinator, readCurrentSessionConfig } from './sessio
 import { workerRelease } from './workerCapabilities.js';
 import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
+import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 
 export const FEEDBACK_PATH = '/feedback';
 export const FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2000, bodyBytes: 8192 });
@@ -74,6 +75,7 @@ export const sendSessionFeedback = async ({
   const normalized = normalizeFeedback(body, { address: String(address || '').toLowerCase() });
   if (!normalized.ok) return normalized;
   const allowed = await checkRateLimit({ env, slug, address: identity, limit: FEEDBACK_LIMITS.perPersonPerDay, route: 'feedback' });
+  if (allowed === null) return { status: 503, body: { error: SESSION_COORDINATOR_UNAVAILABLE, reason: 'rate_limit_unavailable' } };
   if (!allowed) return { status: 429, body: PERSON_LIMIT };
   const saved = await store(env, slug, 'add', { record: { ...normalized.record, workerRelease: release } });
   if (saved.ok) return { status: 200, body: { ok: true } };
