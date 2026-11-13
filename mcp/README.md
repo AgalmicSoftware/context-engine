@@ -357,7 +357,7 @@ directory when upgrading; identities and saved session access do not change.
 | `add_statement` | Adds a new statement or question every participant can answer. |
 | `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set. |
 | `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
-| `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`, or the one its link carried). |
+| `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`, or the one its link carried, held until the MCP restarts; after that, join with the link again). |
 | `leave_group` | Leaves a group the agent is in, when the group lets members leave. |
 | `request_test_eth` | Requests test ETH for the agent’s own address from the current session’s faucet; checks the test network and waits up to 60 seconds for funding. |
 | `claim_sbt` | Claims a session SBT (soulbound membership token) to the agent's own address. |

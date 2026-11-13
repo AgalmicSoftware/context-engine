@@ -220,7 +220,7 @@ export const buildTools = (participant) => [
     name: 'join_group',
     title: 'Join a group',
     description:
-      'Join a group in a hosted session by its id. join_session and get_session list the groups; join the one the session’s instructions ask you to, if any. A group joined by code or password needs its invite: the one the session link carried is used, or pass invite.',
+      'Join a group in a hosted session by its id. join_session and get_session list the groups; join the one the session’s instructions ask you to, if any. A group joined by code or password needs its invite: the one the session link carried is used until the MCP restarts (then call join_session with the link again), or pass invite.',
     inputSchema: {
       type: 'object',
       properties: {
