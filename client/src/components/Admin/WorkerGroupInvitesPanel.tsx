@@ -283,7 +283,8 @@ function GroupPassword({ group, sessionId, sessionSlug, workerUrl, postSignedReq
         sessionSlug,
         postSignedRequest,
       });
-      onGroupChanged(saved);
+      // A new password also clears the wrong-guess count, so the group opens again at once.
+      onGroupChanged({ ...saved, guessLimited: false });
       setRevealed(password);
       setPassword('');
     } catch (error) {
@@ -295,6 +296,12 @@ function GroupPassword({ group, sessionId, sessionSlug, workerUrl, postSignedReq
   return (
     <>
       <div>{group.passwordSet ? 'A password is set.' : 'No password yet: no one can join until one is set.'}</div>
+      {group.guessLimited ? (
+        <div role="alert">
+          Closed to password joins after too many wrong tries in the last hour. A new password opens it again at once;
+          the old one stops working.
+        </div>
+      ) : null}
       <div className={styles.formRow}>
         <Input
           type="text"
@@ -342,7 +349,6 @@ export default function WorkerGroupInvitesPanel(props: Props) {
   return (
     <section className={styles.statusItem} aria-label={`Invites for ${group.label}`}>
       <strong>Invites: {group.label}</strong>
-      {group.guessLimited ? <div role="alert">Too many wrong passwords in the last hour.</div> : null}
       {group.joinMode === 'one_use' ? <OneUseInvites {...props} /> : <GroupPassword {...props} />}
     </section>
   );
