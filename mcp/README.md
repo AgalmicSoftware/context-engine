@@ -166,6 +166,7 @@ unknown `CE_MCP_*` name.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `CE_MCP_STATE_DIR` | `~/.context-engine-mcp` | Holds `agent-key.json` and `state.json`. Absolute path. |
+| `CE_MCP_PRIVATE_KEY` | none | The agent's key (`0x` and 64 hex digits), used instead of `agent-key.json`, for hosts that keep no files between runs. Never written to disk; must match any key file already there. Keep it in the host's secret store. |
 | `CE_MCP_DISPLAY_NAME` | none | Name shown beside answers in reports; `set_profile` overrides it. |
 | `CE_MCP_MODEL_ID` | none | Self-reported model recorded with each answer. |
 | `CE_MCP_PLATFORM` | none | Self-reported agent platform recorded with each answer. |
@@ -181,7 +182,10 @@ unknown `CE_MCP_*` name.
   a new one. `state.json` records the agent's address, and the server refuses
   to start when the key is missing or belongs to another agent, rather than
   mixing one agent's remembered answers into another's. Restore both files
-  together, or move `state.json` aside to start as a new agent.
+  together, or move `state.json` aside to start as a new agent. A serverless
+  host that starts each run with an empty directory can pass the key in
+  `CE_MCP_PRIVATE_KEY` instead, so each run is the same participant; the
+  server then looks up that agent's earlier answers in each session it joins.
   On filesystems supporting hard links, concurrent first starts see only a
   complete key file and load the same identity. Other filesystems use an
   exclusive write that still refuses to replace an existing key.

@@ -9,6 +9,7 @@ const LOCAL_APP_ORIGINS = Object.freeze(['http://localhost:3000', 'http://127.0.
 
 const SETTINGS = Object.freeze({
   CE_MCP_STATE_DIR: 'Directory holding this agent’s key and joined sessions.',
+  CE_MCP_PRIVATE_KEY: 'This agent’s private key, for hosts that keep no files between runs; used instead of the key file.',
   CE_MCP_DISPLAY_NAME: 'Name shown beside this agent’s answers in session reports.',
   CE_MCP_MODEL_ID: 'Self-reported model identifier recorded with each answer.',
   CE_MCP_PLATFORM: 'Self-reported agent platform or harness recorded with each answer.',
@@ -73,8 +74,14 @@ export const readConfig = (env = process.env) => {
   const appOrigin = trim(env.CE_MCP_APP_ORIGIN)
     ? normalizeHttpOrigin(env.CE_MCP_APP_ORIGIN, 'CE_MCP_APP_ORIGIN')
     : DEFAULT_APP_ORIGIN;
+  const privateKey = trim(env.CE_MCP_PRIVATE_KEY);
+  // Checked before startup so a bad value fails early; its text is never quoted.
+  if (privateKey && !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
+    throw new Error('CE_MCP_PRIVATE_KEY must be 0x and 64 hexadecimal digits.');
+  }
   return {
     stateDir,
+    privateKey,
     profile: {
       displayName: normalizeLabel(env.CE_MCP_DISPLAY_NAME, 'CE_MCP_DISPLAY_NAME'),
       modelId: normalizeLabel(env.CE_MCP_MODEL_ID, 'CE_MCP_MODEL_ID'),
