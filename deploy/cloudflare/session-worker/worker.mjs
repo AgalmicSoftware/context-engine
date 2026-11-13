@@ -23332,9 +23332,9 @@ var init_utils4 = __esm({
 });
 
 // workers/sessionCorsWorker/node_modules/ethers/lib.esm/wallet/json-keystore.js
-function isKeystoreJson(json8) {
+function isKeystoreJson(json9) {
   try {
-    const data = JSON.parse(json8);
+    const data = JSON.parse(json9);
     const version2 = data.version != null ? parseInt(data.version) : 0;
     if (version2 === 3) {
       return true;
@@ -23409,8 +23409,8 @@ function getDecryptKdfParams(data) {
   }
   assertArgument(false, "unsupported key-derivation function", "kdf", kdf);
 }
-function decryptKeystoreJsonSync(json8, _password) {
-  const data = JSON.parse(json8);
+function decryptKeystoreJsonSync(json9, _password) {
+  const data = JSON.parse(json9);
   const password = getPassword(_password);
   const params = getDecryptKdfParams(data);
   if (params.name === "pbkdf2") {
@@ -23430,8 +23430,8 @@ function stall3(duration) {
     }, duration);
   });
 }
-async function decryptKeystoreJson(json8, _password, progress) {
-  const data = JSON.parse(json8);
+async function decryptKeystoreJson(json9, _password, progress) {
+  const data = JSON.parse(json9);
   const password = getPassword(_password);
   const params = getDecryptKdfParams(data);
   if (params.name === "pbkdf2") {
@@ -24015,9 +24015,9 @@ var init_hdwallet = __esm({
 });
 
 // workers/sessionCorsWorker/node_modules/ethers/lib.esm/wallet/json-crowdsale.js
-function isCrowdsaleJson(json8) {
+function isCrowdsaleJson(json9) {
   try {
-    const data = JSON.parse(json8);
+    const data = JSON.parse(json9);
     if (data.encseed) {
       return true;
     }
@@ -24025,12 +24025,12 @@ function isCrowdsaleJson(json8) {
   }
   return false;
 }
-function decryptCrowdsaleJson(json8, _password) {
-  const data = JSON.parse(json8);
+function decryptCrowdsaleJson(json9, _password) {
+  const data = JSON.parse(json9);
   const password = getPassword(_password);
   const address3 = getAddress(spelunk(data, "ethaddr:string!"));
   const encseed = looseArrayify(spelunk(data, "encseed:string!"));
-  assertArgument(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json8);
+  assertArgument(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json9);
   const key = getBytes(pbkdf22(password, password, 2e3, 32, "sha256")).slice(0, 16);
   const iv = encseed.slice(0, 16);
   const encryptedSeed = encseed.slice(16);
@@ -24118,17 +24118,17 @@ var init_wallet = __esm({
        *  If %%progress%% is provided, it is called periodically during
        *  decryption so that any UI can be updated.
        */
-      static async fromEncryptedJson(json8, password, progress) {
+      static async fromEncryptedJson(json9, password, progress) {
         var _a2;
         let account = null;
-        if (isKeystoreJson(json8)) {
-          account = await decryptKeystoreJson(json8, password, progress);
-        } else if (isCrowdsaleJson(json8)) {
+        if (isKeystoreJson(json9)) {
+          account = await decryptKeystoreJson(json9, password, progress);
+        } else if (isCrowdsaleJson(json9)) {
           if (progress) {
             progress(0);
             await stall4(0);
           }
-          account = decryptCrowdsaleJson(json8, password);
+          account = decryptCrowdsaleJson(json9, password);
           if (progress) {
             progress(1);
             await stall4(0);
@@ -24143,13 +24143,13 @@ var init_wallet = __esm({
        *  will lock up and freeze the UI during decryption, which may take
        *  some time.
        */
-      static fromEncryptedJsonSync(json8, password) {
+      static fromEncryptedJsonSync(json9, password) {
         var _a2;
         let account = null;
-        if (isKeystoreJson(json8)) {
-          account = decryptKeystoreJsonSync(json8, password);
-        } else if (isCrowdsaleJson(json8)) {
-          account = decryptCrowdsaleJson(json8, password);
+        if (isKeystoreJson(json9)) {
+          account = decryptKeystoreJsonSync(json9, password);
+        } else if (isCrowdsaleJson(json9)) {
+          account = decryptCrowdsaleJson(json9, password);
         } else {
           assertArgument(false, "invalid JSON wallet", "json", "[ REDACTED ]");
         }
@@ -25283,6 +25283,7 @@ var init_sessionConfigEdits = __esm({
       "interviewMode",
       "interviewModeEnabled",
       "pileAutoAdvanceEnabled",
+      "feedbackEnabled",
       "defaultFilterState",
       "defaultFeaturedSBTs",
       "autoFeatureSBTsBySessionSlug",
@@ -25356,6 +25357,8 @@ var init_sessionConfigEdits = __esm({
       "sessionAgent",
       // Checked on each group join, the same way.
       "groupMemberCeiling",
+      // Checked on each feedback send, the same way.
+      "feedbackEnabled",
       ...CURATED_ID_LIST_KEYS
     ]);
     record2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -25978,6 +25981,7 @@ var init_workerSessionPublicConfig = __esm({
       "sessionEndsAt",
       "interviewModeEnabled",
       "pileAutoAdvanceEnabled",
+      "feedbackEnabled",
       "interviewMode",
       "defaultTags",
       "defaultGroupTags",
@@ -26049,6 +26053,7 @@ var init_workerSessionConfig = __esm({
       "sessionEndsAt",
       "interviewModeEnabled",
       "pileAutoAdvanceEnabled",
+      "feedbackEnabled",
       "interviewMode",
       "defaultTags",
       "defaultGroupTags",
@@ -26347,10 +26352,10 @@ var init_sessionLifecycle = __esm({
         ended: normalized.ok && !!normalized.value && Number.isFinite(nowMs) && Date.parse(normalized.value) <= nowMs
       };
     };
-    buildSessionEndedResponse = ({ config, headers: headers2, json: json8, now } = {}) => {
+    buildSessionEndedResponse = ({ config, headers: headers2, json: json9, now } = {}) => {
       const lifecycle = resolveSessionLifecycle(config, { now });
       if (!lifecycle.ended) return null;
-      return json8?.(
+      return json9?.(
         {
           error: "This session has ended.",
           code: "session_ended",
@@ -30236,7 +30241,7 @@ var init_sessionConfigAuthority = __esm({
       resultsAnalysisStatusReads.forget(key.binding, key.slug);
     };
     KEEPS_CONFIG = /* @__PURE__ */ new Set(["current", "backup/write-revision", "backup/export", "diagnostics", "storage/publish"]);
-    KEEPS_CONFIG_PREFIXES = ["agent-submit/", "debate-atlas/", "risk-matrix/"];
+    KEEPS_CONFIG_PREFIXES = ["agent-submit/", "debate-atlas/", "risk-matrix/", "session-feedback/"];
     keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
     callSessionConfigCoordinator = async ({ env, slug, path, cache = false, ...payload }) => {
       const key = sessionKey(env, slug);
@@ -30644,14 +30649,14 @@ var init_sessionContext = __esm({
         fail(errors, "sessionContext.html", "Context is typed text or an HTML file, not both. Remove one of them.");
       }
       const SECRET = "looks like a key, token or password. Remove it: secrets never go in context.";
-      const refuse = (path, subject, ...texts) => {
+      const refuse2 = (path, subject, ...texts) => {
         if (texts.some(hasHexKey)) fail(errors, path, `${subject} ${HEX_KEY_HINT}`);
         else if (texts.some(looksSecret)) fail(errors, path, `${subject} ${SECRET}`);
       };
-      refuse("sessionContext.title", "The title", title);
-      if (html) refuse("sessionContext.html", "The HTML", html, htmlToPlainText(html));
-      paragraphs.forEach((paragraph, index) => refuse(`sessionContext.paragraphs.${index}`, `Paragraph ${index + 1}`, paragraph));
-      links.forEach(({ label, url }, index) => refuse(`sessionContext.links.${index}`, `Link ${index + 1}`, label, url));
+      refuse2("sessionContext.title", "The title", title);
+      if (html) refuse2("sessionContext.html", "The HTML", html, htmlToPlainText(html));
+      paragraphs.forEach((paragraph, index) => refuse2(`sessionContext.paragraphs.${index}`, `Paragraph ${index + 1}`, paragraph));
+      links.forEach(({ label, url }, index) => refuse2(`sessionContext.links.${index}`, `Link ${index + 1}`, label, url));
       if (errors.length) return { ok: false, errors };
       return { ok: true, value: html ? { title, html, paragraphs: [], links: [] } : { title, paragraphs, links }, errors };
     };
@@ -31040,7 +31045,7 @@ ${SESSION_AGENT_RULES.map((rule) => `- ${rule}`).join("\n")}`
 });
 
 // workers/sessionCorsWorker/sessionConfigMutation.js
-var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEY_SET, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validGroupMemberCeiling, validContextAdditionPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
+var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEY_SET, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validGroupMemberCeiling, validContextAdditionPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validFeedbackConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
 var init_sessionConfigMutation = __esm({
   "workers/sessionCorsWorker/sessionConfigMutation.js"() {
     init_sessionConfigEdits();
@@ -31074,6 +31079,7 @@ var init_sessionConfigMutation = __esm({
       return validResultsAnalysisSettings(config.resultsAnalysis);
     };
     validPileAutoAdvanceConfig = (config) => !hasOwn4(config, "pileAutoAdvanceEnabled") || typeof config.pileAutoAdvanceEnabled === "boolean";
+    validFeedbackConfig = (config) => !hasOwn4(config, "feedbackEnabled") || typeof config.feedbackEnabled === "boolean";
     validInterviewModeConfig = (config) => {
       if (hasOwn4(config, "interviewModeEnabled") && typeof config.interviewModeEnabled !== "boolean") return false;
       if (!hasOwn4(config, "interviewMode")) return true;
@@ -31280,6 +31286,9 @@ var init_sessionConfigMutation = __esm({
         if (!validPileAutoAdvanceConfig(incomingConfig)) {
           return { ok: false, status: 400, error: "Invalid pile auto-advance config." };
         }
+        if (!validFeedbackConfig(incomingConfig)) {
+          return { ok: false, status: 400, error: "feedbackEnabled must be true or false." };
+        }
         if (!validInterviewModeConfig(incomingConfig)) {
           return { ok: false, status: 400, error: "Invalid interview mode config." };
         }
@@ -31377,6 +31386,9 @@ var init_sessionConfigMutation = __esm({
       }
       if (!validPileAutoAdvanceConfig(mergedConfig)) {
         return { ok: false, status: 400, error: "Invalid pile auto-advance config." };
+      }
+      if (!validFeedbackConfig(mergedConfig)) {
+        return { ok: false, status: 400, error: "feedbackEnabled must be true or false." };
       }
       if (!validInterviewModeConfig(mergedConfig)) {
         return { ok: false, status: 400, error: "Invalid interview mode config." };
@@ -34256,8 +34268,8 @@ function base64Url(bytes3 = new Uint8Array()) {
   const binary = Array.from(bytes3, (byte) => String.fromCharCode(byte)).join("");
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
-function randomSecret2(byteLength2 = 32) {
-  const bytes3 = new Uint8Array(byteLength2);
+function randomSecret2(byteLength3 = 32) {
+  const bytes3 = new Uint8Array(byteLength3);
   globalThis.crypto.getRandomValues(bytes3);
   return base64Url(bytes3);
 }
@@ -60632,9 +60644,9 @@ var require_json_keystore = __commonJS({
     var utils_js_1 = require_utils4();
     var _version_js_1 = require_version();
     var defaultPath3 = "m/44'/60'/0'/0/0";
-    function isKeystoreJson2(json8) {
+    function isKeystoreJson2(json9) {
       try {
-        const data = JSON.parse(json8);
+        const data = JSON.parse(json9);
         const version2 = data.version != null ? parseInt(data.version) : 0;
         if (version2 === 3) {
           return true;
@@ -60710,8 +60722,8 @@ var require_json_keystore = __commonJS({
       }
       (0, index_js_4.assertArgument)(false, "unsupported key-derivation function", "kdf", kdf);
     }
-    function decryptKeystoreJsonSync2(json8, _password) {
-      const data = JSON.parse(json8);
+    function decryptKeystoreJsonSync2(json9, _password) {
+      const data = JSON.parse(json9);
       const password = (0, utils_js_1.getPassword)(_password);
       const params = getDecryptKdfParams2(data);
       if (params.name === "pbkdf2") {
@@ -60732,8 +60744,8 @@ var require_json_keystore = __commonJS({
         }, duration);
       });
     }
-    async function decryptKeystoreJson2(json8, _password, progress) {
-      const data = JSON.parse(json8);
+    async function decryptKeystoreJson2(json9, _password, progress) {
+      const data = JSON.parse(json9);
       const password = (0, utils_js_1.getPassword)(_password);
       const params = getDecryptKdfParams2(data);
       if (params.name === "pbkdf2") {
@@ -61327,9 +61339,9 @@ var require_json_crowdsale = __commonJS({
     var index_js_3 = require_hash();
     var index_js_4 = require_utils();
     var utils_js_1 = require_utils4();
-    function isCrowdsaleJson2(json8) {
+    function isCrowdsaleJson2(json9) {
       try {
-        const data = JSON.parse(json8);
+        const data = JSON.parse(json9);
         if (data.encseed) {
           return true;
         }
@@ -61338,12 +61350,12 @@ var require_json_crowdsale = __commonJS({
       return false;
     }
     exports.isCrowdsaleJson = isCrowdsaleJson2;
-    function decryptCrowdsaleJson2(json8, _password) {
-      const data = JSON.parse(json8);
+    function decryptCrowdsaleJson2(json9, _password) {
+      const data = JSON.parse(json9);
       const password = (0, utils_js_1.getPassword)(_password);
       const address3 = (0, index_js_1.getAddress)((0, utils_js_1.spelunk)(data, "ethaddr:string!"));
       const encseed = (0, utils_js_1.looseArrayify)((0, utils_js_1.spelunk)(data, "encseed:string!"));
-      (0, index_js_4.assertArgument)(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json8);
+      (0, index_js_4.assertArgument)(encseed && encseed.length % 16 === 0, "invalid encseed", "json", json9);
       const key = (0, index_js_4.getBytes)((0, index_js_2.pbkdf2)(password, password, 2e3, 32, "sha256")).slice(0, 16);
       const iv = encseed.slice(0, 16);
       const encryptedSeed = encseed.slice(16);
@@ -61427,17 +61439,17 @@ var require_wallet = __commonJS({
        *  If %%progress%% is provided, it is called periodically during
        *  decryption so that any UI can be updated.
        */
-      static async fromEncryptedJson(json8, password, progress) {
+      static async fromEncryptedJson(json9, password, progress) {
         var _a2;
         let account = null;
-        if ((0, json_keystore_js_1.isKeystoreJson)(json8)) {
-          account = await (0, json_keystore_js_1.decryptKeystoreJson)(json8, password, progress);
-        } else if ((0, json_crowdsale_js_1.isCrowdsaleJson)(json8)) {
+        if ((0, json_keystore_js_1.isKeystoreJson)(json9)) {
+          account = await (0, json_keystore_js_1.decryptKeystoreJson)(json9, password, progress);
+        } else if ((0, json_crowdsale_js_1.isCrowdsaleJson)(json9)) {
           if (progress) {
             progress(0);
             await stall5(0);
           }
-          account = (0, json_crowdsale_js_1.decryptCrowdsaleJson)(json8, password);
+          account = (0, json_crowdsale_js_1.decryptCrowdsaleJson)(json9, password);
           if (progress) {
             progress(1);
             await stall5(0);
@@ -61452,13 +61464,13 @@ var require_wallet = __commonJS({
        *  will lock up and freeze the UI during decryption, which may take
        *  some time.
        */
-      static fromEncryptedJsonSync(json8, password) {
+      static fromEncryptedJsonSync(json9, password) {
         var _a2;
         let account = null;
-        if ((0, json_keystore_js_1.isKeystoreJson)(json8)) {
-          account = (0, json_keystore_js_1.decryptKeystoreJsonSync)(json8, password);
-        } else if ((0, json_crowdsale_js_1.isCrowdsaleJson)(json8)) {
-          account = (0, json_crowdsale_js_1.decryptCrowdsaleJson)(json8, password);
+        if ((0, json_keystore_js_1.isKeystoreJson)(json9)) {
+          account = (0, json_keystore_js_1.decryptKeystoreJsonSync)(json9, password);
+        } else if ((0, json_crowdsale_js_1.isCrowdsaleJson)(json9)) {
+          account = (0, json_crowdsale_js_1.decryptCrowdsaleJson)(json9, password);
         } else {
           (0, index_js_2.assertArgument)(false, "invalid JSON wallet", "json", "[ REDACTED ]");
         }
@@ -69859,9 +69871,9 @@ var init_uploadSizeLimits = __esm({
     };
     rejectBytesOverLimit = ({ bytes: bytes3, maxUploadBytes } = {}) => {
       const limit = resolveMaxUploadBytes({ maxUploadBytes });
-      const byteLength2 = Number(bytes3?.byteLength ?? bytes3?.length ?? 0);
-      if (!Number.isFinite(byteLength2)) return null;
-      return byteLength2 > limit ? tooLarge(limit) : null;
+      const byteLength3 = Number(bytes3?.byteLength ?? bytes3?.length ?? 0);
+      if (!Number.isFinite(byteLength3)) return null;
+      return byteLength3 > limit ? tooLarge(limit) : null;
     };
     rejectKvValueOverLimit = ({ serializedValue, deps, maxKvValueBytes } = {}) => {
       const limit = resolveMaxKvValueBytes({ deps, maxKvValueBytes });
@@ -70582,8 +70594,8 @@ var init_draftTextRoute = __esm({
       }
       const read = await readBody(request, MAX_BODY_CHARS);
       if (!read.body) return response2({ error: read.status === 413 ? "Draft text request too large." : "Invalid draft text request." }, read.status, headers2);
-      const invalid3 = checkItems(read.body);
-      if (invalid3) return response2({ error: invalid3 }, 400, headers2);
+      const invalid4 = checkItems(read.body);
+      if (invalid4) return response2({ error: invalid4 }, 400, headers2);
       const access = await authorizeSession();
       if (!access?.ok) return access?.response || response2({ error: "Session access required." }, 403, headers2);
       const items = read.body.items.map((item) => ({ ...item, questionId: item.questionId.trim() }));
@@ -71049,15 +71061,15 @@ var init_aiProviderExecution = __esm({
       deps,
       constants
     } = {}) => {
-      const json8 = resolveJson(deps);
+      const json9 = resolveJson(deps);
       const fetchImpl = deps?.fetch || fetch;
       const payloadKey = toStr6(payload?.apiKey).trim();
       const key = payloadKey || toStr6(secrets?.anthropicKey).trim();
       if (!key) {
-        return json8({ error: "Server misconfigured: anthropicKey is missing." }, 401, baseHeaders);
+        return json9({ error: "Server misconfigured: anthropicKey is missing." }, 401, baseHeaders);
       }
       const policy = boundSessionAiRequest({ payload, provider: "anthropic", config, requestKey: payloadKey });
-      if (!policy.ok) return json8({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+      if (!policy.ok) return json9({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
       payload = policy.payload;
       const {
         model,
@@ -71096,21 +71108,21 @@ var init_aiProviderExecution = __esm({
         const retryAfter = response3.headers?.get?.("retry-after");
         const responseHeaders = new Headers(baseHeaders);
         if (retryAfter) responseHeaders.set("retry-after", retryAfter);
-        return json8(
+        return json9(
           { error: data?.error?.message || "Anthropic error", details: data },
           response3.status,
           retryAfter ? responseHeaders : baseHeaders
         );
       }
       if (data?.stop_reason === "refusal") {
-        return json8({ error: "Claude declined this request.", reason: "ai_refused", details: data }, 422, baseHeaders);
+        return json9({ error: "Claude declined this request.", reason: "ai_refused", details: data }, 422, baseHeaders);
       }
       const completion = (Array.isArray(data?.content) ? data.content : []).filter((block2) => block2?.type === "text").map((block2) => toStr6(block2.text)).join("");
       if (!completion.trim()) {
         const error = data?.stop_reason === "max_tokens" ? "Claude used its whole token budget before answering." : "Claude returned an empty answer.";
-        return json8({ error, reason: "ai_empty", details: data }, 422, baseHeaders);
+        return json9({ error, reason: "ai_empty", details: data }, 422, baseHeaders);
       }
-      return json8({ completion, raw: data }, 200, baseHeaders);
+      return json9({ completion, raw: data }, 200, baseHeaders);
     };
     proxyOpenAI = async ({
       payload,
@@ -71120,15 +71132,15 @@ var init_aiProviderExecution = __esm({
       deps,
       constants
     } = {}) => {
-      const json8 = resolveJson(deps);
+      const json9 = resolveJson(deps);
       const fetchImpl = deps?.fetch || fetch;
       const payloadKey = toStr6(payload?.apiKey).trim();
       const key = payloadKey || toStr6(secrets?.openaiKey).trim();
       if (!key) {
-        return json8({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
+        return json9({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
       }
       const policy = boundSessionAiRequest({ payload, provider: "openai", config, requestKey: payloadKey });
-      if (!policy.ok) return json8({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+      if (!policy.ok) return json9({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
       payload = policy.payload;
       const {
         model,
@@ -71197,14 +71209,14 @@ var init_aiProviderExecution = __esm({
         const retryAfter = response3.headers?.get?.("retry-after");
         const responseHeaders = new Headers(baseHeaders);
         if (retryAfter) responseHeaders.set("retry-after", retryAfter);
-        return json8(
+        return json9(
           { error: data?.error?.message || "OpenAI error", details: data },
           response3.status,
           retryAfter ? responseHeaders : baseHeaders
         );
       }
       const completion = extractOpenAiCompletion(data, useResponses);
-      return json8({ completion, raw: data }, 200, baseHeaders);
+      return json9({ completion, raw: data }, 200, baseHeaders);
     };
     proxyOpenRouter = async ({
       payload,
@@ -71214,15 +71226,15 @@ var init_aiProviderExecution = __esm({
       deps,
       constants
     } = {}) => {
-      const json8 = resolveJson(deps);
+      const json9 = resolveJson(deps);
       const fetchImpl = deps?.fetch || fetch;
       const payloadKey = toStr6(payload?.apiKey).trim();
       const key = payloadKey || toStr6(secrets?.openrouterKey).trim();
       if (!key) {
-        return json8({ error: "Server misconfigured: openrouterKey is missing." }, 401, baseHeaders);
+        return json9({ error: "Server misconfigured: openrouterKey is missing." }, 401, baseHeaders);
       }
       const policy = boundSessionAiRequest({ payload, provider: "openrouter", config, requestKey: payloadKey });
-      if (!policy.ok) return json8({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+      if (!policy.ok) return json9({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
       payload = policy.payload;
       const {
         model,
@@ -71269,14 +71281,14 @@ var init_aiProviderExecution = __esm({
         const retryAfter = response3.headers?.get?.("retry-after");
         const responseHeaders = new Headers(baseHeaders);
         if (retryAfter) responseHeaders.set("retry-after", retryAfter);
-        return json8(
+        return json9(
           { error: data?.error?.message || "OpenRouter error", details: data },
           response3.status,
           retryAfter ? responseHeaders : baseHeaders
         );
       }
       const completion = data?.choices?.[0]?.message?.content || "";
-      return json8({ completion, raw: data }, 200, baseHeaders);
+      return json9({ completion, raw: data }, 200, baseHeaders);
     };
     proxyCustomRPC = async ({
       payload,
@@ -71286,7 +71298,7 @@ var init_aiProviderExecution = __esm({
       deps,
       auth
     } = {}) => {
-      const json8 = resolveJson(deps);
+      const json9 = resolveJson(deps);
       const safeFetch = deps?.safeFetch;
       const isBlockedOutboundUrl = deps?.isBlockedOutboundUrl || (() => false);
       const payloadRpcUrl = toStr6(payload?.rpcUrl).trim();
@@ -71295,26 +71307,26 @@ var init_aiProviderExecution = __esm({
       const secretKey = toStr6(secrets?.customRpcKey).trim();
       const requestOverridesRpcUrl = !!payloadRpcUrl && normalizeComparableRpcUrl(payloadRpcUrl) !== normalizeComparableRpcUrl(secretRpcUrl);
       if (!payloadKey && requestOverridesRpcUrl && (secretRpcUrl || secretKey)) {
-        return json8({ error: CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR }, 400, baseHeaders);
+        return json9({ error: CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR }, 400, baseHeaders);
       }
       const rpcUrl = payloadRpcUrl || secretRpcUrl;
       if (!rpcUrl) {
-        return json8({ error: "Server misconfigured: customRpcUrl is missing." }, 400, baseHeaders);
+        return json9({ error: "Server misconfigured: customRpcUrl is missing." }, 400, baseHeaders);
       }
       let parsedRpcUrl;
       try {
         parsedRpcUrl = new URL(rpcUrl);
       } catch {
-        return json8({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
+        return json9({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
       }
       if (parsedRpcUrl.protocol !== "https:") {
-        return json8({ error: "Custom RPC must use HTTPS" }, 403, baseHeaders);
+        return json9({ error: "Custom RPC must use HTTPS" }, 403, baseHeaders);
       }
       if (parsedRpcUrl.username || parsedRpcUrl.password) {
-        return json8({ error: "Custom RPC URL must not contain credentials" }, 403, baseHeaders);
+        return json9({ error: "Custom RPC URL must not contain credentials" }, 403, baseHeaders);
       }
       if (!auth || !auth?.scopes) {
-        return json8({ error: "Custom RPC requires authentication" }, 403, baseHeaders);
+        return json9({ error: "Custom RPC requires authentication" }, 403, baseHeaders);
       }
       const walletAddress = toStr6(auth?.address || auth?.walletAddress || auth?.sub).trim().toLowerCase();
       (typeof deps?.log === "function" ? deps.log : console.log)("[ai] custom rpc request", {
@@ -71322,10 +71334,10 @@ var init_aiProviderExecution = __esm({
         rpcDomain: parsedRpcUrl.hostname
       });
       if (isBlockedOutboundUrl(rpcUrl)) {
-        return json8({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
+        return json9({ error: "Custom RPC URL target is not allowed" }, 403, baseHeaders);
       }
       const policy = !payloadKey && secretKey ? boundSessionAiRequest({ payload, provider: "custom", config, requestKey: payloadKey }) : { ok: true, payload };
-      if (!policy.ok) return json8({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+      if (!policy.ok) return json9({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
       payload = policy.payload;
       const {
         model,
@@ -71360,7 +71372,7 @@ var init_aiProviderExecution = __esm({
       const headers2 = { "content-type": "application/json" };
       if (key) headers2.authorization = `Bearer ${key}`;
       if (typeof safeFetch !== "function") {
-        return json8({ error: "Custom provider outbound checks are unavailable." }, 503, baseHeaders);
+        return json9({ error: "Custom provider outbound checks are unavailable." }, 503, baseHeaders);
       }
       const response3 = await safeFetch(rpcUrl, {
         outboundUrlPolicy: STRICT_HTTPS_NO_CREDENTIALS_POLICY,
@@ -71369,21 +71381,21 @@ var init_aiProviderExecution = __esm({
         body: JSON.stringify(body)
       });
       if (!(response3 instanceof Response)) {
-        return json8({ error: response3?.error }, response3?.status, baseHeaders);
+        return json9({ error: response3?.error }, response3?.status, baseHeaders);
       }
       const data = await response3.json().catch(() => ({}));
       if (!response3.ok) {
         const retryAfter = response3.headers?.get?.("retry-after");
         const responseHeaders = new Headers(baseHeaders);
         if (retryAfter) responseHeaders.set("retry-after", retryAfter);
-        return json8(
+        return json9(
           { error: data?.error?.message || "Custom RPC error", details: data },
           response3.status,
           retryAfter ? responseHeaders : baseHeaders
         );
       }
       const completion = data?.choices?.[0]?.message?.content || data?.completion || data?.content?.[0]?.text || "";
-      return json8({ completion, raw: data }, 200, baseHeaders);
+      return json9({ completion, raw: data }, 200, baseHeaders);
     };
   }
 });
@@ -71410,7 +71422,7 @@ var init_contextDocumentRead = __esm({
     trim12 = (value) => typeof value === "string" ? value.trim() : "";
     fail5 = (status, error, reason) => ({ ok: false, status, error, reason });
     BASE64 = new TextEncoder().encode("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
-    base64Length = (byteLength2) => Math.ceil(byteLength2 / 3) * 4;
+    base64Length = (byteLength3) => Math.ceil(byteLength3 / 3) * 4;
     writeBase64 = (bytes3, out, offset) => {
       let at = offset;
       let index = 0;
@@ -71631,12 +71643,12 @@ var init_fetchExecution = __esm({
       deps,
       cacheTtl = FETCH_CACHE_TTL_SECONDS
     } = {}) => {
-      const json8 = resolveJson2(deps);
+      const json9 = resolveJson2(deps);
       const normalized = resolveNormalizedTarget({ url, deps });
       if (!normalized?.ok) {
         return {
           ok: false,
-          response: json8({ error: normalized?.error }, normalized?.status || 400, baseHeaders)
+          response: json9({ error: normalized?.error }, normalized?.status || 400, baseHeaders)
         };
       }
       let response3;
@@ -71650,7 +71662,7 @@ var init_fetchExecution = __esm({
       } catch (error) {
         return {
           ok: false,
-          response: json8(
+          response: json9(
             { error: isTimeout(error) ? TIMEOUT_ERROR : "The link could not be fetched." },
             isTimeout(error) ? 504 : 502,
             baseHeaders
@@ -71660,13 +71672,13 @@ var init_fetchExecution = __esm({
       if (!(response3 instanceof Response)) {
         return {
           ok: false,
-          response: json8({ error: response3?.error }, response3?.status, baseHeaders)
+          response: json9({ error: response3?.error }, response3?.status, baseHeaders)
         };
       }
       return {
         ok: true,
         response: response3,
-        json: json8
+        json: json9
       };
     };
     readFetchBytes = async (response3, maxBytes = MAX_RESPONSE_BYTES) => {
@@ -71722,22 +71734,22 @@ var init_fetchExecution = __esm({
     } = {}) => {
       const fetchResult = await fetchNormalizedTarget({ url, baseHeaders, deps });
       if (!fetchResult?.ok) return fetchResult?.response;
-      const { response: response3, json: json8 } = fetchResult;
+      const { response: response3, json: json9 } = fetchResult;
       if (!response3.ok) {
-        return json8({ error: `HTTP ${response3.status}` }, 400, baseHeaders);
+        return json9({ error: `HTTP ${response3.status}` }, 400, baseHeaders);
       }
       const type = response3.headers.get("content-type") || "";
       if (!type.startsWith("image/")) {
-        return json8({ error: "URL must return an image" }, 400, baseHeaders);
+        return json9({ error: "URL must return an image" }, 400, baseHeaders);
       }
       let bytes3;
       try {
         bytes3 = await readFetchBytes(response3);
       } catch (error) {
-        if (isTimeout(error)) return json8({ error: TIMEOUT_ERROR }, 504, baseHeaders);
+        if (isTimeout(error)) return json9({ error: TIMEOUT_ERROR }, 504, baseHeaders);
         throw error;
       }
-      if (!bytes3) return json8({ error: "Response too large" }, 413, baseHeaders);
+      if (!bytes3) return json9({ error: "Response too large" }, 413, baseHeaders);
       const headers2 = new Headers(baseHeaders);
       headers2.set("Content-Type", type);
       return new Response(bytes3, { status: 200, headers: headers2 });
@@ -71787,13 +71799,13 @@ var init_fetchExecution = __esm({
       baseHeaders,
       deps
     } = {}) => {
-      const json8 = resolveJson2(deps);
+      const json9 = resolveJson2(deps);
       const result = await fetchPublicText({ url, deps, maxBytes: MAX_RESPONSE_BYTES, cacheTtl: FETCH_CACHE_TTL_SECONDS });
-      if (!result.ok) return json8({ error: result.error }, result.status, baseHeaders);
+      if (!result.ok) return json9({ error: result.error }, result.status, baseHeaders);
       if (HTML_MEDIA_TYPES.has(result.mediaType) && result.text.length < 50) {
-        return json8({ error: "Insufficient content extracted" }, 400, baseHeaders);
+        return json9({ error: "Insufficient content extracted" }, 400, baseHeaders);
       }
-      return json8({ content: result.text, status: "success", contentType: result.contentType }, 200, baseHeaders);
+      return json9({ content: result.text, status: "success", contentType: result.contentType }, 200, baseHeaders);
     };
     fetchContextSnapshotText = ({ url, deps, maxBytes }) => fetchPublicText({ url, deps, maxBytes, cacheTtl: 0 });
   }
@@ -71839,7 +71851,7 @@ var init_contextSourceRoute = __esm({
       { name: CONTEXT_TAGS.adderKind, value: trim13(body.adder) },
       { name: CONTEXT_TAGS.adderName, value: trim13(body.adderName) }
     ].filter((tag) => tag.value);
-    addLink = async ({ body, env, slug, deps, store, json: json8, now }) => {
+    addLink = async ({ body, env, slug, deps, store, json: json9, now }) => {
       const url = trim13(body.url);
       let parsed = null;
       try {
@@ -71848,34 +71860,34 @@ var init_contextSourceRoute = __esm({
         parsed = null;
       }
       if (parsed?.protocol !== "https:") {
-        return json8({ error: `Enter an https:// link of at most ${CONTEXT_SOURCE_LIMITS.urlChars.toLocaleString("en-US")} characters.` }, 400);
+        return json9({ error: `Enter an https:// link of at most ${CONTEXT_SOURCE_LIMITS.urlChars.toLocaleString("en-US")} characters.` }, 400);
       }
       if (looksSecret(url) || looksSecret(trim13(body.title))) {
-        return json8({ error: "This link looks like it holds a key, token or password. Remove it: secrets never go in context." }, 400);
+        return json9({ error: "This link looks like it holds a key, token or password. Remove it: secrets never go in context." }, 400);
       }
       const replaces = trim13(body.replaces) ? await readContextSourceRow({ env, slug, id: body.replaces }) : null;
       if (trim13(body.replaces) && (!replaces || contextTagValue(replaces.tags, CONTEXT_TAGS.kind) !== "link")) {
-        return json8({ error: "That link is no longer in the session." }, 404);
+        return json9({ error: "That link is no longer in the session." }, 404);
       }
       if (replaces && contextTagValue(replaces.tags, CONTEXT_TAGS.url) !== parsed.toString()) {
-        return json8({ error: "A refresh reads the same link again; add another link as a new item." }, 400);
+        return json9({ error: "A refresh reads the same link again; add another link as a new item." }, 400);
       }
       const adderTags = adderTagsOf(replaces ? { adder: contextTagValue(replaces.tags, CONTEXT_TAGS.adderKind), adderName: contextTagValue(replaces.tags, CONTEXT_TAGS.adderName) } : body);
       const adderProblem = contextAdderProblem(adderTags);
-      if (adderProblem) return json8({ error: adderProblem, reason: "context_adder_invalid" }, 400);
+      if (adderProblem) return json9({ error: adderProblem, reason: "context_adder_invalid" }, 400);
       const fetched = await fetchContextSnapshotText({
         url: parsed.toString(),
         deps: { safeFetch: deps?.safeFetch, isBlockedOutboundUrl: deps?.isBlockedOutboundUrl, fetchTimeoutMs: deps?.fetchTimeoutMs },
         maxBytes: CONTEXT_SOURCE_LIMITS.pageBytes
       });
       if (!fetched.ok) {
-        return json8(
+        return json9(
           { error: `The link could not be read: ${fetched.error || "no response"}.`, reason: "context_link_unreadable" },
           fetched.status >= 500 ? 502 : 422
         );
       }
       const text6 = fetched.text.slice(0, CONTEXT_SOURCE_LIMITS.snapshotChars);
-      if (!text6.trim()) return json8({ error: "The page has no text to read.", reason: "context_link_empty" }, 422);
+      if (!text6.trim()) return json9({ error: "The page has no text to read.", reason: "context_link_empty" }, 422);
       const title = clip3(
         (replaces ? contextTagValue(replaces.tags, CONTEXT_TAGS.name) : trim13(body.title)) || fetched.title || parsed.hostname,
         CONTEXT_SOURCE_LIMITS.titleChars
@@ -71908,7 +71920,7 @@ var init_contextSourceRoute = __esm({
       });
       if (stored.response) return stored.response;
       if (replaces) await removeCloudflareStorageRecords({ env, slug, rows: [replaces] });
-      return json8({
+      return json9({
         ok: true,
         source: {
           id: stored.id,
@@ -71945,9 +71957,9 @@ var init_contextSourceRoute = __esm({
       );
       return { status: 200, body: { ok: true } };
     };
-    readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, json: json8, now }) => {
+    readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, json: json9, now }) => {
       const bytes3 = await readContextSourceBytes({ env, config, slug, metadata: pdf, maxBytes: CONTEXT_SOURCE_LIMITS.pdfBytes, principal: admin, deps });
-      if (!bytes3) return { response: json8({ error: "That PDF is no longer in the session." }, 404) };
+      if (!bytes3) return { response: json9({ error: "That PDF is no longer in the session." }, 404) };
       const name = contextTagValue(pdf.tags, CONTEXT_TAGS.name) || "document.pdf";
       const secrets = await deps?.getSessionSecrets?.(env, slug) || {};
       const read = await readPdfWithSessionAi({
@@ -71957,7 +71969,7 @@ var init_contextSourceRoute = __esm({
         filename: name,
         deps: { fetch: deps?.fetch, readTimeoutMs: deps?.readTimeoutMs }
       });
-      if (!read.ok) return { response: json8({ error: read.error, reason: read.reason }, read.status) };
+      if (!read.ok) return { response: json9({ error: read.error, reason: read.reason }, read.status) };
       const readAt = now();
       const text6 = read.text.slice(0, CONTEXT_SOURCE_LIMITS.readTextChars);
       const stored = await storeRecord(store, {
@@ -71979,15 +71991,15 @@ var init_contextSourceRoute = __esm({
       if (stored.response) return stored;
       return { id: stored.id, model: read.model, readAt, chars: text6.length, truncated: read.truncated || read.text.length > text6.length };
     };
-    readPdf = async ({ body, env, config, slug, admin, deps, store, json: json8, now }) => {
+    readPdf = async ({ body, env, config, slug, admin, deps, store, json: json9, now }) => {
       const pdf = await readContextSourceRow({ env, slug, id: body.id });
       if (!pdf || contextRoleOf(pdf.tags) !== CONTEXT_ROLE || pdf.contentType !== CONTEXT_FILE_TYPES.pdf) {
-        return json8({ error: "That PDF is no longer in the session." }, 404);
+        return json9({ error: "That PDF is no longer in the session." }, 404);
       }
-      if (config?.scopes?.ai === false) return json8({ error: "AI is turned off for this session.", reason: "ai_disabled" }, 403);
-      if (Number(pdf.size) > CONTEXT_SOURCE_LIMITS.pdfBytes) return json8({ error: "This PDF is too large for the session\u2019s AI to read." }, 413);
+      if (config?.scopes?.ai === false) return json9({ error: "AI is turned off for this session.", reason: "ai_disabled" }, 403);
+      if (Number(pdf.size) > CONTEXT_SOURCE_LIMITS.pdfBytes) return json9({ error: "This PDF is too large for the session\u2019s AI to read." }, 413);
       const begun = await coordinate(deps, { env, slug, operation: "begin-read", id: pdf.id });
-      if (!begun.ok) return json8(begun.body, begun.status);
+      if (!begun.ok) return json9(begun.body, begun.status);
       const end = (reading2 = {}) => coordinate(deps, {
         env,
         slug,
@@ -71998,16 +72010,16 @@ var init_contextSourceRoute = __esm({
       });
       let reading;
       try {
-        reading = await readAndStorePdf({ pdf, env, config, slug, admin, deps, store, json: json8, now });
+        reading = await readAndStorePdf({ pdf, env, config, slug, admin, deps, store, json: json9, now });
       } catch (error) {
         await end();
         throw error;
       }
       const ended = await end(reading);
       if (reading.response) return reading.response;
-      if (!ended.ok) return json8(ended.body, ended.status);
+      if (!ended.ok) return json9(ended.body, ended.status);
       const { id: id2, model, readAt, chars, truncated } = reading;
-      return json8({ ok: true, text: { id: id2, derivedFrom: pdf.id, model, readAt, chars, truncated } });
+      return json9({ ok: true, text: { id: id2, derivedFrom: pdf.id, model, readAt, chars, truncated } });
     };
     removeContextSource = async ({ env, slug, id: id2, readingIds, markWrite }) => {
       const row = await readContextSourceRow({ env, slug, id: id2 });
@@ -72016,9 +72028,9 @@ var init_contextSourceRoute = __esm({
       await removeCloudflareStorageRecords({ env, slug, rows, markWrite });
       return { status: 200, body: { ok: true, removed: rows.map((entry2) => entry2.id) } };
     };
-    remove2 = async ({ body, env, slug, deps, json: json8 }) => {
+    remove2 = async ({ body, env, slug, deps, json: json9 }) => {
       const removed = await coordinate(deps, { env, slug, operation: "remove", id: trim13(body.id), readingIds: body.readingIds });
-      return json8(removed.body, removed.status);
+      return json9(removed.body, removed.status);
     };
     ACTIONS = Object.freeze({ "add-link": addLink, "read-pdf": readPdf, remove: remove2 });
     contextSourceRoute = async ({
@@ -72034,9 +72046,9 @@ var init_contextSourceRoute = __esm({
       authorizeAdd,
       checkFetchAccess
     } = {}) => {
-      const json8 = (body2, status = 200) => deps?.json ? deps.json(body2, status, baseHeaders) : new Response(JSON.stringify(body2), { status, headers: baseHeaders });
+      const json9 = (body2, status = 200) => deps?.json ? deps.json(body2, status, baseHeaders) : new Response(JSON.stringify(body2), { status, headers: baseHeaders });
       const admin = trim13(uploaderAddress).toLowerCase();
-      const refused = () => json8({ error: "Only session admins can change context.", reason: "context_admin_required" }, 403);
+      const refused = () => json9({ error: "Only session admins can change context.", reason: "context_admin_required" }, 403);
       if (!admin) return refused();
       const isAdmin = resolveSessionAdminAddresses(config).has(admin);
       let body = null;
@@ -72048,36 +72060,36 @@ var init_contextSourceRoute = __esm({
       const name = isObj17(body) ? trim13(body.action) : "";
       const participantMay = name === "remove" || name === "add-link" && !trim13(body.replaces);
       if (!isAdmin && !participantMay) return refused();
-      if (!isObj17(body)) return json8({ error: "Invalid JSON." }, 400);
-      if (!Object.hasOwn(ACTIONS, name)) return json8({ error: "Unknown context action." }, 400);
+      if (!isObj17(body)) return json9({ error: "Invalid JSON." }, 400);
+      if (!Object.hasOwn(ACTIONS, name)) return json9({ error: "Unknown context action." }, 400);
       if (name === "add-link") {
         if (!isAdmin && !participantsMayAddContext(config)) {
-          return json8({ error: "Only session admins can add context.", reason: "context_admin_required" }, 403);
+          return json9({ error: "Only session admins can add context.", reason: "context_admin_required" }, 403);
         }
         if (!isAdmin && resolveSessionLifecycle(config, { now: deps?.now }).ended) {
-          return json8({ error: "This session has ended.", code: "session_ended" }, 410);
+          return json9({ error: "This session has ended.", code: "session_ended" }, 410);
         }
         const access = await authorizeAdd();
         if (!access.ok) return access.response;
         if (!isAdmin) {
           if (authScopes?.fetch !== true) {
-            return json8({
+            return json9({
               error: "This session doesn\u2019t let you have its Worker fetch pages, so you can\u2019t add links.",
               reason: "context_link_fetch_denied"
             }, 403);
           }
           const fetchAccess = await checkFetchAccess?.();
-          if (!fetchAccess?.ok) return fetchAccess?.response || json8({ error: "Fetch access could not be checked." }, 403);
+          if (!fetchAccess?.ok) return fetchAccess?.response || json9({ error: "Fetch access could not be checked." }, 403);
         }
       }
       if (!isAdmin && name === "remove") {
         const row = await readContextSourceRow({ env, slug, id: body.id });
-        if (!row) return json8({ error: "That item is no longer in the session." }, 404);
+        if (!row) return json9({ error: "That item is no longer in the session." }, 404);
         if (trim13(row.uploader).toLowerCase() !== admin) return refused();
       }
       const action = ACTIONS[name];
       const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
-      return action({ body, env, config, slug, admin, deps, store, json: json8, now });
+      return action({ body, env, config, slug, admin, deps, store, json: json9, now });
     };
   }
 });
@@ -76051,11 +76063,11 @@ var init_sessionBackupImport = __esm({
         progress.counts.conflicts += 1;
         if (progress.conflicts.length < 50) progress.conflicts.push(key);
       };
-      const write = async (store, key, value, json8 = false, kind = "index", options) => {
+      const write = async (store, key, value, json9 = false, kind = "index", options) => {
         const existing = await store.get(key);
         if (existing != null) {
           let identical = existing === value;
-          if (!identical && json8) {
+          if (!identical && json9) {
             try {
               identical = same2(JSON.parse(existing), JSON.parse(value));
             } catch {
@@ -76312,13 +76324,13 @@ var init_sponsoredBootstrapGrantStore = __esm({
     });
     buildSponsoredGrantKvKey = (token = "") => `sponsoredGrant:${toTrimmedString8(token)}`;
     buildSponsoredGrantToken = ({
-      byteLength: byteLength2 = DEFAULT_TOKEN_BYTE_LENGTH,
+      byteLength: byteLength3 = DEFAULT_TOKEN_BYTE_LENGTH,
       cryptoImpl = globalThis.crypto
     } = {}) => {
       if (!cryptoImpl?.getRandomValues) {
         throw new Error("Secure random generator unavailable.");
       }
-      const bytes3 = new Uint8Array(Number(byteLength2 || 0) || DEFAULT_TOKEN_BYTE_LENGTH);
+      const bytes3 = new Uint8Array(Number(byteLength3 || 0) || DEFAULT_TOKEN_BYTE_LENGTH);
       cryptoImpl.getRandomValues(bytes3);
       return Array.from(bytes3).map((value) => value.toString(16).padStart(2, "0")).join("");
     };
@@ -78491,9 +78503,9 @@ var init_resultsBuildStore = __esm({
       }
       if (operation === "finalize") {
         const build = isObj22(payload.build) ? payload.build : null;
-        const invalid3 = !!build && !idPattern.test(trim17(build.id));
-        const chunks = build && !invalid3 ? chunkBuild(build) : [];
-        const refusal2 = invalid3 ? json4({ ok: false, error: `Invalid ${kind.name} build.` }, 400) : chunks.length > MAX_CHUNKS ? json4({ ok: false, error: `This ${kind.name} is too large to keep.` }, 413) : null;
+        const invalid4 = !!build && !idPattern.test(trim17(build.id));
+        const chunks = build && !invalid4 ? chunkBuild(build) : [];
+        const refusal2 = invalid4 ? json4({ ok: false, error: `Invalid ${kind.name} build.` }, 400) : chunks.length > MAX_CHUNKS ? json4({ ok: false, error: `This ${kind.name} is too large to keep.` }, 413) : null;
         return storage.transaction(async (transaction) => {
           const index = await readIndex(transaction);
           if (!trim17(payload.attemptId) || index.active?.attemptId !== trim17(payload.attemptId)) {
@@ -78570,6 +78582,96 @@ var init_sessionAgentOptOuts = __esm({
         return json5({ ok: true, optedOut: payload.optedOut });
       }
       return json5({ ok: false, error: "Not found." }, 404);
+    };
+  }
+});
+
+// workers/sessionCorsWorker/sessionFeedback.js
+var PREFIX2, META_KEY, DELETE_BATCH, ID, SESSION_FEEDBACK_LIMITS, json6, refuse, countsOf, publicCounts, randomHex3, removeKeys, dispatchSessionFeedbackStore;
+var init_sessionFeedback = __esm({
+  "workers/sessionCorsWorker/sessionFeedback.js"() {
+    PREFIX2 = "session-feedback-v1:";
+    META_KEY = "session-feedback-meta-v1";
+    DELETE_BATCH = 128;
+    ID = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z:[0-9a-f]{16}$/;
+    SESSION_FEEDBACK_LIMITS = Object.freeze({ perSessionPerDay: 200, stored: 2e3, page: 100 });
+    json6 = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+    refuse = (status, reason) => json6({ ok: false, reason }, status);
+    countsOf = (meta, nowMs) => {
+      const day = new Date(nowMs).toISOString().slice(0, 10);
+      return {
+        day,
+        stored: Math.max(0, Number(meta?.stored) || 0),
+        today: meta?.day === day ? Math.max(0, Number(meta?.today) || 0) : 0
+      };
+    };
+    publicCounts = ({ stored, today }) => ({ stored, today });
+    randomHex3 = (bytes3) => [...crypto.getRandomValues(new Uint8Array(bytes3))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    removeKeys = async (storage, keys) => {
+      let deleted = 0;
+      for (let start = 0; start < keys.length; start += DELETE_BATCH) {
+        const batch = keys.slice(start, start + DELETE_BATCH);
+        deleted += await storage.transaction(async (transaction) => {
+          const present = [];
+          for (const key of batch) if (await transaction.get(key) != null) present.push(key);
+          if (present.length) await transaction.delete(present);
+          const meta = await transaction.get(META_KEY);
+          await transaction.put(META_KEY, { ...meta, stored: Math.max(0, (Number(meta?.stored) || 0) - present.length) });
+          return present.length;
+        });
+      }
+      return deleted;
+    };
+    dispatchSessionFeedbackStore = async (coordinator, operation, payload = {}) => {
+      const storage = coordinator.state.storage;
+      const nowMs = Number(coordinator.now?.()) || Date.now();
+      if (operation === "add") {
+        const record4 = payload.record;
+        if (!record4 || typeof record4 !== "object") return refuse(400, "feedback_invalid");
+        return storage.transaction(async (transaction) => {
+          const counts = countsOf(await transaction.get(META_KEY), nowMs);
+          if (counts.stored >= SESSION_FEEDBACK_LIMITS.stored) return refuse(409, "feedback_full");
+          if (counts.today >= SESSION_FEEDBACK_LIMITS.perSessionPerDay) return refuse(429, "feedback_session_limit");
+          const createdAt = new Date(nowMs).toISOString();
+          await transaction.put(`${PREFIX2}${createdAt}:${randomHex3(8)}`, { ...record4, createdAt });
+          await transaction.put(META_KEY, { day: counts.day, stored: counts.stored + 1, today: counts.today + 1 });
+          return json6({ ok: true });
+        });
+      }
+      if (operation === "list") {
+        const limit = payload.limit == null ? SESSION_FEEDBACK_LIMITS.page : Number(payload.limit);
+        const cursor = payload.cursor == null || payload.cursor === "" ? "" : String(payload.cursor);
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > SESSION_FEEDBACK_LIMITS.page || cursor && !ID.test(cursor)) {
+          return refuse(400, "feedback_page_invalid");
+        }
+        const page = [...await storage.list({ prefix: PREFIX2, reverse: true, limit: limit + 1, ...cursor ? { end: PREFIX2 + cursor } : {} })];
+        const messages = page.slice(0, limit).map(([key, record4]) => ({ id: key.slice(PREFIX2.length), ...record4 }));
+        return json6({
+          ok: true,
+          messages,
+          ...page.length > limit ? { cursor: messages.at(-1).id } : {},
+          counts: publicCounts(countsOf(await storage.get(META_KEY), nowMs))
+        });
+      }
+      if (operation === "delete") {
+        let deleted;
+        if (payload.all === true && payload.ids == null) {
+          deleted = 0;
+          for (let round = 0; round < 2 * Math.ceil(SESSION_FEEDBACK_LIMITS.stored / DELETE_BATCH); round += 1) {
+            const keys = [...(await storage.list({ prefix: PREFIX2, limit: DELETE_BATCH })).keys()];
+            if (!keys.length) break;
+            deleted += await removeKeys(storage, keys);
+          }
+        } else {
+          const ids = payload.ids;
+          if (payload.all != null || !Array.isArray(ids) || ids.length < 1 || ids.length > SESSION_FEEDBACK_LIMITS.page || !ids.every((id2) => typeof id2 === "string" && ID.test(id2))) {
+            return refuse(400, "feedback_invalid");
+          }
+          deleted = await removeKeys(storage, [...new Set(ids)].map((id2) => PREFIX2 + id2));
+        }
+        return json6({ ok: true, deleted, counts: publicCounts(countsOf(await storage.get(META_KEY), nowMs)) });
+      }
+      return refuse(404, "not_found");
     };
   }
 });
@@ -80461,7 +80563,7 @@ var init_chipotleClient = __esm({
 });
 
 // workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js
-var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, ACCOUNT_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord6, hasOwn7, json6, fail11, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator2, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning, checkSessionLitProvisioning, discardSessionLitProvisioning;
+var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, ACCOUNT_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord6, hasOwn7, json7, fail11, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator2, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning, checkSessionLitProvisioning, discardSessionLitProvisioning;
 var init_sessionLitAuthorizationCoordinator = __esm({
   "workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js"() {
     init_lib2();
@@ -80497,7 +80599,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     PENDING_ERROR = "Lit setup projection is pending; retry before using the new authority.";
     isRecord6 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasOwn7 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-    json6 = (body, status = 200) => new Response(JSON.stringify(body), {
+    json7 = (body, status = 200) => new Response(JSON.stringify(body), {
       status,
       headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store" }
     });
@@ -80535,7 +80637,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     };
     executeLitAuthorizationSignerEnsure = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-      if (!slug || !isRecord6(payload?.baseConfig)) return json6({ error: COORDINATION_ERROR }, 400);
+      if (!slug || !isRecord6(payload?.baseConfig)) return json7({ error: COORDINATION_ERROR }, 400);
       try {
         const proposed = walletFor(payload.proposedPrivateKey);
         await coordinator.assertSessionAuthority(payload);
@@ -80553,9 +80655,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           }
           return chosen.privateKey;
         });
-        return json6({ ok: true, privateKey });
+        return json7({ ok: true, privateKey });
       } catch (error) {
-        return json6({ error: COORDINATION_ERROR }, error?.status || 503);
+        return json7({ error: COORDINATION_ERROR }, error?.status || 503);
       }
     };
     repairPendingLitAuthorizationSetup = async (coordinator) => {
@@ -80580,7 +80682,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
     };
     executeLitProvisioning = async (coordinator, payload, operation) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
-      if (!slug) return json6({ error: COORDINATION_ERROR }, 400);
+      if (!slug) return json7({ error: COORDINATION_ERROR }, 400);
       try {
         if (operation !== "release") {
           await coordinator.assertSessionAuthority(payload, { requireRevision: !["checkpoint", "discard"].includes(operation) });
@@ -80649,19 +80751,19 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           await transaction.put(PROVISIONING_RECORD, { ...record4, leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
           return {};
         });
-        return json6({ ok: true, ...result });
+        return json7({ ok: true, ...result });
       } catch (error) {
         if (["lit_provisioning_credentials_conflict", "lit_provisioning_resources_pending"].includes(error?.code)) {
-          return json6({ error: error.message, code: error.code }, error.status);
+          return json7({ error: error.message, code: error.code }, error.status);
         }
-        return json6({ error: "Lit provisioning is pending or in progress; retry." }, error?.status || 503);
+        return json7({ error: "Lit provisioning is pending or in progress; retry." }, error?.status || 503);
       }
     };
     executeLitAuthorizationFinalize = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const outputs = payload?.secretOutputs;
       if (!slug || !isRecord6(payload?.baseConfig) || !isRecord6(payload?.litCredentials) || !isRecord6(outputs) || Object.keys(outputs).some((key) => !SECRET_KEYS.includes(key)) || Object.values(outputs).some((value) => typeof value !== "string")) {
-        return json6({ error: COORDINATION_ERROR }, 400);
+        return json7({ error: COORDINATION_ERROR }, 400);
       }
       try {
         await coordinator.assertSessionAuthority(payload);
@@ -80716,20 +80818,20 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           await transaction.delete(PROVISIONING_RECORD);
         });
       } catch (error) {
-        return json6({ error: error?.status ? COORDINATION_ERROR : PENDING_ERROR }, error?.status || 503);
+        return json7({ error: error?.status ? COORDINATION_ERROR : PENDING_ERROR }, error?.status || 503);
       }
       try {
         await repairPendingLitAuthorizationSetup(coordinator);
-        return json6({ ok: true });
+        return json7({ ok: true });
       } catch {
-        return json6({ error: PENDING_ERROR }, 503);
+        return json7({ error: PENDING_ERROR }, 503);
       }
     };
     executeSessionSecretsAfterLitRepair = async (coordinator, payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const patch = payload?.incomingSecrets;
       if (!slug || !isRecord6(patch) || Object.keys(patch).some((key) => !ADMIN_SESSION_SECRET_KEYS.includes(key)) || Object.values(patch).some((value) => typeof value !== "string")) {
-        return json6({ error: "Invalid session secrets update." }, 400);
+        return json7({ error: "Invalid session secrets update." }, 400);
       }
       try {
         await coordinator.assertSessionAuthority(payload);
@@ -80751,9 +80853,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           }
         });
         await repairPendingSessionSecretsProjection(coordinator);
-        return json6({ ok: true });
+        return json7({ ok: true });
       } catch (error) {
-        return json6({ error: error.status === 409 ? error.message : "Session secrets update is pending; retry after setup repair." }, error.status || 503);
+        return json7({ error: error.status === 409 ? error.message : "Session secrets update is pending; retry after setup repair." }, error.status || 503);
       }
     };
     callCoordinator2 = async ({ env, slug, path, ...payload }) => {
@@ -80858,6 +80960,7 @@ var init_sessionWriteCoordinator = __esm({
     init_contextSourceRoute();
     init_resultsBuildStore();
     init_sessionAgentOptOuts();
+    init_sessionFeedback();
     init_sessionConfigMutation();
     init_sessionSecretsAuthority();
     init_sessionConfigNormalization();
@@ -82894,8 +82997,8 @@ ${expiry}`);
         const groupId = normalizeWorkerGroupId(payload?.groupId);
         const operation = toTrimmedString10(payload?.operation).toLowerCase();
         const input = isObjectRecord(payload?.input) ? payload.input : {};
-        const refuse = (status, reason) => jsonResponse2({ ok: false, status, reason }, status);
-        if (!slug || !sessionId || !groupId) return refuse(400, "worker_group_mutation_invalid");
+        const refuse2 = (status, reason) => jsonResponse2({ ok: false, status, reason }, status);
+        if (!slug || !sessionId || !groupId) return refuse2(400, "worker_group_mutation_invalid");
         const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
         if (!initialized.ok) return jsonResponse2(initialized, initialized.status || 503);
         const settled2 = await this.settleWorkerGroupReservations({ slug, sessionId, groupIds: [groupId] });
@@ -82904,12 +83007,12 @@ ${expiry}`);
         if (!active.ok) return jsonResponse2(active, active.status || 404);
         const groupKey2 = workerGroupCapacityGroupKey(groupId);
         const nowIso4 = new Date(Number(this.now())).toISOString();
-        const needsMode = (joinMode) => active.state.joinMode === joinMode ? null : refuse(409, "worker_group_join_mode_mismatch");
+        const needsMode = (joinMode) => active.state.joinMode === joinMode ? null : refuse2(409, "worker_group_join_mode_mismatch");
         if (operation === "password-set") {
           const mismatch2 = needsMode("group_password");
           if (mismatch2) return mismatch2;
           const signer = normalizeWorkerGroupSigner(input.signer);
-          if (!signer) return refuse(400, "invalid_group_password_signer");
+          if (!signer) return refuse2(400, "invalid_group_password_signer");
           await this.state.storage.transaction(async (transaction) => {
             const state = await transaction.get(groupKey2);
             await transaction.put(groupKey2, { ...state, signer, signerSetAt: nowIso4 });
@@ -82921,10 +83024,10 @@ ${expiry}`);
         if (mismatch) return mismatch;
         if (operation === "invites-add") {
           const hashes = normalizeWorkerGroupInviteHashes(input.hashes);
-          if (!hashes) return refuse(400, "invalid_group_invites");
+          if (!hashes) return refuse2(400, "invalid_group_invites");
           const expiresAtMs = input.expiresAt == null || input.expiresAt === "" ? null : Date.parse(input.expiresAt);
           if (expiresAtMs !== null && !(Number.isFinite(expiresAtMs) && expiresAtMs > Number(this.now()))) {
-            return refuse(400, "invalid_group_invite_expiry");
+            return refuse2(400, "invalid_group_invite_expiry");
           }
           const result = await this.state.storage.transaction(async (transaction) => {
             for (const hash2 of hashes) {
@@ -82952,7 +83055,7 @@ ${expiry}`);
           const limit = input.limit == null ? 100 : Number(input.limit);
           const cursor = input.cursor == null || input.cursor === "" ? "" : toTrimmedString10(input.cursor).toLowerCase();
           if (!Number.isSafeInteger(limit) || limit < 1 || limit > WORKER_GROUP_INVITE_LIST_MAX || cursor && !/^[0-9a-f]{64}$/.test(cursor)) {
-            return refuse(400, "worker_group_invite_page_invalid");
+            return refuse2(400, "worker_group_invite_page_invalid");
           }
           const prefix = workerGroupInvitePrefix(groupId);
           const page = await this.state.storage.list({
@@ -82980,12 +83083,12 @@ ${expiry}`);
         if (operation === "invites-revoke") {
           const all = input.allUnused === true;
           const hashes = all ? null : normalizeWorkerGroupInviteHashes(input.hashes, { max: WORKER_GROUP_REVOKE_BATCH });
-          if (all === (input.hashes != null) || !all && !hashes) return refuse(400, "invalid_group_invites");
+          if (all === (input.hashes != null) || !all && !hashes) return refuse2(400, "invalid_group_invites");
           const { revoked, counts } = all ? await this.revokeAllUnusedWorkerGroupInvites(groupId, nowIso4) : await this.revokeWorkerGroupInvites(groupId, hashes.map((hash2) => workerGroupInviteKey(groupId, hash2)), { nowIso: nowIso4 });
           await bumpStorageBackupRevision(this.state.storage);
           return jsonResponse2({ ok: true, status: 200, groupId, revoked, counts }, 200);
         }
-        return refuse(400, "worker_group_mutation_invalid");
+        return refuse2(400, "worker_group_mutation_invalid");
       }
       async respondToWorkerGroupMutation(mutation, result) {
         if (mutation.operation === "add-member" || mutation.operation === "join" || mutation.operation === "remove-member") {
@@ -83863,6 +83966,9 @@ ${expiry}`);
         if (resultsBuild) return dispatchResultsBuildStore(this, resultsBuild[1], resultsBuild[2], payload || {});
         if (url.pathname.startsWith("/session-config/session-agent/")) {
           return dispatchSessionAgentOptOutStore(this, url.pathname.split("/").pop(), payload || {});
+        }
+        if (url.pathname.startsWith("/session-config/session-feedback/")) {
+          return dispatchSessionFeedbackStore(this, url.pathname.split("/").pop(), payload || {});
         }
         if (["preflight", "begin", "check", "checkpoint", "release", "discard"].some((operation) => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
           return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split("/").at(-1)));
@@ -85994,7 +86100,7 @@ var require_api = __commonJS({
 var require_base64_js = __commonJS({
   "workers/sessionCorsWorker/node_modules/base64-js/index.js"(exports) {
     "use strict";
-    exports.byteLength = byteLength2;
+    exports.byteLength = byteLength3;
     exports.toByteArray = toByteArray;
     exports.fromByteArray = fromByteArray;
     var lookup = [];
@@ -86019,7 +86125,7 @@ var require_base64_js = __commonJS({
       var placeHoldersLen = validLen === len2 ? 0 : 4 - validLen % 4;
       return [validLen, placeHoldersLen];
     }
-    function byteLength2(b64) {
+    function byteLength3(b64) {
       var lens = getLens(b64);
       var validLen = lens[0];
       var placeHoldersLen = lens[1];
@@ -91514,12 +91620,12 @@ var arweaveUpload = async ({
   const log2 = resolveLog(deps);
   const warn = resolveWarn(deps);
   const error = resolveError(deps);
-  const json8 = deps?.json;
+  const json9 = deps?.json;
   const hasAuthHeader = !!request?.headers?.get?.("authorization");
   const maxUploadBytes = resolveMaxUploadBytes({ env, deps });
   const uploadPayload = await (deps?.readArweaveUploadRequestPayload || readArweaveUploadRequestPayload)(request, { maxUploadBytes });
   if (!uploadPayload?.ok) {
-    return json8?.({ error: uploadPayload?.error }, uploadPayload?.status || 400, baseHeaders);
+    return json9?.({ error: uploadPayload?.error }, uploadPayload?.status || 400, baseHeaders);
   }
   const {
     bytes: bytes3,
@@ -91530,17 +91636,17 @@ var arweaveUpload = async ({
   } = uploadPayload.payload || {};
   const Arweave = await (deps?.resolveArweaveCtor || resolveArweaveCtor)({ deps });
   if (!Arweave) {
-    return json8?.({ error: ARWEAVE_UNAVAILABLE_ERROR }, 500, baseHeaders);
+    return json9?.({ error: ARWEAVE_UNAVAILABLE_ERROR }, 500, baseHeaders);
   }
   const jwkResult = (deps?.resolveArweaveUploadJwk || resolveArweaveUploadJwk)({ providedJwk, secrets });
   if (!jwkResult?.ok) {
-    return json8?.({ error: jwkResult?.error }, 500, baseHeaders);
+    return json9?.({ error: jwkResult?.error }, 500, baseHeaders);
   }
   const { jwk, hasProvidedJwk, hasWorkerJwk } = jwkResult;
   const tagCheck = (deps?.normalizeArweaveCeTags || normalizeArweaveCeTags)(tagsInput);
   if (!tagCheck?.ok) {
     warn("[arweave] tag reject", { requestId: requestId || null, error: tagCheck?.error });
-    return json8?.({ error: tagCheck?.error || "Invalid tags." }, 400, baseHeaders);
+    return json9?.({ error: tagCheck?.error || "Invalid tags." }, 400, baseHeaders);
   }
   const tags = tagCheck?.tags || [];
   const runtimeConfig = attachSessionSecretRpcForGateRuntime({ config, secrets });
@@ -91566,7 +91672,7 @@ var arweaveUpload = async ({
         error: association?.error || ""
       });
     }
-    return json8?.(
+    return json9?.(
       { error: association?.error || "SBT association authorization failed." },
       association?.status || 403,
       baseHeaders
@@ -91602,14 +91708,14 @@ var arweaveUpload = async ({
     await arweave.transactions.sign(tx, jwk);
     await uploadTransactionWithFallback({ arweave, tx, deps });
     log2("[arweave] upload success", { requestId: requestId || null, id: tx.id });
-    return json8?.({ id: tx.id }, 200, baseHeaders);
+    return json9?.({ id: tx.id }, 200, baseHeaders);
   } catch (e) {
     error("[arweave] upload error", {
       requestId: requestId || null,
       message: e?.message || "Arweave upload failed",
       stack: e?.stack
     });
-    return json8?.({ error: e?.message || "Arweave upload failed" }, 500, baseHeaders);
+    return json9?.({ error: e?.message || "Arweave upload failed" }, 500, baseHeaders);
   }
 };
 
@@ -92101,7 +92207,7 @@ var faucet = async ({
   constants,
   defaults
 } = {}) => {
-  const json8 = resolveJson3(deps);
+  const json9 = resolveJson3(deps);
   const log2 = resolveLog2(deps);
   const warn = resolveWarn2(deps);
   const error = resolveError2(deps);
@@ -92151,7 +92257,7 @@ var faucet = async ({
     log2("[faucet] request", logContext);
   }
   if (!normalizedFaucet?.ok) {
-    return json8(
+    return json9(
       { error: normalizedFaucet?.error },
       normalizedFaucet?.status || 400,
       baseHeaders
@@ -92172,7 +92278,7 @@ var faucet = async ({
     expectedChainId
   } = normalizedFaucet.normalized || {};
   if (!expectedChainId) {
-    return json8(
+    return json9(
       { error: "Invalid faucet chain configuration." },
       500,
       baseHeaders
@@ -92212,7 +92318,7 @@ var faucet = async ({
       privateRpcUrls,
       errorLabel: "Faucet eligibility RPC request failed."
     });
-    return json8(
+    return json9(
       {
         error: faucetEligibility?.error || DEFAULT_ACCESS_DENIED_ERROR,
         reason: faucetEligibility?.reason || "",
@@ -92294,7 +92400,7 @@ var faucet = async ({
         continue;
       }
       if (currentBalanceWei > thresholdWeiBig) {
-        return json8(
+        return json9(
           {
             error: `Balance above threshold (${thresholdEth} ETH).`,
             balanceEth: formatEther2(currentBalanceWei.toString()),
@@ -92331,7 +92437,7 @@ var faucet = async ({
         gasPriceHex = DEFAULT_GAS_PRICE_HEX;
       }
       if (beforePayout && !payoutAdmitted) {
-        if (!await beforePayout()) return json8({ error: "Rate limit exceeded." }, 429, baseHeaders);
+        if (!await beforePayout()) return json9({ error: "Rate limit exceeded." }, 429, baseHeaders);
         payoutAdmitted = true;
       }
       const txRequest = {
@@ -92361,7 +92467,7 @@ var faucet = async ({
         method: "eth_sendRawTransaction",
         params: [signedTx]
       });
-      return json8(
+      return json9(
         {
           txHash,
           status: null,
@@ -92400,7 +92506,7 @@ var faucet = async ({
       });
     }
   }
-  return json8(
+  return json9(
     {
       error: txHash ? `Transaction submission outcome is unknown; check transaction ${txHash} before retrying.` : errors[errors.length - 1]?.error || "Faucet transfer failed.",
       ...txHash ? { txHash } : {},
@@ -92846,10 +92952,10 @@ var transcribe = async ({
   deps,
   constants
 } = {}) => {
-  const json8 = deps?.json;
+  const json9 = deps?.json;
   const normalizedRequest = transcribeRequest || await (deps?.readTranscribeRequestPayload || readTranscribeRequestPayload)({ request });
   if (!normalizedRequest?.ok) {
-    return json8?.({ error: normalizedRequest?.error }, normalizedRequest?.status || 400, baseHeaders);
+    return json9?.({ error: normalizedRequest?.error }, normalizedRequest?.status || 400, baseHeaders);
   }
   const {
     provider,
@@ -92867,29 +92973,29 @@ var transcribe = async ({
     try {
       parsedTargetUrl = new URL(targetUrl);
     } catch {
-      return json8?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
+      return json9?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
     }
     if (parsedTargetUrl.protocol !== "https:") {
-      return json8?.({ error: "Custom transcription URL must use HTTPS" }, 403, baseHeaders);
+      return json9?.({ error: "Custom transcription URL must use HTTPS" }, 403, baseHeaders);
     }
     if (parsedTargetUrl.username || parsedTargetUrl.password) {
-      return json8?.({ error: "Custom transcription URL must not contain credentials" }, 403, baseHeaders);
+      return json9?.({ error: "Custom transcription URL must not contain credentials" }, 403, baseHeaders);
     }
     if (deps?.isBlockedOutboundUrl?.(targetUrl)) {
-      return json8?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
+      return json9?.({ error: "Custom transcription URL target is not allowed" }, 403, baseHeaders);
     }
     key = requestApiKey;
     outboundUrlPolicy = STRICT_HTTPS_NO_CREDENTIALS_POLICY;
   }
   if (provider !== "custom" && !key) {
-    return json8?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
+    return json9?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
   if (provider === "openai" && !requestApiKey && !isSessionTranscriptionModelAllowed({
     config,
     provider,
     groupSpeakerLabels,
     model: normalizedRequest.payload.model || upstreamFormData.get("model") || TRANSCRIPTION_FALLBACK_MODEL
-  })) return json8?.(AI_MODEL_NOT_ALLOWED, 403, baseHeaders);
+  })) return json9?.(AI_MODEL_NOT_ALLOWED, 403, baseHeaders);
   const headers2 = {};
   if (key) headers2.authorization = `Bearer ${key}`;
   const fetchOptions = {
@@ -92900,7 +93006,7 @@ var transcribe = async ({
   if (outboundUrlPolicy) fetchOptions.outboundUrlPolicy = outboundUrlPolicy;
   const response3 = await deps?.safeFetch?.(targetUrl, fetchOptions);
   if (!(response3 instanceof Response)) {
-    return json8?.({ error: response3?.error }, response3?.status, baseHeaders);
+    return json9?.({ error: response3?.error }, response3?.status, baseHeaders);
   }
   let data = {};
   try {
@@ -92910,12 +93016,12 @@ var transcribe = async ({
   }
   if (!response3.ok) {
     const message = typeof data?.error === "string" ? data.error : data?.error?.message || data?.message || (response3.status === 401 ? "Unauthorized: invalid API key on server." : "Transcription failed.");
-    return json8?.({ error: String(message), details: data }, response3.status, baseHeaders);
+    return json9?.({ error: String(message), details: data }, response3.status, baseHeaders);
   }
   if (typeof data?.text !== "string") {
-    return json8?.({ error: "The transcription service sent an unreadable reply." }, 502, baseHeaders);
+    return json9?.({ error: "The transcription service sent an unreadable reply." }, 502, baseHeaders);
   }
-  return json8?.({
+  return json9?.({
     text: data.text,
     ...groupSpeakerLabels ? { segments: normalizeSpeakerSegments(data.segments) } : {}
   }, 200, baseHeaders);
@@ -93373,8 +93479,8 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
       const url = new URL(path, ctx.origin);
       if (url.origin !== ctx.origin || !["/storage/read", "/storage/list", "/storage/upload"].includes(url.pathname)) throw authorityError("agent_storage_route_denied");
       if (url.pathname === "/storage/upload" && method === "POST") {
-        const json8 = (payload, status) => Response.json(payload, { status });
-        if (buildSessionEndedResponse({ config, json: json8, now: ctx.now })) throw authorityError("agent_session_ended", 410);
+        const json9 = (payload, status) => Response.json(payload, { status });
+        if (buildSessionEndedResponse({ config, json: json9, now: ctx.now })) throw authorityError("agent_session_ended", 410);
         const preflight = await evaluateAuthenticatedRoutePreflight({
           scopes: ctx.scopes,
           scope: ctx.scopes?.storage === true ? "storage" : "arweave",
@@ -93384,7 +93490,7 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
           slug: ctx.slug,
           address: ctx.address,
           limit: config.limits?.perWalletPerDay || 0,
-          deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: json8 }
+          deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: json9 }
         });
         if (!preflight?.ok) throw authorityError("agent_storage_denied", preflight?.response?.status || 403);
       }
@@ -96906,7 +97012,7 @@ function normalizeBoolean3(value, fallback = false) {
 function toCanonicalAgentApiPathname(pathname = "") {
   return safeString(pathname);
 }
-function json7(data, init2 = {}) {
+function json8(data, init2 = {}) {
   const headers2 = new Headers({ "content-type": "application/json; charset=utf-8" });
   new Headers(init2.headers).forEach((value, name) => headers2.set(name, value));
   return new Response(JSON.stringify(data, null, 2), { ...init2, headers: headers2 });
@@ -97172,7 +97278,7 @@ var sessionMetaCorsHeaders = headers;
 var corsJson = (request, env, data, init2 = {}) => {
   const merged = new Headers(headers(request, env));
   new Headers(init2.headers).forEach((value, key) => merged.set(key, value));
-  return json7(data, { ...init2, headers: merged });
+  return json8(data, { ...init2, headers: merged });
 };
 var jsonResultViewCache = corsJson;
 var jsonSessionMeta = corsJson;
@@ -97258,23 +97364,23 @@ init_redaction();
 init_agentCredentials();
 async function handleServiceCredentialBootstrapRequest({ request, env = {}, createdAt = null } = {}) {
   if (request.method !== "POST") {
-    return json7({ ok: false, reason: "method_not_allowed" }, { status: 405 });
+    return json8({ ok: false, reason: "method_not_allowed" }, { status: 405 });
   }
-  if (env.AGENT_CONTEXT?.auth?.authMode !== "session_admin") return json7({ ok: false, reason: "session_admin_required" }, { status: 403 });
+  if (env.AGENT_CONTEXT?.auth?.authMode !== "session_admin") return json8({ ok: false, reason: "session_admin_required" }, { status: 403 });
   const body = await readRequestJson(request);
   const label = safeString(body.name || body.label).slice(0, 120);
   const sessionSlug = sanitizeSessionSlug(body.sessionSlug);
   const requestedScopes = Array.isArray(body.scopes) ? body.scopes.map((scope) => safeString(scope)).filter(Boolean) : [];
   const allowedScopes = new Set(Object.values(AGENT_CREDENTIAL_SCOPES));
-  if (!label) return json7({ ok: false, reason: "service_name_required" }, { status: 400 });
-  if (!sessionSlug) return json7({ ok: false, reason: "session_required" }, { status: 400 });
+  if (!label) return json8({ ok: false, reason: "service_name_required" }, { status: 400 });
+  if (!sessionSlug) return json8({ ok: false, reason: "session_required" }, { status: 400 });
   if (!requestedScopes.length || requestedScopes.some((scope) => !allowedScopes.has(scope))) {
-    return json7({ ok: false, reason: "service_scopes_invalid" }, { status: 400 });
+    return json8({ ok: false, reason: "service_scopes_invalid" }, { status: 400 });
   }
   const policy = await loadSessionPolicy(env);
   const resolved = resolveAgentHttpSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: resolved.reason || "session_not_found",
@@ -97307,7 +97413,7 @@ async function handleServiceCredentialBootstrapRequest({ request, env = {}, crea
     createdAt
   });
   if (!issued.ok) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: issued.reason || "service_credential_create_failed"
@@ -97328,7 +97434,7 @@ async function handleServiceCredentialBootstrapRequest({ request, env = {}, crea
   };
   const { token: _token, ...secretFree } = response3;
   assertNoSecretShape(secretFree, "Service credential bootstrap metadata must not serialize bearer secrets.");
-  return json7(response3);
+  return json8(response3);
 }
 
 // workers/sessionCorsWorker/agent/questions.mjs
@@ -97836,7 +97942,7 @@ async function handleQuestionsRequest({ env = {}, context = {}, input = {}, wait
     total: page.total
   };
   assertNoSecretShape(body, "Agent questions response must not serialize secrets.");
-  return json7(body);
+  return json8(body);
 }
 async function handleTagsRequest({ env = {}, context = {}, waitUntil = null } = {}) {
   const { questions } = await loadPublicQuestionsForHandoff({
@@ -97858,7 +97964,7 @@ async function handleTagsRequest({ env = {}, context = {}, waitUntil = null } = 
     total: tags.length
   };
   assertNoSecretShape(payload, "Agent tags response must not serialize secrets.");
-  return json7(payload);
+  return json8(payload);
 }
 function normalizeCreateQuestionBatch(input = {}) {
   const questions = Array.isArray(input.questions) ? input.questions : Array.isArray(input.questionDrafts) ? input.questionDrafts : [];
@@ -97909,10 +98015,10 @@ function singleSelectForCreatedQuestion(question = {}) {
 async function handleCreateQuestionsRequest({ env = {}, context = {}, input = {} } = {}) {
   const batch = normalizeCreateQuestionBatch(input);
   if (!batch.length) {
-    return json7({ ok: false, reason: "questions_create_batch_required" }, { status: 400 });
+    return json8({ ok: false, reason: "questions_create_batch_required" }, { status: 400 });
   }
   if (batch.length > 20) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: "questions_create_batch_too_large",
@@ -97923,7 +98029,7 @@ async function handleCreateQuestionsRequest({ env = {}, context = {}, input = {}
   }
   const batchSourceUrl = normalizeSourceUrl(input.sourceUrl || input.url || input.link);
   if ((input.sourceUrl || input.url || input.link) && !batchSourceUrl) {
-    return json7({ ok: false, reason: "source_url_invalid" }, { status: 400 });
+    return json8({ ok: false, reason: "source_url_invalid" }, { status: 400 });
   }
   const created = [];
   const skipped = [];
@@ -98001,12 +98107,12 @@ async function handleCreateQuestionsRequest({ env = {}, context = {}, input = {}
     skipped
   };
   assertNoSecretShape(payload, "Agent questions/create response must not serialize secrets.");
-  return json7(payload);
+  return json8(payload);
 }
 async function handleGeoBacklinkRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
   const questionId4 = safeString(input.questionId);
   if (!questionId4) {
-    return json7({ ok: false, reason: "question_id_required" }, { status: 400 });
+    return json8({ ok: false, reason: "question_id_required" }, { status: 400 });
   }
   const { questions } = await loadPublicQuestionsForHandoff({
     env,
@@ -98015,7 +98121,7 @@ async function handleGeoBacklinkRequest({ env = {}, context = {}, input = {}, wa
   });
   const question = questions.find((candidate) => safeString(candidate.questionId) === questionId4);
   if (!question) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: "question_not_found",
@@ -98052,7 +98158,7 @@ async function handleGeoBacklinkRequest({ env = {}, context = {}, input = {}, wa
     note: "Post backlink with the agent Geo credentials. The CE worker does not call Geo or store Geo tokens."
   };
   assertNoSecretShape(payload, "Agent geo-backlink response must not serialize secrets.");
-  return json7(payload);
+  return json8(payload);
 }
 
 // workers/sessionCorsWorker/agent/questionQueue.mjs
@@ -98102,7 +98208,7 @@ async function handleNextQuestionRequest({ env = {}, context = {}, input = {}, w
     createdAt: input.createdAt || null,
     advanceState: (step) => env.AGENT_SERVICES.advanceQuestionQueue(step)
   });
-  return json7(
+  return json8(
     {
       ok: selected.ok,
       sessionSlug: context.session.sessionSlug,
@@ -98378,7 +98484,7 @@ async function handleQuestionQueuePlanRequest({ env = {}, context = {}, input = 
     waitUntil
   });
   if (!plan.ok) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: plan.admin?.reason || "question_queue_admin_required",
@@ -98387,7 +98493,7 @@ async function handleQuestionQueuePlanRequest({ env = {}, context = {}, input = 
       { status: plan.status || 403 }
     );
   }
-  return json7(plan);
+  return json8(plan);
 }
 async function handleQuestionQueueApplyRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
   const plan = await buildSponsoredQuestionPlan({
@@ -98397,7 +98503,7 @@ async function handleQuestionQueueApplyRequest({ env = {}, context = {}, input =
     waitUntil
   });
   if (!plan.ok) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: plan.admin?.reason || "question_queue_admin_required",
@@ -98407,7 +98513,7 @@ async function handleQuestionQueueApplyRequest({ env = {}, context = {}, input =
     );
   }
   if (!hasExplicitSponsoredQueueApproval(input) || typeof input.planDigest !== "string" || !/^[a-f0-9]{64}$/.test(input.planDigest)) {
-    return json7(
+    return json8(
       {
         ...plan,
         ok: false,
@@ -98417,7 +98523,7 @@ async function handleQuestionQueueApplyRequest({ env = {}, context = {}, input =
     );
   }
   if (input.planDigest !== plan.planDigest) {
-    return json7(
+    return json8(
       { ...plan, ok: false, reason: "sponsored_question_plan_changed" },
       { status: 409 }
     );
@@ -98462,7 +98568,7 @@ async function handleQuestionQueueApplyRequest({ env = {}, context = {}, input =
   const baseIds = plan.mode === "replace" ? [] : plan.existingSponsoredQuestionIds;
   const nextIds = [...baseIds, ...plan.sponsoredQuestionIds, ...createdQuestionIds].map(safeString).filter(Boolean).filter((id2, index, values) => values.indexOf(id2) === index).slice(0, 50);
   if (!nextIds.length) {
-    return json7(
+    return json8(
       {
         ...plan,
         ok: false,
@@ -98481,7 +98587,7 @@ async function handleQuestionQueueApplyRequest({ env = {}, context = {}, input =
     createdAt: input.createdAt || null
   });
   if (!saved.ok) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: saved.reason || "question_queue_save_failed",
@@ -98490,7 +98596,7 @@ async function handleQuestionQueueApplyRequest({ env = {}, context = {}, input =
       { status: 500 }
     );
   }
-  return json7({
+  return json8({
     ok: true,
     sessionSlug: context.session.sessionSlug,
     mode: plan.mode,
@@ -98518,7 +98624,7 @@ async function handleQuestionQueueRequest({
 } = {}) {
   const admin = await requireQuestionQueueAdmin({ env, context, input });
   if (!admin.ok) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: admin.reason,
@@ -98542,7 +98648,7 @@ async function handleQuestionQueueRequest({
     const resolved = clearRequested ? { refs: [], ids: [], skipped: [] } : resolveQuestionQueueRefs(input, candidates);
     skipped = resolved.skipped;
     if (!clearRequested && !resolved.refs.length) {
-      return json7(
+      return json8(
         {
           ok: false,
           reason: "question_queue_question_ids_required",
@@ -98553,7 +98659,7 @@ async function handleQuestionQueueRequest({
       );
     }
     if (!clearRequested && !resolved.ids.length) {
-      return json7(
+      return json8(
         {
           ok: false,
           reason: "question_queue_no_matching_questions",
@@ -98573,7 +98679,7 @@ async function handleQuestionQueueRequest({
       createdAt: input.createdAt || null
     });
     if (!saved.ok) {
-      return json7(
+      return json8(
         {
           ok: false,
           reason: saved.reason || "question_queue_save_failed",
@@ -98587,7 +98693,7 @@ async function handleQuestionQueueRequest({
     env,
     sessionSlug: context.session.sessionSlug
   });
-  return json7({
+  return json8({
     ok: true,
     sessionSlug: context.session.sessionSlug,
     permissionMode: context.permission.mode,
@@ -98616,7 +98722,7 @@ init_agentCredentials();
 init_agentSubmitQueue();
 async function handleAdminStatusRequest({ env = {}, context = {}, input = {} } = {}) {
   const status = await loadAgentAdminStatus({ env, context, input });
-  return json7(status);
+  return json8(status);
 }
 async function handleAdminSkillUpdateRequest({ env = {}, context = {}, input = {}, method = "GET" } = {}) {
   const methodName = safeString(method).toUpperCase();
@@ -98634,7 +98740,7 @@ async function handleAdminSkillUpdateRequest({ env = {}, context = {}, input = {
         accountAddress: admin.accountAddress || ""
       };
       assertNoSecretShape(payload3, "Agent admin skill-update denied response must not serialize secrets.");
-      return json7(payload3, { status: admin.status || 403 });
+      return json8(payload3, { status: admin.status || 403 });
     }
     const flag = await readAgentSkillUpdateFlag(env);
     const payload2 = {
@@ -98645,7 +98751,7 @@ async function handleAdminSkillUpdateRequest({ env = {}, context = {}, input = {
       version: CE_AGENT_ACCESS_SKILL_VERSION
     };
     assertNoSecretShape(payload2, "Agent admin skill-update status must not serialize secrets.");
-    return json7(payload2);
+    return json8(payload2);
   }
   if (methodName === "POST") {
     const admin = await requireQuestionQueueAdmin({
@@ -98661,7 +98767,7 @@ async function handleAdminSkillUpdateRequest({ env = {}, context = {}, input = {
         accountAddress: admin.accountAddress || ""
       };
       assertNoSecretShape(payload3, "Agent admin skill-update denied response must not serialize secrets.");
-      return json7(payload3, { status: admin.status || 403 });
+      return json8(payload3, { status: admin.status || 403 });
     }
     const written = await writeAgentSkillUpdateFlag({
       env,
@@ -98676,7 +98782,7 @@ async function handleAdminSkillUpdateRequest({ env = {}, context = {}, input = {
         reason: written.reason || "agent_skill_update_write_failed"
       };
       assertNoSecretShape(payload3, "Agent admin skill-update write failure must not serialize secrets.");
-      return json7(payload3, { status: 500 });
+      return json8(payload3, { status: 500 });
     }
     const payload2 = {
       ok: true,
@@ -98685,7 +98791,7 @@ async function handleAdminSkillUpdateRequest({ env = {}, context = {}, input = {
       version: CE_AGENT_ACCESS_SKILL_VERSION
     };
     assertNoSecretShape(payload2, "Agent admin skill-update set response must not serialize secrets.");
-    return json7(payload2);
+    return json8(payload2);
   }
   if (methodName === "DELETE") {
     const admin = await requireQuestionQueueAdmin({
@@ -98701,7 +98807,7 @@ async function handleAdminSkillUpdateRequest({ env = {}, context = {}, input = {
         accountAddress: admin.accountAddress || ""
       };
       assertNoSecretShape(payload3, "Agent admin skill-update denied response must not serialize secrets.");
-      return json7(payload3, { status: admin.status || 403 });
+      return json8(payload3, { status: admin.status || 403 });
     }
     const cleared = await clearAgentSkillUpdateFlag(env);
     if (!cleared.ok) {
@@ -98710,7 +98816,7 @@ async function handleAdminSkillUpdateRequest({ env = {}, context = {}, input = {
         reason: cleared.reason || "agent_skill_update_clear_failed"
       };
       assertNoSecretShape(payload3, "Agent admin skill-update clear failure must not serialize secrets.");
-      return json7(payload3, { status: 500 });
+      return json8(payload3, { status: 500 });
     }
     const payload2 = {
       ok: true,
@@ -98720,11 +98826,11 @@ async function handleAdminSkillUpdateRequest({ env = {}, context = {}, input = {
       version: CE_AGENT_ACCESS_SKILL_VERSION
     };
     assertNoSecretShape(payload2, "Agent admin skill-update clear response must not serialize secrets.");
-    return json7(payload2);
+    return json8(payload2);
   }
   const payload = { ok: false, reason: "method_not_allowed" };
   assertNoSecretShape(payload, "Agent admin skill-update method response must not serialize secrets.");
-  return json7(payload, { status: 405 });
+  return json8(payload, { status: 405 });
 }
 async function loadAdminMetricsCache(env = {}, cacheKey3 = "") {
   const kv = env?.AGENT_ACTION_KV;
@@ -98881,7 +98987,7 @@ async function buildAdminMetricsSnapshot({
 async function handleAdminMetricsRequest({ env = {}, context = {} } = {}) {
   const manager = await env.AGENT_SERVICES.admin();
   if (!manager.ok) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: "metrics_admin_required",
@@ -98895,7 +99001,7 @@ async function handleAdminMetricsRequest({ env = {}, context = {} } = {}) {
   const visibleSessionSlugs = /* @__PURE__ */ new Set([sessionSlug]);
   const cacheKey3 = `${ADMIN_METRICS_CACHE_KV_PREFIX}${env.AGENT_CONTEXT.sessionId}:${env.AGENT_CONTEXT.revision}:${sessionSlug}`;
   const cached = await loadAdminMetricsCache(env, cacheKey3);
-  if (cached) return json7(cached);
+  if (cached) return json8(cached);
   const computedAt = (/* @__PURE__ */ new Date()).toISOString();
   const snapshot = await buildAdminMetricsSnapshot({
     env,
@@ -98933,7 +99039,7 @@ async function handleAdminMetricsRequest({ env = {}, context = {} } = {}) {
   };
   assertNoSecretShape(payload, "Agent admin metrics response must not serialize secrets.");
   await saveAdminMetricsCache(env, cacheKey3, payload);
-  return json7(payload);
+  return json8(payload);
 }
 function normalizeAdminQuestionDeleteIds(body = {}) {
   const source = [];
@@ -98976,15 +99082,15 @@ async function removeProcessedQuestionIdsFromAgentOnlyConfig({ env = {}, session
 }
 async function handleAdminQuestionsDeleteRequest({ env = {}, input = {}, body = {} } = {}) {
   const sessionSlug = sanitizeSessionSlug(input.sessionSlug || body.sessionSlug);
-  if (!sessionSlug) return json7({ ok: false, reason: "session_slug_required" }, { status: 400 });
+  if (!sessionSlug) return json8({ ok: false, reason: "session_slug_required" }, { status: 400 });
   const mode = lower2(safeString(body.mode)) || "archive";
   if (!["archive", "delete"].includes(mode)) {
-    return json7({ ok: false, reason: "questions_delete_mode_invalid" }, { status: 400 });
+    return json8({ ok: false, reason: "questions_delete_mode_invalid" }, { status: 400 });
   }
   const questionIds = normalizeAdminQuestionDeleteIds(body);
-  if (!questionIds.length) return json7({ ok: false, reason: "question_ids_required" }, { status: 400 });
+  if (!questionIds.length) return json8({ ok: false, reason: "question_ids_required" }, { status: 400 });
   if (questionIds.length > ADMIN_QUESTIONS_DELETE_MAX_IDS) {
-    return json7({ ok: false, reason: "question_ids_too_many" }, { status: 400 });
+    return json8({ ok: false, reason: "question_ids_too_many" }, { status: 400 });
   }
   const results = [];
   for (const questionId4 of questionIds) {
@@ -99019,19 +99125,19 @@ async function handleAdminQuestionsDeleteRequest({ env = {}, input = {}, body = 
   }
   const payload = { ok: true, sessionSlug, mode, results, configUpdated };
   assertNoSecretShape(payload, "Agent admin questions delete response must not serialize secrets.");
-  return json7(payload);
+  return json8(payload);
 }
 async function handleAdminAgentOnlyConfigRequest({ env = {}, input = {}, body = {}, method = "GET" } = {}) {
   const sessionSlug = sanitizeSessionSlug(input.sessionSlug || body.sessionSlug);
-  if (!sessionSlug) return json7({ ok: false, reason: "session_slug_required" }, { status: 400 });
+  if (!sessionSlug) return json8({ ok: false, reason: "session_slug_required" }, { status: 400 });
   if (method === "GET") {
     const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug });
     const payload = { ok: true, source: loaded.source, config: loaded.config };
     assertNoSecretShape(payload, "Agent-only admin config response must not serialize secrets.");
-    return json7(payload);
+    return json8(payload);
   }
   if (method !== "POST") {
-    return json7({ ok: false, reason: "method_not_allowed" }, { status: 405 });
+    return json8({ ok: false, reason: "method_not_allowed" }, { status: 405 });
   }
   const saved = await saveAgentOnlyModeConfig({
     env,
@@ -99042,11 +99148,11 @@ async function handleAdminAgentOnlyConfigRequest({ env = {}, input = {}, body = 
   });
   const status = saved.ok === false ? saved.status || 400 : 200;
   assertNoSecretShape(saved, "Agent-only admin config save response must not serialize secrets.");
-  return json7(saved, { status });
+  return json8(saved, { status });
 }
 async function handleAdminAgentOnlyExportRequest({ env = {}, input = {} } = {}) {
   const sessionSlug = sanitizeSessionSlug(input.sessionSlug);
-  if (!sessionSlug) return json7({ ok: false, reason: "session_slug_required" }, { status: 400 });
+  if (!sessionSlug) return json8({ ok: false, reason: "session_slug_required" }, { status: 400 });
   const includeBase64Input = lower2(input.include_base64 || input.includeBase64);
   const includeImageBase64 = normalizeBoolean3(input.include_base64, false) || normalizeBoolean3(input.includeBase64, false) || includeBase64Input === "true";
   const exported = await exportAgentOnlyData({
@@ -99062,7 +99168,7 @@ async function handleAdminAgentOnlyExportRequest({ env = {}, input = {} } = {}) 
   if (!exported.ok) {
     const payload = { ok: false, reason: exported.reason };
     assertNoSecretShape(payload, "Agent-only admin export error must not serialize secrets.");
-    return json7(payload, { status: exported.status || 400 });
+    return json8(payload, { status: exported.status || 400 });
   }
   const headers2 = {
     "content-type": exported.contentType,
@@ -100206,7 +100312,7 @@ async function handleOnboardingRequest({ env = {}, context = {}, input = {}, bod
       telegramUserId,
       accountAddress: context.delegation?.accountAddress || body.accountAddress || ""
     });
-    return json7(publicOnboardingState({ sessionSlug, settings: current, groups }));
+    return json8(publicOnboardingState({ sessionSlug, settings: current, groups }));
   }
   const completedAt = safeString(input.completedAt || input.createdAt) || (/* @__PURE__ */ new Date()).toISOString();
   const answers = normalizeOnboardingAnswers(body, current);
@@ -100236,7 +100342,7 @@ async function handleOnboardingRequest({ env = {}, context = {}, input = {}, bod
     createdAt: completedAt
   });
   if (!saved.ok) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: saved.reason || "onboarding_settings_save_failed"
@@ -100252,11 +100358,11 @@ async function handleOnboardingRequest({ env = {}, context = {}, input = {}, bod
     })
   };
   assertNoSecretShape(payload, "Agent onboarding save response must not serialize secrets.");
-  return json7(payload);
+  return json8(payload);
 }
 function hostedAgentHttpRouteGuard(context = {}) {
   if (isHostedAgentHttpSession(context.session)) return null;
-  return json7(
+  return json8(
     {
       ok: false,
       reason: "hosted_agent_http_session_required",
@@ -100273,7 +100379,7 @@ async function handleGroupsRequest({ env = {}, context = {} } = {}) {
     session: context.session,
     telegramUserId: context.storageContext.user.telegramUserId
   });
-  return json7({
+  return json8({
     ok: true,
     sessionSlug: context.session.sessionSlug,
     permissionMode: context.permission.mode,
@@ -100295,7 +100401,7 @@ async function handleGroupProposalRequest({ env = {}, context = {}, input = {} }
     },
     createdAt: input.createdAt || null
   });
-  return json7(saved, { status: saved.ok ? 200 : 400 });
+  return json8(saved, { status: saved.ok ? 200 : 400 });
 }
 async function handleChildSessionRequest({ env = {}, context = {}, input = {} } = {}) {
   const guard = hostedAgentHttpRouteGuard(context);
@@ -100307,7 +100413,7 @@ async function handleChildSessionRequest({ env = {}, context = {}, input = {} } 
     input,
     createdAt: input.createdAt || null
   });
-  return json7(saved, { status: saved.ok ? 200 : 400 });
+  return json8(saved, { status: saved.ok ? 200 : 400 });
 }
 
 // workers/sessionCorsWorker/agent/results.mjs
@@ -101758,7 +101864,7 @@ function sessionMemberAggregateDenial(access = {}) {
     ...access.minGroupSize ? { minGroupSize: access.minGroupSize } : {}
   };
   assertNoSecretShape(body, "Session-member aggregate denial must not serialize secrets.");
-  return json7(body, { status: access.status || 403 });
+  return json8(body, { status: access.status || 403 });
 }
 function normalizeAgentResultsView(value = "") {
   const view = lower2(value || "topic-map");
@@ -102005,7 +102111,7 @@ async function handleResultsRequest({
       supportedViews: AGENT_RESULTS_SUPPORTED_VIEWS
     };
     assertNoSecretShape(body2, "Agent results unsupported-view response must not serialize secrets.");
-    return json7(body2, { status: 400 });
+    return json8(body2, { status: 400 });
   }
   const demo = agentBoolean(input.demo);
   if (view === "topic-map") {
@@ -102015,7 +102121,7 @@ async function handleResultsRequest({
         reason: "level_3_aggregate_results_admin_disabled"
       };
       assertNoSecretShape(body3, "Agent results gate response must not serialize secrets.");
-      return json7(body3, { status: 403 });
+      return json8(body3, { status: 403 });
     }
     const memberAccess2 = await authorizeSessionMemberAggregateResults({
       env,
@@ -102036,7 +102142,7 @@ async function handleResultsRequest({
       topicMap: built.topicMap
     };
     assertNoSecretShape(body2, "Agent results response must not serialize secrets.");
-    return json7(body2, { status: 200 });
+    return json8(body2, { status: 200 });
   }
   if (["consensus", "difference"].includes(view)) {
     if (!demo && !aggregateResultsEnabledForAgent(context.session)) {
@@ -102045,7 +102151,7 @@ async function handleResultsRequest({
         reason: "level_3_aggregate_results_admin_disabled"
       };
       assertNoSecretShape(body3, "Agent results gate response must not serialize secrets.");
-      return json7(body3, { status: 403 });
+      return json8(body3, { status: 403 });
     }
     const memberAccess2 = await authorizeSessionMemberAggregateResults({
       env,
@@ -102066,13 +102172,13 @@ async function handleResultsRequest({
       questions: rows
     };
     assertNoSecretShape(body2, "Agent aggregate results response must not serialize secrets.");
-    return json7(body2, { status: 200 });
+    return json8(body2, { status: 200 });
   }
   if (view === "polis") {
     if (!demo && !anonymizedGroupsEnabledForAgent(context.session)) {
       const body3 = { ok: false, reason: "anonymized_groups_admin_disabled" };
       assertNoSecretShape(body3, "Agent polis gate response must not serialize secrets.");
-      return json7(body3, { status: 403 });
+      return json8(body3, { status: 403 });
     }
     const memberAccess2 = await authorizeSessionMemberAggregateResults({
       env,
@@ -102092,16 +102198,16 @@ async function handleResultsRequest({
         participantCount: Number(body2.participantCount || 0)
       };
       assertNoSecretShape(insufficient, "Agent polis min-group response must not serialize secrets.");
-      return json7(insufficient, { status: 403 });
+      return json8(insufficient, { status: 403 });
     }
     body2.minGroupSize = minGroupSize2;
     assertNoSecretShape(body2, "Agent polis dataset response must not serialize secrets.");
-    return json7(body2, { status: 200 });
+    return json8(body2, { status: 200 });
   }
   if (!demo && !anonymizedGroupsEnabledForAgent(context.session)) {
     const body2 = { ok: false, reason: "anonymized_groups_admin_disabled" };
     assertNoSecretShape(body2, "Agent groups gate response must not serialize secrets.");
-    return json7(body2, { status: 403 });
+    return json8(body2, { status: 403 });
   }
   const memberAccess = await authorizeSessionMemberAggregateResults({
     env,
@@ -102127,7 +102233,7 @@ async function handleResultsRequest({
     groups: anonymized.groups
   };
   assertNoSecretShape(body, "Agent anonymized groups response must not serialize secrets.");
-  return json7(body, { status: 200 });
+  return json8(body, { status: 200 });
 }
 async function handleResultsImageRequest({
   env = {},
@@ -102143,7 +102249,7 @@ async function handleResultsImageRequest({
       supportedViews: AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS
     };
     assertNoSecretShape(body, "Agent results-image unsupported-view response must not serialize secrets.");
-    return json7(body, { status: 400 });
+    return json8(body, { status: 400 });
   }
   const demo = agentBoolean(input.demo);
   if (view === "topic-map") {
@@ -102153,7 +102259,7 @@ async function handleResultsImageRequest({
         reason: "level_3_aggregate_results_admin_disabled"
       };
       assertNoSecretShape(body, "Agent results-image gate response must not serialize secrets.");
-      return json7(body, { status: 403 });
+      return json8(body, { status: 403 });
     }
     const memberAccess2 = await authorizeSessionMemberAggregateResults({
       env,
@@ -102171,7 +102277,7 @@ async function handleResultsImageRequest({
         view: "topic-map"
       };
       assertNoSecretShape(body, "Agent topic-map image unavailable response must not serialize secrets.");
-      return json7(body, { status: 409 });
+      return json8(body, { status: 409 });
     }
     const image2 = buildResultsImage({
       mode: "topic-map",
@@ -102196,7 +102302,7 @@ async function handleResultsImageRequest({
         reason: "level_3_aggregate_results_admin_disabled"
       };
       assertNoSecretShape(body, "Agent consensus image gate response must not serialize secrets.");
-      return json7(body, { status: 403 });
+      return json8(body, { status: 403 });
     }
     const memberAccess2 = await authorizeSessionMemberAggregateResults({
       env,
@@ -102215,7 +102321,7 @@ async function handleResultsImageRequest({
         view: "consensus"
       };
       assertNoSecretShape(body, "Agent consensus image unavailable response must not serialize secrets.");
-      return json7(body, { status: 409 });
+      return json8(body, { status: 409 });
     }
     const image2 = buildResultsImage({
       mode: "consensus",
@@ -102236,7 +102342,7 @@ async function handleResultsImageRequest({
   if (!demo && !anonymizedGroupsEnabledForAgent(context.session)) {
     const body = { ok: false, reason: "anonymized_groups_admin_disabled" };
     assertNoSecretShape(body, "Agent groups image gate response must not serialize secrets.");
-    return json7(body, { status: 403 });
+    return json8(body, { status: 403 });
   }
   const memberAccess = await authorizeSessionMemberAggregateResults({
     env,
@@ -102257,7 +102363,7 @@ async function handleResultsImageRequest({
       view: "groups"
     };
     assertNoSecretShape(body, "Agent groups image unavailable response must not serialize secrets.");
-    return json7(body, { status: 409 });
+    return json8(body, { status: 409 });
   }
   const image = buildResultsImage({
     mode: "group",
@@ -102318,7 +102424,7 @@ async function handleAgentOnlyStatementsRequest({ env = {}, context = {}, input 
   });
   const status = page.ok === false ? page.status || 500 : 200;
   assertNoSecretShape(page, "Agent-only statements response must not serialize secrets.");
-  return json7(page, { status });
+  return json8(page, { status });
 }
 async function handleAgentOnlyAnswersBulkRequest({ env = {}, context = {}, input = {}, body = {} } = {}) {
   const result = await submitAgentOnlyAnswersBulk({
@@ -102340,7 +102446,7 @@ async function handleAgentOnlyAnswersBulkRequest({ env = {}, context = {}, input
     now: agentOnlyRequestNow(env)
   });
   assertNoSecretShape(result, "Agent-only answers response must not serialize secrets.");
-  return json7(result, { status });
+  return json8(result, { status });
 }
 async function handleAgentOnlyTokenVotesBulkRequest({ env = {}, context = {}, input = {}, body = {} } = {}) {
   const result = await submitAgentOnlyTokenVotesBulk({
@@ -102362,7 +102468,7 @@ async function handleAgentOnlyTokenVotesBulkRequest({ env = {}, context = {}, in
     now: agentOnlyRequestNow(env)
   });
   assertNoSecretShape(result, "Agent-only token-votes response must not serialize secrets.");
-  return json7(result, { status });
+  return json8(result, { status });
 }
 function base64ToBytes(value = "") {
   const binary = atob(String(value || ""));
@@ -102379,7 +102485,7 @@ function agentOnlyWrappedImageViewUrl(env = {}, imageViewId = "") {
 async function handleAgentOnlyWrappedImageViewRequest({ env = {}, imageViewId = "", method = "GET" } = {}) {
   const result = await loadAgentOnlyWrappedImageByViewId({ env, imageViewId });
   if (!result.ok) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: result.reason || "wrapped_image_not_found"
@@ -102433,7 +102539,7 @@ async function handleAgentOnlyWrappedImageRequest({
   });
   if (!result.ok) {
     assertNoSecretShape(result, "Agent-only wrapped image error must not serialize secrets.");
-    return json7(result, { status });
+    return json8(result, { status });
   }
   const responseFormat = lower2(input.format || body.format);
   const wantsPng = responseFormat === "png";
@@ -102463,7 +102569,7 @@ async function handleAgentOnlyWrappedImageRequest({
     { ...payload, image_base64: "[image omitted]" },
     "Agent-only wrapped image response metadata must not serialize secrets."
   );
-  return json7(payload, { status, headers: { "cache-control": "no-store" } });
+  return json8(payload, { status, headers: { "cache-control": "no-store" } });
 }
 
 // workers/sessionCorsWorker/agent/questionVotes.mjs
@@ -102870,7 +102976,7 @@ async function applyAgentQuestionVotes({
   };
 }
 async function handleQuestionVoteRecommendationsRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
-  if ((input.autoApply === true || lower2(input.applyMode) === "auto") && !context.delegation?.scopes?.includes("apply_question_votes")) return json7({ ok: false, reason: "agent_token_scope_denied", requiredScope: "apply_question_votes" }, { status: 403 });
+  if ((input.autoApply === true || lower2(input.applyMode) === "auto") && !context.delegation?.scopes?.includes("apply_question_votes")) return json8({ ok: false, reason: "agent_token_scope_denied", requiredScope: "apply_question_votes" }, { status: 403 });
   const { loaded, questions } = await loadPublicQuestionsForHandoff({
     env,
     context,
@@ -102903,7 +103009,7 @@ async function handleQuestionVoteRecommendationsRequest({ env = {}, context = {}
       recommendations: built.recommendations
     });
   }
-  return json7({
+  return json8({
     ok: true,
     sessionSlug: context.session.sessionSlug,
     permissionMode: context.permission.mode,
@@ -102944,7 +103050,7 @@ async function handleQuestionVoteApplyRequest({ env = {}, context = {}, input = 
     questions,
     recommendations
   });
-  return json7(applied, { status: applied.ok ? 200 : 400 });
+  return json8(applied, { status: applied.ok ? 200 : 400 });
 }
 async function handleActionsRequest({ env = {}, context = {}, input = {} } = {}) {
   const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug || input.sessionSlug);
@@ -102956,7 +103062,7 @@ async function handleActionsRequest({ env = {}, context = {}, input = {} } = {})
     limit: Number(input.limit || 50) || 50
   });
   assertNoSecretShape(items, "Agent activity response must not serialize secrets.");
-  return json7({
+  return json8({
     ok: true,
     sessionSlug,
     telegramUserId: context.storageContext.user.telegramUserId,
@@ -103246,7 +103352,7 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     }
   };
   assertNoSecretShape(payload, "Agent preference response must not serialize secrets.");
-  return json7(payload, { status: directSubmitIncomplete ? 422 : 200 });
+  return json8(payload, { status: directSubmitIncomplete ? 422 : 200 });
 }
 
 // workers/sessionCorsWorker/agent/invites.mjs
@@ -103324,7 +103430,7 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
   if (request.method !== "POST") {
     const payload = { ok: false, reason: "method_not_allowed" };
     assertNoSecretShape(payload, "Agent invite onboarding method response must not serialize secrets.");
-    return json7(payload, { status: 405 });
+    return json8(payload, { status: 405 });
   }
   const body = await readRequestJson(request);
   const inviteToken = safeString(
@@ -103334,13 +103440,13 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
   if (!invite.ok) {
     const payload = { ok: false, reason: invite.reason };
     assertNoSecretShape(payload, "Agent invite onboarding denial must not serialize secrets.");
-    return json7(payload, { status: invite.status || 401 });
+    return json8(payload, { status: invite.status || 401 });
   }
   const policy = await loadSessionPolicy(env);
   const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug || body.defaultSessionSlug || body.slug);
   const invitedSessionSlug = sanitizeSessionSlug(invite.invite.sessionSlug);
   if (invitedSessionSlug && requestedSessionSlug && invitedSessionSlug !== requestedSessionSlug) {
-    return json7(
+    return json8(
       {
         ok: false,
         reason: "invite_session_mismatch",
@@ -103349,7 +103455,7 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
       { status: 403 }
     );
   }
-  if (!requestedSessionSlug) return json7({ ok: false, reason: "session_required" }, { status: 400 });
+  if (!requestedSessionSlug) return json8({ ok: false, reason: "session_required" }, { status: 400 });
   const explicitSessionSlug = requestedSessionSlug;
   const principal = {
     principalId: createOpaqueAgentPrincipalId(AGENT_CREDENTIAL_KINDS.USER),
@@ -103365,7 +103471,7 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
       sessionSlug: resolved.sessionSlug || explicitSessionSlug || ""
     };
     assertNoSecretShape(payload, "Agent invite onboarding session response must not serialize secrets.");
-    return json7(payload, { status: 404 });
+    return json8(payload, { status: 404 });
   }
   const account = await deriveManagedDemoAccount({
     principal,
@@ -103386,7 +103492,7 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
     }
   });
   if (!reservation.ok) {
-    return json7(
+    return json8(
       { ok: false, reason: reservation.reason || "invite_reservation_failed" },
       { status: reservation.status || 503 }
     );
@@ -103414,7 +103520,7 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
       reason: issued.reason || "agent_token_create_failed"
     };
     assertNoSecretShape(payload, "Agent invite onboarding token failure must not serialize secrets.");
-    return json7(payload, {
+    return json8(payload, {
       status: issued.reason === "agent_token_storage_unavailable" ? 503 : 500
     });
   }
@@ -103431,7 +103537,7 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
   });
   if (!consumed.ok) {
     await revokeAgentCredentialHash({ env, tokenHash: issued.tokenHash });
-    return json7(
+    return json8(
       { ok: false, reason: consumed.reason || "invite_redemption_finalize_failed" },
       { status: consumed.status || 503 }
     );
@@ -103456,7 +103562,7 @@ async function handleInviteOnboardRequest({ request, env = {}, createdAt = null 
   };
   const { token: _token, ...secretFree } = response3;
   assertNoSecretShape(secretFree, "Agent invite onboarding token response metadata must not serialize secrets.");
-  return json7(response3);
+  return json8(response3);
 }
 
 // workers/sessionCorsWorker/agent/exchanges.mjs
@@ -103466,12 +103572,12 @@ init_runtimePrimitives();
 async function handleClientLoginExchangeRequest({ env }) {
   const ctx = env.AGENT_CONTEXT;
   const source = ctx.auth.delegation;
-  if (!["user", "service"].includes(source?.credentialKind) || source.audience !== AGENT_CREDENTIAL_AUDIENCES.SESSION_AGENT || source.scopes.includes("agent_autofill") || source.sourceParticipant) return json7({ ok: false, reason: "agent_credential_exchange_denied" }, { status: 403 });
+  if (!["user", "service"].includes(source?.credentialKind) || source.audience !== AGENT_CREDENTIAL_AUDIENCES.SESSION_AGENT || source.scopes.includes("agent_autofill") || source.sourceParticipant) return json8({ ok: false, reason: "agent_credential_exchange_denied" }, { status: 403 });
   if (source.credentialKind === "service" && !source.scopes.includes("session_login")) {
-    return json7({ ok: false, reason: "agent_credential_session_login_denied" }, { status: 403 });
+    return json8({ ok: false, reason: "agent_credential_session_login_denied" }, { status: 403 });
   }
   const remaining = Math.floor((Date.parse(source.expiresAt) - ctx.now()) / 1e3);
-  if (remaining <= 0) return json7({ ok: false, reason: "agent_token_expired" }, { status: 401 });
+  if (remaining <= 0) return json8({ ok: false, reason: "agent_token_expired" }, { status: 401 });
   const login = await env.AGENT_SERVICES.login({ source });
   const issued = await issueAgentCredential({
     env,
@@ -103487,13 +103593,13 @@ async function handleClientLoginExchangeRequest({ env }) {
   });
   if (!issued.ok) {
     await env.AGENT_SERVICES.revokeLogin(login.payload);
-    return json7({ ok: false, reason: issued.reason }, { status: 503 });
+    return json8({ ok: false, reason: issued.reason }, { status: 503 });
   }
   const policy = await loadSessionPolicy(env);
   const session = policy.linkedSessions[0];
   const groups = await loadAgentLightweightGroups({ env, session, telegramUserId: source.principal.principalId, accountAddress: source.accountAddress });
   const has = (scope) => source.scopes.includes(scope);
-  return json7({
+  return json8({
     ok: true,
     sessionSlug: ctx.slug,
     sessionId: ctx.sessionId,
@@ -103520,12 +103626,12 @@ async function handleWrappedMemberExchangeRequest({ env }) {
   const ctx = env.AGENT_CONTEXT;
   const payload = ctx.auth.payload;
   const kv = env.AGENT_ACTION_KV;
-  if (!kv) return json7({ ok: false, reason: "agent_token_storage_unavailable" }, { status: 503 });
+  if (!kv) return json8({ ok: false, reason: "agent_token_storage_unavailable" }, { status: 503 });
   const replayKey = `agent:member-exchange:v2:${await sha256Hex2(`${ctx.sessionId}:${payload.sub.toLowerCase()}:${payload.jti}`)}`;
-  if (await kv.get(replayKey)) return json7({ ok: false, reason: "session_worker_credential_replayed" }, { status: 409 });
+  if (await kv.get(replayKey)) return json8({ ok: false, reason: "session_worker_credential_replayed" }, { status: 409 });
   const remaining = payload.exp - Math.floor(ctx.now() / 1e3);
   const ttlSeconds = Math.min(AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS, remaining);
-  if (ttlSeconds <= 0) return json7({ ok: false, reason: "session_worker_credential_expired" }, { status: 401 });
+  if (ttlSeconds <= 0) return json8({ ok: false, reason: "session_worker_credential_expired" }, { status: 401 });
   const principal = { principalId: `session-member:${payload.sub.toLowerCase()}`, kind: "user", adapter: "session_worker", label: "Session member" };
   const issued = await issueAgentCredential({
     env,
@@ -103538,14 +103644,14 @@ async function handleWrappedMemberExchangeRequest({ env }) {
     ttlSeconds,
     createdAt: new Date(ctx.now()).toISOString()
   });
-  if (!issued.ok) return json7({ ok: false, reason: issued.reason }, { status: 503 });
+  if (!issued.ok) return json8({ ok: false, reason: issued.reason }, { status: 503 });
   try {
     await kv.put(replayKey, JSON.stringify({ sourceJti: payload.jti, credentialHash: issued.tokenHash }), { expirationTtl: Math.max(60, remaining) });
   } catch {
     await revokeAgentCredentialHash({ env, tokenHash: issued.tokenHash });
-    return json7({ ok: false, reason: "member_exchange_persistence_failed" }, { status: 503 });
+    return json8({ ok: false, reason: "member_exchange_persistence_failed" }, { status: 503 });
   }
-  return json7({
+  return json8({
     ok: true,
     token: issued.token,
     sessionSlug: ctx.slug,
@@ -103563,9 +103669,9 @@ async function handleWrappedMemberExchangeRequest({ env }) {
 async function handleDelegateCredentialRequest({ env }) {
   const ctx = env.AGENT_CONTEXT;
   const payload = ctx.auth.payload;
-  if (payload.agentSource) return json7({ ok: false, reason: "agent_delegate_person_required" }, { status: 403 });
+  if (payload.agentSource) return json8({ ok: false, reason: "agent_delegate_person_required" }, { status: 403 });
   const ttlSeconds = payload.exp - Math.floor(ctx.now() / 1e3);
-  if (ttlSeconds <= 0) return json7({ ok: false, reason: "session_worker_credential_expired" }, { status: 401 });
+  if (ttlSeconds <= 0) return json8({ ok: false, reason: "session_worker_credential_expired" }, { status: 401 });
   const principal = { principalId: `session-member:${payload.sub.toLowerCase()}`, kind: "user", adapter: "session_worker", label: "Session member" };
   const issued = await issueAgentCredential({
     env,
@@ -103577,10 +103683,10 @@ async function handleDelegateCredentialRequest({ env }) {
     ttlSeconds,
     createdAt: new Date(ctx.now()).toISOString()
   });
-  if (!issued.ok) return json7({ ok: false, reason: issued.reason }, { status: 503 });
+  if (!issued.ok) return json8({ ok: false, reason: issued.reason }, { status: 503 });
   const { linkedSessions: [session] } = await loadSessionPolicy(env);
   const hosted = ctx.config.sessionModeProfile?.authority?.mode === "worker_canonical";
-  return json7({
+  return json8({
     ok: true,
     token: issued.token,
     sessionSlug: ctx.slug,
@@ -103634,15 +103740,15 @@ var handlers = {
 };
 async function handleAgentHttpRequest({ request, env, body = {}, context, input, route, waitUntil, fetchImpl }) {
   if (route.path === "/api/agent/skill") return skillRedirectResponse(env);
-  if (route.path === "/api/agent/skill-version") return json7(await skillVersionPayloadWithFlag(env));
+  if (route.path === "/api/agent/skill-version") return json8(await skillVersionPayloadWithFlag(env));
   if (route.path === "/api/agent/session-wrapped/skill") return sessionWrappedSkillRedirectResponse(env);
-  if (route.path === "/api/agent/session-wrapped/skill-version") return json7(sessionWrappedSkillVersionPayload(env));
+  if (route.path === "/api/agent/session-wrapped/skill-version") return json8(sessionWrappedSkillVersionPayload(env));
   if (route.path.endsWith("/view/:id")) {
     let imageViewId;
     try {
       imageViewId = decodeURIComponent(new URL(request.url).pathname.split("/").pop());
     } catch {
-      return json7({ ok: false, reason: "image_not_found" }, { status: 404 });
+      return json8({ ok: false, reason: "image_not_found" }, { status: 404 });
     }
     return handleAgentOnlyWrappedImageViewRequest({ env, imageViewId, method: request.method });
   }
@@ -103653,10 +103759,10 @@ async function handleAgentHttpRequest({ request, env, body = {}, context, input,
 var dispatchSessionAgentRequest = async ({ request, env, deps, baseHeaders = {} }) => {
   const url = new URL(request.url);
   const route = resolveAgentRoute(url.pathname);
-  if (!route) return json7({ ok: false, reason: "agent_route_not_found" }, { status: 404 });
+  if (!route) return json8({ ok: false, reason: "agent_route_not_found" }, { status: 404 });
   const method = request.method.toUpperCase();
   if (!(route.methods.includes(method) || method === "OPTIONS" && route.cors)) {
-    return json7({ ok: false, reason: "method_not_allowed" }, { status: 405, headers: { Allow: route.methods.join(", ") } });
+    return json8({ ok: false, reason: "method_not_allowed" }, { status: 405, headers: { Allow: route.methods.join(", ") } });
   }
   let headers2 = {};
   try {
@@ -103688,7 +103794,7 @@ var dispatchSessionAgentRequest = async ({ request, env, deps, baseHeaders = {} 
     const { config, revision } = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug });
     if (!config) throw authorityError("session_not_found", 404);
     const cors = await deps.getCorsContext({ request, config });
-    if (!cors?.ok) return cors?.response || json7({ ok: false, reason: "origin_not_allowed" }, { status: 403 });
+    if (!cors?.ok) return cors?.response || json8({ ok: false, reason: "origin_not_allowed" }, { status: 403 });
     headers2 = { ...Object.fromEntries(new Headers(cors.headers)), "Cache-Control": "no-store" };
     if (method === "OPTIONS") {
       const requestedMethod = request.headers.get("Access-Control-Request-Method");
@@ -103796,7 +103902,7 @@ var dispatchSessionAgentRequest = async ({ request, env, deps, baseHeaders = {} 
   } catch (error) {
     const reason = error.reason || (error.message === "managed_demo_root_secret_missing" ? "managed_demo_signer_not_configured" : "agent_request_failed");
     const status = error.status || (reason === "managed_demo_signer_not_configured" ? 503 : 500);
-    return json7({ ok: false, reason }, { status, headers: headers2 });
+    return json8({ ok: false, reason }, { status, headers: headers2 });
   }
 };
 
@@ -104335,71 +104441,8 @@ var dispatchInterviewStarterRequest = async ({ request, env, slugHint, baseHeade
   }
 };
 
-// workers/sessionCorsWorker/workerRouteShellBinding.js
-init_bodyByteLimit();
-init_uploadSizeLimits();
-
-// workers/sessionCorsWorker/anonymousRouteEntry.js
+// workers/sessionCorsWorker/sessionFeedbackRoute.js
 init_sessionConfigAuthority();
-var dispatchAnonymousRouteEntry = async ({
-  path,
-  anonymousRoute,
-  request,
-  env,
-  slugHint,
-  baseHeaders,
-  deps
-} = {}) => {
-  const slugResolution = deps?.resolveRequestSlugWithoutToken?.({ request, env, slugHint }) || {
-    ok: false,
-    error: "Invalid session slug."
-  };
-  if (!slugResolution?.ok) {
-    return deps?.json?.({ error: slugResolution?.error }, 400, baseHeaders);
-  }
-  if (!slugResolution?.explicitSlugProvided) {
-    return deps?.json?.({ error: deps?.MISSING_SLUG_ERROR }, 400, baseHeaders);
-  }
-  const slug = slugResolution?.slug;
-  let config;
-  try {
-    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug, cache: true }));
-  } catch (error) {
-    return deps?.json?.({ error: error.message }, 503, baseHeaders);
-  }
-  if (!config) {
-    return deps?.json?.({ error: deps?.SESSION_CONFIG_NOT_FOUND_ERROR }, 404, baseHeaders);
-  }
-  const corsContext = await deps?.getCorsContext?.({ request, config });
-  if (!corsContext?.ok) return corsContext?.response;
-  const headers2 = corsContext?.headers;
-  const limit = resolveAnonymousIpDailyLimit(config);
-  const anonymousIdentity = deps?.resolveAnonymousRateIdentity?.(request);
-  const anonymousRateAllowed = await deps?.checkRateLimit?.({
-    env,
-    slug,
-    address: anonymousIdentity,
-    limit,
-    route: anonymousRoute
-  });
-  if (!anonymousRateAllowed) {
-    return deps?.json?.({ error: "Rate limit exceeded." }, 429, headers2);
-  }
-  return deps?.dispatchAnonymousRoute?.({
-    path,
-    request,
-    anonymousContext: {
-      slug,
-      config,
-      headers: headers2,
-      env
-    }
-  });
-};
-
-// workers/sessionCorsWorker/anonymousRouteDispatch.js
-init_aiRequestPolicy();
-init_aiDefaults();
 
 // workers/sessionCorsWorker/workerCapabilities.js
 init_sessionConfigMutation();
@@ -104435,6 +104478,7 @@ var FEATURES = Object.freeze([
   "response_upload_receipts",
   "results_analysis_retry_v1",
   "session_backup_v1",
+  "session_feedback",
   "storage_read_batch_v1",
   "upload_authority_stamps",
   "worker_groups"
@@ -104501,7 +104545,180 @@ var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 =
   return Response.json(body, { headers: responseHeaders });
 };
 
+// workers/sessionCorsWorker/sessionFeedbackRoute.js
+var FEEDBACK_PATH = "/feedback";
+var FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2e3, reachMeChars: 200, nameChars: 80, bodyBytes: 8192 });
+var SCREENS = /* @__PURE__ */ new Set(["phone", "tablet", "desktop"]);
+var VIEW = /^[A-Za-z0-9:_-]{1,80}$/;
+var THEME = /^[a-z0-9-]{1,40}$/;
+var RELEASE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+var PERSON_LIMIT = { error: "You\u2019ve sent 5 today. Thanks! Try again tomorrow.", reason: "feedback_person_limit" };
+var STORE_REFUSALS = {
+  feedback_full: { status: 409, error: "Feedback is full; an admin can clear old messages." },
+  feedback_session_limit: { status: 429, error: "Feedback is closed for today." }
+};
+var plain = (value) => typeof value === "string" ? value.normalize("NFC").trim() : "";
+var absent = (value) => value === void 0 || value === null || value === "";
+var invalid3 = (error) => ({ ok: false, status: 400, body: { error, reason: "feedback_invalid" } });
+var byteLength2 = (value) => new TextEncoder().encode(value).length;
+var normalizeFeedback = (body, { address: address3 = "" } = {}) => {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return invalid3("Send the feedback as a JSON object.");
+  if (byteLength2(JSON.stringify(body)) > FEEDBACK_LIMITS.bodyBytes) return invalid3("That feedback is too long to send.");
+  const text6 = plain(body.text);
+  if (!text6) return invalid3("Write some feedback first.");
+  if (text6.length > FEEDBACK_LIMITS.textChars) return invalid3(`Feedback can be at most ${FEEDBACK_LIMITS.textChars} characters.`);
+  if (typeof body.view !== "string" || !VIEW.test(body.view)) return invalid3("view must name a section, such as results or answering.");
+  if (typeof body.theme !== "string" || !THEME.test(body.theme)) return invalid3("theme must be a theme id.");
+  if (!SCREENS.has(body.screen)) return invalid3("screen must be phone, tablet or desktop.");
+  if (!absent(body.appRelease) && !(typeof body.appRelease === "string" && body.appRelease.length <= 40 && RELEASE.test(body.appRelease))) {
+    return invalid3("appRelease must be a release number such as 0.9.8.");
+  }
+  let contact;
+  if (!absent(body.contact)) {
+    const reachMe = plain(body.contact?.reachMe);
+    const displayName = plain(body.contact?.displayName);
+    if (typeof body.contact !== "object" || !reachMe || reachMe.length > FEEDBACK_LIMITS.reachMeChars) {
+      return invalid3(`How to reach you must be 1 to ${FEEDBACK_LIMITS.reachMeChars} characters.`);
+    }
+    if (displayName.length > FEEDBACK_LIMITS.nameChars) return invalid3(`A name can be at most ${FEEDBACK_LIMITS.nameChars} characters.`);
+    contact = { ...address3 ? { address: address3 } : {}, ...displayName ? { displayName } : {}, reachMe };
+  }
+  return {
+    ok: true,
+    record: {
+      text: text6,
+      view: body.view,
+      theme: body.theme,
+      screen: body.screen,
+      ...absent(body.appRelease) ? {} : { appRelease: body.appRelease },
+      signedIn: Boolean(address3),
+      ...contact ? { contact } : {}
+    }
+  };
+};
+var callSessionFeedbackStore = (env, slug, operation, payload = {}) => callSessionConfigCoordinator({ env, slug, path: `session-feedback/${operation}`, ...payload });
+var sendSessionFeedback = async ({
+  env,
+  slug,
+  config,
+  body,
+  address: address3 = "",
+  identity,
+  checkRateLimit,
+  release = workerRelease(),
+  store = callSessionFeedbackStore
+} = {}) => {
+  if (config?.feedbackEnabled === false) {
+    return { status: 403, body: { error: "This session isn\u2019t taking feedback.", reason: "feedback_off" } };
+  }
+  const normalized = normalizeFeedback(body, { address: String(address3 || "").toLowerCase() });
+  if (!normalized.ok) return normalized;
+  const allowed = await checkRateLimit({ env, slug, address: identity, limit: FEEDBACK_LIMITS.perPersonPerDay, route: "feedback" });
+  if (!allowed) return { status: 429, body: PERSON_LIMIT };
+  const saved = await store(env, slug, "add", { record: { ...normalized.record, workerRelease: release } });
+  if (saved.ok) return { status: 200, body: { ok: true } };
+  const refusal2 = STORE_REFUSALS[saved.body?.reason];
+  return refusal2 ? { status: refusal2.status, body: { error: refusal2.error, reason: saved.body.reason } } : { status: 503, body: { error: "Feedback couldn\u2019t be saved just now. Try again shortly.", reason: "feedback_unavailable" } };
+};
+var dispatchAnonymousFeedbackRequest = async ({ request, env, slugHint, baseHeaders, deps, constants }) => {
+  const resolved = deps.resolveRequestSlugWithoutToken({ request, env, slugHint });
+  if (!resolved?.ok || !resolved.explicitSlugProvided) {
+    return deps.json({ error: resolved?.error || constants?.missingSlugError }, 400, baseHeaders);
+  }
+  const slug = resolved.slug;
+  let config;
+  try {
+    ({ config } = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug, cache: true }));
+  } catch (error) {
+    return deps.json({ error: error.message }, 503, baseHeaders);
+  }
+  if (!config) return deps.json({ error: constants?.sessionConfigNotFoundError }, 404, baseHeaders);
+  const cors = await deps.getCorsContext({ request, config });
+  if (!cors.ok) return cors.response;
+  const raw = await request.text();
+  if (byteLength2(raw) > FEEDBACK_LIMITS.bodyBytes) return deps.json(invalid3("That feedback is too long to send.").body, 400, cors.headers);
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    body = void 0;
+  }
+  const result = await sendSessionFeedback({
+    env,
+    slug,
+    config,
+    body,
+    identity: deps.resolveAnonymousRateIdentity(request),
+    checkRateLimit: deps.checkRateLimit
+  });
+  return deps.json(result.body, result.status, cors.headers);
+};
+
+// workers/sessionCorsWorker/workerRouteShellBinding.js
+init_bodyByteLimit();
+init_uploadSizeLimits();
+
+// workers/sessionCorsWorker/anonymousRouteEntry.js
+init_sessionConfigAuthority();
+var dispatchAnonymousRouteEntry = async ({
+  path,
+  anonymousRoute,
+  request,
+  env,
+  slugHint,
+  baseHeaders,
+  deps
+} = {}) => {
+  const slugResolution = deps?.resolveRequestSlugWithoutToken?.({ request, env, slugHint }) || {
+    ok: false,
+    error: "Invalid session slug."
+  };
+  if (!slugResolution?.ok) {
+    return deps?.json?.({ error: slugResolution?.error }, 400, baseHeaders);
+  }
+  if (!slugResolution?.explicitSlugProvided) {
+    return deps?.json?.({ error: deps?.MISSING_SLUG_ERROR }, 400, baseHeaders);
+  }
+  const slug = slugResolution?.slug;
+  let config;
+  try {
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug, cache: true }));
+  } catch (error) {
+    return deps?.json?.({ error: error.message }, 503, baseHeaders);
+  }
+  if (!config) {
+    return deps?.json?.({ error: deps?.SESSION_CONFIG_NOT_FOUND_ERROR }, 404, baseHeaders);
+  }
+  const corsContext = await deps?.getCorsContext?.({ request, config });
+  if (!corsContext?.ok) return corsContext?.response;
+  const headers2 = corsContext?.headers;
+  const limit = resolveAnonymousIpDailyLimit(config);
+  const anonymousIdentity = deps?.resolveAnonymousRateIdentity?.(request);
+  const anonymousRateAllowed = await deps?.checkRateLimit?.({
+    env,
+    slug,
+    address: anonymousIdentity,
+    limit,
+    route: anonymousRoute
+  });
+  if (!anonymousRateAllowed) {
+    return deps?.json?.({ error: "Rate limit exceeded." }, 429, headers2);
+  }
+  return deps?.dispatchAnonymousRoute?.({
+    path,
+    request,
+    anonymousContext: {
+      slug,
+      config,
+      headers: headers2,
+      env
+    }
+  });
+};
+
 // workers/sessionCorsWorker/anonymousRouteDispatch.js
+init_aiRequestPolicy();
+init_aiDefaults();
 init_aiRequestNormalization();
 init_workerGroups();
 init_sessionLifecycle();
@@ -105167,20 +105384,20 @@ var askAi = async ({ messages, config, secrets, address: address3, scopes, heade
 };
 var accessFor = ({ env, config, slug, address: address3, scopes, deps }) => createRequesterAccessChecks({ env, config, slug, requesterAddress: address3, authScopes: scopes, deps });
 var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: address3, env, limit, headers: headers2, scopes, deps } = {}) => {
-  const json8 = (payload, status = 200) => deps.json(payload, status, headers2);
+  const json9 = (payload, status = 200) => deps.json(payload, status, headers2);
   const setting = sessionAgentSettingOf(config?.sessionAgent);
   const store = deps.callSessionAgentOptOutStore || callOptOutStore;
   if (path === "/session-agent/opt-out") {
     const saved = await store(env, slug, "set", { address: address3, optedOut: body?.optedOut });
-    if (!saved.ok) return json8({ error: saved.status === 400 ? saved.body?.error : OPT_OUTS_UNAVAILABLE }, saved.status === 400 ? 400 : 503);
-    return json8({ optedOut: saved.body.optedOut });
+    if (!saved.ok) return json9({ error: saved.status === 400 ? saved.body?.error : OPT_OUTS_UNAVAILABLE }, saved.status === 400 ? 400 : 503);
+    return json9({ optedOut: saved.body.optedOut });
   }
   if (!setting) {
-    return path === "/session-agent/status" ? json8({ on: false, answers: null, audience: null }) : json8({ error: "This session has no Session Agent.", reason: "session_agent_off" }, 403);
+    return path === "/session-agent/status" ? json9({ on: false, answers: null, audience: null }) : json9({ error: "This session has no Session Agent.", reason: "session_agent_off" }, 403);
   }
   const ended = buildSessionEndedResponse({ config, headers: headers2, json: deps.json, now: deps.now });
   if (ended) return ended;
-  if (config?.scopes?.ai === false) return json8({ error: "AI is turned off for this session.", reason: "ai_disabled" }, 403);
+  if (config?.scopes?.ai === false) return json9({ error: "AI is turned off for this session.", reason: "ai_disabled" }, 403);
   if (path === "/session-agent/status") {
     const [asker2, own] = await Promise.all([
       resolveAsker({
@@ -105192,9 +105409,9 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
       }),
       canOptOut(address3) ? store(env, slug, "read", { address: address3 }) : { ok: true, body: { optedOut: false } }
     ]);
-    if (!asker2.ok && asker2.status === 503) return json8({ error: asker2.error }, 503);
-    if (!own.ok) return json8({ error: OPT_OUTS_UNAVAILABLE }, 503);
-    return json8({
+    if (!asker2.ok && asker2.status === 503) return json9({ error: asker2.error }, 503);
+    if (!own.ok) return json9({ error: OPT_OUTS_UNAVAILABLE }, 503);
+    return json9({
       on: true,
       answers: asker2.ok ? asker2.answers : null,
       audience: asker2.ok ? asker2.audience : null,
@@ -105202,9 +105419,9 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
     });
   }
   const question = trim22(body?.question);
-  if (!question) return json8({ error: "Ask a question." }, 400);
+  if (!question) return json9({ error: "Ask a question." }, 400);
   if (question.length > SESSION_AGENT_LIMITS.questionChars) {
-    return json8({ error: `A question can be at most ${SESSION_AGENT_LIMITS.questionChars} characters.` }, 400);
+    return json9({ error: `A question can be at most ${SESSION_AGENT_LIMITS.questionChars} characters.` }, 400);
   }
   const preflight = await deps.evaluateAuthenticatedRoutePreflight({
     scopes,
@@ -105219,20 +105436,20 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
     headers: headers2,
     deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: deps.json }
   });
-  if (!preflight?.ok) return preflight?.response || json8({ error: "Current authorization check failed." }, 403);
+  if (!preflight?.ok) return preflight?.response || json9({ error: "Current authorization check failed." }, 403);
   const currentScopes = { ...scopes, ai: preflight.tokenHasScope === true };
   const access = accessFor({ env, config, slug, address: address3, scopes: currentScopes, deps });
   const asker = await resolveAsker({ setting, config, address: address3, aiScope: preflight.tokenHasScope === true, access });
-  if (!asker.ok) return json8({ error: asker.error, ...asker.reason ? { reason: asker.reason } : {} }, asker.status);
+  if (!asker.ok) return json9({ error: asker.error, ...asker.reason ? { reason: asker.reason } : {} }, asker.status);
   const secretContext = await deps.resolveAuthenticatedRouteSecrets({
     env,
     slug,
     headers: headers2,
     deps: { getSessionSecrets: deps.getSessionSecrets, json: deps.json }
   });
-  if (!secretContext?.ok) return json8({ error: "The session\u2019s AI isn\u2019t set up." }, 503);
+  if (!secretContext?.ok) return json9({ error: "The session\u2019s AI isn\u2019t set up." }, 503);
   const optOuts = await store(env, slug, "list");
-  if (!optOuts.ok) return json8({ error: OPT_OUTS_UNAVAILABLE }, 503);
+  if (!optOuts.ok) return json9({ error: OPT_OUTS_UNAVAILABLE }, 503);
   const optedOut = new Set(optOuts.body.addresses);
   const { material, answersUnavailable } = await gatherMaterial({
     env,
@@ -105247,11 +105464,11 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
     deps
   });
   const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
-  if (!payment?.ok) return json8({ error: payment?.error || "This answer needs payment first.", reason: "session_agent_payment_required" }, 402);
+  if (!payment?.ok) return json9({ error: payment?.error || "This answer needs payment first.", reason: "session_agent_payment_required" }, 402);
   const { messages, read } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
   const reply5 = await askAi({ messages, config, secrets: secretContext.secrets, address: address3, scopes: currentScopes, headers: headers2, deps });
-  if (!reply5.ok) return json8(reply5.body, reply5.status);
-  return json8({
+  if (!reply5.ok) return json9(reply5.body, reply5.status);
+  return json9({
     answer: reply5.answer,
     answers: asker.answers,
     audience: asker.audience,
@@ -106173,6 +106390,18 @@ var dispatchAdminRequest = async ({
     } catch (error) {
       return deps?.json?.({ error: error?.message || "Storage visibility update failed." }, 500, headers2);
     }
+  }
+  if (action === "feedback/list" || action === "feedback/delete") {
+    const privateHeaders = withPrivateNoStoreHeaders2(headers2);
+    const listing = action === "feedback/list";
+    const result = await (deps?.callSessionFeedbackStore || callSessionFeedbackStore)(
+      env,
+      targetSlug,
+      listing ? "list" : "delete",
+      listing ? { cursor: body?.cursor, limit: body?.limit } : { ids: body?.ids, all: body?.all }
+    );
+    if (result?.ok) return deps?.json?.(result.body, 200, privateHeaders);
+    return result?.status === 400 ? deps?.json?.({ error: listing ? "That page of feedback can\u2019t be read." : "Name the messages to delete, or all of them.", reason: result.body?.reason }, 400, privateHeaders) : deps?.json?.({ error: "Feedback couldn\u2019t be reached just now. Try again shortly.", reason: "feedback_unavailable" }, 503, privateHeaders);
   }
   if (action === "refresh-interview-opening") {
     try {
@@ -107962,13 +108191,13 @@ var protectBootstrapResponse = (response3, baseHeaders) => {
   return { ...response3, headers: headers2 };
 };
 var readWorkerSessionConfig = async ({ request, env, slugHint, headers: headers2, deps, constants } = {}) => {
-  const refuse = (error, status) => ({ response: deps?.json?.({ error }, status, headers2) });
+  const refuse2 = (error, status) => ({ response: deps?.json?.({ error }, status, headers2) });
   const slugResolution = deps?.resolveRequestSlugWithoutToken?.({ request, env, slugHint }) || {
     ok: false,
     error: "Invalid session slug."
   };
-  if (!slugResolution.ok) return refuse(slugResolution.error, 400);
-  if (!slugResolution.explicitSlugProvided) return refuse(constants?.missingSlugError, 400);
+  if (!slugResolution.ok) return refuse2(slugResolution.error, 400);
+  if (!slugResolution.explicitSlugProvided) return refuse2(constants?.missingSlugError, 400);
   const slug = slugResolution.slug;
   let querySlugRaw = null;
   try {
@@ -107977,13 +108206,13 @@ var readWorkerSessionConfig = async ({ request, env, slugHint, headers: headers2
   }
   if (querySlugRaw != null) {
     const querySlug = validateInboundWorkerSessionSlug(querySlugRaw);
-    if (!querySlug.ok) return refuse(querySlug.error, 400);
-    if (querySlug.slug !== slug) return refuse("Session config slug query does not match X-Session-Slug.", 400);
+    if (!querySlug.ok) return refuse2(querySlug.error, 400);
+    if (querySlug.slug !== slug) return refuse2("Session config slug query does not match X-Session-Slug.", 400);
   }
   const config = await deps?.getSessionConfig?.(env, slug);
-  if (!config || !isWorkerCanonicalSessionConfig(config)) return refuse(constants?.sessionConfigNotFoundError, 404);
+  if (!config || !isWorkerCanonicalSessionConfig(config)) return refuse2(constants?.sessionConfigNotFoundError, 404);
   const modeValidation = validateWorkerConfigModeValues(config);
-  if (!modeValidation.ok) return refuse(constants?.sessionConfigNotFoundError, 404);
+  if (!modeValidation.ok) return refuse2(constants?.sessionConfigNotFoundError, 404);
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return { response: protectBootstrapResponse(corsContext?.response, headers2) };
   return { slug, config, headers: buildBootstrapHeaders(corsContext.headers) };
@@ -108460,6 +108689,7 @@ var resolveTopLevelRouteSelection = ({
     return { kind: "resource-presence" };
   }
   if (path === "/interview/starter" && method === "POST") return { kind: "interview-starter" };
+  if (path === "/feedback" && method === "POST" && !hasTrimmedAuthorization) return { kind: "feedback" };
   if (path === "/session-config" && method === "GET") {
     return { kind: "session-config" };
   }
@@ -108600,6 +108830,26 @@ var createWorkerRouteShellWithWorkerDeps = ({
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
             getSessionConfig: deps?.getSessionConfig,
             getCorsContext: deps?.getCorsContext,
+            json: deps?.json
+          },
+          constants: {
+            missingSlugError: constants?.missingSlugError,
+            sessionConfigNotFoundError: constants?.sessionConfigNotFoundError
+          }
+        });
+      }
+      if (routeSelection.kind === "feedback") {
+        return await dispatchAnonymousFeedbackRequest({
+          request,
+          env,
+          slugHint: envSlug,
+          baseHeaders: routeBaseHeaders,
+          deps: {
+            resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
+            getCorsContext: deps?.getCorsContext,
+            resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
+            checkRateLimit: deps?.checkRateLimit,
             json: deps?.json
           },
           constants: {
@@ -109756,6 +110006,18 @@ var dispatchAuthenticatedSecretActionRoute = async ({
       handled: true,
       response: await dispatchSessionAgentRoute({ path, body, config, slug, address: address3, env, limit, headers: headers2, scopes, deps })
     };
+  }
+  if (path === FEEDBACK_PATH) {
+    const result = await sendSessionFeedback({
+      env,
+      slug,
+      config,
+      body,
+      address: address3,
+      identity: String(address3 || "").toLowerCase(),
+      checkRateLimit: deps?.checkRateLimit
+    });
+    return { handled: true, response: deps?.json?.(result.body, result.status, headers2) };
   }
   const isFaucetAction = action === "request_test_eth";
   const isAiAction = path === "/ai" || action === "ai";
