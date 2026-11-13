@@ -19,6 +19,7 @@ import { projectPublicWorkerSessionConfig } from '../shared/workerSessionConfig.
 import { SLUG, createSessionEnv, fetchWorker, login, makeRequest, readJson, signedAdminRequest } from './sessionWorkerRuntimeFixture.mjs';
 
 const ADDRESS = `0x${'ab'.repeat(20)}`;
+const WORKER_RUN = { sessionModeProfile: { authority: { mode: 'worker_canonical' } } };
 const SEND = { text: 'The atlas was hard to find.', view: 'results:debateAtlas', theme: 'civic', screen: 'phone', appRelease: '0.9.8' };
 
 // The session coordinator as the routes reach it, with a clock the test moves.
@@ -49,7 +50,7 @@ const createDailyLimit = () => {
 const sender = ({ call, coordinator }, { checkRateLimit } = createDailyLimit()) =>
   (body, { address = '', identity = address || 'anon:203.0.113.9', config = {}, release = '0.9.8' } = {}) => {
     coordinator.nowMs += 1;
-    return sendSessionFeedback({ env: {}, slug: 'salon', config, body, address, identity, checkRateLimit, release, store: call });
+    return sendSessionFeedback({ env: {}, slug: 'salon', config: { ...WORKER_RUN, ...config }, body, address, identity, checkRateLimit, release, store: call });
   };
 
 test('a signed-in and a signed-out person each send, and only the Worker stamps its release', async () => {
@@ -120,10 +121,14 @@ test('wrong or oversized sends say which field, and nothing is stored', async ()
   assert.equal((await feedback.call({}, 'salon', 'list')).body.counts.stored, 1);
 });
 
-test('a session with the Feedback box off refuses sends', async () => {
+test('a session with the Feedback box off, or run on chain, refuses sends', async () => {
   const feedback = createStore();
-  const result = await sender(feedback)(SEND, { config: { feedbackEnabled: false } });
-  assert.deepEqual(result, { status: 403, body: { error: 'This session isn’t taking feedback.', reason: 'feedback_off' } });
+  const off = { status: 403, body: { error: 'This session isn’t taking feedback.', reason: 'feedback_off' } };
+  assert.deepEqual(await sender(feedback)(SEND, { config: { feedbackEnabled: false } }), off);
+  // On chain, Settings has no Feedback panel, so no admin could read or stop it.
+  const onChain = { sessionModeProfile: { authority: { mode: 'onchain_registry' } } };
+  assert.deepEqual(await sender(feedback)(SEND, { config: onChain }), off);
+  assert.equal((await feedback.call({}, 'salon', 'list')).body.messages.length, 0);
   assert.equal((await sender(feedback)(SEND, { config: { feedbackEnabled: true } })).status, 200);
 });
 

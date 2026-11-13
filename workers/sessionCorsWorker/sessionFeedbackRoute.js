@@ -6,6 +6,7 @@
 import { callSessionConfigCoordinator, readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { workerRelease } from './workerCapabilities.js';
 import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
+import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
 
 export const FEEDBACK_PATH = '/feedback';
 export const FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2000, reachMeChars: 200, nameChars: 80, bodyBytes: 8192 });
@@ -75,7 +76,9 @@ export const callSessionFeedbackStore = (env, slug, operation, payload = {}) =>
 export const sendSessionFeedback = async ({
   env, slug, config, body, address = '', identity, checkRateLimit, release = workerRelease(), store = callSessionFeedbackStore,
 } = {}) => {
-  if (config?.feedbackEnabled === false) {
+  // Only a session the Worker runs has the Settings panel where admins read
+  // feedback and turn it off; an on-chain session takes none.
+  if (config?.feedbackEnabled === false || !isWorkerCanonicalSessionConfig(config)) {
     return { status: 403, body: { error: 'This session isn’t taking feedback.', reason: 'feedback_off' } };
   }
   const normalized = normalizeFeedback(body, { address: String(address || '').toLowerCase() });
