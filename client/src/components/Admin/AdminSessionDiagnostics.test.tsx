@@ -164,6 +164,9 @@ describe('stored question and answer versions', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       "Over the limit: AI Views, the atlas and the risk matrix can't be built",
     );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "Each person's latest answer to each question counts; for answers saved before 0.9.10, every saved change counts.",
+    );
   });
 
   test('warns from 8,000, says when the Worker could not count, and shows nothing from an older Worker', async () => {
