@@ -249,3 +249,63 @@ test('a hundred people join at once with their own codes, or with one password',
   assert.equal(byPassword.filter((result) => result.ok).length, 100);
   assert.equal(password.activeMembers(), 100);
 });
+
+test('ten wrong guesses stop that person guessing, in any group, for the hour', async () => {
+  const f = await createFixture({ joinMode: 'one_use' });
+  assert.equal((await f.mutate({ operation: 'create', input: { groupId: 'second', label: 'Second', joinMode: 'one_use' } })).ok, true);
+  const [good, other, later] = codes(3);
+  await f.admin('groups/invites/add', { hashes: await hashes([good, other, later]) });
+  await f.admin('groups/invites/add', { groupId: 'second', hashes: await hashes([good]) });
+  for (const index of codes(10, 5).keys()) assert.deepEqual(await f.join(1, { secret: codes(10, 5)[index] }), REFUSED);
+  assert.deepEqual(await f.join(1, { secret: good }), REFUSED);
+  assert.deepEqual(await f.mutate({ operation: 'join', groupId: 'second', principal: principal(1), actorPrincipal: principal(1),
+    credential: { secret: good } }), REFUSED);
+  assert.equal(await inviteState(f, await hashOneUseSecret(good)), 'unused');
+  assert.equal((await f.join(2, { secret: good })).ok, true);
+  const realNow = f.groups.now;
+  f.groups.now = () => realNow() + 60 * 60 * 1000;
+  assert.equal((await f.join(1, { secret: other })).ok, true);
+});
+
+test('300 wrong guesses at a group close it to codes for the hour, and tell its admins', async () => {
+  const f = await createFixture({ joinMode: 'one_use' });
+  const [good, member] = codes(2);
+  await f.admin('groups/invites/add', { hashes: await hashes([good, member]) });
+  assert.equal((await f.join(0, { secret: member })).ok, true);
+  const wrong = codes(300, 7);
+  for (let start = 0; start < 300; start += 50) {
+    await Promise.all(wrong.slice(start, start + 50).map((code, index) => f.join(10 + Math.floor((start + index) / 10), { secret: code })));
+  }
+  assert.equal((await f.admin('groups/list')).groups.find((group) => group.groupId === 'salon').guessLimited, true);
+  assert.deepEqual(await f.join(1, { secret: good }), REFUSED);
+  assert.equal((await f.join(0)).ok, true);
+  const realNow = f.groups.now;
+  f.groups.now = () => realNow() + 60 * 60 * 1000;
+  assert.equal((await f.admin('groups/list')).groups[0].guessLimited, false);
+  assert.equal((await f.join(1, { secret: good })).ok, true);
+});
+
+test('joins to an open group, and joins with no code, never count as guesses', async () => {
+  const f = await createFixture({ joinMode: 'one_use' });
+  const [good] = codes(1);
+  await f.admin('groups/invites/add', { hashes: await hashes([good]) });
+  for (let attempt = 0; attempt < 12; attempt += 1) assert.deepEqual(await f.join(1), REFUSED);
+  assert.equal((await f.join(1, { secret: good })).ok, true);
+  const open = await createFixture();
+  for (let attempt = 0; attempt < 12; attempt += 1) await open.join(1, { secret: codes(1, attempt)[0] });
+  assert.equal([...open.groupState.store.keys()].some((key) => key.startsWith('worker-group-guesses')), false);
+});
+
+test('the guessing hour runs from the first wrong guess, not the latest', async () => {
+  const f = await createFixture({ joinMode: 'one_use' });
+  const [good] = codes(1);
+  await f.admin('groups/invites/add', { hashes: await hashes([good]) });
+  const start = Date.now();
+  f.groups.now = () => start;
+  for (const code of codes(9, 4)) await f.join(1, { secret: code });
+  f.groups.now = () => start + 50 * 60 * 1000;
+  await f.join(1, { secret: codes(1, 6)[0] });
+  assert.deepEqual(await f.join(1, { secret: good }), REFUSED);
+  f.groups.now = () => start + 61 * 60 * 1000;
+  assert.equal((await f.join(1, { secret: good })).ok, true);
+});

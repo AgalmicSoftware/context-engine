@@ -119,5 +119,5 @@ export const createFixture = async ({ memberLimit, groupMemberCeiling, joinMode 
     return { status: response.status, ...response.body };
   };
   return { kv, env, mutate, join, groupRecord, memberKeys, groupState, changeConfig, memberships, catalog, activeMembers,
-    admin, sessionConfig, values };
+    admin, sessionConfig, values, groups };
 };

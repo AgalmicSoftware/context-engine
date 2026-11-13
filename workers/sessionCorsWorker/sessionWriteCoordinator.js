@@ -440,6 +440,17 @@ const admitWorkerGroupJoin = async (transaction, { groupId, groupState, credenti
   return workerGroupJoinRefused();
 };
 
+// Wrong codes and passwords allowed an hour: per person, and per group. Past
+// the group's, its code and password joins are refused until the hour is up.
+export const WORKER_GROUP_GUESS_WINDOW_MS = 60 * 60 * 1000;
+export const WORKER_GROUP_GUESS_LIMITS = Object.freeze({ person: 10, group: 300 });
+const workerGroupGuessKeys = ({ groupId, principalDigest }) => ({
+  person: `worker-group-guesses-v1:p:${principalDigest}`,
+  group: `worker-group-guesses-v1:g:${encodeURIComponent(groupId)}`,
+});
+const workerGroupGuessCount = (record, nowMs) =>
+  record && nowMs - Number(record.since) < WORKER_GROUP_GUESS_WINDOW_MS ? Number(record.count) || 0 : 0;
+
 const normalizeWorkerGroupMutation = (payload) => {
   const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
   const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
@@ -1640,8 +1651,24 @@ export class SessionWriteCoordinator {
       }
       // A join's code or password is checked, and a code spent, with the seat:
       // two people holding one code can never both get in.
+      // Only code and password groups receive a credential to guess with.
+      const guessKeys = join?.credential ? workerGroupGuessKeys({ groupId, principalDigest }) : null;
+      const guesses = guessKeys ? {
+        person: await transaction.get(guessKeys.person),
+        group: await transaction.get(guessKeys.group),
+      } : null;
+      if (guesses && Object.entries(WORKER_GROUP_GUESS_LIMITS)
+        .some(([scope, limit]) => workerGroupGuessCount(guesses[scope], nowMs) >= limit)) {
+        return workerGroupJoinRefused();
+      }
       const admitted = join ? await admitWorkerGroupJoin(transaction, { groupId, groupState, credential: join.credential, nowMs }) : { ok: true };
-      if (!admitted.ok) return admitted;
+      if (!admitted.ok) {
+        for (const scope of guesses ? Object.keys(guessKeys) : []) {
+          const count = workerGroupGuessCount(guesses[scope], nowMs);
+          await transaction.put(guessKeys[scope], { since: count ? guesses[scope].since : nowMs, count: count + 1 });
+        }
+        return admitted;
+      }
       const joinEndsAt = Date.parse(toTrimmedString(groupState.joinEndsAt));
       if (join && joinEndsAt <= nowMs) return { ok: false, status: 403, reason: 'worker_group_join_ended' };
       const configuredMemberLimit = normalizePositiveSafeInteger(groupState.memberLimit);
@@ -2056,6 +2083,9 @@ export class SessionWriteCoordinator {
           ...(payload?.admin === true ? {
             admin: {
               passwordSet: Boolean(group.state.signer),
+              guessLimited: workerGroupGuessCount(
+                await this.state.storage.get(workerGroupGuessKeys({ groupId }).group), Number(this.now()),
+              ) >= WORKER_GROUP_GUESS_LIMITS.group,
               ...(group.state.joinMode === 'one_use' ? { invites: workerGroupInviteCounts(group.state) } : {}),
             },
           } : {}),
