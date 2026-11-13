@@ -25,6 +25,7 @@ const NEXT_TEST_ADDRESS = '0x00000000000000000000000000000000000000bb';
 const CANONICAL_SESSION_ID = '0x1234567890abcdef1234567890abcdef';
 const NEXT_CANONICAL_SESSION_ID = '0xfedcba0987654321fedcba0987654321';
 
+const mockSignMessage = jest.fn(async () => '0xsigned');
 jest.mock('ethers', () => {
   class MockWeb3Provider {
     constructor(provider) {
@@ -34,7 +35,7 @@ jest.mock('ethers', () => {
     getSigner(address) {
       return {
         getAddress: jest.fn(async () => address || TEST_ADDRESS),
-        signMessage: jest.fn(async () => '0xsigned'),
+        signMessage: mockSignMessage,
       };
     }
   }
@@ -547,6 +548,7 @@ describe('workerAuth canonical session resolution', () => {
 
   it('signs in through a busy session coordinator, sending each step again', async () => {
     const busy = () => jsonResp(503, { error: 'Session config coordination is unavailable; retry.' });
+    mockSignMessage.mockClear();
     global.fetch = jest
       .fn()
       .mockResolvedValueOnce(busy())
@@ -566,6 +568,9 @@ describe('workerAuth canonical session resolution', () => {
       'login',
       'login',
     ]);
+    // The busy login is sent again as it was: one signature, the same body.
+    expect(global.fetch.mock.calls[3][1].body).toBe(global.fetch.mock.calls[2][1].body);
+    expect(mockSignMessage).toHaveBeenCalledTimes(1);
   });
 
   it('says whether a Worker token is already held, without asking anyone to sign', async () => {
