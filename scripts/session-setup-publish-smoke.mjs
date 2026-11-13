@@ -221,19 +221,26 @@ const showQuestionList = async (page) => {
 };
 const questionCard = (page, question) => page.locator('[class*="fullQuestionCard"]')
   .filter({ has: page.getByText(question.record.prompt, { exact: true }) });
+// waitForFunction ends at whatever a returned promise settles to, even false,
+// so the page reads again until every save is stored. A reload before then
+// would cancel a tab's save that has not yet committed.
 const waitForSavedBookmarks = (page, slug, questionIds) => page.waitForFunction(
   ({ slug, questionIds }) => new Promise((resolve, reject) => {
-    const open = indexedDB.open('ce_cache_v1');
-    open.onerror = () => reject(open.error);
-    open.onsuccess = () => {
-      const db = open.result;
-      const read = db.transaction('ce_cache_entries_v1').objectStore('ce_cache_entries_v1').get(`dg:bookmarksCache:${slug}`);
-      read.onerror = () => { db.close(); reject(read.error); };
-      read.onsuccess = () => {
-        db.close();
-        resolve(questionIds.every((id) => read.result?.questions?.includes(id.toLowerCase())));
+    const check = () => {
+      const open = indexedDB.open('ce_cache_v1');
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const db = open.result;
+        const read = db.transaction('ce_cache_entries_v1').objectStore('ce_cache_entries_v1').get(`dg:bookmarksCache:${slug}`);
+        read.onerror = () => { db.close(); reject(read.error); };
+        read.onsuccess = () => {
+          db.close();
+          if (questionIds.every((id) => read.result?.questions?.includes(id.toLowerCase()))) resolve(true);
+          else setTimeout(check, 50);
+        };
       };
     };
+    check();
   }),
   { slug, questionIds },
 );
