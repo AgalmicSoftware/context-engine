@@ -1489,11 +1489,12 @@ test('maximum upload metadata fits a backup header and round-trips unchanged', a
   assert.equal(read.status, 200); assert.equal(await read.text(), 'small');
 });
 
-test('restored doc-library rows say in their list metadata whether they are context sources', async () => {
+test('restored doc-library rows say in their list metadata whether they are context sources, and their reading order', async () => {
   const source = fixture();
   const keyOf = (id) => `ce-storage:${slug}:docsContext:${id}`;
-  for (const [id, contextSource] of [['cf_library_file', false], ['cf_context_file', true]]) {
-    const metadata = { id, resource: 'docsContext', storageLayer: 'kv', ...(contextSource ? { contextSource } : {}) };
+  const adminNote = { contextSource: true, uploadAuthority: 'admin', createdAt: '2026-11-01T00:00:00.000Z' };
+  for (const [id, extra] of [['cf_library_file', {}], ['cf_context_file', adminNote]]) {
+    const metadata = { id, resource: 'docsContext', storageLayer: 'kv', ...extra };
     source.kv.values.set(keyOf(id), JSON.stringify(metadata));
     source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('small').toString('base64url') }));
   }
@@ -1503,7 +1504,8 @@ test('restored doc-library rows say in their list metadata whether they are cont
     assert.equal(result.ok, true, JSON.stringify(result));
   }
   assert.deepEqual(target.kv.listMetadata.get(keyOf('cf_library_file')), { contextSource: false });
-  assert.deepEqual(target.kv.listMetadata.get(keyOf('cf_context_file')), { contextSource: true });
+  // A restored source keeps its place in the AI's reading list: who added it, and when.
+  assert.deepEqual(target.kv.listMetadata.get(keyOf('cf_context_file')), { contextSource: true, admin: true, createdAt: adminNote.createdAt });
 });
 
 test('legacy metadata that exceeds the backup entry limit reports the stored id', async () => {

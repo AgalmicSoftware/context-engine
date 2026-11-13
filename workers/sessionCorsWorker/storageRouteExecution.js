@@ -1,4 +1,4 @@
-import { participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { CONTEXT_TEXT_ROLE, contextRoleOf, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { markStorageBackupWrite } from './storageBackupRevision.js';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import {
@@ -156,9 +156,21 @@ export const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${sessionSl
 // context source, so context scans skip other files unread. Set on every write.
 // List metadata lets a listing pass over a row unread: a context listing skips
 // other files, and a person's own-answer listing skips other people's answers.
+// A context source also says whether an admin added it, whether it is a PDF's
+// reading, and when, so the AI's reading list is chosen before any row is read.
 export const storageIndexPutOptions = (metadata) => {
   const resource = trim(metadata?.resource) || 'docsContext';
-  if (resource === 'docsContext') return { metadata: { contextSource: metadata?.contextSource === true } };
+  if (resource === 'docsContext') {
+    if (metadata?.contextSource !== true) return { metadata: { contextSource: false } };
+    return {
+      metadata: {
+        contextSource: true,
+        ...(metadata.uploadAuthority === 'admin' ? { admin: true } : {}),
+        ...(contextRoleOf(metadata.tags) === CONTEXT_TEXT_ROLE ? { reading: true } : {}),
+        createdAt: trim(metadata.createdAt),
+      },
+    };
+  }
   const responder = resource === 'responses' ? trim(metadata?.responder).toLowerCase() : '';
   return responder ? { metadata: { responder } } : undefined;
 };
