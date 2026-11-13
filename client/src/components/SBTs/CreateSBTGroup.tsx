@@ -292,7 +292,7 @@ const DISTRIBUTION_OPTION_CONFIGS = Object.freeze([
   },
   {
     value: 'anyoneCanMint',
-    label: 'public URL',
+    label: 'Public URL',
     helpText: 'Anyone with the link can mint.',
     tooltipId: 'anyoneCanMintTooltip',
     tooltipText: `Generate a URL where anyone can ${t('mintLower')} the ${t('sbtLower')}.`,

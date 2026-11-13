@@ -369,7 +369,7 @@ describe('CreateSBTGroup authoring UI rendering', () => {
 
     expect(screen.getByText('One-use URLs')).toBeInTheDocument();
     expect(screen.getByText('Group Password')).toBeInTheDocument();
-    expect(screen.getByText('public URL')).toBeInTheDocument();
+    expect(screen.getByText('Public URL')).toBeInTheDocument();
     expect(screen.getByText('Unlisted')).toBeInTheDocument();
 
     const nameRow = screen.getByTestId(E2E_TESTIDS.SBT_CREATE_NAME_LOCK_ROW);
