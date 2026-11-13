@@ -940,6 +940,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         matching: matching.length,
         ...progressNotes(questions, mine),
         ...pageNotes(matching.length, start, max, filter),
+        // An empty unanswered list must not read as "nothing answered yet".
+        ...(filter === 'unanswered' && !matching.length && questions.length ? {
+          next: `You have answered all ${questions.length} questions. To see your answers, call list_questions with filter "answered"; answering again replaces an answer, so send one only to change it.`,
+        } : {}),
         questions: matching.slice(start, start + max).map((question) => describeQuestion(question, mine.get(question.id))),
       };
     },

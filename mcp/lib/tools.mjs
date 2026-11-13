@@ -1,4 +1,5 @@
 // MCP tool definitions for an agent taking part in Context Engine sessions.
+import { failedToolResult } from './mcpServer.mjs';
 
 export const SERVER_INSTRUCTIONS = [
   'Context Engine runs group deliberation sessions. With these tools you take part as yourself:',
@@ -114,7 +115,7 @@ export const buildTools = (participant) => [
     name: 'answer',
     title: 'Answer questions',
     description:
-      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a number on the question’s scale and step grid (default step 1); multichoice the option text (an array when several are allowed); quadratic one signed whole-number vote per option whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer.',
+      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a number on the question’s scale and step grid (default step 1); multichoice the option text (an array when several are allowed); quadratic a list of signed whole-number votes, one per option in order (such as [2, -1, 0]), whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -148,7 +149,13 @@ export const buildTools = (participant) => [
       additionalProperties: false,
     },
     annotations: SPENDS,
-    handler: (args, extra) => participant.answer(args, extra),
+    // A call that saved nothing is an error to the host, so a model notices;
+    // not one whose transaction may have gone through.
+    handler: async (args, extra) => {
+      const result = await participant.answer(args, extra);
+      const nothingSaved = result.submitted === 0 && result.failed > 0 && !result.txHash && !result.reconciliationRequired;
+      return nothingSaved ? failedToolResult(result) : result;
+    },
   },
   {
     name: 'add_statement',

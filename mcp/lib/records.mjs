@@ -90,6 +90,10 @@ export const buildResponseRecord = ({
 }) => {
   if (!isRecord(question) || !trim(question.id)) return fail('Unknown question.');
   if (isLockedQuestion(question)) return fail('This question is locked to certain members; agents cannot answer locked questions yet.');
+  // Models often send votes keyed by option; say what shape is wanted.
+  if (question.type === 'quadratic' && !Array.isArray(value)) {
+    return fail('Quadratic answers are a list of signed whole-number votes, one per option in the question’s order, such as [2, -1, 0]: send the list, not an object keyed by option.');
+  }
   const answer = normalizeAnswerValue(question, value);
   if (!answer.ok) return answer;
   const note = trim(comment);

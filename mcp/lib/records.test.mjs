@@ -183,3 +183,11 @@ for (const { name, scale, input, expected } of ratingConformance) {
     if (result.ok) assert.equal(result.record.answer.value, expected);
   });
 }
+
+test('a quadratic answer sent as an object says to send a list of votes', () => {
+  const question = { id: generateQuestionId('quadratic', 'Fund'), type: 'quadratic', prompt: 'Fund', options: ['A', 'B'], voiceCredits: 10 };
+  const built = buildResponseRecord({ question, value: { A: 2, B: -1 }, responder: RESPONDER, session: { sessionSlug: 's', sessionId: '0x' + '3'.repeat(32) } });
+  assert.equal(built.ok, false);
+  assert.match(built.error, /a list of signed whole-number votes, one per option in the question’s order, such as \[2, -1, 0\]/);
+  assert.equal(buildResponseRecord({ question, value: [2, -1], responder: RESPONDER, session: { sessionSlug: 's', sessionId: '0x' + '3'.repeat(32) } }).ok, true);
+});
