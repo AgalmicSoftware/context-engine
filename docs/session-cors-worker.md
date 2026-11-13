@@ -1512,7 +1512,8 @@ session config change lands while a group change is committing. A join that
 finds the coordinator busy answers `503` with
 `Session config coordination is unavailable; retry.` and its `reason`; joining
 again is a no-op that finishes an interrupted join, so the website and the MCP
-send it again after a short wait.
+send it again after a short wait. A busy or timed-out join may still have landed;
+joining again then succeeds at once, even when the group is full.
 
 Member reads and roster pages use only canonical session-identity keys. Legacy
 slug-only or case-folded membership rows are ignored and never migrated during

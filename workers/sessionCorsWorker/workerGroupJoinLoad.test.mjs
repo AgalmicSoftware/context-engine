@@ -122,6 +122,12 @@ test('joining at once never takes a group past its member limit', async () => {
   assert.deepEqual([...new Set(results.filter((result) => !result.ok).map((result) => result.reason))], ['worker_group_member_cap_exceeded']);
   assert.equal(f.groupRecord().memberCount, 10);
   assert.equal(f.memberKeys().length, 10);
+  // A member whose first answer never reached them joins again and is told
+  // they are in, though the group is now full.
+  const admitted = results.flatMap((result, index) => (result.ok ? [index] : []));
+  const again = await Promise.all(admitted.map((index) => f.join(index)));
+  assert.deepEqual(again.filter((result) => !result.ok), []);
+  assert.equal(f.groupRecord().memberCount, 10);
 });
 
 test('one person joining several times at once is counted once', async () => {
