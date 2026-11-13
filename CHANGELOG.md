@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 - Group member limits on `/new` and in the participants' create form follow the session's **Most members in a group**, not 1,000. A blank limit shows that number, and so does a group's page.
 - The Public URL help says anyone signed in can join such a group, with or without the link. Suggest questions says it drafts up to five, and none when nothing in the context supports one.
 - Admins see how many question and answer versions the session stores against the 10,000 that AI Views, the atlas and the risk matrix can read, with a warning from 8,000. It shows once the session's Worker runs this release.
-- Settings has **AI requests per person a day**, a cap on one person's AI requests (drafting, Session Agent questions, agents' AI calls) apart from saving answers. Saving it signs no one out. It does not count AI used before signing in, which voice interviews are.
+- Settings has **AI requests per person a day**, a cap on one person's AI requests (drafting, Session Agent questions, agents' AI calls) apart from saving answers. Saving it signs no one out. It does not count AI used before signing in, which voice interviews are. The field shows only on a Session Worker that counts the limit, and re-saving a session from `/new` keeps the limit set in Settings.
 
 ### Workers — requires redeployment
 
