@@ -39,6 +39,8 @@ const sessionConfig = {
   blockLimits: {},
   sessionModeProfile: publicProfile,
   storageProfile: compileSessionModeProfile(publicProfile).storageProfile,
+  // A Worker with join choices, so an unlisted group can be joined with a link's invite.
+  groupJoinChoices: true,
 };
 upsertWorkerCanonicalSessionBootstrap({
   slug: sessionSlug,
