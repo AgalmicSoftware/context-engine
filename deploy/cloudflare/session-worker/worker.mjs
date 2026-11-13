@@ -80812,8 +80812,6 @@ __export(sessionWriteCoordinator_exports, {
   MAX_ANSWER_VERSIONS: () => MAX_ANSWER_VERSIONS,
   RESULTS_ANALYSIS_MAX_DRAFT_CHARS: () => RESULTS_ANALYSIS_MAX_DRAFT_CHARS,
   SessionWriteCoordinator: () => SessionWriteCoordinator,
-  WORKER_GROUP_GUESS_LIMITS: () => WORKER_GROUP_GUESS_LIMITS,
-  WORKER_GROUP_GUESS_WINDOW_MS: () => WORKER_GROUP_GUESS_WINDOW_MS,
   WorkerGroupWriteCoordinator: () => WorkerGroupWriteCoordinator,
   checkCoordinatedAuthRateLimit: () => checkCoordinatedAuthRateLimit,
   checkCoordinatedLegacyStorageOwner: () => checkCoordinatedLegacyStorageOwner,
@@ -80833,7 +80831,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet,
   withCoordinatedFaucetWalletTurn: () => withCoordinatedFaucetWalletTurn
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, WORKER_GROUP_MEMBER_MUTATIONS, WORKER_GROUP_SECRET_OPERATIONS, WORKER_GROUP_REVOKE_BATCH, NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, WORKER_GROUP_SECRET_JOIN_MODES, workerGroupJoinRefused, admitWorkerGroupJoin, WORKER_GROUP_GUESS_WINDOW_MS, WORKER_GROUP_GUESS_LIMITS, workerGroupGuessKeys, workerGroupGuessCount, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, WORKER_GROUP_MEMBER_MUTATIONS, WORKER_GROUP_SECRET_OPERATIONS, WORKER_GROUP_REVOKE_BATCH, NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, workerGroupJoinRefused, admitWorkerGroupJoin, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_lib2();
@@ -81110,7 +81108,6 @@ ${expiry}`);
       delete next.pending;
       return next;
     };
-    WORKER_GROUP_SECRET_JOIN_MODES = /* @__PURE__ */ new Set(["one_use", "group_password"]);
     workerGroupJoinRefused = () => ({ ok: false, status: 403, reason: WORKER_GROUP_JOIN_REFUSED });
     admitWorkerGroupJoin = async (transaction, { groupId, groupState, credential, nowMs }) => {
       if (groupState.joinMode === "open") return { ok: true };
@@ -81125,13 +81122,6 @@ ${expiry}`);
       }
       return workerGroupJoinRefused();
     };
-    WORKER_GROUP_GUESS_WINDOW_MS = 60 * 60 * 1e3;
-    WORKER_GROUP_GUESS_LIMITS = Object.freeze({ person: 10, group: 300 });
-    workerGroupGuessKeys = ({ groupId, principalDigest }) => ({
-      person: `worker-group-guesses-v1:p:${principalDigest}`,
-      group: `worker-group-guesses-v1:g:${encodeURIComponent(groupId)}`
-    });
-    workerGroupGuessCount = (record4, nowMs) => record4 && nowMs - Number(record4.since) < WORKER_GROUP_GUESS_WINDOW_MS ? Number(record4.count) || 0 : 0;
     normalizeWorkerGroupMutation = (payload) => {
       const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
       const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
@@ -82232,22 +82222,8 @@ ${expiry}`);
               reason: "worker_group_membership_state_pending"
             };
           }
-          const password = groupState.joinMode === "group_password";
-          const guessScopes = !join?.credential || !WORKER_GROUP_SECRET_JOIN_MODES.has(groupState.joinMode) || password && !groupState.signer ? [] : password ? ["person", "group"] : ["person"];
-          const guessKeys = workerGroupGuessKeys({ groupId, principalDigest });
-          const guesses = {};
-          for (const scope of guessScopes) guesses[scope] = await transaction.get(guessKeys[scope]);
-          if (guessScopes.some((scope) => workerGroupGuessCount(guesses[scope], nowMs) >= WORKER_GROUP_GUESS_LIMITS[scope])) {
-            return workerGroupJoinRefused();
-          }
           const admitted = join ? await admitWorkerGroupJoin(transaction, { groupId, groupState, credential: join.credential, nowMs }) : { ok: true };
-          if (!admitted.ok) {
-            for (const scope of guessScopes) {
-              const count = workerGroupGuessCount(guesses[scope], nowMs);
-              await transaction.put(guessKeys[scope], { since: count ? guesses[scope].since : nowMs, count: count + 1 });
-            }
-            return admitted;
-          }
+          if (!admitted.ok) return admitted;
           const joinEndsAt = Date.parse(toTrimmedString10(groupState.joinEndsAt));
           if (join && joinEndsAt <= nowMs) return { ok: false, status: 403, reason: "worker_group_join_ended" };
           const configuredMemberLimit = normalizePositiveSafeInteger(groupState.memberLimit);
@@ -82613,10 +82589,6 @@ ${expiry}`);
               ...payload?.admin === true ? {
                 admin: {
                   passwordSet: Boolean(group.state.signer),
-                  guessLimited: workerGroupGuessCount(
-                    await this.state.storage.get(workerGroupGuessKeys({ groupId }).group),
-                    Number(this.now())
-                  ) >= WORKER_GROUP_GUESS_LIMITS.group,
                   ...group.state.joinMode === "one_use" ? { invites: workerGroupInviteCounts(group.state) } : {}
                 }
               } : {}
@@ -82941,7 +82913,6 @@ ${expiry}`);
           await this.state.storage.transaction(async (transaction) => {
             const state = await transaction.get(groupKey2);
             await transaction.put(groupKey2, { ...state, signer, signerSetAt: nowIso4 });
-            await transaction.delete(workerGroupGuessKeys({ groupId }).group);
           });
           await bumpStorageBackupRevision(this.state.storage);
           return jsonResponse2({ ok: true, status: 200, groupId, passwordSet: true, signerSetAt: nowIso4 }, 200);
