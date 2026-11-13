@@ -14,7 +14,8 @@ Worker bundle publication remains independent.
    Confirm the candidate version and contents; an unpublished version already
    in Git is not by itself a reason to release an older candidate.
 2. Let all canonical CI jobs pass. Inspect the `mcp-package-<sha>-<attempt>`
-   artifact and the publish workflow's dry-run result.
+   artifact and the publish workflow's dry-run result. The attempt is the one
+   that built the package, which can be earlier than the run's last attempt.
 3. In npm, open `@agalmic/contextengine` → Settings → Trusted publishing.
    Add GitHub Actions with owner `AgalmicSoftware`, repository `context-engine`,
    workflow filename `publish-mcp.yml`, and no environment name. Allow direct
@@ -44,10 +45,11 @@ imports outside `mcp/`: the artifact receipt records the actual esbuild inputs.
 
 An identical already-published version is a no-op. Reusing a version with different
 tarball contents fails with an instruction to bump it. The publisher refuses PRs,
-forks, failed or unrelated workflows, old run attempts, stale `main` commits,
-corrupt artifacts and versions that would move `latest` backward. Releases are
-serialized, with no cancellation of an in-progress publish. Registry/network
-failures stop publication; they are never interpreted as an absent version.
+forks, failed or unrelated workflows, a CI attempt that is not the run's
+latest, stale `main` commits, corrupt artifacts and versions that would move
+`latest` backward. Releases are serialized, with no cancellation of an
+in-progress publish. Registry/network failures stop publication; they are never
+interpreted as an absent version.
 
 ## Recovery and pause
 
@@ -59,8 +61,17 @@ upload within the same run. Since npm can take a while to list a new version,
 it reads the registry every ten seconds for up to three minutes before calling
 a publish unconfirmed. A rerun treats identical published bytes as a no-op.
 If `main` or the CI attempt has advanced, use successful CI for the current tip.
-If the artifact has expired, rerun canonical CI to produce a new tested artifact.
 Do not unpublish or overwrite a version to repair a release.
+
+**Re-running CI.** "Re-run failed jobs" keeps the package an earlier attempt
+built: the CI job that packs and tests it only uploads it when it passes, and
+it is re-run only if it failed. The publisher takes the newest
+`mcp-package-<sha>-<attempt>` any attempt of that run uploaded, and checks that
+its receipt names the same run, commit and attempt. "Re-run all jobs" builds and
+uploads a new package under the new attempt. Re-run within 24 hours of the
+first attempt: the Worker bundle candidate that CI's final job needs is kept
+for one day. If the MCP package has expired (after 30 days), use "Re-run all
+jobs"; with nothing failed there is nothing for "Re-run failed jobs" to rebuild.
 
 The default launch command, `npx -y --prefer-online @agalmic/contextengine@latest`,
 checks for a newer published version on restart; running servers are unchanged.

@@ -89,6 +89,26 @@ export function validateRun(run, currentMain) {
   return { sourceCommit: run.head_sha, runId: String(run.id), runAttempt: String(run.run_attempt) };
 }
 
+// "Re-run failed jobs" keeps the package the earlier attempt built and tested,
+// so publish the newest package any attempt of this run uploaded. Only a
+// passing CI gate uploads one, named for the commit and attempt.
+export function selectPackageAttempt(listing, { sourceCommit, runAttempt }) {
+  assert(Array.isArray(listing?.artifacts) && listing.total_count === listing.artifacts.length, 'incomplete artifact listing');
+  const prefix = `mcp-package-${sourceCommit}-`;
+  let newest;
+  for (const artifact of listing.artifacts) {
+    if (!artifact.name?.startsWith(prefix)) continue;
+    const attempt = artifact.name.slice(prefix.length);
+    integer(attempt);
+    if (!newest || Number(attempt) > Number(newest.attempt)) newest = { attempt, artifact };
+  }
+  assert(newest, 'no tested MCP package in this CI run');
+  assert(Number(newest.attempt) <= Number(runAttempt), 'package is newer than the CI attempt');
+  assert.equal(newest.artifact.workflow_run?.head_sha, sourceCommit, 'package from another commit');
+  assert.equal(newest.artifact.expired, false, 'the tested MCP package expired; re-run all CI jobs');
+  return newest.attempt;
+}
+
 function sourcePath(path) {
   assert(typeof path === 'string' && path.length < 512 && path === posix.normalize(path));
   assert(!path.startsWith('/') && !path.split('/').some((part) => part === '..' || part.startsWith('.')));
@@ -127,7 +147,7 @@ export function stagePackage({ root, tarball, output, env = process.env }) {
   return receipt;
 }
 
-export function verifyArtifact({ root, directory, run }) {
+export function verifyArtifact({ root, directory, run, packageAttempt }) {
   assert.deepEqual(readdirSync(directory).sort(), [TARBALL, RECEIPT].sort());
   for (const file of [TARBALL, RECEIPT]) assert(lstatSync(join(directory, file)).isFile());
   assert(lstatSync(join(directory, RECEIPT)).size < 1024 * 1024, 'oversized receipt');
@@ -142,7 +162,10 @@ export function verifyArtifact({ root, directory, run }) {
   assert.equal(receipt.version, manifest.version);
   assert.equal(receipt.repository, REPOSITORY);
   assert.equal(receipt.sourceRef, 'refs/heads/main');
-  for (const key of ['sourceCommit', 'runId', 'runAttempt']) assert.equal(receipt[key], expected[key], `${key} mismatch`);
+  for (const key of ['sourceCommit', 'runId']) assert.equal(receipt[key], expected[key], `${key} mismatch`);
+  integer(packageAttempt);
+  assert(Number(packageAttempt) <= Number(expected.runAttempt), 'package is newer than the CI attempt');
+  assert.equal(receipt.runAttempt, packageAttempt, 'runAttempt mismatch');
   assert.equal(receipt.integrity, integrity(bytes), 'package integrity mismatch');
   assert.deepEqual(receipt.fileHashes, fileHashes);
   assert.deepEqual(manifest, json(join(root, 'mcp/package.json')), 'source manifest mismatch');
