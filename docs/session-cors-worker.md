@@ -1274,6 +1274,9 @@ not recover managed account keys.
 
 The first page includes config authority, wrapped session keys, encrypted
 session secrets and Worker Group authority, catalog and membership records.
+It also lists, in the clear, the addresses of everyone who turned the Session
+Agent off, so a restore keeps them out; plaintext rows and group membership are
+in the clear too, so keep an archive as private as the session's data.
 Very large coordinator snapshots use a `chunked` descriptor and payload/chunk
 entries with `target: "coordinator"`. Storage traversal includes every resource,
 hidden rows, plaintext rows, payloads, owner records and hidden markers. Empty

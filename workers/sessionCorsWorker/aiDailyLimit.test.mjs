@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretActionRouteDispatch.js';
+import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
 import { evaluateAuthenticatedRoutePreflight } from './authenticatedRoutePreflight.js';
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 
@@ -32,6 +33,24 @@ test('the /ai route counts against the AI limit, not the general one', async () 
     },
   });
   assert.deepEqual(seen, [{ route: 'ai', limit: 15 }]);
+});
+
+test('storage and transcription keep the general limit when an AI limit is set', async () => {
+  for (const path of ['/transcribe', '/storage/upload', '/storage/read-batch']) {
+    const seen = [];
+    await dispatchAuthenticatedSecretPathRoute({
+      path, method: 'POST', request: new Request('https://worker.example'), config: both, slug: 'session-a', address: '0xabc',
+      env: {}, limit: 400, headers: {}, scopes: { storage: true, transcribe: true },
+      deps: {
+        evaluateAuthenticatedRoutePreflight: async ({ route, limit }) => {
+          seen.push({ route, limit });
+          return { ok: false, response: 'refused' };
+        },
+        json,
+      },
+    });
+    assert.equal(seen[0]?.limit, 400, path);
+  }
 });
 
 test('an /ai call refused before any AI runs costs nothing from the day', async () => {

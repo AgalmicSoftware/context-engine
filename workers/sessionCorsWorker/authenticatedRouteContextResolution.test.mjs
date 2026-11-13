@@ -107,8 +107,10 @@ test('resolveAuthenticatedRouteContext returns common authenticated route contex
     sessionModeProfile: {
       authority: { mode: 'worker_canonical' },
     },
+    // Every route but AI's counts against the general limit, an AI limit set or not.
     limits: {
       perWalletPerDay: 7,
+      aiPerWalletPerDay: 2,
     },
   };
   const headers = { 'Access-Control-Allow-Origin': 'https://allowed.example' };

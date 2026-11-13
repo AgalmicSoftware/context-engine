@@ -20,6 +20,7 @@ import { updateSessionSecretsAfterLitRepair } from './sessionLitAuthorizationCoo
 import { decryptSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 import { build } from 'esbuild';
+import { signBackupPage } from './sessionBackupAuthentication.js';
 
 const slug = 'restore-fixture';
 const sessionId = `0x${'3'.repeat(32)}`;
@@ -152,12 +153,24 @@ test('a restore keeps everyone who turned the Session Agent off opted out', asyn
   }
   const [page] = await allPages(source.env);
   assert.deepEqual(page.coordinator.sessionAgentOptOuts, people);
-  const target = fixture();
-  target.kv.values.delete(`session:${slug}:config`);
-  const result = await importPage(target.env, page);
-  assert.equal(result.body.complete, true, JSON.stringify(result));
-  const restored = await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/list' });
-  assert.deepEqual(restored.body.addresses, people);
+  // A restore only adds: someone the target already holds as opted out stays so,
+  // and a backup from before backups carried the list restores with none.
+  const already = `0x${'c'.repeat(40)}`;
+  const restoreOnto = async (backupPage) => {
+    const target = fixture();
+    target.kv.values.delete(`session:${slug}:config`);
+    await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/set', address: already, optedOut: true });
+    const result = await importPage(target.env, backupPage);
+    assert.equal(result.body.complete, true, JSON.stringify(result));
+    return (await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/list' })).body.addresses.sort();
+  };
+  assert.deepEqual(await restoreOnto(page), [...people, already]);
+  const older = structuredClone(page);
+  delete older.coordinator.sessionAgentOptOuts;
+  const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+  older.snapshotDigest = sha256(JSON.stringify(older.coordinator));
+  older.archiveId = sha256(`${older.manifest.sessionId}:${older.manifest.exportedAt}:${older.snapshotDigest}`);
+  assert.deepEqual(await restoreOnto(await signBackupPage(older, source.env)), [already]);
 });
 
 test('restore refuses missing or altered pages, foreign keys, and mismatched session ids', async () => {
