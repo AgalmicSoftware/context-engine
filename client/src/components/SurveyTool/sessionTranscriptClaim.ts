@@ -11,6 +11,7 @@ import {
   parseLinkJson,
   readLinkParam,
 } from '../../../../shared/linkPayload.mjs';
+import { parseGroupInviteToken } from '../../../../shared/workerGroupJoin.mjs';
 
 export const CLAIM_FRAGMENT_KEY = 'claim';
 // A version 12 code at level M holds 287 bytes. At this size a phone reads it from arm's length, and it stays
@@ -37,7 +38,15 @@ export type TranscriptClaim = {
   transcript: string;
   /** The group the recorder's link joins, so the person joins it too. */
   joinGroup?: string;
+  /** That link's group password, so the person can join a Group Password group; never a one-use code. */
+  joinToken?: string;
 };
+
+/** Only a group password may be handed on: a one-use code would be spent by whoever used it first. */
+export const isHandOnGroupToken = (token: unknown): token is string =>
+  parseGroupInviteToken(token)?.kind === 'password';
+const handOn = (joinGroup: unknown, token: unknown) =>
+  typeof joinGroup === 'string' && joinGroup && isHandOnGroupToken(token) ? { joinToken: token } : {};
 
 export type ClaimFrame = { id: string; index: number; total: number; data: string };
 
@@ -70,14 +79,29 @@ export const claimTranscriptFor = (transcript: string, person: string): string =
   return text.length > MAX_CLAIM_CHARS ? `[Earlier lines left out.]\n${text.slice(-MAX_CLAIM_CHARS)}` : text;
 };
 
-export const packClaim = async ({ sessionSlug, person, transcript, joinGroup }: TranscriptClaim): Promise<string> =>
-  encodeBase64Url(
+export const packClaim = async ({
+  sessionSlug,
+  person,
+  transcript,
+  joinGroup,
+  joinToken,
+}: TranscriptClaim): Promise<string> => {
+  const token = handOn(joinGroup, joinToken).joinToken;
+  return encodeBase64Url(
     await deflateLinkBytes(
       new TextEncoder().encode(
-        JSON.stringify({ v: 1, s: sessionSlug, p: person, t: transcript, ...(joinGroup ? { g: joinGroup } : {}) }),
+        JSON.stringify({
+          v: 1,
+          s: sessionSlug,
+          p: person,
+          t: transcript,
+          ...(joinGroup ? { g: joinGroup } : {}),
+          ...(token ? { c: token } : {}),
+        }),
       ),
     ),
   );
+};
 
 const UNREADABLE = 'This code couldn’t be read. Ask for it to be shown again.';
 
@@ -95,11 +119,17 @@ export const unpackClaim = async (
   const text = bytes ? decodeLinkUtf8(bytes) : null;
   const parsed = text?.ok ? parseLinkJson(text.text) : null;
   const value = parsed?.ok ? (parsed.value as Record<string, unknown>) : null;
-  const { v, s, p, t, g } = value || {};
+  const { v, s, p, t, g, c } = value || {};
   return v === 1 && typeof s === 'string' && typeof p === 'string' && typeof t === 'string' && t.trim()
     ? {
         ok: true,
-        claim: { sessionSlug: s, person: p, transcript: t, ...(typeof g === 'string' && g ? { joinGroup: g } : {}) },
+        claim: {
+          sessionSlug: s,
+          person: p,
+          transcript: t,
+          ...(typeof g === 'string' && g ? { joinGroup: g } : {}),
+          ...handOn(g, c),
+        },
       }
     : { ok: false, error: UNREADABLE };
 };
@@ -152,6 +182,7 @@ export const readHeldClaim = (sessionSlug: string): TranscriptClaim | null => {
       person: claim.person,
       transcript: claim.transcript,
       ...(claim.joinGroup ? { joinGroup: claim.joinGroup } : {}),
+      ...handOn(claim.joinGroup, claim.joinToken),
     };
   } catch {
     return null;

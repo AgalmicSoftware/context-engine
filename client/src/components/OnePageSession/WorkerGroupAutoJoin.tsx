@@ -136,7 +136,7 @@ function AutoJoinIntent({
       setProgress({ phase: 'done', message });
       onConsumed();
       clearPendingAutoJoin(intent);
-      finishWorkerGroupAutoJoin(sessionSlug, groupId, sessionId);
+      finishWorkerGroupAutoJoin(sessionSlug, groupId, sessionId, token);
     };
     setProgress({ phase: 'loading', message: 'Preparing to join group…' });
     void (async () => {

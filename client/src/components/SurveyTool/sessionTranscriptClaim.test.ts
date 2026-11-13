@@ -114,6 +114,18 @@ describe('moving it between phones', () => {
     });
   });
 
+  it('hands on a group password with its group, and never a one-use code', async () => {
+    const withPassword = { ...claim, joinToken: 'gp:river-stone-lamp' };
+    expect(await unpackClaim(await packClaim(withPassword))).toEqual({ ok: true, claim: withPassword });
+    expect(await unpackClaim(await packClaim({ ...claim, joinToken: 'a'.repeat(32) }))).toEqual({ ok: true, claim });
+    // Without a group there is nothing to join, so nothing is handed on.
+    const { joinGroup: _group, joinToken: _token, ...bare } = withPassword;
+    expect(await unpackClaim(await packClaim({ ...bare, joinToken: withPassword.joinToken }))).toEqual({
+      ok: true,
+      claim: bare,
+    });
+  });
+
   it('carries the whole part in one link as well', async () => {
     const packed = await packClaim(claim);
     const frame = readClaimFrame(buildClaimLink(packed, BASE, 'ab12'));
