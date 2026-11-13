@@ -1,5 +1,5 @@
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
-import { buildSessionAgentCapability } from './agent/capability.mjs';
+import { buildAgentHttpCapability } from './agent/capability.mjs';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { SESSION_CONFIG_MIGRATION_REQUIRED_REASON } from './sessionConfigSecretsStore.js';
 import { getDefaultWorkerSessionSlug, validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
@@ -78,7 +78,7 @@ export const dispatchWorkerCapabilities = async ({ request, env = {}, headers = 
         !!env.GROUP_KV?.get && !!env.GROUP_KV?.put && !!env.GROUP_KV?.list && !!env.GROUP_KV?.delete && !!env.AGENT_MANAGED_ROOT_SECRET;
       const ready = enabled && configured;
       body.agentHttp = { enabled, configured, ready };
-      body.agentSessionWrapped = await buildSessionAgentCapability({ config, revision: current.body.revision,
+      body.agentSessionWrapped = await buildAgentHttpCapability({ config, revision: current.body.revision,
         origin: url.origin, enabled: ready, bundle: body.bundle });
       responseHeaders.set('Cache-Control', 'no-store');
     }

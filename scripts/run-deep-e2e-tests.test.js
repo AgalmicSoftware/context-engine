@@ -91,7 +91,7 @@ test('buildDeepE2eSteps only includes Agent HTTP checks when the root script is 
   assert.deepEqual(
     buildDeepE2eSteps({
       ...baseScripts,
-      'test:worker:agent': 'node scripts/run-session-agent-tests.js',
+      'test:worker:agent': 'node scripts/run-agent-http-tests.js',
     })
       .map(([label]) => label),
     [

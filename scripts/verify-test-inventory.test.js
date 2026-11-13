@@ -64,7 +64,7 @@ function writeInventoryFixture(rootDir, overrides = {}) {
         ROOT_JEST_TEST_FILES.map((relativePath) => `'<rootDir>/${path.join('..', relativePath)}'`).join(' ')
       }`,
       'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
-      'test:worker:agent': 'node scripts/run-session-agent-tests.js',
+      'test:worker:agent': 'node scripts/run-agent-http-tests.js',
       'test:e2e': 'npm run -s test:e2e:smoke',
       'test:e2e:quick': 'npm run -s test:e2e:smoke',
       'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',

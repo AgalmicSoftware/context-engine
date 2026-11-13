@@ -10,7 +10,7 @@ import {
   validCuratedIdList,
   validResultsAdminAddresses,
 } from '../../shared/sessionConfigEdits.mjs';
-import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
+import { validAgentHttpConfig } from '../../shared/agentHttpConfig.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
 import { normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { stableCanonicalSerialize } from '../shared/deployHelperCore.mjs';
@@ -272,7 +272,7 @@ const resolveWorkerCanonicalPublicationWrite = ({
 const SETTINGS_CHECKS = Object.freeze([
   [(config) => !findForbiddenCloudflareDeploymentTokenPath(config), 'Cloudflare deployment tokens are not allowed in session config.'],
   [(config) => !findForbiddenWorkerConfigSecretPath(config), 'Secret-like values are not allowed in public session config fields.'],
-  [validSessionAgentConfig, 'Invalid agent configuration.'],
+  [validAgentHttpConfig, 'Invalid agent configuration.'],
   [validAllowOrigins, 'Worker CORS allowlists must contain exact origins.'],
   [validGroupCreationPolicy, 'Invalid group creation policy.'],
   [validContextAdditionPolicy, 'Invalid context addition policy.'],

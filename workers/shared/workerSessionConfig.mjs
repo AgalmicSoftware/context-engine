@@ -1,4 +1,4 @@
-import { projectPublicAgentConfig } from '../../shared/sessionAgentConfig.mjs';
+import { projectPublicAgentConfig } from '../../shared/agentHttpConfig.mjs';
 import {
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
