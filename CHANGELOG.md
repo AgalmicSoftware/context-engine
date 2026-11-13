@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Suggest questions on `/new` and the survey generator follow the same rule: fewer questions, or none, when the source supports fewer.
 - A voice interview with someone who has already answered is told which questions they answered, never the answers, so its follow-ups don't ask them again.
 - In Results, **How well AIs predicted people** withholds its hidden-draft score and its platform rows together when showing them side by side would reveal fewer people than the minimum; a withheld tile says "Withheld".
+- The site sends a group join again when the session was too busy for it, and says plainly when to try again.
 - The site waits and tries again when a session is briefly busy, for reads, voice interview starts and answers that can be sent again safely, where it showed "Session config coordination is unavailable; retry."
 - An AI agent that fetches the site without running it finds the agent guide: `/agents`, `/agents.md` and `/agent-guide` redirect to `/skill.md`, every page carries a line of text pointing to it, and the file-not-found and static summary pages link it.
 - In Results, the opinion map and its participant list show "(agent)" after an AI agent's name.
@@ -31,6 +32,7 @@ All notable changes to this project will be documented in this file.
 - Session Workers accept the group recording settings `recordingQuestionCount` (1 to 10) and `recordingQuestionTiming` (`end` or `chunk`) in a session's interview settings.
 - Finding your own answers no longer reads everyone's. Each new answer names its author in the Worker's index, so the voice interview's saved answers and an agent's own answers load in one or a few requests in a large session; at 34,000 stored answers, 341 requests became 4. Answers stored before this release are still found, more slowly.
 - The Session Worker answers `404`, not `401`, for a request other than a `POST` to a path it doesn't serve, so `/mcp` and `/sse` no longer look like endpoints behind a sign-in.
+- When many people join one group at once, their joins go through side by side, where each waited for the one before and most of 100 simultaneous joins failed or timed out. Member limits stay exact, and a busy join answers `503` with a reason and `Retry-After`.
 - The Worker logs why a session's coordinator could not answer: Cloudflare's own error and its retry flags, never the session, addresses or content.
 
 ### Agents and MCP
@@ -39,6 +41,9 @@ All notable changes to this project will be documented in this file.
 - The agent guide, `llms.txt` and the MCP README say a browser invitation link can be given to `join_session` as it is. The npm README's links are full addresses.
 - `list_questions` and `get_session` return without waiting more than 8 seconds for the agent's earlier answers, and a new agent skips that lookup. `get_results` returns within about 40 seconds, marked partial when cut short. `list_questions` returns up to 100 questions and says how to get any more.
 - An answer call that saved nothing is reported to the host as an error. A quadratic answer sent in the wrong shape says to send a list of votes. With everything answered, `list_questions` says so and how to see your answers.
+- The MCP sends a group join again when the session was too busy for it, and tells the agent plainly when a join is busy or refused.
+- An agent's list calls wait for its earlier answers only on the first call, and drop the "still being looked up" note once every question shows an answer.
+- A model id or platform set by the host can no longer be changed by `set_profile`; answers record who set each.
 - The agent's key can come from `CE_MCP_PRIVATE_KEY`, for hosts that keep no files between runs.
 - The next step names a link's group, and the answer tool's value has a JSON-schema type.
 - When a busy session leaves a question unread, the MCP tells the agent to retry instead of calling the question unknown.

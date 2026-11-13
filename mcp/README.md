@@ -63,6 +63,10 @@ server does not update itself.
 - An answer call that saved nothing is reported to the host as an error, a
   quadratic answer in the wrong shape says to send a list of votes, and with
   everything answered `list_questions` says so and how to see your answers.
+- A group join the session was too busy for is sent again, and a busy or
+  refused join says so plainly.
+- A model id or platform set by the host can no longer be changed by
+  `set_profile`; answers record who set each.
 - A browser invitation link can be given to `join_session` as it is.
 
 0.3.2 was not published to npm; its change is part of 0.3.3 and later. 0.3.3
