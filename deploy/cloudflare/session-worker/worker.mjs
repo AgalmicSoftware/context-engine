@@ -31494,7 +31494,7 @@ var init_workerGroups = __esm({
       if (!/^[a-z0-9][a-z0-9._-]*$/.test(normalized)) return "";
       return normalized;
     };
-    resolveWorkerGroupListed = ({ joinMode, memberVisibility, listed } = {}) => joinMode === WORKER_GROUP_JOIN_MODES2.OPEN || (typeof listed === "boolean" ? listed : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION);
+    resolveWorkerGroupListed = ({ joinMode, memberVisibility, listed } = {}) => typeof listed === "boolean" ? listed || joinMode === WORKER_GROUP_JOIN_MODES2.OPEN : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
     isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim2(value));
     encodedPrincipalKeyPart = (value) => btoa(trim2(value || "id")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "") || "id";
     canonicalSessionIdKeyPart = (value) => {
@@ -31761,7 +31761,7 @@ var init_workerGroups = __esm({
       if (Object.prototype.hasOwnProperty.call(input, "listed") && typeof input.listed !== "boolean") {
         return { ok: false, status: 400, reason: "invalid_group_listed" };
       }
-      const listed = Object.prototype.hasOwnProperty.call(input, "listed") ? input.listed : existing?.listed;
+      const listed = Object.prototype.hasOwnProperty.call(input, "listed") ? input.listed : existing ? existing.listed : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
       const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
       if (!removalAuth) return { ok: false, status: 400, reason: "invalid_removal_auth" };
       const label = trim2(input.label || existing?.label);
@@ -32460,7 +32460,9 @@ var init_workerGroups = __esm({
         authorityByGroupId.set(groupId, {
           joinMode,
           memberVisibility,
-          listed: resolveWorkerGroupListed({ joinMode, memberVisibility, listed: authority?.listed }),
+          // The catalog has already applied the listing rule; applying it again
+          // would list an open group an older Worker hid.
+          listed: authority?.listed === true,
           memberCount,
           isMember: authority?.isMember === true,
           ...admin && isObj7(authority?.admin) ? { adminDetails: authority.admin } : {}
@@ -33522,6 +33524,9 @@ var init_workerGroups = __esm({
           actorPrincipal: actor.principal,
           remover: "member"
         });
+        if (result.reason === "worker_group_not_found") {
+          return routeError(deps, { status: 404, reason: "worker_group_member_not_found" }, baseHeaders);
+        }
         if (!result.ok) return routeError(deps, result, baseHeaders);
         if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
           return routeError(deps, { status: 503, reason: "worker_group_projection_unavailable" }, baseHeaders);
@@ -82104,7 +82109,8 @@ ${expiry}`);
             active: true,
             joinMode: toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add",
             memberVisibility: toTrimmedString10(group?.memberVisibility).toLowerCase() || "admin_only",
-            listed: resolveWorkerGroupListed(group),
+            // As stored, so a group from before the setting keeps reading the old rule.
+            listed: typeof group?.listed === "boolean" ? group.listed : void 0,
             removalAuth: toTrimmedString10(group?.removalAuth).toLowerCase() || "both",
             memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
             joinEndsAt: toTrimmedString10(group?.joinEndsAt)
@@ -82137,17 +82143,27 @@ ${expiry}`);
         });
       }
       async finalizeWorkerGroupUpdate({ groupId, group }) {
+        const key = workerGroupCapacityGroupKey(groupId);
+        const joinMode = toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add";
+        if (joinMode !== "one_use") {
+          const state = await this.state.storage.get(key);
+          if (state?.phase === "updating" && workerGroupInviteCounts(state).unused > 0) {
+            await this.revokeAllUnusedWorkerGroupInvites(groupId, new Date(Number(this.now())).toISOString());
+          }
+        }
         await this.state.storage.transaction(async (transaction) => {
-          const key = workerGroupCapacityGroupKey(groupId);
           const state = await transaction.get(key);
           if (state?.phase !== "updating") return;
+          const { signer, signerSetAt, ...kept } = withoutPendingMutation(state);
           await transaction.put(key, {
-            ...withoutPendingMutation(state),
+            ...kept,
+            ...joinMode === "group_password" && signer ? { signer, signerSetAt } : {},
             phase: "active",
             active: true,
-            joinMode: toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add",
+            joinMode,
             memberVisibility: toTrimmedString10(group?.memberVisibility).toLowerCase() || "admin_only",
-            listed: resolveWorkerGroupListed(group),
+            // As stored, so a group from before the setting keeps reading the old rule.
+            listed: typeof group?.listed === "boolean" ? group.listed : void 0,
             removalAuth: toTrimmedString10(group?.removalAuth).toLowerCase() || "both",
             memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
             joinEndsAt: toTrimmedString10(group?.joinEndsAt)
@@ -82861,6 +82877,45 @@ ${expiry}`);
         if (!result.ok) return jsonResponse2(result, result.status || 400);
         return this.respondToWorkerGroupMutation(mutation, result);
       }
+      // Revokes the unused codes among `keys` in one transaction. Revoking by hash
+      // marks a code spent by a join still settling too: if that join fails, its
+      // code comes back revoked, not usable. Revoking all of them stamps the time,
+      // which does the same for every such code.
+      async revokeWorkerGroupInvites(groupId, keys, { nowIso: nowIso4, all = false }) {
+        const groupKey2 = workerGroupCapacityGroupKey(groupId);
+        return this.state.storage.transaction(async (transaction) => {
+          const state = await transaction.get(groupKey2);
+          const counts = workerGroupInviteCounts(state);
+          let revoked = 0;
+          for (const key of keys) {
+            const record4 = await transaction.get(key);
+            if (record4?.state === "used" && !all) await transaction.put(key, { ...record4, revokeOnRestore: true });
+            if (record4?.state !== "unused") continue;
+            await transaction.put(key, { ...record4, state: "revoked", revokedAt: nowIso4 });
+            counts.unused = Math.max(0, counts.unused - 1);
+            counts.revoked += 1;
+            revoked += 1;
+          }
+          await transaction.put(groupKey2, { ...state, invites: counts, ...all ? { invitesRevokedAt: nowIso4 } : {} });
+          return { revoked, counts };
+        });
+      }
+      // A page at a time, so a group with many codes never loads them all.
+      async revokeAllUnusedWorkerGroupInvites(groupId, nowIso4) {
+        const prefix = workerGroupInvitePrefix(groupId);
+        let revoked = 0;
+        let counts;
+        let after = "";
+        do {
+          const page = [...await this.state.storage.list({ prefix, startAfter: after, limit: WORKER_GROUP_REVOKE_BATCH })];
+          after = page.length === WORKER_GROUP_REVOKE_BATCH ? page.at(-1)[0] : "";
+          const keys = page.filter(([, record4]) => record4?.state === "unused").map(([key]) => key);
+          const batch = await this.revokeWorkerGroupInvites(groupId, keys, { nowIso: nowIso4, all: true });
+          revoked += batch.revoked;
+          counts = batch.counts;
+        } while (after);
+        return { revoked, counts };
+      }
       async applyWorkerGroupSecretOperation(payload) {
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
         const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
@@ -82886,6 +82941,7 @@ ${expiry}`);
           await this.state.storage.transaction(async (transaction) => {
             const state = await transaction.get(groupKey2);
             await transaction.put(groupKey2, { ...state, signer, signerSetAt: nowIso4 });
+            await transaction.delete(workerGroupGuessKeys({ groupId }).group);
           });
           await bumpStorageBackupRevision(this.state.storage);
           return jsonResponse2({ ok: true, status: 200, groupId, passwordSet: true, signerSetAt: nowIso4 }, 200);
@@ -82954,37 +83010,7 @@ ${expiry}`);
           const all = input.allUnused === true;
           const hashes = all ? null : normalizeWorkerGroupInviteHashes(input.hashes, { max: WORKER_GROUP_REVOKE_BATCH });
           if (all === (input.hashes != null) || !all && !hashes) return refuse(400, "invalid_group_invites");
-          let revoked = 0;
-          let counts = workerGroupInviteCounts(active.state);
-          const revokeBatch = (keys) => this.state.storage.transaction(async (transaction) => {
-            const state = await transaction.get(groupKey2);
-            const next = workerGroupInviteCounts(state);
-            for (const key of keys) {
-              const record4 = await transaction.get(key);
-              if (record4?.state === "used" && !all) await transaction.put(key, { ...record4, revokeOnRestore: true });
-              if (record4?.state !== "unused") continue;
-              await transaction.put(key, { ...record4, state: "revoked", revokedAt: nowIso4 });
-              next.unused = Math.max(0, next.unused - 1);
-              next.revoked += 1;
-              revoked += 1;
-            }
-            await transaction.put(groupKey2, { ...state, invites: next, ...all ? { invitesRevokedAt: nowIso4 } : {} });
-            return next;
-          });
-          if (all) {
-            let after = "";
-            do {
-              const page = [...await this.state.storage.list({
-                prefix: workerGroupInvitePrefix(groupId),
-                startAfter: after,
-                limit: WORKER_GROUP_REVOKE_BATCH
-              })];
-              after = page.length === WORKER_GROUP_REVOKE_BATCH ? page.at(-1)[0] : "";
-              counts = await revokeBatch(page.filter(([, record4]) => record4?.state === "unused").map(([key]) => key));
-            } while (after);
-          } else {
-            counts = await revokeBatch(hashes.map((hash2) => workerGroupInviteKey(groupId, hash2)));
-          }
+          const { revoked, counts } = all ? await this.revokeAllUnusedWorkerGroupInvites(groupId, nowIso4) : await this.revokeWorkerGroupInvites(groupId, hashes.map((hash2) => workerGroupInviteKey(groupId, hash2)), { nowIso: nowIso4 });
           await bumpStorageBackupRevision(this.state.storage);
           return jsonResponse2({ ok: true, status: 200, groupId, revoked, counts }, 200);
         }
