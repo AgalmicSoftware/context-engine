@@ -832,6 +832,28 @@ Authenticated clients can use the worker as the session storage boundary:
     config through this call, so response uploads target the session's own
     Worker rather than the legacy shared Arweave proxy. After durable storage
     refs are returned, the client completes without an on-chain transaction.
+  - In a Worker-canonical session, each `responses` answer is checked before
+    anything is stored; other sessions keep their questions on chain or
+    Arweave, so the Worker doesn't check their answers or apply the limits
+    below. The Worker must be able to read the answers (`422`
+    `response_unreadable`), except in a Lit session. Each answer's question
+    must be one the session has stored, hidden ones included, or an agent's
+    proposed `ceq_` question; otherwise `422` `response_question_unknown`. A
+    readable value its question doesn't accept (an option it lacks, a rating
+    off its scale or step) is `422` `response_answer_invalid`. Encrypted
+    values, blank answers (a comment alone) and locked or encrypted questions
+    aren't checked.
+  - In those sessions, each signed-in person may store at most 20 versions of
+    one question's answer, the latest included (`422`
+    `response_limit_versions`), and at most five times as many answers as the
+    session has questions, proposed ones included, in all (`422`
+    `response_limit_rows`). A Lit session's answers the Worker can't read
+    count only toward the second limit. A survey's bundle is checked against
+    the same row limit but counted apart from its answers, so they aren't
+    counted twice. Uploads still in flight count, so parallel requests can't
+    pass a limit together, and a replayed request id isn't counted again.
+    Only answers to the session's own questions are counted per question. The
+    counts live in the session's coordinator and aren't in backups.
   - For `responses`, the Worker records the authenticated uploader as trusted
     responder metadata. The payload's own `responder` field is not authoritative.
     In Worker-canonical sessions whose results visibility is not
@@ -2691,7 +2713,11 @@ Never return secrets in responses.
 - An explicit `sessionEndsAt: ""` clears a Worker-canonical session's end time.
 - The recovered typed-data signer must match request `address`. Before that, the
   Worker applies the session's CORS policy and checks the signed action, slug, body
-  hash and audience. It then checks expiration and consumes the nonce.
+  hash and audience. It then checks expiration and consumes the nonce. The
+  `expiration` must be in the future and at most ten minutes ahead, or the
+  action is refused (`Admin action expires too far ahead; sign it again.`), so
+  a signed action can't be kept for more than ten minutes before it is sent.
+  The site signs each action to expire five minutes ahead.
 - Without a config, `set-config` authorizes the signer only when it matches the
   requested admin and either the deployment's `BOOTSTRAP_ADMIN_ADDRESS` or, on a
   registry-wired Worker without that binding, the on-chain admin of a registered
