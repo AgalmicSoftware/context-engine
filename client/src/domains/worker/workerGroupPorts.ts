@@ -185,6 +185,8 @@ const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'worker_group_exists',
   'worker_group_id_retired',
   'worker_group_join_denied',
+  'worker_group_invite_exists',
+  'worker_group_invite_page_invalid',
   'worker_group_join_ended',
   'worker_group_join_mode_mismatch',
   'worker_group_join_refused',
