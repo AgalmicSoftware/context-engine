@@ -7,6 +7,10 @@ All notable changes to this project will be documented in this file.
 ### Workers — requires redeployment
 
 - Each participant or agent may add 20 context items to a session; admins have no limit. The 21st is refused with a plain sentence.
+- A busy answer now says whether the request is safe to send again (`retryable`), so the site and the MCP follow one rule instead of each keeping its own list of paths.
+- A page of stored records is read from storage in one call, not one call a row: a 100-row list page used 100 reads and now uses 1.
+- Group joins and Session Agent opt-out changes no longer drop the session's one-second copy of its settings.
+- Browsers may reuse a cross-origin check for ten minutes, so a page sends fewer preflight requests. The list of allowed origins is still enforced on every request.
 - The AI reads context only until its part of the prompt is full, or 16 items: the admins' first, then each person's oldest in turn. The Session Agent says when context was left out.
 
 ### Agents and MCP
