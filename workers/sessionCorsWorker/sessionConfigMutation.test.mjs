@@ -982,3 +982,36 @@ test('set-config merges ai one level deep, so an edit of one part keeps the rest
     error: 'Secret-like values are not allowed in public session config fields.',
   });
 });
+
+// One list of settings checks runs on the settings sent and again on the
+// merged record, so each refuses the same way on either path.
+test('each settings check refuses a value sent or already stored, with the same message', () => {
+  const invalid = {
+    allowOrigins: ['https://*.example'],
+    groupCreationPolicy: 'anyone',
+    contextAdditionPolicy: 'anyone',
+    groupMemberCeiling: 0,
+    pileAutoAdvanceEnabled: 'yes',
+    feedbackEnabled: 'yes',
+    interviewModeEnabled: 'yes',
+  };
+  const messages = new Set();
+  for (const [key, value] of Object.entries(invalid)) {
+    const sent = applySessionConfigMutation({ existingConfig: baseConfig, slug: baseConfig.slug,
+      mutation: { kind: 'set-config', incomingConfig: { ...baseConfig, [key]: value } } });
+    const stored = applySessionConfigMutation({ existingConfig: { ...baseConfig, [key]: value }, slug: baseConfig.slug,
+      mutation: { kind: 'set-limits', incomingLimits: {} } });
+    assert.equal(sent.status, 400, key);
+    assert.equal(stored.error, sent.error, key);
+    messages.add(sent.error);
+  }
+  assert.equal(messages.size, Object.keys(invalid).length);
+  // The daily AI limit arrives with the limits, so only the merged record is checked.
+  const limit = applySessionConfigMutation({ existingConfig: baseConfig, slug: baseConfig.slug,
+    mutation: { kind: 'set-limits', incomingLimits: { aiPerWalletPerDay: -1 } } });
+  assert.match(limit.error, /^limits\.aiPerWalletPerDay must be a whole number/);
+  // Settings sent are checked first, without it, so their own refusal comes first.
+  const both = applySessionConfigMutation({ existingConfig: baseConfig, slug: baseConfig.slug,
+    mutation: { kind: 'set-config', incomingConfig: { ...baseConfig, limits: { aiPerWalletPerDay: -1 }, interviewModeEnabled: 'yes' } } });
+  assert.equal(both.error, 'Invalid interview mode config.');
+});
