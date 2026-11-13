@@ -96,13 +96,14 @@ export const buildTools = (participant) => [
     name: 'list_questions',
     title: 'List questions',
     description:
-      'List the session’s statements and questions with their type, options or scale, and your latest answer. Unanswered ones come first by default. questionsComplete or myAnswersComplete is false when listing or payload reads are unfinished; unreadQuestions and unreadMyAnswers count listed payloads that could not be read.',
+      'List the session’s statements and questions with their type, options or scale, and your latest answer. Unanswered ones come first by default. Returns up to 100 at a time; when more match, more says how many and next how to get them. questionsComplete or myAnswersComplete is false when listing or payload reads are unfinished, including while your earlier answers are still being looked up (the questions come back without waiting for that); unreadQuestions and unreadMyAnswers count listed payloads that could not be read.',
     inputSchema: {
       type: 'object',
       properties: {
         session: sessionParam,
         filter: { type: 'string', enum: ['unanswered', 'answered', 'all'], description: 'Which questions to list.' },
-        limit: { type: 'integer', minimum: 1, maximum: 100, description: 'Maximum questions returned (default 25).' },
+        limit: { type: 'integer', minimum: 1, maximum: 100, description: 'Maximum questions returned (default and most 100).' },
+        offset: { type: 'integer', minimum: 0, description: 'How many matching questions to skip, to get the ones after an earlier call’s (default 0).' },
       },
       additionalProperties: false,
     },
@@ -188,7 +189,7 @@ export const buildTools = (participant) => [
     name: 'get_results',
     title: 'Get results',
     description:
-      'Summarize everyone’s latest answers per question when the session shows results to everyone or to its signed-in members: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished, capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
+      'Summarize everyone’s latest answers per question when the session shows results to everyone or to its signed-in members: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished (it stops after about 40 seconds so the call returns in time), capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -29,6 +29,18 @@ const OWN_ANSWER_DEADLINE_MS = 60_000;
 // One scan of the agent's own answers is reused this long; answers it gives
 // meanwhile come from its local record.
 const OWN_ANSWER_SCAN_MAX_AGE_MS = 10 * 60 * 1000;
+// An unfinished scan of a Session Worker is reused for a minute before another
+// starts, as an unread record is.
+const OWN_ANSWER_RETRY_MS = 60_000;
+// A tool call waits this long for that scan, then answers without it; the
+// scan finishes for later calls. Hosts often give a tool call 60 seconds.
+const OWN_ANSWER_WAIT_MS = 8_000;
+// get_results lists answers for at most this long, then reads them until the
+// second limit, so it returns within a host's usual 60 seconds.
+const RESULTS_LIST_DEADLINE_MS = 20_000;
+const RESULTS_READ_DEADLINE_MS = 40_000;
+// list_questions returns up to this many questions a call.
+const MAX_LISTED_QUESTIONS = 100;
 // A Worker lists answers without their question, so results read every listed
 // one: a 30-question salon of 80 people, some changing answers, lists ~2,900.
 const MAX_RESULT_RECORDS = 10000;
@@ -197,6 +209,20 @@ const nextStep = ({ instructions, linkGroup, member = null }) => {
   return `${read}. ${named}${member === false ? ', which you haven’t joined' : ''}: ${join}. Then call list_questions and answer.`;
 };
 
+// Says plainly what a list_questions call left out and how to get it.
+const pageNotes = (matching, start, max, filter) => {
+  const shown = Math.max(0, Math.min(max, matching - start));
+  const left = Math.max(0, matching - start - shown);
+  return {
+    shown,
+    ...(start ? { offset: start } : {}),
+    ...(left ? { more: left, next: filter === 'unanswered'
+      ? `${left} more not shown. Answer these, then call list_questions again; answered ones drop out of this list, so start again from offset 0.`
+      : `${left} more not shown: call list_questions with filter "${filter}" and offset ${start + shown}.` } : {}),
+    ...(start && start >= matching && matching ? { pageNote: `offset ${start} is past the ${matching} matching questions; call again from offset 0.` } : {}),
+  };
+};
+
 const WHO_CAN_END_MEMBERSHIP = {
   both: 'Members can leave with leave_group, and admins can remove them.',
   admin_only: 'Only admins can remove members; members can’t leave.',
@@ -234,11 +260,14 @@ const progressNotes = (questions, mine) => ({
   ...(questions.unread ? { unreadQuestions: questions.unread } : {}),
   ...(mine.unread ? { unreadMyAnswers: mine.unread } : {}),
   ...(mine.complete === false
-    ? { myAnswersComplete: false, note: 'Some answers could not be read or the scan is unfinished; the answers shown may be incomplete.' }
+    ? { myAnswersComplete: false, note: mine.pending
+      ? 'Your earlier answers are still being looked up, so some you gave may show as unanswered; call again in a minute to see them.'
+      : 'Some answers could not be read or the scan is unfinished; the answers shown may be incomplete.' }
     : {}),
 });
 
-export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), sbt = null, createProvider, sleep, registry = {} }) => {
+export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), sbt = null, createProvider, sleep, registry = {},
+  ownAnswerWaitMs = OWN_ANSWER_WAIT_MS }) => {
   const requestTestEth = createTestEthRequester({ config, wallet, createProvider, now, sleep });
   const sessions = new Map(); // key -> { info, client, records: Map(storageId -> payload), missing: Map(storageId -> time) }
   let state = null;
@@ -403,8 +432,14 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const stored = isRecord(fresh.sessions[key]) ? fresh.sessions[key] : {};
       // A different session behind the same link starts with no remembered answers.
       const previous = stored.sessionId && stored.sessionId !== ctx.client.sessionId ? {} : stored;
+      // A key made with this state has only ever answered from it, so a session
+      // it joins for the first time holds no earlier answers of its own.
+      // Any earlier entry, here or for this session under another link, rules it out.
+      const first = fresh.keyCreatedWithState === true && !isRecord(fresh.sessions[key]) &&
+        !Object.values(fresh.sessions).some((entry) => isRecord(entry) && entry.sessionId === ctx.client.sessionId);
       fresh.sessions[key] = {
         ...previous,
+        ...(first ? { noEarlierAnswers: true } : {}),
         sessionId: ctx.client.sessionId,
         workerOrigin: ctx.info.workerOrigin,
         ...(ctx.registry ? { kind: 'registry', chainId: ctx.info.chainId || 11155420 } : {}),
@@ -501,10 +536,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   };
 
   /** Records not reached or not readable come back undefined and keep the read incomplete. */
-  const readMany = async (ctx, storageIds) => {
-    const deadline = now() + READ_DEADLINE_MS;
+  // `stopped` defaults to the current tool call's cancellation; a background
+  // read that outlives its call passes its own.
+  const readMany = async (ctx, storageIds, { deadlineMs = READ_DEADLINE_MS, stopped = () => signal?.aborted } = {}) => {
+    const deadline = now() + deadlineMs;
     const payloads = await mapLimit(storageIds, READ_CONCURRENCY, async (storageId) => {
-      if (!ctx.records.has(storageId) && (now() >= deadline || signal?.aborted)) return undefined;
+      if (!ctx.records.has(storageId) && (now() >= deadline || stopped())) return undefined;
       return readCached(ctx, storageId).catch(() => undefined);
     });
     const unread = payloads.filter(payload => payload === undefined).length;
@@ -589,9 +626,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     return questions;
   };
 
-  const toEntries = async (ctx, items) => {
+  const toEntries = async (ctx, items, options) => {
     const rows = items.filter((item) => item.hidden !== true && text(item.storageRef?.id));
-    const { payloads, complete, unread } = await readMany(ctx, rows.map((item) => text(item.storageRef.id)));
+    const { payloads, complete, unread } = await readMany(ctx, rows.map((item) => text(item.storageRef.id)), options);
     const entries = rows.map((item, index) => ({
       storageId: text(item.storageRef.id),
       createdAt: text(item.metadata?.createdAt) || text(item.storageRef?.createdAt),
@@ -606,8 +643,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   // Listing your own answers scans the whole session's answer index, so one
   // scan is reused for a while; answers given since come from the local record.
   const scanMyAnswers = async (ctx) => {
-    if (ctx.ownScan && ctx.ownScan.complete && now() - ctx.ownScan.at < OWN_ANSWER_SCAN_MAX_AGE_MS && ctx.ownScan.sessionId === ctx.client.sessionId && ctx.ownScan.windowKey === ctx.registry?.windowKey) {
-      return ctx.ownScan;
+    const last = ctx.ownScan;
+    const reuseFor = last?.complete ? OWN_ANSWER_SCAN_MAX_AGE_MS : (ctx.registry ? 0 : OWN_ANSWER_RETRY_MS);
+    if (last && now() - last.at < reuseFor && last.sessionId === ctx.client.sessionId && last.windowKey === ctx.registry?.windowKey) {
+      return last;
     }
     if (ctx.registry) {
       const questions = await loadQuestions(ctx);
@@ -619,14 +658,21 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, windowKey: ctx.registry.windowKey, answers, complete, chainOrders, unread: unreadAnswers };
       return ctx.ownScan;
     }
+    // A new agent's own answers are all in its local record, unless an upload's reply was lost.
+    const local = sessionState(ctx);
+    if (local.noEarlierAnswers === true && local.sessionId === ctx.client.sessionId && !ctx.localRecordLost &&
+      !(isRecord(local.pendingUploads) && Object.keys(local.pendingUploads).length)) {
+      ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, answers: new Map(), complete: true, unread: 0 };
+      return ctx.ownScan;
+    }
     const { items, complete: listed } = await ctx.client.listAll('responses', {
       mine: true,
       maxItems: MAX_OWN_ANSWER_ITEMS,
       maxPages: OWN_ANSWER_PAGES,
       deadlineMs: OWN_ANSWER_DEADLINE_MS,
-      signal,
     });
-    const entries = await toEntries(ctx, items);
+    // This scan may outlive the call that started it, so no call's cancellation stops it; its deadlines do.
+    const entries = await toEntries(ctx, items, { stopped: () => false });
     const complete = listed && entries.complete;
     const latest = latestAnswersByQuestion(entries, { sessionSlug: ctx.info.slug, sessionId: ctx.client.sessionId });
     const answers = new Map();
@@ -639,9 +685,34 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     return ctx.ownScan;
   };
 
+  // A Session Worker's scan never holds a tool call past the wait: the call
+  // uses the last scan, or none, and the scan carries on for later calls.
+  const awaitOwnScan = async (ctx) => {
+    if (ctx.registry) return scanMyAnswers(ctx);
+    if (!ctx.ownScanRun) {
+      // A failed scan counts as an unfinished one, so it is retried after the
+      // same minute rather than by every call.
+      const run = scanMyAnswers(ctx).catch(() => {
+        const last = ctx.ownScan?.sessionId === ctx.client.sessionId ? ctx.ownScan : null;
+        ctx.ownScan = { at: now(), sessionId: ctx.client.sessionId, answers: last?.answers || new Map(), complete: false, unread: last?.unread || 0 };
+        return ctx.ownScan;
+      }).finally(() => { if (ctx.ownScanRun === run) ctx.ownScanRun = null; });
+      ctx.ownScanRun = run;
+    }
+    let timer;
+    const waited = await Promise.race([
+      ctx.ownScanRun,
+      new Promise((resolve) => { timer = setTimeout(resolve, ownAnswerWaitMs, null); }),
+    ]);
+    clearTimeout(timer);
+    if (waited) return waited;
+    const last = ctx.ownScan?.sessionId === ctx.client.sessionId ? ctx.ownScan : null;
+    return { answers: last?.answers || new Map(), complete: false, pending: true, unread: last?.unread || 0 };
+  };
+
   const loadMyAnswers = async (ctx) => {
     await ensureReady(ctx);
-    const scan = await scanMyAnswers(ctx);
+    const scan = await awaitOwnScan(ctx);
     const mine = new Map(scan.answers);
     let complete = scan.complete;
     const blocks = new Map();
@@ -676,6 +747,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     });
     mine.complete = complete;
     mine.unread = scan.unread;
+    if (scan.pending) mine.pending = true;
     return mine;
   };
 
@@ -849,9 +921,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       };
     },
 
-    async listQuestions({ session, filter = 'unanswered', limit = 25 } = {}) {
+    async listQuestions({ session, filter = 'unanswered', limit = MAX_LISTED_QUESTIONS, offset = 0 } = {}) {
       if (!['unanswered', 'answered', 'all'].includes(filter)) throw new Error('filter must be unanswered, answered, or all.');
-      const max = Math.min(Math.max(Number(limit) || 25, 1), 100);
+      const max = Math.min(Math.max(Math.trunc(Number(limit)) || MAX_LISTED_QUESTIONS, 1), MAX_LISTED_QUESTIONS);
+      const start = Math.max(Math.trunc(Number(offset)) || 0, 0);
       const ctx = await resolveSession(session);
       const [questions, mine] = await Promise.all([loadQuestions(ctx), loadMyAnswers(ctx)]);
       const matching = questions.filter((question) =>
@@ -863,7 +936,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         answeredByMe: questions.filter((question) => mine.has(question.id)).length,
         matching: matching.length,
         ...progressNotes(questions, mine),
-        questions: matching.slice(0, max).map((question) => describeQuestion(question, mine.get(question.id))),
+        ...pageNotes(matching.length, start, max, filter),
+        questions: matching.slice(start, start + max).map((question) => describeQuestion(question, mine.get(question.id))),
       };
     },
 
@@ -948,6 +1022,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           answered.push({ questionId, requestId, record: built.record, answeredAt: text(storageRef?.createdAt) || new Date(now()).toISOString() });
           results.push({ questionId, ok: true, answer: built.record.answer.value });
         } catch (error) {
+          // The upload may have been stored without its reply: look up own answers afresh.
+          ctx.ownScan = null;
           results.push({ questionId, ok: false, error: describeError(error) });
         }
       }
@@ -976,6 +1052,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           // Local bookkeeping cannot undo a successful upload or confirmed tx.
           // Keep the successful result so an agent does not repeat remote effects.
           ctx.ownScan = null;
+          ctx.localRecordLost = true;
           warning = 'Answers were submitted, but the local answer history could not be saved. Do not resubmit them to fix this warning.';
         }
       }
@@ -1079,11 +1156,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         listedCount = entries.length;
         unreadAnswers = result.unreadAnswers;
       } else {
-        const result = await ctx.client.listAll('responses', { maxItems: MAX_RESULT_RECORDS, signal });
+        const started = now();
+        const result = await ctx.client.listAll('responses', { maxItems: MAX_RESULT_RECORDS, deadlineMs: RESULTS_LIST_DEADLINE_MS, signal });
         const listed = result.items
           .filter((item) => text(item.storageRef?.id))
           .sort((left, right) => (text(left.metadata?.createdAt) < text(right.metadata?.createdAt) ? 1 : -1));
-        entries = await toEntries(ctx, listed.slice(0, cap));
+        entries = await toEntries(ctx, listed.slice(0, cap), { deadlineMs: Math.max(0, started + RESULTS_READ_DEADLINE_MS - now()) });
         complete = result.complete;
         listedCount = listed.length;
         unreadAnswers = entries.unread;

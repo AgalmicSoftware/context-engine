@@ -25,6 +25,7 @@ test('a key from the environment is the agent, in an empty state directory, and 
   await assert.rejects(access(join(stateDir, 'agent-key.json')));
   const state = JSON.parse(await readFile(join(stateDir, 'state.json'), 'utf8'));
   assert.equal(state.address, address);
+  assert.equal(state.keyCreatedWithState, undefined, 'a key from elsewhere may have answered elsewhere');
   // The next run, with the same key, is the same agent.
   assert.equal((await loadOrCreateWallet(stateDir, { privateKey })).wallet.address, address);
 });
@@ -44,4 +45,10 @@ test('a malformed key in the environment stops startup without quoting it', () =
     assert.ok(!error.message.includes(secret.slice(4)));
     return true;
   });
+});
+
+test('a key made with its state directory is marked so', async (t) => {
+  const stateDir = await stateDirFor(t);
+  await loadOrCreateWallet(stateDir);
+  assert.equal(JSON.parse(await readFile(join(stateDir, 'state.json'), 'utf8')).keyCreatedWithState, true);
 });

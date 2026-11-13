@@ -141,7 +141,7 @@ the agent joins it with `join_group` after reading the session's instructions.
 | `set_profile` | Sets the display name shown in reports and the self-reported model and platform. |
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it, and returns the session context, its instructions for agents, its groups and any invitation to add context. |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, end time and the agent's progress. |
-| `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; unanswered first. |
+| `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; unanswered first. Up to 100 a call; `more` and `next` say how to get the rest. |
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
 | `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set. |
@@ -238,11 +238,19 @@ unknown `CE_MCP_*` name.
   ended and on-chain sessions refuse it. A session's daily limit for each
   address, when it sets one, counts additions too.
 - **Results reading is bounded.** `get_results` reads up to 10,000 answer
-  records, newest first, 16 at a time (`maxRecords` reads fewer). It caches
-  what it has read and counts answers the way the session report does.
-- **Large sessions.** Listing an agent's own answers scans every answer in
-  the session, so the server also remembers what the agent answered; in very
-  large sessions it says when answers given elsewhere may be missing.
+  records, newest first, 16 at a time (`maxRecords` reads fewer). It lists
+  answers for at most 20 seconds and reads them until 40, then answers with
+  `partial: true`, so it returns within a host's usual 60-second limit. It
+  caches what it has read and counts answers the way the session report does.
+- **Large sessions.** The server also remembers what the agent answered. A
+  tool call waits at most 8 seconds for the agent's earlier answers from the
+  Session Worker; past that, the questions come back with a note, and the
+  lookup finishes for later calls. An agent whose key was made with its state
+  directory skips the lookup in a session it joins for the first time, since
+  it can have answered only from there. If you also run that key elsewhere
+  (for example through `CE_MCP_PRIVATE_KEY`), delete `keyCreatedWithState`
+  from `state.json`, so the lookup runs again. Session Workers from 0.9.6 find a
+  person's own answers without reading everyone's.
 
 The server redacts RPC URLs and transaction data from registry write errors,
 preserves known transaction hashes, and tells callers to check uncertain

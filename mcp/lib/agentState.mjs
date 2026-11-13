@@ -143,8 +143,13 @@ export const loadOrCreateWallet = async (stateDir, { privateKey = '' } = {}) => 
           `Restore the matching files, or move ${STATE_FILE} aside to start fresh with this key.`,
       );
     }
-    // State written before files were bound to an address adopts the key it is used with.
-    if (!state.address) await writeOwnerOnlyJson(path.join(stateDir, STATE_FILE), { ...state, address: loaded.wallet.address });
+    // State written before files were bound to an address adopts the key it is
+    // used with. A key made with this state has answered only from it.
+    if (!state.address) {
+      await writeOwnerOnlyJson(path.join(stateDir, STATE_FILE), {
+        ...state, address: loaded.wallet.address, ...(loaded.created ? { keyCreatedWithState: true } : {}),
+      });
+    }
   });
   return loaded;
 };
@@ -164,6 +169,7 @@ export const readAgentState = async (stateDir) => {
     version: 1,
     // The agent this state belongs to; its remembered answers are that agent's.
     address: typeof parsed.address === 'string' ? parsed.address : '',
+    ...(parsed.keyCreatedWithState === true ? { keyCreatedWithState: true } : {}),
     profile: isRecord(parsed.profile) ? parsed.profile : {},
     sessions: isRecord(parsed.sessions) ? parsed.sessions : {},
     current: typeof parsed.current === 'string' ? parsed.current : '',
