@@ -49,10 +49,11 @@ it('makes one-use codes with the hashes the Worker keeps, and exports them with 
 it('joins with a password’s signature, which only the password’s signer could make', async () => {
   const token = groupPasswordToken('river-stone-lamp-oak-tide');
   expect(isSharableWorkerGroupToken(token)).toBe(true);
-  const result = await buildWorkerGroupJoinCredentials({ token, sessionId, groupId, address });
+  // A link may carry the group id in another case; the Worker lowercases it, so both sides derive from that.
+  const result = await buildWorkerGroupJoinCredentials({ token, sessionId, groupId: groupId.toUpperCase(), address });
   const proof = (result as { proof: string }).proof;
   expect(ethers.utils.verifyMessage(workerGroupJoinStatement({ sessionId, groupId, address }), proof)).toBe(
-    await workerGroupPasswordSigner('river-stone-lamp-oak-tide', sessionId, groupId),
+    await workerGroupPasswordSigner('river-stone-lamp-oak-tide', sessionId, groupId.toUpperCase()),
   );
   expect(proof).not.toContain('river');
   await expect(buildWorkerGroupJoinCredentials({ token: 'inv:abc', sessionId, groupId, address })).resolves.toBeNull();

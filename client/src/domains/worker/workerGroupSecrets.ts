@@ -15,12 +15,13 @@ import { setWorkerGroupPassword, type PostSignedWorkerGroupRequest } from './wor
 // server) and turns them into what a join sends. Neither a password nor a claim code reaches the Worker.
 
 const keys = createWorkerGroupPasswordKeys(ethers);
-// The Worker's canonical session id, the one the group routes send, so the admin and the joiner derive alike.
+// The Worker's canonical ids (it lowercases group ids), so the admin and the joiner derive alike.
 const canonical = (sessionId: string) => normalizeWorkerCanonicalSessionIdHex(sessionId) || sessionId;
+const groupKey = (groupId: string) => groupId.toLowerCase();
 
 /** The address the Worker stores for a group password. */
 export const workerGroupPasswordSigner = (password: string, sessionId: string, groupId: string) =>
-  keys.signerOf({ password, sessionId: canonical(sessionId), groupId });
+  keys.signerOf({ password, sessionId: canonical(sessionId), groupId: groupKey(groupId) });
 
 /** A group's join link, with its secret in the fragment when there is one. */
 export const buildWorkerGroupInviteLink = ({
@@ -79,7 +80,12 @@ export const buildWorkerGroupJoinCredentials = async ({
   if (parsed?.kind === 'password') {
     if (!address) throw new Error('Sign in with a wallet or passkey account to use a group password.');
     return {
-      proof: await keys.signJoin({ password: parsed.password, sessionId: canonical(sessionId), groupId, address }),
+      proof: await keys.signJoin({
+        password: parsed.password,
+        sessionId: canonical(sessionId),
+        groupId: groupKey(groupId),
+        address,
+      }),
     };
   }
   return null;
