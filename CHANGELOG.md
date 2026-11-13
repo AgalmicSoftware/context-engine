@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Settings has a **Feedback** section for full admins, to read the messages, download them as a CSV and delete them, and a **Feedback box** setting, on by default.
 - Risk Matrix: the detail grid for two areas labels its columns and rows, has a key, frames every square (an empty one says "No notes"), shows each balance with an arrow and its note count, and its column and row headings highlight, with a **Clear** button.
 - Every Results view shows when it was made in the same place, top right: built views always show their **Version**, even with one build, and AI Views show when they were generated. AI Views' titles and its Breakdown interpretation are readable in the civic and classic themes.
+- The debate atlas is called **Debate Atlas** everywhere, beside **Build atlas**; its help describes what it shows, and the Results admins help says they can build the atlas, risk matrix and AI Views.
 - Results: when a session holds more answers than one load reads, a Report that fails to load says so, that trying again can take minutes, and what an admin can do.
 - A group on a Session Worker starts on a generated three-word password, selected so an admin can type their own; **Generate new** makes three words too. On-chain groups keep five words. A right password always gets in and wrong tries are not limited, so a hand-typed password should be long and uncommon.
 
