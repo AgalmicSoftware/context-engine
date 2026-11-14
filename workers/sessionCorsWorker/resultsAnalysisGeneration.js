@@ -647,12 +647,27 @@ const snapshotLimitText = (kind) => (kind === 'rows' || kind === 'listed'
   ? `AI builds read at most ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} stored question and answer versions at once, and this session stores more.`
   : 'This session’s stored questions and answers are too large for an AI build to read at once.');
 
+const SNAPSHOT_CHANGED = {
+  ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable',
+  error: 'Answers changed while the results were read. No report was generated; the last successful report is unchanged. Try again.',
+};
+
 export const loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
   try {
-    const source = await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: createResultsAnalysisScanBudget() });
-    return source.listedVersionWon
-      ? await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: createResultsAnalysisScanBudget(), latestOnly: false })
-      : source;
+    const first = createResultsAnalysisScanBudget();
+    const source = await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: first });
+    if (!source.listedVersionWon) return source;
+    // A newer answer read as listed was gone or changed (withdrawn mid-build,
+    // say), so every version is read. Both passes share one operation count,
+    // which keeps them inside one invocation's KV limit; a session too large
+    // for both fails this build only, and the next build starts afresh.
+    try {
+      return await readWorkerCanonicalResultsAnalysisSource({ ...args,
+        budget: createResultsAnalysisScanBudget({ operationsUsed: first.operationsUsed }), latestOnly: false });
+    } catch (error) {
+      if (isStorageReadLimitError(error) && error.kind === 'operations') return SNAPSHOT_CHANGED;
+      throw error;
+    }
   } catch (error) {
     if (!isStorageReadLimitError(error)) return {
       ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable',

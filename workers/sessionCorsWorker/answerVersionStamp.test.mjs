@@ -134,9 +134,8 @@ test('an AI build leaves older stamped answers unread and comes out exactly as r
   assert.deepEqual([all.readKeys, latest.readKeys], [9, 7]);
 });
 
-test('if a newest stamped answer fails to read as stamped, the build reads every version', async () => {
-  const { kv, build, indexKey } = await setup();
-  // Its stored answer now names another session, so the build drops it and an older one is current.
+// Its stored answer now names another session, so the build drops it and an older one is current.
+const tamperNewestAnswer = async ({ kv, indexKey }) => {
   const names = (await kv.list({ prefix: indexKey('') })).keys;
   const newest = names.map(({ name, metadata }) => ({ name, metadata })).filter(({ metadata }) => metadata?.questionId === 'q-1')
     .sort((x, y) => x.metadata.createdAt.localeCompare(y.metadata.createdAt)).at(-1);
@@ -146,8 +145,32 @@ test('if a newest stamped answer fails to read as stamped, the build reads every
   const payload = JSON.parse(Buffer.from(envelope.payloadBase64url, 'base64url').toString());
   envelope.payloadBase64url = Buffer.from(JSON.stringify({ ...payload, sessionSlug: 'another-session' })).toString('base64url');
   await kv.put(payloadKey, JSON.stringify(envelope));
+};
+
+test('if a newest stamped answer fails to read as stamped, the build reads every version', async () => {
+  const { kv, build, indexKey } = await setup();
+  await tamperNewestAnswer({ kv, indexKey });
   const all = await build({ entries: false });
   assert.deepEqual((await build({ entries: true })).source, all.source);
+});
+
+test('a build that reads every version again shares one operation count with its first pass', async () => {
+  const { kv, config, indexKey } = await setup();
+  // 450 empty pages before the answers: each list call is one of the 800 operations a build may use.
+  const padded = {
+    put: kv.put.bind(kv),
+    get: kv.get.bind(kv),
+    async list({ cursor = '', ...options }) {
+      const page = cursor.startsWith('pad:') ? Number(cursor.slice(4)) : cursor ? null : 0;
+      if (options.prefix === indexKey('') && page != null && page < 450) return { keys: [], list_complete: false, cursor: `pad:${page + 1}` };
+      return kv.list({ ...options, ...(page == null ? { cursor } : {}) });
+    },
+  };
+  const load = () => loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: padded }, slug: SLUG, config });
+  assert.equal((await load()).ok, true, 'one pass fits');
+  await tamperNewestAnswer({ kv, indexKey });
+  assert.deepEqual(await load(), { ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable',
+    error: 'Answers changed while the results were read. No report was generated; the last successful report is unchanged. Try again.' });
 });
 
 test('admin diagnostics count each person’s latest stamped answer, as a build reads them', async () => {
