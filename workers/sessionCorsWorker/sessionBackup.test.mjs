@@ -1056,6 +1056,69 @@ test('an export waits after taking its lease, so a write that skipped its first 
   assert.equal(next.reason, 'backup_session_changed');
 });
 
+test('a write whose view was asked just before an export took its lease marks after the cut', async (t) => {
+  const source = largeArchiveSource();
+  const shift = shiftableClock(t);
+  // The write's view is answered before the lease, and arrives only after the
+  // export has waited and read its cut, so the view's age is the export's wait.
+  let first = null;
+  let hold = true;
+  const binding = source.env.CE_SESSION_COORDINATOR;
+  source.env.CE_SESSION_COORDINATOR = { idFromName: (name) => binding.idFromName(name), get: (id) => {
+    const stub = binding.get(id);
+    return { fetch: async (url, init) => {
+      if (!hold || !String(url).endsWith('/current')) return stub.fetch(url, init);
+      hold = false;
+      const response = await stub.fetch(url, init);
+      first = await exportSessionBackup({ env: source.env, slug, expectedAuthority, settle: async () => shift(BACKUP_EXPORT_SETTLE_MS) });
+      return response;
+    } };
+  } };
+  assert.equal((await answerUpload(source, 'Viewed before the lease')).status, 200);
+  assert.ok(first?.nextCursor);
+  const next = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: first.nextCursor });
+  assert.equal(next.reason, 'backup_session_changed');
+});
+
+test('a cached or shared settings view keeps the age of the read that made it', async (t) => {
+  const { env } = fixture();
+  const shift = shiftableClock(t);
+  let gate = null;
+  const calls = countCoordinatorCalls(env);
+  const binding = env.CE_SESSION_COORDINATOR;
+  env.CE_SESSION_COORDINATOR = { idFromName: (name) => binding.idFromName(name), get: (id) => {
+    const stub = binding.get(id);
+    return { fetch: async (url, init) => (gate && String(url).endsWith('/current') ? gate.then(() => stub.fetch(url, init)) : stub.fetch(url, init)) };
+  } };
+  // A view that takes 1.5 s to arrive.
+  let open;
+  gate = new Promise((resolve) => { open = resolve; });
+  const first = markStorageBackupWrite(env, slug);
+  await new Promise((resolve) => setImmediate(resolve));
+  shift(1_500);
+  open();
+  await first;
+  assert.deepEqual(calls, ['current'], 'a 1.5 s old view skips the mark');
+  // Still cached, but asked for 2.4 s ago.
+  gate = null;
+  shift(900);
+  await markStorageBackupWrite(env, slug);
+  assert.deepEqual(calls, ['current', 'backup/write-revision']);
+  // A second write joins a view 1 s after it was asked for; it arrives 1.5 s later.
+  forgetSessionConfig(env, slug);
+  calls.length = 0;
+  gate = new Promise((resolve) => { open = resolve; });
+  const asker = markStorageBackupWrite(env, slug);
+  await new Promise((resolve) => setImmediate(resolve));
+  shift(1_000);
+  const joiner = markStorageBackupWrite(env, slug);
+  await new Promise((resolve) => setImmediate(resolve));
+  shift(1_500);
+  open();
+  await Promise.all([asker, joiner]);
+  assert.deepEqual(calls.sort(), ['backup/write-revision', 'backup/write-revision', 'current']);
+});
+
 test('an export whose lease lapsed between pages restarts, since writes then skip their marks', async (t) => {
   const source = largeArchiveSource();
   const shift = shiftableClock(t);
