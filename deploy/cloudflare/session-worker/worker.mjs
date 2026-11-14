@@ -27137,7 +27137,7 @@ var init_deployHelperCore = __esm({
     SESSION_WORKER_OBSERVABILITY = Object.freeze({
       enabled: true,
       head_sampling_rate: 1,
-      logs: Object.freeze({ enabled: true, invocation_logs: true })
+      logs: Object.freeze({ enabled: true, invocation_logs: false })
     });
     DEFAULT_ALLOWED_ORIGINS = [
       "http://localhost:3000"
@@ -88364,7 +88364,6 @@ var createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     });
     if (!attestation.ok) {
       log2("[gating] sbt rpc chain attestation failed", {
-        address: address3,
         rpcUrl: rpcUrlDiagnostic,
         expectedChainId: attestation.expectedChainId,
         actualChainId: attestation.actualChainId,
@@ -88409,7 +88408,6 @@ var createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     );
     if (!checks.some(Boolean) && errors.length) {
       log2("[gating] sbt balanceOf failed", {
-        address: address3,
         rpcUrl: rpcUrlDiagnostic,
         errors
       });
@@ -90813,7 +90811,6 @@ var resolveLoginGateAuthority = async ({
       if (key === "default") {
         warn("[gating] default gate lookup failed", {
           slug: registrySlug,
-          address: address3,
           registryAddress,
           registryRpcUrls: maskRpcUrlList2(registryRpcUrls, deps),
           registryRpcErrors,
@@ -90856,7 +90853,6 @@ var resolveLoginGateAuthority = async ({
       if (key === "default") {
         log2(`[gating] default gate empty (allow) [${gateSource}]`, {
           slug: registrySlug,
-          address: address3,
           gateChainId: gate.chainId || null,
           registryAddress,
           registryRpcUrl: registryRpcUrlUsed ? maskRpcUrl(registryRpcUrlUsed) : ""
@@ -90868,7 +90864,6 @@ var resolveLoginGateAuthority = async ({
     if (!rpcUrls.length && key === "default") {
       warn("[gating] default gate missing rpc url", {
         slug: registrySlug,
-        address: address3,
         gateChainId: gate.chainId || null,
         registryChainId,
         registryAddress,
@@ -90902,7 +90897,6 @@ var resolveLoginGateAuthority = async ({
     if (key === "default") {
       (ok ? log2 : warn)(`[gating] default gate check ${ok ? "ok" : "failed"} [${gateSource}]`, {
         slug: registrySlug,
-        address: address3,
         gateChainId: gate.chainId || null,
         mode: gate.mode,
         sbtCount: gate.sbtAddresses.length,
@@ -91045,7 +91039,6 @@ var resolveLoginAuthorityContext = async ({
     const reason = sessionCheck?.exists === false ? "session-not-registered" : "session-check-unavailable";
     warn("[gating] on-chain gate authority unavailable; denying login", {
       slug: registrySlug,
-      address: address3,
       reason,
       registryAddress,
       rpcUrl: sessionCheck?.rpcUrl ? maskRpcUrl(sessionCheck.rpcUrl) : "",
@@ -93457,7 +93450,11 @@ var evaluateAuthenticatedRoutePreflight = async ({
   address: address3,
   limit,
   headers: headers2,
-  deps
+  deps,
+  // When set, nothing is counted here: the caller runs `count()` once the
+  // request can no longer be refused for any other reason, and gets the
+  // refusal to send, or null.
+  countLater = false
 } = {}) => {
   let tokenHasScope = scopes?.[scope] === true;
   if (!tokenHasScope && !allowWithoutScope) {
@@ -93494,18 +93491,23 @@ var evaluateAuthenticatedRoutePreflight = async ({
       response: deps?.json?.({ error: `Token missing ${scope} scope.` }, 403, headers2)
     };
   }
-  const rateAllowed = await deps?.checkRateLimit?.({
-    env,
-    slug,
-    address: address3,
-    limit,
-    route
-  });
-  if (!rateAllowed) {
+  const count = async () => {
+    const rateAllowed = await deps?.checkRateLimit?.({
+      env,
+      slug,
+      address: address3,
+      limit,
+      route
+    });
+    return rateAllowed ? null : rateLimitRefusal(rateAllowed, deps?.json, headers2);
+  };
+  if (countLater) return { ok: true, tokenHasScope, count };
+  const refused = await count();
+  if (refused) {
     return {
       ok: false,
       tokenHasScope,
-      response: rateLimitRefusal(rateAllowed, deps?.json, headers2)
+      response: refused
     };
   }
   return {
@@ -93700,20 +93702,20 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
     async ai(payload) {
       await current();
       if (!ctx.scopes?.ai) throw authorityError("agent_ai_scope_denied");
-      const allowed = await deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: "ai", limit: resolveAiDailyLimit(ctx.config) });
-      if (allowed === null) throw authorityError("agent_ai_rate_unavailable", 503);
-      if (!allowed) throw authorityError("agent_ai_rate_limited", 429);
       const key = ctx.sessionId;
       if ((activeAi.get(key) || 0) >= 2) throw authorityError("agent_ai_busy", 429);
       const model = resolveSessionAiModel(ctx.config, { taskType: payload.taskType || "analysis" });
       const proxy = { openai: proxyOpenAI, anthropic: proxyAnthropic, openrouter: proxyOpenRouter }[model.provider];
       if (!proxy) throw authorityError("agent_ai_provider_unavailable", 503);
-      const secrets = await deps.getSessionSecrets(env, ctx.slug);
       const safe = { ...payload, model: model.model, taskType: payload.taskType || "analysis" };
       delete safe.apiKey;
       delete safe.rpcKey;
       activeAi.set(key, (activeAi.get(key) || 0) + 1);
       try {
+        const allowed = await deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: "ai", limit: resolveAiDailyLimit(ctx.config) });
+        if (allowed === null) throw authorityError("agent_ai_rate_unavailable", 503);
+        if (!allowed) throw authorityError("agent_ai_rate_limited", 429);
+        const secrets = await deps.getSessionSecrets(env, ctx.slug);
         const response3 = await proxy({ payload: safe, secrets, config: ctx.config, baseHeaders: {}, deps: { fetch: boundedAgentFetch(deps.fetch || fetch) } });
         const body = await response3.json();
         if (!response3.ok) throw authorityError("agent_ai_request_failed", response3.status);
@@ -104619,6 +104621,8 @@ init_sessionSlugResolution();
 init_storageRouteExecution();
 var FEATURES = Object.freeze([
   "agent_http_v1",
+  // limits.aiPerWalletPerDay is honoured; older Workers store it and ignore it.
+  "ai_daily_limit_v1",
   "context_sources_v1",
   "draft_text_v1",
   "envelope_export_identity_v1",
@@ -105601,7 +105605,8 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
     address: address3,
     limit: resolveAiDailyLimit(config),
     headers: headers2,
-    deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: deps.json }
+    deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: deps.json },
+    countLater: true
   });
   if (!preflight?.ok) return preflight?.response || json9({ error: "Current authorization check failed." }, 403);
   const currentScopes = { ...scopes, ai: preflight.tokenHasScope === true };
@@ -105617,6 +105622,8 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
   if (!secretContext?.ok) return json9({ error: "The session\u2019s AI isn\u2019t set up." }, 503);
   const optOuts = await store(env, slug, "list");
   if (!optOuts.ok) return json9({ error: OPT_OUTS_UNAVAILABLE }, 503);
+  const refused = await preflight.count?.();
+  if (refused) return refused;
   const optedOut = new Set(optOuts.body.addresses);
   const { material, answersUnavailable } = await gatherMaterial({
     env,
@@ -110362,7 +110369,8 @@ var dispatchAuthenticatedSecretActionRoute = async ({
         checkRateLimit: deps?.checkRateLimit,
         computeScopesForLogin: deps?.computeScopesForLogin,
         json: deps?.json
-      }
+      },
+      countLater: true
     });
     if (!preflight2?.ok) {
       return {
@@ -110395,6 +110403,8 @@ var dispatchAuthenticatedSecretActionRoute = async ({
         response: deps?.json?.(aiRequest.requestApiKey ? { error: "Model not allowed for provider" } : AI_MODEL_NOT_ALLOWED, aiRequest.requestApiKey ? 400 : 403, headers2)
       };
     }
+    const refused = await preflight2.count?.();
+    if (refused) return { handled: true, response: refused };
     if (provider === "anthropic") {
       return {
         handled: true,
