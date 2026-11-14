@@ -104551,7 +104551,7 @@ var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 =
 init_sessionSlugResolution();
 init_workerCanonicalAuthority();
 var FEEDBACK_PATH = "/feedback";
-var FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2e3, reachMeChars: 200, bodyBytes: 8192 });
+var FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2e3, bodyBytes: 8192 });
 var SCREENS = /* @__PURE__ */ new Set(["phone", "tablet", "desktop"]);
 var VIEW = /^[A-Za-z0-9:_-]{1,80}$/;
 var THEME = /^[a-z0-9-]{1,40}$/;
@@ -104577,14 +104577,6 @@ var normalizeFeedback = (body, { address: address3 = "" } = {}) => {
   if (!absent(body.appRelease) && !(typeof body.appRelease === "string" && body.appRelease.length <= 40 && RELEASE.test(body.appRelease))) {
     return invalid3("appRelease must be a release number such as 0.9.8.");
   }
-  let contact;
-  if (!absent(body.contact)) {
-    const reachMe = plain(body.contact?.reachMe);
-    if (typeof body.contact !== "object" || !reachMe || reachMe.length > FEEDBACK_LIMITS.reachMeChars) {
-      return invalid3(`How to reach you must be 1 to ${FEEDBACK_LIMITS.reachMeChars} characters.`);
-    }
-    contact = { ...address3 ? { address: address3 } : {}, reachMe };
-  }
   return {
     ok: true,
     record: {
@@ -104593,8 +104585,7 @@ var normalizeFeedback = (body, { address: address3 = "" } = {}) => {
       theme: body.theme,
       screen: body.screen,
       ...absent(body.appRelease) ? {} : { appRelease: body.appRelease },
-      signedIn: Boolean(address3),
-      ...contact ? { contact } : {}
+      signedIn: Boolean(address3)
     }
   };
 };
