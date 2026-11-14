@@ -30455,11 +30455,11 @@ var init_siweMessage = __esm({
   "shared/auth/siweMessage.mjs"() {
     normalizeSessionIdHex = (value) => {
       if (typeof value !== "string" || value !== value.trim()) return "";
-      const lower12 = value.toLowerCase();
-      const hex2 = lower12.startsWith("0x") ? lower12.slice(2) : lower12;
+      const lower13 = value.toLowerCase();
+      const hex2 = lower13.startsWith("0x") ? lower13.slice(2) : lower13;
       if (/^[0-9a-f]{32}$/.test(hex2) && !/^0+$/.test(hex2)) return `0x${hex2}`;
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(lower12)) {
-        const uuidHex = lower12.replace(/-/g, "");
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(lower13)) {
+        const uuidHex = lower13.replace(/-/g, "");
         return /^0+$/.test(uuidHex) ? "" : `0x${uuidHex}`;
       }
       return "";
@@ -71720,11 +71720,11 @@ var init_fetchExecution = __esm({
         throw error;
       }
     };
-    findClosingTagEnd = (lower12, tag, from) => {
+    findClosingTagEnd = (lower13, tag, from) => {
       const prefix = `</${tag}`;
-      for (let at = lower12.indexOf(prefix, from); at >= 0; at = lower12.indexOf(prefix, at + prefix.length)) {
-        if (/[\t\n\f\r />]/.test(lower12[at + prefix.length] || "")) {
-          const close = lower12.indexOf(">", at + prefix.length);
+      for (let at = lower13.indexOf(prefix, from); at >= 0; at = lower13.indexOf(prefix, at + prefix.length)) {
+        if (/[\t\n\f\r />]/.test(lower13[at + prefix.length] || "")) {
+          const close = lower13.indexOf(">", at + prefix.length);
           return close < 0 ? -1 : close + 1;
         }
       }
@@ -71732,7 +71732,7 @@ var init_fetchExecution = __esm({
     };
     stripHtml = (html) => {
       const source = String(html || "");
-      const lower12 = source.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+      const lower13 = source.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
       const missingClosers = /* @__PURE__ */ new Set();
       const text6 = [];
       let cursor = 0;
@@ -71746,7 +71746,7 @@ var init_fetchExecution = __esm({
         text6.push(source.slice(cursor, start));
         const hidden = /^<(script|style|head|nav|footer)\b/i.exec(source.slice(start, end + 1))?.[1].toLowerCase();
         if (hidden && !missingClosers.has(hidden)) {
-          const closingEnd = findClosingTagEnd(lower12, hidden, end + 1);
+          const closingEnd = findClosingTagEnd(lower13, hidden, end + 1);
           if (closingEnd >= 0) {
             cursor = closingEnd;
             continue;
@@ -72215,7 +72215,17 @@ var init_storageRouteExecution = __esm({
     buildPayloadKey = ({ slug, id: id2 }) => `ce-storage-payload:${sessionSlugStorageKey(slug)}:${id2}`;
     storageIndexPutOptions = (metadata) => {
       const resource = trim14(metadata?.resource) || "docsContext";
-      if (resource === "docsContext") return { metadata: { contextSource: metadata?.contextSource === true } };
+      if (resource === "docsContext") {
+        if (metadata?.contextSource !== true) return { metadata: { contextSource: false } };
+        return {
+          metadata: {
+            contextSource: true,
+            ...metadata.uploadAuthority === "admin" ? { admin: true } : {},
+            ...contextRoleOf(metadata.tags) === CONTEXT_TEXT_ROLE ? { reading: true } : {},
+            createdAt: trim14(metadata.createdAt)
+          }
+        };
+      }
       const responder = resource === "responses" ? trim14(metadata?.responder).toLowerCase() : "";
       return responder ? { metadata: { responder } } : void 0;
     };
@@ -77357,57 +77367,129 @@ var init_storageAudience = __esm({
 });
 
 // workers/sessionCorsWorker/contextSourceLoader.js
-var MAX_SOURCES, MAX_READ_BYTES, SCAN_LIMITS, decoder7, scanBudget, forEveryone, createdAtOf2, loadParticipantContextSources, buildParticipantContextPrompt;
+var CONTEXT_READ_LIMITS, MAX_READ_BYTES, LIST_PAGE, BULK_GET, decoder7, lower7, rankOf, byRank, listContextRowsInOrder, forEveryone, createdAtOf2, contextReadingOrder, loadParticipantContextSources, buildParticipantContextPrompt;
 var init_contextSourceLoader = __esm({
   "workers/sessionCorsWorker/contextSourceLoader.js"() {
     init_sessionContextSources();
     init_sessionContextText();
     init_storageAudience();
+    init_storageKvBindings();
     init_storageRouteExecution();
     init_storageScanBudget();
-    MAX_SOURCES = 16;
+    CONTEXT_READ_LIMITS = Object.freeze({ rows: 300, listPages: 40, metadataBytes: 1024 * 1024, sources: 16 });
     MAX_READ_BYTES = 1024 * 1024;
-    SCAN_LIMITS = Object.freeze({ operations: 400, rows: 300, metadataBytes: 1024 * 1024 });
+    LIST_PAGE = 1e3;
+    BULK_GET = 100;
     decoder7 = new TextDecoder();
-    scanBudget = () => {
-      const used = { operations: 0, rows: 0, metadataBytes: 0 };
-      const take = (kind, amount) => {
-        used[kind] += amount;
-        if (used[kind] > SCAN_LIMITS[kind]) throw new StorageReadLimitError(kind);
-      };
-      return {
-        operation: () => take("operations", 1),
-        rows: (count = 1) => take("rows", count),
-        metadata: (value) => take("metadataBytes", jsonByteLength(value))
-      };
+    lower7 = (value) => String(value || "").trim().toLowerCase();
+    rankOf = (hint) => hint?.admin === true ? 0 : 1;
+    byRank = (a, b2) => a.rank - b2.rank || (a.at < b2.at ? -1 : a.at > b2.at ? 1 : 0) || a.order - b2.order;
+    listContextRowsInOrder = async ({ env, slug }) => {
+      const index = getStorageIndexBinding(env);
+      if (typeof index?.list !== "function" || typeof index?.get !== "function") return { rows: [], leftOut: 0, stopped: [] };
+      const stopped = [];
+      const prefix = buildIndexPrefix({ slug, resource: "docsContext" });
+      const candidates = [];
+      let cursor = "";
+      for (let page = 0; ; page += 1) {
+        if (page >= CONTEXT_READ_LIMITS.listPages) {
+          stopped.push("list pages limit");
+          break;
+        }
+        const listed = await index.list({ prefix, limit: LIST_PAGE, ...cursor ? { cursor } : {} });
+        for (const entry2 of Array.isArray(listed?.keys) ? listed.keys : []) {
+          const hint = entry2?.metadata;
+          if (!entry2?.name || hint?.contextSource === false || hint?.reading === true) continue;
+          candidates.push({ name: entry2.name, rank: rankOf(hint), at: String(hint?.createdAt || ""), order: candidates.length });
+        }
+        if (listed?.list_complete !== false) break;
+        const next = String(listed?.cursor || "").trim();
+        if (!next || next === cursor) throw new Error("Cloudflare storage list cursor is unavailable or did not advance.");
+        cursor = next;
+      }
+      const chosen = candidates.sort(byRank).slice(0, CONTEXT_READ_LIMITS.rows);
+      let leftOut = candidates.length - chosen.length + stopped.length;
+      if (chosen.length < candidates.length) stopped.push("rows limit");
+      const rows = [];
+      let bytes3 = 0;
+      for (let start = 0; start < chosen.length; start += BULK_GET) {
+        const keys = chosen.slice(start, start + BULK_GET).map((candidate) => candidate.name);
+        let got = null;
+        try {
+          got = await index.get(keys);
+        } catch {
+          stopped.push("storage unavailable");
+          leftOut += keys.length;
+          continue;
+        }
+        for (const [position, key] of keys.entries()) {
+          const raw = got?.get?.(key);
+          if (raw == null) continue;
+          bytes3 += jsonByteLength(raw);
+          if (bytes3 > CONTEXT_READ_LIMITS.metadataBytes) {
+            stopped.push("row bytes limit");
+            return { rows, leftOut: leftOut + chosen.length - start - position, stopped };
+          }
+          let metadata = null;
+          try {
+            metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
+          } catch {
+            metadata = null;
+          }
+          if (metadata?.contextSource === true) rows.push(metadata);
+        }
+      }
+      return { rows, leftOut, stopped };
     };
     forEveryone = (row, config) => row.payloadEncrypted !== true && !(Array.isArray(row.groupIds) && row.groupIds.length) && !isAdminsOnlyAccess(row.accessConditions) && metadataAccessMatchesPublishedAudience(row, config);
     createdAtOf2 = (row) => Date.parse(row.createdAt) || 0;
+    contextReadingOrder = (rows) => {
+      const oldestFirst = [...rows].sort((a, b2) => createdAtOf2(a) - createdAtOf2(b2));
+      const queues = /* @__PURE__ */ new Map();
+      oldestFirst.filter((row) => row.uploadAuthority !== "admin").forEach((row) => {
+        const who = lower7(row.uploader);
+        if (!queues.has(who)) queues.set(who, []);
+        queues.get(who).push(row);
+      });
+      const rest = [];
+      for (let turn = 0; queues.size; turn += 1) {
+        for (const [who, queue] of queues) {
+          if (turn < queue.length) rest.push(queue[turn]);
+          else queues.delete(who);
+        }
+      }
+      return [...oldestFirst.filter((row) => row.uploadAuthority === "admin"), ...rest];
+    };
     loadParticipantContextSources = async ({ env, slug, config, deps, readable, principal, leaveOutUploaders } = {}) => {
-      let rows = [];
+      const warn = typeof deps?.log?.warn === "function" ? deps.log.warn : console.warn;
+      let listed = { rows: [], leftOut: 0 };
       try {
-        rows = await listContextSourceRows({ env, slug, budget: scanBudget() });
-      } catch (error) {
-        const warn = typeof deps?.log?.warn === "function" ? deps.log.warn : console.warn;
-        warn("[context] sources left out of an AI prompt", {
-          slug,
-          reason: isStorageReadLimitError(error) ? `${error.kind} limit` : "storage unavailable"
-        });
+        listed = await listContextRowsInOrder({ env, slug });
+      } catch {
+        warn("[context] sources left out of an AI prompt", { slug, reason: "storage unavailable" });
         return [];
+      }
+      if (listed.leftOut > 0) {
+        warn("[context] sources left out of an AI prompt", { slug, reason: [...new Set(listed.stopped)].join(", "), leftOut: listed.leftOut });
       }
       const canRead = readable || ((row) => forEveryone(row, config));
       const visible = [];
-      for (const row of rows) if (await canRead(row)) visible.push(row);
-      visible.sort((a, b2) => createdAtOf2(a) - createdAtOf2(b2));
+      for (const row of listed.rows) if (await canRead(row)) visible.push(row);
       const readings = /* @__PURE__ */ new Map();
       visible.filter((row) => contextRoleOf(row.tags) === CONTEXT_TEXT_ROLE).forEach((row) => readings.set(contextTagValue(row.tags, CONTEXT_TAGS.derivedFrom), row));
+      const readingOf = async (pdf) => {
+        if (readings.has(pdf.id)) return readings.get(pdf.id);
+        if (!pdf.contextReadingId) return null;
+        const reading = await readContextSourceRow({ env, slug, id: pdf.contextReadingId });
+        return reading && contextRoleOf(reading.tags) === CONTEXT_TEXT_ROLE && contextTagValue(reading.tags, CONTEXT_TAGS.derivedFrom) === pdf.id && await canRead(reading) ? reading : null;
+      };
       const sources = [];
-      for (const row of visible) {
-        if (sources.length >= MAX_SOURCES) break;
-        if (contextRoleOf(row.tags) !== CONTEXT_ROLE) continue;
-        if (leaveOutUploaders?.has(String(row.uploader || "").trim().toLowerCase())) continue;
+      const ordered = contextReadingOrder(visible.filter((row) => contextRoleOf(row.tags) === CONTEXT_ROLE));
+      for (const row of ordered) {
+        if (sources.length >= CONTEXT_READ_LIMITS.sources) break;
+        if (leaveOutUploaders?.has(lower7(row.uploader))) continue;
         const isPdf = row.contentType === CONTEXT_FILE_TYPES.pdf;
-        const textRow = isPdf ? readings.get(row.id) : row;
+        const textRow = isPdf ? await readingOf(row) : row;
         if (!textRow) continue;
         let bytes3 = null;
         try {
@@ -77508,7 +77590,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder8, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj22, hasOwn6, trim16, lower7, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId2, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, snapshotLimitText, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder8, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj22, hasOwn6, trim16, lower8, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId2, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, snapshotLimitText, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_aiRequestPolicy();
@@ -77558,7 +77640,7 @@ var init_resultsAnalysisGeneration = __esm({
     isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasOwn6 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     trim16 = (value) => toStr6(value).trim();
-    lower7 = (value) => trim16(value).toLowerCase();
+    lower8 = (value) => trim16(value).toLowerCase();
     getResultsAnalysisSettings = (config = {}) => normalizeResultsAnalysisSettings(
       config?.resultsAnalysis
     );
@@ -77582,7 +77664,7 @@ var init_resultsAnalysisGeneration = __esm({
       sections: normalizeRequestedSections([], getResultsAnalysisSettings(config))
     });
     normalizeSessionIdHex2 = (value) => {
-      const raw = lower7(value).replace(/^0x/, "").replace(/-/g, "");
+      const raw = lower8(value).replace(/^0x/, "").replace(/-/g, "");
       return /^[0-9a-f]{32}$/.test(raw) ? `0x${raw}` : "";
     };
     parseJsonBytes = (bytes3) => {
@@ -77676,8 +77758,8 @@ var init_resultsAnalysisGeneration = __esm({
     };
     resolveResultsAnalysisCapability = ({ config } = {}) => {
       const normalizedConfig = normalizeWorkerConfigRecord(config || {}, { slug: normalizeWorkerSessionSlug(config?.slug) });
-      const authorityMode = lower7(normalizedConfig?.sessionModeProfile?.authority?.mode);
-      const storageBackend = lower7(normalizedConfig?.sessionModeProfile?.storage?.backend || normalizedConfig?.storageProfile?.backend);
+      const authorityMode = lower8(normalizedConfig?.sessionModeProfile?.authority?.mode);
+      const storageBackend = lower8(normalizedConfig?.sessionModeProfile?.storage?.backend || normalizedConfig?.storageProfile?.backend);
       const workerCanonicalCloudflare = authorityMode === "worker_canonical" && storageBackend === "cloudflare";
       if (config?.scopes?.ai === false) {
         return {
@@ -77759,7 +77841,7 @@ var init_resultsAnalysisGeneration = __esm({
       const questionMap = /* @__PURE__ */ new Map();
       (Array.isArray(questions) ? questions : []).forEach((question) => {
         const normalized = normalizeQuestionRecord(question);
-        if (normalized && !blocked.has(lower7(normalized.questionId))) questionMap.set(normalized.questionId, normalized);
+        if (normalized && !blocked.has(lower8(normalized.questionId))) questionMap.set(normalized.questionId, normalized);
       });
       const latestByQuestionParticipant = /* @__PURE__ */ new Map();
       const participantSources = /* @__PURE__ */ new Map();
@@ -77778,7 +77860,7 @@ var init_resultsAnalysisGeneration = __esm({
           return { ok: false, status: 400, error: "Encrypted or locked response rows cannot be used for admin snapshot generation." };
         }
         const questionId4 = normalizeQuestionId2(row.questionId || row.questionID || row.id);
-        if (!questionId4 || blocked.has(lower7(questionId4)) || requireKnownQuestion && !questionMap.has(questionId4)) {
+        if (!questionId4 || blocked.has(lower8(questionId4)) || requireKnownQuestion && !questionMap.has(questionId4)) {
           excludedCount += 1;
           continue;
         }
@@ -77851,7 +77933,7 @@ var init_resultsAnalysisGeneration = __esm({
       const sortedParticipantDigests = [...participantDigests].sort();
       const participantLabels = new Map(sortedParticipantDigests.map((digest2, index) => [digest2, `participant_${String(index + 1).padStart(3, "0")}`]));
       const participants = sortedParticipantDigests.map((digest2) => ({ syntheticId: participantLabels.get(digest2) }));
-      const participantAddresses = new Map(sortedParticipantDigests.map((digest2) => [participantLabels.get(digest2), lower7(participantSources.get(digest2))]).filter(([, source]) => /^0x[0-9a-f]{40}$/.test(source)));
+      const participantAddresses = new Map(sortedParticipantDigests.map((digest2) => [participantLabels.get(digest2), lower8(participantSources.get(digest2))]).filter(([, source]) => /^0x[0-9a-f]{40}$/.test(source)));
       const responseRows = includedRows.sort((a, b2) => a.questionId.localeCompare(b2.questionId) || (participantLabels.get(a.participantKey) || "").localeCompare(participantLabels.get(b2.participantKey) || ""));
       const sanitizedResponses = responseRows.map((row, index) => ({
         responseId: `r${index + 1}`,
@@ -77966,7 +78048,7 @@ var init_resultsAnalysisGeneration = __esm({
           uploader: trim16(metadata.uploader),
           uploadAuthority: metadata.uploadAuthority
         };
-        const trustedId = lower7(metadata.resourceId);
+        const trustedId = lower8(metadata.resourceId);
         if (!readableQuestion(metadata)) {
           if (trustedId) candidates.push({ ...version2, resourceId: trustedId, withheld: true });
           continue;
@@ -77977,9 +78059,9 @@ var init_resultsAnalysisGeneration = __esm({
         const payloadId = trim16(payload.id || payload.questionId || payload.questionID);
         const normalized2 = normalizeQuestionRecord({
           ...payload,
-          questionId: trustedId && lower7(payloadId) !== trustedId ? trustedId : payloadId
+          questionId: trustedId && lower8(payloadId) !== trustedId ? trustedId : payloadId
         });
-        if (!normalized2 || hiddenQuestionIds.has(lower7(normalized2.questionId))) continue;
+        if (!normalized2 || hiddenQuestionIds.has(lower8(normalized2.questionId))) continue;
         candidates.push({ ...version2, resourceId: normalized2.questionId, question: normalized2 });
       }
       const questions = selectCanonicalStorageVersions(candidates).filter((candidate) => !candidate.withheld).map((candidate) => candidate.question);
@@ -78462,7 +78544,7 @@ var init_resultsAnalysisGeneration = __esm({
       const normalizedConfig = normalizeWorkerConfigRecord(config || {}, { slug: normalizeWorkerSessionSlug(config?.slug) });
       return isObj22(normalizedConfig?.sessionModeProfile?.results) ? normalizedConfig.sessionModeProfile.results : {};
     };
-    resolveResultsVisibility = (config = {}) => lower7(normalizedResultsProfile(config).visibility);
+    resolveResultsVisibility = (config = {}) => lower8(normalizedResultsProfile(config).visibility);
     aggregateResultsEnabled = (config = {}) => normalizedResultsProfile(config)?.exposure?.aggregateResultsEnabled === true;
     evaluateResultsAnalysisViewerEligibility = ({ config } = {}) => {
       if (!aggregateResultsEnabled(config)) {
@@ -103999,23 +104081,23 @@ init_blockedQuestionIds();
 init_ratingScale();
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
 var trim18 = (value) => String(value == null ? "" : value).trim();
-var lower8 = (value) => trim18(value).toLowerCase();
+var lower9 = (value) => trim18(value).toLowerCase();
 var isObj26 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var hasRestrictedPrompt = (question = {}) => {
-  const visibility = lower8(question.visibility || question.access || question.questionVisibility);
+  const visibility = lower9(question.visibility || question.access || question.questionVisibility);
   return Boolean(
     question.promptEncrypted || question.encryptedPrompt || question.locked === true || question.gated === true || question.gate || Array.isArray(question.gates) && question.gates.length || /private|locked|gated|encrypted/.test(visibility)
   );
 };
 var normalizeQuestion = (value = {}) => {
   const question = isObj26(value) ? value : {};
-  const id2 = lower8(question.id || question.questionId);
+  const id2 = lower9(question.id || question.questionId);
   const prompt = trim18(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /^(?:\[encrypted\]|encrypted prompt[.!]?(?:\s*connect.+decrypt[.!]?)?|connect(?: wallet)? to decrypt(?: encrypted prompt)?[.!]?)$/i.test(
     prompt
   ))
     return null;
-  const type = lower8(question.type || question.questionType || "freeform") || "freeform";
+  const type = lower9(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
   const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim18(isObj26(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
   const ratingScale = type === "rating" ? normalizeRatingScale(question) : null;
@@ -104060,10 +104142,10 @@ var MAX_CANDIDATES = 2e3;
 var catalog = (questions = [], incomplete = false, refused = false) => ({ questions, incomplete, refused });
 var retryableReadStatus = (status) => !status || status === 408 || status === 429 || status >= 500;
 var trim19 = (value) => String(value == null ? "" : value).trim();
-var lower9 = (value) => trim19(value).toLowerCase();
+var lower10 = (value) => trim19(value).toLowerCase();
 var isObj27 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
-var payloadQuestionId = (payload) => lower9(payload?.id || payload?.questionId);
+var payloadQuestionId = (payload) => lower10(payload?.id || payload?.questionId);
 var readJsonResponse = async (response3) => {
   if (!response3 || Number(response3.status || 0) < 200 || Number(response3.status || 0) >= 300) return null;
   try {
@@ -104121,7 +104203,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const listing = await listQuestionRows(callStorage);
   const { items } = listing;
   let incomplete = listing.incomplete;
-  const hiddenIds = /* @__PURE__ */ new Set([...blockedQuestionIds(config), ...items.filter((item) => item?.hidden === true || item?.metadata?.hidden === true).map((item) => lower9(item?.metadata?.resourceId)).filter(Boolean)]);
+  const hiddenIds = /* @__PURE__ */ new Set([...blockedQuestionIds(config), ...items.filter((item) => item?.hidden === true || item?.metadata?.hidden === true).map((item) => lower10(item?.metadata?.resourceId)).filter(Boolean)]);
   const readPayload = async (storageRefId) => {
     try {
       const response3 = await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`);
@@ -104139,7 +104221,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
     const storageRefId = trim19(item?.storageRef?.id || item?.metadata?.id || item?.id);
     if (!storageRefId || item?.hidden === true) continue;
     const version2 = {
-      resourceId: lower9(item?.metadata?.resourceId),
+      resourceId: lower10(item?.metadata?.resourceId),
       createdAtMs: Date.parse(trim19(item?.metadata?.createdAt)) || 0,
       storageRefId,
       uploader: trim19(item?.metadata?.uploader),
@@ -104239,7 +104321,7 @@ var payloadSessionSlug = (payload = {}) => {
     payload.session
   ]) {
     if (typeof candidate !== "string" && typeof candidate !== "number") continue;
-    const normalized = lower9(candidate).replace(/[^a-z0-9_-]/g, "").slice(0, 128);
+    const normalized = lower10(candidate).replace(/[^a-z0-9_-]/g, "").slice(0, 128);
     if (normalized) return normalized;
   }
   return "";
@@ -104322,7 +104404,7 @@ var loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
           incomplete || (incomplete = retryable);
           continue;
         }
-        if (payloadSessionSlug(payload) !== lower9(slug)) continue;
+        if (payloadSessionSlug(payload) !== lower10(slug)) continue;
         const question = normalizeQuestion({ ...payload, id: id2 });
         if (question) questions.push(question);
         if (questions.length >= MAX_QUESTIONS) return catalog(questions, incomplete);
@@ -105156,15 +105238,15 @@ var ADDRESS3 = /^0x[0-9a-f]{40}$/;
 var ADDRESS_TEXT = /\b0x[a-fA-F0-9]{40}\b/g;
 var toArray2 = (value) => Array.isArray(value) ? value : [];
 var trim21 = (value) => value == null ? "" : String(value).trim();
-var lower10 = (value) => trim21(value).toLowerCase();
+var lower11 = (value) => trim21(value).toLowerCase();
 var capitalize = (value) => value.charAt(0).toUpperCase() + value.slice(1);
 var cleanBuildText = (value, max) => (typeof value === "string" ? value : "").replace(ADDRESS_TEXT, "[redacted-address]").replace(/\s+/g, " ").trim().slice(0, max);
-var listAddresses2 = (value) => toArray2(value).map(lower10).filter((address3) => ADDRESS3.test(address3));
+var listAddresses2 = (value) => toArray2(value).map(lower11).filter((address3) => ADDRESS3.test(address3));
 var isListedResultsBuilder = (config, address3) => {
-  const normalized = lower10(address3);
+  const normalized = lower11(address3);
   return ADDRESS3.test(normalized) && (resolveSessionAdminAddresses(config || {}).has(normalized) || listAddresses2(config?.resultsAdminAddresses).includes(normalized));
 };
-var canBuildResults = async ({ env, slug, config, address: address3, validateAdmin: validateAdmin2 }) => isListedResultsBuilder(config, address3) || typeof validateAdmin2 === "function" && await validateAdmin2({ env, slug, address: lower10(address3), config, body: {} }) === true;
+var canBuildResults = async ({ env, slug, config, address: address3, validateAdmin: validateAdmin2 }) => isListedResultsBuilder(config, address3) || typeof validateAdmin2 === "function" && await validateAdmin2({ env, slug, address: lower11(address3), config, body: {} }) === true;
 var callBuildStore = (kindName) => (env, slug, operation, payload = {}) => callSessionConfigCoordinator({
   env,
   slug,
@@ -105191,7 +105273,7 @@ var runResultsBuild = async ({
     return failure(400, `${kind.plural} are built from the responses this session's Worker stores.`);
   }
   const store = deps.callBuildStore || callBuildStore(kindName);
-  const reserved = await store(env, slug, "reserve", { builder: lower10(builderAddress) });
+  const reserved = await store(env, slug, "reserve", { builder: lower11(builderAddress) });
   if (!reserved.ok) {
     return failure(reserved.status || 503, reserved.body?.error || `${capitalize(kind.name)} builds are unavailable; retry.`, {
       ...reserved.body?.reason ? { reason: reserved.body.reason } : {},
@@ -105244,7 +105326,7 @@ var runResultsBuild = async ({
         id: createBuildId(kind.prefix, builtAtMs),
         version: 1,
         builtAt: new Date(builtAtMs).toISOString(),
-        builtBy: lower10(builderAddress),
+        builtBy: lower11(builderAddress),
         model: trim21(resolveAnalysisAiPayload({ config, prompt: "" }).model),
         counts: {
           responses: source.counts.responseCount,
@@ -105323,7 +105405,7 @@ var SESSION_AGENT_PATHS = Object.freeze(["/session-agent/status", "/session-agen
 var OPT_OUTS_UNAVAILABLE = "Who turned the Session Agent off couldn\u2019t be read just now. Try again shortly.";
 var callOptOutStore = (env, slug, operation, payload = {}) => callSessionConfigCoordinator({ env, slug, path: `session-agent/${operation}`, ...payload });
 var trim22 = (value) => typeof value === "string" ? value.trim() : "";
-var lower11 = (value) => trim22(value).toLowerCase();
+var lower12 = (value) => trim22(value).toLowerCase();
 var clip4 = (value, max) => value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1)).trimEnd()}\u2026`;
 var NOT_ADMITTED = {
   ok: false,
@@ -105334,7 +105416,7 @@ var NOT_ADMITTED = {
 var UNCHECKED = { ok: false, status: 503, error: "Who may ask could not be checked just now. Try again shortly." };
 var resolveAsker = async ({ setting, config, address: address3, aiScope, access }) => {
   if (!aiScope) return NOT_ADMITTED;
-  if (resolveSessionAdminAddresses(config).has(lower11(address3))) {
+  if (resolveSessionAdminAddresses(config).has(lower12(address3))) {
     return { ok: true, answers: "detailed", audience: "admin" };
   }
   const gate = await access.sessionGate();
@@ -105421,7 +105503,7 @@ var gatherMaterial = async ({ env, slug, config, setting, address: address3, sco
       slug,
       config,
       deps,
-      principal: lower11(address3),
+      principal: lower12(address3),
       leaveOutUploaders: optedOut,
       // A General asker reads the files open to everyone the session admits;
       // each read checks the session's own gate again, as a file read does.
@@ -106933,7 +107015,7 @@ init_resultsAnalysisGeneration();
 init_storageScanBudget();
 init_storageRouteExecution();
 init_storageResourceOwnership();
-var LIST_PAGE = 1e3;
+var LIST_PAGE2 = 1e3;
 var countResultsScanRows = async ({ env, slug } = {}) => {
   const index = getStorageIndexBinding(env);
   const limit = RESULTS_ANALYSIS_SCAN_LIMITS.rows;
@@ -106947,7 +107029,7 @@ var countResultsScanRows = async ({ env, slug } = {}) => {
     let cursor = "";
     do {
       if (++lists > 20) throw new Error("Stored rows could not be counted.");
-      const listed = await index.list({ prefix, limit: LIST_PAGE, ...cursor ? { cursor } : {} });
+      const listed = await index.list({ prefix, limit: LIST_PAGE2, ...cursor ? { cursor } : {} });
       count += Array.isArray(listed?.keys) ? listed.keys.length : 0;
       if (count > limit) return { count: limit + 1, limit, overLimit: true };
       cursor = listed?.list_complete === false ? String(listed?.cursor || "") : "";
