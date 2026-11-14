@@ -70197,8 +70197,8 @@ var init_storageScanBudget = __esm({
     };
     isStorageReadLimitError = (error) => error?.code === "storage_read_limit";
     jsonByteLength = (value) => encoder5.encode(typeof value === "string" ? value : JSON.stringify(value)).byteLength;
-    createResultsAnalysisScanBudget = () => {
-      const used = { operations: 0, rows: 0, listed: 0, metadataBytes: 0, payloadBytes: 0 };
+    createResultsAnalysisScanBudget = ({ operationsUsed = 0 } = {}) => {
+      const used = { operations: operationsUsed, rows: 0, listed: 0, metadataBytes: 0, payloadBytes: 0 };
       const consume = (kind, amount = 1) => {
         if (used[kind] + amount > RESULTS_ANALYSIS_SCAN_LIMITS[kind]) throw new StorageReadLimitError(kind);
         used[kind] += amount;
@@ -70211,6 +70211,9 @@ var init_storageScanBudget = __esm({
         payload: (count) => consume("payloadBytes", count),
         get remainingPayloadBytes() {
           return RESULTS_ANALYSIS_SCAN_LIMITS.payloadBytes - used.payloadBytes;
+        },
+        get operationsUsed() {
+          return used.operations;
         }
       };
     };
@@ -71919,8 +71922,9 @@ var init_contextSourceRoute = __esm({
         bytes: encoder6.encode(JSON.stringify(record4)),
         contentType: "application/json",
         accessConditions: adminsOnly ? ADMINS_ONLY_ACCESS : null,
-        // A refreshed link stays its first adder's, who may still remove it.
-        ...replaces ? { contextUploader: replaces.uploader } : {},
+        // A refreshed link stays its first adder's, who may still remove it. A new
+        // one is counted by its address: its page text and time change each fetch.
+        ...replaces ? { contextUploader: replaces.uploader } : { countKey: `link:${record4.url}` },
         tags: [
           ...commonTags("link"),
           { name: CONTEXT_TAGS.role, value: CONTEXT_ROLE },
@@ -73706,17 +73710,28 @@ var init_storageRouteExecution = __esm({
         if (error?.status === 503) return responseJson(deps, { error: error.message }, 503, baseHeaders);
         throw error;
       }
+      let contextCount = null;
       if (contextCheck.role === CONTEXT_ROLE && !contextUploaderIsAdmin) {
-        const counted = await (deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit)({
+        const linkKey = payload.contextOrigin === "worker" && typeof payload.countKey === "string" ? payload.countKey : "";
+        const digest2 = await (deps?.crypto || globalThis.crypto).subtle.digest(
+          "SHA-256",
+          linkKey ? new TextEncoder().encode(linkKey) : payload.bytes || new Uint8Array()
+        );
+        contextCount = {
           env,
           slug,
           route: "context-add",
           identity: `${trim15(config?.sessionId || config?.sessionIdHex)}:${uploader}`,
+          key: Array.from(new Uint8Array(digest2), (byte) => byte.toString(16).padStart(2, "0")).join("")
+        };
+        const counted = await (deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit)({
+          ...contextCount,
           limit: CONTEXT_SOURCE_LIMITS.perAdder,
           windowMs: CONTEXT_ADD_WINDOW_MS,
           now: deps?.now
         });
         if (counted?.ok !== true) return responseJson(deps, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: "context_count_unavailable" }, 503, baseHeaders);
+        if (counted.busy === true) return responseJson(deps, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: "context_add_in_progress" }, 503, baseHeaders);
         if (counted.allowed !== true) {
           return responseJson(deps, {
             error: `You\u2019ve added ${CONTEXT_SOURCE_LIMITS.perAdder} context items to this session, the most one person may add. A session admin can add more.`,
@@ -73821,7 +73836,14 @@ var init_storageRouteExecution = __esm({
       if (owned || metadata.contextSource) {
         const publish = deps?.executeCoordinatedStoragePublication || executeCoordinatedStoragePublication;
         const result = await publish({ env, slug, expectedAuthority, metadata, createOwner: owned && !owner && !!uploader });
-        if (!result.ok) return responseJson(deps, { error: result.body?.error || "Storage publication is unavailable; retry." }, result.status || 503, baseHeaders);
+        const settle = deps?.settleCoordinatedAuthRateKey || settleCoordinatedAuthRateKey;
+        if (!result.ok) {
+          if (contextCount) await settle({ ...contextCount, release: true }).catch(() => {
+          });
+          return responseJson(deps, { error: result.body?.error || "Storage publication is unavailable; retry." }, result.status || 503, baseHeaders);
+        }
+        if (contextCount) await settle(contextCount).catch(() => {
+        });
       } else if (index && typeof index.put === "function") {
         await index.put(buildIndexKey({ slug, resource, id: id2 }), serializedMetadata, storageIndexPutOptions(metadata));
       }
@@ -77705,7 +77727,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder8, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj23, hasOwn6, trim17, lower8, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, snapshotLimitText, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder8, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj23, hasOwn6, trim17, lower8, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, snapshotLimitText, SNAPSHOT_CHANGED, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_aiRequestPolicy();
@@ -78230,10 +78252,27 @@ var init_resultsAnalysisGeneration = __esm({
       };
     };
     snapshotLimitText = (kind) => kind === "rows" || kind === "listed" ? `AI builds read at most ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString("en-US")} stored question and answer versions at once, and this session stores more.` : "This session\u2019s stored questions and answers are too large for an AI build to read at once.";
+    SNAPSHOT_CHANGED = {
+      ok: false,
+      status: 503,
+      reason: "results_analysis_snapshot_unavailable",
+      error: "Answers changed while the results were read. No report was generated; the last successful report is unchanged. Try again."
+    };
     loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
       try {
-        const source = await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: createResultsAnalysisScanBudget() });
-        return source.listedVersionWon ? await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: createResultsAnalysisScanBudget(), latestOnly: false }) : source;
+        const first = createResultsAnalysisScanBudget();
+        const source = await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: first });
+        if (!source.listedVersionWon) return source;
+        try {
+          return await readWorkerCanonicalResultsAnalysisSource({
+            ...args,
+            budget: createResultsAnalysisScanBudget({ operationsUsed: first.operationsUsed }),
+            latestOnly: false
+          });
+        } catch (error) {
+          if (isStorageReadLimitError(error) && error.kind === "operations") return SNAPSHOT_CHANGED;
+          throw error;
+        }
       } catch (error) {
         if (!isStorageReadLimitError(error)) return {
           ok: false,
@@ -81184,9 +81223,10 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedHostedFaucet: () => reserveCoordinatedHostedFaucet,
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet,
+  settleCoordinatedAuthRateKey: () => settleCoordinatedAuthRateKey,
   withCoordinatedFaucetWalletTurn: () => withCoordinatedFaucetWalletTurn
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, WORKER_GROUP_MEMBER_MUTATIONS, WORKER_GROUP_SECRET_OPERATIONS, WORKER_GROUP_REVOKE_BATCH, NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, workerGroupJoinRefused, admitWorkerGroupJoin, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, AUTH_RATE_KEY_HOLD_MS, AUTH_RATE_KEY_LEASE_MS, AUTH_RATE_KEY_RE, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, WORKER_GROUP_MEMBER_MUTATIONS, WORKER_GROUP_SECRET_OPERATIONS, WORKER_GROUP_REVOKE_BATCH, NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, workerGroupJoinRefused, admitWorkerGroupJoin, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, settleCoordinatedAuthRateKey, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_lib2();
@@ -81235,6 +81275,9 @@ var init_sessionWriteCoordinator = __esm({
     AUTH_NONCE_ACTIVE_KEY = "auth-nonce-active";
     AUTH_NONCE_USED_KEY = "auth-nonce-used";
     AUTH_RATE_RECORD_KEY = "auth-rate-record";
+    AUTH_RATE_KEY_HOLD_MS = 60 * 6e4;
+    AUTH_RATE_KEY_LEASE_MS = 3e4;
+    AUTH_RATE_KEY_RE = /^[0-9a-f]{64}$/;
     HOSTED_FAUCET_QUOTA_KEY = "hosted-faucet-quota-v1";
     FAUCET_WALLET_TURN_KEY = "faucet-wallet-turn-v1";
     FAUCET_WALLET_TURN_MS = 6e4;
@@ -83799,22 +83842,51 @@ ${expiry}`);
           nowMs,
           MAX_AUTH_RATE_WINDOW_MS
         );
-        if (!slug || !route || !identity || !limit || !resetAtMs) {
+        const key = payload?.key === void 0 ? "" : toTrimmedString10(payload.key);
+        if (!slug || !route || !identity || !limit || !resetAtMs || payload?.key !== void 0 && !AUTH_RATE_KEY_RE.test(key)) {
           return jsonResponse2({ error: "Invalid auth rate-limit request." }, 400);
         }
         const result = await this.state.storage.transaction(async (transaction) => {
           const existing = await transaction.get(AUTH_RATE_RECORD_KEY);
-          const current = Number(existing?.resetAtMs || 0) > nowMs ? normalizePositiveSafeInteger(existing?.count) : 0;
+          const active = Number(existing?.resetAtMs || 0) > nowMs;
+          const current = active ? normalizePositiveSafeInteger(existing?.count) : 0;
+          const effectiveResetAtMs = active ? existing.resetAtMs : resetAtMs;
+          const open = (active && Array.isArray(existing?.open) ? existing.open : []).filter((entry2) => Number(entry2?.atMs) > nowMs - AUTH_RATE_KEY_HOLD_MS);
+          const held = key ? open.find((entry2) => entry2.key === key) : null;
+          if (held && Number(held.untilMs) > nowMs) {
+            return { ok: true, allowed: false, busy: true, count: current, resetAtMs: effectiveResetAtMs };
+          }
+          if (held) {
+            held.untilMs = nowMs + AUTH_RATE_KEY_LEASE_MS;
+            await transaction.put(AUTH_RATE_RECORD_KEY, { ...existing, open });
+            return { ok: true, allowed: true, count: current, resetAtMs: effectiveResetAtMs, repeated: true };
+          }
           const count = current + 1;
-          const effectiveResetAtMs = Number(existing?.resetAtMs || 0) > nowMs ? existing.resetAtMs : resetAtMs;
+          const allowed = count <= limit;
+          if (key && allowed) open.push({ key, atMs: nowMs, untilMs: nowMs + AUTH_RATE_KEY_LEASE_MS });
           await transaction.put(AUTH_RATE_RECORD_KEY, {
             version: 1,
             count,
-            resetAtMs: effectiveResetAtMs
+            resetAtMs: effectiveResetAtMs,
+            ...open.length ? { open } : {}
           });
-          return { ok: true, allowed: count <= limit, count, resetAtMs: effectiveResetAtMs };
+          return { ok: true, allowed, count, resetAtMs: effectiveResetAtMs };
         });
         return jsonResponse2(result);
+      }
+      // The keyed request finished: stored, so the same key counts anew next
+      // time, or (`release`) failed, so a retry may go ahead at once.
+      async executeAuthRateSettle(payload) {
+        const key = toTrimmedString10(payload?.key);
+        if (!AUTH_RATE_KEY_RE.test(key)) return jsonResponse2({ error: "Invalid auth rate-limit request." }, 400);
+        await this.state.storage.transaction(async (transaction) => {
+          const existing = await transaction.get(AUTH_RATE_RECORD_KEY);
+          if (!existing?.open?.some((entry2) => entry2?.key === key)) return;
+          const { open, ...rest } = existing;
+          const kept = payload?.release === true ? open.map((entry2) => entry2?.key === key ? { ...entry2, untilMs: 0 } : entry2) : open.filter((entry2) => entry2?.key !== key);
+          await transaction.put(AUTH_RATE_RECORD_KEY, kept.length ? { ...rest, open: kept } : rest);
+        });
+        return jsonResponse2({ ok: true });
       }
       async executeHostedFaucetQuota(payload, finalize = false) {
         const requestId = toTrimmedString10(payload?.requestId);
@@ -84273,6 +84345,9 @@ ${expiry}`);
         if (url.pathname === "/auth-state/rate/check") {
           return this.executeAuthRateCheck(payload);
         }
+        if (url.pathname === "/auth-state/rate/settle") {
+          return this.executeAuthRateSettle(payload);
+        }
         if (url.pathname === "/worker-groups/ready") {
           return this.executeWorkerGroupReady(payload);
         }
@@ -84579,7 +84654,8 @@ ${expiry}`);
       identity,
       limit,
       windowMs,
-      now = Date.now
+      now = Date.now,
+      key
     } = {}) => {
       const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
       const normalizedRoute = toTrimmedString10(route).toLowerCase();
@@ -84593,10 +84669,17 @@ ${expiry}`);
           route: normalizedRoute,
           identity: normalizedIdentity,
           limit,
-          resetAtMs: nowMs + normalizePositiveSafeInteger(windowMs)
+          resetAtMs: nowMs + normalizePositiveSafeInteger(windowMs),
+          ...key === void 0 ? {} : { key }
         }
       });
     };
+    settleCoordinatedAuthRateKey = ({ env, slug, route, identity, key, release = false } = {}) => callAuthStateCoordinator({
+      env,
+      identity: `auth-rate:${toTrimmedString10(slug)}:${toTrimmedString10(route).toLowerCase()}:${toTrimmedString10(identity).toLowerCase()}`,
+      path: "/auth-state/rate/settle",
+      payload: { key, release }
+    });
     getOrCreateCoordinatedStorageEnvelopeSessionKey = async ({
       env,
       slug,
