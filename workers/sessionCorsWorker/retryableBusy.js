@@ -1,8 +1,9 @@
 import { coordinatorBusyBody, SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 
-// Every busy answer from the session coordinator comes before the request had
-// any effect (shared/sessionCoordinatorBusy.mjs), wherever in the Worker it
-// was refused, so it is marked safe to send again here, once, on its way out.
+// Every busy answer from the session coordinator is marked `retryable: true`
+// here, once, on its way out, wherever in the Worker it was refused. It may
+// follow work that was done before a reply was lost, so a client sends again
+// only a request whose repeat does no harm (shared/sessionCoordinatorBusy.mjs).
 // An answer that already says whether it may be repeated is left as it is.
 export const markRetryableBusy = async (response) => {
   if (response?.status !== 503 || !/application\/json/i.test(response.headers.get('Content-Type') || '')) return response;

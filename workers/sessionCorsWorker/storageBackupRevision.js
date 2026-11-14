@@ -30,8 +30,9 @@ export const backupExportActive = async (storage, now = Date.now()) =>
 // restart. Only a mark landing after an export read its start revision can
 // change anything, so a write skips a mark when a settings view started at
 // most 2 s ago saw no export: the export took its lease after that view and
-// waits 5 s before reading. Operators must still pause writes; KV/R2 have no
-// shared snapshot.
+// waits 5 s before reading. The saving needs a cached view: a write that finds
+// it expired reads it again for each mark, and during an export it pays both.
+// Operators must still pause writes; KV/R2 have no shared snapshot.
 export const markStorageBackupWrite = async (env, slug) => {
   if (!env?.CE_SESSION_COORDINATOR) return;
   const view = await callSessionConfigCoordinator({ env, slug, path: 'current', cache: true });

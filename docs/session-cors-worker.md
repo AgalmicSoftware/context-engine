@@ -1317,6 +1317,23 @@ falls before the export's starting read, where it could not have changed the
 outcome. If the lease lapses between pages, the next page restarts the export,
 because writes in the gap skipped their marks.
 
+Skipping saves both marks only while the write finds a settings view cached
+(for up to 1 second); a slower write asks for a fresh view in place of each
+mark. During an export, and until its lease lapses 10 minutes after the last
+page, a write costs up to two views and two marks.
+
+A finished backup holds every write that finished before the export began. A
+write that changed anything after the export read its starting revision makes
+the export restart, so a finished backup holds none of it, with three
+exceptions. A write whose final mark fails is not refused, since it is already
+done. An upload whose listing fails leaves its payload stored with no listing
+row. And the timing: the 5-second wait exceeds the 2-second view age by
+3 seconds, less the time a write computes between its view and its check
+(Worker clocks stand still while code runs; about half a second for a 25 MB
+payload), and assumes the coordinator's clock never steps back. Any of these
+can leave part of one write in a finished backup; pausing writes avoids all
+three.
+
 Backup restore reads JSONL as a UTF-8 stream, validating the complete file before
 signing and holding only one page while importing. Resuming reopens the selected
 file and skips completed pages. Restore requires an empty target session: no
