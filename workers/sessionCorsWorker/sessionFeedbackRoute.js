@@ -9,7 +9,7 @@ import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
 
 export const FEEDBACK_PATH = '/feedback';
-export const FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2000, reachMeChars: 200, bodyBytes: 8192 });
+export const FEEDBACK_LIMITS = Object.freeze({ perPersonPerDay: 5, textChars: 2000, bodyBytes: 8192 });
 
 const SCREENS = new Set(['phone', 'tablet', 'desktop']);
 // A view names a section, never a URL: links carry group ids and fragments carry invites.
@@ -41,16 +41,8 @@ export const normalizeFeedback = (body, { address = '' } = {}) => {
   if (!absent(body.appRelease) && !(typeof body.appRelease === 'string' && body.appRelease.length <= 40 && RELEASE.test(body.appRelease))) {
     return invalid('appRelease must be a release number such as 0.9.8.');
   }
-  let contact;
-  if (!absent(body.contact)) {
-    const reachMe = plain(body.contact?.reachMe);
-    if (typeof body.contact !== 'object' || !reachMe || reachMe.length > FEEDBACK_LIMITS.reachMeChars) {
-      return invalid(`How to reach you must be 1 to ${FEEDBACK_LIMITS.reachMeChars} characters.`);
-    }
-    // Only the Worker names who sent it: the signed-in address, never a name the sender typed.
-    contact = { ...(address ? { address } : {}), reachMe };
-  }
-  // Without the contact box ticked, nothing stored names the sender.
+  // Nothing stored names the sender: only the fields below are kept, and
+  // signedIn says whether they were signed in, never who they are.
   return {
     ok: true,
     record: {
@@ -60,7 +52,6 @@ export const normalizeFeedback = (body, { address = '' } = {}) => {
       screen: body.screen,
       ...(absent(body.appRelease) ? {} : { appRelease: body.appRelease }),
       signedIn: Boolean(address),
-      ...(contact ? { contact } : {}),
     },
   };
 };

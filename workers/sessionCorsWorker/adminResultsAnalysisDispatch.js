@@ -77,8 +77,8 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
     slugHint: slug,
   });
   if (!auth?.ok) return auth?.response;
-  // Feedback holds people's contact details: an agent key, even one minted for
-  // an admin, does not read it.
+  // Feedback is for the session's admins only: an agent key, even one minted
+  // for an admin, does not read it.
   if (feedback && auth.payload?.agentSource) {
     return deps?.json?.({ error: 'Only the session’s admins can read feedback.' }, 403, withPrivateNoStoreHeaders(baseHeaders));
   }

@@ -67,18 +67,23 @@ test('a signed-in and a signed-out person each send, and only the Worker stamps 
   assert.equal(signedIn.createdAt, '2026-11-20T12:00:00.001Z');
   assert.equal(signedOut.signedIn, false);
   assert.equal('appRelease' in signedOut, false);
-  // Without the contact box ticked, nothing stored names the sender, signed in or not.
+  // Nothing stored names the sender, signed in or not.
   assert.ok(!JSON.stringify(messages).includes(ADDRESS.slice(2)));
 });
 
-test('the contact box stores who to reach only when ticked', async () => {
+test('a contact field sent with feedback is dropped, never stored', async () => {
   const feedback = createStore();
   const send = sender(feedback);
-  await send({ ...SEND, contact: { reachMe: ' sam on Signal ', displayName: 'Sam' } }, { address: ADDRESS.toUpperCase().replace('0X', '0x') });
-  await send({ ...SEND, contact: { reachMe: '@sam' } });
-  const [signedOut, signedIn] = (await feedback.call({}, 'salon', 'list')).body.messages;
-  assert.deepEqual(signedIn.contact, { address: ADDRESS, reachMe: 'sam on Signal' });
-  assert.deepEqual(signedOut.contact, { reachMe: '@sam' });
+  assert.equal((await send({ ...SEND, contact: { reachMe: 'sam on Signal', displayName: 'Sam' } }, { address: ADDRESS })).status, 200);
+  assert.equal((await send({ ...SEND, contact: { reachMe: '@sam' } })).status, 200);
+  assert.equal((await send({ ...SEND, contact: 'not an object' })).status, 200);
+  const { messages } = (await feedback.call({}, 'salon', 'list')).body;
+  assert.equal(messages.length, 3);
+  // A stored message holds only these fields; none of them says who sent it.
+  const kept = ['appRelease', 'createdAt', 'id', 'screen', 'signedIn', 'text', 'theme', 'view', 'workerRelease'];
+  for (const message of messages) assert.deepEqual(Object.keys(message).sort(), kept);
+  assert.ok(!/sam|Signal|not an object/.test(JSON.stringify(messages)));
+  assert.ok(!JSON.stringify(messages).includes(ADDRESS.slice(2)));
 });
 
 test('a sixth send in a day is refused, counted per address signed in and per network signed out', async () => {
@@ -106,8 +111,6 @@ test('wrong or oversized sends say which field, and nothing is stored', async ()
     [{ ...SEND, theme: 'Civic Theme' }, /theme/],
     [{ ...SEND, screen: 'watch' }, /screen/],
     [{ ...SEND, appRelease: 'latest' }, /appRelease/],
-    [{ ...SEND, contact: { reachMe: '' } }, /How to reach you/],
-    [{ ...SEND, contact: { reachMe: 'x'.repeat(201) } }, /How to reach you/],
     [{ ...SEND, padding: 'p'.repeat(FEEDBACK_LIMITS.bodyBytes) }, /too long/],
   ];
   for (const [body, error] of cases) {
@@ -367,9 +370,10 @@ test('through the whole Worker: people send signed in and out, the admin reads, 
   assert.equal(listed.status, 200, JSON.stringify(listed.body));
   assert.equal(listed.body.cursor, undefined);
   const [signedIn, signedOut] = ['signed in', 'signed out'].map((text) => listed.body.messages.find((message) => message.text === text));
-  assert.deepEqual([signedOut.text, signedOut.signedIn, signedOut.contact], ['signed out', false, undefined]);
-  assert.deepEqual([signedIn.text, signedIn.signedIn, signedIn.contact],
-    ['signed in', true, { address: admin.address.toLowerCase(), reachMe: 'by email' }]);
+  assert.deepEqual([signedOut.text, signedOut.signedIn, 'contact' in signedOut], ['signed out', false, false]);
+  assert.deepEqual([signedIn.text, signedIn.signedIn, 'contact' in signedIn], ['signed in', true, false]);
+  const listedText = JSON.stringify(listed.body).toLowerCase();
+  assert.ok(!listedText.includes('by email') && !listedText.includes(admin.address.slice(2).toLowerCase()));
   assert.equal(signedIn.workerRelease, signedOut.workerRelease);
 
   assert.equal(listed.headers.get('cache-control'), 'private, no-store');

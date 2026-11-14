@@ -131,7 +131,7 @@ test('feedback is never a storage resource and never enters a backup', async () 
   const { env, kv } = fixture();
   const text = 'Feedback marker 7d1c: the atlas was hard to find.';
   const sent = await sendSessionFeedback({
-    env, slug, config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }, body: { text, view: 'results', theme: 'civic', screen: 'desktop', contact: { reachMe: 'marker-7d1c on Signal' } },
+    env, slug, config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }, body: { text, view: 'results', theme: 'civic', screen: 'desktop' },
     identity: 'anon:203.0.113.9', checkRateLimit: async () => true, release: '0.9.8',
   });
   assert.equal(sent.status, 200, JSON.stringify(sent));
