@@ -30486,12 +30486,11 @@ var init_realtimeInterviewConfig = __esm({
 });
 
 // shared/workerGroupJoin.mjs
-var WORKER_GROUP_JOIN_MODES, WORKER_GROUP_SECRET_MODES, WORKER_GROUP_JOIN_REFUSED, WORKER_GROUP_MEMBER_CEILING_DEFAULT, WORKER_GROUP_MEMBER_CEILING_MAX, WORKER_GROUP_INVITE_BATCH_MAX, ONE_USE_SECRET, SECRET_HASH, JOIN_STATEMENT, hex, hashOneUseSecret, isOneUseSecretHash, workerGroupJoinStatement;
+var WORKER_GROUP_JOIN_MODES, WORKER_GROUP_JOIN_REFUSED, WORKER_GROUP_MEMBER_CEILING_DEFAULT, WORKER_GROUP_MEMBER_CEILING_MAX, WORKER_GROUP_INVITE_BATCH_MAX, ONE_USE_SECRET, SECRET_HASH, JOIN_STATEMENT, hex, hashOneUseSecret, isOneUseSecretHash, workerGroupJoinStatement;
 var init_workerGroupJoin = __esm({
   "shared/workerGroupJoin.mjs"() {
     init_workerSessionPublicConfig();
     WORKER_GROUP_JOIN_MODES = Object.freeze(["open", "one_use", "group_password", "admin_add"]);
-    WORKER_GROUP_SECRET_MODES = Object.freeze(["one_use", "group_password"]);
     WORKER_GROUP_JOIN_REFUSED = "worker_group_join_refused";
     WORKER_GROUP_MEMBER_CEILING_DEFAULT = 1e3;
     WORKER_GROUP_MEMBER_CEILING_MAX = 1e4;
