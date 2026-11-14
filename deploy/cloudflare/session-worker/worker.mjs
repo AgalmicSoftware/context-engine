@@ -24743,6 +24743,16 @@ var init_lib2 = __esm({
   }
 });
 
+// shared/sessionCoordinatorBusy.mjs
+var SESSION_COORDINATOR_UNAVAILABLE, COORDINATOR_RETRY_DELAYS_MS, coordinatorBusyBody;
+var init_sessionCoordinatorBusy = __esm({
+  "shared/sessionCoordinatorBusy.mjs"() {
+    SESSION_COORDINATOR_UNAVAILABLE = "Session config coordination is unavailable; retry.";
+    COORDINATOR_RETRY_DELAYS_MS = Object.freeze([400, 1e3, 2e3]);
+    coordinatorBusyBody = (extra = {}) => ({ error: SESSION_COORDINATOR_UNAVAILABLE, ...extra, retryable: true });
+  }
+});
+
 // shared/rpcDefaults.cjs
 var require_rpcDefaults = __commonJS({
   "shared/rpcDefaults.cjs"(exports, module) {
@@ -25179,15 +25189,6 @@ var init_stringCoercion = __esm({
       const stringify3 = typeof deps?.toStr === "function" ? deps.toStr : toStr6;
       return stringify3(value).trim();
     };
-  }
-});
-
-// shared/sessionCoordinatorBusy.mjs
-var SESSION_COORDINATOR_UNAVAILABLE, COORDINATOR_RETRY_DELAYS_MS;
-var init_sessionCoordinatorBusy = __esm({
-  "shared/sessionCoordinatorBusy.mjs"() {
-    SESSION_COORDINATOR_UNAVAILABLE = "Session config coordination is unavailable; retry.";
-    COORDINATOR_RETRY_DELAYS_MS = Object.freeze([400, 1e3, 2e3]);
   }
 });
 
@@ -30248,8 +30249,8 @@ var init_sessionConfigAuthority = __esm({
       configReads.forget(key.binding, key.slug);
       resultsAnalysisStatusReads.forget(key.binding, key.slug);
     };
-    KEEPS_CONFIG = /* @__PURE__ */ new Set(["current", "backup/write-revision", "backup/export", "diagnostics", "storage/publish"]);
-    KEEPS_CONFIG_PREFIXES = ["agent-submit/", "debate-atlas/", "risk-matrix/", "session-feedback/"];
+    KEEPS_CONFIG = /* @__PURE__ */ new Set(["current", "backup/write-revision", "backup/export", "diagnostics", "storage/publish", "worker-groups/mutate"]);
+    KEEPS_CONFIG_PREFIXES = ["agent-submit/", "debate-atlas/", "risk-matrix/", "session-feedback/", "session-agent/"];
     keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
     callSessionConfigCoordinator = async ({ env, slug, path, cache = false, ...payload }) => {
       const key = sessionKey(env, slug);
@@ -74103,16 +74104,11 @@ var init_storageRouteExecution = __esm({
             return false;
           }
         };
-        for (let offset = 0; mine && offset < keys.length; offset += KV_BULK_GET_KEYS2) {
-          const batch = keys.slice(offset, offset + KV_BULK_GET_KEYS2).map((keyEntry) => trim14(keyEntry?.name || keyEntry)).filter(Boolean);
+        const names2 = keys.map((keyEntry) => trim14(keyEntry?.name || keyEntry)).filter(Boolean);
+        for (let offset = 0; offset < names2.length; offset += KV_BULK_GET_KEYS2) {
+          const batch = names2.slice(offset, offset + KV_BULK_GET_KEYS2);
           const got = await index.get(batch);
-          rows.push(...batch.map((name) => ({ name, raw: got?.get?.(name) ?? null })).filter(({ raw }) => typeof raw !== "string" || !othersRow(raw)));
-        }
-        for (let offset = 0; !mine && offset < keys.length; offset += 8) {
-          rows.push(...await Promise.all(keys.slice(offset, offset + 8).map(async (keyEntry) => {
-            const name = trim14(keyEntry?.name || keyEntry);
-            return { name, raw: name ? await index.get(name) : null };
-          })));
+          rows.push(...batch.map((name) => ({ name, raw: got?.get?.(name) ?? null })).filter(({ raw }) => !mine || typeof raw !== "string" || !othersRow(raw)));
         }
       } catch {
         return responseJson(deps, { error: "Cloudflare storage index metadata is unavailable." }, 503, baseHeaders);
@@ -88184,6 +88180,21 @@ var require_web = __commonJS({
 
 // workers/sessionCorsWorker/worker.js
 init_lib2();
+
+// workers/sessionCorsWorker/retryableBusy.js
+init_sessionCoordinatorBusy();
+var markRetryableBusy = async (response3) => {
+  if (response3?.status !== 503 || !/application\/json/i.test(response3.headers.get("Content-Type") || "")) return response3;
+  const body = await response3.clone().json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body) || "retryable" in body || body.error !== SESSION_COORDINATOR_UNAVAILABLE) {
+    return response3;
+  }
+  const headers2 = new Headers(response3.headers);
+  headers2.delete("Content-Length");
+  return new Response(JSON.stringify(coordinatorBusyBody(body)), { status: 503, statusText: response3.statusText, headers: headers2 });
+};
+
+// workers/sessionCorsWorker/worker.js
 var import_rpcDefaults5 = __toESM(require_rpcDefaults(), 1);
 
 // workers/sessionCorsWorker/rpcDiagnosticSafety.js
@@ -107389,9 +107400,11 @@ var dispatchAuthNonceRequest = async ({
   );
   const issuedNonce = typeof issueResult?.nonce === "string" ? issueResult.nonce.trim() : "";
   if (!issueResult?.ok || !issuedNonce) {
+    const status = Number(issueResult?.status || 0) >= 400 ? Number(issueResult.status) : 503;
     return deps?.json?.(
-      { error: issueResult?.error || "Authorization state coordination is unavailable." },
-      Number(issueResult?.status || 0) >= 400 ? Number(issueResult.status) : 503,
+      // Asking for another nonce changes nothing, so a busy one may be asked again.
+      { error: issueResult?.error || "Authorization state coordination is unavailable.", ...status === 503 ? { retryable: true } : {} },
+      status,
       headers2
     );
   }
@@ -107541,10 +107554,11 @@ var resolveAuthLoginRequestAuthority = async ({
   }
   const nonceResult = await deps?.consumeNonce?.(env, targetSlug, address3.toLowerCase(), siwe?.nonce);
   if (!nonceResult?.ok) {
+    const busy2 = Number(nonceResult?.status || 0) >= 500;
     return {
       ok: false,
       response: deps?.json?.(
-        { error: nonceResult?.error },
+        { error: nonceResult?.error, ...busy2 ? { retryable: false } : {} },
         Number(nonceResult?.status || 0) >= 500 ? Number(nonceResult.status) : 400,
         headers2
       )
@@ -110696,6 +110710,10 @@ var corsHeaders = (origin, allowList) => {
   const headers2 = new Headers({
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Session-Slug, X-Group-Slug, X-Anonymous-Client-Id",
+    // Browsers keep a preflight's answer this long (ten minutes), so a page
+    // polling every 15 seconds stops checking first each time. A header the
+    // list lacks still gets a fresh check.
+    "Access-Control-Max-Age": "600",
     Vary: "Origin"
   });
   const hasAllowList = allowList != null;
@@ -111161,7 +111179,7 @@ var createWorkerRuntime = (env, overrides = {}) => {
     workerLowLevelHelpers,
     workerRouteRuntime,
     workerAuthGateUtils: workerRouteRuntime.workerAuthGateUtils,
-    fetch: workerRouteRuntime.fetch,
+    fetch: async (...args) => markRetryableBusy(await workerRouteRuntime.fetch(...args)),
     queue: workerRouteRuntime.queue
   };
   return Object.freeze(runtime);
