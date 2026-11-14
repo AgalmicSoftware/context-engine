@@ -1068,7 +1068,7 @@ export const fetchWorkerWithAuth = async (
   url: RequestInfo | URL,
   options: RequestInit = {},
   opts: WorkerFetchAuthOptions = {},
-) => {
+): Promise<Response> => {
   const resolvedSession = resolveWorkerSessionContext({
     sessionSlug: opts.sessionSlug,
     sessionConfig: opts.sessionConfig,
@@ -1210,6 +1210,8 @@ export const fetchWorkerWithAuth = async (
         allowDemoFallback: opts.allowDemoFallback,
       });
     }
+    // The remembered route skipped the signed-out try, which may serve this request: start over from it, once.
+    if (signInKnownNeeded) return fetchWorkerWithAuth(url, options, { ...opts, retry: false });
     let retryToken: string;
     try {
       retryToken = await getWorkerSessionToken({ requestContext: authRequestContext, prompt: opts.prompt });

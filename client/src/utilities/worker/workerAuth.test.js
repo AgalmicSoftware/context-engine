@@ -1791,6 +1791,30 @@ describe('workerAuth fetchWorkerWithAuth', () => {
       }
     });
 
+    it('is tried signed out again once the Worker refuses its token', async () => {
+      let revoked = false;
+      const served = serve((path) =>
+        path === '/storage/read?id=public'
+          ? jsonResp(200, { ok: true })
+          : jsonResp(401, { error: 'Missing Authorization header.' }),
+      );
+      global.fetch = jest.fn(async (url, init = {}) =>
+        revoked && new Headers(init.headers).get('Authorization')
+          ? jsonResp(401, { error: 'Invalid or expired token.' })
+          : served(url, init),
+      );
+      await read('https://worker.example/storage/read?id=private');
+      revoked = true;
+      global.fetch.mockClear();
+      const response = await fetchWorkerWithAuth(
+        'https://worker.example/storage/read?id=public',
+        { method: 'GET' },
+        { sessionSlug: 'mixed', workerUrl: 'https://worker.example', preferAnonymous: true, context, prompt: false },
+      );
+      expect(response.ok).toBe(true);
+      expect(sent()).toEqual(['/storage/read?id=public true', '/storage/read?id=public false']);
+    });
+
     it('is not learned from a rate limit', async () => {
       global.fetch = serve(() => jsonResp(429, { error: 'Rate limit exceeded.' }));
       await read('https://worker.example/storage/list?resource=responses');
