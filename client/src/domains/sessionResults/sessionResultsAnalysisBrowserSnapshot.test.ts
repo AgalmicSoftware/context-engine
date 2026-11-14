@@ -115,14 +115,15 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
       body: { source: { kind: 'admin-snapshot', snapshot: result.snapshot } },
     });
     expect(source.ok).toBe(true);
-    if (!source.ok || !('aiSnapshot' in source)) throw new Error('Worker did not return an AI snapshot.');
-    expect(source.aiSnapshot.questions).toEqual(
+    const aiSnapshot = source.ok && 'aiSnapshot' in source ? source.aiSnapshot : undefined;
+    if (!aiSnapshot) throw new Error('Worker did not return an AI snapshot.');
+    expect(aiSnapshot.questions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'single', singleSelect: true }),
         expect.objectContaining({ id: 'multi', singleSelect: false, maxSelections: 2 }),
       ]),
     );
-    expect(source.aiSnapshot.questions).toEqual(
+    expect(aiSnapshot.questions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'rating', scale: { ...scale, step: 1 } }),
         expect.objectContaining({ id: 'quadratic', voiceCredits: 25 }),
@@ -315,13 +316,14 @@ it.each(['Two  spaces', 'Non\u00a0breaking'])(
       },
     });
     expect(source.ok).toBe(true);
-    if (!source.ok || !('snapshot' in source)) throw new Error('Worker did not return a normalized snapshot.');
-    expect(source.snapshot.responses.map((row) => row.answer)).toEqual(expect.arrayContaining([[option], ['Other']]));
+    const snapshot = source.ok && 'snapshot' in source ? source.snapshot : undefined;
+    if (!snapshot) throw new Error('Worker did not return a normalized snapshot.');
+    expect(snapshot.responses.map((row) => row.answer)).toEqual(expect.arrayContaining([[option], ['Other']]));
     const state = resolveGeneratedResultsControllerState({
       statusBody: {
         ok: true,
         viewerAuthorized: true,
-        state: { jobState: 'succeeded', lastGood: { snapshot: source.snapshot } },
+        state: { jobState: 'succeeded', lastGood: { snapshot } },
       },
     });
     const result = buildGeneratedBreakdownAnalysisData({ questions: state.questions, responses: state.responses });
