@@ -3,6 +3,7 @@ import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy';
 import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import { buildSignedAdminActionAuth, fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 import { readWorkerCapabilities } from '../../utilities/worker/workerCapabilities';
+import { readWorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
 import { defaultStrictAllowDemoFallback } from '../../utilities/worker/workerSessionResolution.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
@@ -77,6 +78,18 @@ export const feedbackOffered = async (options: FeedbackOptions): Promise<boolean
   } catch {
     return false;
   }
+};
+
+/**
+ * True when the session's Worker holds an AI key the session pays for, so speech can be written down there as
+ * for an answer. Asked when the form first opens; the Worker's reply is kept for half a minute.
+ */
+export const dictationOffered = async (options: FeedbackOptions): Promise<boolean> => {
+  const { sessionSlug, sessionConfig, account } = options;
+  const presence = await readWorkerResourcePresence({ sessionSlug, sessionConfig, context: { account } }).catch(
+    () => null,
+  );
+  return presence?.ai === true;
 };
 
 // The feedback route's own refusals are plain sentences for the sender; any other error's text may hold anything.

@@ -128,7 +128,7 @@ $theme: (
   footer-link-border: transparent,
   footer-link-border-width: 0,
   footer-link-shadow: none,
-  footer-link-text: inherit,
+  footer-link-text: var(--ce-panel-text-muted),
   footer-link-hover-bg: transparent,
   footer-link-hover-shadow: none,
   footer-link-hover-text: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent),

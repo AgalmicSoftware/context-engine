@@ -18,7 +18,7 @@ import styles from './OnePageSession.module.scss';
 
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
 const PolisReportCompat = PolisReport as React.ComponentType<Record<string, unknown>>;
-const SessionFeedbackSection = React.lazy(() => import('./SessionFeedbackSection'));
+const SessionFeedback = React.lazy(() => import('./SessionFeedback'));
 const AgentQuestionPile = React.lazy(() => import('./agent/AgentQuestionPile'));
 const AgentBucketCards = React.lazy(() => import('./agent/AgentBucketCards'));
 const AgentDebateMapPanel = React.lazy(() => import('./agent/AgentDebateMapPanel'));
@@ -279,8 +279,7 @@ const OnePageSessionAgentShell = ({
           </section>
           {/* Sent without a sign-in: this page signs people in as agents, which the feedback route doesn't read. */}
           <Suspense fallback={null}>
-            <SessionFeedbackSection
-              agent
+            <SessionFeedback
               sessionSlug={displaySessionSlug}
               sessionConfig={sessionConfig}
               account=""

@@ -222,7 +222,7 @@ const SessionSettingsPage = ({
   const [workerRelease, setWorkerRelease] = useState('');
   // Whether it keeps AI draft text for admins; null while unknown, which leaves the setting as it is.
   const [workerKeepsDraftText, setWorkerKeepsDraftText] = useState<boolean | null>(null);
-  // Whether it takes feedback about the app; an older one shows no Feedback section here or on the session page.
+  // Whether it takes feedback about the app; an older one shows no Feedback section here or button on the session page.
   const [workerTakesFeedback, setWorkerTakesFeedback] = useState(false);
   useEffect(() => {
     let stale = false;

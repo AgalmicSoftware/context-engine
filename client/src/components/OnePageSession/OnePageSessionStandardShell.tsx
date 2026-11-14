@@ -53,7 +53,7 @@ const SessionContextHtml = React.lazy(() => import('./SessionContextHtml'));
 const SessionDebateAtlasView = React.lazy(() => import('../DebateAtlas/SessionDebateAtlasView'));
 const SessionRiskMatrixView = React.lazy(() => import('../ResultsBuilds/SessionRiskMatrixView'));
 const SessionAgentModal = React.lazy(() => import('./SessionAgentModal'));
-const SessionFeedbackSection = React.lazy(() => import('./SessionFeedbackSection'));
+const SessionFeedback = React.lazy(() => import('./SessionFeedback'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
@@ -1121,7 +1121,7 @@ export default function OnePageSessionStandardShell({
           )}
         </div>
         <Suspense fallback={null}>
-          <SessionFeedbackSection
+          <SessionFeedback
             sessionSlug={effectiveSlug}
             sessionConfig={resolvedSessionConfig}
             account={viewerAccount}

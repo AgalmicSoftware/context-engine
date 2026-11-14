@@ -1,79 +1,17 @@
-/* @file SessionFeedbackSection.module.scss: the Feedback section's header button and form. */
+/* @file SessionFeedback.module.scss: the footer's Feedback button and the dialog's form. */
 
-// The heading is the page's; the button inside it only adds keyboard use.
-.toggle {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: inherit;
-  font: inherit;
+// The footer's links are a button here: the same look, in capitals a screen reader still says as a word.
+.footerButton {
+  font-family: inherit;
+  font-weight: 600;
   line-height: inherit;
-  text-align: left;
+  text-transform: uppercase;
   cursor: pointer;
-
-  &:hover,
-  &:focus,
-  &:active {
-    background: transparent;
-    color: inherit;
-  }
-
-  &:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: 4px;
-  }
-}
-
-.agentHeaderRow {
-  display: flex;
 }
 
 // Focused after sending so it is read out; it is not a control, so it shows no ring.
 .thanks:focus {
   outline: none;
-}
-
-.agentHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: inherit;
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-// The "?"s keep their surroundings' text colour in every state.
-.help {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  min-height: 28px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: inherit;
-  font-size: 1rem;
-  cursor: pointer;
-
-  &:hover,
-  &:focus,
-  &:active {
-    background: transparent;
-    color: inherit;
-  }
-
-  &:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: 2px;
-  }
 }
 
 .hidden {
@@ -86,23 +24,6 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-// The setup page's surface and text, a pair every theme keeps readable.
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--ce-card-border);
-  border-radius: var(--ce-radius-8, 8px);
-  background: var(--ce-surface);
-  color: var(--ce-panel-text);
-
-  p {
-    margin: 0;
-  }
 }
 
 .form {
@@ -143,6 +64,58 @@
   gap: 12px;
 }
 
+// The countdown, and the microphone where the session pays for AI.
+.below {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+
+  p {
+    margin: 0;
+  }
+
+  [role='alert'] {
+    flex-basis: 100%;
+  }
+}
+
+.dictation {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+// As the answer field's microphone, at full strength so it reads against the panel.
+.mic {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ce-panel-text-muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    color: var(--ce-panel-text);
+  }
+
+  &[aria-disabled='true'] {
+    cursor: progress;
+  }
+}
+
+.recording,
+.recording:hover:not(:disabled),
+.recording:focus-visible {
+  color: var(--ce-status-danger-text);
+}
+
 // The accent pair, which every theme keeps readable, in each state.
 .send {
   padding: 6px 18px;
@@ -158,10 +131,11 @@
     color: var(--ce-action-accent-text);
   }
 
-  // Muted text rather than opacity, so the label stays readable.
+  // The theme's disabled fill and outline, so it still reads as a button (a minimal theme shows buttons by their
+  // fill), with muted text rather than opacity or a theme's faint grey, so the label stays readable.
   &:disabled {
-    border-style: dashed;
-    background: transparent;
+    border: 1px solid var(--ce-panel-text-muted);
+    background: var(--ce-control-disabled-bg);
     color: var(--ce-panel-text-muted);
     cursor: not-allowed;
   }
@@ -173,7 +147,7 @@
   overflow-wrap: anywhere;
 }
 
-// Links keep the panel's text colour: the page's link colour is for another surface.
+// Send more keeps the panel's text colour: the page's link colour is for another surface.
 .link {
   padding: 0;
   border: 0;

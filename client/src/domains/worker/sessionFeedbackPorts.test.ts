@@ -1,5 +1,6 @@
 import {
   deleteFeedback,
+  dictationOffered,
   feedbackCsv,
   feedbackOffered,
   listFeedback,
@@ -12,6 +13,7 @@ import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy';
 import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 import { readWorkerCapabilities } from '../../utilities/worker/workerCapabilities';
+import { readWorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
 
 jest.mock('../../utilities/worker/corsProxy', () => ({ getCorsProxyUrlOrThrow: jest.fn() }));
 jest.mock('../../utilities/worker/workerAuth', () => ({
@@ -20,11 +22,13 @@ jest.mock('../../utilities/worker/workerAuth', () => ({
 }));
 jest.mock('../../utilities/worker/signedAdminWorkerRequest', () => ({ postSignedAdminWorkerRequest: jest.fn() }));
 jest.mock('../../utilities/worker/workerCapabilities', () => ({ readWorkerCapabilities: jest.fn() }));
+jest.mock('../../utilities/worker/workerResourcePresence', () => ({ readWorkerResourcePresence: jest.fn() }));
 
 const workerUrl = jest.mocked(getCorsProxyUrlOrThrow);
 const fetchWorker = jest.mocked(fetchWorkerWithAuth);
 const adminPost = jest.mocked(postSignedAdminWorkerRequest);
 const capabilities = jest.mocked(readWorkerCapabilities);
+const presence = jest.mocked(readWorkerResourcePresence);
 
 const WORKER_RUN = { slug: 'salon', sessionModeProfile: { authority: { mode: 'worker_canonical' } } };
 const SIGNED_IN = { sessionSlug: 'salon', sessionConfig: WORKER_RUN, account: '0xabc' };
@@ -91,6 +95,23 @@ describe('sessionFeedbackPorts', () => {
 
     workerUrl.mockRejectedValue(new Error('no Worker'));
     await expect(feedbackOffered(SIGNED_IN)).resolves.toBe(false);
+  });
+
+  it('offers speech only where the session’s Worker holds an AI key the session pays for', async () => {
+    presence.mockResolvedValue({ ai: true, arweave: false, rpc: false, txGas: false });
+    await expect(dictationOffered(VISITOR)).resolves.toBe(true);
+    expect(presence).toHaveBeenCalledWith({
+      sessionSlug: 'salon',
+      sessionConfig: WORKER_RUN,
+      context: { account: '' },
+    });
+    presence.mockResolvedValue({ ai: false, arweave: true, rpc: true, txGas: true });
+    await expect(dictationOffered(SIGNED_IN)).resolves.toBe(false);
+    // An older Worker, or one that can't be reached, says nothing: no microphone.
+    presence.mockResolvedValue(null);
+    await expect(dictationOffered(SIGNED_IN)).resolves.toBe(false);
+    presence.mockRejectedValue(new Error('no Worker'));
+    await expect(dictationOffered(SIGNED_IN)).resolves.toBe(false);
   });
 
   it('sends a signed-in person’s message with their sign-in, and nothing that names them', async () => {

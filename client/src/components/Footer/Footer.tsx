@@ -27,6 +27,11 @@ type FooterState = {
   startMenuOpen: boolean;
 };
 
+// A session page puts its own footer controls in both places, such as Feedback where the session takes it:
+// the next item after the links, or, in a desktop-window theme, the taskbar, since its menu stays closed.
+// Each stays mounted, so what a page put there survives a change of theme.
+export const FOOTER_SESSION_ACTIONS_IDS = ['ce-footer-session-actions', 'ce-footer-session-taskbar'] as const;
+
 const isDesktopWindowTheme = (themeId: string): boolean => getThemeMetadata(themeId).layoutProfile === 'desktop-window';
 
 class Footer extends React.Component<FooterProps, FooterState> {
@@ -205,8 +210,10 @@ class Footer extends React.Component<FooterProps, FooterState> {
                   DOCS
                 </NavLink>
               </li>
+              <li id={FOOTER_SESSION_ACTIONS_IDS[0]} className={styles.sessionActions} hidden={isDesktopWindowTheme} />
             </ul>
           </nav>
+          <div id={FOOTER_SESSION_ACTIONS_IDS[1]} className={styles.sessionActions} hidden={!isDesktopWindowTheme} />
           <div className={styles.copyright}>
             <span className="copyright-link" data-testid="ce-footer-brand-attribution">
               <span className={styles.copyrightContent}>
