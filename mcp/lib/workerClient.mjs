@@ -1,6 +1,6 @@
 import { buildSiweMessage as buildSharedSiweMessage, normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { describeTestEthOffer } from '../../shared/sessions/testEthOffer.mjs';
-import { COORDINATOR_RETRY_DELAYS_MS, SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
+import { COORDINATOR_RETRY_DELAYS_MS, SESSION_COORDINATOR_UNAVAILABLE, isRetryableBusy } from '../../shared/sessionCoordinatorBusy.mjs';
 
 // HTTP client for one Worker-hosted session, signing in exactly as the web
 // client does for a passkey participant (client/src/utilities/worker/workerAuth.ts).
@@ -70,9 +70,10 @@ const explainFailure = (status, error, path) => {
     return 'Too many sign-ins for this agent or its network in the last minute. Wait about a minute, then try again; anything that needed the sign-in was not sent.';
   }
   if (status === 429) return `Rate limited by the Worker (${detail || '429'}). Wait a minute and retry.`;
-  // Sent after the client's own retries ran out; the Worker refused before doing anything.
+  // Sent after the client's own retries ran out. Usually nothing changed, but
+  // the same answer follows a reply lost after the work was done.
   if (status === 503 && error === SESSION_COORDINATOR_UNAVAILABLE) {
-    return 'The session is busy and this request did not go through; nothing changed. Wait a few seconds and try again.';
+    return 'The session is busy, so this request may not have gone through. Wait a few seconds, check whether it did, and try again.';
   }
   return detail || `Worker request failed (${status}).`;
 };
@@ -180,11 +181,12 @@ export const createWorkerClient = ({
   let features = null;
   let featuresLoadedAt = -Infinity;
 
-  // A busy session coordinator refuses a request before it has any effect.
-  // Reads, answers with a request id (replayed, never stored twice) and group
-  // joins (joining again is a no-op) wait and try again; other writes are sent once.
+  // A busy answer the Worker marks safe to send again may follow work already
+  // done, so only requests whose repeat does no harm wait and try again, as
+  // the web client lists them: reads, a nonce, a group join (a no-op the second
+  // time), and an upload the Worker replays by its request id. Others go once.
   const replaySafe = (path, method, body) => method === 'GET' ||
-    (path === '/storage/upload' && !!body?.requestId) || (path === '/groups/join' && method === 'POST');
+    ['/storage/read-batch', '/auth/nonce', '/groups/join'].includes(path) || (path === '/storage/upload' && !!body?.requestId);
   const waitBeforeRetry = (attempt, signal) => new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new Error('Stopped before the Worker request was sent.'));
     const timer = setTimeout(resolve, COORDINATOR_RETRY_DELAYS_MS[attempt] * (0.5 + Math.random()));
@@ -225,7 +227,7 @@ export const createWorkerClient = ({
       data = raw;
     }
     const error = isRecord(data) ? text(data.error) || text(data.message) : '';
-    if (response.status === 503 && error === SESSION_COORDINATOR_UNAVAILABLE && !form &&
+    if (isRetryableBusy(response.status, data) && !form &&
         busyRetries < COORDINATOR_RETRY_DELAYS_MS.length && replaySafe(path, method, body)) {
       await waitBeforeRetry(busyRetries, signal);
       return request(path, { method, headers, body, form, auth, retried, busyRetries: busyRetries + 1, maxBytes, signal });
