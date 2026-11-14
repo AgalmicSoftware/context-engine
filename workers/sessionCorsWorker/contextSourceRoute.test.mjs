@@ -267,6 +267,65 @@ test('an add the session is too busy to take costs nothing from the person’s 2
   assert.equal((await note(20)).status, 403);
 });
 
+test('sending an add again after a lost reply or a failed store counts it once', async (t) => {
+  const h = harness();
+  const fail = { publish: 2, countReply: 1 };
+  let offset = 0;
+  const realNow = Date.now.bind(Date);
+  t.mock.method(Date, 'now', () => realNow() + offset);
+  const binding = h.env.CE_SESSION_COORDINATOR;
+  h.env.CE_SESSION_COORDINATOR = {
+    ...binding,
+    get: (id) => {
+      const stub = binding.get(id);
+      return { ...stub, fetch: async (url, init) => {
+        const response = await stub.fetch(url, init);
+        // The count lands, but its reply is lost on the way back.
+        if (String(url).includes('rate/check') && !fail.publish && fail.countReply-- > 0) return json({ error: 'lost' }, 503);
+        return response;
+      } };
+    },
+  };
+  const publish = h.deps.executeCoordinatedStoragePublication;
+  h.deps.executeCoordinatedStoragePublication = async (args) => (fail.publish > 0 && fail.publish--
+    ? { ok: false, status: 503, body: { error: SESSION_COORDINATOR_UNAVAILABLE } } : publish(args));
+  const note = (i) => h.uploadFile({ address: PARTICIPANT, name: `note-${i}.md`, type: 'text/markdown', bytes: new TextEncoder().encode(`Note ${i}`) });
+  const reason = async (response) => [response.status, (await response.json()).reason];
+  // Two failed stores release the count at once; a lost count reply holds it for the lease.
+  assert.deepEqual([(await note(0)).status, (await note(0)).status], [503, 503]);
+  assert.deepEqual(await reason(await note(0)), [503, 'context_count_unavailable']);
+  assert.deepEqual(await reason(await note(0)), [503, 'context_add_in_progress']);
+  offset += 30_001;
+  for (let i = 0; i < 20; i += 1) assert.equal((await note(i)).status, 200, `add ${i}`);
+  // Once stored, the same item added again is a new add, and the 21st; sent
+  // again, a refused add stays refused.
+  assert.deepEqual([(await note(0)).status, (await note(0)).status], [403, 403]);
+  assert.equal((await h.list(ADMIN)).length, 20);
+});
+
+test('copies of one add sent at once store it once', async () => {
+  const h = harness();
+  const note = (i) => h.uploadFile({ address: PARTICIPANT, name: `note-${i}.md`, type: 'text/markdown', bytes: new TextEncoder().encode(`Note ${i}`) });
+  const statuses = (await Promise.all(Array.from({ length: 5 }, () => note(0)))).map((response) => response.status);
+  assert.deepEqual(statuses.sort(), [200, 503, 503, 503, 503]);
+  assert.equal((await h.list(ADMIN)).length, 1);
+});
+
+test('adding a link again after a failed store counts it once, though its page is fetched anew', async () => {
+  const h = harness({ pages: { 'https://example.org/essay': () => pageResponse('<p>An essay.</p>') } });
+  let fail = 1;
+  const publish = h.deps.executeCoordinatedStoragePublication;
+  h.deps.executeCoordinatedStoragePublication = async (args) => (fail-- > 0
+    ? { ok: false, status: 503, body: { error: SESSION_COORDINATOR_UNAVAILABLE } } : publish(args));
+  let now = Date.parse('2026-11-14T00:00:00.000Z');
+  h.deps.now = () => (now += 1_000);
+  const link = () => h.context({ action: 'add-link', url: 'https://example.org/essay' }, PARTICIPANT);
+  assert.deepEqual([(await link()).status, (await link()).status], [503, 200]);
+  const note = (i) => h.uploadFile({ address: PARTICIPANT, name: `note-${i}.md`, type: 'text/markdown', bytes: new TextEncoder().encode(`Note ${i}`) });
+  for (let i = 0; i < 19; i += 1) assert.equal((await note(i)).status, 200, `add ${i}`);
+  assert.equal((await note(19)).status, 403);
+});
+
 test('a context add whose count can’t be reached is refused as busy, and stores nothing', async () => {
   const h = harness();
   h.deps.checkCoordinatedAuthRateLimit = async () => ({ ok: false, status: 503 });

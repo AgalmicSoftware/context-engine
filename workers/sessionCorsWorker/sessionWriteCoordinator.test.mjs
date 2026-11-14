@@ -285,6 +285,32 @@ test('SessionWriteCoordinator admits exactly the configured number of concurrent
 	assert.doesNotMatch(JSON.stringify([...store.values()]), /session-a|0xabc|ai/i);
 });
 
+test('SessionWriteCoordinator counts a keyed request once until it settles or an hour passes', async () => {
+	const { state } = createTransactionalState();
+	let now = 1_000;
+	const coordinator = new SessionWriteCoordinator(state, {}, { now: () => now });
+	const call = async (path, extra) => {
+		const response = await coordinator.fetch(
+			createCoordinatorRequest(path, { slug: 'session-a', route: 'context-add', identity: '0xabc', limit: 5, resetAtMs: now + 86_400_000, ...extra }),
+		);
+		const body = await response.json();
+		return [response.status, body.count, body.allowed, body.busy];
+	};
+	const key = 'a'.repeat(64);
+	assert.deepEqual(await call('/auth-state/rate/check', { key }), [200, 1, true, undefined]);
+	assert.deepEqual(await call('/auth-state/rate/check', { key }), [200, 1, false, true], 'a copy sent while the first runs waits');
+	now += 30_001;
+	assert.deepEqual(await call('/auth-state/rate/check', { key }), [200, 1, true, undefined], 'after the lease a retry is not counted again');
+	assert.deepEqual(await call('/auth-state/rate/check', { key }), [200, 1, false, true], 'the retry holds a new lease');
+	assert.deepEqual(await call('/auth-state/rate/settle', { key, release: true }), [200, undefined, undefined, undefined]);
+	assert.deepEqual(await call('/auth-state/rate/check', { key }), [200, 1, true, undefined], 'a released key is retried at once');
+	assert.deepEqual(await call('/auth-state/rate/settle', { key }), [200, undefined, undefined, undefined]);
+	assert.deepEqual(await call('/auth-state/rate/check', { key }), [200, 2, true, undefined], 'a settled key counts anew');
+	now += 60 * 60_000 + 1;
+	assert.deepEqual(await call('/auth-state/rate/check', { key }), [200, 3, true, undefined], 'an hour later it counts anew');
+	assert.deepEqual((await call('/auth-state/rate/check', { key: 'not-a-digest' }))[0], 400);
+});
+
 test('SessionWriteCoordinator admits exactly one concurrent group create at cap one', async () => {
 	let releaseFirstPut;
 	let markFirstPutStarted;

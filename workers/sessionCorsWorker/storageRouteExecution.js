@@ -64,7 +64,7 @@ import {
   writeStorageResourceHidden,
   writeStorageResourceOwner,
 } from './storageResourceOwnership.js';
-import { checkCoordinatedAuthRateLimit, checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt } from './sessionWriteCoordinator.js';
+import { checkCoordinatedAuthRateLimit, checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt, settleCoordinatedAuthRateKey } from './sessionWriteCoordinator.js';
 import { executeCoordinatedStoragePublication, SUPERSEDED_AUTHORITY_ERROR } from './sessionConfigAuthority.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
@@ -1762,16 +1762,28 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   }
   // Each person, an agent included, adds at most CONTEXT_SOURCE_LIMITS.perAdder
   // context sources to a session; admins are not limited. The session
-  // coordinator counts each add once it is ready to store, after the backup
-  // mark a busy retry would repeat; a removal, or a store that fails after
-  // counting, gives none back. The count is kept per session id, so a session
+  // coordinator counts each add once it is ready to store. The count is keyed
+  // by the item's bytes (a link's, by its address) and stays open until the
+  // store finishes, so sending the same item again after a busy reply or a
+  // failed store is not counted twice; a copy sent while the first is still
+  // being stored gets the busy reply. A removal gives none back. The count is kept per session id, so a session
   // reset under the same link starts afresh. Refreshing a link is an admin's,
   // so never counted.
+  let contextCount = null;
   if (contextCheck.role === CONTEXT_ROLE && !contextUploaderIsAdmin) {
+    const linkKey = payload.contextOrigin === 'worker' && typeof payload.countKey === 'string' ? payload.countKey : '';
+    const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256',
+      linkKey ? new TextEncoder().encode(linkKey) : payload.bytes || new Uint8Array());
+    contextCount = {
+      env, slug, route: 'context-add', identity: `${trim(config?.sessionId || config?.sessionIdHex)}:${uploader}`,
+      key: Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''),
+    };
     const counted = await (deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit)({
-      env, slug, route: 'context-add', identity: `${trim(config?.sessionId || config?.sessionIdHex)}:${uploader}`, limit: CONTEXT_SOURCE_LIMITS.perAdder, windowMs: CONTEXT_ADD_WINDOW_MS, now: deps?.now,
+      ...contextCount, limit: CONTEXT_SOURCE_LIMITS.perAdder, windowMs: CONTEXT_ADD_WINDOW_MS, now: deps?.now,
     });
     if (counted?.ok !== true) return responseJson(deps, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: 'context_count_unavailable' }, 503, baseHeaders);
+    // The same item is being added by another request right now.
+    if (counted.busy === true) return responseJson(deps, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: 'context_add_in_progress' }, 503, baseHeaders);
     if (counted.allowed !== true) {
       return responseJson(deps, {
         error: `You’ve added ${CONTEXT_SOURCE_LIMITS.perAdder} context items to this session, the most one person may add. A session admin can add more.`,
@@ -1878,7 +1890,14 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (owned || metadata.contextSource) {
     const publish = deps?.executeCoordinatedStoragePublication || executeCoordinatedStoragePublication;
     const result = await publish({ env, slug, expectedAuthority, metadata, createOwner: owned && !owner && !!uploader });
-    if (!result.ok) return responseJson(deps, { error: result.body?.error || 'Storage publication is unavailable; retry.' }, result.status || 503, baseHeaders);
+    const settle = deps?.settleCoordinatedAuthRateKey || settleCoordinatedAuthRateKey;
+    if (!result.ok) {
+      // A retry may go ahead at once; without this it waits out the lease.
+      if (contextCount) await settle({ ...contextCount, release: true }).catch(() => {});
+      return responseJson(deps, { error: result.body?.error || 'Storage publication is unavailable; retry.' }, result.status || 503, baseHeaders);
+    }
+    // Unsettled, the same bytes stay free to add again for an hour.
+    if (contextCount) await settle(contextCount).catch(() => {});
   } else if (index && typeof index.put === 'function') {
     await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata, storageIndexPutOptions(metadata));
   }

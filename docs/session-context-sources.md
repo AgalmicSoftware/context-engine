@@ -198,13 +198,17 @@ features, only the Session Agent says when context was left out (its reply's
 
 **Adds per person:** each signed-in person, an agent included, adds at most 20
 context items (files and links) to a session; admins are not limited. The
-session coordinator counts each add just before it is stored, so an add that
-then fails still counts, and removing an item does not give its place back.
-The count belongs to the session, so a reset under the same link starts it
-afresh. The 21st is refused with 403 `context_adder_limit`
+session coordinator counts each add just before it is stored. Sending the same
+item again (the same file, or the same link) after a busy reply or a failed
+store does not count it twice, for up to an hour; once it is stored, adding it
+again counts anew. Removing an item does not give its place back. The count
+belongs to the session, so a reset under the same link starts it afresh. The
+21st is refused with 403 `context_adder_limit`
 ("You've added 20 context items to this session, the most one person may add.
-A session admin can add more."); when the count can't be reached the add is
-refused as busy (503, `context_count_unavailable`) and stores nothing.
+A session admin can add more."). An add is refused as busy, and stores nothing,
+when the count can't be reached (503, `context_count_unavailable`) or when the
+same item is still being added by another request (503,
+`context_add_in_progress`, for up to 30 seconds).
 
 ## Templates
 
