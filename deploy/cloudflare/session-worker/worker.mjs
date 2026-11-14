@@ -31045,7 +31045,9 @@ ${SESSION_AGENT_RULES.map((rule) => `- ${rule}`).join("\n")}`
           results: !!results,
           // Every answer a count covers, and otherwise each one quoted.
           answers: answers.reduce((count, group) => count + (group.counts ? group.answered : group.written?.length || 0), 0)
-        }
+        },
+        // Context items that didn't fit the block, for the reply's note.
+        contextOmitted: context.omitted
       };
     };
   }
@@ -69302,7 +69304,9 @@ var init_sessionContextSources = __esm({
       // The groups one item may be locked to; reading it checks each in turn.
       lockedGroups: 20,
       // An agent's display name, as long as its profile allows.
-      adderNameChars: 80
+      adderNameChars: 80,
+      // Context items one person or agent may add to a session; admins are not limited.
+      perAdder: 20
     });
     CONTEXT_FILE_TYPES = Object.freeze({
       pdf: "application/pdf",
@@ -72125,10 +72129,11 @@ var init_contextSourceRoute = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim14, isObj19, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, MINE_LIST_KV_KEYS, MINE_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, AUTOMATIC_ANALYSIS_MODES, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, KV_BULK_REPLY_BYTES, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
+var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim14, isObj19, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, MINE_LIST_KV_KEYS, MINE_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, CONTEXT_ADD_WINDOW_MS, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, AUTOMATIC_ANALYSIS_MODES, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, KV_BULK_REPLY_BYTES, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_sessionContextSources();
+    init_sessionCoordinatorBusy();
     init_storageBackupRevision();
     init_resultsAnalysisSettings();
     init_storageRefNormalization();
@@ -72228,6 +72233,7 @@ var init_storageRouteExecution = __esm({
       const responder = resource === "responses" ? trim14(metadata?.responder).toLowerCase() : "";
       return responder ? { metadata: { responder } } : void 0;
     };
+    CONTEXT_ADD_WINDOW_MS = 366 * 24 * 60 * 60 * 1e3;
     safeGroupId = (value) => trim14(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "");
     normalizeGroupIdList = (value) => {
       let raw = value;
@@ -73676,6 +73682,24 @@ var init_storageRouteExecution = __esm({
       } catch (error) {
         if (error?.status === 503) return responseJson(deps, { error: error.message }, 503, baseHeaders);
         throw error;
+      }
+      if (contextCheck.role === CONTEXT_ROLE && !contextUploaderIsAdmin) {
+        const counted = await (deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit)({
+          env,
+          slug,
+          route: "context-add",
+          identity: `${trim14(config?.sessionId || config?.sessionIdHex)}:${uploader}`,
+          limit: CONTEXT_SOURCE_LIMITS.perAdder,
+          windowMs: CONTEXT_ADD_WINDOW_MS,
+          now: deps?.now
+        });
+        if (counted?.ok !== true) return responseJson(deps, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: "context_count_unavailable" }, 503, baseHeaders);
+        if (counted.allowed !== true) {
+          return responseJson(deps, {
+            error: `You\u2019ve added ${CONTEXT_SOURCE_LIMITS.perAdder} context items to this session, the most one person may add. A session admin can add more.`,
+            reason: "context_adder_limit"
+          }, 403, baseHeaders);
+        }
       }
       const callerRequestId = trim14(payload.requestId);
       const requestId = callerRequestId && callerRequestId.length <= 200 ? callerRequestId : `server:${id2}`;
@@ -77459,14 +77483,23 @@ var init_contextSourceLoader = __esm({
       }
       return [...oldestFirst.filter((row) => row.uploadAuthority === "admin"), ...rest];
     };
-    loadParticipantContextSources = async ({ env, slug, config, deps, readable, principal, leaveOutUploaders } = {}) => {
+    loadParticipantContextSources = async ({
+      env,
+      slug,
+      config,
+      deps,
+      readable,
+      principal,
+      leaveOutUploaders,
+      totalChars = SESSION_CONTEXT_TEXT_LIMITS.totalChars
+    } = {}) => {
       const warn = typeof deps?.log?.warn === "function" ? deps.log.warn : console.warn;
       let listed = { rows: [], leftOut: 0 };
       try {
         listed = await listContextRowsInOrder({ env, slug });
       } catch {
         warn("[context] sources left out of an AI prompt", { slug, reason: "storage unavailable" });
-        return [];
+        return { sources: [], leftOut: 0 };
       }
       if (listed.leftOut > 0) {
         warn("[context] sources left out of an AI prompt", { slug, reason: [...new Set(listed.stopped)].join(", "), leftOut: listed.leftOut });
@@ -77483,10 +77516,14 @@ var init_contextSourceLoader = __esm({
         return reading && contextRoleOf(reading.tags) === CONTEXT_TEXT_ROLE && contextTagValue(reading.tags, CONTEXT_TAGS.derivedFrom) === pdf.id && await canRead(reading) ? reading : null;
       };
       const sources = [];
-      const ordered = contextReadingOrder(visible.filter((row) => contextRoleOf(row.tags) === CONTEXT_ROLE));
-      for (const row of ordered) {
-        if (sources.length >= CONTEXT_READ_LIMITS.sources) break;
-        if (leaveOutUploaders?.has(lower7(row.uploader))) continue;
+      const ordered = contextReadingOrder(visible.filter((row) => contextRoleOf(row.tags) === CONTEXT_ROLE)).filter((row) => !leaveOutUploaders?.has(lower7(row.uploader)));
+      let chars = 0;
+      let leftOut = listed.leftOut;
+      for (const [position, row] of ordered.entries()) {
+        if (sources.length >= CONTEXT_READ_LIMITS.sources || chars >= totalChars) {
+          leftOut += ordered.slice(position).filter((rest) => rest.contentType !== CONTEXT_FILE_TYPES.pdf || readings.has(rest.id) || rest.contextReadingId).length;
+          break;
+        }
         const isPdf = row.contentType === CONTEXT_FILE_TYPES.pdf;
         const textRow = isPdf ? await readingOf(row) : row;
         if (!textRow) continue;
@@ -77510,11 +77547,12 @@ var init_contextSourceLoader = __esm({
           }
         }
         sources.push({ title: contextTagValue(row.tags, CONTEXT_TAGS.name), kind, url, text: text6, readByAi: isPdf });
+        chars += Math.min(text6.trim().length, SESSION_CONTEXT_TEXT_LIMITS.itemChars);
       }
-      return sources;
+      return { sources, leftOut };
     };
     buildParticipantContextPrompt = async ({ env, slug, config, deps, totalChars } = {}) => {
-      const sources = await loadParticipantContextSources({ env, slug, config, deps });
+      const { sources } = await loadParticipantContextSources({ env, slug, config, deps, totalChars });
       return buildSessionContextPrompt({ sessionContext: config?.sessionContext, sources, totalChars }).text;
     };
   }
@@ -81157,7 +81195,7 @@ var init_sessionWriteCoordinator = __esm({
     RUNNING_LEASE_MS = 65e3;
     MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1e3;
     AUTH_NONCE_MAC_KEY = "auth-nonce-mac-key";
-    MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1e3;
+    MAX_AUTH_RATE_WINDOW_MS = 400 * 24 * 60 * 60 * 1e3;
     WRAPPED_SESSION_KEY_FIELDS = [
       "alg",
       "createdAt",
@@ -105500,7 +105538,7 @@ var readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, de
 };
 var gatherMaterial = async ({ env, slug, config, setting, address: address3, scopes, asker, access, optedOut, deps }) => {
   const detailed = asker.answers === "detailed";
-  const [sources, results, answers] = await Promise.all([
+  const [context, results, answers] = await Promise.all([
     loadParticipantContextSources({
       env,
       slug,
@@ -105508,6 +105546,7 @@ var gatherMaterial = async ({ env, slug, config, setting, address: address3, sco
       deps,
       principal: lower12(address3),
       leaveOutUploaders: optedOut,
+      totalChars: SESSION_AGENT_LIMITS.contextChars,
       // A General asker reads the files open to everyone the session admits;
       // each read checks the session's own gate again, as a file read does.
       readable: detailed ? access.canRead : async (row) => forEveryone(row, config) && access.canRead(row)
@@ -105523,8 +105562,9 @@ var gatherMaterial = async ({ env, slug, config, setting, address: address3, sco
     }) : []
   ]);
   return {
-    material: { sessionContext: config?.sessionContext, sources, results, answers: Array.isArray(answers) ? answers : [] },
-    answersUnavailable: answers === TOO_MANY_STORED ? "too_many" : answers === null
+    material: { sessionContext: config?.sessionContext, sources: context.sources, results, answers: Array.isArray(answers) ? answers : [] },
+    answersUnavailable: answers === TOO_MANY_STORED ? "too_many" : answers === null,
+    contextLeftOut: context.leftOut
   };
 };
 var checkSessionAgentPayment = async () => ({ ok: true });
@@ -105624,7 +105664,7 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
   const refused = await preflight.count?.();
   if (refused) return refused;
   const optedOut = new Set(optOuts.body.addresses);
-  const { material, answersUnavailable } = await gatherMaterial({
+  const { material, answersUnavailable, contextLeftOut } = await gatherMaterial({
     env,
     slug,
     config,
@@ -105638,15 +105678,19 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
   });
   const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
   if (!payment?.ok) return json9({ error: payment?.error || "This answer needs payment first.", reason: "session_agent_payment_required" }, 402);
-  const { messages, read } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
+  const { messages, read, contextOmitted } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
   const reply5 = await askAi({ messages, config, secrets: secretContext.secrets, address: address3, scopes: currentScopes, headers: headers2, deps });
   if (!reply5.ok) return json9(reply5.body, reply5.status);
+  const notes = [
+    answersUnavailable === "too_many" ? `Members\u2019 answers weren\u2019t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString("en-US")} question and answer versions, the most the Session Agent can read at once.` : answersUnavailable ? "Members\u2019 answers couldn\u2019t be read for this answer." : "",
+    contextLeftOut > 0 || contextOmitted > 0 ? `Some of the session\u2019s context wasn\u2019t read: the Session Agent reads at most ${SESSION_AGENT_LIMITS.contextChars.toLocaleString("en-US")} characters or ${CONTEXT_READ_LIMITS.sources} items of it.` : ""
+  ].filter(Boolean);
   return json9({
     answer: reply5.answer,
     answers: asker.answers,
     audience: asker.audience,
     read,
-    ...answersUnavailable ? { note: answersUnavailable === "too_many" ? `Members\u2019 answers weren\u2019t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString("en-US")} question and answer versions, the most the Session Agent can read at once.` : "Members\u2019 answers couldn\u2019t be read for this answer." } : {}
+    ...notes.length ? { note: notes.join(" ") } : {}
   });
 };
 
