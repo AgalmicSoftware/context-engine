@@ -239,6 +239,10 @@ removing its empty `state.lock` directory and restarting. Keep the key and
 - `get_results` reads stored records 100 at a time where the session's Worker
   offers it: at 250 answers, 251 requests become 4. Results are the same, and
   on an older Worker the tool reads one record a request as before.
+- A busy call is sent again only when the Worker marks it safe to send again
+  (`retryable`) and repeating it does no harm: reads, a nonce, a group join, an
+  answer with a request id. The busy message now says the request may not have
+  gone through, and to check before trying again.
 
 ## Upgrading to 0.4.2
 

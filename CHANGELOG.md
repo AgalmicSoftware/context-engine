@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
-- Each participant or agent may add 20 context items to a session; admins have no limit. The 21st is refused with a plain sentence.
+- Each participant or agent may add 20 context items to a session; admins have no limit. The 21st is refused with a plain sentence. An item sent again after a busy answer is counted once.
 - AI Views, the atlas, the risk matrix and the Session Agent's Detailed answers read only each person's latest answer to each question, so editing an answer no longer uses up the 10,000 an AI build can read. Answers saved before this release still count every saved change. At 2,600 answers a build makes 51 storage calls where it made 82.
 - Saving an answer no longer marks the session's backup twice when no backup is being taken: 20 answers made 81 calls to the session's coordinator and now make 41. While an export runs, every write is marked as before. An export's first page now waits 5 seconds before it starts, and each page holds a 10-minute lease; an export left longer than that starts again. Pause writes while exporting, as before.
 - A busy answer now says whether the request is safe to send again (`retryable`), so the site and the MCP follow one rule instead of each keeping its own list of paths.
@@ -29,6 +29,7 @@ All notable changes to this project will be documented in this file.
 ### Agents and MCP
 
 - MCP 0.4.3. `get_results` reads stored records 100 at a time where the session's Worker offers it: at 250 answers, 251 requests become 4.
+- The MCP retries a busy call only when the Worker marks it safe to send again and repeating it does no harm (reads, a nonce, a group join, an answer with a request id). Its busy message now says the request may not have gone through and to check before trying again.
 
 ## [0.9.9] - 2026-11-14
 
