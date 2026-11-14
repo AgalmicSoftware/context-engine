@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.9.8] - 2026-11-13
+## [0.9.8] - 2026-11-14
 
 ### Client — available when the site deploys
 
