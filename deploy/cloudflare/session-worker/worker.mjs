@@ -25192,10 +25192,10 @@ var init_stringCoercion = __esm({
   }
 });
 
-// shared/sessionAgentConfig.mjs
-var record, booleanFields, fields, validSessionAgentConfig, projectPublicAgentConfig;
-var init_sessionAgentConfig = __esm({
-  "shared/sessionAgentConfig.mjs"() {
+// shared/agentHttpConfig.mjs
+var record, booleanFields, fields, validAgentHttpConfig, projectPublicAgentConfig;
+var init_agentHttpConfig = __esm({
+  "shared/agentHttpConfig.mjs"() {
     record = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     booleanFields = /* @__PURE__ */ new Set([
       "managedAccountSubmitAllowed",
@@ -25216,7 +25216,7 @@ var init_sessionAgentConfig = __esm({
       "invites",
       "riskCeiling"
     ]);
-    validSessionAgentConfig = (config) => {
+    validAgentHttpConfig = (config) => {
       if (config.agentHttp === void 0) return true;
       const value = config.agentHttp;
       if (!record(value) || Object.keys(value).some((key) => !fields.has(key))) return false;
@@ -25965,7 +25965,7 @@ var init_deployHelperEndpointConfig = __esm({
 });
 
 // shared/workerSessionPublicConfig.mjs
-var PUBLIC_WORKER_CONFIG_FIELDS, PUBLIC_WORKER_AI_FIELDS, SET_CONFIG_MERGES_AI_FIELD, DEBATE_ATLAS_FIELD, RISK_MATRIX_FIELD, MEMBER_RESULTS_FIELD, SESSION_AGENT_READY_FIELD, GROUP_JOIN_CHOICES_FIELD;
+var PUBLIC_WORKER_CONFIG_FIELDS, PUBLIC_WORKER_AI_FIELDS, SET_CONFIG_MERGES_AI_FIELD, DEBATE_ATLAS_FIELD, RISK_MATRIX_FIELD, MEMBER_RESULTS_FIELD, SESSION_AGENT_READY_FIELD, GROUP_JOIN_CHOICES_FIELD, WORKER_SUPPORT_FIELDS;
 var init_workerSessionPublicConfig = __esm({
   "shared/workerSessionPublicConfig.mjs"() {
     PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
@@ -26032,6 +26032,14 @@ var init_workerSessionPublicConfig = __esm({
     MEMBER_RESULTS_FIELD = "memberResults";
     SESSION_AGENT_READY_FIELD = "sessionAgentReady";
     GROUP_JOIN_CHOICES_FIELD = "groupJoinChoices";
+    WORKER_SUPPORT_FIELDS = Object.freeze([
+      SET_CONFIG_MERGES_AI_FIELD,
+      DEBATE_ATLAS_FIELD,
+      RISK_MATRIX_FIELD,
+      MEMBER_RESULTS_FIELD,
+      SESSION_AGENT_READY_FIELD,
+      GROUP_JOIN_CHOICES_FIELD
+    ]);
   }
 });
 
@@ -26039,7 +26047,7 @@ var init_workerSessionPublicConfig = __esm({
 var isObj2, toStr7, DEPLOY_CANONICAL_CONFIG_KEYS, OPEN_CONFIG_SUBTREE_KEYS, normalizeKey, OMIT_PUBLIC_VALUE, SAFE_PUBLIC_KEY_FIELD_NAMES, SAFE_STRUCTURAL_AUTHORIZATION_PATHS, SAFE_WRAPPED_STORAGE_KEY_PATHS, SAFE_BOOLEAN_SCOPE_PATH, SAFE_LEGACY_FAUCET_CONFIG_PATH, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS, WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET, TOP_LEVEL_PROVIDER_KEY_NAMES, hasSensitiveTokenValue, isRecursiveSecretAlias, isSecretAdjacentKey, hasUrlCredentials, sanitizePublicValue, projectPublicAiConfig, selectFields, findForbiddenCloudflareDeploymentTokenPath, findForbiddenOpenConfigSecretPath, findForbiddenRecursiveSecretAliasPath, findInvalidLitCredentialsDescriptorPath, findForbiddenWorkerConfigSecretPath, projectPublicWorkerSessionConfig, profileUsesOnChainSbt, selectDeployWorkerSessionConfigFields, sanitizeWorkerConfigOpenSubtree;
 var init_workerSessionConfig = __esm({
   "workers/shared/workerSessionConfig.mjs"() {
-    init_sessionAgentConfig();
+    init_agentHttpConfig();
     init_workerSessionPublicConfig();
     isObj2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     toStr7 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
@@ -26288,12 +26296,7 @@ var init_workerSessionConfig = __esm({
     projectPublicWorkerSessionConfig = (config) => {
       const projected = selectFields(isObj2(config) ? config : {}, PUBLIC_WORKER_CONFIG_FIELDS);
       if (projected.agentHttp) projected.agentHttp = projectPublicAgentConfig(projected.agentHttp);
-      projected[SET_CONFIG_MERGES_AI_FIELD] = true;
-      projected[DEBATE_ATLAS_FIELD] = true;
-      projected[RISK_MATRIX_FIELD] = true;
-      projected[MEMBER_RESULTS_FIELD] = true;
-      projected[SESSION_AGENT_READY_FIELD] = true;
-      projected[GROUP_JOIN_CHOICES_FIELD] = true;
+      for (const field of WORKER_SUPPORT_FIELDS) projected[field] = true;
       return projected;
     };
     profileUsesOnChainSbt = (profile) => {
@@ -27115,7 +27118,7 @@ var init_workerScriptName = __esm({
 var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, SESSION_WORKER_OBSERVABILITY, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr9, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret, sha256Hex, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, normalizeRequestedWorkerName, buildFreshDeploymentName, buildPreLimitDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
 var init_deployHelperCore = __esm({
   "workers/shared/deployHelperCore.mjs"() {
-    init_sessionAgentConfig();
+    init_agentHttpConfig();
     init_sessionConfigEdits();
     init_canonicalJson();
     init_recoveryKey();
@@ -28164,7 +28167,7 @@ var init_deployHelperCore = __esm({
       return lookup;
     };
     validateDeployHelperPublicConfigInputs = (body = {}) => {
-      if (!validSessionAgentConfig(body)) return "Invalid agent configuration.";
+      if (!validAgentHttpConfig(body)) return "Invalid agent configuration.";
       if (body?.deploymentKind) return "Separate agent deployments are no longer supported; configure the Session Worker.";
       if (Object.hasOwn(body || {}, "agentInstructions") && !validAgentInstructions(body.agentInstructions)) {
         return `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`;
@@ -30177,27 +30180,34 @@ var init_sessionConfigAuthority = __esm({
         if (!state) slugs.set(slug, state = { generation: 0, cached: null, inFlight: null });
         return state;
       };
+      const stamp = (result, readStartedAt) => {
+        if (result && typeof result === "object" && !Object.isFrozen(result)) Object.defineProperty(result, "readStartedAt", { value: readStartedAt });
+        return result;
+      };
       const share = (state, read) => {
         const joined = state.inFlight;
         if (!joined) {
           const generation = state.generation;
+          const startedAt = Date.now();
           const pending = read().then((result) => {
             if (result?.ok && state.generation === generation) {
-              state.cached = { result, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
+              state.cached = { result, startedAt, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
             }
             return result;
           }).finally(() => {
             if (state.inFlight === pending) state.inFlight = null;
           });
           state.inFlight = pending;
-          return pending.then(copy4);
+          state.inFlightStartedAt = startedAt;
+          return pending.then((result) => stamp(copy4(result), startedAt));
         }
+        const joinedStartedAt = state.inFlightStartedAt;
         let timer;
         const stalled = new Promise((resolve) => {
           timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED);
         });
         return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
-          if (result !== STALLED) return copy4(result);
+          if (result !== STALLED) return stamp(copy4(result), joinedStartedAt);
           if (state.inFlight === joined) {
             state.inFlight = null;
             state.generation += 1;
@@ -30208,7 +30218,7 @@ var init_sessionConfigAuthority = __esm({
       return {
         read: ({ binding, slug, cache, read }) => {
           const state = stateFor(binding, slug);
-          if (cache && state.cached && Date.now() < state.cached.expiresAt) return Promise.resolve(copy4(state.cached.result));
+          if (cache && state.cached && Date.now() < state.cached.expiresAt) return Promise.resolve(stamp(copy4(state.cached.result), state.cached.startedAt));
           return share(state, read);
         },
         forget: (binding, slug) => {
@@ -31073,11 +31083,11 @@ var init_aiRateLimitPolicy = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigMutation.js
-var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEY_SET, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validGroupMemberCeiling, validContextAdditionPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validFeedbackConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
+var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEY_SET, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validGroupMemberCeiling, validContextAdditionPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validFeedbackConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, SETTINGS_CHECKS, refuseInvalidSettings, applySessionConfigMutation;
 var init_sessionConfigMutation = __esm({
   "workers/sessionCorsWorker/sessionConfigMutation.js"() {
     init_sessionConfigEdits();
-    init_sessionAgentConfig();
+    init_agentHttpConfig();
     init_interviewSettings();
     init_siweMessage();
     init_deployHelperCore();
@@ -31264,6 +31274,25 @@ var init_sessionConfigMutation = __esm({
         }
       };
     };
+    SETTINGS_CHECKS = Object.freeze([
+      [(config) => !findForbiddenCloudflareDeploymentTokenPath(config), "Cloudflare deployment tokens are not allowed in session config."],
+      [(config) => !findForbiddenWorkerConfigSecretPath(config), "Secret-like values are not allowed in public session config fields."],
+      [validAgentHttpConfig, "Invalid agent configuration."],
+      [validAllowOrigins, "Worker CORS allowlists must contain exact origins."],
+      [validGroupCreationPolicy, "Invalid group creation policy."],
+      [validContextAdditionPolicy, "Invalid context addition policy."],
+      [validGroupMemberCeiling, `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.`],
+      [validAppearanceConfig, "Invalid session appearance config."],
+      [validPileAutoAdvanceConfig, "Invalid pile auto-advance config."],
+      [validFeedbackConfig, "feedbackEnabled must be true or false."],
+      [validAiDailyLimit, `limits.aiPerWalletPerDay must be a whole number from 0 to ${AI_DAILY_LIMIT_MAX}, or empty.`, { mergedOnly: true }],
+      [validInterviewModeConfig, "Invalid interview mode config."],
+      [validResultsAnalysisSettingsConfig, "Invalid results analysis settings config."]
+    ]);
+    refuseInvalidSettings = (config, { merged = false } = {}) => {
+      const failed = SETTINGS_CHECKS.find(([valid2, , options]) => (merged || !options?.mergedOnly) && !valid2(config));
+      return failed ? { ok: false, status: 400, error: failed[1] } : null;
+    };
     applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
       const authorityExisting = normalizeWorkerConfigRecord(existingConfig) || {};
       let existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
@@ -31290,40 +31319,8 @@ var init_sessionConfigMutation = __esm({
         if (hasOwn4(incomingConfig, WORKER_GROUPS_BOOTSTRAP_KEY) && (!hasOwn4(authorityExisting, WORKER_GROUPS_BOOTSTRAP_KEY) || stableCanonicalSerialize(incomingConfig[WORKER_GROUPS_BOOTSTRAP_KEY]) !== stableCanonicalSerialize(authorityExisting[WORKER_GROUPS_BOOTSTRAP_KEY]))) {
           return { ok: false, status: 400, error: "Worker Group bootstrap state is server-managed." };
         }
-        if (findForbiddenCloudflareDeploymentTokenPath(incomingConfig)) {
-          return { ok: false, status: 400, error: "Cloudflare deployment tokens are not allowed in session config." };
-        }
-        if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
-          return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
-        }
-        if (!validSessionAgentConfig(incomingConfig)) return { ok: false, status: 400, error: "Invalid agent configuration." };
-        if (!validAllowOrigins(incomingConfig)) {
-          return { ok: false, status: 400, error: "Worker CORS allowlists must contain exact origins." };
-        }
-        if (!validGroupCreationPolicy(incomingConfig)) {
-          return { ok: false, status: 400, error: "Invalid group creation policy." };
-        }
-        if (!validContextAdditionPolicy(incomingConfig)) {
-          return { ok: false, status: 400, error: "Invalid context addition policy." };
-        }
-        if (!validGroupMemberCeiling(incomingConfig)) {
-          return { ok: false, status: 400, error: `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.` };
-        }
-        if (!validAppearanceConfig(incomingConfig)) {
-          return { ok: false, status: 400, error: "Invalid session appearance config." };
-        }
-        if (!validPileAutoAdvanceConfig(incomingConfig)) {
-          return { ok: false, status: 400, error: "Invalid pile auto-advance config." };
-        }
-        if (!validFeedbackConfig(incomingConfig)) {
-          return { ok: false, status: 400, error: "feedbackEnabled must be true or false." };
-        }
-        if (!validInterviewModeConfig(incomingConfig)) {
-          return { ok: false, status: 400, error: "Invalid interview mode config." };
-        }
-        if (!validResultsAnalysisSettingsConfig(incomingConfig)) {
-          return { ok: false, status: 400, error: "Invalid results analysis settings config." };
-        }
+        const refusedSent = refuseInvalidSettings(incomingConfig);
+        if (refusedSent) return refusedSent;
         const invalidIdList = CURATED_ID_LIST_KEYS.find(
           (key) => hasOwn4(incomingConfig, key) && !validCuratedIdList(incomingConfig[key])
         );
@@ -31391,43 +31388,8 @@ var init_sessionConfigMutation = __esm({
       } else {
         return { ok: false, status: 400, error: "Unsupported session config mutation." };
       }
-      if (findForbiddenCloudflareDeploymentTokenPath(mergedConfig)) {
-        return { ok: false, status: 400, error: "Cloudflare deployment tokens are not allowed in session config." };
-      }
-      if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
-        return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
-      }
-      if (!validSessionAgentConfig(mergedConfig)) return { ok: false, status: 400, error: "Invalid agent configuration." };
-      if (!validAllowOrigins(mergedConfig)) {
-        return { ok: false, status: 400, error: "Worker CORS allowlists must contain exact origins." };
-      }
-      if (!validGroupCreationPolicy(mergedConfig)) {
-        return { ok: false, status: 400, error: "Invalid group creation policy." };
-      }
-      if (!validContextAdditionPolicy(mergedConfig)) {
-        return { ok: false, status: 400, error: "Invalid context addition policy." };
-      }
-      if (!validGroupMemberCeiling(mergedConfig)) {
-        return { ok: false, status: 400, error: `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.` };
-      }
-      if (!validAppearanceConfig(mergedConfig)) {
-        return { ok: false, status: 400, error: "Invalid session appearance config." };
-      }
-      if (!validPileAutoAdvanceConfig(mergedConfig)) {
-        return { ok: false, status: 400, error: "Invalid pile auto-advance config." };
-      }
-      if (!validFeedbackConfig(mergedConfig)) {
-        return { ok: false, status: 400, error: "feedbackEnabled must be true or false." };
-      }
-      if (!validAiDailyLimit(mergedConfig)) {
-        return { ok: false, status: 400, error: `limits.aiPerWalletPerDay must be a whole number from 0 to ${AI_DAILY_LIMIT_MAX}, or empty.` };
-      }
-      if (!validInterviewModeConfig(mergedConfig)) {
-        return { ok: false, status: 400, error: "Invalid interview mode config." };
-      }
-      if (!validResultsAnalysisSettingsConfig(mergedConfig)) {
-        return { ok: false, status: 400, error: "Invalid results analysis settings config." };
-      }
+      const refusedMerged = refuseInvalidSettings(mergedConfig, { merged: true });
+      if (refusedMerged) return refusedMerged;
       const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
       if (!mergedModeValidation.ok) {
         return {
@@ -69370,7 +69332,7 @@ var init_sessionContextSources = __esm({
 });
 
 // workers/sessionCorsWorker/storageBackupRevision.js
-var STORAGE_BACKUP_REVISION_KEY, WORKER_GROUP_BACKUP_PENDING_PREFIX, bumpStorageBackupRevision, markStorageBackupWrite;
+var STORAGE_BACKUP_REVISION_KEY, WORKER_GROUP_BACKUP_PENDING_PREFIX, bumpStorageBackupRevision, BACKUP_EXPORT_LEASE_KEY, BACKUP_EXPORT_LEASE_MS, BACKUP_VIEW_MAX_AGE_MS, BACKUP_EXPORT_SETTLE_MS, takeBackupExportLease, backupExportActive, markStorageBackupWrite;
 var init_storageBackupRevision = __esm({
   "workers/sessionCorsWorker/storageBackupRevision.js"() {
     init_sessionConfigAuthority();
@@ -69381,8 +69343,21 @@ var init_storageBackupRevision = __esm({
       await transaction.put(STORAGE_BACKUP_REVISION_KEY, revision);
       return revision;
     });
+    BACKUP_EXPORT_LEASE_KEY = "backup-export-lease";
+    BACKUP_EXPORT_LEASE_MS = 10 * 6e4;
+    BACKUP_VIEW_MAX_AGE_MS = 2e3;
+    BACKUP_EXPORT_SETTLE_MS = 5e3;
+    takeBackupExportLease = async (storage, now = Date.now()) => {
+      const held = await storage.get(BACKUP_EXPORT_LEASE_KEY);
+      const since = Number(held?.until) > now ? held.since : now;
+      await storage.put(BACKUP_EXPORT_LEASE_KEY, { since, until: now + BACKUP_EXPORT_LEASE_MS });
+      return since;
+    };
+    backupExportActive = async (storage, now = Date.now()) => Number((await storage.get(BACKUP_EXPORT_LEASE_KEY))?.until) > now;
     markStorageBackupWrite = async (env, slug) => {
       if (!env?.CE_SESSION_COORDINATOR) return;
+      const view = await callSessionConfigCoordinator({ env, slug, path: "current", cache: true });
+      if (view.ok && view.body?.backupExportActive === false && Date.now() - view.readStartedAt <= BACKUP_VIEW_MAX_AGE_MS) return;
       const result = await callSessionConfigCoordinator({ env, slug, path: "backup/write-revision" });
       if (result.ok) return;
       if (result.status === 503 && result.body?.error === SESSION_CONFIG_COORDINATION_ERROR) {
@@ -75852,13 +75827,14 @@ var init_sessionBackupCoordinator = __esm({
     exportCoordinatorBackup = async (coordinator, payload) => {
       const authority = await coordinator.assertSessionAuthority(payload);
       if (!authority) fail9("Session config is not initialized.", 409);
+      const leaseSince = await takeBackupExportLease(coordinator.state.storage);
       await coordinator.repairPendingSessionConfigProjection();
       const current = await coordinator.state.storage.get("session-config-authority");
       const signer = await coordinator.state.storage.get("session-lit-authorization-signer-v1");
       const secretAuthority = await coordinator.state.storage.transaction((transaction) => readSessionSecretsAuthority(coordinator, transaction, current.slug));
       const secrets = secretAuthority?.envelope || null;
       if (signer && !isEncryptedSessionSecretsEnvelope(signer.envelope)) fail9("Invalid wrapped authorization signer.", 409);
-      return json4({ ok: true, writeRevision: await coordinator.state.storage.get(STORAGE_BACKUP_REVISION_KEY) || 0, coordinator: {
+      return json4({ ok: true, writeRevision: await coordinator.state.storage.get(STORAGE_BACKUP_REVISION_KEY) || 0, leaseSince, coordinator: {
         configAuthority: { ...current, config: stripAgentAdmissionFromBackup(current.config) },
         wrappedSessionKeys: {
           activeSessionKey: current.activeSessionKey || null,
@@ -83436,7 +83412,8 @@ ${expiry}`);
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
         if (!slug) return jsonResponse2({ error: "Invalid session slug." }, 400);
         try {
-          return jsonResponse2({ ok: true, ...await this.readCurrentSessionConfig(slug) });
+          const backupExport = await backupExportActive(this.state.storage);
+          return jsonResponse2({ ok: true, ...await this.readCurrentSessionConfig(slug), backupExportActive: backupExport });
         } catch (error) {
           if (error?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
             const safeError = legacySessionConfigMigrationError();
@@ -104067,7 +104044,7 @@ async function handleAgentHttpRequest({ request, env, body = {}, context, input,
 }
 
 // workers/sessionCorsWorker/agent/requestBoundary.mjs
-var dispatchSessionAgentRequest = async ({ request, env, deps, baseHeaders = {} }) => {
+var dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders = {} }) => {
   const url = new URL(request.url);
   const route = resolveAgentRoute(url.pathname);
   if (!route) return json8({ ok: false, reason: "agent_route_not_found" }, { status: 404 });
@@ -104760,7 +104737,7 @@ init_sessionConfigMutation();
 
 // workers/sessionCorsWorker/agent/capability.mjs
 init_sessionConfigMutation();
-var buildSessionAgentCapability = async ({ config, revision, origin, enabled, bundle = "" }) => {
+var buildAgentHttpCapability = async ({ config, revision, origin, enabled, bundle = "" }) => {
   const data = new TextEncoder().encode(JSON.stringify([resolveCanonicalWorkerSessionIdHex(config), revision, origin, bundle]));
   const hash2 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", data)), (byte) => byte.toString(16).padStart(2, "0")).join("");
   return {
@@ -104845,7 +104822,7 @@ var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 =
       const configured = readiness.coordinator === "ok" && readiness.configAuthority === "ok" && readiness.tokenHmac === "ok" && !!env.GROUP_KV?.get && !!env.GROUP_KV?.put && !!env.GROUP_KV?.list && !!env.GROUP_KV?.delete && !!env.AGENT_MANAGED_ROOT_SECRET;
       const ready = enabled && configured;
       body.agentHttp = { enabled, configured, ready };
-      body.agentSessionWrapped = await buildSessionAgentCapability({
+      body.agentSessionWrapped = await buildAgentHttpCapability({
         config,
         revision: current.body.revision,
         origin: url.origin,
@@ -105943,6 +105920,7 @@ init_recoveryKey();
 init_deployHelperCore();
 init_storageEnvelopeEncryption();
 init_storageRouteExecution();
+init_storageBackupRevision();
 init_storageScanBudget();
 var encoder10 = new TextEncoder();
 var CHUNK_BYTES = 256 * 1024;
@@ -105951,7 +105929,8 @@ var fail12 = (message, status = 409, reason) => {
 };
 var digestBytes = async (bytes3) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes3))].map((v) => v.toString(16).padStart(2, "0")).join("");
 var prefixes = (slug) => [null, `ce-storage-hidden:${slug}:`, `ce-storage-owner:${slug}:`, `ce-storage-payload:${slug}:`, `ce-storage:${slug}:`, `sessions/${slug}/storage/`];
-var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) => {
+var settleAfterLease = () => new Promise((resolve) => setTimeout(resolve, BACKUP_EXPORT_SETTLE_MS));
+var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "", settle = settleAfterLease }) => {
   const keySlug = sessionSlugStorageKey(slug);
   let authenticatedCursor = "";
   try {
@@ -105964,8 +105943,16 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
   const rawIndex = getStorageIndexBinding(env);
   const index = rawIndex ? budget.wrap(rawIndex) : null;
   if (!index?.list || !index?.get) fail12("Backup storage is unavailable.", 503);
-  const current = await callSessionConfigCoordinator({ env, slug, path: "backup/export", expectedAuthority });
-  if (!current.ok) fail12(current.body?.error || "Backup authority is unavailable.", current.status);
+  const readExport = async () => {
+    const result = await callSessionConfigCoordinator({ env, slug, path: "backup/export", expectedAuthority });
+    if (!result.ok) fail12(result.body?.error || "Backup authority is unavailable.", result.status);
+    return result;
+  };
+  let current = await readExport();
+  if (!cursor) {
+    await settle();
+    current = await readExport();
+  }
   const coordinator = current.body.coordinator;
   const sessionId = resolveCanonicalWorkerSessionIdHex(coordinator.configAuthority.config);
   if (!sessionId) fail12("The session has no canonical identity.");
@@ -105985,9 +105972,11 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     pageNumber: 0,
     exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
     writeRevision: current.body.writeRevision,
+    leaseSince: current.body.leaseSince,
     configDigest: await sha256Hex(JSON.stringify(coordinator)),
     counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 }
   };
+  const changedSince = (result) => position.writeRevision !== result.body.writeRevision || position.leaseSince !== result.body.leaseSince;
   const nextCursor = () => signBackupCursor(storageExportCursor({ prefix, sessionId, continuation: position }), env);
   if (position.configDigest !== await sha256Hex(JSON.stringify(coordinator))) fail12("Session config changed during backup. Restart the export.", 409, "backup_session_changed");
   const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: "export", snapshotId: position.groupSnapshotId });
@@ -106030,11 +106019,10 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     archiveId: position.archiveId
   };
   const finish = async () => {
-    const latest = await callSessionConfigCoordinator({ env, slug, path: "backup/export", expectedAuthority });
-    if (!latest.ok) fail12(latest.body?.error || "Backup authority is unavailable.", latest.status);
+    const latest = await readExport();
     const groupCheck = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: "export", snapshotId: position.groupSnapshotId, checkOnly: true });
     if (!groupCheck.ok && groupCheck.status !== 409) fail12(groupCheck.error || "Group backup is unavailable.", groupCheck.status);
-    if (!groupCheck.ok || position.writeRevision !== latest.body.writeRevision) {
+    if (!groupCheck.ok || changedSince(latest)) {
       manifest.complete = false;
       page.nextCursor = "";
       page.reason = "backup_session_changed";
@@ -106042,7 +106030,7 @@ var exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = "" }) 
     }
     return signBackupPage(page, env);
   };
-  if (position.writeRevision !== current.body.writeRevision) return finish();
+  if (changedSince(current)) return finish();
   let used = jsonByteLength(page) + 16384;
   let rows = 0;
   const append = (entry2) => {
@@ -109197,7 +109185,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
       deps: { corsHeaders: deps?.corsHeaders }
     });
     try {
-      if (isAgentPath(path)) return await dispatchSessionAgentRequest({ request, env, deps, baseHeaders: routeBaseHeaders });
+      if (isAgentPath(path)) return await dispatchAgentHttpRequest({ request, env, deps, baseHeaders: routeBaseHeaders });
       if (routeSelection.kind === "options") {
         if (path === "/arweave/upload") {
           log2("[arweave] preflight", {
