@@ -6,7 +6,6 @@ import { feedbackOffered, feedbackView, sendFeedback } from '../../domains/worke
 
 jest.mock('../../domains/worker/sessionFeedbackPorts', () => ({
   FEEDBACK_TEXT_MAX: 2000,
-  FEEDBACK_REACH_MAX: 200,
   feedbackOffered: jest.fn(),
   sendFeedback: jest.fn(),
   feedbackView: jest.requireActual<typeof import('../../domains/worker/sessionFeedbackPorts')>(
@@ -59,7 +58,7 @@ describe('SessionFeedbackSection', () => {
     expect(screen.getByRole('region', { name: 'Feedback' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Your feedback')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About feedback' })).toHaveAccessibleDescription(
-      /goes to this session’s admins and isn’t part of anyone’s answers/,
+      /goes to this session’s admins without saying who you are, and isn’t part of anyone’s answers/,
     );
   });
 
@@ -126,26 +125,14 @@ describe('SessionFeedbackSection', () => {
     expect(screen.getByLabelText('Your feedback')).toHaveAttribute('maxlength', '2000');
   });
 
-  it('asks how to reach them only once they tick the box, and sends it only then', async () => {
+  it('asks for no way to reach them: every message is sent without saying who wrote it', async () => {
     send.mockResolvedValue();
     await renderOpen();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     type('Please tell me when this is fixed.');
-    expect(screen.queryByLabelText('How to reach you')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText('You may contact me'));
-    // Ticked with nothing to reach them by, there is nothing to send yet.
-    expect(sendButton()).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('How to reach you'), { target: { value: ' sam on Signal ' } });
     fireEvent.click(sendButton());
     await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
-    expect(send.mock.calls[0][0]).toEqual(expect.objectContaining({ reachMe: 'sam on Signal' }));
-
-    // Unticked again, what they typed there stays behind.
-    fireEvent.click(await screen.findByRole('button', { name: 'Send more' }));
-    type('One more thing.');
-    fireEvent.click(screen.getByLabelText('You may contact me'));
-    fireEvent.click(sendButton());
-    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
-    expect(send.mock.calls[1][0]).not.toHaveProperty('reachMe');
+    expect(send.mock.calls[0][0]).not.toHaveProperty('reachMe');
   });
 
   it('shows the Worker’s sentence when a message is refused, and keeps what was typed', async () => {

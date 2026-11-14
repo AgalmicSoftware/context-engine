@@ -33,7 +33,7 @@ const sentAt = (createdAt: string): string => {
   return Number.isNaN(date.getTime()) ? createdAt : date.toLocaleString();
 };
 
-// What came with a message: where they were and on what, never who, unless they asked to be contacted.
+// What came with a message: where they were and on what, never who.
 const details = (message: FeedbackMessage): string =>
   [
     sentAt(message.createdAt),
@@ -150,11 +150,6 @@ export default function SettingsFeedbackPanel({ admin, children = null }: Props)
             <li key={message.id} className={panel.message}>
               <p className={panel.text}>{message.text}</p>
               <p className={styles.hint}>{details(message)}</p>
-              {message.contact ? (
-                <p className={styles.hint}>
-                  May be contacted: {[message.contact.reachMe, message.contact.address].filter(Boolean).join(' · ')}
-                </p>
-              ) : null}
               <button
                 type="button"
                 className={styles.button}

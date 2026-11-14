@@ -1224,8 +1224,8 @@ under the box points ideas for everyone to the project's GitHub issues.
 Each message is up to 2,000 characters of plain text. With it go the part of the
 page that was open (never the page's address, which can carry invites), the
 theme, whether the screen was a phone, tablet or desktop, and the app's and the
-Worker's releases. Nothing names the sender unless they tick **You may contact
-me** and say how to reach them.
+Worker's releases. Nothing names the sender; the admins see only whether they
+were signed in.
 
 A full admin reads the messages under **Feedback** on the session's settings
 page: **Show messages**, **Download CSV**, and **Delete** for one message or all

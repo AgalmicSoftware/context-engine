@@ -136,32 +136,6 @@
   font-size: 0.85rem;
 }
 
-.contact {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-
-  label {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0;
-  }
-}
-
-.reach {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 420px;
-
-  label {
-    margin: 0;
-    font-weight: 600;
-  }
-}
-
 .actions {
   display: flex;
   align-items: center;

@@ -74,24 +74,19 @@ export async function inspectFeedback(page, { theme, width, sent, screenshotDir 
     await assertReadable(body);
     assert.match(await page.locator('#ce-session-feedback-left').innerText(), /^1,9\d\d left$/);
   });
-  await step('contact tick and field', async () => {
-    const tick = page.getByTestId('ce-session-feedback-contact');
-    await tabTo(page, tick);
-    await page.keyboard.press('Space');
-    await page.getByRole('button', { name: 'About being contacted' }).focus();
-    await assertReadable(page.locator('.tooltip.show', { hasText: 'nothing sent says who you are' }));
-    await tabTo(page, page.getByTestId('ce-session-feedback-reach'));
-    await assertReadable(body);
-    // Unticked again: nothing that names the sender goes with this message.
-    await tick.focus();
-    await page.keyboard.press('Space');
-    assert.equal(await page.getByTestId('ce-session-feedback-reach').count(), 0);
+  await step('no contact choice', async () => {
+    // Every message goes without saying who sent it, so the form asks for no way to reach them.
+    assert.equal(await body.getByRole('checkbox').count(), 0);
   });
   await step('nothing wider than the screen', async () => {
     const overflow = await section.evaluate((node) => node.scrollWidth - node.clientWidth);
     assert(overflow <= 1, `The section overflows by ${overflow}px`);
   });
-  if (screenshotDir) await section.screenshot({ path: `${screenshotDir}/feedback-form-${tag}.png` });
+  if (screenshotDir) {
+    // The header's tooltip fades out after focus moves on; wait, so it covers nothing in the picture.
+    await page.locator('.tooltip').waitFor({ state: 'detached' });
+    await section.screenshot({ path: `${screenshotDir}/feedback-form-${tag}.png` });
+  }
 
   await step('sends from the keyboard', async () => {
     const send = page.getByTestId('ce-session-feedback-send');

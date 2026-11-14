@@ -18,7 +18,6 @@ import { FEEDBACK_LIMITS } from '../../../../workers/sessionCorsWorker/sessionFe
 import { FEATURES } from '../../../../workers/sessionCorsWorker/workerCapabilities.js';
 import {
   FEEDBACK_FEATURE,
-  FEEDBACK_REACH_MAX,
   FEEDBACK_TEXT_MAX,
   deleteFeedback,
   feedbackView,
@@ -99,19 +98,13 @@ describe('feedback: the page and the Session Worker agree', () => {
 
   it('names the feature and the limits the same way', () => {
     expect(FEATURES).toContain(FEEDBACK_FEATURE);
-    expect(FEEDBACK_LIMITS).toMatchObject({ textChars: FEEDBACK_TEXT_MAX, reachMeChars: FEEDBACK_REACH_MAX });
+    expect(FEEDBACK_LIMITS).toMatchObject({ textChars: FEEDBACK_TEXT_MAX });
   });
 
   it('takes a visitor’s message on a Worker that serves many sessions, and an admin reads it back', async () => {
     const worker = connect({ pinned: false });
-    await sendFeedback(
-      draft({ view: feedbackView('results:debateAtlas'), appRelease: '0.9.8', reachMe: 'sam on Signal' }),
-      worker.person(),
-    );
-    await sendFeedback(
-      draft({ text: 'x'.repeat(FEEDBACK_TEXT_MAX), reachMe: 'y'.repeat(FEEDBACK_REACH_MAX), screen: 'desktop' }),
-      worker.person(),
-    );
+    await sendFeedback(draft({ view: feedbackView('results:debateAtlas'), appRelease: '0.9.8' }), worker.person());
+    await sendFeedback(draft({ text: 'x'.repeat(FEEDBACK_TEXT_MAX), screen: 'desktop' }), worker.person());
     // The names the two session pages give for the open view, and an address that must never be one.
     const views = ['questions', 'agent:polis', 'https://x.example/session/s?joinGroup=g#groupInvite=i'];
     for (const view of views) {
@@ -130,27 +123,21 @@ describe('feedback: the page and the Session Worker agree', () => {
       screen: 'phone',
       appRelease: '0.9.8',
       signedIn: false,
-      contact: { address: '', reachMe: 'sam on Signal' },
     });
     expect(messages.at(-1).workerRelease).toEqual(expect.any(String));
     // What was an address arrives as letters only: no path, query or fragment survives.
     expect(messages[0].view).toBe('https:xexamplesessionsjoinGroupggroupInvitei');
-    expect(messages[0].contact).toBeNull();
     expect(messages.every((message) => message.id && !Number.isNaN(Date.parse(message.createdAt)))).toBe(true);
   });
 
-  it('takes a signed-in person’s message with their sign-in, and their address only with the contact box', async () => {
+  it('takes a signed-in person’s message with their sign-in, and never says who sent it', async () => {
     const worker = connect();
     await worker.signIn();
     await sendFeedback(draft({ text: 'Anonymous, though signed in.' }), worker.person(worker.admin.address));
-    await sendFeedback(draft({ text: 'Reach me.', reachMe: 'by post' }), worker.person(worker.admin.address));
     expect(global.fetch).not.toHaveBeenCalled();
-    const [reachable, anonymous] = await listFeedback(worker.adminOf);
-    expect(anonymous).toMatchObject({ text: 'Anonymous, though signed in.', signedIn: true, contact: null });
-    expect(reachable).toMatchObject({
-      signedIn: true,
-      contact: { address: worker.admin.address.toLowerCase(), reachMe: 'by post' },
-    });
+    const [anonymous] = await listFeedback(worker.adminOf);
+    expect(anonymous).toMatchObject({ text: 'Anonymous, though signed in.', signedIn: true });
+    expect(JSON.stringify(anonymous).toLowerCase()).not.toContain(worker.admin.address.toLowerCase());
   });
 
   it('sends as a visitor when the Worker won’t take the sign-in', async () => {

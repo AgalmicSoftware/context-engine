@@ -44,7 +44,6 @@ const message = (id: string, extra: Partial<FeedbackMessage> = {}): FeedbackMess
   appRelease: '0.9.8',
   workerRelease: '0.9.7',
   signedIn: false,
-  contact: null,
   ...extra,
 });
 
@@ -65,7 +64,7 @@ describe('SettingsFeedbackPanel', () => {
   it('lists each message with what came with it, as plain text', async () => {
     await showMessages([
       message('a', { text: '<img src=x onerror=alert(1)> https://evil.example' }),
-      message('b', { signedIn: true, contact: { address: '0xdef', reachMe: 'sam on Signal' } }),
+      message('b', { signedIn: true }),
     ]);
     const rows = within(await screen.findByTestId('ce-settings-feedback-list')).getAllByRole('listitem');
     expect(rows).toHaveLength(2);
@@ -76,8 +75,9 @@ describe('SettingsFeedbackPanel', () => {
     for (const detail of ['results:debateAtlas', 'classic-95', 'phone', 'app 0.9.8', 'Worker 0.9.7', 'not signed in']) {
       expect(rows[0]).toHaveTextContent(detail);
     }
-    expect(rows[0]).not.toHaveTextContent('May be contacted');
-    expect(rows[1]).toHaveTextContent('May be contacted: sam on Signal · 0xdef');
+    // Signed in or not, nothing says who sent it.
+    expect(rows[1]).toHaveTextContent(/signed in/);
+    expect(rows[1]).not.toHaveTextContent('not signed in');
   });
 
   it('says so when there is none', async () => {

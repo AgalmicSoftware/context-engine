@@ -5,7 +5,6 @@ import { faCaretDown, faCaretUp, faQuestionCircle } from '@fortawesome/free-soli
 
 import CETooltip from '../Shared/CETooltip';
 import {
-  FEEDBACK_REACH_MAX,
   FEEDBACK_TEXT_MAX,
   feedbackOffered,
   feedbackView,
@@ -18,11 +17,8 @@ import page from './OnePageSession.module.scss';
 import styles from './SessionFeedbackSection.module.scss';
 
 const ABOUT =
-  'Say what worked in the app, what didn’t, and what you’d change. It goes to this session’s admins and isn’t ' +
-  'part of anyone’s answers.';
-const ABOUT_CONTACT =
-  'Without this, nothing sent says who you are. With it, the admins also get what you write here and, if you’re ' +
-  'signed in, your account’s address.';
+  'Say what worked in the app, what didn’t, and what you’d change. It goes to this session’s admins without ' +
+  'saying who you are, and isn’t part of anyone’s answers.';
 
 /** The app's release, set when it is built; empty in tests and local runs without one. */
 const appRelease = (): string => (typeof __CE_APP_RELEASE__ === 'string' ? __CE_APP_RELEASE__ : '');
@@ -72,8 +68,6 @@ function FeedbackSection({ sessionSlug, sessionConfig, account, view, agent = fa
   const [offered, setOffered] = useState(false);
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  const [contactMe, setContactMe] = useState(false);
-  const [reachMe, setReachMe] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
@@ -105,8 +99,7 @@ function FeedbackSection({ sessionSlug, sessionConfig, account, view, agent = fa
   if (!offered) return null;
 
   const message = text.trim();
-  const reach = reachMe.trim();
-  const ready = !!message && (!contactMe || !!reach) && !sending;
+  const ready = !!message && !sending;
 
   const send = async (event: FormEvent) => {
     event.preventDefault();
@@ -121,7 +114,6 @@ function FeedbackSection({ sessionSlug, sessionConfig, account, view, agent = fa
           theme: getResolvedTheme().id,
           screen: screenClass(),
           ...(appRelease() ? { appRelease: appRelease() } : {}),
-          ...(contactMe ? { reachMe: reach } : {}),
         },
         options.current,
       );
@@ -204,35 +196,6 @@ function FeedbackSection({ sessionSlug, sessionConfig, account, view, agent = fa
               <p id="ce-session-feedback-left" className={styles.hint}>
                 {(FEEDBACK_TEXT_MAX - text.length).toLocaleString('en-US')} left
               </p>
-              <div className={styles.contact}>
-                <label htmlFor="ce-session-feedback-contact">
-                  <input
-                    id="ce-session-feedback-contact"
-                    type="checkbox"
-                    checked={contactMe}
-                    data-testid="ce-session-feedback-contact"
-                    onChange={(event) => setContactMe(event.target.checked)}
-                  />
-                  You may contact me
-                </label>
-                <Help id="ce-session-feedback-contact-help" label="About being contacted" text={ABOUT_CONTACT} />
-              </div>
-              {contactMe ? (
-                <div className={styles.reach}>
-                  <label htmlFor="ce-session-feedback-reach">How to reach you</label>
-                  <input
-                    id="ce-session-feedback-reach"
-                    type="text"
-                    className={`form-control ${styles.field}`}
-                    placeholder="Email or handle"
-                    maxLength={FEEDBACK_REACH_MAX}
-                    value={reachMe}
-                    autoComplete="email"
-                    data-testid="ce-session-feedback-reach"
-                    onChange={(event) => setReachMe(event.target.value)}
-                  />
-                </div>
-              ) : null}
               <div className={styles.actions}>
                 <button type="submit" className={styles.send} disabled={!ready} data-testid="ce-session-feedback-send">
                   {sending ? 'Sending…' : 'Send'}

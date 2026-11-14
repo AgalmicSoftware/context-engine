@@ -8,7 +8,6 @@ import { toStr } from '../../utilities/shared/primitives.js';
 
 export const FEEDBACK_FEATURE = 'session_feedback';
 export const FEEDBACK_TEXT_MAX = 2000;
-export const FEEDBACK_REACH_MAX = 200;
 
 export type FeedbackOptions = { sessionSlug: string; sessionConfig: unknown; account: string };
 
@@ -20,8 +19,6 @@ export type FeedbackDraft = {
   screen: 'phone' | 'tablet' | 'desktop';
   /** Left out when the app was built without one. */
   appRelease?: string;
-  /** Only when they ticked "You may contact me". */
-  reachMe?: string;
 };
 
 export type FeedbackMessage = {
@@ -34,8 +31,6 @@ export type FeedbackMessage = {
   appRelease: string;
   workerRelease: string;
   signedIn: boolean;
-  /** Only for a sender who asked to be contacted; the address only when they were signed in. */
-  contact: { address: string; reachMe: string } | null;
 };
 
 export type FeedbackAdmin = {
@@ -98,12 +93,11 @@ const NOT_SENT = 'Not sent. Try again.';
  * message is the Worker's own sentence for a refusal, or a plain one.
  */
 export const sendFeedback = async (draft: FeedbackDraft, options: FeedbackOptions): Promise<void> => {
-  const { reachMe, ...message } = draft;
   // No referrer: the page's address can carry a group or an invite.
   const init: RequestInit = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(reachMe ? { ...message, contact: { reachMe } } : message),
+    body: JSON.stringify(draft),
     referrerPolicy: 'no-referrer',
   };
   // A send's outcome: taken, or the feedback route's own reason for refusing it.
@@ -155,7 +149,6 @@ const adminPost = async (admin: FeedbackAdmin, action: string, body: Record<stri
 
 const messageOf = (value: unknown): FeedbackMessage => {
   const row = asRecord(value);
-  const contact = row.contact ? asRecord(row.contact) : null;
   return {
     id: toStr(row.id),
     text: toStr(row.text),
@@ -166,7 +159,6 @@ const messageOf = (value: unknown): FeedbackMessage => {
     appRelease: toStr(row.appRelease),
     workerRelease: toStr(row.workerRelease),
     signedIn: row.signedIn === true,
-    contact: contact && { address: toStr(contact.address), reachMe: toStr(contact.reachMe) },
   };
 };
 
@@ -223,18 +215,7 @@ const csvCell = (value: string): string => {
 
 export const feedbackCsv = (messages: FeedbackMessage[]): string =>
   [
-    [
-      'Sent',
-      'Feedback',
-      'View',
-      'Theme',
-      'Screen',
-      'App release',
-      'Worker release',
-      'Signed in',
-      'Reach me',
-      'Address',
-    ],
+    ['Sent', 'Feedback', 'View', 'Theme', 'Screen', 'App release', 'Worker release', 'Signed in'],
     ...messages.map((message) => [
       message.createdAt,
       message.text,
@@ -244,8 +225,6 @@ export const feedbackCsv = (messages: FeedbackMessage[]): string =>
       message.appRelease,
       message.workerRelease,
       message.signedIn ? 'yes' : 'no',
-      message.contact?.reachMe || '',
-      message.contact?.address || '',
     ]),
   ]
     .map((row) => row.map(csvCell).join(','))

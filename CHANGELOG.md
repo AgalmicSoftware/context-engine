@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
-- A session page has a collapsed **Feedback** section below Results, where anyone, signed in or not, can say what worked in the app and what didn't. It goes to the session's admins and is no part of answers, Results or exports. A message is anonymous unless **You may contact me** is ticked. The section shows only for a session a Worker runs, on a Session Worker running this release; an on-chain session has none.
+- A session page has a collapsed **Feedback** section below Results, where anyone, signed in or not, can say what worked in the app and what didn't. It goes to the session's admins and is no part of answers, Results or exports. A message never says who sent it. The section shows only for a session a Worker runs, on a Session Worker running this release; an on-chain session has none.
 - Settings has a **Feedback** section for full admins, to read the messages, download them as a CSV and delete them, and a **Feedback box** setting, on by default. Reading takes no signature; deleting one message or all of them takes one.
 - Risk Matrix: the detail grid for two areas labels its columns and rows, has a key, frames every square (an empty one says "No notes"), shows each balance with an arrow and its note count, and its column and row headings highlight, with a **Clear** button.
 - Every Results view shows when it was made in the same place, top right: built views always show their **Version**, even with one build, and AI Views show when they were generated. AI Views' titles and its Breakdown interpretation are readable in the civic and classic themes.
@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
-- Session Workers take feedback about the app at `POST /feedback`, from anyone on the session page, signed in or not. A message is text only, at most 2,000 characters, and names its sender only when they ask to be contacted. A person can send 5 a day; a session takes 200 a day and stores 2,000. Only sessions a Worker runs take feedback; an on-chain session takes none.
+- Session Workers take feedback about the app at `POST /feedback`, from anyone on the session page, signed in or not. A message is text only, at most 2,000 characters, and never names its sender. A person can send 5 a day; a session takes 200 a day and stores 2,000. Only sessions a Worker runs take feedback; an on-chain session takes none.
 - Full admins read and page through feedback with their sign-in (`GET /admin/feedback`), and clear it with one signed delete; results admins and agent keys cannot. Feedback never reaches AI Views, the atlas, the Risk Matrix, the Session Agent, the fidelity report, exports or backups.
 - A session's `feedbackEnabled` setting, on unless set, turns the Feedback box off; turning it off signs no one out.
 

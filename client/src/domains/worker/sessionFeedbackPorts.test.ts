@@ -140,17 +140,6 @@ describe('sessionFeedbackPorts', () => {
     expect(fetchWorker).not.toHaveBeenCalled();
   });
 
-  it('sends how to reach them only when they asked to be contacted', async () => {
-    fetchMock.mockResolvedValue(response(200, { ok: true }));
-    await sendFeedback({ ...DRAFT, reachMe: 'sam on Signal' }, VISITOR);
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toEqual({
-      ...DRAFT,
-      contact: { reachMe: 'sam on Signal' },
-    });
-    await sendFeedback(DRAFT, VISITOR);
-    expect(JSON.parse(String(fetchMock.mock.calls[1][1].body))).not.toHaveProperty('contact');
-  });
-
   it('gives the Worker’s own sentence for a refusal, and a plain one for anything else', async () => {
     fetchMock.mockResolvedValueOnce(
       response(429, { error: 'You’ve sent 5 today. Thanks! Try again tomorrow.', reason: 'feedback_person_limit' }),
@@ -173,13 +162,13 @@ describe('sessionFeedbackPorts', () => {
       .mockResolvedValueOnce(response(200, { messages: [stored('b'), stored('a')], cursor: 'a' }))
       .mockResolvedValueOnce(
         response(200, {
-          messages: [stored('0', { contact: { address: '0xdef', reachMe: '@sam' } }), {}],
+          messages: [{ ...stored('0'), contact: { address: '0xdef', reachMe: '@sam' } }, {}],
         }),
       );
     const messages = await listFeedback(ADMIN);
     expect(messages.map((message) => message.id)).toEqual(['b', 'a', '0']);
-    expect(messages[0].contact).toBeNull();
-    expect(messages[2].contact).toEqual({ address: '0xdef', reachMe: '@sam' });
+    // Nothing that would name a sender is read, whatever a row holds.
+    expect(messages[2]).not.toHaveProperty('contact');
     expect(fetchWorker.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
       ['https://worker.example/admin/feedback?slug=salon&limit=100', 'GET'],
       ['https://worker.example/admin/feedback?slug=salon&limit=100&cursor=a', 'GET'],
@@ -227,16 +216,15 @@ describe('sessionFeedbackPorts', () => {
       {
         ...stored('a'),
         text: 'Said "no", then\nleft',
-        contact: { address: '0xdef', reachMe: '=HYPERLINK("https://evil.example")' },
       } as FeedbackMessage,
-      { ...stored('b'), text: '+1 for the map', signedIn: false, contact: null } as FeedbackMessage,
+      { ...stored('b'), text: '=HYPERLINK("https://evil.example")', signedIn: false } as FeedbackMessage,
     ]);
     const [header, first] = csv.split('\r\n');
-    expect(header).toBe('Sent,Feedback,View,Theme,Screen,App release,Worker release,Signed in,Reach me,Address');
+    expect(header).toBe('Sent,Feedback,View,Theme,Screen,App release,Worker release,Signed in');
     // A quoted cell keeps its line break; a cell that would run as a formula starts with an apostrophe.
-    expect(first).toBe(
-      '2026-11-24T10:00:00.000Z,"Said ""no"", then\nleft",questions,civic,desktop,0.9.8,0.9.8,yes,"\'=HYPERLINK(""https://evil.example"")",0xdef',
+    expect(first).toBe('2026-11-24T10:00:00.000Z,"Said ""no"", then\nleft",questions,civic,desktop,0.9.8,0.9.8,yes');
+    expect(csv).toContain(
+      '\r\n2026-11-24T10:00:00.000Z,"\'=HYPERLINK(""https://evil.example"")",questions,civic,desktop,0.9.8,0.9.8,no\r\n',
     );
-    expect(csv).toContain("\r\n2026-11-24T10:00:00.000Z,'+1 for the map,questions,civic,desktop,0.9.8,0.9.8,no,,\r\n");
   });
 });
