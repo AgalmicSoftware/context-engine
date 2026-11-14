@@ -180,6 +180,9 @@ export const hydrateWorkerCanonicalResponses = async ({
     // may display its new rows while missing-answer checks still remain unready.
     const worker = merged.worker as CacheRecord;
     worker.workerResponseHydrationStatus = partial ? 'partial' : 'complete';
+    // Unlike the status, this outlasts the next run's loading, so a report that
+    // can't be shown can say the session holds more than one load reads.
+    worker.workerResponseOverReadLimit = partial;
     // The next refresh continues from here instead of rereading the same prefix.
     if (resumeCursor) worker.workerResponseListCursor = resumeCursor;
     return merged;

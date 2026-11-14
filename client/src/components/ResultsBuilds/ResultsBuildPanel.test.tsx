@@ -38,7 +38,8 @@ it("stamps the build with its time and counts, under its title or the view's nam
   expect(screen.getByRole('heading', { name: 'Debate atlas' })).toBeVisible();
   expect(screen.getByText(/^Built .*2026.* · 12 responses · 1 participant$/)).toBeVisible();
   expect(screen.getByText('Body')).toBeVisible();
-  expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  // One build still shows its Version, so the time sits where it does with several.
+  expect(screen.getByRole('combobox', { name: 'Version' })).toHaveDisplayValue(/2026/);
 });
 
 it('leaves out a time it cannot read', () => {

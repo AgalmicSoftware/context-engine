@@ -207,7 +207,7 @@ test('publication intro explains the benchmark and does not overstate preview ar
   assert.doesNotMatch(html, /How to read these results/);
   assert.doesNotMatch(html, /aidb-publication-note/);
   assert.doesNotMatch(html, /Publication status:/);
-  assert.match(html, /questions about AI futures and policy, drawn from or implied by the OSS <strong>ai-discourse-corpus<\/strong>\. The same benchmark method can be applied to any topic\. An optional quadratic-importance mode gives every model the same credit budget to prioritize questions; those allocations determine Debate Map prominence when present\./);
+  assert.match(html, /questions about AI futures and policy, drawn from or implied by the OSS <strong>ai-discourse-corpus<\/strong>\. The same benchmark method can be applied to any topic\. An optional quadratic-importance mode gives every model the same credit budget to prioritize questions; those allocations determine Debate Atlas prominence when present\./);
   assert.match(html, /<div class="aidb-benchmark-topic-fact"><dt><label for="aidb-benchmark-topic">Benchmark topic<\/label><\/dt><dd><select id="aidb-benchmark-topic" aria-describedby="aidb-benchmark-topic-description" data-ce-benchmark-topic-selector><option value="ai-futures-policy" selected>AI Futures &amp; Policy<\/option><\/select><\/dd><\/div>/);
   assert.doesNotMatch(html, /class="aidb-benchmark-topic-control"/);
   assert.match(html, /<div class="aidb-benchmark-fact-number"><dt>Questions<\/dt><dd>1<\/dd><\/div>/);
@@ -282,7 +282,7 @@ test('publication intro explains the benchmark and does not overstate preview ar
   assert.doesNotMatch(hostileHtml, /<img src=x onerror=alert\(1\)>/);
 });
 
-test('quadratic importance allocations control Debate Map prominence without changing stance results', async () => {
+test('quadratic importance allocations control Debate Atlas prominence without changing stance results', async () => {
   const questionBank = {
     benchmarkId: 'importance-report',
     runPlan: { repeatsPerPolarity: 1 },
@@ -704,7 +704,7 @@ test('All Questions gives each model one averaged vote and preserves invalid raw
   assert.doesNotMatch(html, /This describes response direction, not correctness/);
 });
 
-test('Debate Map uses stable model colors on a separate mean-stance axis', async () => {
+test('Debate Atlas uses stable model colors on a separate mean-stance axis', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -767,7 +767,7 @@ test('Debate Map uses stable model colors on a separate mean-stance axis', async
   assert.match(html, /if \(lockedAtlasModelId === modelId\) \{\s*lockedAtlasModelId = '';\s*hoveredAtlasModelId = '';\s*focusedAtlasModelId = '';\s*if \(modelCard\.blur\) modelCard\.blur\(\);\s*\} else \{\s*lockedAtlasModelId = modelId;/);
 });
 
-test('Debate Map model repeat stability stays separate from polarity sensitivity', async () => {
+test('Debate Atlas model repeat stability stays separate from polarity sensitivity', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -801,7 +801,7 @@ test('Debate Map model repeat stability stays separate from polarity sensitivity
   assert.equal(report.polisReport.byQuestion[question.id].wordingSensitivity.meanAbsoluteShift, 2);
 });
 
-test('Debate Map contributor context distinguishes partial model coverage', async () => {
+test('Debate Atlas contributor context distinguishes partial model coverage', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -884,7 +884,7 @@ test('Summary stats count averaged model/question responses without multiplying 
   assert.doesNotMatch(html, /<span class="statLabel">Responses\/Participant Avg<span class="pdfIgnore aidb-inline-tooltip-reference"[\s\S]*?:<\/span><span class="statValue">1\.50<\/span>/);
 });
 
-test('analysis overlay populates risk matrix popups and Debate Map generated surfaces', async () => {
+test('analysis overlay populates risk matrix popups and Debate Atlas generated surfaces', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -993,11 +993,29 @@ test('analysis overlay populates risk matrix popups and Debate Map generated sur
             confidence: 'medium',
             generatedBy: 'fixture-model',
           },
+          'Capabilities.Agents.Safety.Evaluations': { summary: 'Scored only.', value: -2 },
+          'Capabilities.Scaling.Safety.Alignment': {
+            summary: 'Scaling outpaces alignment checks.',
+            opportunities: ['Shared evaluations.', 'Earlier red teaming.'],
+            risks: [],
+            confidence: 'medium',
+            generatedBy: 'fixture-model',
+          },
         },
       },
     },
   };
   const html = renderHtmlReport(report);
+  // A square scored without listed notes still shows its balance, not "No notes".
+  assert.match(
+    html,
+    /data-testid="ce-risk-matrix-subcell-capabilities-agents-vs-safety-evaluations"\s+aria-label="Capabilities Agents versus Safety Evaluations, risk balance -2\. Open detailed notes\."\s*>\s*<span class="riskMatrixCellValue cellValue">▼ -2<\/span>\s*<\/button>/,
+  );
+  // A square with analysis gives its direction and note count, not colour alone.
+  assert.match(
+    html,
+    /data-testid="ce-risk-matrix-subcell-capabilities-scaling-vs-safety-alignment"\s+aria-label="Capabilities Scaling versus Safety Alignment, opportunity balance \+2, 2 notes\. Open detailed notes\."\s*>\s*<span class="riskMatrixCellValue cellValue">▲ \+2<\/span><span class="detailNoteCount">2 notes<\/span>/,
+  );
 
   assert.match(html, /id="ai-analysis"/);
   assert.match(html, /data-ce-ai-analysis-overlay/);
@@ -1321,7 +1339,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html.slice(modeSurfacesStart), /id="snapshot-json"[\s\S]*class="ce-report-section ce-results-mode-pane aidb-mode-pane aidb-raw-results-modal-pane|class="ce-report-section ce-results-mode-pane aidb-mode-pane aidb-raw-results-modal-pane[\s\S]*id="snapshot-json"/);
   assert.doesNotMatch(html.slice(modeSurfacesStart), /ce-results-mode-pane aidb-view-section/);
   assert.doesNotMatch(html.slice(modeSurfacesStart), /class="ce-results-mode-pane-header"/);
-  assert.match(html, /data-ce-pane-title="Debate Map"/);
+  assert.match(html, /data-ce-pane-title="Debate Atlas"/);
   assert.match(html, /data-ce-pane-subtitle="Circle prominence currently reflects question count; quadratic importance allocations can replace this fallback"/);
   assert.match(html, /class="[^"]*aidb-raw-results-modal-pane/);
   assert.doesNotMatch(html, /class="[^"]*aidb-raw-results-modal-pane resultsModal/);
@@ -1376,7 +1394,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="modal-header modalHeader"[\s\S]*<h2 class="modalTitle">Question Results<\/h2>[\s\S]*data-ce-close-raw-results/);
   assert.match(html, /class="demoResultsViewNav" aria-label="Demo results views" data-testid="ce-surveyresults-demo-view-nav"/);
   assert.match(html, /class="demoResultsViewButton demoResultsViewButtonActive" aria-pressed="true" data-ce-raw-demo-view="report" data-testid="ce-surveyresults-demo-view-report">Report<\/button>/);
-  assert.match(html, /class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="debate-atlas" data-testid="ce-surveyresults-demo-view-atlas">Debate Map<\/button>/);
+  assert.match(html, /class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="debate-atlas" data-testid="ce-surveyresults-demo-view-atlas">Debate Atlas<\/button>/);
   assert.match(html, /class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="breakdown" data-testid="ce-surveyresults-demo-view-breakdown">Breakdown<\/button>/);
   assert.match(html, /class="demoResultsViewButton" aria-pressed="false" data-ce-raw-demo-view="risk-matrix" data-testid="ce-surveyresults-demo-view-riskMatrix">Risk Matrix<\/button>/);
   assert.doesNotMatch(html, /class="demoResultsViewButton demoResultsViewButtonActive" aria-pressed="true">Raw<\/button>/);
@@ -1564,7 +1582,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.sectionHeaderViewModeButton\[aria-pressed="true"\]/);
   assert.match(html, /rgba\(77, 255, 164, 0\.7\)/);
   assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">🧾<\/span><span class="sectionHeaderViewModeLabel">Report<\/span>/);
-  assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">🗺️<\/span><span class="sectionHeaderViewModeLabel">Debate Map<\/span>/);
+  assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">🗺️<\/span><span class="sectionHeaderViewModeLabel">Debate Atlas<\/span>/);
   assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">📊<\/span><span class="sectionHeaderViewModeLabel">Breakdown<\/span>/);
   assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">⚠️<\/span><span class="sectionHeaderViewModeLabel">Risk Matrix<\/span>/);
   assert.match(html, /class="sectionHeaderViewModeButton" data-ce-open-raw-results>/);
@@ -1940,7 +1958,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /card\.querySelector\('\[data-ce-question-body\]'\)/);
   assert.doesNotMatch(html, /class="question-explorer"/);
   assert.doesNotMatch(html, /class="question-detail"/);
-  assert.match(html, /Debate Map/);
+  assert.match(html, /Debate Atlas/);
   assert.match(html, /id="debate-atlas"[\s\S]*class="ce-report-section ce-results-mode-pane aidb-mode-pane aidb-debate-atlas-pane"/);
   assert.doesNotMatch(html, /ce-results-dark-pane/);
   assert.doesNotMatch(html, /ce-results-scroll-pane/);
@@ -2365,17 +2383,19 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /opportunity balance \+/);
   assert.doesNotMatch(html, /risk balance -/);
   assert.doesNotMatch(html, /riskMatrixGridCellLinked gridCellLinked/);
-  assert.match(html, /class="selectorGrid"/);
-  assert.match(html, /class="selectorPanel"/);
-  assert.match(html, /data-testid="ce-risk-matrix-selector-x-/);
-  assert.match(html, /data-testid="ce-risk-matrix-selector-y-/);
-  assert.match(html, /data-testid="ce-risk-matrix-selector-x-clear"[\s\S]*?disabled/);
   assert.match(html, /data-testid="ce-risk-matrix-subheader-x-/);
   assert.match(html, /data-testid="ce-risk-matrix-subheader-y-/);
   assert.match(html, /data-testid="ce-risk-matrix-subgrid"/);
-  assert.match(html, /class="subgridContainer"/);
+  assert.match(html, /class="subgridContainer detailGrid"/);
   assert.match(html, /data-testid="ce-risk-matrix-subcell-/);
-  assert.match(html, /Refine generated analysis into sub-overlaps and open atlas-linked scenarios attached to each detail cell\./);
+  assert.match(html, /Open a square to read its analysis\./);
+  // The detail grid names its axes, has a key, and says when a square is empty.
+  assert.match(html, />Columns: [^<]+<\/div>/);
+  assert.match(html, />Rows: [^<]+<\/div>/);
+  assert.match(html, /<ul class="detailLegend" aria-label="Key">[\s\S]*More opportunity[\s\S]*More risk[\s\S]*No notes/);
+  assert.match(html, /<summary aria-label="How to read this grid">/);
+  assert.match(html, /<span class="detailEmptyLabel">No notes<\/span>/);
+  assert.doesNotMatch(html, /ce-risk-matrix-selector-/);
   assert.doesNotMatch(html, /class="riskMatrixCellMeta">AI analysis<\/span>/);
   assert.doesNotMatch(html, /AI Discourse Risk Matrix/);
   assert.doesNotMatch(html, /Facet Scenarios/);
@@ -2406,13 +2426,12 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.riskMatrixGridCellLinked,\s*\.riskMatrixGridCellLinked\.gridCellLinked \{ border-color: rgba\(0, 197, 255, 0\.18\); box-shadow: inset 0 0 0 1px rgba\(0, 197, 255, 0\.08\), 0 12px 24px rgba\(0, 0, 0, 0\.14\); \}/);
   assert.match(html, /\.riskMatrixEmptyCell,\s*\.riskMatrixEmptyCell\.emptyCell \{ background: rgba\(255, 255, 255, 0\.04\); color: rgba\(244, 247, 255, 0\.35\); \}/);
   assert.match(html, /\.riskMatrixDiagonalCell, \.diagonalCell \{ cursor: default; background: rgba\(255, 255, 255, 0\.03\); color: rgba\(190, 199, 230, 0\.82\); font-size: 1\.35rem; \}/);
-  // A figure sits on its own surface, readable on the strongest fill, and a
-  // disabled selector stays legible instead of fading.
+  // A figure sits on its own surface, readable on the strongest fill, and an
+  // empty detail square is framed rather than blank.
   assert.match(html, /\.riskMatrixCellValue \{ padding: 2px 8px; border-radius: var\(--ce-radius-pill\); background: #1f234f; color: rgba\(244, 247, 255, 0\.96\);/);
-  assert.match(html, /\.selectorButton:disabled \{ cursor: not-allowed; border-style: dashed; color: rgba\(190, 199, 230, 0\.82\); transform: none; \}/);
   assert.match(html, /\.riskMatrixContainer \.sectionTitle \{ color: rgba\(244, 247, 255, 0\.96\); \}/);
-  assert.match(html, /\.selectorGrid \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   assert.match(html, /\.subgridContainer \{ display: grid; gap: 8px; min-width: 100%; width: 100%; \}/);
+  assert.match(html, /\.riskMatrixCell\.cell\.detailCellEmpty \{ background: transparent; border-style: dashed; \}/);
 
   const ceExport = buildContextEnginePolisExport(report);
   assert.equal(ceExport.kind, 'ce_polis_question_responses_export');
@@ -2564,7 +2583,7 @@ test('All Questions Invalid is the question aggregate, including models not run 
   const html = renderHtmlReport(report);
   assert.equal(report.polisReport.byQuestion[question.id].invalid, 2);
 
-  // The row, the bar segment and the Debate Map legend share one Invalid count.
+  // The row, the bar segment and the Debate Atlas legend share one Invalid count.
   assert.match(questionVoteSummaries(html), /<strong>Responses:<\/strong> 1 \/\s*<strong>Invalid:<\/strong> 2\s*<\/span>/);
   const row = html.match(new RegExp(`id="question-${question.id}"[\\s\\S]*?data-ce-atlas-question-distribution[^>]*>`))?.[0];
   assert.ok(row);

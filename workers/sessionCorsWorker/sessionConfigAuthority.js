@@ -133,7 +133,7 @@ export const forgetSessionConfig = (env, slug) => {
 // the per-answer and per-view journals. Every other call drops this copy.
 // (backup/status can finish a restore, so it drops it.)
 const KEEPS_CONFIG = new Set(['current', 'backup/write-revision', 'backup/export', 'diagnostics', 'storage/publish']);
-const KEEPS_CONFIG_PREFIXES = ['agent-submit/', 'debate-atlas/', 'risk-matrix/'];
+const KEEPS_CONFIG_PREFIXES = ['agent-submit/', 'debate-atlas/', 'risk-matrix/', 'session-feedback/'];
 const keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
 
 export const callSessionConfigCoordinator = async ({ env, slug, path, cache = false, ...payload }) => {

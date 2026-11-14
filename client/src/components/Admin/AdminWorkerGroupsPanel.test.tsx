@@ -711,6 +711,13 @@ describe('AdminWorkerGroupsPanel', () => {
         target: { value: 'group_password' },
       });
       fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), { target: { value: 'Salon' } });
+      // The field opens with a generated three-word password, the strong default.
+      const generated = (screen.getByLabelText('Group password') as HTMLInputElement).value;
+      expect(generated).toMatch(/^[a-z]+-[a-z]+-[a-z]+$/);
+      expect(screen.getByRole('button', { name: 'Create Group' })).toBeEnabled();
+      // Clearing it to type another doesn't refill it.
+      fireEvent.change(screen.getByLabelText('Group password'), { target: { value: '' } });
+      expect(screen.getByLabelText('Group password')).toHaveValue('');
       fireEvent.change(screen.getByLabelText('Group password'), { target: { value: 'short' } });
       expect(screen.getByRole('button', { name: 'Create Group' })).toBeDisabled();
       // A joiner's typed text is trimmed, so a password with an edge space could never be entered.

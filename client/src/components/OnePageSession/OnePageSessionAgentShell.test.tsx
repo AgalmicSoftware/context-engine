@@ -30,6 +30,7 @@ const baseProps = {
   questionResponsesNonce: 0,
   questionScanProgress: null,
   resultsViewMode: 'polis',
+  sessionConfig: null,
   sessionHeader: 'Agent Session',
   sessionInfo: 'Agent shell',
   sessionName: 'Agent Session',

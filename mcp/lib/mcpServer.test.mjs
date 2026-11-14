@@ -237,3 +237,16 @@ test('deliberate error messages reach the client and the log unchanged', async (
   assert.deepEqual(await errorTexts(failing(messages.map((message) => new Error(message)), (line) => logs.push(line)), messages.length), messages);
   assert.deepEqual(logs, messages.map((message, index) => `tool fail${index} failed: ${message}`));
 });
+
+test('initialize tells the server the client’s own clientInfo, and a failing listener does not break it', async () => {
+  const seen = [];
+  const srv = createMcpServer({ serverInfo: { name: 't', version: '1' }, onInitialize: ({ clientInfo }) => seen.push(clientInfo) });
+  await call(srv, { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', clientInfo: { name: 'hermes', version: '3' } } });
+  await call(srv, { jsonrpc: '2.0', id: 2, method: 'initialize', params: { protocolVersion: '2025-06-18', clientInfo: 'not an object' } });
+  assert.deepEqual(seen, [{ name: 'hermes', version: '3' }, {}]);
+  const logged = [];
+  const failing = createMcpServer({ serverInfo: { name: 't', version: '1' }, log: (line) => logged.push(line), onInitialize: () => { throw new Error('listener broke'); } });
+  const reply = await call(failing, { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } });
+  assert.equal(reply.result.serverInfo.name, 't');
+  assert.match(logged.join('\n'), /listener broke/);
+});

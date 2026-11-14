@@ -45,6 +45,11 @@ const explainFailure = (status, error, path) => {
   if (status === 403) return `Not allowed: ${detail || 'this session’s access rules deny the request'}.`;
   if (status === 404 && path.startsWith('/session-config')) return 'No hosted session with that name exists on this Worker.';
   if (status === 410) return 'This session has ended and no longer accepts answers.';
+  // Agents read "nonce" as a blockchain limit; this one counts sign-ins. Any
+  // other refusal of a sign-in (a busy coordinator, say) keeps its own words.
+  if (status === 429 && path === '/auth/nonce' && /too many nonce/i.test(detail)) {
+    return 'Too many sign-ins for this agent or its network in the last minute. Wait about a minute, then try again; anything that needed the sign-in was not sent.';
+  }
   if (status === 429) return `Rate limited by the Worker (${detail || '429'}). Wait a minute and retry.`;
   // Sent after the client's own retries ran out; the Worker refused before doing anything.
   if (status === 503 && error === SESSION_COORDINATOR_UNAVAILABLE) {

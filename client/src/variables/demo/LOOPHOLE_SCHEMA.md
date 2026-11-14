@@ -26,7 +26,7 @@ Each case in `loophole_historical_cases.json` is a JSON object with these fields
 | `concrete_patch_options` | array | 2-4 `{name, summary, favored_by}` patch proposals |
 | `best_patch` | string | the patch the judge would recommend and why |
 | `why_other_patch_fails` | string | why the runner-up patch is rejected |
-| `open_question` | string | the question the user should actually vote on in Debate Map |
+| `open_question` | string | the question the user should actually vote on in Debate Atlas |
 
 ## Field notes
 
@@ -36,7 +36,7 @@ Each case in `loophole_historical_cases.json` is a JSON object with these fields
 
 ## Rendering contract
 
-The Debate Map case panel reads these fields through `debateMapHistoricalData.ts`:
+The Debate Atlas case panel reads these fields through `debateMapHistoricalData.ts`:
 1. `draft_legal_code` renders its articles as a numbered list.
 2. `loophole_exploit` renders institution, actor, action, victims, why_legal and why_immoral as a grid.
 3. `overreach_variant` renders the foil in a secondary panel.

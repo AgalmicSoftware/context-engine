@@ -5,9 +5,9 @@ import path from 'path';
 import React from 'react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
-import Footer from './Footer';
+import Footer, { FOOTER_SESSION_ACTIONS_IDS } from './Footer';
 import styles from './Footer.module.scss';
 import { applyResolvedTheme } from '../../utilities/ui/themeRuntime';
 
@@ -51,10 +51,26 @@ describe('Footer', () => {
 
   it('renders POSTS immediately after ABOUT', () => {
     const { container } = renderFooter();
-    const navItems = Array.from(container.querySelectorAll('nav li'));
+    const navItems = Array.from(container.querySelectorAll('nav li > a'));
 
     expect(navItems.map((item) => item.textContent?.trim())).toEqual(['NEW', 'ABOUT', 'POSTS', 'SETTINGS', 'DOCS']);
     expect(screen.getByRole('link', { name: 'POSTS' })).toHaveAttribute('href', '/posts');
+  });
+
+  it('keeps empty places for a session page’s own controls: after the links, or on the taskbar', () => {
+    const { container } = renderFooter();
+    const [afterLinks, taskbar] = FOOTER_SESSION_ACTIONS_IDS.map((id) => container.querySelector(`#${id}`));
+    expect(afterLinks).toBeEmptyDOMElement();
+    expect(taskbar).toBeEmptyDOMElement();
+    // The next item in the links' own list, so it sits and wraps with them.
+    expect(afterLinks?.previousElementSibling).toHaveTextContent('DOCS');
+    expect(afterLinks).toBeVisible();
+    // Outside the menu, which a desktop-window theme keeps closed.
+    expect(taskbar?.closest('nav')).toBeNull();
+    expect(taskbar).not.toBeVisible();
+    act(() => applyResolvedTheme({ id: 'classic-95', source: 'user' }));
+    expect(afterLinks).not.toBeVisible();
+    expect(taskbar).toBeVisible();
   });
 
   it('renders internal links under the configured PUBLIC_URL base path', () => {
@@ -95,11 +111,11 @@ describe('Footer', () => {
     expect(screen.queryByTestId('ce-footer-agalmic-link')).not.toBeInTheDocument();
   });
 
-  it('keeps tablet footer links on one full-width row', () => {
+  it('keeps tablet footer links, however many, on one full-width row', () => {
     [{ minWidth: 466, maxWidth: 768, fontSize: 'clamp\\(0\\.9rem, 2\\.25vw, 1\\.08rem\\)' }].forEach(
       ({ minWidth, maxWidth, fontSize }) => {
         const breakpointRule = new RegExp(
-          `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?\\.footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: grid;[\\s\\S]*?grid-template-columns: repeat\\(5, minmax\\(0, 1fr\\)\\);[\\s\\S]*?justify-content: stretch;[\\s\\S]*?width: 100%;[\\s\\S]*?li \\{[\\s\\S]*?width: 100%;[\\s\\S]*?li \\.footerLink \\{[\\s\\S]*?display: flex;[\\s\\S]*?font-size: ${fontSize};[\\s\\S]*?justify-content: center;[\\s\\S]*?margin-left: 0 !important;[\\s\\S]*?margin-right: 0 !important;[\\s\\S]*?white-space: nowrap;[\\s\\S]*?width: 100%;`,
+          `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?\\.footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: grid;[\\s\\S]*?grid-auto-columns: minmax\\(max-content, 1fr\\);[\\s\\S]*?grid-auto-flow: column;[\\s\\S]*?justify-content: stretch;[\\s\\S]*?width: 100%;[\\s\\S]*?li \\{[\\s\\S]*?width: 100%;[\\s\\S]*?li \\.footerLink \\{[\\s\\S]*?display: flex;[\\s\\S]*?font-size: ${fontSize};[\\s\\S]*?justify-content: center;[\\s\\S]*?margin-left: 0 !important;[\\s\\S]*?margin-right: 0 !important;[\\s\\S]*?white-space: nowrap;[\\s\\S]*?width: 100%;`,
         );
 
         expect(footerStylesheet).toMatch(breakpointRule);

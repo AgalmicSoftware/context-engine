@@ -7,11 +7,13 @@ import {
   generateCreateSbtGroupPassphrase,
   generateCreateSbtInviteNonces,
   generateCreateSbtRandomHexString,
+  generateWorkerGroupPassphrase,
   isShortCreateSbtGroupPassword,
   resolveCreateSbtInviteCodeList,
   resolveCreateSbtPasswordGenerationCount,
   resolveCreateSbtPredictablePasswordListDecision,
 } from './createSbtGroupPasswordHelpers';
+import { workerGroupPasswordProblem } from '../../../../shared/workerGroupJoin.mjs';
 
 describe('createSbtGroupPasswordHelpers', () => {
   it('builds CreateSBT password export files', () => {
@@ -246,6 +248,19 @@ describe('createSbtGroupPasswordHelpers', () => {
     );
     expect(getRandomValues).toHaveBeenCalledWith(expect.any(Uint16Array));
     expect(getRandomValues.mock.calls[0][0]).toHaveLength(5);
+  });
+
+  it('generates three words for a Session Worker group, still a valid group password', () => {
+    const words = generateWorkerGroupPassphrase().split('-');
+    expect(words).toHaveLength(3);
+    words.forEach((word) => expect(ethers.wordlists.en.getWordIndex(word)).toBeGreaterThanOrEqual(0));
+    // Even the shortest words make a password a joiner can type back.
+    const wordlist = ethers.wordlists.en;
+    let shortest = 0;
+    for (let index = 1; index < 2048; index += 1) {
+      if (wordlist.getWord(index).length < wordlist.getWord(shortest).length) shortest = index;
+    }
+    expect(workerGroupPasswordProblem(generateWorkerGroupPassphrase((array) => array.fill(shortest)))).toBe('');
   });
 
   it('draws passphrase words from crypto.getRandomValues by default', () => {

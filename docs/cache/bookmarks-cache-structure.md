@@ -71,6 +71,6 @@ When parsed, each cache value has the following top-level shape (arrays may be e
 - `dg:bookmarksCache:<slug>`: Group-scoped bookmarks namespace (managed by cacheScripts)
 - `dg:filters:<slug>`: Filter namespace (includes migrated `questionFilterState_questions`, `questionFilterState_results`, `bookmarkedFilters`)
 - `bookmarks`: Legacy SBT bookmarks store, shaped as `{ "sbts": [] }`
-- `bookmarkedNodes`: Debate map node IDs
+- `bookmarkedNodes`: Debate atlas node IDs
 
 The `/bookmarks` page aggregates across `bookmarksCache` and `filters` namespaces, plus legacy fallback keys where present.

@@ -432,6 +432,33 @@ describe('saving the edit page through the Session Worker', () => {
     expect(result.config.pileAutoAdvanceEnabled).toBe(save.patch.pileAutoAdvanceEnabled);
   });
 
+  it('saves the Feedback box choice only when it changes, and signs no one out', () => {
+    const stored = publishedSession();
+    // On unless turned off: a session that never set it shows the box ticked.
+    const off = editAndSave(stored, (draft) => {
+      expect(draft.feedbackEnabled).toBe(true);
+      draft.feedbackEnabled = false;
+    });
+    expect(off.save.patch).toEqual({ feedbackEnabled: false });
+    expect(off.save.classification).toMatchObject({ content: ['feedbackEnabled'], signsParticipantsOut: false });
+    expect(describeSessionSettingsPath('feedbackEnabled')).toBe('Feedback box');
+    expect(off.result).toMatchObject({ ok: true });
+    expect(projectPublicWorkerSessionConfig(off.result.config).feedbackEnabled).toBe(false);
+
+    const on = editAndSave(off.result.config, (draft) => {
+      expect(draft.feedbackEnabled).toBe(false);
+      draft.feedbackEnabled = true;
+    });
+    expect(on.save.patch).toEqual({ feedbackEnabled: true });
+    expect(on.result).toMatchObject({ ok: true });
+
+    // Left alone, it is never sent, so a Worker too old to know it refuses nothing.
+    const untouched = editAndSave(stored, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
+  });
+
   it('saves SBT defaults only where SBTs grant access, as the Worker requires', () => {
     const plain = editAndSave(publishedSession(), (draft) => {
       draft.defaultSbtTags = 'members';

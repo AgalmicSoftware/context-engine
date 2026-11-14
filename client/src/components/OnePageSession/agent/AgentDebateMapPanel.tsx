@@ -13,7 +13,7 @@ type AgentDebateMapPanelProps = {
 const buildPrompt = (questions: AgentQuestion[], results: AgentResultsResult | null): string => {
   const topicCounts = results?.views?.topicMap?.data?.counts || {};
   const lines = [
-    'Create a Context Engine debate map from this hosted agent session.',
+    'Create a Context Engine debate atlas from this hosted agent session.',
     '',
     'Questions:',
     ...questions.slice(0, 20).map((question, index) => `${index + 1}. ${question.prompt}`),
@@ -40,7 +40,7 @@ const AgentDebateMapPanel = ({ questions, results }: AgentDebateMapPanelProps): 
   return (
     <section className={styles.agentListPanel} data-testid="ce-agent-http-debate-map">
       <div className={styles.agentListHeader}>
-        <span>Debate Map Prompt</span>
+        <span>Debate Atlas prompt</span>
         <button
           type="button"
           className={styles.agentSecondaryButton}

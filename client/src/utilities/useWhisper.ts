@@ -34,6 +34,11 @@ type UseWhisperOptions = {
   onRecordingStop?: WhisperCallback;
   silenceThresholdDb?: number;
   silenceDurationMs?: number;
+  /**
+   * False never asks for a signature or passkey: a request that needs one fails instead, and the person's own
+   * key, which may need a signature to read, isn't used.
+   */
+  signInPrompt?: boolean;
 };
 
 const whisperLog = createLogger('whisper');
@@ -132,6 +137,7 @@ export const useWhisper = ({
   // NEW: optional silence knobs (non-breaking; defaults preserved)
   silenceThresholdDb,
   silenceDurationMs,
+  signInPrompt,
 }: UseWhisperOptions = {}) => {
   const effectiveSessionSlug = sessionSlug;
   const effectiveSessionConfig = sessionConfig;
@@ -436,6 +442,7 @@ export const useWhisper = ({
           model,
           apiKey,
           context,
+          ...(signInPrompt === false ? { preferLocal: false } : {}),
         });
       } catch (err) {
         const msg = getErrorMessage(err, 'Failed to resolve transcription settings.');
@@ -507,6 +514,7 @@ export const useWhisper = ({
           preferAnonymous: true,
           fallbackOnGateUnavailable: true,
           allowDemoFallback: defaultStrictAllowDemoFallback(),
+          ...(signInPrompt === false ? { prompt: false } : {}),
         });
 
         if (!ownsRecordingAttempt(attempt)) return null;
@@ -547,7 +555,17 @@ export const useWhisper = ({
         if (ownsRecordingAttempt(attempt)) setIsStreaming(false);
       }
     },
-    [apiKey, context, effectiveSessionConfig, effectiveSessionSlug, model, onError, workerUrl, ownsRecordingAttempt],
+    [
+      apiKey,
+      context,
+      effectiveSessionConfig,
+      effectiveSessionSlug,
+      model,
+      onError,
+      workerUrl,
+      ownsRecordingAttempt,
+      signInPrompt,
+    ],
   );
 
   // The finished recording goes through the shared pipeline, which cuts audio too large or long for one
@@ -577,6 +595,7 @@ export const useWhisper = ({
           model,
           apiKey,
           signal: controller.signal,
+          ...(signInPrompt === false ? { prompt: false, preferLocal: false } : {}),
         });
       } catch (error) {
         // A second stop or a reset cancelled this request, and what replaced it reports instead.
@@ -586,7 +605,7 @@ export const useWhisper = ({
         if (finalAbortControllerRef.current === controller) finalAbortControllerRef.current = null;
       }
     },
-    [apiKey, context, effectiveSessionConfig, effectiveSessionSlug, model, workerUrl],
+    [apiKey, context, effectiveSessionConfig, effectiveSessionSlug, model, workerUrl, signInPrompt],
   );
 
   const handleStreamingTranscription = useCallback(async () => {

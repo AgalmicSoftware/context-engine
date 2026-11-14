@@ -27,7 +27,7 @@ coverage, release, persona, and analysis-provenance rules.
   or contemporary figure would answer using only knowledge in model weights.
 - Optional quadratic importance allocation, where every model receives the same
   credit budget and pays `votes^2` to prioritize questions. These allocations
-  control Debate Map prominence without changing stance results.
+  control Debate Atlas prominence without changing stance results.
 
 ## Result Views
 
@@ -442,7 +442,7 @@ node ./bin/ai-discourse-bench.mjs build-report \
 ```
 
 `--importance` is optional and accepts comma-separated model-specific
-artifacts. When present, Debate Map circle size and its `Most important` sort
+artifacts. When present, Debate Atlas circle size and its `Most important` sort
 use the aggregated allocations. Without it, circle size falls back to the
 number of questions in each topic.
 
@@ -534,7 +534,7 @@ node ./bin/ai-discourse-bench.mjs export-ce-native \
 
 `ce_benchmark_results_dataset` preserves repeated-answer distributions,
 uncertainty intervals, wording sensitivity, similarity details, model
-provenance, graph inputs, quadratic importance, Debate Map inputs, and integrity state. Its schema is
+provenance, graph inputs, quadratic importance, Debate Atlas inputs, and integrity state. Its schema is
 `schemas/ce-benchmark-results-v1.schema.json`; this is the preferred substrate
 for eventual native Context Engine rendering.
 
@@ -580,7 +580,7 @@ node ./bin/ai-discourse-bench.mjs export-analysis-input \
 Feed that JSON plus `prompts/analysis-overlay-generator.md` to an analysis model
 to produce an `ai_discourse_bench_analysis_overlay`. Re-render with the overlay
 when you want generated risk-matrix popups, higher-level AI analysis, generated
-Debate Map topics, issue-area modal analysis, edges, or compasses:
+Debate Atlas topics, issue-area modal analysis, edges, or compasses:
 
 ```bash
 node ./bin/ai-discourse-bench.mjs render-report \
@@ -598,7 +598,7 @@ adjudication:
   stability and wording-sensitivity measures.
 - Raw Results retains the aggregate report, Context Engine export, and
   provenance needed to audit a finding.
-- Optional AI-generated summaries, Debate Map topics, and Risk Matrix content
+- Optional AI-generated summaries, Debate Atlas topics, and Risk Matrix content
   are accepted only when their overlay is bound to the exact source-report
   hash.
 
@@ -619,7 +619,7 @@ and human-review artifacts without treating generation as validation.
 
 The second-pass analysis overlay prompt lives at
 `prompts/analysis-overlay-generator.md`. It asks an analysis model to return
-compact JSON for risk-matrix popups, generated Debate Map topics, modal-ready
+compact JSON for risk-matrix popups, generated Debate Atlas topics, modal-ready
 issue areas, topic edges, compasses, and report-level analysis.
 
 ## Keeping Results Styling In Sync

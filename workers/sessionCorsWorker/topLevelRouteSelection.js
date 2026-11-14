@@ -37,6 +37,9 @@ export const resolveTopLevelRouteSelection = ({
 
   if (path === '/interview/starter' && method === 'POST') return { kind: 'interview-starter' };
 
+  // Signed in, feedback is an ordinary signed-in route; signed out, it names its session with ?slug=.
+  if (path === '/feedback' && method === 'POST' && !hasTrimmedAuthorization) return { kind: 'feedback' };
+
   if (path === '/session-config' && method === 'GET') {
     return { kind: 'session-config' };
   }
@@ -71,6 +74,7 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'admin-results-analysis-status' };
   }
   if (path === '/admin/diagnostics' && method === 'GET') return { kind: 'admin-session-diagnostics' };
+  if (path === '/admin/feedback' && method === 'GET') return { kind: 'admin-feedback-list' };
 
   if (path === '/results-analysis/artifact' && method === 'GET') {
     return { kind: 'results-analysis-artifact' };

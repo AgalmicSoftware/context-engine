@@ -64,8 +64,11 @@
     nav {
       width: 100%;
       ul {
+        // One column per link shown, so a session's Feedback joins the row and an empty place takes none;
+        // each as wide as its word at least, so six still fit at the narrowest.
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-auto-columns: minmax(max-content, 1fr);
+        grid-auto-flow: column;
         justify-content: stretch;
         align-items: center;
         gap: 4px;
@@ -195,6 +198,12 @@
   font-size: 1rem;
   margin-left: 5px;
   margin-right: 5px;
+}
+
+// Filled only on a session page that takes feedback; otherwise, or when the theme uses the other one, no room.
+.sessionActions:empty,
+.sessionActions[hidden] {
+  display: none !important;
 }
 
 .footer .footerLink {
@@ -343,6 +352,41 @@
   }
 
   .startButton:focus-visible {
+    outline: 1px dotted var(--ce-control-text);
+    outline-offset: -5px;
+  }
+
+  // A session's own control on the taskbar, such as Feedback, is a taskbar button beside Start. The element
+  // name outranks the frameless recipe, which would flatten it.
+  .footer .sessionActions button.footerLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    margin: 0 0 0 4px;
+    padding: 0 10px;
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    font-size: var(--ce-footer-link-font-size);
+    line-height: 1;
+  }
+
+  .footer .sessionActions button.footerLink:hover,
+  .footer .sessionActions button.footerLink:focus-visible {
+    background: var(--ce-surface-alt);
+    color: var(--ce-control-text);
+  }
+
+  // The frameless recipe also clears a pressed control's border.
+  .footer .sessionActions button.footerLink:active {
+    border: 2px solid;
+    border-color: var(--ce-border-inset);
+    box-shadow: var(--ce-shadow-pressed);
+  }
+
+  .footer .sessionActions button.footerLink:focus-visible {
     outline: 1px dotted var(--ce-control-text);
     outline-offset: -5px;
   }

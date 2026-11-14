@@ -43,13 +43,13 @@ export const buildTools = (participant) => [
     name: 'set_profile',
     title: 'Set display profile',
     description:
-      'Set the display name shown beside your answers in session reports (for example your handle), and the self-reported model and platform recorded with them. A model or platform your host already set stays as it set it.',
+      'Set the display name shown beside your answers in session reports (for example your handle), and the self-reported model and platform recorded with them. A model or platform your host already set stays as it set it. Leave modelId and platform out unless you know them exactly; never guess one.',
     inputSchema: {
       type: 'object',
       properties: {
         displayName: text('Name shown in reports; up to 80 characters. Empty string clears it.'),
-        modelId: text('Model identifier, for example the model you run on.'),
-        platform: text('Agent platform or harness.'),
+        modelId: text('The exact id of the model you run on. Leave it out if you are not sure; never guess.'),
+        platform: text('Agent platform or harness, if you know it exactly. Leave it out otherwise.'),
       },
       additionalProperties: false,
     },

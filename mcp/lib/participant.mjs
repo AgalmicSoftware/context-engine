@@ -346,13 +346,18 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     state = await updateAgentState(config.stateDir, mutate);
   };
 
+  // The MCP client names itself when it connects ("claude-code", say). With no
+  // platform from the host or the agent, that name fills in, so a model need not
+  // guess one. The agent's side may have typed it, so it counts as the agent's.
+  let clientPlatform = '';
+
   // A model or platform the host set is kept over one the agent declares, and
   // the answer records say which of the two set it.
   const profile = () => {
     const hostModelId = trim(config.profile.modelId);
     const hostPlatform = trim(config.profile.platform);
     const modelId = hostModelId || trim(state?.profile?.modelId);
-    const platform = hostPlatform || trim(state?.profile?.platform);
+    const platform = hostPlatform || trim(state?.profile?.platform) || clientPlatform;
     return {
       displayName: trim(state?.profile?.displayName ?? config.profile.displayName),
       modelId,
@@ -843,6 +848,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
               .catch(() => ({ offered: false, reason: 'Session availability could not be checked.' })),
           })),
       };
+    },
+
+    /** Records the connecting client's name; a bad or missing one is ignored. */
+    setClientInfo(clientInfo = {}) {
+      const name = typeof clientInfo?.name === 'string' ? clientInfo.name.replace(/[\u0000-\u001f\u007f]/g, ' ') : '';
+      try {
+        clientPlatform = normalizeLabel(name, 'clientInfo.name');
+      } catch {
+        clientPlatform = '';
+      }
     },
 
     async setProfile({ displayName, modelId, platform } = {}) {

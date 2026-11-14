@@ -8,8 +8,8 @@ import styles from '../setup/SessionSetup.module.scss';
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const ID = 'ce-setting-results-admins';
 
-// People an admin adds here may build debate atlases in Results, and nothing
-// else; the list saves with the rest of the page.
+// People an admin adds here may build the atlas, risk matrix and AI Views in
+// Results, and nothing else; the list saves with the rest of the page.
 export default function SettingsResultsAdminsField({
   value,
   onChange,
@@ -38,7 +38,7 @@ export default function SettingsResultsAdminsField({
     <SetupField
       id={ID}
       label="Results admins"
-      help="They can build debate atlases in Results. Only this session's admins change its settings, this list included."
+      help="They can build the debate atlas, risk matrix and AI Views in Results. Only this session's admins change its settings, this list included."
     >
       {value.length ? (
         <ul className={styles.listRowBody} aria-label="Results admins" data-testid="ce-setting-results-admins-list">

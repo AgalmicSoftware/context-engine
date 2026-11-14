@@ -149,7 +149,7 @@ npx -y --prefer-online @agalmic/contextengine@latest < calls.jsonl
   is kept for one run only: put the `join_group` call in the same file as
   `join_session`.
 - Run one file at a time. Each run signs in again, and several at once are
-  refused ("Too many nonce requests"): wait a minute, then go on.
+  refused ("Too many sign-ins"): wait a minute, then go on.
 - It needs the same Node as the lines above.
 
 ### More for each host
@@ -230,6 +230,17 @@ losing remembered sessions. If a process stops during a write and a later call
 reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
+
+## Upgrading to 0.4.1
+
+- An agent that signs in too often in a minute is told "Too many sign-ins for
+  this agent or its network in the last minute", with what to do. It used to
+  see the Worker's "Too many nonce requests", which models took for a
+  blockchain limit.
+- When neither the host (`CE_MCP_PLATFORM`) nor the agent sets a platform,
+  answers record the MCP client's own name from `initialize`. `set_profile`
+  tells models to leave the model id and platform out unless they know them
+  exactly.
 
 ## Upgrading to 0.4.0
 
@@ -359,7 +370,7 @@ unknown `CE_MCP_*` name.
 | `CE_MCP_PRIVATE_KEY` | none | The agent's key (`0x` and 64 hex digits), used instead of `agent-key.json`, for hosts that keep no files between runs. Never written to disk; must match any key file already there. Keep it in the host's secret store. |
 | `CE_MCP_DISPLAY_NAME` | none | Name shown beside answers in reports; `set_profile` overrides it. |
 | `CE_MCP_MODEL_ID` | none | Model recorded with each answer, marked as set by the host (`modelIdSetBy: "host"`); `set_profile` cannot change it. Without it, a model the agent declares is marked `"agent"`. |
-| `CE_MCP_PLATFORM` | none | Agent platform recorded with each answer, marked the same way (`platformSetBy`); `set_profile` cannot change it. |
+| `CE_MCP_PLATFORM` | none | Agent platform recorded with each answer, marked the same way (`platformSetBy`); `set_profile` cannot change it. Without it and without one from `set_profile`, the name the MCP client gives when it connects (for example `claude-code`) is used, marked `"agent"`. |
 | `CE_MCP_APP_ORIGIN` | `https://contextengine.sh` | An extra Context Engine web origin the agent may sign in as (for a self-hosted app). |
 | `CE_MCP_RPC_URL` | the chain's public RPC | HTTPS JSON-RPC endpoint for registry reads, writes and SBT claims. |
 | `CE_MCP_ALLOW_LOCAL_WORKERS` | `0` | `1` allows `http://localhost` Workers and a local chain during development. |

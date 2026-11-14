@@ -5,21 +5,25 @@ import { sanitizeSbtClaimIdentityUrl } from './sbtClaimUrlSafety';
 // The group's password check is public on-chain and can be attacked offline,
 // so custom passwords shorter than this need an explicit confirmation.
 export const CREATE_SBT_GROUP_PASSWORD_MIN_LENGTH = 16;
-const CREATE_SBT_GROUP_PASSPHRASE_WORDS = 5;
 
 type CreateSbtGetRandomUint16Values = (array: Uint16Array) => Uint16Array;
+const cryptoRandomValues: CreateSbtGetRandomUint16Values = (array) => globalThis.crypto.getRandomValues(array);
 
-// Five BIP-39 English words (55 bits). The shortest word has 3 letters, so a
-// generated passphrase is always at least 19 characters and never "short".
-export const generateCreateSbtGroupPassphrase = (
-  getRandomValues: CreateSbtGetRandomUint16Values = (array) => globalThis.crypto.getRandomValues(array),
-): string => {
-  const wordlist = ethers.wordlists.en;
-  // 65536 is a multiple of 2048, so the low 11 bits pick each word without bias.
-  return Array.from(getRandomValues(new Uint16Array(CREATE_SBT_GROUP_PASSPHRASE_WORDS)), (value) =>
-    wordlist.getWord(value & 2047),
-  ).join('-');
-};
+// BIP-39 English words, 11 bits each. 65536 is a multiple of 2048, so the low
+// 11 bits pick each word without bias.
+const generatePassphrase = (words: number, getRandomValues: CreateSbtGetRandomUint16Values): string =>
+  Array.from(getRandomValues(new Uint16Array(words)), (value) => ethers.wordlists.en.getWord(value & 2047)).join('-');
+
+// Five words (55 bits). The shortest word has 3 letters, so a generated
+// passphrase is always at least 19 characters and never "short".
+export const generateCreateSbtGroupPassphrase = (getRandomValues = cryptoRandomValues): string =>
+  generatePassphrase(5, getRandomValues);
+
+// Three words (33 bits), short enough to read out in a room. A Session Worker
+// checks its groups' passwords itself and doesn't publish the check, unlike
+// an on-chain group, so it can't be guessed offline.
+export const generateWorkerGroupPassphrase = (getRandomValues = cryptoRandomValues): string =>
+  generatePassphrase(3, getRandomValues);
 
 export const isShortCreateSbtGroupPassword = (password: unknown): boolean => {
   const length = Array.from(String(password || '')).length;

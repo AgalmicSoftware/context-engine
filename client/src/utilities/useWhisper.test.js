@@ -282,10 +282,53 @@ describe('useWhisper', () => {
       }),
     );
     expect(fetchWorkerWithAuth.mock.calls[0]?.[2]?.anonymousOnly).not.toBe(true);
+    // An answer's dictation may still ask to sign in for the session's AI key.
+    expect(fetchWorkerWithAuth.mock.calls[0]?.[2]?.prompt).not.toBe(false);
     const requestInit = fetchWorkerWithAuth.mock.calls[0]?.[1] || {};
     const uploadedFile = requestInit.body?.get?.('file');
     expect(uploadedFile?.type).toBe('audio/wav');
     expect(String(uploadedFile?.name || '')).toMatch(/\.wav$/);
+  });
+
+  it('never asks for a signature or passkey when told not to', async () => {
+    const onComplete = jest.fn();
+    act(() => {
+      root.render(
+        <WhisperHarness
+          ref={ref}
+          options={{
+            silenceDetection: false,
+            sessionSlug: 'demo-sh',
+            sessionConfig: { sessionSlug: 'demo-sh', sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2' },
+            signInPrompt: false,
+            onTranscriptionComplete: onComplete,
+          }}
+        />,
+      );
+    });
+    await act(async () => {
+      await ref.current.startRecording();
+    });
+    if (!ref.current.audioContextRef.current) ref.current.audioContextRef.current = new MockAudioContext();
+    ref.current.audioContextRef.current.state = 'closed';
+    setNow(2000);
+    await act(async () => {
+      await ref.current.stopRecording();
+    });
+    await act(async () => {
+      await flushPromises();
+      await flushPromises();
+      await flushPromises();
+      await flushPromises();
+    });
+    expect(onComplete).toHaveBeenCalledWith('hello world');
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      expect.stringContaining('/transcribe'),
+      expect.any(Object),
+      expect.objectContaining({ preferAnonymous: true, prompt: false }),
+    );
+    // Nor reads the person's own key, which may take a signature: the session's allowance pays.
+    expect(getEffectiveTranscriptionConfig).toHaveBeenCalledWith(expect.objectContaining({ preferLocal: false }));
   });
 
   it.each([

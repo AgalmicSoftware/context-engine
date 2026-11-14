@@ -26,6 +26,7 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'sessionEndsAt',
   'interviewModeEnabled',
   'pileAutoAdvanceEnabled',
+  'feedbackEnabled',
   'interviewMode',
   'defaultTags',
   'defaultGroupTags',

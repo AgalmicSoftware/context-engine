@@ -28,7 +28,8 @@ it('draws the build read-only as circles, stamped, and names topics it could not
   expect(screen.getByRole('heading', { name: 'Salon atlas' })).toBeVisible();
   expect(screen.getByText(/^Built .*500 responses · 40 participants$/)).toBeVisible();
   expect(screen.getByRole('status')).toHaveTextContent('Not mapped this time: Privacy, Labor.');
-  expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  // One build still shows its Version, so the time sits where it does with several.
+  expect(screen.getByRole('combobox', { name: 'Version' })).toHaveDisplayValue(/2026/);
   expect(mockDebateMap).toHaveBeenLastCalledWith(
     expect.objectContaining({
       atlasLayoutMode: 'packed',

@@ -43,6 +43,7 @@ import { publishCloudflareOwnedStorageMetadata, scanLegacyStorageOwnerIds, setCl
 import { finishContextPdfReading, removeContextSource } from './contextSourceRoute.js';
 import { dispatchResultsBuildStore } from './resultsBuildStore.js';
 import { dispatchSessionAgentOptOutStore } from './sessionAgentOptOuts.js';
+import { dispatchSessionFeedbackStore } from './sessionFeedback.js';
 import {
   applySessionConfigMutation,
   resolveCanonicalWorkerSessionIdHex,
@@ -3458,6 +3459,9 @@ export class SessionWriteCoordinator {
     if (resultsBuild) return dispatchResultsBuildStore(this, resultsBuild[1], resultsBuild[2], payload || {});
     if (url.pathname.startsWith('/session-config/session-agent/')) {
       return dispatchSessionAgentOptOutStore(this, url.pathname.split('/').pop(), payload || {});
+    }
+    if (url.pathname.startsWith('/session-config/session-feedback/')) {
+      return dispatchSessionFeedbackStore(this, url.pathname.split('/').pop(), payload || {});
     }
     if (['preflight', 'begin', 'check', 'checkpoint', 'release', 'discard'].some(operation => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
       return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split('/').at(-1)));

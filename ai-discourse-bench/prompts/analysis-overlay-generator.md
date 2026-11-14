@@ -53,7 +53,7 @@ Requirements:
   may include `summary`, `opportunities`, `risks`, `linkedQuestionIds`,
   `linkedTopicIds`, `scenarios`, `confidence`, and `generatedBy`.
 - Use `riskMatrix.cells.<cellId>.scenarios` sparingly for click-popup cards that
-  connect a risk-matrix cell to a Debate Map topic or compass. Each scenario may
+  connect a risk-matrix cell to a Debate Atlas topic or compass. Each scenario may
   include `id`, `atlasNodeId`, `atlasNodeLabel`, `title`, `summary`, `valence`
   (`risk`, `opportunity`, or `mixed`), `confidence`, `timeHorizon`,
   `primaryMechanism`, and optional `historicalAnchors`.

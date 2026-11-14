@@ -814,6 +814,7 @@ export default function PolisReport({
       filtered,
       metadata,
       workerResponseHydrationStatus: cacheContext.workerResponseHydrationStatus,
+      workerResponseOverReadLimit: cacheContext.workerResponseOverReadLimit,
       responseStats: buildReportResponseStats(filtered, metadata, {
         sessionSlug: activeReportSlug,
         allowDemo: effectiveUseDemoData,
@@ -2450,6 +2451,8 @@ export default function PolisReport({
   const loadFailed = isLoading && !!cacheInitializationError && typeof onRetryLoad === 'function';
   // Retrying can't help someone the Worker refuses until they log in, so ask for that instead.
   const loginRequired = loadFailed && !(loginComplete && account) && sessionAnswersRequireLogin(sessionConfig);
+  // A session holding more answers than one load reads loads in parts, slowly; say so, and that a retry may take minutes.
+  const overReadLimit = loadFailed && pendingReportData.workerResponseOverReadLimit;
   const retryLoad = async () => {
     if (retryingLoad || typeof onRetryLoad !== 'function') return;
     setRetryingLoad(true);
@@ -2644,6 +2647,17 @@ export default function PolisReport({
               </button>
             )}
           </p>
+        ) : overReadLimit ? (
+          <div className={styles.noData} role="alert" data-testid="ce-report-over-read-limit">
+            <p>
+              This session holds more answers than Results can read at once, so its report is slow to load and may not
+              load.
+            </p>
+            <p>An admin can start a new session for new answers.</p>
+            <button type="button" className={styles.downloadButton} onClick={retryLoad} disabled={retryingLoad}>
+              {retryingLoad ? 'Loading, which can take minutes…' : 'Try again'}
+            </button>
+          </div>
         ) : loadFailed ? (
           <p className={styles.noData} role="alert">
             Responses could not be loaded, so the report can&apos;t be shown yet.{' '}

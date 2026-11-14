@@ -159,8 +159,8 @@ export async function inspectCivicExplorerContent(page, { groupLabel = 'e/acc' }
   await assertReadable(body);
   await back.click();
 
-  await open('Debate Map');
-  await page.getByRole('heading', { name: 'Debate Map', exact: true }).waitFor({ state: 'visible' });
+  await open('Debate Atlas');
+  await page.getByRole('heading', { name: 'Debate Atlas', exact: true }).waitFor({ state: 'visible' });
   await assertReadable(body);
   await page.getByRole('button', { name: 'Top Debates', exact: true }).click();
   await assertReadable(body);

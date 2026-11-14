@@ -6,3 +6,6 @@ declare module 'process/browser' {
   };
   export default processShim;
 }
+
+/** The app's release (client/package.json's version), set by the build; not defined in tests. */
+declare const __CE_APP_RELEASE__: string | undefined;

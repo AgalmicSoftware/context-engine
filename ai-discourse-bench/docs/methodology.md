@@ -113,12 +113,12 @@ model's votes per question across its valid allocation runs, treating omitted
 questions as zero, and then averages those model-level values with one equal
 weight per contributing model. A model with extra repeats therefore receives
 no extra influence. Question importance rolls up additively into topic
-importance, which controls Debate Map circle prominence when available.
+importance, which controls Debate Atlas circle prominence when available.
 
 Importance is not confidence, correctness, stance strength, or participant
 count. It does not alter Agree/Unsure/Disagree aggregates, similarity, opinion
 groups, or release coverage. Reports without an importance artifact retain a
-question-count sizing fallback and state that fallback in the Debate Map.
+question-count sizing fallback and state that fallback in the Debate Atlas.
 
 ## Coverage And Release Status
 
@@ -189,7 +189,7 @@ compared as weights-only persona results.
 
 ## AI Analysis Boundary
 
-Debate Map topics, compasses, narrative analysis, and Risk Matrix cells may be
+Debate Atlas topics, compasses, narrative analysis, and Risk Matrix cells may be
 generated as a second pass. They are interpretations of measured results, not
 raw benchmark observations.
 

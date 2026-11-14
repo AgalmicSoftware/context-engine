@@ -24,3 +24,14 @@ export const readWorkerKeepsDraftText = async (
   const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
   return found.unavailable ? null : found.features.includes('draft_text_v1');
 };
+
+/** Whether the Session Worker takes feedback about the app (0.9.8 on); false when it can't be read. */
+export const readWorkerTakesFeedback = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> => {
+  if (!workerOrigin) return false;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.features.includes('session_feedback');
+};

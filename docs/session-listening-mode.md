@@ -119,7 +119,7 @@ Session `interviewMode` settings are available under **Participation** on `/new`
 | `autoRegenerate` | `false` | Refresh the generated opening when enough questions have been added. |
 | `questionGrowthPercent` | `20` | Additions needed since the last successful generation or conversation update, rounded up to at least one. |
 | `followNewQuestions` | `false` | Check the public question catalog every 30 seconds during active recording and append qualifying additions to the interviewer's context. |
-| `suggestQuestions` | `false` | Propose up to three new respondent-grounded question drafts when preparing responses. Drafts may be freeform, rating, binary, multichoice or quadratic; multichoice and quadratic drafts include suggested options for review. |
+| `suggestQuestions` | `false` | Propose up to three new respondent-grounded question drafts when preparing responses. Drafts may be freeform, rating, binary, multichoice or quadratic; multichoice and quadratic drafts include suggested options for review. On, the voice interviewer also closes by asking what else should be asked and which session question the responder would most like others to answer; off, it skips both. |
 | `allowManualRefresh` | `true` | Enable **Regenerate interview opening** for session admins. |
 | `shareDraftChangesByDefault` | `true` | Initially check **Share for research**, beside **AI submission info**, for new responses. Participants can change the checkbox before submission; saved per-question choices take precedence. |
 | `researchDetail` | `minimal` | What a shared draft comparison keeps: `minimal` has no AI notes or drafted text; `full` adds them and drafts for skipped questions. `full` needs a Session Worker newer than 0.8.0. |

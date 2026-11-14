@@ -507,9 +507,67 @@ describe('RiskMatrix', () => {
     fireEvent.click(screen.getByLabelText('Close'));
     fireEvent.click(screen.getByTestId('ce-risk-matrix-subcell-safety-alignment-vs-capabilities-scaling'));
     expect(screen.getByText('AI note')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-risk-matrix-subgrid')).toHaveTextContent(
-      'Refine to sub-overlaps and compare the notes in each detail cell.',
+    expect(screen.getByTestId('ce-risk-matrix-subgrid')).toHaveTextContent('Open a square to read its notes.');
+  });
+
+  it('labels the detail grid’s axes, key, empty squares and highlights', () => {
+    render(
+      <RiskMatrix
+        categories={[
+          { name: 'Safety', subcategories: ['Alignment', 'Evaluations'] },
+          { name: 'Capabilities', subcategories: ['Scaling', 'Agents'] },
+        ]}
+        initialComments={[
+          { cell: 'Safety.Alignment.Capabilities.Scaling', comment: 'Outpaces checks.', intensity: 7, valence: 'risk' },
+          { cell: 'Safety.Alignment.Capabilities.Scaling', comment: 'Shared evals.', intensity: 3, valence: 'risk' },
+          { cell: 'Safety.Evaluations.Capabilities.Agents', comment: 'Even.', intensity: 4, valence: 'risk' },
+          { cell: 'Safety.Evaluations.Capabilities.Agents', comment: 'Even.', intensity: 4, valence: 'opportunity' },
+        ]}
+        readOnly
+      />,
     );
+    fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-safety-vs-capabilities'));
+    fireEvent.click(screen.getByLabelText('Close'));
+
+    const grid = within(screen.getByTestId('ce-risk-matrix-subgrid'));
+    expect(grid.getByText('Columns: Safety')).toBeInTheDocument();
+    expect(grid.getByText('Rows: Capabilities')).toBeInTheDocument();
+    expect(grid.getByRole('list', { name: 'Key' })).toHaveTextContent('More opportunity');
+    expect(grid.getByRole('list', { name: 'Key' })).toHaveTextContent('More risk');
+
+    // The number carries its direction, so colour is never the only cue.
+    const filled = grid.getByTestId('ce-risk-matrix-subcell-safety-alignment-vs-capabilities-scaling');
+    expect(filled).toHaveTextContent('▼ -10');
+    expect(filled).toHaveTextContent('2 notes');
+    // Notes that cancel out are not an empty square.
+    const even = grid.getByTestId('ce-risk-matrix-subcell-safety-evaluations-vs-capabilities-agents');
+    expect(even).toHaveTextContent('±0');
+    expect(even).toHaveAccessibleName(
+      'Safety Evaluations versus Capabilities Agents, even balance 0, 2 notes. Open detailed notes.',
+    );
+    const empty = grid.getByTestId('ce-risk-matrix-subcell-safety-evaluations-vs-capabilities-scaling');
+    expect(empty).toHaveTextContent('No notes');
+    expect(empty).toHaveAccessibleName(
+      'Safety Evaluations versus Capabilities Scaling, no notes. Open detailed notes.',
+    );
+
+    expect(grid.queryByTestId('ce-risk-matrix-clear-highlight')).not.toBeInTheDocument();
+    expect(grid.getByRole('status')).toBeEmptyDOMElement();
+    const column = grid.getByTestId('ce-risk-matrix-subheader-x-alignment');
+    const row = grid.getByTestId('ce-risk-matrix-subheader-y-agents');
+    fireEvent.click(column);
+    fireEvent.click(row);
+    expect(column).toHaveAttribute('aria-pressed', 'true');
+    expect(row).toHaveAttribute('aria-pressed', 'true');
+    expect(grid.getByRole('status')).toHaveTextContent('Highlighted: Alignment, Agents');
+
+    fireEvent.click(grid.getByTestId('ce-risk-matrix-clear-highlight'));
+    expect(column).toHaveAttribute('aria-pressed', 'false');
+    expect(row).toHaveAttribute('aria-pressed', 'false');
+    expect(grid.getByRole('status')).toBeEmptyDOMElement();
+    expect(grid.queryByTestId('ce-risk-matrix-clear-highlight')).not.toBeInTheDocument();
+    // The keyboard stays in the grid rather than falling back to the page.
+    expect(grid.getByTestId('ce-risk-matrix-subheader-x-alignment')).toHaveFocus();
   });
 
   it("gives a pair only the notes that join its two areas, though a subarea bears another area's name", () => {

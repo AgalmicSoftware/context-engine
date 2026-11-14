@@ -253,9 +253,8 @@ export default function SessionInterviewPanel({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   // joinMatchingGroups is off by default. On, the AI suggests groups; the ones the person ticks join on submit.
-  const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins } = normalizeInterviewSettings(
-    sessionConfig?.interviewMode,
-  );
+  const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins, suggestQuestions } =
+    normalizeInterviewSettings(sessionConfig?.interviewMode);
   const [draftTextShown, setDraftTextShown] = useState(keepDraftTextForAdmins);
   if (draftTextShown && !keepDraftTextForAdmins) setDraftTextShown(false);
   const [showViewResults, setShowViewResults] = useState(false);
@@ -941,6 +940,7 @@ export default function SessionInterviewPanel({
       const instructions = buildRealtimeInterviewInstructions({
         questions: openQuestions.length ? openQuestions : questions,
         answeredQuestions: questions.filter((question) => answered(question.id)),
+        suggestQuestions,
         responderContext: voiceContext,
         openingPrompt: openQuestions.length === questions.length ? interviewOpening.opening : undefined,
         steeringPrompt: interviewOpening.steeringPrompt,

@@ -35,6 +35,7 @@ test('the executable answers MCP over stdio and keeps one agent identity per sta
     { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'whoami', arguments: {} } },
     { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'set_profile', arguments: { modelId: 'model-x' } } },
     { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'list_questions', arguments: {} } },
+    { jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'set_profile', arguments: { platform: 'contextengine' } } },
   ]);
   assert.equal(first.code, 0);
   const byId = Object.fromEntries(first.replies.map((reply) => [reply.id, reply]));
@@ -57,6 +58,10 @@ test('the executable answers MCP over stdio and keeps one agent identity per sta
   assert.match(whoami.address, /^0x[0-9a-fA-F]{40}$/);
   assert.equal(whoami.profile.displayName, 'entry-bot');
   assert.equal(byId[4].result.structuredContent.profile.modelId, 'model-x');
+  // The MCP client named itself "test" when it connected; that fills in until the agent declares one.
+  assert.deepEqual([whoami.profile.platform, whoami.profile.platformSetBy], ['test', 'agent']);
+  assert.equal(byId[6].result.structuredContent.profile.platform, 'contextengine');
+  assert.match(byId[2].result.tools.find((tool) => tool.name === 'set_profile').description, /never guess/);
   assert.equal(byId[5].result.isError, true);
   assert.match(byId[5].result.content[0].text, /join_session/);
   assert.match(first.stderr, /created agent address/);

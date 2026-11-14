@@ -58,8 +58,11 @@ not cancel a publish already in progress. If a publication fails, first inspect
 the registry: the upload may have succeeded despite a connection error. The
 workflow verifies registry integrity after either outcome and never retries the
 upload within the same run. Since npm can take a while to list a new version,
-it reads the registry every ten seconds for up to three minutes before calling
-a publish unconfirmed. A rerun treats identical published bytes as a no-op.
+it reads the registry every ten seconds for up to ten minutes before calling
+a publish unconfirmed. That error prints the expected integrity: if
+`npm view @agalmic/contextengine@<version> dist.integrity` matches it, the
+publish succeeded. While `main` is unchanged, a rerun treats identical published
+bytes as a no-op.
 If `main` or the CI attempt has advanced, use successful CI for the current tip.
 Do not unpublish or overwrite a version to repair a release.
 

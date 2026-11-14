@@ -82,7 +82,7 @@ const SWITCHES = {
   },
   suggestQuestions: {
     label: 'Suggest new question drafts from interview evidence',
-    help: 'When someone’s answers are drafted from their interview, the AI also drafts up to three new questions from what they said. They review them, and only people allowed to add questions can.',
+    help: 'When someone’s answers are drafted from their interview, the AI also drafts up to three new questions from what they said. They review them, and only people allowed to add questions can. On, the voice interviewer also closes by asking what else should be asked.',
   },
   allowManualRefresh: {
     label: 'Allow admins to regenerate the opening',

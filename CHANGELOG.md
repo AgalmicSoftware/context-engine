@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.8] - 2026-11-14
+
+### Client — available when the site deploys
+
+- A session page has a **Feedback** button in its footer that opens a short form, where anyone, signed in or not, can say what worked in the app and what didn't. It goes to the session's admins and is no part of answers, Results or exports. A message never says who sent it. Where the session pays for AI and hasn't ended, a microphone writes speech into the box as on an answer, on the session's AI allowance, without ever asking to sign in, for people the session gives transcription (signed-out visitors only where it lets them). Writing speech down needs the session's OpenAI key: with only another provider's key the microphone shows and says it couldn't. No audio is kept. The button shows only for a session a Worker runs, on a Session Worker running this release; an on-chain session has none.
+- Settings has a **Feedback** section for full admins, to read the messages, download them as a CSV and delete them, and a **Feedback box** setting, on by default. Reading takes no signature; deleting one message or all of them takes one.
+- Risk Matrix: the detail grid for two areas labels its columns and rows, has a key, frames every square (an empty one says "No notes"), shows each balance with an arrow and its note count, and its column and row headings highlight, with a **Clear** button.
+- Every Results view shows when it was made in the same place, top right: built views always show their **Version**, even with one build, and AI Views show when they were generated. AI Views' titles and its Breakdown interpretation are readable in the civic and classic themes.
+- The debate atlas is called **Debate Atlas** everywhere, beside **Build atlas**; its help describes what it shows, and the Results admins help says they can build the atlas, risk matrix and AI Views.
+- The voice interviewer asks its two closing questions (what else should be asked, and which question others should answer) only when the session drafts new questions from interviews. With that setting off, as it is by default, an interview no longer ends on them.
+- Results: when a session holds more answers than one load reads, a Report that fails to load says so, that trying again can take minutes, and what an admin can do.
+- A group on a Session Worker starts on a generated three-word password, selected so an admin can type their own; **Generate new** makes three words too. On-chain groups keep five words. A right password always gets in and wrong tries are not limited, so a hand-typed password should be long and uncommon.
+
+### Workers — requires redeployment
+
+- Session Workers take feedback about the app at `POST /feedback`, from anyone on the session page, signed in or not. A message is text only, at most 2,000 characters, and never names its sender. A person can send 5 a day; a session takes 200 a day and stores 2,000. Only sessions a Worker runs take feedback; an on-chain session takes none.
+- Full admins read and page through feedback with their sign-in (`GET /admin/feedback`), and clear it with one signed delete; results admins and agent keys cannot. Feedback never reaches AI Views, the atlas, the Risk Matrix, the Session Agent, the fidelity report, exports or backups.
+- A session's `feedbackEnabled` setting, on unless set, turns the Feedback box off; turning it off signs no one out.
+
+### Agents and MCP
+
+- MCP 0.4.1. An agent that signs in too often is told "Too many sign-ins" and what to do, instead of a "nonce" message that models mistook for a blockchain limit.
+- Answers record the MCP client's own name as the platform when neither the host nor the agent sets one, and `set_profile` tells models never to guess a model id.
+
+### Local tooling
+
+- `npm run ai:test-theme:feedback` checks the footer's Feedback button and form, speaking included, by keyboard in each theme at phone, tablet and desktop widths.
+- The MCP publish workflow waits up to ten minutes, not three, for npm to list a published version, since npm once took four. If it still can't confirm it, the error gives the `npm view` command and the integrity to compare, and says that when they match, the publish went through and a rerun while `main` is unchanged does nothing.
+
 ## [0.9.7] - 2026-11-13
 
 ### Client — available when the site deploys

@@ -12,7 +12,7 @@ From `ai-discourse-bench/`:
 npm run check:results-sync
 ```
 
-The command hashes the canonical OnePageSession, PolisReport, Debate Map,
+The command hashes the canonical OnePageSession, PolisReport, Debate Atlas,
 Breakdown, Risk Matrix, and Survey Results source files in the parent Context
 Engine checkout and compares them with
 `data/context-engine-results-sync.json`. It fails and lists changed paths when

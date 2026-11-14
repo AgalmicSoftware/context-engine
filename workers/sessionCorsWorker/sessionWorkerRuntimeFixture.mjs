@@ -61,8 +61,14 @@ const createDurableStorage = () => {
   const view = (target) => ({
     get: async (key) => cloneValue(target.get(key)),
     put: async (key, value) => target.set(key, cloneValue(value)),
-    delete: async (key) => target.delete(key),
-    list: async ({ prefix = '' } = {}) => new Map([...target].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => [key, cloneValue(value)])),
+    // One key, or an array of keys answered with how many were there.
+    delete: async (key) => (Array.isArray(key) ? key.filter((name) => target.delete(name)).length : target.delete(key)),
+    // As the runtime's list: sorted, `end` exclusive, `reverse` from the end.
+    list: async ({ prefix = '', startAfter = '', end = '', reverse = false, limit = Infinity } = {}) => new Map([...target]
+      .filter(([key]) => key.startsWith(prefix) && (!startAfter || key > startAfter) && (!end || key < end))
+      .sort(([left], [right]) => (left < right ? -1 : 1) * (reverse ? -1 : 1))
+      .slice(0, limit)
+      .map(([key, value]) => [key, cloneValue(value)])),
   });
   return {
     get: (key) => enqueue(() => view(values).get(key)),

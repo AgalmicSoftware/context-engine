@@ -18,6 +18,7 @@ import styles from './OnePageSession.module.scss';
 
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
 const PolisReportCompat = PolisReport as React.ComponentType<Record<string, unknown>>;
+const SessionFeedback = React.lazy(() => import('./SessionFeedback'));
 const AgentQuestionPile = React.lazy(() => import('./agent/AgentQuestionPile'));
 const AgentBucketCards = React.lazy(() => import('./agent/AgentBucketCards'));
 const AgentDebateMapPanel = React.lazy(() => import('./agent/AgentDebateMapPanel'));
@@ -40,6 +41,7 @@ export type OnePageSessionAgentShellProps = {
   questionResponsesNonce: unknown;
   questionScanProgress: unknown;
   resultsViewMode: string;
+  sessionConfig: unknown;
   sessionHeader: unknown;
   sessionInfo: React.ReactNode;
   sessionName: unknown;
@@ -84,6 +86,7 @@ const OnePageSessionAgentShell = ({
   questionResponsesNonce,
   questionScanProgress,
   resultsViewMode,
+  sessionConfig,
   sessionHeader,
   sessionInfo,
   sessionName,
@@ -220,7 +223,7 @@ const OnePageSessionAgentShell = ({
                   aria-pressed={mode === 'debateAtlas'}
                   onClick={() => onResultsModeChange('debateAtlas')}
                 >
-                  Debate Map
+                  Debate Atlas
                 </button>
               </div>
             </div>
@@ -269,11 +272,20 @@ const OnePageSessionAgentShell = ({
               <div className={styles.agentListEmpty}>No participant-visible results are available yet.</div>
             ) : null}
             {mode === 'debateAtlas' ? (
-              <Suspense fallback={<LazyFallback label="Loading debate map prompt..." minHeight="20vh" />}>
+              <Suspense fallback={<LazyFallback label="Loading debate atlas prompt..." minHeight="20vh" />}>
                 <AgentDebateMapPanel questions={agentQuestions} results={agentResults} />
               </Suspense>
             ) : null}
           </section>
+          {/* Sent without a sign-in: this page signs people in as agents, which the feedback route doesn't read. */}
+          <Suspense fallback={null}>
+            <SessionFeedback
+              sessionSlug={displaySessionSlug}
+              sessionConfig={sessionConfig}
+              account=""
+              view={`agent:${mode}`}
+            />
+          </Suspense>
         </div>
       </div>
     </div>

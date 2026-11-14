@@ -144,6 +144,10 @@ describe('SessionGeneratedResultsViews', () => {
 
     expect(screen.getByText('AI-generated session view')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Risk Matrix' })).toBeInTheDocument();
+    // Where a built view shows its Version, with no picker: there is one result.
+    expect(screen.getByTestId('ce-session-generated-results-version')).toHaveTextContent(/^VersionGenerated .*2026/);
+    expect(screen.getByText('Model mock-model')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(await screen.findByTestId('ce-risk-matrix-generated-severity')).toBeInTheDocument();
     expect(screen.getByTestId('ce-risk-matrix-severity-cell-likelihood-medium-impact-high')).toHaveTextContent(
       'Rehearsal Readiness',

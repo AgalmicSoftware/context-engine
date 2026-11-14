@@ -1212,6 +1212,35 @@ addresses it took from chain defaults because the metadata could not be read,
 until you correct or confirm them. An on-chain session's questions are added on
 its session page, not from a template here.
 
+### Read feedback about the app
+
+A session page whose Session Worker is on 0.9.8 or later has a **Feedback**
+button in the page's footer. It opens a short form where anyone, signed in or
+not, can say what worked in the app and what didn't; the session's admins read
+it. It is about the app, not the session's subject: nothing sent is part of
+anyone's answers, Results, AI views, the Session Agent's reading or any export.
+
+Where the session pays for AI and hasn't ended, a microphone beside the box
+writes speech down into it, as on an answer: the audio goes through the
+session's Worker to its AI provider on the session's AI allowance and limits,
+and is not kept. The words can be edited before **Send**, and count against the
+limit. It never asks to sign in or uses a person's own AI key, and shows only
+to people the session gives transcription: participants, and signed-out
+visitors only where the session lets them. Writing speech down needs the
+session's OpenAI key: with only an Anthropic or OpenRouter key the microphone
+still shows, as on an answer, and says it couldn't write the speech down.
+
+Each message is up to 2,000 characters of plain text. With it go the part of the
+page that was open (never the page's address, which can carry invites), the
+theme, whether the screen was a phone, tablet or desktop, and the app's and the
+Worker's releases. Nothing names the sender; the admins see only whether they
+were signed in.
+
+A full admin reads the messages under **Feedback** on the session's settings
+page: **Show messages**, **Download CSV**, and **Delete** for one message or all
+those listed. The **Feedback box** setting there, on by default, takes the button off
+the session page; changing it signs no one out.
+
 ### Templates and share links
 
 **Export** downloads the draft as a `ce.session-template/v1` JSON file;

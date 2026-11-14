@@ -123,7 +123,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
       status: 'live',
     },
     {
-      name: 'Debate Map',
+      name: 'Debate Atlas',
       subtext: 'For efficient discourse',
       icon: faProjectDiagram,
       explainText:
@@ -277,7 +277,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
               toolbarTarget: questionsToolbarTarget,
             }
           : {}),
-        ...(expandedToolName === 'Debate Map'
+        ...(expandedToolName === 'Debate Atlas'
           ? {
               demoMode: demoSurfaceEnabled,
               // The child clears its modal; its default close otherwise routes
@@ -428,7 +428,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                     </div>
                   )}
 
-                  {expandedComponent.data.name === 'Debate Map' && (
+                  {expandedComponent.data.name === 'Debate Atlas' && (
                     <a
                       href={buildPublicRoute('/atlas')}
                       className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerActionLink}`}

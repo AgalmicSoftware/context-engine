@@ -267,7 +267,7 @@ async function inspectStates(page, control, name, target) {
 
 export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', theme = '' } = {}) {
   const nav = page.getByTestId('ce-session-results-view-nav');
-  await nav.getByRole('button', { name: 'Debate Map', exact: true }).click();
+  await nav.getByRole('button', { name: 'Debate Atlas', exact: true }).click();
   const atlas = page.getByTestId('ce-session-debate-atlas');
   await atlas.waitFor();
   await page.getByTestId('ce-atlas-node').first().waitFor();
@@ -470,7 +470,22 @@ export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } =
   await step('detail grid', () => assertReadable(subgrid));
   const subcell = subgrid.getByTestId('ce-risk-matrix-subcell-safety-street-lighting-vs-transport-bus-lanes');
   await inspectStates(page, subcell, 'detail cell', subgrid);
-  await inspectStates(page, view.getByTestId('ce-risk-matrix-selector-x-street-lighting'), 'subarea selector', view);
+  const detailHelp = subgrid.getByRole('button', { name: 'How to read this grid' });
+  await detailHelp.focus();
+  await step('detail grid tooltip', async () => {
+    const tip = page.getByRole('tooltip').filter({ hasText: 'A square holds the notes' });
+    await tip.waitFor();
+    await assertReadable(tip);
+  });
+  await detailHelp.blur();
+  const heading = subgrid.getByTestId('ce-risk-matrix-subheader-x-street-lighting');
+  await inspectStates(page, heading, 'detail heading', subgrid);
+  await heading.click();
+  await step('detail grid highlighted', () => assertReadable(subgrid));
+  const clear = subgrid.getByTestId('ce-risk-matrix-clear-highlight');
+  await inspectStates(page, clear, 'clear highlight', subgrid);
+  if (screenshotDir) await subgrid.screenshot({ path: `${screenshotDir}/risk-matrix-detail-highlight-${tag}.png` });
+  await clear.click();
   await subcell.click();
   await step('detail cell notes', async () => {
     await modal.getByText('Lit bus stops make late routes feel safer.').waitFor();

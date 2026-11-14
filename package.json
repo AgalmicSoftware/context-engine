@@ -1,6 +1,6 @@
 {
   "name": "contextEngine",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "description": "Context Engine — an OSS toolkit for groups",
   "author": "Context Engine Contributors",
   "license": "MPL-2.0",
@@ -105,6 +105,7 @@
     "ai:test-about": "node scripts/about-page-smoke.mjs",
     "ai:test-theme:results": "node scripts/results-theme-smoke.mjs",
     "ai:test-theme:results-builds": "node scripts/results-builds-theme-smoke.mjs",
+    "ai:test-theme:feedback": "node scripts/session-feedback-theme-smoke.mjs",
     "ai:test-theme:runtime": "npm run -s ai:node -- scripts/app-theme-runtime-smoke.js",
     "ai:test-nav:smoke:mobile": "PLAYWRIGHT_VIEWPORT=mobile npm run -s ai:test-nav:smoke",
     "ai:test-nav:smoke:firefox": "PLAYWRIGHT_BROWSER=firefox npm run -s ai:test-nav:smoke",

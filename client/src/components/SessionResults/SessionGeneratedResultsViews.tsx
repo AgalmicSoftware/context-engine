@@ -270,11 +270,16 @@ const SessionGeneratedResultsViews = ({
   return (
     <section className={wrapperClassName} data-testid="ce-session-generated-results-view">
       <div className={styles.header}>
-        <p className={styles.eyebrow}>AI-generated session view</p>
-        <h2 className={styles.title}>{label}</h2>
-        {generatedAt || model ? (
-          <p className={styles.meta}>
-            {[generatedAt ? `Generated ${generatedAt}` : '', model ? `Model ${model}` : ''].filter(Boolean).join(' · ')}
+        <div className={styles.headerText}>
+          <p className={styles.eyebrow}>AI-generated session view</p>
+          <h2 className={styles.title}>{label}</h2>
+          {model ? <p className={styles.meta}>Model {model}</p> : null}
+        </div>
+        {/* Where a built view's Version picker sits; AI Views keep one result, so there is nothing to pick. */}
+        {generatedAt ? (
+          <p className={styles.version} data-testid="ce-session-generated-results-version">
+            <span>Version</span>
+            <span className={styles.versionValue}>Generated {generatedAt}</span>
           </p>
         ) : null}
       </div>

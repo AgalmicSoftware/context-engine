@@ -158,3 +158,15 @@ export const SettingsSbtFields = ({ draft, onChange, onChain }: FieldsProps & { 
     ) : null}
   </>
 );
+
+// Whether the session page offers its Feedback button, for feedback about the app itself.
+export const SettingsFeedbackField = ({ draft, onChange }: FieldsProps) => (
+  <SetupCheck
+    id="ce-settings-feedback-enabled"
+    label="Feedback box"
+    help="Shows a Feedback button in the session page’s footer, where anyone can say what worked in the app and what didn’t. Messages come to this session’s admins, here, and aren’t part of anyone’s answers."
+    checked={draft.feedbackEnabled !== false}
+    testId="ce-settings-feedback-enabled"
+    onChange={(checked) => onChange(['feedbackEnabled'], checked)}
+  />
+);

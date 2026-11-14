@@ -487,6 +487,7 @@ describe('capped Worker response listings', () => {
   const ROWS = 120;
   const createLargeSession = () => {
     let failCursor = '';
+    let total = ROWS;
     const listPage = jest.fn(async ({ cursor }: any) => {
       if (cursor && cursor === failCursor) throw new Error('Expired cursor');
       const start = Number(cursor || 0);
@@ -498,7 +499,7 @@ describe('capped Worker response listings', () => {
           },
         ],
         cursor: String(start + 1),
-        listComplete: start + 1 >= ROWS,
+        listComplete: start + 1 >= total,
       };
     });
     const readBlob = async ({ storageRef }: any) =>
@@ -543,6 +544,9 @@ describe('capped Worker response listings', () => {
       failAt: (cursor: string) => {
         failCursor = cursor;
       },
+      shrinkTo: (rows: number) => {
+        total = rows;
+      },
       answered: () => Object.keys(questions.worker.questionResponses.q1 || {}).length,
       node: () => questions.worker,
     };
@@ -561,6 +565,20 @@ describe('capped Worker response listings', () => {
     expect(session.answered()).toBe(ROWS);
     expect(session.node().workerResponseListCursor).toBeUndefined();
     expect(session.node().workerResponseHydrationStatus).toBe('partial');
+    // A report that can't be shown during the next load still knows the session is over the limit.
+    expect(session.node().workerResponseOverReadLimit).toBe(true);
+  });
+
+  it('stops calling a session over the read limit once one load reads it whole', async () => {
+    const session = createLargeSession();
+    await session.refresh();
+    expect(session.node().workerResponseOverReadLimit).toBe(true);
+    session.shrinkTo(50);
+    // The continuation still counts as partial; the next load from the first page is whole.
+    await session.refresh();
+    await session.refresh();
+    expect(session.node().workerResponseHydrationStatus).toBe('complete');
+    expect(session.node().workerResponseOverReadLimit).toBe(false);
   });
 
   it('restarts from the first page after a continuation fails', async () => {
