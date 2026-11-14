@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Client — available when the site deploys
 
 - Opening a session takes far fewer requests. Measured in a browser on a session of 40 questions and 1,200 answers: a signed-in member's page load went from 114 requests to 65 on a public session, and from 174 to 67 on a members-only one; signed out, from 99 to 60.
+- A session page no longer reloads every question, answer and survey while the on-chain session registry can't be reached (offline, or its RPC blocked). It did so about 3, 6, 12, 24 and 48 seconds after loading, then every 30 seconds for as long as the page stayed open. On the same session, signed in, the first minute went from 108 requests and 5.6 MB to 35 and 2.0 MB.
 - Your saved answers come from a listing of your own, not everyone's.
 - A members-only session is asked signed in from the start once the tab knows it needs that, instead of being refused signed out first on every read.
 - AI Views refreshes without downloading its answers again unless the build changed: with Results open for a minute, 7.2 MB became 2.5 MB.

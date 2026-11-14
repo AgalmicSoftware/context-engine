@@ -802,6 +802,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         sessionPathResolutionNonce: Number(prev.sessionPathResolutionNonce || 0) + 1,
       }));
     },
+    rerender: () => this.forceUpdate(),
     normalizeRoutePath: (path: string) => this.normalizeRoutePath(path),
     getSessionTokenFromPath: (path: string) => this.getSessionTokenFromPath(path),
     warn: (context: string, error: unknown) => mainSiteLog.warn(context, error),

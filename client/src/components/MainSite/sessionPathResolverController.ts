@@ -22,7 +22,10 @@ export interface SessionPathResolverHost {
   getProvider: () => unknown;
   getAccount: () => unknown;
   isMounted: () => boolean;
+  /** The registry gave a config or the route was rewritten: the page reloads the session's data. */
   bumpResolutionNonce: () => void;
+  /** Nothing changed (not registered, or the lookup failed): only the waiting or not-found view updates. */
+  rerender: () => void;
   normalizeRoutePath: (path: string) => string;
   getSessionTokenFromPath: (path: string) => string;
   warn: (context: string, error: unknown) => void;
@@ -184,15 +187,16 @@ const fetchSessionFromRegistryAcrossChains = async (
   return { resolved, lastErr };
 };
 
-const maybeCanonicalizeSessionIdRoute = (host: SessionPathResolverHost, sessionId: string): void => {
+// True when it rewrote the address.
+const maybeCanonicalizeSessionIdRoute = (host: SessionPathResolverHost, sessionId: string): boolean => {
   const resolvedCfg = sessionRegistryStore.getSessionConfigById(sessionId);
-  if (!resolvedCfg || typeof window === 'undefined') return;
+  if (!resolvedCfg || typeof window === 'undefined') return false;
 
   const currentPath = window.location.pathname || '';
   const normalizedCurrentPath = host.normalizeRoutePath(currentPath);
   const currentToken = host.getSessionTokenFromPath(currentPath);
   const currentSessionId = sessionRegistryUtils.formatSessionId(currentToken);
-  if (!currentSessionId || currentSessionId !== sessionId) return;
+  if (!currentSessionId || currentSessionId !== sessionId) return false;
 
   const currentParts = String(normalizedCurrentPath || '')
     .split('/')
@@ -200,15 +204,24 @@ const maybeCanonicalizeSessionIdRoute = (host: SessionPathResolverHost, sessionI
   // Docs and settings keep their own paths; only the session page itself is canonicalized here.
   const isOwnSubroute =
     currentParts.length >= 3 && currentParts[0] === 'session' && ['docs', 'settings'].includes(currentParts[2]);
-  if (isOwnSubroute) return;
+  if (isOwnSubroute) return false;
 
   const resolvedSlug = normalizeSessionSlug(resolvedCfg.slug || '');
   const canonicalToken = resolvedSlug || DEFAULT_SESSION_SLUG_ALIAS;
   const nextPath = `/session/${canonicalToken}`;
-  if (normalizedCurrentPath === nextPath) return;
+  if (normalizedCurrentPath === nextPath) return false;
 
   const nextUrl = buildPublicUrl(nextPath, window.location.search || '', window.location.hash || '');
   window.history.replaceState({}, '', nextUrl);
+  return true;
+};
+
+// A lookup that changed nothing must not reload the session's data: while the registry's RPC can't be reached it
+// retries with growing gaps for as long as the page is open, and a Worker-run session isn't in the registry at all.
+const settleResolve = (host: SessionPathResolverHost, changed: boolean): void => {
+  if (!host.isMounted()) return;
+  if (changed) host.bumpResolutionNonce();
+  else host.rerender();
 };
 
 export function createSessionPathResolverController(host: SessionPathResolverHost): SessionPathResolverController {
@@ -243,9 +256,11 @@ export function createSessionPathResolverController(host: SessionPathResolverHos
     controller._pendingIdResolves.add(sessionId);
 
     void (async () => {
+      let changed = false;
       try {
         const { resolved, lastErr } = await fetchSessionFromRegistryAcrossChains(host, { sessionId });
 
+        changed = resolved;
         if (resolved) {
           clearResolveErrorState(controller, 'id', sessionId, host);
         } else if (lastErr) {
@@ -255,14 +270,11 @@ export function createSessionPathResolverController(host: SessionPathResolverHos
         }
 
         if (controller._destroyed) return;
-        maybeCanonicalizeSessionIdRoute(host, sessionId);
+        if (maybeCanonicalizeSessionIdRoute(host, sessionId)) changed = true;
       } catch (error) {
         host.warn('[SessionRegistry] Failed resolving /session/:sessionId path:', error);
       } finally {
-        const wasPending = controller._pendingIdResolves.delete(sessionId);
-        if (wasPending && host.isMounted()) {
-          host.bumpResolutionNonce();
-        }
+        if (controller._pendingIdResolves.delete(sessionId)) settleResolve(host, changed);
       }
     })();
   };
@@ -282,8 +294,10 @@ export function createSessionPathResolverController(host: SessionPathResolverHos
     controller._pendingSlugResolves.add(slug);
 
     void (async () => {
+      let changed = false;
       try {
         const { resolved, lastErr } = await fetchSessionFromRegistryAcrossChains(host, { slug });
+        changed = resolved;
 
         if (resolved) {
           clearResolveErrorState(controller, 'slug', slug, host);
@@ -295,10 +309,7 @@ export function createSessionPathResolverController(host: SessionPathResolverHos
       } catch (error) {
         host.warn('[SessionRegistry] Failed resolving /session/:slug path:', error);
       } finally {
-        const wasPending = controller._pendingSlugResolves.delete(slug);
-        if (wasPending && host.isMounted()) {
-          host.bumpResolutionNonce();
-        }
+        if (controller._pendingSlugResolves.delete(slug)) settleResolve(host, changed);
       }
     })();
   };
