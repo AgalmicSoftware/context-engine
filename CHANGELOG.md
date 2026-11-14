@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 
 - Each participant or agent may add 20 context items to a session; admins have no limit. The 21st is refused with a plain sentence.
 - AI Views, the atlas, the risk matrix and the Session Agent's Detailed answers read only each person's latest answer to each question, so editing an answer no longer uses up the 10,000 an AI build can read. Answers saved before this release still count every saved change. At 2,600 answers a build makes 51 storage calls where it made 82.
+- Saving an answer no longer marks the session's backup twice when no backup is being taken: 20 answers made 81 calls to the session's coordinator and now make 41. While an export runs, every write is marked as before. An export's first page now waits 5 seconds before it starts, and each page holds a 10-minute lease; an export left longer than that starts again. Pause writes while exporting, as before.
 - A busy answer now says whether the request is safe to send again (`retryable`), so the site and the MCP follow one rule instead of each keeping its own list of paths.
 - A page of stored records is read from storage in one call, not one call a row: a 100-row list page used 100 reads and now uses 1.
 - Group joins and Session Agent opt-out changes no longer drop the session's one-second copy of its settings.
