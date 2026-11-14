@@ -7,6 +7,7 @@ import {
   dictationOffered,
   feedbackOffered,
   feedbackView,
+  feedbackWorkerRun,
   sendFeedback,
 } from '../../domains/worker/sessionFeedbackPorts';
 
@@ -18,6 +19,12 @@ jest.mock('../../domains/worker/sessionFeedbackPorts', () => ({
   feedbackView: jest.requireActual<typeof import('../../domains/worker/sessionFeedbackPorts')>(
     '../../domains/worker/sessionFeedbackPorts',
   ).feedbackView,
+  feedbackWorkerRun: jest.requireActual<typeof import('../../domains/worker/sessionFeedbackPorts')>(
+    '../../domains/worker/sessionFeedbackPorts',
+  ).feedbackWorkerRun,
+  sessionEnded: jest.requireActual<typeof import('../../domains/worker/sessionFeedbackPorts')>(
+    '../../domains/worker/sessionFeedbackPorts',
+  ).sessionEnded,
 }));
 
 // The recorder the answer field uses, as a test sets it; it counts its unmounts, which stop a real one.
@@ -119,6 +126,21 @@ describe('SessionFeedback', () => {
     await act(async () => {});
     expect(offered).not.toHaveBeenCalled();
     expect(slot).toBeEmptyDOMElement();
+  });
+
+  it('asks again once the session’s config arrives after the page mounted', async () => {
+    // The real test reads the config: no answer from a Worker it can't tell runs the session.
+    offered.mockImplementation(async ({ sessionConfig }) => feedbackWorkerRun(sessionConfig));
+    const { rerender } = render(<SessionFeedback {...PROPS} sessionConfig={null} />);
+    await act(async () => {});
+    expect(slot).toBeEmptyDOMElement();
+    rerender(
+      <SessionFeedback
+        {...PROPS}
+        sessionConfig={{ slug: 'salon', sessionModeProfile: { authority: { mode: 'worker_canonical' } } }}
+      />,
+    );
+    expect(await footerButton()).toBeInTheDocument();
   });
 
   it('opens from a footer button, says who reads it, and puts focus in the box', async () => {
@@ -283,8 +305,9 @@ describe('SessionFeedback', () => {
       await renderOpen();
       const button = await mic();
       expect(button).toHaveAttribute('aria-pressed', 'false');
+      // Like Send, it never opens a signature or passkey prompt.
       expect(mockWhisper.options).toEqual(
-        expect.objectContaining({ sessionSlug: 'salon', context: { account: '0xabc' } }),
+        expect.objectContaining({ sessionSlug: 'salon', context: { account: '0xabc' }, signInPrompt: false }),
       );
       fireEvent.click(button);
       expect(mockWhisper.state.startRecording).toHaveBeenCalledTimes(1);
@@ -358,20 +381,65 @@ describe('SessionFeedback', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t transcribe the recording. Try again.');
     });
 
-    it('lets Send go again after the dialog closed mid-recording', async () => {
-      speech.mockResolvedValue(true);
+    it('lets Send go again when signing out takes the microphone away mid-recording', async () => {
+      speech.mockResolvedValueOnce(true).mockResolvedValue(false);
       mockWhisper.state = { ...mockWhisper.state, isRecording: true };
-      await renderOpen();
-      type('Before the close.');
+      offered.mockResolvedValue(true);
+      const { rerender } = render(<SessionFeedback {...PROPS} />);
+      await open();
+      type('Before signing out.');
       await screen.findByRole('button', { name: 'Stop recording' });
       expect(sendButton()).toBeDisabled();
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-      // Closing stopped the recorder, so it is idle when the dialog opens again.
-      mockWhisper.state = { ...mockWhisper.state, isRecording: false };
+      // Signed out, a visitor's speech isn't taken here: the microphone goes, and Send with it is free.
+      rerender(<SessionFeedback {...PROPS} account="" />);
+      await waitFor(() => expect(screen.queryByTestId('ce-session-feedback-mic')).not.toBeInTheDocument());
+      expect(speech).toHaveBeenLastCalledWith(expect.objectContaining({ account: '' }));
+      expect(sendButton()).toBeEnabled();
+    });
+
+    it('drops an answer for the old sign-in that lands after signing out', async () => {
+      let answerForOld: (value: boolean) => void = () => {};
+      speech.mockReturnValueOnce(new Promise((resolve) => (answerForOld = resolve))).mockResolvedValue(false);
+      offered.mockResolvedValue(true);
+      const { rerender } = render(<SessionFeedback {...PROPS} />);
+      await open();
+      rerender(<SessionFeedback {...PROPS} account="" />);
+      await waitFor(() => expect(speech).toHaveBeenLastCalledWith(expect.objectContaining({ account: '' })));
+      await act(async () => answerForOld(true));
+      expect(screen.queryByTestId('ce-session-feedback-mic')).not.toBeInTheDocument();
+    });
+
+    it('takes the microphone away when the session ends while the page is open', async () => {
+      speech.mockResolvedValue(true);
+      offered.mockResolvedValue(true);
+      const until = (ms: number) => ({ slug: 'salon', sessionEndsAt: new Date(Date.now() + ms).toISOString() });
+      const { rerender } = render(<SessionFeedback {...PROPS} sessionConfig={until(60_000)} />);
       await open();
       await mic();
-      expect(sendButton()).toBeEnabled();
+      rerender(<SessionFeedback {...PROPS} sessionConfig={until(-1_000)} />);
+      expect(screen.queryByTestId('ce-session-feedback-mic')).not.toBeInTheDocument();
+    });
+
+    it('asks again on the next open when the Worker couldn’t be read', async () => {
+      speech.mockResolvedValueOnce(null).mockResolvedValue(true);
+      await renderOpen();
+      await waitFor(() => expect(speech).toHaveBeenCalledTimes(1));
+      expect(screen.queryByTestId('ce-session-feedback-mic')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      await open();
+      expect(await mic()).toBeInTheDocument();
+      expect(speech).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps a real no for the page', async () => {
+      await renderOpen();
+      await waitFor(() => expect(speech).toHaveBeenCalledTimes(1));
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      await open();
+      await act(async () => {});
+      expect(speech).toHaveBeenCalledTimes(1);
     });
 
     it('stops recording when the dialog closes, and keeps what was written', async () => {

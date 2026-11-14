@@ -1220,10 +1220,15 @@ not, can say what worked in the app and what didn't; the session's admins read
 it. It is about the app, not the session's subject: nothing sent is part of
 anyone's answers, Results, AI views, the Session Agent's reading or any export.
 
-Where the session pays for AI, a microphone beside the box writes speech down
-into it, as on an answer: the audio goes through the session's Worker to its AI
-provider on the session's AI allowance and limits, and is not kept. The words
-can be edited before **Send**, and count against the limit.
+Where the session pays for AI and hasn't ended, a microphone beside the box
+writes speech down into it, as on an answer: the audio goes through the
+session's Worker to its AI provider on the session's AI allowance and limits,
+and is not kept. The words can be edited before **Send**, and count against the
+limit. It never asks to sign in or uses a person's own AI key, and shows only
+to people the session gives transcription: participants, and signed-out
+visitors only where the session lets them. Writing speech down needs the
+session's OpenAI key: with only an Anthropic or OpenRouter key the microphone
+still shows, as on an answer, and says it couldn't write the speech down.
 
 Each message is up to 2,000 characters of plain text. With it go the part of the
 page that was open (never the page's address, which can carry invites), the

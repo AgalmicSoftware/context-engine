@@ -63,15 +63,17 @@ const workerBase = async (options: FeedbackOptions): Promise<string> =>
 /** The open part of the page as a short name. Never an address: links carry group ids, invites and prefills. */
 export const feedbackView = (view: string): string => view.replace(/[^A-Za-z0-9:_-]/g, '').slice(0, 80) || 'session';
 
+/** The Worker's own test of a session it runs, so the page and the Worker never disagree. */
+export const feedbackWorkerRun = (sessionConfig: unknown): boolean =>
+  asRecord(asRecord(asRecord(sessionConfig).sessionModeProfile).authority).mode === 'worker_canonical';
+
 /**
  * True when the session is run by its Worker, its admins left the Feedback box on, and the Worker takes
  * feedback (from 0.9.8). An on-chain session has no place for its admins to read it, so it is never offered.
  */
 export const feedbackOffered = async (options: FeedbackOptions): Promise<boolean> => {
   const config = asRecord(options.sessionConfig);
-  // The Worker's own test of a session it runs, so the page and the Worker never disagree.
-  const workerRun = asRecord(asRecord(config.sessionModeProfile).authority).mode === 'worker_canonical';
-  if (config.feedbackEnabled === false || !workerRun) return false;
+  if (config.feedbackEnabled === false || !feedbackWorkerRun(config)) return false;
   try {
     const capabilities = await readWorkerCapabilities(await workerBase(options), options.sessionSlug);
     return capabilities.features.includes(FEEDBACK_FEATURE);
@@ -80,16 +82,43 @@ export const feedbackOffered = async (options: FeedbackOptions): Promise<boolean
   }
 };
 
+/** True once the session's end time has passed, when the Worker stops writing speech down. */
+export const sessionEnded = (sessionConfig: unknown): boolean => {
+  const endsAt = Date.parse(toStr(asRecord(sessionConfig).sessionEndsAt));
+  return Number.isFinite(endsAt) && endsAt <= Date.now();
+};
+
+// The Worker's rule for writing down speech in a session it runs: transcription among the scopes it gives a
+// signed-in participant, or a signed-out visitor where no sign-in condition stands in the way. A signed-in
+// person's sign-in condition is the Worker's to check.
+const transcriptionOpen = (config: Record<string, unknown>, signedIn: boolean): boolean => {
+  const policy = asRecord(config.workerAuthority);
+  const conditions = asRecord(policy.loginGate).conditions;
+  const gated =
+    Array.isArray(conditions) &&
+    conditions.some((condition) => !!condition && typeof condition === 'object' && !Array.isArray(condition));
+  const list = signedIn ? policy.participantScopes : policy.anonymousScopes;
+  return (
+    Number(policy.version) === 1 &&
+    (signedIn || !gated) &&
+    (Array.isArray(list) ? list : []).some((scope) => toStr(scope).trim().toLowerCase() === 'transcribe') &&
+    asRecord(config.scopes).transcribe !== false
+  );
+};
+
 /**
- * True when the session's Worker holds an AI key the session pays for, so speech can be written down there as
- * for an answer. Asked when the form first opens; the Worker's reply is kept for half a minute.
+ * Whether speech can be written down here as for an answer: the session pays for AI, hasn't ended, and gives
+ * this person, signed in or not, transcription. Asked when the form opens, and only a real answer counts:
+ * `null` when the Worker couldn't be read, so the next open asks again.
  */
-export const dictationOffered = async (options: FeedbackOptions): Promise<boolean> => {
+export const dictationOffered = async (options: FeedbackOptions): Promise<boolean | null> => {
   const { sessionSlug, sessionConfig, account } = options;
+  const config = asRecord(sessionConfig);
+  if (sessionEnded(config) || !transcriptionOpen(config, !!account)) return false;
   const presence = await readWorkerResourcePresence({ sessionSlug, sessionConfig, context: { account } }).catch(
     () => null,
   );
-  return presence?.ai === true;
+  return presence ? presence.ai : null;
 };
 
 // The feedback route's own refusals are plain sentences for the sender; any other error's text may hold anything.

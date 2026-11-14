@@ -9,6 +9,8 @@ import {
   FEEDBACK_TEXT_MAX,
   dictationOffered,
   feedbackOffered,
+  feedbackWorkerRun,
+  sessionEnded,
   feedbackView,
   sendFeedback,
   type FeedbackDraft,
@@ -55,6 +57,8 @@ function Dictation({
     sessionSlug: options.sessionSlug,
     sessionConfig: options.sessionConfig,
     context: { account: options.account },
+    // Like Send, speaking never asks for a signature or passkey.
+    signInPrompt: false,
     onTranscriptionComplete: onWords,
   });
   const writing = isProcessing || status === RECORDING_STATUS.PROCESSING;
@@ -135,6 +139,8 @@ function Feedback({ sessionSlug, sessionConfig, account, view }: Props) {
   const typed = useRef(text);
   typed.current = text;
   const turnedOff = (sessionConfig as { feedbackEnabled?: unknown } | null)?.feedbackEnabled === false;
+  // The page may get the session's config after this mounts: ask again once it says a Worker runs it.
+  const workerRun = feedbackWorkerRun(sessionConfig);
 
   // The button sits in the site's footer, which the app renders beside the session page: in each of its places,
   // of which the footer shows the one its theme uses.
@@ -154,18 +160,25 @@ function Feedback({ sessionSlug, sessionConfig, account, view }: Props) {
     return () => {
       current = false;
     };
-  }, [sessionSlug, turnedOff]);
+  }, [sessionSlug, turnedOff, workerRun]);
 
+  // Signing in or out changes whether speech can be written down.
+  useEffect(() => {
+    setSpeech(null);
+  }, [account]);
+
+  // Asked again for a new sign-in, which also drops an answer still on its way for the old one.
   useEffect(() => {
     if (!open || speech !== null) return undefined;
     let current = true;
+    // A Worker that couldn't be read gives null, so the next open asks again.
     void dictationOffered(options.current).then((value) => {
-      if (current) setSpeech(value);
+      if (current && value !== null) setSpeech(value);
     });
     return () => {
       current = false;
     };
-  }, [open, speech]);
+  }, [open, speech, account]);
 
   // Send and Send more each remove the control that had focus: move it to what replaced them, which
   // also has a screen reader read the thanks.
@@ -296,7 +309,10 @@ function Feedback({ sessionSlug, sessionConfig, account, view }: Props) {
                 <p id="ce-session-feedback-left" className={styles.hint}>
                   {(FEEDBACK_TEXT_MAX - text.length).toLocaleString('en-US')} left
                 </p>
-                {speech ? <Dictation options={options.current} onWords={addWords} onBusy={setListening} /> : null}
+                {/* Gone once the session ends while the page is open. */}
+                {speech && !sessionEnded(sessionConfig) ? (
+                  <Dictation options={options.current} onWords={addWords} onBusy={setListening} />
+                ) : null}
               </div>
               {cut ? (
                 <p className={styles.hint} role="status">

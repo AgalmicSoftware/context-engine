@@ -5,6 +5,7 @@ import {
   feedbackOffered,
   listFeedback,
   sendFeedback,
+  sessionEnded,
   type FeedbackAdmin,
   type FeedbackDraft,
   type FeedbackMessage,
@@ -97,21 +98,61 @@ describe('sessionFeedbackPorts', () => {
     await expect(feedbackOffered(SIGNED_IN)).resolves.toBe(false);
   });
 
+  // A session that gives transcription to its participants and to visitors.
+  const AUTHORITY = { version: 1, participantScopes: ['ai', 'transcribe'], anonymousScopes: ['ai', 'Transcribe'] };
+  const SPEAKING = { ...WORKER_RUN, workerAuthority: AUTHORITY };
+
   it('offers speech only where the session’s Worker holds an AI key the session pays for', async () => {
     presence.mockResolvedValue({ ai: true, arweave: false, rpc: false, txGas: false });
-    await expect(dictationOffered(VISITOR)).resolves.toBe(true);
+    await expect(dictationOffered({ ...SIGNED_IN, sessionConfig: SPEAKING })).resolves.toBe(true);
     expect(presence).toHaveBeenCalledWith({
       sessionSlug: 'salon',
-      sessionConfig: WORKER_RUN,
-      context: { account: '' },
+      sessionConfig: SPEAKING,
+      context: { account: '0xabc' },
     });
     presence.mockResolvedValue({ ai: false, arweave: true, rpc: true, txGas: true });
-    await expect(dictationOffered(SIGNED_IN)).resolves.toBe(false);
-    // An older Worker, or one that can't be reached, says nothing: no microphone.
+    await expect(dictationOffered({ ...SIGNED_IN, sessionConfig: SPEAKING })).resolves.toBe(false);
+    // An older Worker, or one that can't be reached, gives no answer, so the form asks again later.
     presence.mockResolvedValue(null);
-    await expect(dictationOffered(SIGNED_IN)).resolves.toBe(false);
+    await expect(dictationOffered({ ...SIGNED_IN, sessionConfig: SPEAKING })).resolves.toBeNull();
     presence.mockRejectedValue(new Error('no Worker'));
-    await expect(dictationOffered(SIGNED_IN)).resolves.toBe(false);
+    await expect(dictationOffered({ ...SIGNED_IN, sessionConfig: SPEAKING })).resolves.toBeNull();
+  });
+
+  it('offers no speech once the session has ended, without asking the Worker', async () => {
+    presence.mockResolvedValue({ ai: true, arweave: false, rpc: false, txGas: false });
+    const ended = { ...SPEAKING, sessionEndsAt: new Date(Date.now() - 60_000).toISOString() };
+    expect(sessionEnded(ended)).toBe(true);
+    await expect(dictationOffered({ ...SIGNED_IN, sessionConfig: ended })).resolves.toBe(false);
+    expect(presence).not.toHaveBeenCalled();
+    const later = { ...SPEAKING, sessionEndsAt: new Date(Date.now() + 60_000).toISOString() };
+    expect(sessionEnded(later)).toBe(false);
+    expect(sessionEnded(SPEAKING)).toBe(false);
+    await expect(dictationOffered({ ...SIGNED_IN, sessionConfig: later })).resolves.toBe(true);
+  });
+
+  it('offers speech only to whom the session gives transcription, as the Worker decides', async () => {
+    presence.mockResolvedValue({ ai: true, arweave: false, rpc: false, txGas: false });
+    await expect(dictationOffered({ ...VISITOR, sessionConfig: SPEAKING })).resolves.toBe(true);
+    presence.mockClear();
+    const gate = { loginGate: { conditions: [{ kind: 'worker_role' }] } };
+    for (const [who, closed] of [
+      [VISITOR, WORKER_RUN],
+      [VISITOR, { ...WORKER_RUN, workerAuthority: { ...AUTHORITY, version: 2 } }],
+      [VISITOR, { ...WORKER_RUN, workerAuthority: { ...AUTHORITY, anonymousScopes: ['ai'] } }],
+      [VISITOR, { ...WORKER_RUN, workerAuthority: { ...AUTHORITY, ...gate } }],
+      [VISITOR, { ...SPEAKING, scopes: { transcribe: false } }],
+      [SIGNED_IN, WORKER_RUN],
+      [SIGNED_IN, { ...WORKER_RUN, workerAuthority: { ...AUTHORITY, participantScopes: ['ai'] } }],
+      [SIGNED_IN, { ...SPEAKING, scopes: { transcribe: false } }],
+    ] as const) {
+      await expect(dictationOffered({ ...who, sessionConfig: closed })).resolves.toBe(false);
+    }
+    expect(presence).not.toHaveBeenCalled();
+    // A signed-in person's sign-in condition is the Worker's to check.
+    await expect(
+      dictationOffered({ ...SIGNED_IN, sessionConfig: { ...WORKER_RUN, workerAuthority: { ...AUTHORITY, ...gate } } }),
+    ).resolves.toBe(true);
   });
 
   it('sends a signed-in person’s message with their sign-in, and nothing that names them', async () => {
