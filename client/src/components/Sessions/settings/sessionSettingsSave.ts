@@ -17,8 +17,10 @@ type SaveSessionSettingsInput = {
   sessionSlug: string;
   /** The Worker-canonical session ID the admin signature is bound to ('' for an on-chain session). */
   sessionIdHex: string;
-  /** Only changed fields set-config accepts (buildSessionSettingsSave's patch). */
+  /** Changed fields for set-config, which replaces limits whole when the patch carries them. */
   patch: Record<string, unknown>;
+  /** Limits to merge key by key through set-limits, such as the AI daily limit. */
+  limits?: Record<string, unknown>;
   account: string;
   provider?: unknown;
   chainId: number;
@@ -27,36 +29,52 @@ type SaveSessionSettingsInput = {
   fetchImpl?: typeof fetch;
 };
 
-// One signed POST /admin/set-config, retried only for the Worker's nonce races
-// (postSignedAdminWorkerRequest). The patch merges into the stored config.
-export const saveSessionSettings = ({
+const messageOf = (error: unknown, fallback: string) => (error instanceof Error && error.message) || fallback;
+
+// Signed POSTs to /admin/set-config, then /admin/set-limits, each retried
+// only for the Worker's nonce races (postSignedAdminWorkerRequest). Resolves
+// to '' when all is saved, or to why the limits weren't when the patch was.
+export const saveSessionSettings = async ({
   workerOrigin,
   sessionSlug,
   sessionIdHex,
   patch,
+  limits,
   account,
   provider,
   chainId,
   sessionAuthorityMode = 'worker_canonical',
   fetchImpl,
-}: SaveSessionSettingsInput) =>
-  postSignedAdminWorkerRequest({
-    action: 'set-config',
-    path: '/admin/set-config',
-    workerUrl: workerOrigin,
-    body: { sessionSlug, config: patch },
-    ...(fetchImpl ? { fetchImpl } : {}),
-    signAdminAction: ({ action, body, workerUrl }) =>
-      buildSignedAdminActionAuth({
-        action,
-        slug: sessionSlug,
-        sessionId: sessionIdHex || undefined,
-        sessionAuthorityMode,
-        body,
-        workerUrl,
-        context: { account, chainId, providerLike: typeof provider === 'string' ? provider : undefined },
-      }),
-  });
+}: SaveSessionSettingsInput): Promise<string> => {
+  const post = (action: 'set-config' | 'set-limits', body: Record<string, unknown>) =>
+    postSignedAdminWorkerRequest({
+      action,
+      path: `/admin/${action}`,
+      workerUrl: workerOrigin,
+      body: { sessionSlug, ...body },
+      ...(fetchImpl ? { fetchImpl } : {}),
+      signAdminAction: ({ action: signedAction, body: signedBody, workerUrl }) =>
+        buildSignedAdminActionAuth({
+          action: signedAction,
+          slug: sessionSlug,
+          sessionId: sessionIdHex || undefined,
+          sessionAuthorityMode,
+          body: signedBody,
+          workerUrl,
+          context: { account, chainId, providerLike: typeof provider === 'string' ? provider : undefined },
+        }),
+    });
+  const sendsConfig = Object.keys(patch).length > 0;
+  if (sendsConfig) await post('set-config', { config: patch });
+  if (!limits) return '';
+  try {
+    await post('set-limits', { limits });
+    return '';
+  } catch (error) {
+    if (!sendsConfig) throw error;
+    return messageOf(error, 'Saving it failed.');
+  }
+};
 
 export const ON_CHAIN_SAVE_STEPS = Object.freeze(['wallet', 'upload', 'registry', 'cache', 'worker'] as const);
 export type OnChainSaveStep = (typeof ON_CHAIN_SAVE_STEPS)[number];
@@ -93,8 +111,6 @@ export type OnChainSaveResult = {
   /** The Worker sync, kept so a failed one can be retried; null without a Worker. */
   workerSync: OnChainWorkerSync | null;
 };
-
-const messageOf = (error: unknown, fallback: string) => (error instanceof Error && error.message) || fallback;
 
 // The /admin metadata save, restored: check the signing wallet, upload the
 // new metadata, point the SessionRegistry at it from the admin's wallet

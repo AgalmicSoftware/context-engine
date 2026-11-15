@@ -93,6 +93,23 @@ describe('publishPendingWorkerGroupDrafts', () => {
     );
   });
 
+  it("refuses a queued group above the session's typed ceiling before any request", async () => {
+    const postSignedRequestImpl = jest.fn();
+    await expect(
+      publishPendingWorkerGroupDrafts({
+        drafts: [{ ...draft, memberLimit: '200' }],
+        sessionConfig: { groupMemberCeiling: '50' },
+        sessionId: SESSION_ID,
+        sessionSlug: 'test-session',
+        signerAccount: ADMIN_ADDRESS,
+        workerUrl: 'https://worker.example',
+        signTypedAdminAction: jest.fn(),
+        postSignedRequestImpl,
+      }),
+    ).rejects.toThrow('from 1 to 50, the most members in a group');
+    expect(postSignedRequestImpl).not.toHaveBeenCalled();
+  });
+
   it('reuses an identical stable-ID group after a partial publish retry', async () => {
     const postSignedRequestImpl: jest.MockedFunction<typeof postSignedAdminWorkerRequest> = jest
       .fn()

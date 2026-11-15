@@ -7,6 +7,7 @@ import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
 import { isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import { backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal, clearBackupImportMetadata } from './sessionBackupLifecycle.js';
+import { listSessionAgentOptOuts } from './sessionAgentOptOuts.js';
 
 const json = (body, status = 200) => Response.json(body, { status });
 const fail = (message, status = 503) => { throw Object.assign(new Error(message), { status }); };
@@ -56,6 +57,8 @@ export const exportCoordinatorBackup = async (coordinator, payload) => {
       litAuthorizationSigner: signer || null,
     },
     secrets,
+    // Carried so a restore cannot opt anyone back in to the Session Agent.
+    sessionAgentOptOuts: await listSessionAgentOptOuts(coordinator.state.storage),
   } });
 };
 

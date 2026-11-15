@@ -20,6 +20,7 @@ import { updateSessionSecretsAfterLitRepair } from './sessionLitAuthorizationCoo
 import { decryptSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 import { build } from 'esbuild';
+import { signBackupPage } from './sessionBackupAuthentication.js';
 
 const slug = 'restore-fixture';
 const sessionId = `0x${'3'.repeat(32)}`;
@@ -129,7 +130,9 @@ test('backup pages preserve all storage records and chunk payloads larger than a
 
 test('feedback is never a storage resource and never enters a backup', async () => {
   const { env, kv } = fixture();
+  // Whole phrases: a short marker like 7d1c turns up in random MACs and ids.
   const text = 'Feedback marker 7d1c: the atlas was hard to find.';
+  const leaked = (value) => String(value).includes(text);
   const sent = await sendSessionFeedback({
     env, slug, config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }, body: { text, view: 'results', theme: 'civic', screen: 'desktop' },
     identity: 'anon:203.0.113.9', checkRateLimit: async () => true, release: '0.9.8',
@@ -137,10 +140,39 @@ test('feedback is never a storage resource and never enters a backup', async () 
   assert.equal(sent.status, 200, JSON.stringify(sent));
   const listed = await callSessionConfigCoordinator({ env, slug, path: 'session-feedback/list' });
   assert.equal(listed.body.messages[0].text, text);
-  assert.ok(![...kv.values.values()].some((value) => String(value).includes('7d1c')));
+  assert.ok(![...kv.values.values()].some(leaked));
   const pages = await allPages(env);
   assert.equal(pages.at(-1).manifest.complete, true);
-  assert.ok(!JSON.stringify(pages).includes('7d1c'));
+  assert.ok(!leaked(JSON.stringify(pages)));
+});
+
+test('a restore keeps everyone who turned the Session Agent off opted out', async () => {
+  const source = fixture();
+  const people = [`0x${'a'.repeat(40)}`, `0x${'b'.repeat(40)}`];
+  for (const address of people) {
+    const set = await callSessionConfigCoordinator({ env: source.env, slug, path: 'session-agent/set', address, optedOut: true });
+    assert.equal(set.body.optedOut, true);
+  }
+  const [page] = await allPages(source.env);
+  assert.deepEqual(page.coordinator.sessionAgentOptOuts, people);
+  // A restore only adds: someone the target already holds as opted out stays so,
+  // and a backup from before backups carried the list restores with none.
+  const already = `0x${'c'.repeat(40)}`;
+  const restoreOnto = async (backupPage) => {
+    const target = fixture();
+    target.kv.values.delete(`session:${slug}:config`);
+    await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/set', address: already, optedOut: true });
+    const result = await importPage(target.env, backupPage);
+    assert.equal(result.body.complete, true, JSON.stringify(result));
+    return (await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/list' })).body.addresses.sort();
+  };
+  assert.deepEqual(await restoreOnto(page), [...people, already]);
+  const older = structuredClone(page);
+  delete older.coordinator.sessionAgentOptOuts;
+  const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+  older.snapshotDigest = sha256(JSON.stringify(older.coordinator));
+  older.archiveId = sha256(`${older.manifest.sessionId}:${older.manifest.exportedAt}:${older.snapshotDigest}`);
+  assert.deepEqual(await restoreOnto(await signBackupPage(older, source.env)), [already]);
 });
 
 test('restore refuses missing or altered pages, foreign keys, and mismatched session ids', async () => {
@@ -1472,11 +1504,12 @@ test('maximum upload metadata fits a backup header and round-trips unchanged', a
   assert.equal(read.status, 200); assert.equal(await read.text(), 'small');
 });
 
-test('restored doc-library rows say in their list metadata whether they are context sources', async () => {
+test('restored doc-library rows say in their list metadata whether they are context sources, and their reading order', async () => {
   const source = fixture();
   const keyOf = (id) => `ce-storage:${slug}:docsContext:${id}`;
-  for (const [id, contextSource] of [['cf_library_file', false], ['cf_context_file', true]]) {
-    const metadata = { id, resource: 'docsContext', storageLayer: 'kv', ...(contextSource ? { contextSource } : {}) };
+  const adminNote = { contextSource: true, uploadAuthority: 'admin', createdAt: '2026-11-01T00:00:00.000Z' };
+  for (const [id, extra] of [['cf_library_file', {}], ['cf_context_file', adminNote]]) {
+    const metadata = { id, resource: 'docsContext', storageLayer: 'kv', ...extra };
     source.kv.values.set(keyOf(id), JSON.stringify(metadata));
     source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('small').toString('base64url') }));
   }
@@ -1486,7 +1519,8 @@ test('restored doc-library rows say in their list metadata whether they are cont
     assert.equal(result.ok, true, JSON.stringify(result));
   }
   assert.deepEqual(target.kv.listMetadata.get(keyOf('cf_library_file')), { contextSource: false });
-  assert.deepEqual(target.kv.listMetadata.get(keyOf('cf_context_file')), { contextSource: true });
+  // A restored source keeps its place in the AI's reading list: who added it, and when.
+  assert.deepEqual(target.kv.listMetadata.get(keyOf('cf_context_file')), { contextSource: true, admin: true, createdAt: adminNote.createdAt });
 });
 
 test('legacy metadata that exceeds the backup entry limit reports the stored id', async () => {

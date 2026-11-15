@@ -13,6 +13,8 @@ import {
 import { canOptOut } from './sessionAgentOptOuts.js';
 import { isListedResultsBuilder } from './resultsBuild.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
+import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
+import { RESULTS_ANALYSIS_SCAN_LIMITS } from './storageScanBudget.js';
 import {
   authorizeCloudflareStorageResourceRead,
   createRequesterAccessChecks,
@@ -115,9 +117,10 @@ const scaleText = ({ scale } = {}) => {
 // Someone who is not an admin gets nothing from a question fewer than
 // `minAnswers` members answered: a count of one, or the one answer left when
 // the asker keeps their own out, would be a single person's answer.
+const TOO_MANY_STORED = Symbol('too many stored versions');
 const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
-  if (!source?.ok) return null;
+  if (!source?.ok) return source?.reason === 'results_analysis_snapshot_limit' ? TOO_MANY_STORED : null;
   const byQuestion = new Map(source.snapshot.questions.map((question) => [
     question.id, { question: trim(question.prompt), scale: scaleText(question), counted: COUNTED_TYPES.has(question.type), answers: [] },
   ]));
@@ -155,7 +158,10 @@ const gatherMaterial = async ({ env, slug, config, setting, address, scopes, ask
       env, slug, config, optedOut, deps, minAnswers: asker.audience === 'admin' ? 1 : sessionAgentMinAnswers(setting),
     }) : [],
   ]);
-  return { material: { sessionContext: config?.sessionContext, sources, results, answers: answers || [] }, answersUnavailable: answers === null };
+  return {
+    material: { sessionContext: config?.sessionContext, sources, results, answers: Array.isArray(answers) ? answers : [] },
+    answersUnavailable: answers === TOO_MANY_STORED ? 'too_many' : answers === null,
+  };
 };
 
 // A price for an audience will be checked here, refusing with 402 until it
@@ -191,7 +197,7 @@ const askAi = async ({ messages, config, secrets, address, scopes, headers, deps
 const accessFor = ({ env, config, slug, address, scopes, deps }) =>
   createRequesterAccessChecks({ env, config, slug, requesterAddress: address, authScopes: scopes, deps });
 
-export const dispatchSessionAgentRoute = async ({ path, body, config, slug, address, env, limit, headers, scopes, deps } = {}) => {
+export const dispatchSessionAgentRoute = async ({ path, body, config, slug, address, env, headers, scopes, deps } = {}) => {
   const json = (payload, status = 200) => deps.json(payload, status, headers);
   const setting = sessionAgentSettingOf(config?.sessionAgent);
   const store = deps.callSessionAgentOptOutStore || callOptOutStore;
@@ -231,10 +237,11 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
     return json({ error: `A question can be at most ${SESSION_AGENT_LIMITS.questionChars} characters.` }, 400);
   }
   // The /ai route's checks: the current AI scope, which every asker needs,
-  // then its rate limit.
+  // then its rate limit, counted once nothing below can refuse the question.
   const preflight = await deps.evaluateAuthenticatedRoutePreflight({
-    scopes, scope: 'ai', route: 'ai', allowWithoutScope: true, config, env, slug, address, limit, headers,
+    scopes, scope: 'ai', route: 'ai', allowWithoutScope: true, config, env, slug, address, limit: resolveAiDailyLimit(config), headers,
     deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: deps.json },
+    countLater: true,
   });
   if (!preflight?.ok) return preflight?.response || json({ error: 'Current authorization check failed.' }, 403);
   const currentScopes = { ...scopes, ai: preflight.tokenHasScope === true };
@@ -250,6 +257,8 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   // Who opted out is read on every question, so no answer goes ahead without it.
   const optOuts = await store(env, slug, 'list');
   if (!optOuts.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
+  const refused = await preflight.count?.();
+  if (refused) return refused;
   const optedOut = new Set(optOuts.body.addresses);
   const { material, answersUnavailable } = await gatherMaterial({
     env, slug, config, setting, address, scopes: currentScopes, asker, access, optedOut, deps,
@@ -264,6 +273,8 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
     answers: asker.answers,
     audience: asker.audience,
     read,
-    ...(answersUnavailable ? { note: 'Members’ answers couldn’t be read for this answer.' } : {}),
+    ...(answersUnavailable ? { note: answersUnavailable === 'too_many'
+      ? `Members’ answers weren’t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} question and answer versions, the most the Session Agent can read at once.`
+      : 'Members’ answers couldn’t be read for this answer.' } : {}),
   });
 };

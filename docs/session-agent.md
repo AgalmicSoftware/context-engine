@@ -144,7 +144,7 @@ untrusted data.
 
 ## Keeping your answers and files out
 
-Everyone's answers and files are in until they say otherwise. In the Group
+Everyone's answers and files are in until they say otherwise. In the Session
 Agent's dialog, turning off **Use my answers and files** keeps them out of every
 answer from the next question on. The files stay in the session's file list, and
 answers already given can't be taken back. The published results still count
@@ -155,7 +155,9 @@ any time.
 The Worker keeps one entry per address that turned it off, in the session's
 coordinator, and reads the list on every question; if it can't, the question
 fails rather than going ahead without it. The choices stay when an admin turns
-the Session Agent off. Session backups don't include them.
+the Session Agent off, and a session backup made by a 0.9.9 or later Worker
+carries them, so its restore keeps everyone who turned it off opted out. An
+older backup has none: after restoring one, tell people to set the switch again.
 
 A "?" by the switch, and a robot by the session's title while the Session Agent
 is on, say what it may read and link here through the README.

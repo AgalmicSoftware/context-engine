@@ -348,6 +348,16 @@ test('a refused or unusable invite says what to do', async (t) => {
   assert.equal(sent.length, 1);
 });
 
+test('a join refused with no invite sent says to bring the link again, not that the invite failed', async (t) => {
+  // As after a restart: the MCP no longer holds the invite the link carried.
+  const { participant } = await setup(t, { onJoin: () => Response.json(
+    { error: 'Worker group request failed.', reason: 'worker_group_join_refused' }, { status: 403 }) });
+  const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID });
+  assert.match(reply.result.content[0].text,
+    new RegExp(`Group "${GROUP_ID}" didn’t let you in, and no invite was sent\\. If you were given a link, call join_session again with the full link`));
+  assert.doesNotMatch(reply.result.content[0].text, /Ask whoever invited you/);
+});
+
 test('a join with no answer says it may not have gone through and how to check', async (t) => {
   const { participant } = await setup(t, { onJoin: () => { throw new TypeError('fetch failed'); } });
   const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID });

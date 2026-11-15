@@ -15,7 +15,7 @@ export const WORKER_GROUP_JOIN_LABELS: Record<WorkerGroupJoinMode, string> = {
 };
 
 const MEANINGS: Record<WorkerGroupJoinMode, string> = {
-  open: 'Anyone with the link can join.',
+  open: 'Anyone signed in can join, with or without the link.',
   one_use: 'Generate a unique claim link for each participant.',
   group_password: `Use a shared password: anyone who has it can join.`,
   admin_add: 'Admins add each member by address.',

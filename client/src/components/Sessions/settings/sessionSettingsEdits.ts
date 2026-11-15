@@ -41,6 +41,7 @@ import { resolveSessionCapabilityProjection } from '../../../utilities/session/s
 import { resolveSessionWizardAutoFeatureBySessionSlug } from '../sessionWizardAiConfig';
 import { normalizeSessionWizardContext } from '../sessionWizardWriteNormalization';
 import { asRecord, text, type SetupDraft } from '../setup/setupSectionTypes';
+import { AI_DAILY_LIMIT_LABEL, formatAiDailyLimit, getAiDailyLimitInputError } from '../aiDailyLimit';
 import { buildSessionSettingsChainDraft, editedChainValues } from './sessionSettingsChain';
 
 type Config = Record<string, unknown>;
@@ -124,6 +125,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     defaultTags: text(source.defaultTags),
     defaultGroupTags: text(source.defaultGroupTags),
     groupMemberCeiling: isWorkerGroupMemberCeiling(source.groupMemberCeiling) ? String(source.groupMemberCeiling) : '',
+    aiPerWalletPerDay: formatAiDailyLimit(source.limits),
     questionsGenPrompt: text(source.questionsGenPrompt),
     agentInstructions: text(source.agentInstructions),
     groupCreationPolicy: source.groupCreationPolicy,
@@ -294,6 +296,16 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
       );
     }
   }
+  // Worker sessions only, and only when changed. Just this limit is sent, and
+  // the page merges it through set-limits, so a limit changed since
+  // this page loaded stays and no one is signed out. null clears it.
+  const aiDaily = trimmed(draft.aiPerWalletPerDay);
+  if (!onChain && aiDaily !== formatAiDailyLimit(before.limits)) {
+    const error = getAiDailyLimitInputError(aiDaily);
+    if (error) throw new Error(`${AI_DAILY_LIMIT_LABEL}: ${error}`);
+    const limit = Number(aiDaily) || null;
+    if (limit !== (Number(formatAiDailyLimit(before.limits)) || null)) values.limits = { aiPerWalletPerDay: limit };
+  }
   // Pile navigation has a deployment default; only a changed choice is stored.
   if (draft.pileAutoAdvanceEnabled !== resolvePileAutoAdvanceEnabled(before)) {
     values.pileAutoAdvanceEnabled = draft.pileAutoAdvanceEnabled === true;
@@ -385,7 +397,11 @@ export const buildSessionSettingsSave = (
   }
   const after = { ...before, ...patch };
   if (!onChain && patch.ai) after.ai = mergeSetConfigAi(before.ai, patch.ai);
-  return { patch, after, classification: classifySessionConfigEdits(before, after) };
+  if (patch.limits) after.limits = { ...asRecord(before.limits), ...asRecord(patch.limits) };
+  const classification = classifySessionConfigEdits(before, { ...after, limits: before.limits });
+  // Limits go through set-limits, which, unlike set-config, signs no one out.
+  if (patch.limits) classification.content.push('limits');
+  return { patch, after, classification };
 };
 
 // A fresh copy over an edited draft: a field the admin left alone takes the
@@ -461,6 +477,7 @@ const LABELS: Record<string, string> = {
   defaultTags: 'Tag suggestions',
   defaultGroupTags: 'Group tags',
   groupMemberCeiling: 'Most members in a group',
+  limits: AI_DAILY_LIMIT_LABEL,
   questionsGenPrompt: 'Question prompt',
   agentInstructions: 'Instructions for AI agents',
   interviewModeEnabled: 'Voice interviews',

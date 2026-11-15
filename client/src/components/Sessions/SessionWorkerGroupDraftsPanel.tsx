@@ -7,6 +7,7 @@ import type { PendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups
 
 type SessionWorkerGroupDraftsPanelProps = {
   drafts?: PendingWorkerGroupDraft[];
+  memberCeiling: number;
   onAdd: (label: string) => void;
   onRemove: (groupId: string) => void;
   onUpdate: (groupId: string, patch: Partial<PendingWorkerGroupDraft>) => void;
@@ -22,6 +23,7 @@ const getDraftDomId = (groupId: string, index: number): string => {
 
 const SessionWorkerGroupDraftsPanel = ({
   drafts = [],
+  memberCeiling,
   onAdd,
   onRemove,
   onUpdate,
@@ -149,6 +151,7 @@ const SessionWorkerGroupDraftsPanel = ({
                     tags={draft.tags}
                     documentURLs={draft.documentURLs}
                     memberLimit={draft.memberLimit}
+                    memberLimitMax={memberCeiling}
                     joinEndsAt={draft.joinEndsAt}
                     adminAddress={draft.adminAddress}
                     joinMode={draft.joinMode}

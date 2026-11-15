@@ -7,6 +7,7 @@ import {
   type WorkerGroupRemovalAuth,
 } from '../../domains/worker/workerGroupPorts';
 import { validateWorkerGroupImageFile } from '../../domains/worker/workerGroupImageUpload';
+import { readWorkerGroupMemberCeiling, WORKER_GROUP_MEMBER_CEILING_FIELD } from '@ce-shared/workerGroupJoin.mjs';
 import { generateSessionId } from './sessionWizardCoreUtils';
 
 export const MAX_PENDING_WORKER_GROUP_DRAFTS = 100;
@@ -28,6 +29,10 @@ export type PendingWorkerGroupDraft = {
 };
 
 const toText = (value: unknown): string => String(value ?? '').trim();
+
+/** The session's "Most members in a group" as typed on /new; blank or invalid is the default. */
+export const resolveDraftGroupMemberCeiling = (value: unknown): number =>
+  readWorkerGroupMemberCeiling({ [WORKER_GROUP_MEMBER_CEILING_FIELD]: Number(toText(value) || NaN) });
 
 const isBlob = (value: unknown): value is Blob => typeof Blob !== 'undefined' && value instanceof Blob;
 
@@ -105,7 +110,7 @@ export const normalizePendingWorkerGroupDrafts = (value: unknown): PendingWorker
   return drafts;
 };
 
-export const validatePendingWorkerGroupDrafts = (value: unknown): string[] => {
+export const validatePendingWorkerGroupDrafts = (value: unknown, memberCeiling: number): string[] => {
   const source = Array.isArray(value) ? value : [];
   const normalized = normalizePendingWorkerGroupDrafts(source);
   const issues: string[] = [];
@@ -148,9 +153,11 @@ export const validatePendingWorkerGroupDrafts = (value: unknown): string[] => {
     const memberLimitNumber = Number(memberLimit);
     if (
       memberLimit &&
-      (!Number.isSafeInteger(memberLimitNumber) || memberLimitNumber < 1 || memberLimitNumber > 1000)
+      (!Number.isSafeInteger(memberLimitNumber) || memberLimitNumber < 1 || memberLimitNumber > memberCeiling)
     ) {
-      issues.push(`Group ${index + 1} member limit must be a whole number from 1 to 1000.`);
+      issues.push(
+        `Group ${index + 1} member limit must be a whole number from 1 to ${memberCeiling.toLocaleString('en-US')}, the most members in a group.`,
+      );
     }
     const joinEndsAt = toText(raw.joinEndsAt);
     const joinEndsAtTime = joinEndsAt ? new Date(joinEndsAt).getTime() : 0;

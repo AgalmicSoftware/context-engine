@@ -177,9 +177,19 @@ read. Results analysis keeps context out of its source signature, so editing
 context never marks a report stale, and it grounds every claim in responses,
 not in the background.
 
-**Limit:** sources are found by walking the session's doc-library rows. The
-Worker's features stop after 300 rows and then use no sources; the page lists
-up to 500. Sessions with that many documents need a dedicated index first.
+**Limits and order:** each doc-library row's list entry says whether it is a
+context source and, for a source, whether an admin added it and when, so the
+Worker chooses before it reads a row. Its features look at up to 300 context
+rows, the admins' first, then the oldest; more than that leaves the newest
+out, never all of them, and the Worker logs how many. Past 40,000 rows only
+the first 40,000 listed are looked at, and rows that can't be fetched leave
+only themselves out. They read sources in
+this order, up to 16: what admins added, oldest first, then everyone else's,
+each person's oldest in turn, in the order people first added, so one
+person's many notes never crowd out everyone else's. A PDF's reading is found
+from its PDF and takes no place of its own. Rows stored before 0.9.9 carry no
+adder or time in their list entry and count as the oldest participants'. The
+page lists up to 500.
 
 ## Templates
 

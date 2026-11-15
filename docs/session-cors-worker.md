@@ -8,7 +8,7 @@ Session secrets use a separate AES-GCM-encrypted, versioned Worker KV envelope;
 public config never contains API keys, private keys, JWKs, bearer tokens,
 credentials, RPC/faucet settings, or URL-embedded credentials.
 
-Its storage routes are `POST /storage/upload`, `GET|POST /storage/read`, `GET|POST /storage/list`, and the authorization-gated `GET|POST /storage/export-envelopes`; see [Session Storage Routes](#session-storage-routes). `POST /arweave/upload` uploads directly to Arweave.
+Its storage routes are `POST /storage/upload`, `GET|POST /storage/read`, `POST /storage/read-batch`, `GET|POST /storage/list`, the `POST /storage/draft-text/*` routes, and the authorization-gated `GET|POST /storage/export-envelopes`; see [Session Storage Routes](#session-storage-routes). `POST /arweave/upload` uploads directly to Arweave.
 
 Research summary completion is calculated from each run's distinct accepted
 answer and privacy-skip events. The first accepted batch fixes that run's
@@ -103,6 +103,7 @@ in `workers/sessionCorsWorker/agent/` within the Session Worker.
 - Per-session worker: set `DEFAULT_SESSION_SLUG` to the session slug (single-tenant).
 - Multi-tenant worker: leave `DEFAULT_SESSION_SLUG` empty; all requests must include `X-Session-Slug` (legacy `X-Group-Slug` still accepted) or a token claim.
 - Note: the registry’s default session is stored under the literal `general` slug; the worker maps an empty slug to `general` for gate lookups.
+- Logs: the deploy helper's upload and the checked-in `wrangler.jsonc` both set `observability` on for all requests, so the Worker's own lines, such as why its coordinator or a limit, receipt or sign-in object did not answer, can be read in the dashboard afterwards. Invocation logs, one per request with its URL, are off: an interview catalog link carries a sign-in ticket in its query string. A Worker deployed before this keeps whatever Cloudflare gave it; check it under the Worker's Observability tab.
 
 ## Runtime dependency boundary
 
@@ -314,10 +315,10 @@ deleted speculatively.
   bodies, and worker bundle bytes are not written to either coordinator state or
   the journal. KV journal records expire after seven days.
 - Deploy-helper origin configuration:
-  - CE-hosted mode should set `ALLOWED_ORIGINS` explicitly to the public app origins it serves. Current hosted example: `https://contextengine.sh,https://www.contextengine.sh,https://contextengine.xyz,https://www.contextengine.xyz,http://localhost:3000`.
+  - CE-hosted mode should set `ALLOWED_ORIGINS` explicitly to the public app origins it serves. Current hosted list: `https://contextengine.sh,https://www.contextengine.sh`.
   - Self-hosted mode should replace that list with the origins for your own app/admin hosts. Leaving `ALLOWED_ORIGINS` unset is intentionally restrictive and only allows `http://localhost:3000` until you configure it.
   - `CE_CLOUDFLARE_API_BASE_URL` is optional and defaults to `https://api.cloudflare.com/client/v4`. Override it only for Cloudflare-compatible test or proxy endpoints.
-  - `npm run deploy-helper:deploy` can seed the stable CE/local defaults, but unlike the `/new` browser flow it cannot discover your current custom app origin. If your UI runs on `https://your-app.example`, pass that origin explicitly with `--allowed-origins`.
+  - `npm run deploy-helper:deploy` seeds the site's two origins (`https://contextengine.sh` and `https://www.contextengine.sh`) when no list is given, but unlike the `/new` browser flow it cannot discover your current custom app origin. If your UI runs on `https://your-app.example`, pass that origin explicitly with `--allowed-origins`.
   - Worker URLs returned from deploy flows are normalized to absolute `http(s)` base URLs before auth/admin calls run. Protocol-less hosts are prefixed (`https://` except local dev hosts), while relative paths are rejected.
 - Admin origin management:
   - `GET /admin/origins` with `Authorization: Bearer <ADMIN_SECRET>` returns the current `{ origins, source }`.
@@ -540,8 +541,10 @@ Admin test panel:
 - If tests fail with a browser network error like `Load failed` / `Failed to fetch`, the worker is often
   rejecting the browser origin via `allowOrigins` (CORS allowlist).
   - Local dev frequently runs at `http://localhost:3001` (and E2E may use `http://127.0.0.1:3000`).
-  - Use the `/admin` CORS allowlist editor to inspect and edit the full list directly. `Add recommended origins` appends the current browser origin plus the stable defaults, and `Save allowlist` persists the exact list you entered.
-  - Trusted admin origins (for example the first-party localhost admin hosts) can reach `/admin/*` even when the session's current allowlist is wrong, so admins can repair a blocked allowlist without manual KV edits first.
+  - Use the `/admin` CORS allowlist editor to inspect and edit the full list directly. `Add recommended origins` appends the current browser origin plus the site's two origins, and `Save allowlist` persists the exact list you entered.
+  - Trusted admin origins (the site's two `.sh` origins, or the deployment's
+    `ADMIN_TRUSTED_ORIGINS`, plus the local dev servers on ports 3000, 3001 and
+    7391 when the Worker sets `CE_ALLOW_LOCAL_ORIGINS=true`) can reach `/admin/*` even when the session's current allowlist is wrong, so admins can repair a blocked allowlist without manual KV edits first.
 - Static custom-domain frontend deploys must add the final browser origin (for
   example `https://app.example`) to the same `allowOrigins` list after DNS
   cutover. See the Netlify/static hosting checklist in
@@ -736,6 +739,10 @@ Admin test panel:
   provider generation reuse the same complete snapshot and its single scan
   budget. These application limits leave room for authentication and JSON
   processing; they are not a claim about a universal platform request ceiling.
+  Past the row limit the error says so in plain words ("AI builds read at most
+  10,000 stored question and answer versions at once…"), and the Session Agent's
+  Detailed answers note the same limit; `GET /admin/diagnostics` returns the
+  count as `storedVersions`.
   Larger histories require a future bounded background snapshot/current-version
   index. This guard covers Worker storage history, not the separate existing
   admin-snapshot contract.
@@ -825,6 +832,28 @@ Authenticated clients can use the worker as the session storage boundary:
     config through this call, so response uploads target the session's own
     Worker rather than the legacy shared Arweave proxy. After durable storage
     refs are returned, the client completes without an on-chain transaction.
+  - In a Worker-canonical session, each `responses` answer is checked before
+    anything is stored; other sessions keep their questions on chain or
+    Arweave, so the Worker doesn't check their answers or apply the limits
+    below. The Worker must be able to read the answers (`422`
+    `response_unreadable`), except in a Lit session. Each answer's question
+    must be one the session has stored, hidden ones included, or an agent's
+    proposed `ceq_` question; otherwise `422` `response_question_unknown`. A
+    readable value its question doesn't accept (an option it lacks, a rating
+    off its scale or step) is `422` `response_answer_invalid`. Encrypted
+    values, blank answers (a comment alone) and locked or encrypted questions
+    aren't checked.
+  - In those sessions, each signed-in person may store at most 20 versions of
+    one question's answer, the latest included (`422`
+    `response_limit_versions`), and at most five times as many answers as the
+    session has questions, proposed ones included, in all (`422`
+    `response_limit_rows`). A Lit session's answers the Worker can't read
+    count only toward the second limit. A survey's bundle is checked against
+    the same row limit but counted apart from its answers, so they aren't
+    counted twice. Uploads still in flight count, so parallel requests can't
+    pass a limit together, and a replayed request id isn't counted again.
+    Only answers to the session's own questions are counted per question. The
+    counts live in the session's coordinator and aren't in backups.
   - For `responses`, the Worker records the authenticated uploader as trusted
     responder metadata. The payload's own `responder` field is not authoritative.
     In Worker-canonical sessions whose results visibility is not
@@ -967,6 +996,15 @@ Authenticated clients can use the worker as the session storage boundary:
     `Content-Disposition: attachment`, so opening the URL downloads it instead
     of rendering it on the Worker origin. A malformed declared type is served
     as `application/octet-stream`.
+- `POST /storage/read-batch` with `{ "ids": [...] }`: reads 1 to 100 distinct
+  storage ids in one request (Workers advertising `storage_read_batch_v1`).
+  Each id is read exactly as `/storage/read` reads it, with its own access
+  check, so a batch never shows more than single reads would. The reply is
+  `{ items }`, one per id in order, each `{ id, status, contentType, text }`
+  or `{ id, status, error, reason? }`. Only text and JSON items come back
+  (`415` otherwise). Items are read five at a time; once the batch holds 8 MiB
+  of text the rest answer `413`, to be read one by one. The reply is
+  `private, no-store` when any item is private.
 - `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in batches of at most eight concurrent KV reads. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Question and survey rows include `metadata.uploader` and `metadata.resourceId` when they were recorded, and `metadata.uploadAuthority` for new uploads. `metadata.uploaderIsAdmin` is derived strictly from `uploadAuthority === "admin"`. Clients use the explicit upload authority stamp for precedence and ignore legacy flags and current public admin configuration. A version of an id that an admin hid is listed only as a marker, `{ "hidden": true, "metadata": { "resource", "resourceId", "hidden": true } }`, with no storage reference, so clients can drop a copy they cached earlier. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
   - Worker-canonical question and survey authoring writes payloads to this
     session's Cloudflare storage and does not register them in the Surveys
@@ -977,6 +1015,14 @@ Authenticated clients can use the worker as the session storage boundary:
     the active passkey context. List/read/auth failures fail closed without an
     EVM scan or registry fallback.
 - `GET|POST /storage/export-envelopes`: returns ciphertext plus envelope metadata for encrypted Cloudflare payloads in the requested resource. Only a session admin can call it. It does not decrypt payload bytes and does not include session KEK material.
+- `POST /storage/draft-text/put`, `/storage/draft-text/delete` and
+  `/storage/draft-text/export` keep the AI's drafted text for config admins
+  when `interviewMode.keepDraftTextForAdmins` is on (Workers advertising
+  `draft_text_v1`). A signed-in person puts up to 200 drafts at once, one per
+  session question, each field at most 8,000 characters; deletes their own by
+  `questionIds` or with `all: true`, which needs only a sign-in, no storage
+  scope, and works whatever the setting; and a config admin pages the export 250 rows at a time. See
+  [AI draft text for admins](session-interview-research.md#ai-draft-text-for-admins).
 
 Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; legacy doc-library configs with `docLibrary.provider = "cloudflare"` are also accepted by the worker for storage route compatibility. Backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for authoritative R2 per-item authorization metadata plus the KV-only payload fallback. R2-only payload objects are not readable through the worker, including legacy objects whose per-item conditions cannot be proven from R2 metadata; restore their matching index rows rather than weakening authorization. KV-only payload storage remains supported. The Deploy to Cloudflare template binds only `GROUP_KV` and sets `CE_STORAGE_IN_GROUP_KV=1`, which keeps payloads there. One-click deploys that receive a Cloudflare storage profile bind the created session KV namespace as both `GROUP_KV` and `CE_STORAGE_INDEX_KV`, then persist a sanitized `storageProfile` in `session:{slug}:config`. If the deploy request explicitly asks for R2 storage, it must provide an existing bucket name so the helper can bind it as `CE_STORAGE_R2`; otherwise the helper fails before provisioning partial Cloudflare resources. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
@@ -1228,6 +1274,9 @@ not recover managed account keys.
 
 The first page includes config authority, wrapped session keys, encrypted
 session secrets and Worker Group authority, catalog and membership records.
+It also lists, in the clear, the addresses of everyone who turned the Session
+Agent off, so a restore keeps them out; plaintext rows and group membership are
+in the clear too, so keep an archive as private as the session's data.
 Very large coordinator snapshots use a `chunked` descriptor and payload/chunk
 entries with `target: "coordinator"`. Storage traversal includes every resource,
 hidden rows, plaintext rows, payloads, owner records and hidden markers. Empty
@@ -1882,8 +1931,10 @@ the groups. Joining at sign-in and its outcome show in the notice as usual. Canc
 membership. Before sign-in the cancellation is stored for the signed-out visitor;
 when that invitation’s visitor signs in, it is assigned to that account.
 A changed canonical session identity does not inherit another session's choice.
-No credentials are saved with an invitation. Browser storage restrictions can
-limit persistence to the current page.
+A link's one-use code or group password is kept with the pending invitation in
+the tab's session storage, never in the address, and is dropped when the join
+succeeds, is refused or cancelled, or after 24 hours. Browser storage
+restrictions can limit persistence to the current page.
 
 Native Group membership is separate from the existing on-chain SBT results
 filters. Auto-joining records the cohort membership, but does not itself filter
@@ -2057,8 +2108,11 @@ Runtime:
 
 - `session:{slug}:config` JSON. This example uses the `fast_cheap_cloudflare`
   preset, which is the access baseline for non-public Cloudflare sessions. A new
-  `/new` draft instead starts with `"preset": "custom"`, `gate: "none"`,
-  `encryption: "none"` and `"visibility": "public_full_if_storage_public"`:
+  `/new` draft instead starts with `"preset": "custom"`, the
+  `fast_cheap_cloudflare` preset's `role_gate` payload access with
+  `encryption: "none"`, and
+  `"visibility": "session_member_full"`, so every signed-in member reads the
+  results:
 
   ```json
   {
@@ -2187,7 +2241,10 @@ Runtime:
       coordinator config revision. Callers cannot set it directly.
     - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array. New config mutations reject `*` and wildcard hosts because runtime CORS matching requires exact origins.
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist). The `/new` native verification path refuses an empty list for new or attached Workers so clearing the field cannot accidentally publish an unrestricted CORS policy.
-    - `limits.perWalletPerDay` is the authenticated per-wallet daily route budget. `limits.perAnonymousIpPerDay` is an optional anonymous-only daily IP budget for the public anonymous route surface (`/ai`, `/transcribe`, `/realtime/call`, `/storage/read`, `/storage/list`, `/groups/list`, `/interview/starter`, `/agent/interview-brief`, and `/agent/interview-catalog`): a positive integer enforces that per-session/per-route anonymous identity budget, and omitted, `0` or malformed leaves those anonymous route buckets unlimited. In native Cloudflare requests, IPv6 addresses within one /64 share an anonymous identity and IPv4-mapped addresses use their IPv4 identity, matching nonce throttling.
+    - `limits.perWalletPerDay` is the authenticated per-wallet daily route budget, counted separately for each kind of route; every signed-in storage call (saving an answer, listing or reading) shares one count.
+    - `limits.aiPerWalletPerDay`, when a positive whole number, is how many signed-in AI calls one address may make in 24 hours: the `/ai` route, Session Agent questions and Agent HTTP's AI, counted together. A call is counted only once nothing else will refuse it, so a disallowed model, a Session Agent question its asker may not put, or an Agent HTTP call turned away while two others run costs nothing. It bounds AI spend without touching answer saves or reads. Empty or `0` leaves AI calls on `limits.perWalletPerDay`. Signed-out AI calls (when the session lets visitors use AI) are bounded by `limits.perAnonymousIpPerDay` instead, and transcription stays on the general limit, since it is part of answering by voice. Admins set it under AI on the session's settings page, which shows the field only when the Worker's capabilities list `ai_daily_limit_v1` and sends it alone through `/admin/set-limits`: that merges it into the stored limits and, unlike a `limits` change through `/admin/set-config`, signs no one out. `/new` has no field for it; when it saves the session's config it reads the stored limit and sends it back, so the limit survives.
+    - When the count cannot be reached, a limited request (signed-in routes, signed-out routes, feedback, and the interview brief and starter) is refused as busy (`503` with the coordinator's retry sentence and `reason: "rate_limit_unavailable"`), not as `429`, so clients send it again; Agent HTTP's AI answers `503 agent_ai_rate_unavailable`. A request the count refuses as malformed is a plain refusal. The faucet's payout and Agent HTTP's poster still answer `429`.
+    - `limits.perAnonymousIpPerDay` is an optional anonymous-only daily IP budget for the public anonymous route surface (`/ai`, `/transcribe`, `/realtime/call`, `/storage/read`, `/storage/list`, `/groups/list`, `/interview/starter`, `/agent/interview-brief`, and `/agent/interview-catalog`): a positive integer enforces that per-session/per-route anonymous identity budget, and omitted, `0` or malformed leaves those anonymous route buckets unlimited. In native Cloudflare requests, IPv6 addresses within one /64 share an anonymous identity and IPv4-mapped addresses use their IPv4 identity, matching nonce throttling.
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
     - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes. A supplied `limits` object replaces the stored one.
     - writes fail closed when open config subtrees contain secret-like keys,
@@ -2468,6 +2525,9 @@ and authenticated routes reject tokens when that marker is missing or expired,
 with `401 { error: "Invalid token." }`. The worker neither mints nor accepts tokens
 without a `jti`.
 
+`POST /auth/logout` with the bearer token deletes that token's marker, so the
+token, and any copy of it, stops working at once. It returns `{ ok: true }`.
+
 ## Required headers
 
 Authenticated requests must include:
@@ -2510,9 +2570,10 @@ Anonymous exception (AI/transcribe/realtime interview only):
 
 ## Admin endpoints
 
-`GET /admin/abuse-summary`, `GET /admin/diagnostics` and
+`GET /admin/abuse-summary`, `GET /admin/diagnostics`, `GET /admin/feedback` and
 `GET /admin/results-analysis/status` use a current session token; see
-[Endpoints](#endpoints) and the Results notes above.
+[Endpoints](#endpoints), [Session feedback](#session-feedback) and the Results
+notes above.
 
 The remaining Admin requests are signed EIP-712 admin actions with no session
 token. The body carries `address`, `signature`, `action`, `slug`, `bodyHash`,
@@ -2524,6 +2585,7 @@ token. The body carries `address`, `signature`, `action`, `slug`, `bodyHash`,
 - `POST /admin/set-limits`
 - `POST /admin/lit-chipotle-status`
 - `POST /admin/storage/set-hidden`
+- `POST /admin/feedback/delete` (see [Session feedback](#session-feedback))
 
 `/admin/storage/set-hidden` notes:
 
@@ -2584,8 +2646,9 @@ Never return secrets in responses.
   `sessionInfo`, `sessionContext`, `questionsGenPrompt`, `agentInstructions`,
   `appearance`, `sessionHeaderImg`, `contextAdditionPolicy`,
   `resultsAdminAddresses`, every interview setting (`interviewModeEnabled` and
-  all of `interviewMode`, which each interview request reads afresh), and the
-  curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
+  all of `interviewMode`, which each interview request reads afresh),
+  `sessionAgent`, `groupMemberCeiling` and `feedbackEnabled` (each read afresh
+  where it applies), and the curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
   invite records remain unchanged. Removing, disabling, re-enabling or editing
@@ -2653,7 +2716,11 @@ Never return secrets in responses.
 - An explicit `sessionEndsAt: ""` clears a Worker-canonical session's end time.
 - The recovered typed-data signer must match request `address`. Before that, the
   Worker applies the session's CORS policy and checks the signed action, slug, body
-  hash and audience. It then checks expiration and consumes the nonce.
+  hash and audience. It then checks expiration and consumes the nonce. The
+  `expiration` must be in the future and at most ten minutes ahead, or the
+  action is refused (`Admin action expires too far ahead; sign it again.`), so
+  a signed action can't be kept for more than ten minutes before it is sent.
+  The site signs each action to expire five minutes ahead.
 - Without a config, `set-config` authorizes the signer only when it matches the
   requested admin and either the deployment's `BOOTSTRAP_ADMIN_ADDRESS` or, on a
   registry-wired Worker without that binding, the on-chain admin of a registered
@@ -2808,7 +2875,9 @@ Signed login/bootstrap requests:
   instructions, or a config that isn't Worker-canonical, returns `404`.
 - `GET /health` (requires Authorization token; does not require session KV config, so it works for newly registered sessions during bootstrap)
 - `GET /capabilities` is public and returns the code-defined feature list, API
-  version and optional bundle hash, cached for 30 seconds. With `?slug=<slug>`,
+  version, optional bundle hash and the Worker's `release` (the version it was
+  bundled from, `null` from unbundled source), cached for 30 seconds. Features
+  include `ai_daily_limit_v1` (`limits.aiPerWalletPerDay` is honoured), `draft_text_v1`, `session_feedback` and `storage_read_batch_v1`. With `?slug=<slug>`,
   it also reports coordinator, config authority, storage-index and secret-presence
   readiness, plus fixed reasons for unavailable submit, publication, correction
   and backup operations. A fresh authority reports `seeding`; legacy config
@@ -2832,6 +2901,13 @@ Signed login/bootstrap requests:
   Diagnostics inspect the current durable authority without first repairing its
   KV projection, so a failed repair remains visible and a removed admin cannot
   use the stale projection to retain access.
+  The first page (no cursor) also has `storedVersions: { count, limit, overLimit }`:
+  how many stored question and answer versions, with hidden-question marks, an AI
+  build would read, against its 10,000-row limit (every saved change to an answer
+  counts). It is counted from key lists and stops just past the limit, so an
+  over-limit session shows `limit + 1`; it is `null` when the count can't be read.
+  The card shows it as "N of 10,000", "More than 10,000" or "Couldn't be
+  counted", and from 8,000 says what stops past the limit.
   Receipt counts are sampled from up to 25 participant coordinators per page;
   `complete` and `cursor` distinguish partial totals, and the card can load more.
   Cursors use a deployment-secret-derived HMAC and a private continuation map;
@@ -3174,6 +3250,51 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
     same-wallet generic requests may re-check `txGas` access without that scope, and proof-backed pre-claim funding
     may proceed without that scope when the request includes `sbtAddress` plus the required proof.
 
+### Session feedback
+
+Anyone on a session page can tell the session's admins what worked in the app
+and what didn't (Workers advertising `session_feedback`). Only sessions a
+Worker runs take feedback; an on-chain session refuses it with `403`
+`feedback_off`, as does a session whose `feedbackEnabled` is `false`. The
+setting is on unless set; turning it off keeps stored messages and signs no
+one out.
+
+- `POST /feedback` takes `{ text, view, theme, screen, appRelease?, contact? }`
+  as JSON, at most 8 KiB. `text` is 1 to 2,000 characters; `view` names a
+  section (letters, digits, `:`, `_` and `-`, up to 80), never a URL; `theme`
+  is a theme id; `screen` is `phone`, `tablet` or `desktop`; `appRelease` is a
+  release number. A bad field is `400` `feedback_invalid` and says which.
+  - Signed in, it runs with the session token. Signed out, it has no
+    `Authorization` header and names the session with `?slug=` (a Worker
+    pinned to one session refuses another slug with `404`); the session's CORS
+    rules apply either way.
+  - A person sends at most 5 in any 24 hours, counted by their address, or by
+    their network when signed out (`429` `feedback_person_limit`); a send the
+    store then refuses still counts. A session takes 200 a UTC day (`429`
+    `feedback_session_limit`) and stores at most 2,000 (`409` `feedback_full`,
+    until an admin clears some).
+  - Stored with each message: the text, view, theme, screen, the app's release
+    if sent, whether the sender was signed in, the Worker's own release and the
+    time. Nothing names the sender unless they ask to be contacted:
+    `contact: { reachMe }` (1 to 200 characters) then also stores their
+    signed-in address, if any. A name the sender types is never stored as who
+    sent it.
+- `GET /admin/feedback[?limit=<1-100>&cursor=<id>]` with the session token
+  returns `{ messages, cursor?, counts: { stored, today } }`, newest first, 100
+  a page by default; each message carries its `id`. A reply's `cursor`, sent
+  back as `?cursor=`, reads the next, older page; a bad `limit` or `cursor` is
+  `400` `feedback_page_invalid`. Only full session admins
+  may read it: results admins and agent keys, even one minted for an admin,
+  get `403`.
+- `POST /admin/feedback/delete` is a signed admin action whose body adds
+  `ids` (1 to 100 message ids) or `through` (an id: every message stored at or
+  before it), never both. Unknown or repeated ids are skipped, and `deleted`
+  counts only messages removed. It returns `{ ok, deleted, counts }`.
+- Feedback lives in the session's coordinator under its own prefix. Nothing
+  that reads answers, files or results lists it, so it never reaches AI Views,
+  the atlas, the risk matrix, the Session Agent, the fidelity report, exports
+  or backups.
+
 ## Self-deploy
 
 Manual:
@@ -3207,7 +3328,7 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   - The helper still needs only one deployment token containing `Workers
 Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
     binding and migration are part of the Worker script upload.
-  - If you omit `--allowed-origins`, the CLI seeds the stable hosted/local defaults only. Unlike `/new`, it does not know your current self-hosted browser origin, so custom hosts still need an explicit `--allowed-origins`.
+  - If you omit `--allowed-origins`, the CLI seeds the site's two origins only. Unlike `/new`, it does not know your current self-hosted browser origin, so custom hosts still need an explicit `--allowed-origins`.
   - If you omit `--admin-secret`, the script generates one and prints it after deploy so you can still manage `/admin/origins`.
 - `POST /deploy` with CF API token, requested worker name, passkey-derived admin
   address, session identity/profile, authority policy, public canonical config,
@@ -3295,7 +3416,7 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
   script-level workers.dev setup are both covered by `Workers Scripts: Edit`.
 - `allowOrigins` entries are normalized to origins (`https://host`, `http://localhost:3000`), and the
-  helper returns a normalized `workerUrl` with protocol. The first-party Session Wizard default seed list includes the hosted app plus local dev/E2E origins for ports `3000`, `3001`, and `7391`.
+  helper returns a normalized `workerUrl` with protocol. The first-party Session Wizard seeds the site's two origins plus the page's own origin.
 - `/new` deploys through the project helper at
   `https://ce-deploy-helper.agalmic.workers.dev/` by default; the dashboard handoff
   under Hosting and storage → More is the token-free alternative.

@@ -7,6 +7,14 @@
     "global_fetch_strictly_public"
   ],
   "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    }
+  },
   "kv_namespaces": [
     {
       "binding": "GROUP_KV"
@@ -35,6 +43,6 @@
     "CE_STORAGE_IN_GROUP_KV": "1",
     "DEPLOY_HELPER_ENABLED": "0",
     "WORKER_DEBUG_LOGS": "0",
-    "CE_BUNDLE_SHA256": "968aab9338a996b0792198e11a9bc387bc28a9cc0338bfa5c775146820cd9334"
+    "CE_BUNDLE_SHA256": "9206bfa913582cfcd2a7adbdcaf23e24eb391e80787a50e1c6c5a5e1a21022a1"
   }
 }

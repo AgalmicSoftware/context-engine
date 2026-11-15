@@ -1,5 +1,6 @@
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
+import { rateLimitRefusal } from './rateLimitRefusal.js';
 
 export const dispatchAnonymousRouteEntry = async ({
   path,
@@ -47,7 +48,7 @@ export const dispatchAnonymousRouteEntry = async ({
     route: anonymousRoute,
   });
   if (!anonymousRateAllowed) {
-    return deps?.json?.({ error: 'Rate limit exceeded.' }, 429, headers);
+    return rateLimitRefusal(anonymousRateAllowed, deps?.json, headers);
   }
 
   return deps?.dispatchAnonymousRoute?.({

@@ -1,3 +1,5 @@
+import { rateLimitRefusal } from './rateLimitRefusal.js';
+
 export const evaluateAuthenticatedRoutePreflight = async ({
   scopes,
   scope,
@@ -10,6 +12,10 @@ export const evaluateAuthenticatedRoutePreflight = async ({
   limit,
   headers,
   deps,
+  // When set, nothing is counted here: the caller runs `count()` once the
+  // request can no longer be refused for any other reason, and gets the
+  // refusal to send, or null.
+  countLater = false,
 } = {}) => {
   let tokenHasScope = scopes?.[scope] === true;
   if (!tokenHasScope && !allowWithoutScope) {
@@ -48,18 +54,23 @@ export const evaluateAuthenticatedRoutePreflight = async ({
     };
   }
 
-  const rateAllowed = await deps?.checkRateLimit?.({
-    env,
-    slug,
-    address,
-    limit,
-    route,
-  });
-  if (!rateAllowed) {
+  const count = async () => {
+    const rateAllowed = await deps?.checkRateLimit?.({
+      env,
+      slug,
+      address,
+      limit,
+      route,
+    });
+    return rateAllowed ? null : rateLimitRefusal(rateAllowed, deps?.json, headers);
+  };
+  if (countLater) return { ok: true, tokenHasScope, count };
+  const refused = await count();
+  if (refused) {
     return {
       ok: false,
       tokenHasScope,
-      response: deps?.json?.({ error: 'Rate limit exceeded.' }, 429, headers),
+      response: refused,
     };
   }
 

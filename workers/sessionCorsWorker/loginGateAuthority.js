@@ -105,7 +105,6 @@ export const resolveLoginGateAuthority = async ({
       if (key === 'default') {
         warn('[gating] default gate lookup failed', {
           slug: registrySlug,
-          address,
           registryAddress,
           registryRpcUrls: maskRpcUrlList(registryRpcUrls, deps),
           registryRpcErrors,
@@ -149,7 +148,6 @@ export const resolveLoginGateAuthority = async ({
       if (key === 'default') {
         log(`[gating] default gate empty (allow) [${gateSource}]`, {
           slug: registrySlug,
-          address,
           gateChainId: gate.chainId || null,
           registryAddress,
           registryRpcUrl: registryRpcUrlUsed ? maskRpcUrl(registryRpcUrlUsed) : '',
@@ -162,7 +160,6 @@ export const resolveLoginGateAuthority = async ({
     if (!rpcUrls.length && key === 'default') {
       warn('[gating] default gate missing rpc url', {
         slug: registrySlug,
-        address,
         gateChainId: gate.chainId || null,
         registryChainId,
         registryAddress,
@@ -198,7 +195,6 @@ export const resolveLoginGateAuthority = async ({
     if (key === 'default') {
       (ok ? log : warn)(`[gating] default gate check ${ok ? 'ok' : 'failed'} [${gateSource}]`, {
         slug: registrySlug,
-        address,
         gateChainId: gate.chainId || null,
         mode: gate.mode,
         sbtCount: gate.sbtAddresses.length,

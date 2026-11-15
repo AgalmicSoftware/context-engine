@@ -50,7 +50,10 @@ export const createRateLimitFaucetSupportWithWorkerDeps = ({
       windowMs: DAY_MS,
       now: deps?.now,
     });
-    const allowed = result?.ok === true && result?.allowed === true;
+    // An unreachable count is refused as busy (null), not counted as abuse;
+    // a request the count object refuses as malformed is refused outright.
+    if (result?.ok !== true) return Number(result?.status) >= 400 && Number(result?.status) < 500 ? false : null;
+    const allowed = result.allowed === true;
     if (!allowed) await recordRateLimitTrip({ env, deps });
     return allowed;
   };

@@ -232,6 +232,11 @@ test('Detailed answers add what the asker may read and members’ answers, and n
   assert.equal(unread.status, 200);
   assert.doesNotMatch(unread.prompt, /ANSWER/);
   assert.match(unread.body.note, /couldn’t be read/);
+  // Past the build limit the note says which limit, in plain words.
+  const tooMany = await ask(h, { address: MEMBER, deps: { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+    ok: false, status: 503, reason: 'results_analysis_snapshot_limit' }) } });
+  assert.doesNotMatch(tooMany.prompt, /ANSWER/);
+  assert.match(tooMany.body.note, /weren’t read: this session stores more than 10,000 question and answer versions/);
 });
 
 test('results reach an answer only where the page shows the asker results', async () => {
@@ -258,6 +263,25 @@ test('the payment step sees only who is asking, after the material is fixed, and
   assert.equal(refused.status, 402);
   assert.deepEqual(seen, [{ audience: 0, answers: 'detailed' }]);
   assert.deepEqual(refused.calls.ai, []);
+});
+
+test('questions count against the AI daily limit, not the general one', async () => {
+  const h = await seeded();
+  h.state.config.limits = { perWalletPerDay: 400, aiPerWalletPerDay: 15 };
+  const seen = [];
+  await ask(h, { deps: { checkRateLimit: async ({ route, limit }) => { seen.push({ route, limit }); return true; } } });
+  assert.deepEqual(seen, [{ route: 'ai', limit: 15 }]);
+});
+
+test('a question refused before any AI runs costs nothing from the day', async () => {
+  const h = await seeded();
+  const refusals = [
+    await ask(h, { address: MEMBER, current: { ai: false } }),
+    await ask(h, { deps: { getSessionSecrets: async () => null } }),
+    await ask(h, { deps: { callSessionAgentOptOutStore: async () => ({ ok: false, status: 503, body: {} }) } }),
+  ];
+  assert.deepEqual(refusals.map((refused) => [refused.status, refused.calls.rate]), [[403, []], [503, []], [503, []]]);
+  assert.deepEqual((await ask(h)).calls.rate, ['ai']);
 });
 
 test('questions share the /ai rate limit', async () => {

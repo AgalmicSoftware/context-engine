@@ -64,7 +64,7 @@ export const printUsage = () => {
     '  --api-token <token>           Cloudflare API token with Workers KV Storage + Workers Scripts edit scopes',
     '  --account-id <id>             Developer override; otherwise look up the one visible account using the token',
     '  --allowed-origins <csv>       Optional comma/newline-delimited origin allowlist written into ALLOWED_ORIGINS',
-    '                                When omitted, seeds the hosted/local defaults used by /new before it prepends the current browser origin',
+    '                                When omitted, seeds https://contextengine.sh and https://www.contextengine.sh',
     '                                Self-hosted custom app origins are not discoverable here; pass --allowed-origins explicitly',
     '  --admin-secret <secret>       Optional ADMIN_SECRET (auto-generated when omitted)',
       '  --release-commit <sha>       Immutable Worker release (default client/src/variables/workerReleasePin.json)',

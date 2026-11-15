@@ -120,7 +120,6 @@ test('resolveLoginAuthorityContext preserves session-not-registered warning and 
     '[gating] on-chain gate authority unavailable; denying login',
     {
       slug: 'general',
-      address: '0xabc123',
       reason: 'session-not-registered',
       registryAddress: REGISTRY_ADDRESS,
       rpcUrl: 'masked:https://rpc.example',
@@ -158,7 +157,6 @@ test('resolveLoginAuthorityContext preserves session-check-unavailable warning a
     '[gating] on-chain gate authority unavailable; denying login',
     {
       slug: 'session-b',
-      address: '0xabc123',
       reason: 'session-check-unavailable',
       registryAddress: REGISTRY_ADDRESS,
       rpcUrl: '',

@@ -8,6 +8,7 @@ import { normalizeWorkerSessionSlug, sessionSlugStorageKey } from './sessionSlug
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import { coordinateWorkerGroupBackup } from './workerGroups.js';
+import { canOptOut, sessionAgentOptOutKey } from './sessionAgentOptOuts.js';
 import { base64urlToBytes, bytesToBase64url } from './storageEnvelopeEncryption.js';
 import { isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
 import { isStorageResourceId } from './storageUploadValidation.js';
@@ -78,6 +79,9 @@ const validateSnapshot = ({ snapshot, manifest, normalizeConfig, normalizeSessio
       !isEncryptedSessionSecretsEnvelope(signer.envelope))) fail('Invalid wrapped authorization signer.');
   if (snapshot.secrets && !isEncryptedSessionSecretsEnvelope(snapshot.secrets)) fail('Backup secrets must be ciphertext.');
   if (!Array.isArray(snapshot.workerGroups?.durable) || !Array.isArray(snapshot.workerGroups?.records)) fail('Invalid backup groups.');
+  const optOuts = snapshot.sessionAgentOptOuts;
+  if (optOuts !== undefined && (!Array.isArray(optOuts) || !optOuts.every((address) => canOptOut(address) && address === address.toLowerCase()) ||
+      new Set(optOuts).size !== optOuts.length)) fail('Invalid backup Session Agent opt-outs.');
 };
 
 const validatePage = (page, slug) => {
@@ -426,6 +430,13 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
           await journalBackupImportWrite(storage, page.archiveId, 'durable', 'session-lit-authorization-signer-v1');
           await storage.put('session-lit-authorization-signer-v1', signer); progress.counts.written += 1;
         }
+      }
+      // Opt-outs only add: one already on the target stays as it is.
+      for (const address of snapshot.sessionAgentOptOuts || []) {
+        const key = sessionAgentOptOutKey(address);
+        if (await storage.get(key) === true) { progress.counts.skipped += 1; continue; }
+        await journalBackupImportWrite(storage, page.archiveId, 'durable', key);
+        await storage.put(key, true); progress.counts.written += 1;
       }
       if (!progress.counts.conflicts) {
         // Commit the verified authority before reclaiming its staged snapshot.

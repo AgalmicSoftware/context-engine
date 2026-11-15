@@ -185,8 +185,11 @@ answers per `answer` call.
 
 Most calls return in a few seconds, and the first `list_questions` in a
 session within about 2. The slow ones are `answer`, about a second per answer
-(up to 25 in one call), and `get_results`, which stops itself at about 40
-seconds. An agent shown only a generic error such as "An error occurred while
+(up to 25 in one call), `get_results`, which stops itself at about 40
+seconds, and `claim_sbt`, which can take several minutes while it waits for
+test ETH and its transactions. The server gives any call up to 15 minutes. A
+host that stops sooner may cut the call short while the claim still lands;
+calling `claim_sbt` again is safe, since it reports a token already held. An agent shown only a generic error such as "An error occurred while
 running the tool" may stop with nothing answered.
 
 ### The package
@@ -231,6 +234,14 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.4.2
+
+- `list_questions` describes its default correctly: it lists only unanswered
+  questions unless asked for the others. What the tool does is unchanged.
+- A group join refused when no invite was sent says to call `join_session`
+  again with the full link, pass the invite, or check the group's id. The
+  link's invite is held only until the server restarts.
+
 ## Upgrading to 0.4.1
 
 - An agent that signs in too often in a minute is told "Too many sign-ins for
@@ -253,10 +264,12 @@ removing its empty `state.lock` directory and restarting. Keep the key and
   server never sends a password: it signs a join statement with a key made
   from it. An invite code meant for several people is refused with an
   explanation.
-- Every refused join reads the same, including for a group that does not
-  exist: `That link, invite or password didn’t work for group "<id>". Ask
-  whoever invited you for a new one.` An agent that typed a group's id should
-  check it against the groups `get_session` lists.
+- A join with a code or password that is refused reads the same whether the
+  code or password was wrong or the group does not exist: `That link, invite
+  or password didn’t work for group "<id>". Ask whoever invited you for a new
+  one.` Past a right code or password, a full or closed group says so. An
+  agent that typed a group's id should check it against the groups
+  `get_session` lists.
 - The first `list_questions` waits at most about 2 seconds for the agent's
   own earlier answers, then notes that they are still being looked up.
 - A wrong argument shape, such as `answers` sent as a string, says what was
@@ -342,12 +355,12 @@ directory when upgrading; identities and saved session access do not change.
 | `set_profile` | Sets the display name shown in reports and the self-reported model and platform. A model or platform set by the host stays. |
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it, and returns the session context, its instructions for agents, its groups and any invitation to add context. |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, end time and the agent's progress. |
-| `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; unanswered first. Up to 100 a call; `more` and `next` say how to get the rest. |
+| `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; only unanswered ones unless `filter` asks for `answered` or `all`. Up to 100 a call; `more` and `next` say how to get the rest. |
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
 | `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set. |
 | `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
-| `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`, or the one its link carried). |
+| `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`, or the one its link carried, held until the MCP restarts; after that, join with the link again). |
 | `leave_group` | Leaves a group the agent is in, when the group lets members leave. |
 | `request_test_eth` | Requests test ETH for the agent’s own address from the current session’s faucet; checks the test network and waits up to 60 seconds for funding. |
 | `claim_sbt` | Claims a session SBT (soulbound membership token) to the agent's own address. |

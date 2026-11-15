@@ -274,8 +274,14 @@ const groupJoinCredential = async ({ token, sessionId, groupId, address }) => {
   return { proof: await groupPasswordKeys.signJoin({ password: invite.password, sessionId, groupId, address }) };
 };
 
-const groupRefusal = (error, id, tool) => {
+// `sentInvite` is false when join_group had no invite to send: the link's is
+// held only until the MCP restarts, so a refusal then is not a bad invite. The
+// Worker refuses an unknown group the same way, so neither is assumed.
+const groupRefusal = (error, id, tool, { sentInvite = true } = {}) => {
   if (!(error instanceof WorkerRequestError)) return error;
+  if (error.code === 'worker_group_join_refused' && !sentInvite) {
+    return new Error(`Group "${id}" didn’t let you in, and no invite was sent. If you were given a link, call join_session again with the full link (an invite it carried isn’t kept when the MCP restarts), or pass invite to join_group; otherwise check the group id with get_session.`);
+  }
   if (Object.hasOwn(GROUP_REFUSALS, error.code)) return new Error(GROUP_REFUSALS[error.code](id));
   const joining = tool === 'join_group';
   if (error.status === 503 && (BUSY_GROUP_REASONS.has(error.code) || !error.code || error.code === SESSION_COORDINATOR_UNAVAILABLE)) {
@@ -1311,7 +1317,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         : {};
       checkpoint();
       await ctx.client.joinGroup(id, { signal, ...credential }).catch((error) => {
-        throw groupRefusal(error, id, 'join_group');
+        throw groupRefusal(error, id, 'join_group', { sentInvite: !!token });
       });
       return { session: ctx.info.slug, joinedGroup: id };
     },

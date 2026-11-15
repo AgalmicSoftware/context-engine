@@ -6,6 +6,7 @@ import { executeSessionLitChipotleAction } from './chipotleClient.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { SESSION_AGENT_PATHS, dispatchSessionAgentRoute } from './sessionAgentRoute.js';
 import { FEEDBACK_PATH, sendSessionFeedback } from './sessionFeedbackRoute.js';
+import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
 
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return DEFAULT_ANTHROPIC_MODEL;
@@ -38,7 +39,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
   if (SESSION_AGENT_PATHS.includes(path)) {
     return {
       handled: true,
-      response: await dispatchSessionAgentRoute({ path, body, config, slug, address, env, limit, headers, scopes, deps }),
+      response: await dispatchSessionAgentRoute({ path, body, config, slug, address, env, headers, scopes, deps }),
     };
   }
   if (path === FEEDBACK_PATH) {
@@ -175,13 +176,14 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       env,
       slug,
       address,
-      limit,
+      limit: resolveAiDailyLimit(config),
       headers,
       deps: {
         checkRateLimit: deps?.checkRateLimit,
         computeScopesForLogin: deps?.computeScopesForLogin,
         json: deps?.json,
       },
+      countLater: true,
     });
     if (!preflight?.ok) {
       return {
@@ -216,6 +218,9 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         response: deps?.json?.(aiRequest.requestApiKey ? { error: 'Model not allowed for provider' } : AI_MODEL_NOT_ALLOWED, aiRequest.requestApiKey ? 400 : 403, headers),
       };
     }
+    // Counted only now, so a call refused above costs nothing from the day's AI calls.
+    const refused = await preflight.count?.();
+    if (refused) return { handled: true, response: refused };
     if (provider === 'anthropic') {
       return {
         handled: true,

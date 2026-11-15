@@ -161,6 +161,7 @@ import { createSessionWizardPublishRuntimeController } from './sessionWizardPubl
 import {
   createPendingWorkerGroupDraft,
   normalizePendingWorkerGroupDrafts,
+  resolveDraftGroupMemberCeiling,
   validatePendingWorkerGroupDrafts,
   type PendingWorkerGroupDraft,
 } from './sessionWizardPendingWorkerGroups';
@@ -1955,14 +1956,17 @@ const SessionWizard = ({
       try {
         const pendingDraftSnapshot = normalizePendingSbtDrafts(pendingSbtDrafts);
         const pendingWorkerGroupDraftSnapshot = normalizePendingWorkerGroupDrafts(pendingWorkerGroupDraftsRef.current);
-        const pendingWorkerGroupIssues = validatePendingWorkerGroupDrafts(pendingWorkerGroupDraftsRef.current);
+        const currentWorkerSecrets = getCurrentWorkerSecrets();
+        const liveRuntime = workerDeployRuntimeRef.current;
+        const liveDraft = liveRuntime?.draft || draftRef.current;
+        const pendingWorkerGroupIssues = validatePendingWorkerGroupDrafts(
+          pendingWorkerGroupDraftsRef.current,
+          resolveDraftGroupMemberCeiling(liveDraft?.groupMemberCeiling),
+        );
         if (pendingWorkerGroupIssues.length) {
           setStatus(pendingWorkerGroupIssues[0]);
           return;
         }
-        const currentWorkerSecrets = getCurrentWorkerSecrets();
-        const liveRuntime = workerDeployRuntimeRef.current;
-        const liveDraft = liveRuntime?.draft || draftRef.current;
         const interviewError = getSessionWizardInterviewValidationError(liveDraft?.interviewMode);
         if (interviewError) {
           setStatus(interviewError);
@@ -2854,6 +2858,7 @@ const SessionWizard = ({
         showOnChainGateControls:
           sessionModeRequirements.publish.deployPendingSbts || sessionModeRequirements.publish.registerSession,
         pendingWorkerGroupDrafts,
+        pendingWorkerGroupMemberCeiling: resolveDraftGroupMemberCeiling(draft.groupMemberCeiling),
         onAddPendingWorkerGroupDraft: addPendingWorkerGroupDraft,
         onRemovePendingWorkerGroupDraft: removePendingWorkerGroupDraft,
         onUpdatePendingWorkerGroupDraft: updatePendingWorkerGroupDraft,

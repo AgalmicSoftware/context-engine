@@ -6,8 +6,10 @@ export { SESSION_COORDINATOR_UNAVAILABLE };
 // busy-coordinator 503 instead of failing.
 const RETRY_DELAYS_MS = COORDINATOR_RETRY_DELAYS_MS;
 const READ_PATHS = /\/(capabilities|storage\/(list|read|read-batch)|realtime\/call)$/;
-// Joining a group again is a no-op that finishes an interrupted join.
-const REPEATABLE_WRITE_PATHS = /\/groups\/join$/;
+// Joining a group again is a no-op that finishes an interrupted join; draft text is
+// stored or deleted per question, so sending it twice leaves the same rows. A busy
+// sign-in answers before its nonce is issued or used, so it simply starts again.
+const REPEATABLE_WRITE_PATHS = /\/(groups\/join|storage\/draft-text\/(put|delete)|auth\/(nonce|login))$/;
 
 const wait = (ms: number, signal?: AbortSignal | null) =>
   new Promise<void>((resolve, reject) => {

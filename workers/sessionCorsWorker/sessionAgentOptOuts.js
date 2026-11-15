@@ -11,7 +11,10 @@ const addressOf = (value) => (typeof value === 'string' ? value.trim().toLowerCa
 /** Only someone signed in with an address has the switch. */
 export const canOptOut = (value) => ADDRESS.test(addressOf(value));
 
-const listAddresses = async (storage) => {
+/** The stored key for one person's opt-out; a backup restores it as is. */
+export const sessionAgentOptOutKey = (address) => PREFIX + addressOf(address);
+
+export const listSessionAgentOptOuts = async (storage) => {
   const addresses = [];
   for (let startAfter = ''; ;) {
     const keys = [...(await storage.list({ prefix: PREFIX, startAfter, limit: PAGE })).keys()];
@@ -23,7 +26,7 @@ const listAddresses = async (storage) => {
 
 export const dispatchSessionAgentOptOutStore = async (coordinator, operation, payload = {}) => {
   const storage = coordinator.state.storage;
-  if (operation === 'list') return json({ ok: true, addresses: await listAddresses(storage) });
+  if (operation === 'list') return json({ ok: true, addresses: await listSessionAgentOptOuts(storage) });
   const address = addressOf(payload.address);
   if (!canOptOut(address)) return json({ ok: false, error: 'Sign in with an address to change this.' }, 400);
   if (operation === 'read') return json({ ok: true, optedOut: (await storage.get(PREFIX + address)) === true });

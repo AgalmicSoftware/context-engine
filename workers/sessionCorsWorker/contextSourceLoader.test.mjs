@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { buildParticipantContextPrompt, loadParticipantContextSources } from './contextSourceLoader.js';
 import { resolveInterviewStarter } from './interviewStarter.js';
 import { runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
-import { buildIndexKey, buildIndexPrefix, buildPayloadKey } from './storageRouteExecution.js';
+import { buildIndexKey, buildIndexPrefix, buildPayloadKey, storageIndexPutOptions } from './storageRouteExecution.js';
 import { agentAdderTags, groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { PARTICIPANT, harness, idOf, json, pageResponse } from './contextSourceTestFixture.mjs';
 
@@ -70,31 +70,136 @@ test('a participant’s file, an agent’s included, reaches the AI as data, nev
   assert.ok(prompt.endsWith('</session_context>'), 'nothing follows the block as instructions');
 });
 
-test('context sources are found among more doc-library files than one scan reads', async () => {
+const titlesFor = async (h, deps = h.deps) =>
+  (await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps })).map((source) => source.title);
+const contextKeys = (h) => [...h.kv.store.keys()].filter((key) => key.startsWith(buildIndexPrefix({ slug: 'salon', resource: 'docsContext' })));
+// Uploads a second apart, so the order they were added is the order of their times.
+const ticking = (h) => {
+  let at = Date.parse('2026-11-01T00:00:00.000Z');
+  h.deps.now = () => (at += 1000);
+};
+
+test('context sources are chosen from their list entries: past 300 rows the newest are left out, never all', async () => {
   const h = await seeded();
   for (let i = 0; i < 300; i += 1) {
     await idOf(await h.uploadFile({ name: `library-${i}.txt`, type: 'text/plain', bytes: encode('A library file'), role: 'library' }));
   }
-  // Every doc-library row's list metadata says whether it is a context source.
-  const keys = [...h.kv.store.keys()].filter((key) => key.startsWith(buildIndexPrefix({ slug: 'salon', resource: 'docsContext' })));
+  // Every doc-library row's list entry says whether it is a context source,
+  // and a source's says whether an admin added it, whether it is a reading, and when.
+  const keys = contextKeys(h);
   assert.equal(keys.length, 309);
   for (const key of keys) {
-    assert.deepEqual(h.kv.listMetadata.get(key), { contextSource: JSON.parse(h.kv.store.get(key)).contextSource === true }, key);
+    const row = JSON.parse(h.kv.store.get(key));
+    const reading = row.tags.some((tag) => tag.name === 'CE-DocRole' && tag.value === 'context-text');
+    assert.deepEqual(h.kv.listMetadata.get(key), row.contextSource === true
+      ? { contextSource: true, admin: true, ...(reading ? { reading: true } : {}), createdAt: row.createdAt }
+      : { contextSource: false }, key);
   }
   const warnings = [];
   const deps = { ...h.deps, log: { warn: (...args) => warnings.push(args) } };
-  const titles = async () =>
-    (await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps })).map((source) => source.title);
-  assert.deepEqual(await titles(), ['agenda.md', 'example.org', 'deck.pdf']);
+  assert.deepEqual(await titlesFor(h, deps), ['agenda.md', 'example.org', 'deck.pdf']);
   assert.deepEqual(warnings, []);
-  // Rows stored without list metadata are read, so enough of them still
-  // exceed the scan: the AI then goes without context, and the operator is told.
+  // Rows stored without list entries come after the admins' rows: enough of
+  // them leave sources out, and the operator is told how many, but the
+  // admins' sources are still read.
   for (let i = 0; i < 300; i += 1) {
     const id = `cf_unlisted_${i}`;
     h.kv.store.set(buildIndexKey({ slug: 'salon', resource: 'docsContext', id }), JSON.stringify({ id, resource: 'docsContext' }));
   }
-  assert.deepEqual(await titles(), []);
-  assert.deepEqual(warnings, [['[context] sources left out of an AI prompt', { slug: 'salon', reason: 'rows limit' }]]);
+  assert.deepEqual(await titlesFor(h, deps), ['agenda.md', 'example.org', 'deck.pdf']);
+  assert.deepEqual(warnings, [['[context] sources left out of an AI prompt', { slug: 'salon', reason: 'rows limit', leftOut: 7 }]]);
+});
+
+test('an admin’s sources are read first, and everyone else’s take turns, oldest first', async () => {
+  const h = harness();
+  ticking(h);
+  const other = `0x${'3'.repeat(40)}`;
+  for (let i = 0; i < 20; i += 1) {
+    await idOf(await h.uploadFile({ address: PARTICIPANT, name: `early-${i}.md`, type: 'text/markdown', bytes: encode(`Note ${i}`) }));
+  }
+  await idOf(await h.uploadFile({ address: other, name: 'later.md', type: 'text/markdown', bytes: encode('A later view') }));
+  await idOf(await h.uploadFile({ name: 'reading-list.md', type: 'text/markdown', bytes: encode('The hosts’ reading list') }));
+  assert.deepEqual(await titlesFor(h), [
+    'reading-list.md', 'early-0.md', 'later.md', ...Array.from({ length: 13 }, (_, i) => `early-${i + 1}.md`),
+  ]);
+});
+
+test('an admin’s source added after 300 others is still read, and so is one stored before list entries named its adder', async () => {
+  const h = harness();
+  ticking(h);
+  // An admin's row from before list entries said who added it: it counts as oldest.
+  const oldId = await idOf(await h.uploadFile({ name: 'old-agenda.md', type: 'text/markdown', bytes: encode('An older agenda') }));
+  h.kv.listMetadata.set(buildIndexKey({ slug: 'salon', resource: 'docsContext', id: oldId }), { contextSource: true });
+  const noteId = await idOf(await h.uploadFile({ address: PARTICIPANT, name: 'note.md', type: 'text/markdown', bytes: encode('A note') }));
+  const note = JSON.parse(h.kv.store.get(buildIndexKey({ slug: 'salon', resource: 'docsContext', id: noteId })));
+  // Three hundred more participant rows, written as an upload writes them.
+  for (let i = 0; i < 300; i += 1) {
+    const row = { ...note, id: `cf_note_${i}`, createdAt: new Date(Date.parse(note.createdAt) + i + 1).toISOString() };
+    await h.kv.put(buildIndexKey({ slug: 'salon', resource: 'docsContext', id: row.id }), JSON.stringify(row), storageIndexPutOptions(row));
+  }
+  await idOf(await h.uploadFile({ name: 'reading-list.md', type: 'text/markdown', bytes: encode('The hosts’ reading list') }));
+  const titles = await titlesFor(h, { ...h.deps, log: { warn: () => {} } });
+  assert.deepEqual(titles, ['old-agenda.md', 'reading-list.md', 'note.md']);
+});
+
+// Three hundred and one participant notes, a millisecond apart, written as an
+// upload writes them, newest first, so the key list's order is not their age.
+const manyNotes = async (h) => {
+  const noteId = await idOf(await h.uploadFile({ address: PARTICIPANT, name: 'note.md', type: 'text/markdown', bytes: encode('A note') }));
+  const note = JSON.parse(h.kv.store.get(buildIndexKey({ slug: 'salon', resource: 'docsContext', id: noteId })));
+  for (let i = 299; i >= 0; i -= 1) {
+    const row = { ...note, id: `cf_note_${i}`, createdAt: new Date(Date.parse(note.createdAt) + i + 1).toISOString() };
+    await h.kv.put(buildIndexKey({ slug: 'salon', resource: 'docsContext', id: row.id }), JSON.stringify(row), storageIndexPutOptions(row));
+  }
+  return noteId;
+};
+
+test('past 300 rows the newest participant source is the one left out', async () => {
+  const h = harness();
+  const oldest = await manyNotes(h);
+  // Only the oldest and the newest may be read here, so which was looked at shows.
+  const readable = (row) => row.id === oldest || row.id === 'cf_note_299';
+  const sources = await loadParticipantContextSources({
+    env: h.env, slug: 'salon', config: h.state.config, deps: { ...h.deps, log: { warn: () => {} } }, readable,
+  });
+  assert.equal(sources.length, 1);
+});
+
+test('a list too long to finish, or rows that can’t be fetched, leave sources out, never all', async () => {
+  const h = harness();
+  await manyNotes(h);
+  await idOf(await h.uploadFile({ name: 'reading-list.md', type: 'text/markdown', bytes: encode('The hosts’ reading list') }));
+  const warnings = [];
+  const deps = { ...h.deps, log: { warn: (...args) => warnings.push(args) } };
+  // One key a page: the list stops after 40 pages and reads what it has,
+  // which is the first note (the copies have no text of their own).
+  const { list, get } = h.kv;
+  h.kv.list = (options) => list({ ...options, limit: 1 });
+  assert.deepEqual(await titlesFor(h, deps), ['note.md']);
+  assert.deepEqual(warnings.pop(), ['[context] sources left out of an AI prompt', { slug: 'salon', reason: 'list pages limit', leftOut: 1 }]);
+  h.kv.list = list;
+  // A bulk read that fails drops only its own hundred rows.
+  let calls = 0;
+  h.kv.get = (key) => (Array.isArray(key) && calls++ === 1 ? Promise.reject(new Error('KV unavailable')) : get(key));
+  assert.deepEqual(await titlesFor(h, deps), ['reading-list.md', 'note.md']);
+  assert.deepEqual(warnings.pop(), ['[context] sources left out of an AI prompt', { slug: 'salon', reason: 'rows limit, storage unavailable', leftOut: 102 }]);
+  h.kv.get = get;
+  // Rows past a megabyte of their own text are not looked at: here, all but the first two.
+  const key = buildIndexKey({ slug: 'salon', resource: 'docsContext', id: 'cf_note_0' });
+  h.kv.store.set(key, JSON.stringify({ ...JSON.parse(h.kv.store.get(key)), padding: 'x'.repeat(1024 * 1024) }));
+  assert.deepEqual(await titlesFor(h, deps), ['reading-list.md', 'note.md']);
+  assert.deepEqual(warnings.pop(), ['[context] sources left out of an AI prompt', { slug: 'salon', reason: 'rows limit, row bytes limit', leftOut: 300 }]);
+});
+
+test('rows stored before list entries said who added them read as they did', async () => {
+  const h = await seeded();
+  const expected = ['agenda.md', 'example.org', 'deck.pdf'];
+  // As 0.9.0 to 0.9.8 wrote them: whether a row is a context source, nothing more.
+  for (const key of contextKeys(h)) h.kv.listMetadata.set(key, { contextSource: JSON.parse(h.kv.store.get(key)).contextSource === true });
+  assert.deepEqual(await titlesFor(h), expected);
+  // Older still: no list entry at all.
+  for (const key of contextKeys(h)) h.kv.listMetadata.delete(key);
+  assert.deepEqual(await titlesFor(h), expected);
 });
 
 test('a context row whose access no longer matches the session’s is left out', async () => {

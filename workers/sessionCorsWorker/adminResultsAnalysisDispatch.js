@@ -9,6 +9,8 @@ import {
 } from './resultsAnalysisGeneration.js';
 import { canBuildResults } from './resultsBuild.js';
 import { callSessionFeedbackStore } from './sessionFeedbackRoute.js';
+import { countResultsScanRows } from './resultsScanRowCount.js';
+import { STORED_VERSIONS_FIELD } from '../../shared/sessionDiagnostics.mjs';
 
 const toTrimmedString = (value, deps) => {
   if (typeof deps?.toStr === 'function') return deps.toStr(value).trim();
@@ -128,10 +130,14 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
     try {
       const cursor = new URL(request.url).searchParams.get('cursor') || '';
       const uploadReceipts = await readUploadReceiptDiagnostics({ env, slug: targetSlug, cursor });
+      // Counted on the first page only; null when the count can't be read.
+      const storedVersions = cursor ? undefined
+        : await (deps?.countResultsScanRows || countResultsScanRows)({ env, slug: targetSlug }).catch(() => null);
       return deps?.json?.({
         ok: true, type: 'ce_session_diagnostics', version: 1,
         observedAtMs: typeof deps?.now === 'function' ? deps.now() : Date.now(),
         uploadReceipts, analysis: snapshot.analysis, configProjection: snapshot.configProjection,
+        ...(storedVersions === undefined ? {} : { [STORED_VERSIONS_FIELD]: storedVersions }),
       }, 200, headers);
     } catch (error) {
       return deps?.json?.({ error: error?.status === 400 ? 'Invalid diagnostics cursor.' : 'Session diagnostics are unavailable; retry.' }, error?.status === 400 ? 400 : 503, headers);

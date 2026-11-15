@@ -25,6 +25,7 @@ const NEXT_TEST_ADDRESS = '0x00000000000000000000000000000000000000bb';
 const CANONICAL_SESSION_ID = '0x1234567890abcdef1234567890abcdef';
 const NEXT_CANONICAL_SESSION_ID = '0xfedcba0987654321fedcba0987654321';
 
+const mockSignMessage = jest.fn(async () => '0xsigned');
 jest.mock('ethers', () => {
   class MockWeb3Provider {
     constructor(provider) {
@@ -34,7 +35,7 @@ jest.mock('ethers', () => {
     getSigner(address) {
       return {
         getAddress: jest.fn(async () => address || TEST_ADDRESS),
-        signMessage: jest.fn(async () => '0xsigned'),
+        signMessage: mockSignMessage,
       };
     }
   }
@@ -543,6 +544,33 @@ describe('workerAuth canonical session resolution', () => {
 
     expect(JSON.parse(global.fetch.mock.calls[0][1].body)).not.toHaveProperty('sessionId');
     expect(JSON.parse(global.fetch.mock.calls[1][1].body)).not.toHaveProperty('sessionId');
+  });
+
+  it('signs in through a busy session coordinator, sending each step again', async () => {
+    const busy = () => jsonResp(503, { error: 'Session config coordination is unavailable; retry.' });
+    mockSignMessage.mockClear();
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(busy())
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(busy())
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
+
+    await expect(
+      getWorkerSessionToken({
+        sessionConfig: { slug: 'busy-session', corsWorkerUrl: 'https://worker.example' },
+        context: authContext,
+      }),
+    ).resolves.toBe('token-1');
+    expect(global.fetch.mock.calls.map(([url]) => String(url).split('/').pop())).toEqual([
+      'nonce',
+      'nonce',
+      'login',
+      'login',
+    ]);
+    // The busy login is sent again as it was: one signature, the same body.
+    expect(global.fetch.mock.calls[3][1].body).toBe(global.fetch.mock.calls[2][1].body);
+    expect(mockSignMessage).toHaveBeenCalledTimes(1);
   });
 
   it('says whether a Worker token is already held, without asking anyone to sign', async () => {
@@ -1202,6 +1230,49 @@ describe('workerAuth fetchWorkerWithAuth', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+  });
+
+  it('sends with requireAccount only as that account, never asking another to sign', async () => {
+    const OTHER = '0x00000000000000000000000000000000000000bb';
+    global.fetch = jest.fn(async () => jsonResp(200, { ok: true }));
+    // Another account is signed in on the page.
+    await expect(
+      fetchWorkerWithAuth(
+        'https://worker.example/storage/draft-text/delete',
+        { method: 'POST', body: '{"questionIds":["q1"]}' },
+        { sessionSlug: 'edge', workerUrl: 'https://worker.example', requireAccount: OTHER },
+      ),
+    ).rejects.toThrow('A different account is signed in now.');
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(mockProviderRequest.mock.calls.map(([payload]) => payload?.method)).not.toContain('personal_sign');
+  });
+
+  it('refuses a requireAccount request when the page and wallet switch account during sign-in', async () => {
+    const OTHER = '0x00000000000000000000000000000000000000bb';
+    const mockStore = require('../../store.js').default;
+    mockProviderRequest.mockImplementation(async (payload) => {
+      if (payload?.method !== 'eth_accounts') return defaultProviderRequest(payload);
+      mockStore.getState.mockReturnValue({
+        profile: { account: OTHER, provider: 'wagmi', network: { id: 84532 } },
+        sessionState: {},
+      });
+      return [OTHER];
+    });
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-b', exp: Math.floor(Date.now() / 1000) + 3600 }))
+      .mockResolvedValue(jsonResp(200, { ok: true }));
+    await expect(
+      fetchWorkerWithAuth(
+        'https://worker.example/storage/draft-text/delete',
+        { method: 'POST', body: '{"questionIds":["q1"]}' },
+        { sessionSlug: 'edge', workerUrl: 'https://worker.example', requireAccount: TEST_ADDRESS },
+      ),
+    ).rejects.toThrow('A different account is signed in now.');
+    expect(global.fetch.mock.calls.map(([url]) => String(url))).not.toContain(
+      'https://worker.example/storage/draft-text/delete',
+    );
   });
 
   it('sends anonymous-first request with X-Group-Slug general for default session', async () => {

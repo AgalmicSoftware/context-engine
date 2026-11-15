@@ -57,7 +57,6 @@ export const resolveLoginAuthorityContext = async ({
     const reason = sessionCheck?.exists === false ? 'session-not-registered' : 'session-check-unavailable';
     warn('[gating] on-chain gate authority unavailable; denying login', {
       slug: registrySlug,
-      address,
       reason,
       registryAddress,
       rpcUrl: sessionCheck?.rpcUrl ? maskRpcUrl(sessionCheck.rpcUrl) : '',

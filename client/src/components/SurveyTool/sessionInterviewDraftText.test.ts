@@ -1,4 +1,9 @@
-import { exportDraftText, planDraftTextSync, syncDraftText } from './sessionInterviewDraftText';
+import {
+  exportDraftText,
+  planDraftTextSync,
+  resendPendingDraftTextDeletes,
+  syncDraftText,
+} from './sessionInterviewDraftText';
 import { keepConsentWithdrawals, resolveConsentFlags, summarizeInterviewConsent } from './sessionInterviewConsent';
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 
@@ -49,6 +54,72 @@ describe('syncDraftText', () => {
   it('sends nothing when there is nothing to change', async () => {
     await syncDraftText({ put: [], remove: [] }, context);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('a draft text delete that fails', () => {
+  const signed = { ...context, account: '0xabc' };
+  beforeEach(() => localStorage.clear());
+
+  it('is kept and sent again on the next page load, without asking anyone to sign in', async () => {
+    fetchMock.mockResolvedValueOnce(reply({ error: 'Busy.' }, false));
+    await expect(syncDraftText({ put: [], remove: ['q1'] }, signed)).rejects.toThrow('Busy.');
+
+    // Another account, or no one signed in, sends nothing.
+    await resendPendingDraftTextDeletes({ ...signed, account: '0xdef' });
+    await resendPendingDraftTextDeletes({ ...context, account: '' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fetchMock.mockResolvedValue(reply({ ok: true }));
+    await resendPendingDraftTextDeletes(signed);
+    expect(calls()[1]).toEqual(['https://worker.test/storage/draft-text/delete', { questionIds: ['q1'] }]);
+    // Signed in as the address that kept it, never as whoever is signed in now, and with no prompt.
+    expect(fetchMock.mock.calls[1][2]).toEqual(expect.objectContaining({ prompt: false, requireAccount: '0xabc' }));
+
+    // Sent once: nothing is left to resend.
+    await resendPendingDraftTextDeletes(signed);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('is kept by address whatever the case or wallet kind', async () => {
+    fetchMock.mockResolvedValueOnce(reply({ error: 'Busy.' }, false));
+    await expect(syncDraftText({ put: [], remove: ['q1'] }, { ...context, account: '0xABC' })).rejects.toThrow();
+    fetchMock.mockResolvedValue(reply({ ok: true }));
+    await resendPendingDraftTextDeletes(signed);
+    expect(calls()[1]).toEqual(['https://worker.test/storage/draft-text/delete', { questionIds: ['q1'] }]);
+  });
+
+  it('is not cleared by a resend that was already under way when a submit kept another', async () => {
+    let finishResend: (value: Response) => void = () => undefined;
+    fetchMock
+      .mockResolvedValueOnce(reply({ error: 'Busy.' }, false))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishResend = resolve)))
+      .mockResolvedValueOnce(reply({ error: 'Busy.' }, false));
+    await expect(syncDraftText({ put: [], remove: ['q1'] }, signed)).rejects.toThrow('Busy.');
+
+    const resend = resendPendingDraftTextDeletes(signed);
+    const submit = syncDraftText({ put: [], remove: ['q2'] }, signed);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    finishResend(reply({ ok: true }));
+    await resend;
+    await expect(submit).rejects.toThrow('Busy.');
+
+    fetchMock.mockResolvedValue(reply({ ok: true }));
+    await resendPendingDraftTextDeletes(signed);
+    expect(calls().map(([, body]) => body.questionIds)).toEqual([['q1'], ['q1'], ['q2'], ['q2']]);
+  });
+
+  it('goes out with the next submit, before its new text', async () => {
+    fetchMock.mockResolvedValueOnce(reply({ error: 'Busy.' }, false));
+    await expect(syncDraftText({ put: [], remove: ['q1'] }, signed)).rejects.toThrow('Busy.');
+    fetchMock.mockResolvedValue(reply({ ok: true }));
+    await syncDraftText({ put: [{ questionId: 'q1', aiComment: 'New' }], remove: ['q2'] }, signed);
+    expect(calls().slice(1)).toEqual([
+      ['https://worker.test/storage/draft-text/delete', { questionIds: ['q1', 'q2'] }],
+      ['https://worker.test/storage/draft-text/put', { items: [{ questionId: 'q1', aiComment: 'New' }] }],
+    ]);
+    await resendPendingDraftTextDeletes(signed);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
 

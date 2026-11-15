@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.9] - 2026-11-14
+
+### Client — available when the site deploys
+
+- When a session is briefly busy, signing in and saving the AI draft text kept for admins wait a moment and try again. A withdrawn consent whose delete still fails is sent again the next time the page loads.
+- Group member limits on `/new` and in the participants' create form follow the session's **Most members in a group**, not 1,000. A blank limit shows that number, and so does a group's page.
+- The Public URL help says anyone signed in can join such a group, with or without the link. Suggest questions says it drafts up to five, and none when nothing in the context supports one.
+- Admins see how many question and answer versions the session stores against the 10,000 that AI Views, the atlas and the risk matrix can read, with a warning from 8,000. It shows once the session's Worker runs this release.
+- Settings has **AI requests per person a day**, a cap on one person's AI requests (drafting, Session Agent questions, agents' AI calls) apart from saving answers. Saving it signs no one out. It does not count AI used before signing in, which voice interviews are. The field shows only on a Session Worker that counts the limit, and re-saving a session from `/new` keeps the limit set in Settings.
+
+### Workers — requires redeployment
+
+- A session can set a separate daily limit for signed-in AI calls (`limits.aiPerWalletPerDay`): `/ai`, Session Agent questions and Agent HTTP's AI share one count per person. A cap on AI spend no longer stops answers or reads; empty or 0 falls back to the general limit. A call refused before any AI runs is not counted. It counts signed-in calls only: where a session opens AI to signed-out visitors, those calls fall under the per-network limit. Saved from Settings (`set-limits`) it signs no one out; a limit changed in a full settings save (`set-config`) signs everyone out, as before.
+- `/capabilities` reports `ai_daily_limit_v1` when the Worker honours the AI daily limit.
+- Admin diagnostics show how many stored question and answer versions an AI build reads, against its limit of 10,000, and a build over the limit says so in plain words.
+- A rate limit that cannot be reached answers "busy, retry" (`503`) instead of "Rate limit exceeded.", so the site and the MCP try again. The Worker logs a line when its limit, sign-in or receipt object does not answer.
+- Restoring a backup keeps everyone who turned the Session Agent off opted out. Backups made before this release carry no opt-outs. A backup lists who opted out, so keep backups private.
+- An admin saving a setting that does not affect access no longer refuses group joins and leaves already under way.
+- A session with more than 300 context items no longer leaves the AI with none of them. The AI takes 300, the admins' first and then the oldest, and the Worker logs how many were left out. Items stored by earlier releases are still read.
+- New Session Workers keep the Worker's own log lines: the deployment template and the deploy helper turn Cloudflare's logs on, with per-request logs off, so no request address is kept. Warnings about sign-in checks no longer name the signer's address.
+
+### Agents and MCP
+
+- MCP 0.4.2.
+- A group join refused when no invite was sent says to call `join_session` again with the full link, pass the invite, or check the group's id, instead of blaming an invite.
+- `list_questions` says that by default it lists only unanswered questions, as it always has, and how to list the others.
+
+### Local tooling
+
+- Two Session Worker tests no longer fail by chance: the group-password test picks people the join race really refused, and the backup test looks for whole feedback phrases, not a short marker that random ids can contain.
+
 ## [0.9.8] - 2026-11-14
 
 ### Client — available when the site deploys
@@ -38,7 +69,7 @@ All notable changes to this project will be documented in this file.
 - On the Admin page, each group on a Session Worker has **Who can join**: One-use URLs, Group Password, Public URL, or Admin adds members, with the detail behind a "?". The choices appear once the session's Worker runs this release; on an older Worker the form is as before.
 - One-use URLs: an admin generates 1 to 500 links, with an optional expiry. They are shown once, to copy or export as CSV, and listed afterwards by the start of their hash with **Revoke** and **Revoke all unused**. Only hashes of the links reach the Worker.
 - Group Password: an admin sets, generates or replaces a password, shown once with **Copy password** and a link with or without it. Only the signer made from the password reaches the Worker. A password a joiner could not type back is refused with the reason.
-- **Show in the group list** keeps a group out of the list. A group's card says how people join, "Not in the group list", "No password yet: no one can join.", and how many links are left.
+- Turning off **Show in the group list** keeps a group out of the list. A group's card says how people join, "Not in the group list", "No password yet: no one can join.", and how many links are left.
 - A link's invite leaves the address bar at once and is never kept in history, logs or copied links. A listed group that needs a password or a code takes one typed into the Groups section. A refused join says one sentence and offers the field again, and a refused invite is never sent again.
 - A claim link from a group recording carries the recorder's group password, never a one-use code. A group joined by one-use links says each person needs their own invite.
 - `/new` and Settings have **Most members in a group** (1 to 10,000). Settings offers it once the session's Worker runs this release.
@@ -46,17 +77,17 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
-- An admin chooses how people join a group on a Session Worker: anyone with the link, one-use codes, a group password, or only people an admin adds. For a group joined by code or password, the group's id in a link no longer admits anyone. Admins add, list and revoke codes at `groups/invites/add`, `groups/invites/list` and `groups/invites/revoke`, and set a password at `groups/password/set`; a password is never sent or stored, only the signer made from it. Changing a group's join mode voids its password and its unused codes.
+- An admin chooses how people join a group on a Session Worker: anyone signed in to the session (from the group list or a link), one-use codes, a group password, or only people an admin adds. For a group joined by code or password, the group's id in a link no longer admits anyone. Admins add, list and revoke codes at `groups/invites/add`, `groups/invites/list` and `groups/invites/revoke`, and set a password at `groups/password/set`; a password is never sent or stored, only the signer made from it. Changing a group's join mode voids its password and its unused codes.
 - A group can be left out of group lists. Someone who is not a member gets "not found" for an unlisted group's members, as for a group that does not exist, and leaving a group answers the same for both. Groups an earlier Worker kept out of lists stay out until an admin lists them.
 - A session sets the most members any group may have (`groupMemberCeiling`, 1,000 unless set, up to 10,000). The Worker variable `CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP` is gone: a deployment that set it should set the session's ceiling instead.
 - Every join refused before a valid code or password answers the same `403` and sentence, so an answer does not show whether a group exists. A right group password or code always gets in: wrong tries are not counted or limited, so no one can shut a group by guessing, and a password's strength is the protection. Prefer a generated password to a short or common one.
 - Session backups carry a group's codes and a password group's signer, which a restore needs. Keep backups private.
-- A session's public settings report `groupJoinChoices`, which the site and the MCP read to offer the new choices.
+- A session's public settings report `groupJoinChoices`, which the site reads to offer the new choices.
 
 ### Agents and MCP
 
 - MCP 0.4.0. `join_group` uses the invite a session link carries (`#groupInvite=…`), or a one-use code or group password passed as `invite`. The server never sends a password: it signs a join statement with a key made from it.
-- Every refused join reads the same, including for a group that does not exist; it used to say "This session has no group". `get_session` and `join_session` say how a code or password group is joined.
+- Every join refused before a valid code or password reads the same, including for a group that does not exist; it used to say "This session has no group". A full or closed group still says so. `get_session` and `join_session` say how a code or password group is joined.
 - The first `list_questions` waits at most about 2 seconds for the agent's own earlier answers. A wrong argument shape says what was wrong, with a one-line example. The README says how long a host should allow a tool call.
 - The guide for AI agents (`/skill.md`) now starts from what an agent can do with a session link. An agent that can run commands can take part with nothing set up, and each of Claude Code, Codex, Gemini CLI, Hermes Agent, Cursor and the OpenAI Agents SDK adds the tools in one step. The MCP README says the same.
 - `scripts/mcp-mcpb.mjs` packs the MCP as a Claude Desktop bundle (`.mcpb`), which installs from a double-click and needs no Node. Nothing builds or publishes it yet.

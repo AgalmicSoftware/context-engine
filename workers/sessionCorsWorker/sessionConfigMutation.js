@@ -25,6 +25,7 @@ import { validResultsAnalysisSettings } from '../../shared/resultsAnalysisSettin
 import { WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mjs';
 import { validateSessionContext } from '../../shared/sessionContext.mjs';
 import { validateSessionAgent } from '../../shared/sessionAgent.mjs';
+import { AI_DAILY_LIMIT_MAX, validAiDailyLimit } from './aiRateLimitPolicy.js';
 import {
   mergeWorkerConfigRecords,
   mergeWorkerLimitRecords,
@@ -451,6 +452,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   }
   if (!validFeedbackConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'feedbackEnabled must be true or false.' };
+  }
+  if (!validAiDailyLimit(mergedConfig)) {
+    return { ok: false, status: 400, error: `limits.aiPerWalletPerDay must be a whole number from 0 to ${AI_DAILY_LIMIT_MAX}, or empty.` };
   }
   if (!validInterviewModeConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid interview mode config.' };

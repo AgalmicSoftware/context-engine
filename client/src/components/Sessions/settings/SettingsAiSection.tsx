@@ -8,6 +8,7 @@ import {
   normalizeAiModelForProvider,
   normalizeAiProvider,
 } from '../sessionWizardAiConfig';
+import { AI_DAILY_LIMIT_HELP, AI_DAILY_LIMIT_LABEL, AI_DAILY_LIMIT_MAX } from '../aiDailyLimit';
 import { SetupField, SetupSection, setupHelpId } from '../setup/SetupPrimitives';
 import { asRecord, text, type SetupSectionProps } from '../setup/setupSectionTypes';
 import styles from '../setup/SessionSetup.module.scss';
@@ -62,6 +63,8 @@ type Props = Omit<SetupSectionProps, 'mode' | 'conflicts'> & {
   keys?: React.ReactNode;
   /** Who may ask the Session Agent, for a session on a Session Worker. */
   sessionAgent?: React.ReactNode;
+  /** True for a session on a Session Worker, which bounds each person's AI requests a day. */
+  dailyLimit?: boolean;
 };
 
 // The settings page's AI section: the same fields setup writes, plus the
@@ -75,6 +78,7 @@ export const SettingsAiSection = ({
   lockedReason,
   keys = null,
   sessionAgent = null,
+  dailyLimit = false,
 }: Props) => {
   const { models, provider, fast, thinking, transcription, effort, taskEffort } = readAi(draft);
   const [newTask, setNewTask] = useState('');
@@ -251,6 +255,22 @@ export const SettingsAiSection = ({
           )}
         </>
       )}
+      {dailyLimit ? (
+        <SetupField id="ce-settings-ai-daily-limit" label={AI_DAILY_LIMIT_LABEL} help={AI_DAILY_LIMIT_HELP}>
+          <Input
+            id="ce-settings-ai-daily-limit"
+            type="number"
+            min="0"
+            max={AI_DAILY_LIMIT_MAX}
+            step="1"
+            placeholder="Same as other requests"
+            value={text(draft.aiPerWalletPerDay)}
+            aria-describedby={setupHelpId('ce-settings-ai-daily-limit')}
+            data-testid="ce-settings-ai-daily-limit"
+            onChange={(event) => onChange(['aiPerWalletPerDay'], event.target.value)}
+          />
+        </SetupField>
+      ) : null}
       <SetupField
         id="ce-setup-questions-prompt"
         label="Question prompt"

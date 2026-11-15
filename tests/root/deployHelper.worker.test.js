@@ -788,6 +788,10 @@ describe('deploy-helper worker', () => {
       expect(uploadMetadata.main_module).toBe('worker.mjs');
       // Embedded deployment also probes sibling Workers over their public URL.
       expect(uploadMetadata.compatibility_flags).toContain('global_fetch_strictly_public');
+      // The Worker keeps its own log lines.
+      expect(uploadMetadata.observability).toEqual({
+        enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: false },
+      });
       expect(uploadMetadata.bindings).toContainEqual({
         name: 'CE_SESSION_COORDINATOR',
         type: 'durable_object_namespace',

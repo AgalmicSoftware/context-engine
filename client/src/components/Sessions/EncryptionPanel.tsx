@@ -63,6 +63,8 @@ export type EncryptionPanelProps = {
   isWorkerCanonical?: boolean;
   showOnChainGateControls?: boolean;
   pendingWorkerGroupDrafts?: PendingWorkerGroupDraft[];
+  // The session's "Most members in a group", which bounds each draft's member limit.
+  pendingWorkerGroupMemberCeiling: number;
   onAddPendingWorkerGroupDraft?: (label: string) => void;
   onRemovePendingWorkerGroupDraft?: (groupId: string) => void;
   onUpdatePendingWorkerGroupDraft?: (groupId: string, patch: Partial<PendingWorkerGroupDraft>) => void;
@@ -94,6 +96,7 @@ const EncryptionPanel = ({
   isWorkerCanonical = false,
   showOnChainGateControls = true,
   pendingWorkerGroupDrafts = [],
+  pendingWorkerGroupMemberCeiling,
   onAddPendingWorkerGroupDraft = () => {},
   onRemovePendingWorkerGroupDraft = () => {},
   onUpdatePendingWorkerGroupDraft = () => {},
@@ -149,6 +152,7 @@ const EncryptionPanel = ({
         {isWorkerCanonical && !showOnChainGateControls ? (
           <SessionWorkerGroupDraftsPanel
             drafts={pendingWorkerGroupDrafts}
+            memberCeiling={pendingWorkerGroupMemberCeiling}
             onAdd={onAddPendingWorkerGroupDraft}
             onRemove={onRemovePendingWorkerGroupDraft}
             onUpdate={onUpdatePendingWorkerGroupDraft}

@@ -122,4 +122,33 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
     expect(fetchImpl.mock.calls[0][0]).toBe('https://worker.example.test/session-config');
     expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)).config.agentInstructions).toBe(expected);
   });
+
+  it('keeps the AI daily limit the Worker stores, which /new has no field for', async () => {
+    const fetchImpl = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({
+      ok: true,
+      json: async () =>
+        init?.method === 'POST'
+          ? { ok: true }
+          : { config: { slug: 'lit-session', limits: { perWalletPerDay: 25, aiPerWalletPerDay: 40 } } },
+    }));
+    const ensureSessionConfig = createSessionWizardEnsureWorkerSessionConfig({
+      getWorkerConfig: () => ({
+        slug: 'lit-session',
+        agentInstructions: '',
+        sessionAgent: null,
+        limits: { perWalletPerDay: 100 },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }),
+      getAdminAddress: () => '0xadmin',
+      signTypedAdminAction: async () => ({ address: '0xadmin', signature: '0xsig' }),
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await ensureSessionConfig({ workerUrl: 'https://worker.example.test', slug: 'lit-session' });
+
+    expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)).config.limits).toEqual({
+      perWalletPerDay: 100,
+      aiPerWalletPerDay: 40,
+    });
+  });
 });

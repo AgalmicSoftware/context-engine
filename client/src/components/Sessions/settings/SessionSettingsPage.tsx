@@ -41,6 +41,7 @@ import {
 import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/session/sessionWorkerConfigCache';
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
 import {
+  readWorkerCountsAiLimit,
   readWorkerKeepsDraftText,
   readWorkerReleaseLabel,
   readWorkerTakesFeedback,
@@ -224,11 +225,14 @@ const SessionSettingsPage = ({
   const [workerKeepsDraftText, setWorkerKeepsDraftText] = useState<boolean | null>(null);
   // Whether it takes feedback about the app; an older one shows no Feedback section here or button on the session page.
   const [workerTakesFeedback, setWorkerTakesFeedback] = useState(false);
+  // Whether it counts a separate AI daily limit; an older one would store the field and ignore it.
+  const [workerCountsAiLimit, setWorkerCountsAiLimit] = useState(false);
   useEffect(() => {
     let stale = false;
     setWorkerRelease('');
     setWorkerKeepsDraftText(null);
     setWorkerTakesFeedback(false);
+    setWorkerCountsAiLimit(false);
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
       if (!stale) setWorkerRelease(release);
     });
@@ -237,6 +241,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerTakesFeedback(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesFeedback(takes);
+    });
+    void readWorkerCountsAiLimit(workerOrigin, sessionSlug, fetchImpl).then((counts) => {
+      if (!stale) setWorkerCountsAiLimit(counts);
     });
     return () => {
       stale = true;
@@ -300,19 +307,29 @@ const SessionSettingsPage = ({
     }
   };
 
-  const saveToWorker = async (patch: Record<string, unknown>) => {
+  // The page's limits (the AI one) merge through set-limits, so a limit
+  // changed since this page loaded stays.
+  const saveToWorker = async ({ limits, ...patch }: Record<string, unknown>) => {
     setStatus('Saving…');
-    await saveSessionSettings({
+    const limitsError = await saveSessionSettings({
       workerOrigin,
       sessionSlug,
       sessionIdHex: resolveWorkerCanonicalSessionIdHex(saved),
       patch,
+      ...(limits ? { limits: limits as Record<string, unknown> } : {}),
       account,
       provider,
       chainId: Number(network?.id || 1) || 1,
     });
-    await refresh(false);
-    setStatus('Settings saved.');
+    const outcome = limitsError ? `Other settings saved. The AI limit wasn’t: ${limitsError}` : 'Settings saved.';
+    try {
+      // On a partial save the unsaved AI limit stays as typed, ready to save again.
+      await refresh(!!limitsError);
+      setStatus(outcome);
+    } catch (error) {
+      const reason = error instanceof Error && error.message ? error.message : 'reload the page';
+      setStatus(`${outcome} Reloading them failed: ${reason}`);
+    }
   };
 
   const showStep = (step: OnChainSaveStep, state: OnChainSaveStepState, detail?: string) =>
@@ -636,6 +653,7 @@ const SessionSettingsPage = ({
           open={openSections.ai}
           onToggle={() => setOpenSections((prev) => ({ ...prev, ai: !prev.ai }))}
           lockedReason={onChain || workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
+          dailyLimit={!onChain && workerCountsAiLimit}
           sessionAgent={
             onChain ? null : workerAnswersSessionAgent(saved) ? (
               <SetupSessionAgent

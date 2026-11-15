@@ -77,7 +77,6 @@ test('resolveLoginGateAuthority preserves gate evaluation ordering and default-e
     '[gating] default gate empty (allow) [onchain]',
     {
       slug: 'session-a',
-      address: '0xabc123',
       gateChainId: 84532,
       registryAddress: '0x0000000000000000000000000000000000000001',
       registryRpcUrl: 'masked:https://registry.example',
@@ -152,6 +151,8 @@ test('resolveLoginGateAuthority preserves default-gate diagnostics when lookup i
     '[gating] sessionExists probe',
     '[gating] registry code probe',
   ]);
+  // Logs are kept, so none names the person signing in.
+  assert.doesNotMatch(JSON.stringify(logs), /0xabc123/);
   assert.deepEqual(logs[2], [
     '[gating] registry code probe',
     {
@@ -201,7 +202,6 @@ test('resolveLoginGateAuthority preserves default-gate missing-rpc and failed-ch
       '[gating] default gate missing rpc url',
       {
         slug: 'session-c',
-        address: '0xabc123',
         gateChainId: 84532,
         registryChainId: 84532,
         registryAddress: '0x0000000000000000000000000000000000000001',
@@ -213,7 +213,6 @@ test('resolveLoginGateAuthority preserves default-gate missing-rpc and failed-ch
       '[gating] default gate check failed [onchain]',
       {
         slug: 'session-c',
-        address: '0xabc123',
         gateChainId: 84532,
         mode: 1,
         sbtCount: 1,

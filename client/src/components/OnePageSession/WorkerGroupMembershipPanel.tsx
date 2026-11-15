@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { createPortal } from 'react-dom';
 import { faInfinity, faLink, faQuestionCircle, faSyncAlt, faUser } from '@fortawesome/free-solid-svg-icons';
+import { readWorkerGroupMemberCeiling } from '@ce-shared/workerGroupJoin.mjs';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
@@ -197,13 +198,9 @@ const WorkerGroupDetailView = ({
   });
   const hasVisibleMemberCount = Number.isSafeInteger(memberCount) && Number(memberCount) >= 0;
   const hasRelevantInfo = documentURLs.length > 0 || Boolean(group.tags?.length);
-  const memberLimitDisplay = group.memberLimit ? (
-    group.memberLimit
-  ) : (
-    <span aria-label="Unlimited" title="Unlimited">
-      <FontAwesomeIcon icon={faInfinity} />
-    </span>
-  );
+  // Joins stop at the session's most members in a group, whatever the group's own limit says.
+  const memberCeiling = readWorkerGroupMemberCeiling(sessionConfig);
+  const memberLimitDisplay = Math.min(group.memberLimit || memberCeiling, memberCeiling);
 
   useEffect(() => {
     setJoinWindowNowMs(Date.now());

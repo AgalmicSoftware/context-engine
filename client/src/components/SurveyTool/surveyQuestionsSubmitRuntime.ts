@@ -1,5 +1,5 @@
 import { buildSavedInterviewConsent } from './sessionInterviewConsent';
-import { planDraftTextSync, syncDraftText } from './sessionInterviewDraftText';
+import { planDraftTextSync, resendPendingDraftTextDeletes, syncDraftText } from './sessionInterviewDraftText';
 import { getSubmittedWorkerResponseRecency } from '../../utilities/survey/workerResponseRecency';
 import {
   nameQuestionForNotice,
@@ -211,6 +211,21 @@ export const createSurveyQuestionsSubmitRuntime = (
       workerTargetValid: workerTarget?.valid !== false,
       mounted: !!inst._isMounted,
     };
+  };
+
+  // Who signed in, address and wallet kind: a change in either during an upload skips its draft text.
+  const signer = (snapshot: SurveyQuestionsLegacyValue) =>
+    snapshot.loginComplete ? `${String(snapshot.account).toLowerCase()}|${snapshot.providerKind}` : '';
+
+  // Sends any AI draft text delete an earlier submit could not, once this page is signed in.
+  const resendDraftTextDeletes = () => {
+    const snapshot = buildSubmitContextSnapshot();
+    if (!signer(snapshot)) return;
+    resendPendingDraftTextDeletes({
+      sessionConfig: resolveEffectiveResponseGateConfig(snapshot.effectiveDraftSlug, snapshot.props),
+      sessionSlug: snapshot.effectiveDraftSlug,
+      account: String(snapshot.account).toLowerCase(),
+    }).catch((error) => surveyLog.warn('[SurveyQuestions] AI draft text resend failed:', error));
   };
 
   const buildSubmitContextKey = (snapshot: SurveyQuestionsLegacyValue = null) => {
@@ -611,8 +626,6 @@ export const createSurveyQuestionsSubmitRuntime = (
       // before the stale check, so a withdrawal that reached storage sends its delete even after the
       // person moves on. The Worker keys rows by the signer, so it is skipped if someone else signed in.
       const draftTextConfig = resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props);
-      const signer = (snapshot: SurveyQuestionsLegacyValue) =>
-        snapshot.loginComplete ? `${String(snapshot.account).toLowerCase()}|${snapshot.providerKind}` : '';
       let draftTextFailed = false;
       try {
         if (!signer(submitContext) || signer(submitContext) !== signer(buildSubmitContextSnapshot())) {
@@ -624,7 +637,11 @@ export const createSurveyQuestionsSubmitRuntime = (
           drafts: activeSlice?.interviewProvenance || {},
           earlier: earlierProvenance,
         });
-        await syncDraftText(plan, { sessionConfig: draftTextConfig, sessionSlug: submitContext.effectiveDraftSlug });
+        await syncDraftText(plan, {
+          sessionConfig: draftTextConfig,
+          sessionSlug: submitContext.effectiveDraftSlug,
+          account: String(submitContext.account).toLowerCase(),
+        });
       } catch (error) {
         surveyLog.warn('[SurveyQuestions] AI draft text update failed:', error);
         draftTextFailed = true;
@@ -903,5 +920,6 @@ export const createSurveyQuestionsSubmitRuntime = (
     finishSubmitAttempt,
     handleStaleSubmitContext,
     encryptAndUpload,
+    resendDraftTextDeletes,
   };
 };

@@ -209,6 +209,41 @@ it.each([
   },
 );
 
+// Applies a Settings limit change through the Worker's real set-limits merge.
+const setLimits = (worker, incomingLimits) => {
+  const result = applySessionConfigMutation({
+    existingConfig: worker.stored,
+    mutation: { kind: 'set-limits', incomingLimits },
+    slug,
+  });
+  if (!result.ok) throw new Error(result.error);
+  worker.stored = result.config;
+};
+
+// Settings sets the AI daily limit through set-limits; /new has no field for it,
+// and set-config replaces limits whole, so /new carries the stored one.
+it('keeps the AI daily limit Settings stored when /new verifies and publishes again', async () => {
+  const worker = createWorker();
+  const config = buildWizardConfig({ sessionEndsAt: '', perWalletPerDay: '100', perAnonymousIpPerDay: '' });
+  await verifySessionWizardWorkerPublicDeployment(buildInput(config, worker));
+  expect(worker.stored.limits).toEqual({ perWalletPerDay: 100, perAnonymousIpPerDay: null });
+
+  // Clearing the field in Settings stores null, which /new leaves cleared.
+  setLimits(worker, { aiPerWalletPerDay: null });
+  await verifySessionWizardWorkerPublicDeployment(buildInput(config, worker));
+  expect(worker.stored.limits).toEqual({ perWalletPerDay: 100, perAnonymousIpPerDay: null });
+
+  setLimits(worker, { aiPerWalletPerDay: 40 });
+  await verifySessionWizardWorkerPublicDeployment(buildInput(config, worker));
+  expect(worker.stored.limits).toEqual({ perWalletPerDay: 100, perAnonymousIpPerDay: null, aiPerWalletPerDay: 40 });
+  const published = await persistAndVerifySessionWizardWorkerConfig({
+    ...buildInput(config, worker),
+    retryDelaysMs: [],
+  });
+  expect(worker.stored.workerCanonicalPublicationRevision).toBe(published.configRevision);
+  expect(worker.stored.limits.aiPerWalletPerDay).toBe(40);
+});
+
 it('verifies and publishes with no instructions for AI agents on an older Worker that refuses the field', async () => {
   const worker = createWorker();
   const serve = worker.fetchImpl;

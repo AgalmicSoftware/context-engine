@@ -19,7 +19,7 @@ describe('withCoordinatorRetry', () => {
     jest.useRealTimers();
   });
 
-  it('retries a busy coordinator for reads, voice starts, group joins and answers with a request id', async () => {
+  it('retries a busy coordinator for reads, voice starts, group joins, draft text, sign-in and answers with a request id', async () => {
     const answer = JSON.stringify({ resource: 'responses', requestId: 'answer:v1:op:q1:0', data: {} });
     for (const [url, init] of [
       [`${worker}/storage/list?resource=responses`, {}],
@@ -27,6 +27,10 @@ describe('withCoordinatorRetry', () => {
       [`${worker}/realtime/call?slug=s`, { method: 'POST', body: '{"sdp":"v=0"}' }],
       [`${worker}/storage/upload`, { method: 'POST', body: answer }],
       [`${worker}/groups/join`, { method: 'POST', body: '{"groupId":"salon"}' }],
+      [`${worker}/storage/draft-text/put`, { method: 'POST', body: '{"items":[]}' }],
+      [`${worker}/storage/draft-text/delete`, { method: 'POST', body: '{"questionIds":["q1"]}' }],
+      [`${worker}/auth/nonce`, { method: 'POST', body: '{"address":"0x1"}' }],
+      [`${worker}/auth/login`, { method: 'POST', body: '{"signature":"0x2"}' }],
     ] as Array<[string, RequestInit]>) {
       const { response, calls } = await run([busy, busy], url, init);
       expect(response.status).toBe(200);
