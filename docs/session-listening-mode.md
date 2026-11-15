@@ -333,7 +333,7 @@ AI returns the clean interview URL with no prefill packet.
 
 When relevant evidence exists, the AI returns a compact base64url JSON packet
 in a Context Engine link. The copied prompt asks capable interfaces to render
-that long URL as an **Open prefilled interview** Markdown link rather than
+that long URL as a **Review your drafted answers** Markdown link rather than
 showing the encoded payload; raw-URL fallback remains allowed for interfaces
 without clickable Markdown. The packet records the session slug, question-set
 hash, prompt version, concise question-relevant responder context, proposed response drafts, per-draft
