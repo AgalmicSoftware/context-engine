@@ -153,6 +153,11 @@ test('the fixed rules follow the instructions, whatever the instructions say', (
   SESSION_AGENT_RULES.forEach((rule) => assert.ok(system.content.indexOf(rule) > rulesAt, rule));
   assert.match(system.content, /at most 150 words/);
   assert.match(system.content, /Never name or identify a participant/);
+  // A job title can point to one person as surely as a name, so both styles are told not to repeat one.
+  for (const style of ['general', 'detailed']) {
+    const [rules] = buildSessionAgentMessages({ setting, style, question: 'Who chairs the committee?' }).messages;
+    assert.match(rules.content, /Never repeat a name, role, workplace or other detail a participant gives about themselves\./);
+  }
 });
 
 test('General answers never carry members’ answers, even when they are passed', () => {
