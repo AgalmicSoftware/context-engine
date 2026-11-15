@@ -62,6 +62,13 @@ describe('AdminSessionAgentExportPanel', () => {
 
   it('says what the file holds, that opting out keeps membership, and that older copies stay', () => {
     renderPanel();
+    // What is always on screen says it too: the file is not address-free.
+    expect(
+      screen.getByText(
+        'A snapshot. It holds members’ account addresses, with what they wrote and added. Keep copies somewhere private.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/no names or addresses/)).not.toBeInTheDocument();
     const help = screen.getByRole('button', { name: 'About the Session Agent export' });
     expect(help).toHaveAccessibleDescription(/^What the Session Agent may give a member, as one file/);
     expect(help).toHaveAccessibleDescription(/Admins-only context is not in it/);

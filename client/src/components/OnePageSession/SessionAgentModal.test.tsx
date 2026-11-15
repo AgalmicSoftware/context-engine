@@ -24,7 +24,14 @@ const setOptOut = jest.mocked(setSessionAgentOptOut);
 const setUnattributed = jest.mocked(setSessionAgentUnattributed);
 
 const OPTIONS = { sessionSlug: 'salon', sessionConfig: { slug: 'salon' }, account: '0xabc' };
-const member: SessionAgentStatus = { on: true, answers: 'general', audience: 1, optedOut: false, unattributed: false };
+const member: SessionAgentStatus = {
+  on: true,
+  answers: 'general',
+  audience: 1,
+  optedOut: false,
+  unattributed: false,
+  closed: null,
+};
 const reply = (answer: string, read = { context: 0, results: false, answers: 0 }, note = ''): SessionAgentReply => ({
   answer,
   answers: 'general',
@@ -164,7 +171,7 @@ describe('SessionAgentModal', () => {
     expect(leaveOff).toBeChecked();
   });
 
-  it('shows the address switch as on for someone who chose it, and not at all on an older Session Worker', async () => {
+  it('shows the address switch as on for someone who chose it, and not at all for someone who has none', async () => {
     const chosen = await renderModal({ ...member, unattributed: true });
     expect(chosen.dialog.getByRole('switch', { name: 'Leave my address off exported items' })).toBeChecked();
     cleanup();
@@ -186,6 +193,47 @@ describe('SessionAgentModal', () => {
     await waitFor(() => expect(leaveOff).toBeChecked());
     await act(async () => answer(member));
     expect(leaveOff).toBeChecked();
+  });
+
+  it('still offers both switches once the session has ended or its AI is off, and no question box', async () => {
+    const ended = await renderModal({ ...member, answers: null, audience: null, closed: 'session_ended' });
+    expect(
+      ended.dialog.getByText('This session has ended, so the Session Agent no longer answers.'),
+    ).toBeInTheDocument();
+    expect(ended.dialog.queryByLabelText('Your question')).not.toBeInTheDocument();
+    setUnattributed.mockResolvedValueOnce(true);
+    const leaveOff = ended.dialog.getByRole('switch', { name: 'Leave my address off exported items' });
+    fireEvent.click(leaveOff);
+    await waitFor(() => expect(leaveOff).toBeChecked());
+    expect(ended.dialog.getByRole('switch', { name: 'Use my answers and files' })).toBeChecked();
+    cleanup();
+    const aiOff = await renderModal({ ...member, answers: null, audience: null, closed: 'ai_disabled' });
+    expect(
+      aiOff.dialog.getByText('AI is turned off for this session, so the Session Agent isn’t answering.'),
+    ).toBeInTheDocument();
+    expect(aiOff.dialog.getAllByRole('switch')).toHaveLength(2);
+  });
+
+  it('never shows one person’s saved choice as another’s when the account changes mid-save', async () => {
+    readStatus.mockResolvedValueOnce(member);
+    const view = render(<SessionAgentModal {...OPTIONS} onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    let saved: (unattributed: boolean) => void = () => {};
+    setUnattributed.mockReturnValueOnce(new Promise<boolean>((resolve) => (saved = resolve)));
+    fireEvent.click(await dialog.findByRole('switch', { name: 'Leave my address off exported items' }));
+    // Someone else signs in before that save answers.
+    let answer: (status: SessionAgentStatus) => void = () => {};
+    readStatus.mockReturnValueOnce(new Promise<SessionAgentStatus>((resolve) => (answer = resolve)));
+    view.rerender(<SessionAgentModal {...OPTIONS} account="0xdef" onClose={() => {}} />);
+    expect(readStatus).toHaveBeenLastCalledWith({ ...OPTIONS, account: '0xdef' });
+    // Until their own status is read, nothing of the person before is on screen.
+    expect(await dialog.findByText('Checking…')).toBeInTheDocument();
+    expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
+    await act(async () => answer(member));
+    const theirs = await dialog.findByRole('switch', { name: 'Leave my address off exported items' });
+    await act(async () => saved(true));
+    expect(theirs).not.toBeChecked();
+    await waitFor(() => expect(theirs).toBeEnabled());
   });
 
   it('shows the switch as off for someone who opted out', async () => {

@@ -29,6 +29,7 @@ const LEFT_OUT: Array<[string, (count: number) => string]> = [
   ['optedOut', (count) => `${count} from people who opted out`],
   ['patternMatches', (count) => `${count} written ${count === 1 ? 'answer' : 'answers'} that may name someone`],
   ['belowMinAnswers', (count) => `answers to ${count} ${count === 1 ? 'question' : 'questions'} with too few answers`],
+  ['answersWithoutAddress', (count) => `${count} ${count === 1 ? 'answer' : 'answers'} from people with no address`],
   ['adminsOnlyContext', (count) => `${count} admins-only context ${count === 1 ? 'item' : 'items'}`],
   ['otherRulesContext', (count) => `${count} context ${count === 1 ? 'item' : 'items'} under another access rule`],
   ['contextNotRead', (count) => `${count} context ${count === 1 ? 'item' : 'items'} past the reading limit`],
@@ -115,7 +116,7 @@ const AdminSessionAgentExportPanel = ({ sessionSlug, sessionConfig, canAdminWork
         {HELP}
       </UncontrolledTooltip>
       <p className={styles.statusNote}>
-        A snapshot with no names or addresses on its items. Keep copies somewhere private.
+        A snapshot. It holds members’ account addresses, with what they wrote and added. Keep copies somewhere private.
       </p>
       <button
         type="button"

@@ -60,13 +60,14 @@ describe('sessionAgentRequests', () => {
   });
 
   it('reads how the Worker would answer, and nothing it doesn’t know', async () => {
-    reply(200, { on: true, answers: 'general', audience: 0, optedOut: true, unattributed: true });
+    reply(200, { on: true, answers: 'general', audience: 0, optedOut: true, unattributed: true, closed: 'never' });
     await expect(readSessionAgentStatus(OPTIONS)).resolves.toEqual({
       on: true,
       answers: 'general',
       audience: 0,
       optedOut: true,
       unattributed: true,
+      closed: null,
     });
     expect(fetchWorker.mock.calls[0][0]).toBe('https://worker.example/session-agent/status');
     reply(200, { on: true, answers: 'everything', audience: 'owner' });
@@ -75,9 +76,21 @@ describe('sessionAgentRequests', () => {
       answers: null,
       audience: null,
       optedOut: false,
-      // A Session Worker that doesn't say has no such switch.
+      // A Session Worker that doesn't say has no such switch for this person.
       unattributed: null,
+      closed: null,
     });
+    reply(200, {
+      on: true,
+      answers: null,
+      audience: null,
+      optedOut: false,
+      unattributed: false,
+      closed: 'session_ended',
+    });
+    await expect(readSessionAgentStatus(OPTIONS)).resolves.toEqual(
+      expect.objectContaining({ closed: 'session_ended' }),
+    );
   });
 
   it('throws the Worker’s own sentence, or says which status failed', async () => {

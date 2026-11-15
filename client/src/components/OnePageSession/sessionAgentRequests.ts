@@ -14,8 +14,10 @@ export type SessionAgentStatus = {
   /** The audience that admits them, by position, or 'admin'. */
   audience: number | 'admin' | null;
   optedOut: boolean;
-  /** Their address is left off exported items; null when the Session Worker has no such switch yet. */
+  /** Their address is left off exported items; null when they have no such switch. */
   unattributed: boolean | null;
+  /** Why it answers no one, when the session has ended or its AI is off. */
+  closed: 'session_ended' | 'ai_disabled' | null;
 };
 
 export type SessionAgentReply = {
@@ -64,7 +66,9 @@ export const readSessionAgentStatus = async (options: SessionAgentRequestOptions
     answers: styleOf(result.answers),
     audience,
     optedOut: result.optedOut === true,
+    // Absent from a Session Worker without the switch, and for someone signed in without an address.
     unattributed: typeof result.unattributed === 'boolean' ? result.unattributed : null,
+    closed: result.closed === 'session_ended' || result.closed === 'ai_disabled' ? result.closed : null,
   };
 };
 

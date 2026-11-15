@@ -34,6 +34,12 @@ const ADDRESS_HELP =
   'file you added carries your account address in that file unless you turn this on. Your answers and files ' +
   'stay in either way; copies already exported keep what they had.';
 
+// It answers no one, but each person's switches still count for what an admin exports.
+const CLOSED = {
+  session_ended: 'This session has ended, so the Session Agent no longer answers.',
+  ai_disabled: 'AI is turned off for this session, so the Session Agent isn’t answering.',
+};
+
 const errorText = (error: unknown) => (error instanceof Error && error.message) || 'Something went wrong. Try again.';
 
 const count = (value: number, one: string, many: string) =>
@@ -64,11 +70,21 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   const [savingSwitch, setSavingSwitch] = useState(false);
   const [switchError, setSwitchError] = useState('');
   const switchSaves = useRef(0);
+  // Whose switches are on screen. When someone else signs in the dialog starts
+  // afresh, and a save that lands for the person before is not shown as theirs.
+  const person = `${sessionSlug}\n${account}`;
+  const shownFor = useRef(person);
 
   // A recheck keeps what was shown until the answer comes, so the form stays put.
   // A switch saved after the check was sent is newer than its answer, so it stays.
   useEffect(() => {
     let active = true;
+    if (shownFor.current !== person) {
+      shownFor.current = person;
+      switchSaves.current = 0;
+      setStatus(null);
+      setReply(null);
+    }
     const savesBefore = switchSaves.current;
     setStatusError('');
     readSessionAgentStatus({ sessionSlug, sessionConfig, account })
@@ -84,7 +100,7 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     return () => {
       active = false;
     };
-  }, [sessionSlug, sessionConfig, account, attempt]);
+  }, [sessionSlug, sessionConfig, account, attempt, person]);
 
   const ask = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -106,6 +122,7 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     setSwitchError('');
     try {
       const saved = await save();
+      if (shownFor.current !== person) return;
       switchSaves.current += 1;
       setStatus((current) => (current ? { ...current, ...saved } : current));
     } catch (error) {
@@ -200,6 +217,13 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     body = <p className={styles.hint}>Checking…</p>;
   } else if (!status.on) {
     body = <p>An admin has turned the Session Agent off.</p>;
+  } else if (status.closed) {
+    body = (
+      <>
+        <p>{CLOSED[status.closed]}</p>
+        {switches}
+      </>
+    );
   } else if (!style) {
     body = (
       <>
