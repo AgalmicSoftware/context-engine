@@ -1,4 +1,4 @@
-/** @file SessionAgentModal.tsx: asks the Session Agent, and sets whether it may use your answers and files. */
+/** @file SessionAgentModal.tsx: asks the Session Agent, and sets how it and its export may use what you gave. */
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
@@ -11,6 +11,7 @@ import {
   askSessionAgent,
   readSessionAgentStatus,
   setSessionAgentOptOut,
+  setSessionAgentUnattributed,
   type SessionAgentReply,
   type SessionAgentRequestOptions,
   type SessionAgentStatus,
@@ -27,6 +28,11 @@ const STYLE_HELP = {
     'Detailed answers draw on everything you may see in this session, and on members’ answers from people who ' +
     'haven’t turned that off. No answer names anyone.',
 };
+
+const ADDRESS_HELP =
+  'An admin can export what the Session Agent may draw on, as a file to keep. Each answer you wrote and each ' +
+  'file you added carries your account address in that file unless you turn this on. Your answers and files ' +
+  'stay in either way; copies already exported keep what they had.';
 
 const errorText = (error: unknown) => (error instanceof Error && error.message) || 'Something went wrong. Try again.';
 
@@ -55,8 +61,8 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   const [asking, setAsking] = useState(false);
   const [reply, setReply] = useState<SessionAgentReply | null>(null);
   const [askError, setAskError] = useState('');
-  const [savingOptOut, setSavingOptOut] = useState(false);
-  const [optOutError, setOptOutError] = useState('');
+  const [savingSwitch, setSavingSwitch] = useState(false);
+  const [switchError, setSwitchError] = useState('');
   const switchSaves = useRef(0);
 
   // A recheck keeps what was shown until the answer comes, so the form stays put.
@@ -69,7 +75,9 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
       .then((next) => {
         if (!active) return;
         setStatus((current) =>
-          current && switchSaves.current !== savesBefore ? { ...next, optedOut: current.optedOut } : next,
+          current && switchSaves.current !== savesBefore
+            ? { ...next, optedOut: current.optedOut, unattributed: current.unattributed }
+            : next,
         );
       })
       .catch((error) => active && setStatusError(errorText(error)));
@@ -93,38 +101,81 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     }
   };
 
-  const setUse = async (use: boolean) => {
-    setSavingOptOut(true);
-    setOptOutError('');
+  const saveSwitch = async (save: () => Promise<Partial<SessionAgentStatus>>) => {
+    setSavingSwitch(true);
+    setSwitchError('');
     try {
-      const optedOut = await setSessionAgentOptOut(!use, options);
+      const saved = await save();
       switchSaves.current += 1;
-      setStatus((current) => (current ? { ...current, optedOut } : current));
+      setStatus((current) => (current ? { ...current, ...saved } : current));
     } catch (error) {
-      setOptOutError(errorText(error));
+      setSwitchError(errorText(error));
     } finally {
-      setSavingOptOut(false);
+      setSavingSwitch(false);
     }
   };
 
-  const optOutSwitch = status ? (
-    <div className={styles.switchRow}>
-      <label htmlFor={`${baseId}-use`}>
-        <input
-          id={`${baseId}-use`}
-          type="checkbox"
-          role="switch"
-          checked={!status.optedOut}
-          disabled={savingOptOut}
-          data-testid="ce-session-agent-use-mine"
-          onChange={(event) => setUse(event.target.checked)}
-        />
-        Use my answers and files
-      </label>
-      <SessionAgentNotice id={`${baseId}-notice`} where="switch" className={styles.helpLink} />
-      {optOutError ? (
+  const switches = status ? (
+    <div className={styles.switches}>
+      <div className={styles.switchRow}>
+        <label htmlFor={`${baseId}-use`}>
+          <input
+            id={`${baseId}-use`}
+            type="checkbox"
+            role="switch"
+            checked={!status.optedOut}
+            disabled={savingSwitch}
+            data-testid="ce-session-agent-use-mine"
+            onChange={(event) => {
+              const optOut = !event.target.checked;
+              void saveSwitch(async () => ({ optedOut: await setSessionAgentOptOut(optOut, options) }));
+            }}
+          />
+          Use my answers and files
+        </label>
+        <SessionAgentNotice id={`${baseId}-notice`} where="switch" className={styles.helpLink} />
+      </div>
+      {status.unattributed === null ? null : (
+        <div className={styles.switchRow}>
+          <label htmlFor={`${baseId}-address`}>
+            <input
+              id={`${baseId}-address`}
+              type="checkbox"
+              role="switch"
+              checked={status.unattributed}
+              disabled={savingSwitch}
+              data-testid="ce-session-agent-leave-address-off"
+              onChange={(event) => {
+                const leaveOff = event.target.checked;
+                void saveSwitch(async () => ({
+                  unattributed: await setSessionAgentUnattributed(leaveOff, options),
+                }));
+              }}
+            />
+            Leave my address off exported items
+          </label>
+          <button
+            type="button"
+            id={`${baseId}-address-help`}
+            className={styles.helpLink}
+            data-ce-control-appearance="frameless"
+            aria-label="About your address on exported items"
+            aria-describedby={`${baseId}-address-text`}
+            onClick={(event) => event.currentTarget.focus()}
+          >
+            <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+          </button>
+          <span id={`${baseId}-address-text`} className={styles.hidden}>
+            {ADDRESS_HELP}
+          </span>
+          <CETooltip target={`${baseId}-address-help`} placement="bottom" trigger="hover focus" autohide={false}>
+            {ADDRESS_HELP}
+          </CETooltip>
+        </div>
+      )}
+      {switchError ? (
         <p className={styles.error} role="alert">
-          {optOutError}
+          {switchError}
         </p>
       ) : null}
     </div>
@@ -153,7 +204,7 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     body = (
       <>
         <p>The Session Agent isn’t open to you in this session.</p>
-        {optOutSwitch}
+        {switches}
       </>
     );
   } else {
@@ -219,7 +270,7 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             </div>
           ) : null}
         </div>
-        {optOutSwitch}
+        {switches}
       </>
     );
   }

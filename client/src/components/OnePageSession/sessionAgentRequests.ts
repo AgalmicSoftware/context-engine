@@ -14,6 +14,8 @@ export type SessionAgentStatus = {
   /** The audience that admits them, by position, or 'admin'. */
   audience: number | 'admin' | null;
   optedOut: boolean;
+  /** Their address is left off exported items; null when the Session Worker has no such switch yet. */
+  unattributed: boolean | null;
 };
 
 export type SessionAgentReply = {
@@ -57,7 +59,13 @@ const post = async (path: string, body: Record<string, unknown>, options: Sessio
 export const readSessionAgentStatus = async (options: SessionAgentRequestOptions): Promise<SessionAgentStatus> => {
   const result = await post('/session-agent/status', {}, options);
   const audience = result.audience === 'admin' || typeof result.audience === 'number' ? result.audience : null;
-  return { on: result.on === true, answers: styleOf(result.answers), audience, optedOut: result.optedOut === true };
+  return {
+    on: result.on === true,
+    answers: styleOf(result.answers),
+    audience,
+    optedOut: result.optedOut === true,
+    unattributed: typeof result.unattributed === 'boolean' ? result.unattributed : null,
+  };
 };
 
 export const askSessionAgent = async (
@@ -77,3 +85,9 @@ export const askSessionAgent = async (
 /** Turns the agent's use of this person's answers and files off (true) or back on. */
 export const setSessionAgentOptOut = async (optedOut: boolean, options: SessionAgentRequestOptions): Promise<boolean> =>
   (await post('/session-agent/opt-out', { optedOut }, options)).optedOut === true;
+
+/** Leaves this person's address off what an admin exports (true), or puts it back. */
+export const setSessionAgentUnattributed = async (
+  unattributed: boolean,
+  options: SessionAgentRequestOptions,
+): Promise<boolean> => (await post('/session-agent/attribution', { unattributed }, options)).unattributed === true;

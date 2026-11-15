@@ -1,4 +1,9 @@
-import { askSessionAgent, readSessionAgentStatus, setSessionAgentOptOut } from './sessionAgentRequests';
+import {
+  askSessionAgent,
+  readSessionAgentStatus,
+  setSessionAgentOptOut,
+  setSessionAgentUnattributed,
+} from './sessionAgentRequests';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy';
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 
@@ -45,15 +50,23 @@ describe('sessionAgentRequests', () => {
     await expect(setSessionAgentOptOut(true, OPTIONS)).resolves.toBe(true);
     expect(fetchWorker.mock.calls[1][0]).toBe('https://worker.example/session-agent/opt-out');
     expect(fetchWorker.mock.calls[1][1]?.body).toBe(JSON.stringify({ optedOut: true }));
+
+    reply(200, { unattributed: true });
+    await expect(setSessionAgentUnattributed(true, OPTIONS)).resolves.toBe(true);
+    expect(fetchWorker.mock.calls[2][0]).toBe('https://worker.example/session-agent/attribution');
+    expect(fetchWorker.mock.calls[2][1]?.body).toBe(JSON.stringify({ unattributed: true }));
+    reply(200, { unattributed: false });
+    await expect(setSessionAgentUnattributed(false, OPTIONS)).resolves.toBe(false);
   });
 
   it('reads how the Worker would answer, and nothing it doesn’t know', async () => {
-    reply(200, { on: true, answers: 'general', audience: 0, optedOut: true });
+    reply(200, { on: true, answers: 'general', audience: 0, optedOut: true, unattributed: true });
     await expect(readSessionAgentStatus(OPTIONS)).resolves.toEqual({
       on: true,
       answers: 'general',
       audience: 0,
       optedOut: true,
+      unattributed: true,
     });
     expect(fetchWorker.mock.calls[0][0]).toBe('https://worker.example/session-agent/status');
     reply(200, { on: true, answers: 'everything', audience: 'owner' });
@@ -62,6 +75,8 @@ describe('sessionAgentRequests', () => {
       answers: null,
       audience: null,
       optedOut: false,
+      // A Session Worker that doesn't say has no such switch.
+      unattributed: null,
     });
   });
 

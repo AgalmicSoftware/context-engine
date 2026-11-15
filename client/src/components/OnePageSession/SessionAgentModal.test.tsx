@@ -1,11 +1,12 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import SessionAgentModal from './SessionAgentModal';
 import {
   askSessionAgent,
   readSessionAgentStatus,
   setSessionAgentOptOut,
+  setSessionAgentUnattributed,
   type SessionAgentReply,
   type SessionAgentStatus,
 } from './sessionAgentRequests';
@@ -14,14 +15,16 @@ jest.mock('./sessionAgentRequests', () => ({
   readSessionAgentStatus: jest.fn(),
   askSessionAgent: jest.fn(),
   setSessionAgentOptOut: jest.fn(),
+  setSessionAgentUnattributed: jest.fn(),
 }));
 
 const readStatus = jest.mocked(readSessionAgentStatus);
 const ask = jest.mocked(askSessionAgent);
 const setOptOut = jest.mocked(setSessionAgentOptOut);
+const setUnattributed = jest.mocked(setSessionAgentUnattributed);
 
 const OPTIONS = { sessionSlug: 'salon', sessionConfig: { slug: 'salon' }, account: '0xabc' };
-const member: SessionAgentStatus = { on: true, answers: 'general', audience: 1, optedOut: false };
+const member: SessionAgentStatus = { on: true, answers: 'general', audience: 1, optedOut: false, unattributed: false };
 const reply = (answer: string, read = { context: 0, results: false, answers: 0 }, note = ''): SessionAgentReply => ({
   answer,
   answers: 'general',
@@ -92,13 +95,13 @@ describe('SessionAgentModal', () => {
   });
 
   it('tells an admin they get Detailed answers, and what those draw on', async () => {
-    const { dialog } = await renderModal({ on: true, answers: 'detailed', audience: 'admin', optedOut: false });
+    const { dialog } = await renderModal({ ...member, answers: 'detailed', audience: 'admin' });
     expect(dialog.getByText('As an admin, you get Detailed answers.')).toBeInTheDocument();
     expect(dialog.getByRole('button', { name: 'What Detailed answers draw on' })).toBeInTheDocument();
   });
 
   it('tells someone it doesn’t answer them, and still lets them keep their answers and files out', async () => {
-    const { dialog } = await renderModal({ on: true, answers: null, audience: null, optedOut: false });
+    const { dialog } = await renderModal({ ...member, answers: null, audience: null });
     expect(dialog.getByText('The Session Agent isn’t open to you in this session.')).toBeInTheDocument();
     expect(dialog.queryByLabelText('Your question')).not.toBeInTheDocument();
     const use = dialog.getByRole('switch', { name: 'Use my answers and files' });
@@ -138,6 +141,53 @@ describe('SessionAgentModal', () => {
     expect(use).not.toBeChecked();
   });
 
+  it('lets someone keep their address off exported items, and says what that changes', async () => {
+    const { dialog } = await renderModal(member);
+    const leaveOff = dialog.getByRole('switch', { name: 'Leave my address off exported items' });
+    expect(leaveOff).not.toBeChecked();
+    const help = dialog.getByRole('button', { name: 'About your address on exported items' });
+    expect(help).toHaveAccessibleDescription(/carries your account address in that file unless you turn this on/);
+    expect(help).toHaveAccessibleDescription(/Your answers and files stay in either way/);
+
+    setUnattributed.mockResolvedValueOnce(true);
+    fireEvent.click(leaveOff);
+    await waitFor(() => expect(leaveOff).toBeChecked());
+    expect(setUnattributed).toHaveBeenCalledWith(true, OPTIONS);
+    // The other switch is untouched, and was never saved.
+    expect(dialog.getByRole('switch', { name: 'Use my answers and files' })).toBeChecked();
+    expect(setOptOut).not.toHaveBeenCalled();
+
+    setUnattributed.mockRejectedValueOnce(new Error('Your choice couldn’t be saved just now.'));
+    fireEvent.click(leaveOff);
+    expect(await dialog.findByRole('alert')).toHaveTextContent('couldn’t be saved just now');
+    expect(setUnattributed).toHaveBeenLastCalledWith(false, OPTIONS);
+    expect(leaveOff).toBeChecked();
+  });
+
+  it('shows the address switch as on for someone who chose it, and not at all on an older Session Worker', async () => {
+    const chosen = await renderModal({ ...member, unattributed: true });
+    expect(chosen.dialog.getByRole('switch', { name: 'Leave my address off exported items' })).toBeChecked();
+    cleanup();
+    const older = await renderModal({ ...member, unattributed: null });
+    expect(older.dialog.getByRole('switch', { name: 'Use my answers and files' })).toBeInTheDocument();
+    expect(older.dialog.queryByRole('switch', { name: 'Leave my address off exported items' })).not.toBeInTheDocument();
+  });
+
+  it('keeps an address choice saved while a status check was on its way', async () => {
+    readStatus.mockResolvedValueOnce(member);
+    const view = render(<SessionAgentModal {...OPTIONS} onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    const leaveOff = await dialog.findByRole('switch', { name: 'Leave my address off exported items' });
+    let answer: (status: SessionAgentStatus) => void = () => {};
+    readStatus.mockReturnValueOnce(new Promise<SessionAgentStatus>((resolve) => (answer = resolve)));
+    view.rerender(<SessionAgentModal {...OPTIONS} sessionConfig={{ slug: 'salon' }} onClose={() => {}} />);
+    setUnattributed.mockResolvedValueOnce(true);
+    fireEvent.click(leaveOff);
+    await waitFor(() => expect(leaveOff).toBeChecked());
+    await act(async () => answer(member));
+    expect(leaveOff).toBeChecked();
+  });
+
   it('shows the switch as off for someone who opted out', async () => {
     const { dialog } = await renderModal({ ...member, optedOut: true });
     expect(dialog.getByRole('switch', { name: 'Use my answers and files' })).not.toBeChecked();
@@ -155,7 +205,7 @@ describe('SessionAgentModal', () => {
   });
 
   it('says when an admin has turned it off since the page loaded', async () => {
-    const { dialog } = await renderModal({ on: false, answers: null, audience: null, optedOut: false });
+    const { dialog } = await renderModal({ ...member, on: false, answers: null, audience: null });
     expect(dialog.getByText('An admin has turned the Session Agent off.')).toBeInTheDocument();
     expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
   });
