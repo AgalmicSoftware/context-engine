@@ -35,9 +35,22 @@ import {
 import ContractViewer, { type ContractViewerContract } from './ContractViewer';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
-import { DOCS_PAGE_COPY, FAQ_ITEMS, GUIDE_TOPICS, QUICKSTART_STEPS } from './docsContent.js';
+import {
+  AGENT_KINDS,
+  AGENT_KINDS_COPY,
+  AGENT_PARTICIPANTS_DOC_PATH,
+  DOCS_PAGE_COPY,
+  FAQ_ITEMS,
+  GUIDE_TOPICS,
+  QUICKSTART_STEPS,
+  SESSION_AGENT_TOPICS,
+} from './docsContent.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import { PUBLIC_REPO_URL, buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
+import {
+  PUBLIC_REPO_URL,
+  buildPublicContractSourceUrl,
+  buildPublicRepoBlobUrl,
+} from '../../variables/publicRepoMetadata.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 
@@ -563,6 +576,55 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
               </ul>
             </article>
           ))}
+        </div>
+      </DocsSection>
+
+      <DocsSection id="session-agent" title="Session Agent">
+        <div className={styles.guideTopics}>
+          {SESSION_AGENT_TOPICS.map((topic) => (
+            <article key={topic.id} className={styles.guideTopic}>
+              <h2>{topic.title}</h2>
+              <p>{topic.summary}</p>
+              <ul>
+                {topic.points.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+              {topic.link ? (
+                <div className={styles.docsInlineLinks}>
+                  <a
+                    href={buildPublicRepoBlobUrl(topic.link.href)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.docsInlineLink}
+                  >
+                    {topic.link.label}
+                  </a>
+                </div>
+              ) : null}
+            </article>
+          ))}
+          <article className={`${styles.guideTopic} ${styles.guideTopicWide}`} data-testid="ce-docs-agent-kinds">
+            <h2>{AGENT_KINDS_COPY.title}</h2>
+            <p>{AGENT_KINDS_COPY.introduction}</p>
+            <ul>
+              {AGENT_KINDS.map((kind) => (
+                <li key={kind.id}>
+                  <strong>{kind.name}</strong> <span className={styles.agentKindStatus}>{kind.status}</span> {kind.body}
+                </li>
+              ))}
+            </ul>
+            <div className={styles.docsInlineLinks}>
+              <a
+                href={buildPublicRepoBlobUrl(AGENT_PARTICIPANTS_DOC_PATH)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.docsInlineLink}
+              >
+                How your own agent takes part
+              </a>
+            </div>
+          </article>
         </div>
       </DocsSection>
 

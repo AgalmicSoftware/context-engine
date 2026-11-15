@@ -19,6 +19,23 @@ export type GuideTopic = Readonly<{
   points: readonly string[];
 }>;
 
+export type DocsLink = Readonly<{
+  href: string;
+  label: string;
+}>;
+
+export type SessionAgentTopic = GuideTopic &
+  Readonly<{
+    link?: DocsLink;
+  }>;
+
+export type AgentKind = Readonly<{
+  id: string;
+  name: string;
+  status: 'Available' | 'Available (preview)' | 'Planned';
+  body: string;
+}>;
+
 export type FaqItem = Readonly<{
   id: string;
   question: string;
@@ -34,6 +51,12 @@ const freezeQuickstartStep = (step: QuickstartStep): QuickstartStep => {
 };
 const freezeGuideTopic = (topic: GuideTopic): GuideTopic =>
   Object.freeze({ ...topic, points: Object.freeze([...topic.points]) });
+const freezeSessionAgentTopic = (topic: SessionAgentTopic): SessionAgentTopic =>
+  Object.freeze({
+    ...topic,
+    points: Object.freeze([...topic.points]),
+    ...(topic.link ? { link: Object.freeze(topic.link) } : {}),
+  });
 const freezeFaqItem = (item: FaqItem): FaqItem => Object.freeze(item);
 
 export const DOCS_PAGE_COPY = Object.freeze({
@@ -169,6 +192,92 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
     },
   ].map(freezeGuideTopic),
 );
+
+// Paths in the public repository, linked from the Session Agent section.
+export const SESSION_AGENT_DOC_PATH = 'docs/session-agent.md';
+export const AGENT_PARTICIPANTS_DOC_PATH = 'docs/agent-participants.md';
+
+export const SESSION_AGENT_TOPICS: readonly SessionAgentTopic[] = Object.freeze(
+  [
+    {
+      id: 'what-it-is',
+      title: 'What it is',
+      summary:
+        'An AI that answers questions about one session from that session’s own material, using the AI the session is set up with. It is a preview, off until an admin turns it on under AI, and only sessions on a Session Worker have one.',
+      points: [
+        'While it is on, a robot shows by the session’s title, and anyone signed in can open it from the session’s Context.',
+        'It takes one question at a time and answers in at most 150 words.',
+      ],
+      link: { href: SESSION_AGENT_DOC_PATH, label: 'Full Session Agent docs' },
+    },
+    {
+      id: 'who-may-ask',
+      title: 'Who may ask',
+      summary:
+        'The admin lists who may ask: everyone signed in, members of chosen groups, or SBT holders. The first entry that matches you sets how you are answered.',
+      points: [
+        'Admins always get Detailed answers. With no entries, only admins may ask.',
+        'Everyone who asks needs to be allowed to use the session’s AI, and the session’s own group or SBT lock still applies.',
+      ],
+    },
+    {
+      id: 'answer-styles',
+      title: 'Two answer styles',
+      summary:
+        'General answers read what the session shares. Detailed answers also read members’ answers, without names.',
+      points: [
+        'General: the session’s context, files open to everyone, and the published results if you may see Results.',
+        'Detailed: every file you may read, and members’ answers with how many chose each option.',
+        'It is told never to name a participant or say who gave an answer. Unless an admin lowers the bar, members’ answers to a session question that fewer than three members answered are left out for everyone but admins.',
+      ],
+    },
+    {
+      id: 'keep-out',
+      title: 'Keeping your answers and files out',
+      summary:
+        'Your answers and files are in until you say otherwise. Turn off “Use my answers and files” in the Session Agent, or untick “Session Agent may use my answers and files” at the foot of the interview dialog.',
+      points: [
+        'It applies from the next question on; answers already given can’t be taken back.',
+        'The published results still count your answers, as on the Results page.',
+        'You can turn it off even when the Session Agent doesn’t answer you, and back on at any time.',
+      ],
+    },
+  ].map(freezeSessionAgentTopic),
+);
+
+export const AGENT_KINDS_COPY = Object.freeze({
+  title: 'Which agent is which',
+  introduction: 'Four ideas are easy to mix up. Two exist today; two are planned and not available.',
+});
+
+const agentKinds: AgentKind[] = [
+  {
+    id: 'own-agent',
+    name: 'Your own AI agent',
+    status: 'Available',
+    body: 'An agent you run takes part like a participant, as itself or, where the session allows it, on your behalf. The session’s rules apply to it.',
+  },
+  {
+    id: 'session-agent',
+    name: 'The Session Agent',
+    status: 'Available (preview)',
+    body: 'Belongs to one session and answers only from that session’s own material.',
+  },
+  {
+    id: 'group-agent',
+    name: 'A Group Agent',
+    status: 'Planned',
+    body: 'An agent for one group that would draw on that group’s work across several sessions.',
+  },
+  {
+    id: 'community-hosted',
+    name: 'Community-hosted knowledge',
+    status: 'Planned',
+    body: 'A community would take a session’s export and host the same knowledge itself, outside the session’s Worker.',
+  },
+];
+
+export const AGENT_KINDS: readonly AgentKind[] = Object.freeze(agentKinds.map((kind) => Object.freeze(kind)));
 
 export const FAQ_ITEMS: readonly FaqItem[] = Object.freeze(
   [

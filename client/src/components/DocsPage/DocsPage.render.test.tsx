@@ -279,6 +279,66 @@ describe('DocsPage contract deep links', () => {
     expect(within(projectLinks).queryByText('Repository')).not.toBeInTheDocument();
   });
 
+  it('explains the Session Agent and tells the four kinds of agent apart, marking planned ones', () => {
+    render(<DocsPage />);
+    const toggle = screen.getByRole('button', { name: 'Session Agent' });
+    const guideToggle = screen.getByRole('button', { name: 'Session options guide' });
+    const promptsToggle = screen.getByRole('button', { name: 'Prompts' });
+    expect(Boolean(guideToggle.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(Boolean(toggle.compareDocumentPosition(promptsToggle) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('heading', { name: 'Two answer styles' })).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    const content = document.getElementById('docs-section-session-agent')!;
+    expect(
+      within(content)
+        .getAllByRole('heading', { level: 2 })
+        .map((heading) => heading.textContent),
+    ).toEqual([
+      'What it is',
+      'Who may ask',
+      'Two answer styles',
+      'Keeping your answers and files out',
+      'Which agent is which',
+    ]);
+    expect(within(content).getByText(/Use my answers and files/)).toBeInTheDocument();
+    expect(within(content).getByText(/Session Agent may use my answers and files/)).toBeInTheDocument();
+
+    const fullDocs = within(content).getByRole('link', { name: 'Full Session Agent docs' });
+    expect(fullDocs).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-agent.md',
+    );
+    expect(fullDocs).toHaveAttribute('target', '_blank');
+    expect(fullDocs).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(within(content).getByRole('link', { name: 'How your own agent takes part' })).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/agent-participants.md',
+    );
+
+    const kinds = within(screen.getByTestId('ce-docs-agent-kinds')).getAllByRole('listitem');
+    expect(
+      kinds.map((kind) => [kind.querySelector('strong')?.textContent, kind.querySelector('span')?.textContent]),
+    ).toEqual([
+      ['Your own AI agent', 'Available'],
+      ['The Session Agent', 'Available (preview)'],
+      ['A Group Agent', 'Planned'],
+      ['Community-hosted knowledge', 'Planned'],
+    ]);
+    expect(content.textContent).not.toMatch(/kami/i);
+  });
+
+  it('keeps the Session Agent links and status labels on the document text colour', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'DocsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.quickstartStep \.docsInlineLink,\s*\.guideTopic \.docsInlineLink\s*\{[^}]*color:\s*var\(--docs-document-text\);[^}]*text-decoration:\s*underline;/,
+    );
+    expect(scss).toMatch(/\.agentKindStatus\s*\{[^}]*color:\s*var\(--docs-document-text\);/);
+    expect(scss).toMatch(/\.guideTopicWide\s*\{[^}]*grid-column:\s*1 \/ -1;/);
+  });
+
   it('opens the matching contract source and scrolls it into view when a contract query param is present', async () => {
     const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
     const scrollSpy = jest.fn();
