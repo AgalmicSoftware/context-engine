@@ -224,6 +224,15 @@ The flow:
      subdomain calls are also covered by `Workers Scripts: Edit`. Cloudflare only pre-fills the
      form: create the token, copy its generated value, and paste it into the **Cloudflare API
      token** field.
+   - The Worker also gets a Workers AI binding (`AI`). A Worker with that
+     binding has deployed with a token that had no Workers AI permission, but
+     not yet with this two-permission token, so the first deploy proves it. If
+     Cloudflare refuses, the deploy stops at the script upload and setup shows
+     Cloudflare's first error message followed by "Bundle diagnostics: …"; for a
+     missing permission Cloudflare usually says "Authentication error" (code
+     10000). Then add the account permission `Workers AI: Read` to the token in
+     [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens) and
+     deploy again.
    - CLI equivalent for agents/local setup: `npm run -s cloudflare:token-link -- --slug <session-slug>`
      Add `--include-r2-storage` only for an advanced deployment that manages an existing R2 bucket;
      the flag does not create the bucket.
@@ -2016,6 +2025,15 @@ KV:
 - `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) for all Cloudflare payload storage, unless `CE_STORAGE_IN_GROUP_KV=1` keeps it in `GROUP_KV`. It holds authoritative R2 per-item authorization metadata and the KV-only payload fallback. R2 uploads require both `get` and `put`, and R2 reads never fall back to custom object metadata. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
 - `CE_STORAGE_AUDIT_KV` (optional) for worker-envelope key-release audit events. If omitted, the worker uses the storage index KV for audit rows.
 - `CE_WORKER_GROUPS_KV` (optional) for worker-native group records and membership rows. If omitted, the worker uses `GROUP_KV`, then the storage index KV aliases. Membership rows remain separate from group records. D1-only configuration is not a group store and fails as unconfigured.
+
+Workers AI:
+
+- `AI` lets a session's Session Agent answer on Cloudflare's open models
+  instead of the session's AI provider. Deploys add it to every Session
+  Worker; it costs nothing until a session turns that on, and then Cloudflare
+  bills the account that hosts the Worker (10,000 Neurons a day free, then
+  Workers Paid pricing). A Worker deployed before this release has no `AI`
+  binding until it is redeployed.
 
 R2 / Durable Objects:
 

@@ -15,6 +15,9 @@
       "invocation_logs": false
     }
   },
+  "ai": {
+    "binding": "AI"
+  },
   "kv_namespaces": [
     {
       "binding": "GROUP_KV"

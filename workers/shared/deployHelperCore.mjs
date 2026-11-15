@@ -101,6 +101,7 @@ const DEPLOYMENT_ID_BINDING_NAME = 'CE_DEPLOYMENT_ID';
 const DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME = 'CE_DEPLOYMENT_REQUEST_DIGEST';
 const BUNDLE_SHA256_BINDING_NAME = 'CE_BUNDLE_SHA256';
 const SESSION_COORDINATOR_BINDING_NAME = 'CE_SESSION_COORDINATOR';
+const WORKERS_AI_BINDING_NAME = 'AI';
 const SESSION_COORDINATOR_CLASS_NAME = 'SessionWriteCoordinator';
 const SESSION_COORDINATOR_MIGRATION_TAG = 'ce-session-write-coordinator-v1';
 const R2_BUCKET_NAME_RE = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
@@ -1624,6 +1625,10 @@ const executeDeployHelperRequestCore = async ({
         toStr(matches[0]?.type).trim() === 'durable_object_namespace' &&
         toStr(matches[0]?.class_name).trim() === expectedClassName;
     };
+    const hasAi = (name) => {
+      const matches = named(name);
+      return matches.length === 1 && toStr(matches[0]?.type).trim() === 'ai';
+    };
     const observedMainModule = toStr(settings?.main_module).trim();
     const moduleIdentityMatches = !observedMainModule || observedMainModule === 'worker.mjs';
     const storageIndexMatches = storageBindingPlan.requiresStorageIndexKv
@@ -1657,6 +1662,7 @@ const executeDeployHelperRequestCore = async ({
       bundleIdentityMatches &&
       hasExactDurableObject(SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME) &&
       hasExactKv('GROUP_KV', namespaceId) &&
+      hasAi(WORKERS_AI_BINDING_NAME) &&
       storageIndexMatches &&
       r2Matches &&
       adminMatches &&
@@ -1975,6 +1981,9 @@ const executeDeployHelperRequestCore = async ({
         class_name: SESSION_COORDINATOR_CLASS_NAME,
       },
       { name: 'DEPLOY_HELPER_ENABLED', type: 'plain_text', text: embeddedDeployHelperEnabled ? '1' : '0' },
+      // Workers AI, for a Session Agent that answers on Cloudflare's models.
+      // It costs nothing until a session uses it.
+      { name: WORKERS_AI_BINDING_NAME, type: 'ai' },
       ...(sessionReleaseVerified
         ? [
             { name: 'WORKER_BUNDLE_URL', type: 'plain_text', text: bundleUrl },
