@@ -7,6 +7,7 @@ import {
   normalizeAiProvider,
   resolveSessionWizardAiModelProviderPatch,
   resolveSessionWizardAutoFeatureBySessionSlug,
+  sessionAgentOnCloudflare,
 } from './sessionWizardAiConfig';
 
 describe('sessionWizardAiConfig', () => {
@@ -119,5 +120,29 @@ describe('sessionWizardAiConfig', () => {
         autoFeatureSBTsWithFeaturedSbtTags: true,
       }),
     ).toBe(true);
+  });
+});
+
+const cloudflare = { provider: 'workers-ai', model: '@cf/zai-org/glm-5.3' };
+
+describe('normalizeAiModels and the Session Agent on Cloudflare', () => {
+  it('keeps the Session Agent’s Cloudflare model through a save', () => {
+    const models = normalizeAiModels({ 'session-agent': cloudflare }, 'openai');
+    expect(models['session-agent']).toEqual(cloudflare);
+    expect(sessionAgentOnCloudflare({ models })).toBe(true);
+  });
+
+  it('puts an unlisted Cloudflare model back on the listed one', () => {
+    const models = normalizeAiModels({ 'session-agent': { provider: 'workers-ai', model: '@cf/other' } }, 'openai');
+    expect(models['session-agent']).toEqual(cloudflare);
+  });
+
+  it('drops a Session Agent entry on any other provider, and other task entries', () => {
+    const models = normalizeAiModels(
+      { 'session-agent': { provider: 'openai', model: 'gpt-5' }, summarize: cloudflare },
+      'openai',
+    );
+    expect(Object.keys(models).sort()).toEqual(['fast', 'thinking', 'transcription']);
+    expect(sessionAgentOnCloudflare({ models })).toBe(false);
   });
 });

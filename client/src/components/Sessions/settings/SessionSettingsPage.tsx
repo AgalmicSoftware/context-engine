@@ -42,6 +42,7 @@ import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/sessio
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
 import {
   readWorkerCountsAiLimit,
+  readWorkerRunsWorkersAi,
   readWorkerKeepsDraftText,
   readWorkerReleaseLabel,
   readWorkerTakesFeedback,
@@ -227,12 +228,14 @@ const SessionSettingsPage = ({
   const [workerTakesFeedback, setWorkerTakesFeedback] = useState(false);
   // Whether it counts a separate AI daily limit; an older one would store the field and ignore it.
   const [workerCountsAiLimit, setWorkerCountsAiLimit] = useState(false);
+  const [workerRunsWorkersAi, setWorkerRunsWorkersAi] = useState(false);
   useEffect(() => {
     let stale = false;
     setWorkerRelease('');
     setWorkerKeepsDraftText(null);
     setWorkerTakesFeedback(false);
     setWorkerCountsAiLimit(false);
+    setWorkerRunsWorkersAi(false);
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
       if (!stale) setWorkerRelease(release);
     });
@@ -244,6 +247,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerCountsAiLimit(workerOrigin, sessionSlug, fetchImpl).then((counts) => {
       if (!stale) setWorkerCountsAiLimit(counts);
+    });
+    void readWorkerRunsWorkersAi(workerOrigin, sessionSlug, fetchImpl).then((runs) => {
+      if (!stale) setWorkerRunsWorkersAi(runs);
     });
     return () => {
       stale = true;
@@ -654,6 +660,7 @@ const SessionSettingsPage = ({
           onToggle={() => setOpenSections((prev) => ({ ...prev, ai: !prev.ai }))}
           lockedReason={onChain || workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
           dailyLimit={!onChain && workerCountsAiLimit}
+          workersAi={!onChain && workerRunsWorkersAi}
           sessionAgent={
             onChain ? null : workerAnswersSessionAgent(saved) ? (
               <SetupSessionAgent

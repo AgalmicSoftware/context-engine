@@ -7,9 +7,11 @@ import {
   getAiModelOptions,
   normalizeAiModelForProvider,
   normalizeAiProvider,
+  sessionAgentOnCloudflare,
 } from '../sessionWizardAiConfig';
 import { AI_DAILY_LIMIT_HELP, AI_DAILY_LIMIT_LABEL, AI_DAILY_LIMIT_MAX } from '../aiDailyLimit';
 import { SetupField, SetupSection, setupHelpId } from '../setup/SetupPrimitives';
+import { SessionAgentModelChoice } from '../setup/SetupAiSection';
 import { asRecord, text, type SetupSectionProps } from '../setup/setupSectionTypes';
 import styles from '../setup/SessionSetup.module.scss';
 
@@ -65,6 +67,8 @@ type Props = Omit<SetupSectionProps, 'mode' | 'conflicts'> & {
   sessionAgent?: React.ReactNode;
   /** True for a session on a Session Worker, which bounds each person's AI requests a day. */
   dailyLimit?: boolean;
+  /** True when the Session Worker can answer the Session Agent on Cloudflare's models. */
+  workersAi?: boolean;
 };
 
 // The settings page's AI section: the same fields setup writes, plus the
@@ -79,8 +83,10 @@ export const SettingsAiSection = ({
   keys = null,
   sessionAgent = null,
   dailyLimit = false,
+  workersAi = false,
 }: Props) => {
   const { models, provider, fast, thinking, transcription, effort, taskEffort } = readAi(draft);
+  const onCloudflare = sessionAgentOnCloudflare(draft.ai);
   const [newTask, setNewTask] = useState('');
   const unusedTasks = AI_TASKS.filter((task) => !(task.key in taskEffort));
   const setProvider = (next: string) => {
@@ -298,6 +304,20 @@ export const SettingsAiSection = ({
         />
       </SetupField>
       {sessionAgent}
+      {/* It changes the AI models, so it shows only where AI can be edited. A
+          session already on Cloudflare keeps it on a Worker without the binding,
+          so the admin can switch back. */}
+      {sessionAgent && draft.sessionAgent && !lockedReason && (workersAi || onCloudflare) ? (
+        <>
+          <SessionAgentModelChoice draft={draft} onChange={onChange} />
+          {workersAi ? null : (
+            <p className={styles.hint} data-testid="ce-ai-session-agent-cloudflare-redeploy">
+              This Session Worker can’t reach Cloudflare’s models, so the Session Agent can’t answer. Redeploy the
+              Worker, or untick this.
+            </p>
+          )}
+        </>
+      ) : null}
     </SetupSection>
   );
 };

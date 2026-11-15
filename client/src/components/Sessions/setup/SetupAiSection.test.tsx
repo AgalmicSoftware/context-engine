@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 import { SetupAiSection } from './SetupAiSection';
 import type { SetupDraft, SetupMode } from './setupSectionTypes';
@@ -39,5 +39,48 @@ describe('SetupAiSection', () => {
       /Transcription always uses OpenAI gpt-transcribe, so voice interviews and group recordings need an OpenAI key too\./,
     );
     expect(screen.queryByText(/^Transcription uses OpenAI/)).not.toBeInTheDocument();
+  });
+
+  describe('Session Agent on Cloudflare', () => {
+    const agent = { audiences: [] };
+    const cloudflare = { provider: 'workers-ai', model: '@cf/zai-org/glm-5.3' };
+    const renderAgent = (extra: SetupDraft) => {
+      const onChange = jest.fn();
+      render(
+        <SetupAiSection
+          draft={{ ...draft, ...extra }}
+          onChange={onChange}
+          mode="create"
+          open
+          onToggle={() => {}}
+          conflicts={[]}
+          sessionAgent={<div />}
+        />,
+      );
+      return onChange;
+    };
+
+    it('offers it only while the Session Agent is on, off by default', () => {
+      renderAgent({ sessionAgent: null });
+      expect(screen.queryByTestId('ce-ai-session-agent-cloudflare')).not.toBeInTheDocument();
+      cleanup();
+      const onChange = renderAgent({ sessionAgent: agent });
+      const box = screen.getByTestId('ce-ai-session-agent-cloudflare');
+      expect(box).not.toBeChecked();
+      expect(box).toHaveAccessibleDescription(/Everything else, including voice, transcription and drafting/);
+      fireEvent.click(box);
+      expect(onChange).toHaveBeenCalledWith(['ai', 'models'], { ...draft.ai.models, 'session-agent': cloudflare });
+    });
+
+    it('unticking hands the Session Agent back to the session’s provider', () => {
+      const onChange = renderAgent({
+        sessionAgent: agent,
+        ai: { ...draft.ai, models: { ...draft.ai.models, 'session-agent': cloudflare } },
+      });
+      const box = screen.getByTestId('ce-ai-session-agent-cloudflare');
+      expect(box).toBeChecked();
+      fireEvent.click(box);
+      expect(onChange).toHaveBeenCalledWith(['ai', 'models'], draft.ai.models);
+    });
   });
 });

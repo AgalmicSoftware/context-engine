@@ -36,6 +36,19 @@ export const readWorkerTakesFeedback = async (
   return found.features.includes('session_feedback');
 };
 
+export const WORKERS_AI_FEATURE = 'workers_ai_v1';
+
+/** Whether the Session Worker can answer the Session Agent on Cloudflare's models: it has the AI binding. */
+export const readWorkerRunsWorkersAi = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> => {
+  if (!workerOrigin) return false;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.features.includes(WORKERS_AI_FEATURE);
+};
+
 export const AI_DAILY_LIMIT_FEATURE = 'ai_daily_limit_v1';
 
 /** Whether the Session Worker counts a separate AI daily limit (0.9.9 on); false when it can't be read. */

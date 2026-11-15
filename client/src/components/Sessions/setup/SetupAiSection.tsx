@@ -8,10 +8,28 @@ import {
   getAiModelOptions,
   normalizeAiModelForProvider,
   normalizeAiProvider,
+  sessionAgentOnCloudflare,
+  withSessionAgentOnCloudflare,
 } from '../sessionWizardAiConfig';
-import { SetupField, SetupSection, setupHelpId } from './SetupPrimitives';
+import { DEFAULT_WORKERS_AI_MODEL } from '../../../../../shared/workersAiModels.mjs';
+import { SetupCheck, SetupField, SetupSection, setupHelpId } from './SetupPrimitives';
 import { asRecord, text, type SetupSectionProps } from './setupSectionTypes';
 import styles from './SessionSetup.module.scss';
+
+const CLOUDFLARE_MODEL_NAME = DEFAULT_WORKERS_AI_MODEL.split('/').pop();
+
+// Under the Session Agent's settings, in setup and in settings: whether it
+// answers with Cloudflare's open model instead of the session's AI provider.
+export const SessionAgentModelChoice = ({ draft, onChange }: Pick<SetupSectionProps, 'draft' | 'onChange'>) => (
+  <SetupCheck
+    id="ce-ai-session-agent-cloudflare"
+    label="Answer with an open model on Cloudflare"
+    testId="ce-ai-session-agent-cloudflare"
+    help={`The Session Agent answers with ${CLOUDFLARE_MODEL_NAME}, an open model, on the Cloudflare account that hosts the session's Worker, billed to that account, with no key to add. Cloudflare says it doesn't train on prompts or keep them after the reply. Everything else, including voice, transcription and drafting, keeps the session's AI provider. A Worker deployed before this release needs a redeploy first.`}
+    checked={sessionAgentOnCloudflare(draft.ai)}
+    onChange={(on) => onChange(['ai', 'models'], withSessionAgentOnCloudflare(asRecord(draft.ai).models, on))}
+  />
+);
 
 const providerLabel = (value: string) => AI_PROVIDER_OPTIONS.find((option) => option.value === value)?.label || value;
 
@@ -157,6 +175,8 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null, s
         />
       </SetupField>
       {sessionAgent}
+      {/* A Worker deployed from this release has the AI binding the choice needs. */}
+      {sessionAgent && draft.sessionAgent ? <SessionAgentModelChoice draft={draft} onChange={onChange} /> : null}
     </SetupSection>
   );
 };

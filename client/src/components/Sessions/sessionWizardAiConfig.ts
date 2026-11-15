@@ -3,6 +3,12 @@ import {
   DEFAULT_TRANSCRIPTION_MODEL,
   TRANSCRIPTION_FALLBACK_MODEL,
 } from '../../../../shared/aiDefaults.mjs';
+import {
+  DEFAULT_WORKERS_AI_MODEL,
+  WORKERS_AI_MODEL_IDS,
+  WORKERS_AI_PROVIDER,
+  WORKERS_AI_TASK,
+} from '../../../../shared/workersAiModels.mjs';
 import { toStr } from '../../utilities/shared/primitives.js';
 import type { AnyRecord } from '../shellTypes';
 
@@ -65,6 +71,28 @@ const normalizeAiTranscriptionEntry = (entry: AnyRecord | null | undefined): Any
   };
 };
 
+// The Session Agent's own model, when it answers on Cloudflare: a listed
+// Workers AI model, or nothing. Every other task uses the fast and thinking models.
+const readSessionAgentModel = (models: unknown): { provider: string; model: string } | null => {
+  const entry = models && typeof models === 'object' ? (models as AnyRecord)[WORKERS_AI_TASK] : null;
+  if (!entry || typeof entry !== 'object' || normalizeAiProvider(entry.provider, '') !== WORKERS_AI_PROVIDER)
+    return null;
+  const model = toStr(entry.model).trim();
+  return {
+    provider: WORKERS_AI_PROVIDER,
+    model: (WORKERS_AI_MODEL_IDS as readonly string[]).includes(model) ? model : DEFAULT_WORKERS_AI_MODEL,
+  };
+};
+
+export const sessionAgentOnCloudflare = (ai: unknown): boolean =>
+  !!readSessionAgentModel(ai && typeof ai === 'object' ? (ai as AnyRecord).models : null);
+
+/** The models with the Session Agent answering on Cloudflare's open model, or on the session's own. */
+export const withSessionAgentOnCloudflare = (models: unknown, on: boolean): AnyRecord => {
+  const { [WORKERS_AI_TASK]: _previous, ...rest } = models && typeof models === 'object' ? (models as AnyRecord) : {};
+  return on ? { ...rest, [WORKERS_AI_TASK]: { provider: WORKERS_AI_PROVIDER, model: DEFAULT_WORKERS_AI_MODEL } } : rest;
+};
+
 export const normalizeAiModels = (
   raw: AnyRecord | null | undefined,
   fallbackProvider: string,
@@ -73,10 +101,12 @@ export const normalizeAiModels = (
   const obj: AnyRecord = raw && typeof raw === 'object' ? raw : {};
   const transcriptionSource =
     transcriptionRaw && typeof transcriptionRaw === 'object' ? transcriptionRaw : obj.transcription;
+  const sessionAgent = readSessionAgentModel(obj);
   return {
     fast: normalizeAiModelEntry(obj.fast || obj.default, DEFAULT_AI_MODELS.fast, fallbackProvider),
     thinking: normalizeAiModelEntry(obj.thinking || obj.reasoning, DEFAULT_AI_MODELS.thinking, fallbackProvider),
     transcription: normalizeAiTranscriptionEntry(transcriptionSource),
+    ...(sessionAgent ? { [WORKERS_AI_TASK]: sessionAgent } : {}),
   };
 };
 
