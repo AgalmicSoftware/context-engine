@@ -3076,6 +3076,23 @@ Signed login/bootstrap requests:
   `POST /session-agent/status` says how the signed-in person would be answered,
   and `POST /session-agent/opt-out` stores their choice to keep their answers and
   files out of it. See [session-agent.md](session-agent.md).
+  - A session may have the Session Agent answer on Cloudflare Workers AI by
+    setting `ai.models["session-agent"]` to `{ provider: "workers-ai", model }`
+    with a model from `shared/workersAiModels.mjs`; every other AI task keeps
+    the session's provider, and `/ai` refuses `workers-ai` as an unsupported
+    provider. The call goes through the Worker's `AI` binding, never `fetch`,
+    with the Session Agent's 3,000-token ceiling sent in the field the model
+    takes, so a model's own default never applies. Only the answer is read,
+    never a reasoning model's thinking. No request key pays for it, a session
+    needs no stored AI key for it, and a question counts toward the person's
+    AI calls a day as before. Settings keeps the choice shown on a Worker
+    without the binding when the session already uses it, so it can be
+    switched off.
+    Cloudflare's errors become `429` (busy or out of daily allocation) or
+    `502`, without Cloudflare's text. A Worker with the binding lists
+    `workers_ai_v1` in `/capabilities`; Settings offers the choice only then.
+    Cloudflare says it doesn't train on Workers AI prompts or keep them after
+    the reply.
 - `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>[&ticket=<ticket>]`
   (`/agent/interview-brief` remains a compatibility alias)
   - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or

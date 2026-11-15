@@ -3,6 +3,8 @@ import {
 } from '../../shared/sessionAgent.mjs';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
+import { proxyWorkersAi } from './aiProviderExecution.js';
+import { WORKERS_AI_PROVIDER } from '../../shared/workersAiModels.mjs';
 import { isModelAllowed, normalizeAiRequestPayload } from './aiRequestNormalization.js';
 import { CONTEXT_READ_LIMITS, forEveryone, loadParticipantContextSources } from './contextSourceLoader.js';
 import {
@@ -169,19 +171,22 @@ const gatherMaterial = async ({ env, slug, config, setting, address, scopes, ask
 // is paid. It runs after the material is fixed, so paying never widens it.
 const checkSessionAgentPayment = async () => ({ ok: true });
 
-const PROXIES = { anthropic: 'proxyAnthropic', openai: 'proxyOpenAI', openrouter: 'proxyOpenRouter', custom: 'proxyCustomRPC' };
+const PROXIES = { anthropic: 'proxyAnthropic', openai: 'proxyOpenAI', openrouter: 'proxyOpenRouter', custom: 'proxyCustomRPC', 'workers-ai': 'proxyWorkersAi' };
+// Workers AI calls the Worker's own binding, so it needs no wiring through deps.
+const DIRECT_PROXIES = { 'workers-ai': proxyWorkersAi };
 
-const askAi = async ({ messages, config, secrets, address, scopes, headers, deps }) => {
-  const request = (deps.normalizeAiRequestPayload || normalizeAiRequestPayload)({
-    payload: { taskType: 'session-agent', messages, max_tokens: 3000, max_output_tokens: 3000 },
-    config,
-  });
-  const { provider, payload } = request;
+const sessionAgentRequest = ({ messages, config, deps }) => (deps.normalizeAiRequestPayload || normalizeAiRequestPayload)({
+  payload: { taskType: 'session-agent', messages, max_tokens: 3000, max_output_tokens: 3000 },
+  config,
+});
+
+const askAi = async ({ messages, config, secrets, address, scopes, env, headers, deps }) => {
+  const { provider, payload } = sessionAgentRequest({ messages, config, deps });
   if (!isModelAllowed(payload.model, provider)) return { ok: false, status: 403, body: AI_MODEL_NOT_ALLOWED };
-  const proxy = deps[PROXIES[provider]];
+  const proxy = deps[PROXIES[provider]] || DIRECT_PROXIES[provider];
   if (!proxy) return { ok: false, status: 503, body: { error: 'The session’s AI provider can’t answer the Session Agent.' } };
   const response = await proxy({
-    payload, config, secrets, baseHeaders: headers, ...(provider === 'custom' ? { auth: { address, scopes } } : {}),
+    payload, config, secrets, env, baseHeaders: headers, ...(provider === 'custom' ? { auth: { address, scopes } } : {}),
   });
   const data = await response.json().catch(() => ({}));
   // Provider errors never reach the page as they are, and never as a 401,
@@ -253,7 +258,9 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
     env, slug, headers, deps: { getSessionSecrets: deps.getSessionSecrets, json: deps.json },
   });
   // Missing secrets come back as a 401, which the page would take for its sign-in.
-  if (!secretContext?.ok) return json({ error: 'The session’s AI isn’t set up.' }, 503);
+  // Cloudflare's models need no key, so a session answering on them needs none stored.
+  const keyless = sessionAgentRequest({ messages: [], config, deps }).provider === WORKERS_AI_PROVIDER;
+  if (!secretContext?.ok && !keyless) return json({ error: 'The session’s AI isn’t set up.' }, 503);
 
   // Who opted out is read on every question, so no answer goes ahead without it.
   const optOuts = await store(env, slug, 'list');
@@ -267,7 +274,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
   if (!payment?.ok) return json({ error: payment?.error || 'This answer needs payment first.', reason: 'session_agent_payment_required' }, 402);
   const { messages, read, contextOmitted } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
-  const reply = await askAi({ messages, config, secrets: secretContext.secrets, address, scopes: currentScopes, headers, deps });
+  const reply = await askAi({ messages, config, secrets: secretContext?.ok ? secretContext.secrets : {}, address, scopes: currentScopes, env, headers, deps });
   if (!reply.ok) return json(reply.body, reply.status);
   const notes = [
     answersUnavailable === 'too_many'
