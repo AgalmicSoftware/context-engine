@@ -230,7 +230,9 @@ const byCloseness = (groups, question) => {
 
 // How many chose each option, from every answer given: the most chosen ones,
 // which JSON lists most chosen first, or in number order for a rating's numbers.
-const countChoices = (rows) => {
+// Equally chosen options go in the order of their words, so the same answers
+// always give the same counts, whatever order they were stored in.
+export const countChoices = (rows) => {
   const counts = new Map();
   rows.forEach((row) =>
     (Array.isArray(row.choices) ? row.choices : []).forEach((choice) => {
@@ -238,7 +240,9 @@ const countChoices = (rows) => {
       if (key) counts.set(key, (counts.get(key) || 0) + 1);
     }),
   );
-  return Object.fromEntries([...counts].sort((a, b) => b[1] - a[1]).slice(0, L.countedChoices));
+  return Object.fromEntries(
+    [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)).slice(0, L.countedChoices),
+  );
 };
 
 // In an order drawn afresh for each question asked, so a member's place among
