@@ -4,6 +4,7 @@ import { Wallet } from 'ethers';
 
 import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, harness, idOf, json } from './contextSourceTestFixture.mjs';
+import { buildSessionAgentExport } from '../../shared/sessionAgentExport.mjs';
 import { SESSION_AGENT_EXPORT_ACTION, exportSessionAgent, sessionAgentExportGate } from './sessionAgentExport.js';
 import { SLUG, createSessionEnv, signedAdminRequest } from './sessionWorkerRuntimeFixture.mjs';
 
@@ -89,9 +90,11 @@ const exported = async (options) => {
 };
 const of = (file, kind) => file.items.filter((item) => item.kind === kind);
 const texts = (file, kind) => of(file, kind).map((item) => item.text);
-const refusedAsUnavailable = (result) => assert.deepEqual(
-  [result.ok, result.status, result.body?.reason, result.content], [false, 503, 'session_agent_export_unavailable', undefined],
-);
+// Refused with nothing exported, and a sentence that names the part that couldn't be read.
+const refusedAsUnavailable = (result, part) => {
+  assert.deepEqual([result.ok, result.status, result.body?.reason, result.content], [false, 503, 'session_agent_export_unavailable', undefined]);
+  assert.equal(result.body.error, `The Session Agent’s material couldn’t all be read just now: ${part}. Nothing was exported; try again shortly.`);
+};
 
 test('the file holds what the agent may give a member, each item with the lowest style that may hear it', async () => {
   const { file, filename, manifest } = await exported();
@@ -239,7 +242,7 @@ test('a group too large to list in full says so, and a listing that can’t fini
     async () => ({ ok: true, members: [], nextCursor: 'same' }),
     async () => { throw new Error('KV down'); },
     async () => ({ ok: false, status: 503, reason: 'worker_group_store_unavailable' }),
-  ]) refusedAsUnavailable(await run({ listWorkerGroupMembers }));
+  ]) refusedAsUnavailable(await run({ listWorkerGroupMembers }), 'a group’s members');
 });
 
 test('someone who opted out has no answer or file in the file, and exporting again removes exactly theirs', async () => {
@@ -367,22 +370,22 @@ test('nothing is exported when the agent is off, or when anything it would hold 
   assert.deepEqual([(await onChain.run()).status, (await onChain.run()).content], [409, undefined]);
 
   const { run } = await seeded();
-  for (const deps of [
-    { callSessionAgentOptOutStore: async () => ({ ok: false, status: 503, body: {} }) },
+  for (const [part, deps] of [
+    ['people’s own choices', { callSessionAgentOptOutStore: async () => ({ ok: false, status: 503, body: {} }) }],
     // An older store that can't say who wants their address left off.
-    { callSessionAgentOptOutStore: async () => ({ ok: true, body: { addresses: [] } }) },
-    { loadWorkerCanonicalResultsAnalysisSource: async () => ({ ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable' }) },
-    { readPublishedResultsAnalysisArtifact: async () => { throw new Error('storage down'); } },
+    ['people’s own choices', { callSessionAgentOptOutStore: async () => ({ ok: true, body: { addresses: [] } }) }],
+    ['members’ answers', { loadWorkerCanonicalResultsAnalysisSource: async () => ({ ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable' }) }],
+    ['the results', { readPublishedResultsAnalysisArtifact: async () => { throw new Error('storage down'); } }],
     // The results' own storage is down: their reader would say "none yet".
-    {
+    ['the results', {
       readCoordinatedResultsAnalysisStatus: async () => ({ ok: false, status: 503 }),
       readPublishedResultsAnalysisArtifact: async ({ deps: inner, ...args }) => {
         await inner.readCoordinatedResultsAnalysisStatus(args);
         return { ok: false, status: 404, error: 'No generated results analysis artifact is available yet.' };
       },
-    },
-    { listWorkerGroupMembers: async () => ({ ok: false, status: 503, reason: 'worker_group_store_unavailable' }) },
-  ]) refusedAsUnavailable(await run(deps));
+    }],
+    ['a group’s members', { listWorkerGroupMembers: async () => ({ ok: false, status: 503, reason: 'worker_group_store_unavailable' }) }],
+  ]) refusedAsUnavailable(await run(deps), part);
 });
 
 test('context that can’t be listed or read just now stops the export', async () => {
@@ -393,7 +396,7 @@ test('context that can’t be listed or read just now stops the export', async (
     if (String(options?.prefix || '').includes('docsContext')) throw new Error('KV down');
     return list(options);
   };
-  refusedAsUnavailable(await listDown.run());
+  refusedAsUnavailable(await listDown.run(), 'its context');
   // The list answers, but a batch of its rows can't be fetched: some context is missing, so nothing is exported.
   index.list = list;
   const get = index.get.bind(index);
@@ -401,7 +404,7 @@ test('context that can’t be listed or read just now stops the export', async (
     if (Array.isArray(key) && key.some((name) => name.includes('docsContext'))) throw new Error('KV down');
     return get(key);
   };
-  refusedAsUnavailable(await listDown.run());
+  refusedAsUnavailable(await listDown.run(), 'its context');
   index.get = get;
   assert.equal((await listDown.run()).ok, true);
 
@@ -409,9 +412,100 @@ test('context that can’t be listed or read just now stops the export', async (
   const bucket = readDown.h.r2;
   const read = bucket.get.bind(bucket);
   bucket.get = async () => { throw new Error('R2 down'); };
-  refusedAsUnavailable(await readDown.run());
+  refusedAsUnavailable(await readDown.run(), 'its context');
   bucket.get = read;
   assert.equal((await readDown.run()).ok, true);
+});
+
+test('a storage error on a PDF’s reading, or on bytes held outside the bucket, stops the export instead of leaving them out', async () => {
+  // The AI's reading of a PDF is found from the PDF's own row, by one read of its own.
+  const pdf = await seeded({ provider: async () => json({ content: [{ type: 'text', text: 'DECK text, as the AI read it.' }], stop_reason: 'end_turn' }) });
+  const deck = await idOf(await pdf.h.uploadFile({ name: 'deck.pdf' }));
+  await idOf(await pdf.h.context({ action: 'read-pdf', id: deck }));
+  assert.match((await pdf.run()).content, /DECK text/);
+  const get = pdf.h.kv.get.bind(pdf.h.kv);
+  pdf.h.kv.get = async (key) => {
+    if (typeof key === 'string' && key.includes(':docsContext:')) throw new Error('KV down');
+    return get(key);
+  };
+  refusedAsUnavailable(await pdf.run(), 'its context');
+  pdf.h.kv.get = get;
+  assert.equal((await pdf.run()).ok, true);
+
+  // Bytes the bucket doesn't hold are looked for in the index's store: an error there is not "missing".
+  const held = await seeded();
+  held.h.r2.store.clear();
+  const read = held.h.kv.get.bind(held.h.kv);
+  held.h.kv.get = async (key) => {
+    if (typeof key === 'string' && key.startsWith('ce-storage-payload:')) throw new Error('KV down');
+    return read(key);
+  };
+  refusedAsUnavailable(await held.run(), 'its context');
+  // With the store answering "nothing there", the bytes are gone for good: counted, and the rest exported.
+  held.h.kv.get = read;
+  const gone = await held.run();
+  assert.deepEqual([gone.ok, gone.manifest.leftOut.unreadableContext], [true, 2]);
+});
+
+test('a context item too large to read here is counted as unreadable, not as a failure', async () => {
+  const { h, run } = await seeded();
+  const id = await idOf(await h.uploadFile({ name: 'huge.txt', type: 'text/plain', bytes: encode('HUGE text') }));
+  const key = `ce-storage:salon:docsContext:${id}`;
+  await h.kv.put(key, JSON.stringify({ ...JSON.parse(h.kv.store.get(key)), size: 64 * 1024 * 1024 }), { metadata: h.kv.listMetadata.get(key) });
+  const { ok, content, manifest } = await run();
+  assert.equal(ok, true);
+  assert.doesNotMatch(content, /HUGE text/);
+  assert.equal(manifest.leftOut.unreadableContext, 1);
+});
+
+test('answers from people with no address are left out and counted, and a link or file with no text is counted too', async () => {
+  // Dee has no address: she joined some way that gives none, so she could never have set either switch.
+  const { run } = await seeded();
+  const withoutDee = new Map(PEOPLE.filter((person) => person !== DEE).map((person) => [`participant_00${PEOPLE.indexOf(person) + 1}`, person]));
+  const { content, manifest } = await run({
+    loadWorkerCanonicalResultsAnalysisSource: async () => ({
+      ok: true,
+      snapshot: { questions: QUESTIONS, responses: [...RESPONSES, answer(DEE, 'q1', 'Agree', 'DEE-COMMENT')] },
+      participantAddresses: withoutDee,
+    }),
+  });
+  assert.doesNotMatch(content, /DEE-/);
+  assert.ok(content.includes('3 answered. Agree: 2, Disagree: 1'));
+  assert.equal(manifest.leftOut.answersWithoutAddress, 2);
+  assert.equal((await run()).manifest.leftOut.answersWithoutAddress, 0);
+
+  const built = await buildSessionAgentExport({
+    slug: 'salon', setting: SETTING, leftOut: { unreadableContext: 1 },
+    sources: [
+      { title: 'empty.txt', kind: 'file', url: '', text: '  ', everyone: true, groupIds: [], uploader: ANA },
+      { title: 'Blank page', kind: 'link', url: 'https://example.org/blank', text: '', everyone: true, groupIds: [], uploader: ANA },
+      { title: 'kept.txt', kind: 'file', url: '', text: 'KEPT', everyone: true, groupIds: [], uploader: ANA },
+    ],
+  });
+  assert.deepEqual(built.items.map((item) => item.text), ['KEPT']);
+  assert.equal(built.manifest.leftOut.unreadableContext, 3);
+});
+
+test('an answer names its question in the same words as the question’s own item, however long', async () => {
+  const long = `${'Should the salon meet more often than it does now? '.repeat(8)}END`;
+  assert.ok(long.length > 300);
+  const { file } = await exported({
+    deps: {
+      loadWorkerCanonicalResultsAnalysisSource: async () => ({
+        ok: true,
+        snapshot: {
+          questions: [{ id: 'q1', prompt: long, type: 'binary' }, { id: 'q2', prompt: `${long} Why?`, type: 'text' }],
+          responses: [answer(ANA, 'q1', 'Agree'), answer(BEN, 'q1', 'Agree'), answer(ANA, 'q2', 'ANA-WROTE'), answer(BEN, 'q2', 'BEN-WROTE')],
+        },
+        participantAddresses: new Map(PEOPLE.map((person, index) => [`participant_00${index + 1}`, person])),
+      }),
+    },
+  });
+  const asked = new Set(of(file, 'question').map((item) => item.question));
+  assert.deepEqual([...asked].sort(), [long, `${long} Why?`]);
+  for (const item of [...of(file, 'counts'), ...of(file, 'written')]) assert.ok(asked.has(item.question), item.question.slice(-20));
+  // The two questions differ only past 300 characters, and their answers stay apart.
+  assert.deepEqual(of(file, 'written').map((item) => item.question), [`${long} Why?`, `${long} Why?`]);
 });
 
 test('a context item whose stored bytes are gone is counted, and the rest is exported', async () => {
@@ -445,22 +539,36 @@ test('the file carries the session’s sign-in rule and its reading rule as the 
   assert.deepEqual(gateOf(), { signIn: open, read: open });
   // The sign-in rule names one group a condition; the file names them the way audiences do.
   assert.deepEqual(
-    gateOf({ match: 'all', conditions: [{ kind: 'worker_group', groupId: 'B' }, { kind: 'worker_role' }] }).signIn,
-    { match: 'all', conditions: [group('b'), { kind: 'worker_role', role: 'admin' }] },
+    gateOf({ match: 'all', conditions: [{ kind: 'worker_group', groupId: 'B' }, { kind: 'worker_role' }, { kind: 'worker_role', role: 'Results_Admin' }] }).signIn,
+    { match: 'all', conditions: [group('b'), { kind: 'worker_role', role: 'admin' }, { kind: 'worker_role', role: 'results_admin' }] },
   );
-  assert.deepEqual(gateOf({ match: 'any', conditions: [{ kind: 'something_new' }, { kind: 'worker_group' }] }).signIn, {
-    match: 'any', conditions: [{ kind: 'unknown' }, { kind: 'unknown' }],
-  });
+  // Signing in knows a role and one group. Any other rule admits no one there, which the file can't say, so it is unknown:
+  // an SBT, a scope, and a group named the way audiences name several.
+  const holders = { kind: 'sbt_onchain', chainId: 10, contract: address('9'), anyOrAll: 'any' };
+  assert.deepEqual(
+    gateOf({ match: 'any', conditions: [{ kind: 'something_new' }, { kind: 'worker_group' }, holders, { kind: 'agent_grant_scope', scope: 'ai' }, { kind: 'worker_group', groupIds: ['a'] }, 'junk'] }).signIn,
+    { match: 'any', conditions: Array.from({ length: 5 }, () => ({ kind: 'unknown' })) },
+  );
   // A session the Worker doesn't run under its own policy signs people in some other way: not guessed at.
   assert.deepEqual(gateOf(null, undefined, {}).signIn, unknown);
   assert.deepEqual(gateOf(null, undefined, { sessionModeProfile: WORKER_RUN.sessionModeProfile }).signIn, unknown);
 
   // The reading rule, in each form the Worker stores it.
+  const reading = (...conditions) => gateOf(null, { gate: 'role_gate', encryption: 'none', accessConditions: { match: 'all', conditions } }).read.conditions;
   assert.deepEqual(gateOf(null, { gate: 'group_gate', encryption: 'none', groupIds: ['Readers', 'a'] }).read, { match: 'any', conditions: [group('a', 'readers')] });
-  assert.deepEqual(
-    gateOf(null, { gate: 'role_gate', encryption: 'none', accessConditions: { match: 'all', conditions: [{ kind: 'sbt_onchain', chainId: 10, contract: '0xABC', anyOrAll: 'all' }] } }).read,
-    { match: 'all', conditions: [{ kind: 'sbt_onchain', chainId: 10, contract: '0xabc', anyOrAll: 'all' }] },
-  );
+  assert.deepEqual(reading({ ...holders, contract: address('9').toUpperCase().replace('0X', '0x'), anyOrAll: 'all' }, { ...holders, anyOrAll: undefined }), [
+    { ...holders, anyOrAll: 'all' }, holders,
+  ]);
+  // The Worker reads older spellings of a role, a scope and a group; the file says what it reads.
+  assert.deepEqual(reading({ kind: 'worker_role', name: 'results_admin' }, { kind: 'agent_grant_scope', value: 'storage' }, { kind: 'worker_group', groups: ['B', 'a'] }), [
+    { kind: 'worker_role', role: 'results_admin' }, { kind: 'agent_grant_scope', scope: 'storage' }, group('a', 'b'),
+  ]);
+  // An SBT rule in any shape but one contract on a named chain is not restated, since a reader could take it for a wider one.
+  for (const odd of [
+    { ...holders, sbtAddresses: [address('8')] }, { ...holders, address: address('8') }, { ...holders, anyOrAll: undefined, mode: 'all' },
+    { ...holders, anyOrAll: undefined, match: 'all' }, { ...holders, chainId: undefined, networkChainId: 10 }, { ...holders, contract: '0xabc' },
+    { ...holders, anyOrAll: 'most' }, { kind: 'sbt_onchain', sbtAddresses: [address('8')] },
+  ]) assert.deepEqual(reading(odd), [{ kind: 'unknown' }], JSON.stringify(odd));
   // Conditions stored under the gate's other names are the rule too.
   assert.deepEqual(gateOf(null, { gate: 'none', encryption: 'none', conditions: { match: 'any', conditions: [group('a')] } }).read, { match: 'any', conditions: [group('a')] });
   // A gate with nothing saying whom it admits is not guessed at: empty conditions don't open an SBT or role gate.

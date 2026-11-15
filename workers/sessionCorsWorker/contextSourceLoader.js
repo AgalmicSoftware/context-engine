@@ -12,7 +12,7 @@ import { buildSessionContextPrompt, SESSION_CONTEXT_TEXT_LIMITS } from '../../sh
 import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
 import { buildIndexPrefix, readContextSourceBytes, readContextSourceRow } from './storageRouteExecution.js';
-import { jsonByteLength } from './storageScanBudget.js';
+import { StorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 
 // How much one AI prompt's reading list may cost: rows looked at (chosen from
 // the key list before any is read), list pages (40,000 keys, after which the
@@ -167,7 +167,7 @@ export const loadParticipantContextSources = async ({
   const readingOf = async (pdf) => {
     if (readings.has(pdf.id)) return readings.get(pdf.id);
     if (!pdf.contextReadingId) return null;
-    const reading = await readContextSourceRow({ env, slug, id: pdf.contextReadingId });
+    const reading = await readContextSourceRow({ env, slug, id: pdf.contextReadingId, strict: true });
     return reading && contextRoleOf(reading.tags) === CONTEXT_TEXT_ROLE &&
       contextTagValue(reading.tags, TAGS.derivedFrom) === pdf.id && await canRead(reading) ? reading : null;
   };
@@ -186,14 +186,17 @@ export const loadParticipantContextSources = async ({
       break;
     }
     const isPdf = row.contentType === CONTEXT_FILE_TYPES.pdf;
-    const textRow = isPdf ? await readingOf(row) : row;
-    if (!textRow) continue;
+    // A storage error is a read that failed just now; bytes that are gone, or
+    // too large to read here, will never be read.
     let bytes = null;
     try {
-      bytes = await readContextSourceBytes({ env, config, slug, metadata: textRow, maxBytes: MAX_READ_BYTES, principal, deps });
-    } catch {
-      bytes = null;
-      failed += 1;
+      const textRow = isPdf ? await readingOf(row) : row;
+      if (!textRow) continue;
+      bytes = await readContextSourceBytes({ env, config, slug, metadata: textRow, maxBytes: MAX_READ_BYTES, principal, strict: true, deps });
+    } catch (error) {
+      if (error instanceof StorageReadLimitError) unreadable += 1;
+      else failed += 1;
+      continue;
     }
     if (!bytes) {
       unreadable += 1;
@@ -219,7 +222,7 @@ export const loadParticipantContextSources = async ({
     chars += Math.min(text.trim().length, SESSION_CONTEXT_TEXT_LIMITS.itemChars);
   }
   return {
-    sources, leftOut, withheld: mine.length - ordered.length, unreadable: unreadable - failed, failed,
+    sources, leftOut, withheld: mine.length - ordered.length, unreadable, failed,
     unavailable: listed.stopped.includes('storage unavailable'),
   };
 };

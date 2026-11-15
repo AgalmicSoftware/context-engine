@@ -123,14 +123,15 @@ const scaleText = ({ scale } = {}) => {
 // the asker keeps their own out, would be a single person's answer.
 // The answer is `{ groups, questions, leftOut }`: the session's questions as
 // its analysis reads them, and how many answers stayed out because their
-// author opted out and how many questions for having too few answers.
+// author opted out, how many because they have no address to opt out with,
+// and how many questions for having too few answers.
 export const TOO_MANY_STORED = Symbol('too many stored versions');
 // With `writers`, each answer also says whose it is (`from`), for an export
 // that shows it; the agent's own answers are never given that.
 export const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, writers = false, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
   if (!source?.ok) return source?.reason === 'results_analysis_snapshot_limit' ? TOO_MANY_STORED : null;
-  const leftOut = { optedOut: 0, belowMinAnswers: 0 };
+  const leftOut = { optedOut: 0, withoutAddress: 0, belowMinAnswers: 0 };
   const questions = source.snapshot.questions.map((question) => ({ ...question, scale: scaleText(question) }));
   const byQuestion = new Map(questions.map((question) => [
     question.id, { question: trim(question.prompt), scale: question.scale, counted: COUNTED_TYPES.has(question.type), answers: [] },
@@ -138,7 +139,11 @@ export const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswer
   source.snapshot.responses.forEach((response) => {
     const from = source.participantAddresses?.get(response.participantId);
     const group = byQuestion.get(response.questionId);
-    if (!group || !from) return;
+    if (!group) return;
+    if (!from) {
+      leftOut.withoutAddress += 1;
+      return;
+    }
     if (optedOut.has(from)) {
       leftOut.optedOut += 1;
       return;
@@ -242,26 +247,32 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
       ? json({ on: false, answers: null, audience: null })
       : json({ error: 'This session has no Session Agent.', reason: 'session_agent_off' }, 403);
   }
-  // An ended session, or one with AI off, answers no one, so status says so too.
+  // An ended session, or one with AI off, answers no one. Status still
+  // answers, saying why in `closed`: each person's two switches stay theirs to
+  // set for as long as the session's material can be exported.
   const ended = buildSessionEndedResponse({ config, headers, json: deps.json, now: deps.now });
-  if (ended) return ended;
-  if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
+  const aiOff = config?.scopes?.ai === false;
   // Status only decides what the page shows, so it reads the sign-in's
   // scopes; each question checks them afresh before anything is read.
   if (path === '/session-agent/status') {
+    const closed = ended ? 'session_ended' : aiOff ? 'ai_disabled' : '';
     const [asker, own] = await Promise.all([
-      resolveAsker({
+      closed ? { ok: false } : resolveAsker({
         setting, config, address, aiScope: scopes?.ai === true, access: accessFor({ env, config, slug, address, scopes, deps }),
       }),
-      canOptOut(address) ? store(env, slug, 'read', { address }) : { ok: true, body: { optedOut: false } },
+      canOptOut(address) ? store(env, slug, 'read', { address }) : { ok: true, body: {} },
     ]);
     if (!asker.ok && asker.status === 503) return json({ error: asker.error }, 503);
     if (!own.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
     return json({
       on: true, answers: asker.ok ? asker.answers : null, audience: asker.ok ? asker.audience : null, optedOut: own.body.optedOut === true,
-      unattributed: own.body.unattributed === true,
+      // Only someone signed in with an address has an address to leave off.
+      ...(canOptOut(address) ? { unattributed: own.body.unattributed === true } : {}),
+      ...(closed ? { closed } : {}),
     });
   }
+  if (ended) return ended;
+  if (aiOff) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
 
   const question = trim(body?.question);
   if (!question) return json({ error: 'Ask a question.' }, 400);

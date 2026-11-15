@@ -162,6 +162,12 @@ older backup has none: after restoring one, tell people to set the switch again.
 A second switch there, **Leave my address off exported items**, keeps a
 person's answers and files in while taking their account address off them in
 the [export](#export). It is stored and backed up the same way, from 0.9.11.
+Only someone signed in with an address has it. The interview dialog carries
+the first switch only.
+
+Both switches stay open after the session has ended or its AI is turned off,
+when the Session Agent answers no one: an export can still be made then, and
+each person's choices apply to it.
 
 A "?" by the switch, and a robot by the session's title while the Session Agent
 is on, say what it may read and link here through the README.
@@ -234,7 +240,13 @@ agent itself reads:
 | `counts` | detailed | How many answered a question and how many chose each option |
 | `written` | detailed | What a member wrote, cut to 300 characters |
 
-An `id` is a hash of what the item says, its address included when it has one.
+`question` on a `counts` or `written` item is the question's words in full, the
+same as on its own `question` item. Anyone the session admits can read the
+questions on its page, so they are `general`; the live agent itself cites them
+only in Detailed answers. A `context` item from a file or link also has its
+`title`, a link its `url`, and `readByAi: true` when the text is the session
+AI's reading of a PDF, not the file's own words. An `id` is a hash of what the
+item says, its address included when it has one.
 
 **Addresses on items.** A `written` item, and a `context` item made from a file
 or link someone added, carries `by`: the account address of the person who
@@ -251,6 +263,16 @@ rule for signing in and `read` its rule for reading its questions, each as the
 Worker enforces it. Someone must pass both; a rule with no conditions keeps no
 one out, and admins pass every rule. A rule the file can't say appears as
 `{ "kind": "unknown" }`, and a reader should then refuse rather than guess.
+That covers a sign-in rule of any kind but a role or one group, which the
+Worker admits no one by, and an SBT rule in any shape but one contract on a
+named chain.
+
+The file can't settle two kinds of rule, and a reader should not take either
+as "anyone": it lists no admins or other role holders, so a `worker_role` rule
+admits no one the file names; and an `agent_grant_scope` rule means the
+session's own sign-in gave the person that scope, which the file doesn't
+record. The Worker also gives results only to someone whose sign-in may read
+the session's stored answers.
 
 `gate.groups` lists the addresses in each group that the gate, an audience or
 an item names, so a reader can tell who may ask and which tier they get.
@@ -260,7 +282,9 @@ their membership. A member without an address, such as one who joined through
 Telegram, can't be listed and is counted in the manifest. The export lists at
 most 500 members across at most 40 groups; a group it couldn't list in full
 has `"complete": false`, and a reader should not treat an address missing from
-such a group as a non-member.
+such a group as a non-member. With a small group, its member list, and a count
+beside an answer that has no address, who wrote it can sometimes be worked out
+by elimination: leaving an address off is not anonymity within a small group.
 
 **Left out,** each counted in `manifest.leftOut`:
 
@@ -268,17 +292,20 @@ such a group as a non-member.
 |---|---|
 | `optedOut` | Answers and files of people who turned off **Use my answers and files** |
 | `belowMinAnswers` | Questions fewer members answered than the session's minimum: no counts and nothing they wrote |
+| `answersWithoutAddress` | Answers from people who joined without an address, such as through Telegram, who have no switch to set; they aren't in the counts either |
 | `patternMatches` | Written answers holding an email address, an account address, an ENS name or a run of ten or more digits such as a phone number, dropped whole |
 | `adminsOnlyContext` | Admins-only context |
 | `otherRulesContext` | Context under any access rule other than the session's own or a group lock |
 | `contextNotRead` | Context past the export's reading limit (32 items, each cut to 6,000 characters), and session notes and links past theirs |
-| `unreadableContext` | Context items whose stored text is missing or can't be read at all |
+| `unreadableContext` | Context items that will never be read: stored text that is missing, larger than 1 MiB, or empty, such as a link whose page gave no text |
 | `resultsNotForEveryone` | 1 when the published results stayed out because not everyone the session admits may see them |
 | `membersWithoutAddress` | Group members with no address |
 | `answersNotRead` | 1 when every question and answer stayed out because the session stores more question and answer versions than the agent can read at once (10,000) |
 
-Withheld and locked answers, hidden questions, the atlas and the risk matrix,
-secrets, keys and Worker addresses are never in the file. The pattern check
+Withheld and locked answers, hidden questions, secrets, keys and Worker
+addresses are never in the file. The `results` items are the text of the
+published results analysis, every section of it, as the live agent reads it;
+the debate atlas and risk matrix built apart from it are not in the file. The pattern check
 finds addresses and numbers, not a name written out, so read what members wrote
 before sharing the file any further than the agent's own audience.
 
@@ -294,7 +321,14 @@ admin actions. It returns `{ filename, content, manifest }`, with `content` the
 file's exact text. It answers `409` (`session_agent_off`) when the session has no
 Session Agent, and `503` (`session_agent_export_unavailable`) when the opt-outs
 and address choices, the context, the answers, the results or a group's members
-can't all be read, exporting nothing rather than a file with a part missing.
+can't all be read, exporting nothing rather than a file with a part missing;
+its sentence names the part. A context item that fails every time, such as one
+whose stored text can't be decrypted, stops every export until it is removed.
+
+One export reads the answers, up to 32 context items and up to 500 group
+members in a single request. A session with several hundred members in the
+groups its rules name may be more than one request can read, and then answers
+`503` each time.
 
 ## Routes
 
@@ -302,13 +336,16 @@ Each is a `POST` with JSON and the person's session sign-in, like the Worker's
 other signed-in routes.
 
 - `POST /session-agent/status` with `{}` returns
-  `{ on, answers, audience, optedOut, unattributed }`. `on` is false when the session has no
-  setting. `answers` is `general`, `detailed`, or `null` when the person lacks AI
-  access or no audience admits them; `audience` is the admitting audience's
-  position, or `admin`. `optedOut` and `unattributed` are false for someone
-  signed in without an address, who has neither switch. It checks the sign-in's scopes, and each question
-  checks them afresh. Like `ask`, it refuses with `410` once the session has
-  ended and with `403` (`ai_disabled`) while AI is off for it.
+  `{ on, answers, audience, optedOut, unattributed?, closed? }`. `on` is false
+  when the session has no setting. `answers` is `general`, `detailed`, or `null`
+  when the person lacks AI access or no audience admits them; `audience` is the
+  admitting audience's position, or `admin`. Someone signed in without an
+  address has neither switch: `optedOut` is false and `unattributed` is absent.
+  It checks the sign-in's scopes, and each question checks them afresh. Once
+  the session has ended, or while AI is off for it, status still answers, with
+  `answers: null` and `closed` as `session_ended` or `ai_disabled`, so each
+  person can still set their switches; `ask` then refuses with `410` or with
+  `403` (`ai_disabled`).
 - `POST /session-agent/ask` with `{ question }` (at most 500 characters) returns
   `{ answer, answers, audience, read, note? }`. `read` says how much the answer
   drew on: `{ context, results, answers }`, as a count of context items, whether

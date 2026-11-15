@@ -340,25 +340,34 @@ test('a question must be there and short, and an ended session or AI turned off 
   assert.equal((await ask(h, { body: { question: '   ' } })).status, 400);
   assert.equal((await ask(h, { body: { question: 'x'.repeat(501) } })).status, 400);
   assert.equal((await ask(h, { body: { question: 'x'.repeat(500) } })).status, 200);
-  // Status says so too, so the dialog doesn't offer a question that would fail.
-  const status = () => ask(h, { path: '/session-agent/status', body: {} });
+  // Status says so too, so the dialog doesn't offer a question that would fail,
+  // and still answers: each person's switches stay theirs after the session
+  // ends, when its material is most likely to be exported.
+  const status = async () => (await ask(h, { path: '/session-agent/status', body: {} }));
   h.state.config.scopes = { ai: false };
   const off = await ask(h);
   assert.deepEqual([off.status, off.body.reason], [403, 'ai_disabled']);
-  assert.deepEqual([(await status()).status, (await status()).body.reason], [403, 'ai_disabled']);
+  assert.deepEqual([(await status()).status, (await status()).body],
+    [200, { on: true, answers: null, audience: null, optedOut: false, unattributed: false, closed: 'ai_disabled' }]);
   h.state.config.scopes = {};
   h.state.config.sessionEndsAt = '2020-01-01T00:00:00.000Z';
   const ended = await ask(h);
   assert.equal(ended.status, 410);
   assert.deepEqual(ended.calls.ai, []);
-  assert.equal((await status()).status, 410);
-  // Anyone can still keep their answers and files out.
+  // Both switches can still be set, and status shows them.
   assert.deepEqual((await ask(h, { path: '/session-agent/opt-out', body: { optedOut: true } })).body, { optedOut: true });
+  assert.deepEqual((await ask(h, { path: '/session-agent/attribution', body: { unattributed: true } })).body, { unattributed: true });
+  assert.deepEqual([(await status()).status, (await status()).body],
+    [200, { on: true, answers: null, audience: null, optedOut: true, unattributed: true, closed: 'session_ended' }]);
+  // Who may ask is never worked out for a session that answers no one.
+  const unreached = await ask(h, { path: '/session-agent/status', body: {}, deps: { isWorkerGroupMember: async () => { throw new Error('not asked'); } } });
+  assert.equal(unreached.status, 200);
 });
 
 test('someone signed in without an address has no switch, and status still says how they’d be answered', async () => {
   const status = await ask(await seeded(), { path: '/session-agent/status', body: {}, address: 'agent:delve-town' });
-  assert.deepEqual(status.body, { on: true, answers: 'general', audience: 1, optedOut: false, unattributed: false });
+  // No address, so neither switch: nothing of theirs could carry one.
+  assert.deepEqual(status.body, { on: true, answers: 'general', audience: 1, optedOut: false });
 });
 
 test('each person can turn off the Session Agent’s use of their answers and files, and turn it back on', async () => {
@@ -392,6 +401,10 @@ test('each person can leave their address off exported items, which changes noth
   assert.equal((await ask(h, { address: ADMIN })).prompt, before);
   assert.deepEqual((await leaveOff(MEMBER, false)).body, { unattributed: false });
   assert.equal((await statusOf(MEMBER)).unattributed, false);
+  // Only the signed-in person's own choice is set: an address sent in the body is not read.
+  await ask(h, { path: '/session-agent/attribution', address: MEMBER, body: { unattributed: true, address: PARTICIPANT } });
+  assert.deepEqual([(await statusOf(MEMBER)).unattributed, (await statusOf(PARTICIPANT)).unattributed], [true, false]);
+  await leaveOff(MEMBER, false);
   assert.equal((await leaveOff(MEMBER, 'yes')).status, 400);
   assert.equal((await leaveOff('agent:delve-town', true)).status, 400);
   const down = async () => ({ ok: false, status: 503, body: {} });

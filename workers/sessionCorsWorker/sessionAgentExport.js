@@ -41,24 +41,53 @@ const refuse = (status, error, reason) => ({ ok: false, status, body: { error, r
 const OPEN_RULE = Object.freeze({ match: 'any', conditions: [] });
 const UNKNOWN_RULE = Object.freeze({ match: 'all', conditions: [{ kind: 'unknown' }] });
 
-// One condition in the words the agent's audiences use. One this file can't
-// say becomes `{ kind: 'unknown' }`, so its reader refuses rather than guesses.
-const conditionOf = (rule) => {
+const UNKNOWN = Object.freeze({ kind: 'unknown' });
+const ADDRESS = /^0x[0-9a-f]{40}$/;
+const has = (rule, ...fields) => fields.some((field) => rule[field] !== undefined);
+const groupsOf = (ids) => [...new Set((Array.isArray(ids) ? ids : [ids]).map(normalizeWorkerGroupId).filter(Boolean))].sort();
+
+// One condition in the words the agent's audiences use, read the way the
+// Worker's own check reads it. One this file can't say exactly becomes
+// `{ kind: 'unknown' }`, so its reader refuses rather than guesses.
+//
+// The sign-in rule knows two kinds, a role and one group, and admits no one by
+// any other.
+const signInConditionOf = (rule) => {
   const kind = lower(rule.kind);
-  if (kind === 'worker_group') {
-    const groupIds = [...new Set((Array.isArray(rule.groupIds) ? rule.groupIds : [rule.groupId]).map(normalizeWorkerGroupId).filter(Boolean))].sort();
-    return groupIds.length ? { kind, groupIds } : { kind: 'unknown' };
-  }
   if (kind === 'worker_role') return { kind, role: lower(rule.role) || 'admin' };
-  if (kind === 'agent_grant_scope' && lower(rule.scope)) return { kind, scope: lower(rule.scope) };
-  if (kind === 'sbt_onchain' && Number.isSafeInteger(rule.chainId) && lower(rule.contract)) {
-    return { kind, chainId: rule.chainId, contract: lower(rule.contract), anyOrAll: lower(rule.anyOrAll) === 'all' ? 'all' : 'any' };
+  if (kind === 'worker_group' && typeof rule.groupId === 'string' && groupsOf(rule.groupId).length) {
+    return { kind, groupIds: groupsOf(rule.groupId) };
   }
-  return { kind: 'unknown' };
+  return { ...UNKNOWN };
 };
-const ruleOf = (rule) => ({
+// The reading rule takes older spellings too; an SBT rule is said only in the
+// one shape the file's readers know: one contract on a named chain.
+const readConditionOf = (rule) => {
+  const kind = lower(rule.kind);
+  if (kind === 'worker_role') return { kind, role: lower(rule.role || rule.name) || 'admin' };
+  if (kind === 'agent_grant_scope' && trim(rule.scope || rule.value)) return { kind, scope: trim(rule.scope || rule.value) };
+  if (kind === 'worker_group') {
+    const groupIds = groupsOf(rule.groupIds || rule.groups || rule.groupId);
+    return groupIds.length ? { kind, groupIds } : { ...UNKNOWN };
+  }
+  if (kind === 'sbt_onchain') {
+    const anyOrAll = rule.anyOrAll === undefined ? 'any' : lower(rule.anyOrAll);
+    return !has(rule, 'sbtAddresses', 'address', 'mode', 'match', 'networkChainId') && Number.isSafeInteger(rule.chainId) && rule.chainId > 0 &&
+      ADDRESS.test(lower(rule.contract)) && ['any', 'all'].includes(anyOrAll)
+      ? { kind, chainId: rule.chainId, contract: lower(rule.contract), anyOrAll }
+      : { ...UNKNOWN };
+  }
+  return { ...UNKNOWN };
+};
+// Sign-in skips an entry that isn't a rule, as the Worker's own check does; in
+// a reading rule such an entry is not guessed at.
+const signInRuleOf = (rule) => ({
   match: lower(rule?.match) === 'all' ? 'all' : 'any',
-  conditions: (Array.isArray(rule?.conditions) ? rule.conditions : []).filter(isObj).map(conditionOf),
+  conditions: (Array.isArray(rule?.conditions) ? rule.conditions : []).filter(isObj).map(signInConditionOf),
+});
+const readRuleOf = (rule) => ({
+  match: lower(rule?.match) === 'all' ? 'all' : 'any',
+  conditions: (Array.isArray(rule?.conditions) ? rule.conditions : []).map((entry) => (isObj(entry) ? readConditionOf(entry) : { ...UNKNOWN })),
 });
 
 /**
@@ -71,16 +100,16 @@ export const sessionAgentExportGate = (config) => {
   // Signing in follows the sign-in rule only where the Worker runs the session under its own policy.
   const policy = isObj(config?.workerAuthority) && Number(config.workerAuthority.version) === 1 ? config.workerAuthority : null;
   const signIn = isWorkerCanonicalSessionConfig(config) && policy
-    ? (isObj(policy.loginGate) ? ruleOf(policy.loginGate) : OPEN_RULE)
+    ? (isObj(policy.loginGate) ? signInRuleOf(policy.loginGate) : OPEN_RULE)
     : UNKNOWN_RULE;
   // The reading rule, in the order the Worker's own gate tries it: its
   // conditions when it has any, then no gate, then the gate's groups.
   const access = resolvePayloadAccessControl(config);
   let read = UNKNOWN_RULE;
-  if (access.conditions?.conditions?.length) read = ruleOf(access.conditions);
+  if (access.conditions?.conditions?.length) read = readRuleOf(access.conditions);
   else if (access.encryption === PAYLOAD_ENCRYPTION_MODES.LIT || access.gate === PAYLOAD_ACCESS_GATES.NONE) read = OPEN_RULE;
   else if (access.gate === PAYLOAD_ACCESS_GATES.GROUP_GATE && access.groupIds.length) {
-    read = ruleOf({ conditions: [{ kind: 'worker_group', groupIds: access.groupIds }] });
+    read = readRuleOf({ conditions: [{ kind: 'worker_group', groupIds: access.groupIds }] });
   }
   return { signIn: { ...signIn }, read: { ...read } };
 };
@@ -128,8 +157,15 @@ const membersOf = async ({ env, slug, sessionId, groupId, budget, deps }) => {
   }
 };
 
-const UNAVAILABLE = 'The Session Agent’s material couldn’t all be read just now. Nothing was exported; try again shortly.';
-const unavailable = () => refuse(503, UNAVAILABLE, 'session_agent_export_unavailable');
+// Names the part that couldn't be read, so one that keeps failing can be looked at.
+const unavailable = (part) => ({
+  ok: false,
+  status: 503,
+  body: {
+    error: `The Session Agent’s material couldn’t all be read just now: ${part}. Nothing was exported; try again shortly.`,
+    reason: 'session_agent_export_unavailable',
+  },
+});
 
 /** `{ ok, filename, content, manifest }`, or a refusal with a plain sentence. `address` is the admin exporting. */
 export const exportSessionAgent = async ({ env, slug, config, address, deps = {} } = {}) => {
@@ -141,7 +177,7 @@ export const exportSessionAgent = async ({ env, slug, config, address, deps = {}
     ((storeEnv, storeSlug, operation) => callSessionConfigCoordinator({ env: storeEnv, slug: storeSlug, path: `session-agent/${operation}` }));
   // Who opted out, and who wants their address left off, is read first: without it nothing may be exported.
   const choices = await store(env, slug, 'list');
-  if (!choices?.ok || !Array.isArray(choices.body?.addresses) || !Array.isArray(choices.body?.unattributed)) return unavailable();
+  if (!choices?.ok || !Array.isArray(choices.body?.addresses) || !Array.isArray(choices.body?.unattributed)) return unavailable('people’s own choices');
   const optedOut = new Set(choices.body.addresses);
 
   // Context the agent may give a Detailed asker: what everyone the session
@@ -186,7 +222,9 @@ export const exportSessionAgent = async ({ env, slug, config, address, deps = {}
       }
     })(),
   ]);
-  if (answers === null || published === null || context.unavailable || context.failed) return unavailable();
+  if (context.unavailable || context.failed) return unavailable('its context');
+  if (answers === null) return unavailable('members’ answers');
+  if (published === null) return unavailable('the results');
   const tooMany = answers === TOO_MANY_STORED;
 
   const sessionId = resolveCanonicalWorkerSessionIdHex(config);
@@ -196,7 +234,7 @@ export const exportSessionAgent = async ({ env, slug, config, address, deps = {}
     const group = index < LIMITS.groups
       ? await membersOf({ env, slug, sessionId, groupId, budget, deps })
       : { groupId, members: [], withoutAddress: 0, complete: false };
-    if (!group) return unavailable();
+    if (!group) return unavailable('a group’s members');
     groups.push(group);
   }
 
@@ -216,6 +254,7 @@ export const exportSessionAgent = async ({ env, slug, config, address, deps = {}
     leftOut: {
       optedOut: (tooMany ? 0 : answers.leftOut.optedOut) + context.withheld,
       belowMinAnswers: tooMany ? 0 : answers.leftOut.belowMinAnswers,
+      answersWithoutAddress: tooMany ? 0 : answers.leftOut.withoutAddress,
       adminsOnlyContext: notExported.adminsOnly,
       otherRulesContext: notExported.otherRules,
       contextNotRead: context.leftOut,

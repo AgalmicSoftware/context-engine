@@ -2955,12 +2955,20 @@ export const listContextSourceRows = async ({ env, slug, budget } = {}) => {
   return rows.map((row) => row.metadata).filter((metadata) => metadata?.contextSource === true);
 };
 
-export const readContextSourceRow = async ({ env, slug, id } = {}) => {
+// With `strict`, a storage error is thrown, so a caller can tell a row that
+// can't be read just now from one that isn't there.
+export const readContextSourceRow = async ({ env, slug, id, strict = false } = {}) => {
   const index = getStorageIndexBinding(env);
   if (!isSafeCloudflareStorageRefId(trim(id)) || typeof index?.get !== 'function') return null;
+  let raw = null;
+  try {
+    raw = await index.get(buildIndexKey({ slug, resource: 'docsContext', id: trim(id) }));
+  } catch (error) {
+    if (strict) throw error;
+    return null;
+  }
   let metadata = null;
   try {
-    const raw = await index.get(buildIndexKey({ slug, resource: 'docsContext', id: trim(id) }));
     metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
   } catch {
     return null;
@@ -2970,9 +2978,10 @@ export const readContextSourceRow = async ({ env, slug, id } = {}) => {
 
 // A context source's stored bytes, decrypted. The Worker reads them for the
 // session's AI, so each worker_envelope read is audited under that principal.
-export const readContextSourceBytes = async ({ env, config, slug, metadata, maxBytes, principal = 'session-ai', deps } = {}) => {
+// With `strict`, a storage error is thrown rather than read as missing bytes.
+export const readContextSourceBytes = async ({ env, config, slug, metadata, maxBytes, principal = 'session-ai', strict = false, deps } = {}) => {
   const index = getStorageIndexBinding(env);
-  let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes });
+  let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes, strict });
   if (!bytes) return null;
   if (isObj(metadata?.envelope)) {
     await writeStorageEnvelopeKeyReleaseAudit({

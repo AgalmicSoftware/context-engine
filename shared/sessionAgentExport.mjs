@@ -101,6 +101,7 @@ export const buildSessionAgentExport = async ({
 } = {}) => {
   const found = [];
   let patternMatches = 0;
+  let withoutText = 0;
   const add = (kind, tier, fields) => found.push({ kind, tier, ...fields });
   const withoutAddress = new Set([...unattributed].map((address) => text(address).toLowerCase()));
   // The writer's address, when it may be shown; never a name.
@@ -122,7 +123,11 @@ export const buildSessionAgentExport = async ({
 
   sources.filter(isRecord).forEach((source) => {
     const body = clip(text(source.text), SESSION_CONTEXT_TEXT_LIMITS.itemChars);
-    if (!body) return;
+    // A link whose page gave no text, or an empty file, has nothing to export.
+    if (!body) {
+      withoutText += 1;
+      return;
+    }
     const lockedTo = [...new Set((Array.isArray(source.groupIds) ? source.groupIds : []).map(text).filter(Boolean))].sort(byCodePoint);
     add('context', source.everyone === true ? 'general' : 'detailed', {
       source: source.kind === 'link' ? 'link' : 'file',
@@ -141,7 +146,8 @@ export const buildSessionAgentExport = async ({
   }
 
   answers.filter(isRecord).forEach((group) => {
-    const question = clip(text(group.question), L.answerItemChars);
+    // The question's words in full, as its own item has them, so the two can be matched.
+    const question = text(group.question);
     const rows = (Array.isArray(group.answers) ? group.answers : []).filter(isRecord);
     if (!question || !rows.length) return;
     const counts = countsText(rows);
@@ -185,7 +191,12 @@ export const buildSessionAgentExport = async ({
     .sort((a, b) => byCodePoint(a.groupId, b.groupId));
   const rules = isRecord(gate) ? gate : { signIn: OPEN_RULE, read: OPEN_RULE };
   const counted = Object.fromEntries(
-    Object.entries({ ...leftOut, patternMatches, contextNotRead: (leftOut.contextNotRead || 0) + notes.omitted })
+    Object.entries({
+      ...leftOut,
+      patternMatches,
+      contextNotRead: (leftOut.contextNotRead || 0) + notes.omitted,
+      unreadableContext: (leftOut.unreadableContext || 0) + withoutText,
+    })
       .filter(([, count]) => Number.isSafeInteger(count) && count >= 0),
   );
   return {
