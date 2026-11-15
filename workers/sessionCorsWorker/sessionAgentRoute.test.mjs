@@ -94,9 +94,9 @@ test('with no setting the Session Agent is off: status says so, and a question i
 test('the first audience that admits someone sets their answers, admins get Detailed, and the reply names the audience', async () => {
   const h = await seeded();
   const status = async (address) => (await ask(h, { path: '/session-agent/status', body: {}, address })).body;
-  assert.deepEqual(await status(MEMBER), { on: true, answers: 'detailed', audience: 0, optedOut: false });
-  assert.deepEqual(await status(PARTICIPANT), { on: true, answers: 'general', audience: 1, optedOut: false });
-  assert.deepEqual(await status(ADMIN), { on: true, answers: 'detailed', audience: 'admin', optedOut: false });
+  assert.deepEqual(await status(MEMBER), { on: true, answers: 'detailed', audience: 0, optedOut: false, unattributed: false });
+  assert.deepEqual(await status(PARTICIPANT), { on: true, answers: 'general', audience: 1, optedOut: false, unattributed: false });
+  assert.deepEqual(await status(ADMIN), { on: true, answers: 'detailed', audience: 'admin', optedOut: false, unattributed: false });
   // The path decides, whatever action the body names.
   const answered = await ask(h, { address: MEMBER });
   assert.equal(answered.status, 200);
@@ -113,7 +113,7 @@ test('every asker needs the session’s AI access, whichever audience would admi
   for (const address of [MEMBER, ADMIN]) {
     const withoutAi = { address, scopes: { storage: true } };
     assert.deepEqual((await ask(h, { ...withoutAi, path: '/session-agent/status', body: {} })).body, {
-      on: true, answers: null, audience: null, optedOut: false,
+      on: true, answers: null, audience: null, optedOut: false, unattributed: false,
     });
     const refused = await ask(h, withoutAi);
     assert.deepEqual([refused.status, refused.body.reason], [403, 'session_agent_not_admitted']);
@@ -123,7 +123,7 @@ test('every asker needs the session’s AI access, whichever audience would admi
 
 test('no audience admits someone in no listed group', async () => {
   const h = await seeded({ audiences: [{ who: salonMembers, answers: 'general' }] });
-  assert.deepEqual((await ask(h, { path: '/session-agent/status', body: {} })).body, { on: true, answers: null, audience: null, optedOut: false });
+  assert.deepEqual((await ask(h, { path: '/session-agent/status', body: {} })).body, { on: true, answers: null, audience: null, optedOut: false, unattributed: false });
   const outsider = await ask(h);
   assert.equal(outsider.status, 403);
   assert.deepEqual(outsider.calls.ai, []);
@@ -212,7 +212,7 @@ test('the session’s own gate comes first: someone it keeps out may not ask, wh
   assert.equal(outsider.body.reason, 'session_agent_not_admitted');
   assert.deepEqual(outsider.calls.ai, []);
   assert.deepEqual((await ask(h, { path: '/session-agent/status', body: {} })).body, {
-    on: true, answers: null, audience: null, optedOut: false,
+    on: true, answers: null, audience: null, optedOut: false, unattributed: false,
   });
   const member = await ask(h, { address: MEMBER });
   assert.equal(member.status, 200);
@@ -358,7 +358,7 @@ test('a question must be there and short, and an ended session or AI turned off 
 
 test('someone signed in without an address has no switch, and status still says how they’d be answered', async () => {
   const status = await ask(await seeded(), { path: '/session-agent/status', body: {}, address: 'agent:delve-town' });
-  assert.deepEqual(status.body, { on: true, answers: 'general', audience: 1, optedOut: false });
+  assert.deepEqual(status.body, { on: true, answers: 'general', audience: 1, optedOut: false, unattributed: false });
 });
 
 test('each person can turn off the Session Agent’s use of their answers and files, and turn it back on', async () => {
@@ -378,6 +378,24 @@ test('each person can turn off the Session Agent’s use of their answers and fi
   const admin = await ask(h, { address: ADMIN });
   for (const piece of ['ANSWER meet less', 'OPEN agenda', 'ADMINS plan']) assert.match(admin.prompt, new RegExp(piece));
   assert.equal((await optOut(MEMBER, 'yes')).status, 400);
+});
+
+test('each person can leave their address off exported items, which changes nothing the agent reads', async () => {
+  const h = await seeded();
+  const leaveOff = (address, unattributed) => ask(h, { path: '/session-agent/attribution', address, body: { unattributed } });
+  const statusOf = async (address) => (await ask(h, { path: '/session-agent/status', body: {}, address })).body;
+  const before = (await ask(h, { address: ADMIN })).prompt;
+  assert.deepEqual((await leaveOff(MEMBER, true)).body, { unattributed: true });
+  assert.deepEqual([(await statusOf(MEMBER)).unattributed, (await statusOf(MEMBER)).optedOut], [true, false]);
+  assert.equal((await statusOf(PARTICIPANT)).unattributed, false);
+  // Their answers are still read: this is about the export's address, not the agent.
+  assert.equal((await ask(h, { address: ADMIN })).prompt, before);
+  assert.deepEqual((await leaveOff(MEMBER, false)).body, { unattributed: false });
+  assert.equal((await statusOf(MEMBER)).unattributed, false);
+  assert.equal((await leaveOff(MEMBER, 'yes')).status, 400);
+  assert.equal((await leaveOff('agent:delve-town', true)).status, 400);
+  const down = async () => ({ ok: false, status: 503, body: {} });
+  assert.equal((await ask(h, { path: '/session-agent/attribution', body: { unattributed: true }, deps: { callSessionAgentOptOutStore: down } })).status, 503);
 });
 
 test('answers without an address stay out, and no question goes ahead when opt-outs can’t be read', async () => {

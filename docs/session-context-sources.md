@@ -125,7 +125,9 @@ not in, and then can't read it themselves. A PDF's reading keeps the PDF's
 privacy. No other access rule is accepted for a context item. Groups don't travel
 between sessions, so a template lists a locked file as admins only. The Worker's own AI
 features act for participants, so they use neither admins-only nor group-locked
-items; an AI that runs in someone's browser uses what that person may read.
+items, with one exception: the Session Agent's Detailed answers read a
+group-locked item for an asker who may read it. An AI that runs in someone's
+browser uses what that person may read.
 
 ## Links
 
@@ -175,7 +177,8 @@ what it left out.
 
 The Worker's features act for all participants, so they never use admins-only
 items, items with a narrower access than the session's, or items it cannot
-read. Results analysis keeps context out of its source signature, so editing
+read. The Session Agent answers one person, so its Detailed answers also read
+what that person may read, group-locked items included. Results analysis keeps context out of its source signature, so editing
 context never marks a report stale, and it grounds every claim in responses,
 not in the background.
 

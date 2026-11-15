@@ -147,15 +147,21 @@ test('feedback is never a storage resource and never enters a backup', async () 
   assert.ok(!leaked(JSON.stringify(pages)));
 });
 
-test('a restore keeps everyone who turned the Session Agent off opted out', async () => {
+test('a restore keeps everyone who turned the Session Agent off opted out, and every address left off exports off', async () => {
   const source = fixture();
   const people = [`0x${'a'.repeat(40)}`, `0x${'b'.repeat(40)}`];
+  const unnamed = [`0x${'b'.repeat(40)}`, `0x${'d'.repeat(40)}`];
   for (const address of people) {
     const set = await callSessionConfigCoordinator({ env: source.env, slug, path: 'session-agent/set', address, optedOut: true });
     assert.equal(set.body.optedOut, true);
   }
+  for (const address of unnamed) {
+    const set = await callSessionConfigCoordinator({ env: source.env, slug, path: 'session-agent/set-unattributed', address, unattributed: true });
+    assert.equal(set.body.unattributed, true);
+  }
   const [page] = await allPages(source.env);
   assert.deepEqual(page.coordinator.sessionAgentOptOuts, people);
+  assert.deepEqual(page.coordinator.sessionAgentUnattributed, unnamed);
   // A restore only adds: someone the target already holds as opted out stays so,
   // and a backup from before backups carried the list restores with none.
   const already = `0x${'c'.repeat(40)}`;
@@ -163,17 +169,20 @@ test('a restore keeps everyone who turned the Session Agent off opted out', asyn
     const target = fixture();
     target.kv.values.delete(`session:${slug}:config`);
     await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/set', address: already, optedOut: true });
+    await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/set-unattributed', address: already, unattributed: true });
     const result = await importPage(target.env, backupPage);
     assert.equal(result.body.complete, true, JSON.stringify(result));
-    return (await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/list' })).body.addresses.sort();
+    const { addresses, unattributed } = (await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/list' })).body;
+    return [addresses.sort(), unattributed.sort()];
   };
-  assert.deepEqual(await restoreOnto(page), [...people, already]);
+  assert.deepEqual(await restoreOnto(page), [[...people, already], [...unnamed, already].sort()]);
   const older = structuredClone(page);
   delete older.coordinator.sessionAgentOptOuts;
+  delete older.coordinator.sessionAgentUnattributed;
   const sha256 = (text) => createHash('sha256').update(text).digest('hex');
   older.snapshotDigest = sha256(JSON.stringify(older.coordinator));
   older.archiveId = sha256(`${older.manifest.sessionId}:${older.manifest.exportedAt}:${older.snapshotDigest}`);
-  assert.deepEqual(await restoreOnto(await signBackupPage(older, source.env)), [already]);
+  assert.deepEqual(await restoreOnto(await signBackupPage(older, source.env)), [[already], [already]]);
 });
 
 test('restore refuses missing or altered pages, foreign keys, and mismatched session ids', async () => {

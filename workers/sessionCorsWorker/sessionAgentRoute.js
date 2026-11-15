@@ -28,7 +28,9 @@ import {
 // turns the agent's use of their answers and files off or on. Each question
 // judges who may ask afresh and gathers what the person's answer style may
 // read; the page sends only the question.
-export const SESSION_AGENT_PATHS = Object.freeze(['/session-agent/status', '/session-agent/ask', '/session-agent/opt-out']);
+export const SESSION_AGENT_PATHS = Object.freeze([
+  '/session-agent/status', '/session-agent/ask', '/session-agent/opt-out', '/session-agent/attribution',
+]);
 const OPT_OUTS_UNAVAILABLE = 'Who turned the Session Agent off couldn’t be read just now. Try again shortly.';
 
 const callOptOutStore = (env, slug, operation, payload = {}) =>
@@ -67,7 +69,7 @@ const resolveAsker = async ({ setting, config, address, aiScope, access }) => {
 
 // The published results analysis as lines of plain text, without IDs.
 const TEXT_FIELDS = ['overview', 'title', 'label', 'summary', 'description'];
-const resultsText = (artifact) => {
+export const resultsText = (artifact) => {
   const lines = [];
   const walk = (value) => {
     if (Array.isArray(value)) return value.forEach(walk);
@@ -119,26 +121,43 @@ const scaleText = ({ scale } = {}) => {
 // Someone who is not an admin gets nothing from a question fewer than
 // `minAnswers` members answered: a count of one, or the one answer left when
 // the asker keeps their own out, would be a single person's answer.
-const TOO_MANY_STORED = Symbol('too many stored versions');
-const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, deps }) => {
+// The answer is `{ groups, questions, leftOut }`: the session's questions as
+// its analysis reads them, and how many answers stayed out because their
+// author opted out and how many questions for having too few answers.
+export const TOO_MANY_STORED = Symbol('too many stored versions');
+// With `writers`, each answer also says whose it is (`from`), for an export
+// that shows it; the agent's own answers are never given that.
+export const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, writers = false, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
   if (!source?.ok) return source?.reason === 'results_analysis_snapshot_limit' ? TOO_MANY_STORED : null;
-  const byQuestion = new Map(source.snapshot.questions.map((question) => [
-    question.id, { question: trim(question.prompt), scale: scaleText(question), counted: COUNTED_TYPES.has(question.type), answers: [] },
+  const leftOut = { optedOut: 0, belowMinAnswers: 0 };
+  const questions = source.snapshot.questions.map((question) => ({ ...question, scale: scaleText(question) }));
+  const byQuestion = new Map(questions.map((question) => [
+    question.id, { question: trim(question.prompt), scale: question.scale, counted: COUNTED_TYPES.has(question.type), answers: [] },
   ]));
   source.snapshot.responses.forEach((response) => {
     const from = source.participantAddresses?.get(response.participantId);
     const group = byQuestion.get(response.questionId);
-    if (!group || !from || optedOut.has(from)) return;
+    if (!group || !from) return;
+    if (optedOut.has(from)) {
+      leftOut.optedOut += 1;
+      return;
+    }
     const given = (Array.isArray(response.answer) ? response.answer : [response.answer]).map(trim).filter(Boolean);
     const comment = trim(response.additional);
     const answer = group.counted
       ? { choices: given, text: comment }
       : { choices: [], text: [given.join('; '), comment].filter(Boolean).join(' — ') };
-    if (answer.choices.length || answer.text) group.answers.push(answer);
+    if (answer.choices.length || answer.text) group.answers.push(writers ? { ...answer, from } : answer);
   });
-  return [...byQuestion.values()].filter((group) => group.answers.length >= minAnswers)
-    .map(({ question, scale, answers }) => ({ question, ...(scale ? { scale } : {}), answers }));
+  const answered = [...byQuestion.values()].filter((group) => group.answers.length);
+  const kept = answered.filter((group) => group.answers.length >= minAnswers);
+  leftOut.belowMinAnswers = answered.length - kept.length;
+  return {
+    groups: kept.map(({ question, scale, answers }) => ({ question, ...(scale ? { scale } : {}), answers })),
+    questions,
+    leftOut,
+  };
 };
 
 // What each style reads, decided here and nowhere else. General: the
@@ -158,10 +177,10 @@ const gatherMaterial = async ({ env, slug, config, setting, address, scopes, ask
     readVisibleResults({ env, slug, config, address, scopes, deps }),
     detailed ? readMemberAnswers({
       env, slug, config, optedOut, deps, minAnswers: asker.audience === 'admin' ? 1 : sessionAgentMinAnswers(setting),
-    }) : [],
+    }) : { groups: [] },
   ]);
   return {
-    material: { sessionContext: config?.sessionContext, sources: context.sources, results, answers: Array.isArray(answers) ? answers : [] },
+    material: { sessionContext: config?.sessionContext, sources: context.sources, results, answers: answers?.groups || [] },
     answersUnavailable: answers === TOO_MANY_STORED ? 'too_many' : answers === null,
     contextLeftOut: context.leftOut,
   };
@@ -212,6 +231,12 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
     if (!saved.ok) return json({ error: saved.status === 400 ? saved.body?.error : OPT_OUTS_UNAVAILABLE }, saved.status === 400 ? 400 : 503);
     return json({ optedOut: saved.body.optedOut });
   }
+  // Whether exports may show this person's address beside what they wrote and added.
+  if (path === '/session-agent/attribution') {
+    const saved = await store(env, slug, 'set-unattributed', { address, unattributed: body?.unattributed });
+    if (!saved.ok) return json({ error: saved.status === 400 ? saved.body?.error : OPT_OUTS_UNAVAILABLE }, saved.status === 400 ? 400 : 503);
+    return json({ unattributed: saved.body.unattributed });
+  }
   if (!setting) {
     return path === '/session-agent/status'
       ? json({ on: false, answers: null, audience: null })
@@ -234,6 +259,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
     if (!own.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
     return json({
       on: true, answers: asker.ok ? asker.answers : null, audience: asker.ok ? asker.audience : null, optedOut: own.body.optedOut === true,
+      unattributed: own.body.unattributed === true,
     });
   }
 

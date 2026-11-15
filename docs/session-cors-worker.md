@@ -3074,8 +3074,9 @@ Signed login/bootstrap requests:
 - `POST /session-agent/ask` answers a question to the Session Agent
   through the session's own AI, under the `/ai` scope check and rate limit.
   `POST /session-agent/status` says how the signed-in person would be answered,
-  and `POST /session-agent/opt-out` stores their choice to keep their answers and
-  files out of it. See [session-agent.md](session-agent.md).
+  `POST /session-agent/opt-out` stores their choice to keep their answers and
+  files out of it, and `POST /session-agent/attribution` their choice to leave
+  their address off exported items. See [session-agent.md](session-agent.md).
   - A session may have the Session Agent answer on Cloudflare Workers AI by
     setting `ai.models["session-agent"]` to `{ provider: "workers-ai", model }`
     with a model from `shared/workersAiModels.mjs`; every other AI task keeps

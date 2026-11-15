@@ -1472,7 +1472,7 @@ test('the Session Agent answers a member from stored answers through the real Wo
     workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: ['https://contextengine.sh'], wallet: alice.wallet, fetchImpl: workerFetch(env),
   });
   assert.deepEqual(await client.request('/session-agent/status', { method: 'POST', auth: true, body: {} }), {
-    on: true, answers: 'detailed', audience: 0, optedOut: false,
+    on: true, answers: 'detailed', audience: 0, optedOut: false, unattributed: false,
   });
   const reply = await client.request('/session-agent/ask', { method: 'POST', auth: true, body: { question: 'Do people want labels?' } });
   assert.deepEqual({ answer: reply.answer, answers: reply.answers, read: reply.read.answers }, {
@@ -1497,4 +1497,10 @@ test('the Session Agent answers a member from stored answers through the real Wo
   assert.equal(without.read.answers, 3);
   assert.match(sent[1], /\\"Agree\\":2,\\"Disagree\\":1/);
   assert.doesNotMatch(sent[1], /Labels help readers/);
+  // The other switch is each person's own too, and is stored apart from the first.
+  const leaveOff = { method: 'POST', auth: true, body: { unattributed: true } };
+  assert.deepEqual(await bobClient.request('/session-agent/attribution', leaveOff), { unattributed: true });
+  const statusOf = async (asker) => asker.request('/session-agent/status', { method: 'POST', auth: true, body: {} });
+  assert.deepEqual([(await statusOf(bobClient)).optedOut, (await statusOf(bobClient)).unattributed], [true, true]);
+  assert.deepEqual([(await statusOf(client)).optedOut, (await statusOf(client)).unattributed], [false, false]);
 });

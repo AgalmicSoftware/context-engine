@@ -159,6 +159,10 @@ the Session Agent off, and a session backup made by a 0.9.9 or later Worker
 carries them, so its restore keeps everyone who turned it off opted out. An
 older backup has none: after restoring one, tell people to set the switch again.
 
+A second switch there, **Leave my address off exported items**, keeps a
+person's answers and files in while taking their account address off them in
+the [export](#export). It is stored and backed up the same way, from 0.9.11.
+
 A "?" by the switch, and a robot by the session's title while the Session Agent
 is on, say what it may read and link here through the README.
 
@@ -168,17 +172,141 @@ answers and files**, with the same "?". A change made there is saved at once
 when signed in; made before signing in, it is saved once the person has, ahead
 of their answers, and if it can't be saved nothing is submitted.
 
+## Export
+
+A full admin can download what the Session Agent may give a member as one file,
+`<slug>.session-agent.json`, from **Session Agent export** on the session's
+Admin page. It is for running the same agent somewhere else, such as a service
+that reads the file from a private repository. Results admins can't export.
+Admins-only context, which the agent gives only to admins, is never in it.
+
+The file is built from what the agent itself reads, so the two never disagree
+about what counts or who is left out. The same session state always gives the
+same bytes: keys are in one order, items are sorted by id, and nothing in the
+file says when it was made. Kept in git, an unchanged session gives an empty
+diff, and a changed one shows what changed.
+
+```json
+{
+  "format": "ce.session-agent-export",
+  "version": 1,
+  "session": {
+    "slug": "salon",
+    "title": "Salon planning",
+    "gate": {
+      "signIn": { "match": "any", "conditions": [] },
+      "read": { "match": "any", "conditions": [{ "kind": "worker_group", "groupIds": ["salon"] }] },
+      "groups": [{ "groupId": "salon", "members": ["0x…"] }]
+    }
+  },
+  "agent": {
+    "instructions": { "general": "…", "detailed": "…" },
+    "rules": ["…"],
+    "limits": { "questionChars": 500, "answerWords": 150, "contextChars": 8000, "resultsChars": 2000, "answersChars": 24000, "answerItemChars": 300 },
+    "audiences": [{ "who": { "match": "any", "conditions": [{ "kind": "worker_group", "groupIds": ["salon"] }] }, "answers": "detailed" }],
+    "minAnswers": 3
+  },
+  "items": [
+    { "id": "q-3f2a…", "kind": "question", "tier": "general", "question": "…", "text": "type: rating, 1 (Agree) to 5 (Disagree)" },
+    { "id": "c-a0b9…", "kind": "context", "tier": "detailed", "source": "file", "title": "…", "groups": ["salon"], "by": "0x…", "text": "…" },
+    { "id": "r-55e2…", "kind": "results", "tier": "general", "text": "…" },
+    { "id": "n-91c0…", "kind": "counts", "tier": "detailed", "question": "…", "text": "12 answered. Agree: 7, Disagree: 5" },
+    { "id": "w-7d14…", "kind": "written", "tier": "detailed", "question": "…", "by": "0x…", "text": "…" },
+    { "id": "w-c41e…", "kind": "written", "tier": "detailed", "question": "…", "text": "…", "count": 2 }
+  ],
+  "manifest": { "itemCount": 6, "itemsSha256": "…", "byKind": { "written": 2 }, "leftOut": { "optedOut": 0 } }
+}
+```
+
+JSON is also valid YAML, so a YAML loader reads the file as it is. A reader
+should ignore fields it doesn't know: later versions may add some.
+
+**Items.** Each item has an `id`, a `kind`, a `tier` and its `text`. `tier` is
+the lowest answer style allowed to hear it, `general` or `detailed`, as the
+agent itself reads:
+
+| Kind | Tier | What |
+|---|---|---|
+| `question` | general | Each question the session's own analysis reads: its words, and its type with its options or what its scale's ends mean |
+| `context` | general | The session's notes and links, and the files and links open to everyone the session admits |
+| `context` with `groups` | detailed | A file or link locked to groups: only for an asker in one of them |
+| `results` | general | The published results analysis, a line an item, when everyone the session admits may see Results |
+| `counts` | detailed | How many answered a question and how many chose each option |
+| `written` | detailed | What a member wrote, cut to 300 characters |
+
+An `id` is a hash of what the item says, its address included when it has one.
+
+**Addresses on items.** A `written` item, and a `context` item made from a file
+or link someone added, carries `by`: the account address of the person who
+wrote or added it. No item carries a name, and questions, counts, results and
+the session's own notes carry no address. Anyone signed in with an address can
+turn on **Leave my address off exported items** in the Session Agent's dialog:
+their answers and files are still exported, without `by`. Answers without an
+address that say the same words to the same question are one item with a
+`count`, so they can't be told apart. The live Session Agent never sees an
+address either way.
+
+**The gate.** `session.gate` applies to every item: `signIn` is the session's
+rule for signing in and `read` its rule for reading its questions, each as the
+Worker enforces it. Someone must pass both; a rule with no conditions keeps no
+one out, and admins pass every rule. A rule the file can't say appears as
+`{ "kind": "unknown" }`, and a reader should then refuse rather than guess.
+
+`gate.groups` lists the addresses in each group that the gate, an audience or
+an item names, so a reader can tell who may ask and which tier they get.
+Addresses appear nowhere else in the file but an item's `by`. People who opted
+out are still listed: opting out keeps a person's answers and files out, not
+their membership. A member without an address, such as one who joined through
+Telegram, can't be listed and is counted in the manifest. The export lists at
+most 500 members across at most 40 groups; a group it couldn't list in full
+has `"complete": false`, and a reader should not treat an address missing from
+such a group as a non-member.
+
+**Left out,** each counted in `manifest.leftOut`:
+
+| Count | What stayed out |
+|---|---|
+| `optedOut` | Answers and files of people who turned off **Use my answers and files** |
+| `belowMinAnswers` | Questions fewer members answered than the session's minimum: no counts and nothing they wrote |
+| `patternMatches` | Written answers holding an email address, an account address, an ENS name or a run of ten or more digits such as a phone number, dropped whole |
+| `adminsOnlyContext` | Admins-only context |
+| `otherRulesContext` | Context under any access rule other than the session's own or a group lock |
+| `contextNotRead` | Context past the export's reading limit (32 items, each cut to 6,000 characters), and session notes and links past theirs |
+| `unreadableContext` | Context items whose stored text is missing or can't be read at all |
+| `resultsNotForEveryone` | 1 when the published results stayed out because not everyone the session admits may see them |
+| `membersWithoutAddress` | Group members with no address |
+| `answersNotRead` | 1 when every question and answer stayed out because the session stores more question and answer versions than the agent can read at once (10,000) |
+
+Withheld and locked answers, hidden questions, the atlas and the risk matrix,
+secrets, keys and Worker addresses are never in the file. The pattern check
+finds addresses and numbers, not a name written out, so read what members wrote
+before sharing the file any further than the agent's own audience.
+
+**Someone who opts out later,** or takes their address off, is left out of the
+next export, or exported without it. The Worker can't reach copies already
+downloaded, and a git repository keeps its old commits: a service that reads
+the latest file stops using that person's answers once a new export replaces
+it, and the older copies hold them until the repository's history is rewritten.
+Keep exports in a private place.
+
+The route is `POST /admin/session-agent/export`, signed like the Worker's other
+admin actions. It returns `{ filename, content, manifest }`, with `content` the
+file's exact text. It answers `409` (`session_agent_off`) when the session has no
+Session Agent, and `503` (`session_agent_export_unavailable`) when the opt-outs
+and address choices, the context, the answers, the results or a group's members
+can't all be read, exporting nothing rather than a file with a part missing.
+
 ## Routes
 
 Each is a `POST` with JSON and the person's session sign-in, like the Worker's
 other signed-in routes.
 
 - `POST /session-agent/status` with `{}` returns
-  `{ on, answers, audience, optedOut }`. `on` is false when the session has no
+  `{ on, answers, audience, optedOut, unattributed }`. `on` is false when the session has no
   setting. `answers` is `general`, `detailed`, or `null` when the person lacks AI
   access or no audience admits them; `audience` is the admitting audience's
-  position, or `admin`. `optedOut` is false for someone signed in without an
-  address, who has no switch. It checks the sign-in's scopes, and each question
+  position, or `admin`. `optedOut` and `unattributed` are false for someone
+  signed in without an address, who has neither switch. It checks the sign-in's scopes, and each question
   checks them afresh. Like `ask`, it refuses with `410` once the session has
   ended and with `403` (`ai_disabled`) while AI is off for it.
 - `POST /session-agent/ask` with `{ question }` (at most 500 characters) returns
@@ -190,6 +318,9 @@ other signed-in routes.
   ("Some of the session's context wasn't read: …").
 - `POST /session-agent/opt-out` with `{ optedOut: true | false }` returns
   `{ optedOut }`.
+- `POST /session-agent/attribution` with `{ unattributed: true | false }`
+  returns `{ unattributed }`: whether the person's address is left off the
+  items of theirs in an [export](#export).
 
 A question goes through the session's AI provider and models as the
 `session-agent` task, which Settings can give its own reasoning effort, with at
