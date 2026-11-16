@@ -3,7 +3,11 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 import WorkerGroupAutoJoin from './WorkerGroupAutoJoin';
-import { AUTO_JOIN_STORAGE_KEY, readPendingAutoJoin } from '../../domains/worker/workerGroupAutoJoinIntent';
+import {
+  AUTO_JOIN_STORAGE_KEY,
+  readPendingAutoJoin,
+  savePendingAutoJoin,
+} from '../../domains/worker/workerGroupAutoJoinIntent';
 import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
 import { AUTO_JOIN_CLAIM_ATTRIBUTE, VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
 import { rememberWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
@@ -106,6 +110,24 @@ describe('WorkerGroupAutoJoin', () => {
     global.fetch = originalFetch;
   });
   const joins = () => fetchMock.mock.calls.filter(([url]) => String(url).includes('/groups/join'));
+
+  it('keeps the invite a link brought when the host saves it after this first read the tab', async () => {
+    const token = 'gp:river-stone-lamp-oak';
+    // As on a fresh tab whose first render was hidden: the host's layout effect saves the link's invite after this
+    // component read the tab and before its own effect reads the link, whose fragment is already gone.
+    const SaveLate = () => {
+      React.useLayoutEffect(() => savePendingAutoJoin({ ...readPendingAutoJoinFixture(), token }), []);
+      return null;
+    };
+    render(
+      <>
+        <WorkerGroupAutoJoin {...props} account="" loginComplete={false} />
+        <SaveLate />
+      </>,
+    );
+    await settle();
+    expect(readPendingAutoJoin()?.token).toBe(token);
+  });
 
   it('retains the link through sign-in, joins once immediately after login and cleans only its parameter', async () => {
     const changed = jest.fn();

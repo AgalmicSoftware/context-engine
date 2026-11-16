@@ -339,7 +339,10 @@ export default function WorkerGroupAutoJoin(props: Props) {
     );
     removeGroupInviteFromAddress();
     if (!incoming) return;
-    setIntent((previous) => {
+    setIntent((current) => {
+      // The host saves a link's invite in a layout effect that a hidden first render can delay past this
+      // component's first read of the tab, so compare with what the tab holds now, not with nothing.
+      const previous = current ?? readPendingAutoJoin();
       if (
         previous &&
         consumedKey.current !== autoJoinIntentKey(previous) &&
