@@ -30,9 +30,9 @@ const STYLE_HELP = {
 };
 
 const ADDRESS_HELP =
-  'On unless you turn it off. What you wrote and the files you added will be available to this session’s ' +
-  'organisers with your account address, and may be exported with it. Turn this off and exports leave your ' +
-  'address off them; your answers and files stay in. Copies already made keep it.';
+  'What you wrote and the files you added will be available to this session’s organisers with your account ' +
+  'address, and may be exported with it. Turn this off and exports leave your address off them; your answers ' +
+  'and files stay in. Copies already made keep it.';
 
 // It answers no one, but each person's switches still count for what an admin exports.
 const CLOSED = {

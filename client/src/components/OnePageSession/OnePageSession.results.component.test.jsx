@@ -1754,10 +1754,12 @@ describe('OnePageSession results routing', () => {
           'will be available to this session’s organisers with your account address, and may be exported',
         ),
       );
+      // The whole of it, as the owner settled it.
       expect(notice).toHaveAccessibleDescription(
-        expect.stringContaining('a summary without names or addresses may be published'),
+        'The Session Agent may draw on your answers and the files you add when it answers others, never naming you. ' +
+          'They will be available to this session’s organisers with your account address, and may be exported; ' +
+          'a summary without names or addresses may be published.',
       );
-      expect(notice).toHaveAccessibleDescription(expect.stringContaining('Two switches in the Session Agent turn off'));
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       expect(screen.getByTestId('ce-session-context-sources')).toBeInTheDocument();
       expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();

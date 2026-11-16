@@ -118,7 +118,9 @@ describe('SessionAgentModal', () => {
       expect.stringMatching(/README\.md#session-agent$/),
     );
     expect(dialog.getByTestId('ce-session-agent-notice-switch')).toHaveAccessibleDescription(
-      expect.stringContaining('keeps them out of exports made from then on'),
+      'The Session Agent may draw on the files you added, and Detailed answers on your answers too, never naming ' +
+        'you. Turning it off stops future use and keeps them out of exports made from then on; it can’t take back ' +
+        'answers already given.',
     );
 
     setOptOut.mockResolvedValueOnce(true);
@@ -158,9 +160,10 @@ describe('SessionAgentModal', () => {
     expect(include).toBeChecked();
     const help = dialog.getByRole('button', { name: 'About your address on your answers' });
     expect(help).toHaveAccessibleDescription(
-      /will be available to this session’s organisers with your account address, and may be exported with it/,
+      'What you wrote and the files you added will be available to this session’s organisers with your account ' +
+        'address, and may be exported with it. Turn this off and exports leave your address off them; your ' +
+        'answers and files stay in. Copies already made keep it.',
     );
-    expect(help).toHaveAccessibleDescription(/Turn this off and exports leave your address off them/);
 
     setUnattributed.mockResolvedValueOnce(true);
     fireEvent.click(include);

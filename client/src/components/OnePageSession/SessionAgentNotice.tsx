@@ -12,12 +12,11 @@ const NOTICES = {
   page:
     'The Session Agent may draw on your answers and the files you add when it answers others, never ' +
     'naming you. They will be available to this session’s organisers with your account address, and may be ' +
-    'exported; a summary without names or addresses may be published. Two switches in the Session Agent turn ' +
-    'off its use of them, and your address on them. Select it for how it works.',
+    'exported; a summary without names or addresses may be published.',
   switch:
-    'On unless you turn it off. The Session Agent may draw on the files you added, and Detailed answers on your ' +
-    'answers too, never naming you. Turning it off stops future use and keeps them out of exports made from ' +
-    'then on; it can’t take back answers already given. Select it for how it works.',
+    'The Session Agent may draw on the files you added, and Detailed answers on your answers too, never naming ' +
+    'you. Turning it off stops future use and keeps them out of exports made from then on; it can’t take back ' +
+    'answers already given.',
 };
 
 type Props = { id: string; where: keyof typeof NOTICES; className?: string };
