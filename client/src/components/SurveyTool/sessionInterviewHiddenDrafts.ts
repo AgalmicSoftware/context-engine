@@ -266,7 +266,7 @@ export function useInterviewHiddenDrafts({ questions, editedDrafts, savedRespons
     [submittable],
   );
 
-  // How many drafts this review hid, answered or not; none once research sharing is off.
-  const count = Object.keys(hidden).length;
+  // How many drafts are still hidden: answering one shows its guess, and unticking research sharing shows them all.
+  const count = Object.values(hidden).filter((state) => state.revealedAt === undefined).length;
   return { assign, isConcealed, reviewedValues, view, noteEdit, submittable, prepareSubmit, count };
 }

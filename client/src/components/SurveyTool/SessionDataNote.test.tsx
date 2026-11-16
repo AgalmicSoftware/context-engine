@@ -18,6 +18,14 @@ it('shows the note as text, with only https addresses as links that open in a ne
   expect(note.querySelector('b')).toBeNull();
 });
 
+it('keeps a bracket that belongs to the address in the link', () => {
+  render(<SessionDataNote note="See https://example.test/wiki/Foo_(bar), or (https://example.test/a)." />);
+  expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+    'https://example.test/wiki/Foo_(bar)',
+    'https://example.test/a',
+  ]);
+});
+
 it('shows nothing for an empty note', () => {
   const { container } = render(<SessionDataNote note="  " />);
   expect(container).toBeEmptyDOMElement();

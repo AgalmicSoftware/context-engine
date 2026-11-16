@@ -15,7 +15,7 @@ export const HIDDEN_DRAFTS_ABOUT =
 type Props = {
   draftCount: number;
   platform?: InterviewPrefillPacket['source']['platform'];
-  // Drafts this review hid until the person answers; 0 while research sharing is off.
+  // Drafts still hidden until the person answers; 0 once all are answered or research sharing is off.
   hiddenCount: number;
   // The session's note on where research data goes (interviewMode.dataNote); empty shows none.
   dataNote: string;

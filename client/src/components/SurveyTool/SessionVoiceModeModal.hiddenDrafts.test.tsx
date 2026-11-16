@@ -185,6 +185,19 @@ it('says how many drafts are hidden and why, with the session note on where the 
   expect(status).toHaveTextContent('Your AI drafted 6 answers');
 });
 
+it('counts only drafts still hidden, so answering them or unticking sharing clears the line', async () => {
+  renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const status = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS);
+  answerWith(hiddenStatement, 'Disagree');
+  await waitFor(() => expect(status).toHaveTextContent(`${hiddenIds.length - 1} `));
+  expect(status).toHaveTextContent(
+    `${hiddenIds.length - 1} ${hiddenIds.length - 1 === 1 ? 'is' : 'are'} hidden until you answer`,
+  );
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
+  await waitFor(() => expect(status).not.toHaveTextContent('hidden until you answer'));
+});
+
 it('names no study when the session has no note on where the data goes', async () => {
   renderReview();
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
