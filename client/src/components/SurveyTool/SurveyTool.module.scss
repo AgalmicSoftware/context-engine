@@ -4646,6 +4646,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 .sessionInterviewConsentGroupOpen {
   flex-basis: 100%;
   max-width: none;
+  // Wide enough that sharing for research, on the bar, leaves its middle free (see below).
+  grid-template-columns: minmax(0, 700px);
 }
 
 // Sharing for research sits at the end of the summary's row, open or closed, and drops
@@ -4657,8 +4659,9 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   margin: 6px 12px 0 0;
 }
 
-// The summary's text ends near 175px and the share control, with its “What’s kept” link, is about 306px wide.
-@container (max-width: 520px) {
+// The share control, with its “What’s kept” link, is about 306px wide; on the bar it must leave the
+// middle free, so a tap there opens the summary instead of ticking the box.
+@container (max-width: 640px) {
   .sessionInterviewConsentGroup > .sessionInterviewResearchShare {
     grid-area: 2 / 1;
     justify-self: start;
