@@ -2725,10 +2725,13 @@ Never return secrets in responses.
   not `all`, more `groupIds` in a `worker_group` condition, or more `groupIds`
   under a group read gate (`payloadAccessControl.gate: group_gate`). Every
   earlier entry must stay unchanged and in place, the rule must already have
-  one, and nothing else may change. Removing or swapping a group, a first rule
-  on an open session, `any` becoming `all`, a condition added to an `all` rule,
-  or a reorder still raise `authzEpoch`. Other fields, including permissions,
-  gates, groups, surfaces, visibility, encryption, origins and unknown settings,
+  one, and nothing else may change. Entries the Worker skips (not an object, or
+  no `kind`) do not count as a rule. The last two group lists apply only to
+  sessions without a capability profile, which refuses group gates. Removing
+  or swapping a group, a first rule on an open session, `any` becoming `all`, a
+  condition added to an `all` rule, or a reorder still raise `authzEpoch`.
+  Other fields, including permissions, gates, groups, surfaces, visibility,
+  encryption, origins and unknown settings,
   remain authority-sensitive. A mixed content/authority edit raises `authzEpoch`.
   Classification compares the normalized configuration that will be stored.
   Config revision and optimistic-write checks still cover every effective edit.

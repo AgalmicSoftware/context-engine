@@ -125,11 +125,13 @@ const onlyAddsInvites = (before, after) => {
 };
 
 // Adding an alternative to an access rule that admits anyone meeting any one
-// of them only widens it: a group to a group gate, a condition to an "any"
-// rule, or a group to a group condition. Every gate is checked afresh on each
-// request and a sign-in under the narrower rule passes the wider one, so a
-// widening needs no new sign-in. A first rule closes an open session, and any
-// removal, reorder or other edit may narrow, so those still sign people out.
+// of them only widens it: a condition to an "any" sign-in or read rule, a
+// group to a group read gate, or a group to a group read condition (the last
+// two only in sessions without a capability profile, which refuses both).
+// Every gate is checked afresh on each request and a sign-in under the
+// narrower rule passes the wider one, so a widening needs no new sign-in. A
+// first rule closes an open session, and any removal, reorder or other edit
+// may narrow, so those still sign people out.
 const GROUP_GATES = new Set(['group', 'group_gate', 'worker_group']);
 const keepsAll = (before, after) => Array.isArray(before) && before.length > 0 && Array.isArray(after) &&
   before.every(item => after.some(next => same(item, next)));
@@ -144,6 +146,9 @@ const widensRule = (before, after) => {
   const prior = before.conditions;
   const next = after.conditions;
   if (!Array.isArray(prior) || !prior.length || !Array.isArray(next) || next.length < prior.length) return false;
+  // The Worker skips entries that are not records or have no kind; a rule of
+  // only those is open, so a first real condition closes it.
+  if (!prior.every(condition => record(condition) && String(condition.kind ?? '').trim())) return false;
   const anyOf = String(after.match ?? '').trim().toLowerCase() !== 'all';
   return (anyOf || next.length === prior.length) && prior.every((condition, index) => widensCondition(condition, next[index]));
 };

@@ -365,6 +365,18 @@ test('adding a group to an any-of access rule keeps sign-ins; every narrowing st
   assert.equal(revokes(groupRules({ login: [] }), groupRules({ login: ['g1'] })), true);
   assert.equal(revokes(groupRules({ readGroups: [] }), groupRules({ readGroups: ['g1'] })), true);
   assert.equal(revokes(groupRules({ ruleGroups: [] }), groupRules({ ruleGroups: ['g1'] })), true);
+  // So is one after entries the Worker skips: such a rule is open.
+  const loginOf = (...conditions) => ({ workerAuthority: { version: 1, loginGate: { match: 'any', conditions } } });
+  const group = { kind: 'worker_group', groupId: 'g1' };
+  for (const skipped of [null, 'x', 7, [], true, { kind: ' ' }, {}]) {
+    assert.equal(revokes(loginOf(skipped), loginOf(skipped, group)), true, JSON.stringify(skipped));
+  }
+  assert.equal(revokes(loginOf(group), loginOf(group, { kind: 'worker_group', groupId: 'g2' })), false);
+  // "ALL" in any case is an all-of rule, where an added condition narrows.
+  for (const match of ['ALL', ' All ']) {
+    const rule = (...conditions) => ({ workerAuthority: { version: 1, loginGate: { match, conditions } } });
+    assert.equal(revokes(rule(group), rule(group, { kind: 'worker_role', role: 'admin' })), true, match);
+  }
   // A group read list counts only under a group gate.
   const sbt = (groupIds) => ({ storageProfile: { payloadAccessControl: { gate: 'sbt_gate', groupIds } } });
   assert.equal(revokes(sbt(['g1']), sbt(['g1', 'g2'])), true);
@@ -392,4 +404,31 @@ test('adding a group keeps the authorization epoch on save; removing one raises 
   });
   assert.equal(narrowed.ok, true, narrowed.error);
   assert.equal(narrowed.config.authzEpoch, 5);
+  // A first group after a skipped entry closes an open sign-in.
+  const open = applySessionConfigMutation({
+    existingConfig: { ...stored, workerAuthority: { ...stored.workerAuthority, loginGate: { match: 'any', conditions: [null] } } },
+    mutation: { kind: 'set-config', incomingConfig: { workerAuthority: { ...stored.workerAuthority, loginGate: {
+      match: 'any', conditions: [null, { kind: 'worker_group', groupId: 'g1' }] } } } },
+    slug: 'session-a',
+  });
+  assert.equal(open.ok, true, open.error);
+  assert.equal(open.config.authzEpoch, 5);
+});
+
+test('a session without a capability profile keeps sign-ins when its group read gate gains a group', () => {
+  const stored = { ...workerCanonicalConfig(), authzEpoch: 4 };
+  delete stored.sessionModeProfile;
+  stored.storageProfile = { ...stored.storageProfile, payloadAccessControl: { gate: 'group_gate', groupIds: ['g1'] } };
+  const save = groupIds => applySessionConfigMutation({
+    existingConfig: stored,
+    mutation: { kind: 'set-config', incomingConfig: { storageProfile: { ...stored.storageProfile, payloadAccessControl: { gate: 'group_gate', groupIds } } } },
+    slug: 'session-a',
+  });
+  const widened = save(['g1', 'g2']);
+  assert.equal(widened.ok, true, widened.error);
+  assert.deepEqual(widened.config.storageProfile.payloadAccessControl.groupIds, ['g1', 'g2']);
+  assert.equal(widened.config.authzEpoch, 4);
+  const swapped = save(['g2']);
+  assert.equal(swapped.ok, true, swapped.error);
+  assert.equal(swapped.config.authzEpoch, 5);
 });
