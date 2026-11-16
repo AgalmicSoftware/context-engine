@@ -30352,7 +30352,7 @@ var init_workerGroupUrl = __esm({
 });
 
 // shared/interviewSettings.mjs
-var GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_NEVER, GROUP_SUGGESTION_DATA_KINDS, DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, MAX_RECORDING_QUESTION_COUNT, RECORDING_QUESTION_TIMINGS, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
+var GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_NEVER, GROUP_SUGGESTION_DATA_KINDS, DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, MAX_RECORDING_QUESTION_COUNT, RECORDING_QUESTION_TIMINGS, MAX_DATA_NOTE_CHARS, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
 var init_interviewSettings = __esm({
   "shared/interviewSettings.mjs"() {
     GROUP_SUGGESTION_DATA = Object.freeze({
@@ -30383,12 +30383,14 @@ var init_interviewSettings = __esm({
       showFidelityResults: false,
       fidelityMinimumPeople: 5,
       recordingQuestionCount: 3,
-      recordingQuestionTiming: "end"
+      recordingQuestionTiming: "end",
+      dataNote: ""
     });
     MAX_HIDDEN_DRAFT_SHARE = 0.5;
     MAX_FIDELITY_MINIMUM_PEOPLE = 50;
     MAX_RECORDING_QUESTION_COUNT = 10;
     RECORDING_QUESTION_TIMINGS = ["chunk", "end"];
+    MAX_DATA_NOTE_CHARS = 300;
     normalizeInterviewSettings = (value = {}) => {
       const source = value && typeof value === "object" ? value : {};
       return {
@@ -30426,7 +30428,8 @@ var init_interviewSettings = __esm({
         fidelityMinimumPeople: Number.isInteger(source.fidelityMinimumPeople) ? Math.max(1, Math.min(MAX_FIDELITY_MINIMUM_PEOPLE, source.fidelityMinimumPeople)) : DEFAULT_INTERVIEW_SETTINGS.fidelityMinimumPeople,
         // The most questions a group recording drafts each time: once when the recording stops, or after every chunk.
         recordingQuestionCount: Number.isInteger(source.recordingQuestionCount) ? Math.max(1, Math.min(MAX_RECORDING_QUESTION_COUNT, source.recordingQuestionCount)) : DEFAULT_INTERVIEW_SETTINGS.recordingQuestionCount,
-        recordingQuestionTiming: source.recordingQuestionTiming === "chunk" ? "chunk" : "end"
+        recordingQuestionTiming: source.recordingQuestionTiming === "chunk" ? "chunk" : "end",
+        dataNote: typeof source.dataNote === "string" ? source.dataNote.trim().slice(0, MAX_DATA_NOTE_CHARS) : ""
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -30448,6 +30451,8 @@ var init_interviewSettings = __esm({
       if (value.recordingQuestionCount !== void 0 && (!Number.isInteger(value.recordingQuestionCount) || value.recordingQuestionCount < 1 || value.recordingQuestionCount > MAX_RECORDING_QUESTION_COUNT))
         return false;
       if (value.recordingQuestionTiming !== void 0 && !RECORDING_QUESTION_TIMINGS.includes(value.recordingQuestionTiming))
+        return false;
+      if (value.dataNote !== void 0 && (typeof value.dataNote !== "string" || value.dataNote.length > MAX_DATA_NOTE_CHARS))
         return false;
       return [
         "autoRegenerate",
