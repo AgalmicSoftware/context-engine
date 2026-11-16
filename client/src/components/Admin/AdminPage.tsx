@@ -55,6 +55,7 @@ import AdminWorkerCapabilities from './AdminWorkerCapabilities';
 import AdminSessionDiagnostics from './AdminSessionDiagnostics';
 import AdminSessionBackupPanel from './AdminSessionBackupPanel';
 import AdminSessionAgentExportPanel from './AdminSessionAgentExportPanel';
+import AdminSessionAgentChatsPanel from './AdminSessionAgentChatsPanel';
 import AdminDraftTextPanel from './AdminDraftTextPanel';
 import { resolveAdminCapabilityRoute, resolveAdminSessionRecoveryMessage } from './adminPageCapabilityRoutingHelpers';
 import { createLogger } from '../../utilities/logging';
@@ -2628,6 +2629,17 @@ const AdminPageRuntime = ({
           <AdminSessionAgentExportPanel
             sessionSlug={normalizeSlug(selectedSlug)}
             sessionConfig={selectedConfig}
+            canAdminWorker={canAdminWorker}
+            postSignedRequest={postSignedAdminRequest}
+          />
+        ) : null}
+        {selectedConfig && isWorkerCanonicalSession ? (
+          <AdminSessionAgentChatsPanel
+            key={JSON.stringify([baseWorkerUrl || selectedConfigWorkerUrl, selectedSlug, account])}
+            workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+            sessionSlug={normalizeSlug(selectedSlug)}
+            sessionConfig={selectedConfig}
+            account={account || ''}
             canAdminWorker={canAdminWorker}
             postSignedRequest={postSignedAdminRequest}
           />

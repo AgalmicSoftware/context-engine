@@ -72,6 +72,7 @@ describe('AdminSessionAgentExportPanel', () => {
     const help = screen.getByRole('button', { name: 'About the Session Agent export' });
     expect(help).toHaveAccessibleDescription(/^What the Session Agent may give a member, as one file/);
     expect(help).toHaveAccessibleDescription(/Admins-only context is not in it/);
+    expect(help).toHaveAccessibleDescription(/and any chats people chose to store/);
     expect(help).toHaveAccessibleDescription(
       /carries its writer’s account address, unless that person chose to leave it off; nothing carries a name/,
     );

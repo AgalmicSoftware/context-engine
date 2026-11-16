@@ -18,7 +18,7 @@ type Props = {
 };
 
 const HELP =
-  'What the Session Agent may give a member, as one file: the questions, the context, the published results, counts, and what members wrote, each marked for General or Detailed answers. Admins-only context is not in it. Each written answer and each added file carries its writer’s account address, unless that person chose to leave it off; nothing carries a name. It also lists the addresses in the groups the session’s rules and items name, people who opted out included: opting out keeps a person’s answers out, not their membership. It is a snapshot. A later export leaves out anyone who has opted out since, but copies already made keep their earlier answers and addresses, so keep them somewhere private.';
+  'What the Session Agent may give a member, as one file: the questions, the context, the published results, counts, what members wrote, and any chats people chose to store, each marked for General or Detailed answers. Admins-only context is not in it. Each written answer and each added file carries its writer’s account address, unless that person chose to leave it off; nothing carries a name. It also lists the addresses in the groups the session’s rules and items name, people who opted out included: opting out keeps a person’s answers out, not their membership. It is a snapshot. A later export leaves out anyone who has opted out since, but copies already made keep their earlier answers and addresses, so keep them somewhere private.';
 
 // What the Worker left out, in the order an admin would ask about it.
 const LEFT_OUT: Array<[string, (count: number) => string]> = [
