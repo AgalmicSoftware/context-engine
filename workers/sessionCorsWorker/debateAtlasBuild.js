@@ -255,7 +255,11 @@ export const buildDebateAtlas = (args = {}) => runResultsBuild({
           id: topic.id,
           label: topic.label,
           ...result,
-          questions: topic.questionIds.map((id) => ({ id, prompt: text(questionsById.get(id).prompt, 400), type: questionsById.get(id).type })),
+          // What the atlas shows of each question: its words, and the choices it offers.
+          questions: topic.questionIds.map((id) => {
+            const { prompt, type, options, voiceCredits } = questionsById.get(id);
+            return { id, prompt: text(prompt, 400), type, ...(options?.length ? { options } : {}), ...(voiceCredits ? { voiceCredits } : {}) };
+          }),
         };
       }).filter(Boolean);
       // A branch of one topic shares that topic's compass and keeps the plan's summary.

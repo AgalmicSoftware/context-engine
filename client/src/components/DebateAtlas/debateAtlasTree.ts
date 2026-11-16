@@ -204,10 +204,11 @@ export const buildDebateAtlasTree = (build: DebateAtlasBuild, { sessionSlug = ''
           name: topic.label,
           depth: 1,
           ...mappedNode(topicId, topic, sessionSlug),
-          questions: (topic.questions || []).map((question) => ({
-            id: question.id,
-            question: question.prompt,
-            questionType: question.type,
+          questions: (topic.questions || []).map(({ id, prompt, type, ...choices }) => ({
+            id,
+            question: prompt,
+            questionType: type,
+            ...choices,
           })),
         };
       }),
