@@ -963,7 +963,7 @@ export default function OnePageSessionStandardShell({
               )}
               <div>
                 {!showDemoAtlas && effectiveResultsViewMode === 'debateAtlas' && atlas.build && (
-                  <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
+                  <Suspense fallback={<LazyFallback label="Loading Atlas..." minHeight="30vh" />}>
                     <SessionDebateAtlasView
                       build={atlas.build}
                       builds={atlas.builds}
@@ -1018,7 +1018,7 @@ export default function OnePageSessionStandardShell({
                   </Suspense>
                 )}
                 {showDemoAtlas && effectiveResultsViewMode === 'debateAtlas' && (
-                  <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
+                  <Suspense fallback={<LazyFallback label="Loading Atlas..." minHeight="30vh" />}>
                     <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
                       <DebateMapAny
                         account={account}
@@ -1056,7 +1056,9 @@ export default function OnePageSessionStandardShell({
                 {/* Shown only to those who may build it: nothing stands in for a view before an admin builds it. */}
                 {!isDemoSlug &&
                   resultsBuilds.map(({ kind, mode, results, busy, label, busyLabel }) =>
-                    effectiveResultsViewMode === mode && !results.build && !results.loading ? (
+                    effectiveResultsViewMode === mode &&
+                    !results.build &&
+                    (busy || (results.loaded && !results.error)) ? (
                       <p key={kind} className={styles.resultsBuildEmpty} data-testid={`ce-session-${kind}-empty`}>
                         {busy ? (
                           busyLabel

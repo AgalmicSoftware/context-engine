@@ -3,7 +3,7 @@ import { resolveGeneratedResultsControllerState } from '../../domains/sessionRes
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import OnePageSession from './OnePageSession';
@@ -1341,6 +1341,7 @@ describe('OnePageSession results routing', () => {
       canBuild: false,
       building: false,
       loading: false,
+      loaded: true,
       activeSinceMs: null,
       error: '',
       startBuild: jest.fn(async () => true),
@@ -1413,8 +1414,27 @@ describe('OnePageSession results routing', () => {
       expect(mockDebateMap).not.toHaveBeenCalled();
     });
 
-    it('says the first atlas is building while it builds', async () => {
-      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, building: true });
+    it('says nothing of a build before the first read comes back, nor when it fails', async () => {
+      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, loaded: false });
+      renderSession('edge');
+      fireEvent.click(screen.getByRole('button', { name: 'Atlas' }));
+      expect(screen.queryByTestId('ce-session-debate-atlas-empty')).not.toBeInTheDocument();
+      cleanup();
+      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, error: 'Atlases are unavailable.' });
+      renderSession('edge');
+      fireEvent.click(screen.getByRole('button', { name: 'Atlas' }));
+      expect(screen.queryByTestId('ce-session-debate-atlas-empty')).not.toBeInTheDocument();
+    });
+
+    it('shows no build note beside the fixture atlas of a demo session', async () => {
+      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true });
+      renderSession('demo');
+      fireEvent.click(await screen.findByRole('button', { name: /^Atlas$/i }));
+      expect(screen.queryByTestId('ce-session-debate-atlas-empty')).not.toBeInTheDocument();
+    });
+
+    it('says the first atlas is building while it builds, even while it checks back', async () => {
+      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, building: true, loading: true });
       renderSession('edge');
       fireEvent.click(screen.getByRole('button', { name: 'Atlas' }));
       expect(await screen.findByTestId('ce-session-debate-atlas-empty')).toHaveTextContent(/^Building atlas…$/);
@@ -1527,6 +1547,7 @@ describe('OnePageSession results routing', () => {
       canBuild: false,
       building: false,
       loading: false,
+      loaded: true,
       activeSinceMs: null,
       error: '',
       startBuild: jest.fn(async () => true),
@@ -1597,6 +1618,16 @@ describe('OnePageSession results routing', () => {
       });
       expect(viewButtons()).toEqual(['🧾Report', '⚠️Risk Matrix']);
       await expectBuiltMatrix();
+    });
+
+    it('tells those who may build that the risk matrix is not built yet', async () => {
+      mockRiskMatrixState = riskState({ builds: [], build: null, canBuild: true });
+      renderSession('edge');
+      fireEvent.click(screen.getByRole('button', { name: 'Risk Matrix', exact: true }));
+      expect(await screen.findByTestId('ce-session-risk-matrix-empty')).toHaveTextContent(
+        'Not built yet. Press Build risk matrix above to build it from the responses so far.',
+      );
+      expect(mockRiskMatrix).not.toHaveBeenCalled();
     });
 
     it('offers Build risk matrix beside Build atlas and opens Risk Matrix when it finishes', async () => {
