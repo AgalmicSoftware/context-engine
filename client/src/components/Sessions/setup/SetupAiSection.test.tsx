@@ -44,6 +44,7 @@ describe('SetupAiSection', () => {
   describe('Session Agent on Cloudflare', () => {
     const agent = { audiences: [] };
     const cloudflare = { provider: 'workers-ai', model: '@cf/zai-org/glm-5.3' };
+    const ai = draft.ai as { models: Record<string, unknown> };
     const renderAgent = (extra: SetupDraft) => {
       const onChange = jest.fn();
       render(
@@ -69,18 +70,18 @@ describe('SetupAiSection', () => {
       expect(box).not.toBeChecked();
       expect(box).toHaveAccessibleDescription(/Everything else, including voice, transcription and drafting/);
       fireEvent.click(box);
-      expect(onChange).toHaveBeenCalledWith(['ai', 'models'], { ...draft.ai.models, 'session-agent': cloudflare });
+      expect(onChange).toHaveBeenCalledWith(['ai', 'models'], { ...ai.models, 'session-agent': cloudflare });
     });
 
     it('unticking hands the Session Agent back to the session’s provider', () => {
       const onChange = renderAgent({
         sessionAgent: agent,
-        ai: { ...draft.ai, models: { ...draft.ai.models, 'session-agent': cloudflare } },
+        ai: { ...ai, models: { ...ai.models, 'session-agent': cloudflare } },
       });
       const box = screen.getByTestId('ce-ai-session-agent-cloudflare');
       expect(box).toBeChecked();
       fireEvent.click(box);
-      expect(onChange).toHaveBeenCalledWith(['ai', 'models'], draft.ai.models);
+      expect(onChange).toHaveBeenCalledWith(['ai', 'models'], ai.models);
     });
   });
 });

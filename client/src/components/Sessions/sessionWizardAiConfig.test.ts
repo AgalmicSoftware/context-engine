@@ -127,13 +127,17 @@ const cloudflare = { provider: 'workers-ai', model: '@cf/zai-org/glm-5.3' };
 
 describe('normalizeAiModels and the Session Agent on Cloudflare', () => {
   it('keeps the Session Agent’s Cloudflare model through a save', () => {
-    const models = normalizeAiModels({ 'session-agent': cloudflare }, 'openai');
+    const models = normalizeAiModels({ 'session-agent': cloudflare }, 'openai', null);
     expect(models['session-agent']).toEqual(cloudflare);
     expect(sessionAgentOnCloudflare({ models })).toBe(true);
   });
 
   it('puts an unlisted Cloudflare model back on the listed one', () => {
-    const models = normalizeAiModels({ 'session-agent': { provider: 'workers-ai', model: '@cf/other' } }, 'openai');
+    const models = normalizeAiModels(
+      { 'session-agent': { provider: 'workers-ai', model: '@cf/other' } },
+      'openai',
+      null,
+    );
     expect(models['session-agent']).toEqual(cloudflare);
   });
 
@@ -141,6 +145,7 @@ describe('normalizeAiModels and the Session Agent on Cloudflare', () => {
     const models = normalizeAiModels(
       { 'session-agent': { provider: 'openai', model: 'gpt-5' }, summarize: cloudflare },
       'openai',
+      null,
     );
     expect(Object.keys(models).sort()).toEqual(['fast', 'thinking', 'transcription']);
     expect(sessionAgentOnCloudflare({ models })).toBe(false);
