@@ -419,6 +419,7 @@ export const proxyWorkersAi = async ({ payload, config, env, baseHeaders, deps }
   const inputs = {
     messages: Array.isArray(messages) ? messages : [{ role: 'user', content: String(prompt || '') }],
     [listed.tokenField]: maxTokens,
+    ...(listed.reasoningEffort ? { reasoning_effort: listed.reasoningEffort } : {}),
   };
   let data;
   try {

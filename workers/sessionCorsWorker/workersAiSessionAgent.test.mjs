@@ -45,10 +45,13 @@ test('only the Session Agent may use it, and every call sets the Session Agentâ€
   assert.equal(ai.calls.length, 0);
   assert.deepEqual(await proxy({ env: { AI: ai }, payload: { ...ASK, max_tokens: 99_999, apiKey: 'synthetic-byo-key' } }),
     { status: 200, body: { completion: 'Synthetic open-model answer' } });
-  assert.deepEqual(ai.calls[0], { model: GLM, inputs: { messages: ASK.messages, max_completion_tokens: 3000 } });
-  // No limit asked: the ceiling is still sent, never the model's own default.
-  await proxy({ env: { AI: ai }, payload: ASK });
-  assert.equal(ai.calls[1].inputs.max_completion_tokens, 3000);
+  // GLM 5.3 thinks at `max` unless told, so every call asks for `low`.
+  assert.deepEqual(ai.calls[0], { model: GLM, inputs: { messages: ASK.messages, max_completion_tokens: 3000, reasoning_effort: 'low' } });
+  // No limit asked: the ceiling is still sent, never the model's own default;
+  // and a session set to think harder doesn't change it.
+  const harder = { ...AGENT_ON_CLOUDFLARE, reasoningEffort: 'high' };
+  await proxyWorkersAi({ env: { AI: ai }, config: { ai: harder }, baseHeaders: {}, payload: { ...ASK, reasoning_effort: 'medium' } });
+  assert.deepEqual([ai.calls[1].inputs.max_completion_tokens, ai.calls[1].inputs.reasoning_effort], [3000, 'low']);
 });
 
 test('a model the session didnâ€™t set, or one off the list, is refused', async (t) => {
