@@ -108,6 +108,11 @@ export const workerGroupJoinStatement = ({ sessionId, groupId, address }) =>
 const READ_STATEMENT = 'ContextEngine.WorkerGroup.Read:1';
 // The header that carries a read invite: `<groupId>:<signature>`. Group ids never contain ':'.
 export const WORKER_GROUP_READ_INVITE_HEADER = 'X-CE-Group-Invite';
+// Why a private session refused a request: it carried no invite and isn't a member's, or its invite doesn't hold
+// (wrong or changed password, a group the rule no longer names, a deleted group, or unreadable).
+export const PRIVATE_SESSION_INVITE_REQUIRED = 'private_session_invite_required';
+export const PRIVATE_SESSION_INVITE_INVALID = 'private_session_invite_invalid';
+export const PRIVATE_SESSION_UNAVAILABLE = 'private_session_unavailable';
 const READ_PROOF = /^0x[0-9a-f]{130}$/i;
 
 /**

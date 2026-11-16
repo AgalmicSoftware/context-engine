@@ -4,7 +4,12 @@
 // in or not. Every check reads the rule and the groups afresh, so a narrowing
 // takes effect on the next request. Sessions whose rule names no group are
 // unaffected.
-import { WORKER_GROUP_READ_INVITE_HEADER } from '../../shared/workerGroupJoin.mjs';
+import {
+  PRIVATE_SESSION_INVITE_INVALID,
+  PRIVATE_SESSION_INVITE_REQUIRED,
+  PRIVATE_SESSION_UNAVAILABLE,
+  WORKER_GROUP_READ_INVITE_HEADER,
+} from '../../shared/workerGroupJoin.mjs';
 import { WORKER_SUPPORT_FIELDS } from '../../shared/workerSessionPublicConfig.mjs';
 import {
   STORAGE_GROUP_READ_INVITE,
@@ -30,9 +35,7 @@ export const isPrivateSession = (config) =>
 
 export const readGroupReadInviteHeader = (request) => request?.headers?.get?.(WORKER_GROUP_READ_INVITE_HEADER) || '';
 
-export const PRIVATE_SESSION_INVITE_REQUIRED = 'private_session_invite_required';
-export const PRIVATE_SESSION_INVITE_INVALID = 'private_session_invite_invalid';
-export const PRIVATE_SESSION_UNAVAILABLE = 'private_session_unavailable';
+export { PRIVATE_SESSION_INVITE_INVALID, PRIVATE_SESSION_INVITE_REQUIRED, PRIVATE_SESSION_UNAVAILABLE };
 
 /**
  * Whether a request may see one part of a session: `{ ok: true }` for a session that isn't private or a request its

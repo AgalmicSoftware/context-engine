@@ -30,6 +30,11 @@ import {
 import { checkWorkerGroupReadInvite, isWorkerGroupMember } from './workerGroups.js';
 import { readWorkerGroupReadInvite } from './workerGroupInvites.js';
 import {
+  PRIVATE_SESSION_INVITE_INVALID,
+  PRIVATE_SESSION_INVITE_REQUIRED,
+  WORKER_GROUP_READ_INVITE_HEADER,
+} from '../../shared/workerGroupJoin.mjs';
+import {
   MAX_STORAGE_METADATA_BYTES,
   STORAGE_METADATA_TAG_LIMITS,
   rejectBytesOverLimit,
@@ -1129,13 +1134,17 @@ const authorizeCloudflareStorageGate = async ({
         conditionMatched: conditionResult.conditionMatched,
       };
     }
+    // A rule naming Worker groups says whether an invite was missing or didn't hold.
+    const namesGroup = payloadConditions.document.conditions.some((condition) => condition.kind === 'worker_group');
+    const reason = !namesGroup || conditionResult.outcome === 'unavailable' ? conditionResult.reason
+      : deps?.[STORAGE_GROUP_READ_INVITE] ? PRIVATE_SESSION_INVITE_INVALID : PRIVATE_SESSION_INVITE_REQUIRED;
     return {
       ok: false,
       // An SBT rule the chain can't answer, as opposed to a membership outage.
       ...(conditionResult.outcome === 'unavailable' && conditionResult.condition?.kind === 'sbt_onchain' ? { chainUnavailable: true } : {}),
       response: responseJson(deps, {
         error: 'Access denied: Cloudflare storage conditions failed.',
-        reason: conditionResult.reason,
+        reason,
         ...(conditionResult.outcome === 'unavailable' ? { retryable: true } : {}),
       }, conditionResult.status || 403, baseHeaders),
     };
@@ -3052,6 +3061,10 @@ export const storageRoute = async ({
   path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, checkFetchAccess, deps,
   answersChecked = false,
 } = {}) => {
+  // A read invite opens reads only: never an upload, a context addition or a field key.
+  if (['/storage/read', '/storage/read-batch', '/storage/list'].includes(path)) {
+    deps = { ...(deps || {}), [STORAGE_GROUP_READ_INVITE]: request?.headers?.get?.(WORKER_GROUP_READ_INVITE_HEADER) || '' };
+  }
   if (method === 'POST' && ['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path)) {
     // Field keys use the same lazy private-RPC setup and chain attestation as
     // payload reads; bypassing it denies members of secret-only SBT gates.

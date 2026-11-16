@@ -4310,7 +4310,8 @@ test('storageRoute worker_envelope evaluates any/all and supported condition kin
 		requesterAddress: '0x0000000000000000000000000000000000000eee',
 	});
 	assert.equal(groupDeniedResponse.status, 403);
-	assert.equal((await readJson(groupDeniedResponse)).reason, 'worker_group_membership_denied');
+	// A rule naming groups tells a non-member they need an invite.
+	assert.equal((await readJson(groupDeniedResponse)).reason, 'private_session_invite_required');
 
 	await deleteWorkerGroup({
 		env,
@@ -4321,12 +4322,80 @@ test('storageRoute worker_envelope evaluates any/all and supported condition kin
 	});
 	const deletedGroupResponse = await read();
 	assert.equal(deletedGroupResponse.status, 403);
-	assert.equal((await readJson(deletedGroupResponse)).reason, 'worker_group_not_found');
+	// A deleted group's former members are refused the same way.
+	assert.equal((await readJson(deletedGroupResponse)).reason, 'private_session_invite_required');
 
 	await setConditions({ match: 'all', conditions: [{ kind: 'future_kind' }] });
 	const unknownResponse = await read();
 	assert.equal(unknownResponse.status, 403);
 	assert.equal((await readJson(unknownResponse)).reason, 'unknown_condition_kind');
+});
+
+test('a read invite opens a group rule to a signed-out reader, and nothing it was not sent with', async () => {
+	const { Wallet } = await import('ethers');
+	const { formatWorkerGroupReadInvite, workerGroupReadStatement } = await import('../../shared/workerGroupJoin.mjs');
+	const kv = createMockKv();
+	const env = { CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek' };
+	let config = createEnvelopeConfig({ config: { sessionId: WORKER_GROUP_SESSION_ID } });
+	const { body } = await uploadEnvelopePayload({ env, config, setConfig: (next) => { config = next; } });
+	const metadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', body.storageRef.id);
+	const rule = { match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupIds: ['salon'] }] };
+	metadata.accessConditions = rule;
+	metadata.envelope.accessConditions = rule;
+	await writeStorageIndexMetadata(kv, 'session-a', 'docsContext', metadata);
+	const key = new Wallet(`0x${'11'.repeat(32)}`);
+	const invite = async (signer = key, groupId = 'salon') => formatWorkerGroupReadInvite({
+		groupId, proof: await signer.signMessage(workerGroupReadStatement({ sessionId: WORKER_GROUP_SESSION_ID, groupId })),
+	});
+	const checked = [];
+	const read = async (header, path = '/storage/read') => {
+		const response = await storageRoute({
+			path,
+			method: 'GET',
+			request: new Request(`https://worker.example${path}?id=${body.storageRef.id}&resource=docsContext`, header ? { headers: { 'X-CE-Group-Invite': header } } : {}),
+			env, config, slug: 'session-a', uploaderAddress: '', authScopes: {}, baseHeaders: {},
+			deps: {
+				json,
+				now: () => Date.parse('2026-01-02T03:04:06.000Z'),
+				randomUUID: () => 'audit-1',
+				isWorkerGroupMember: async () => ({ ok: false, status: 400, reason: 'missing_principal' }),
+				checkWorkerGroupReadInvite: async ({ groupId, signer }) => {
+					checked.push(groupId);
+					return signer === key.address.toLowerCase() ? { ok: true } : { ok: false, status: 403 };
+				},
+			},
+		});
+		return { status: response.status, body: response.status === 200 ? await response.text() : await readJson(response) };
+	};
+	assert.deepEqual(await read(await invite()), { status: 200, body: 'classified payload' });
+	assert.equal((await read()).body.reason, 'private_session_invite_required');
+	assert.equal((await read(await invite(new Wallet(`0x${'22'.repeat(32)}`)))).body.reason, 'private_session_invite_invalid');
+	assert.equal((await read(await invite(key, 'other'))).body.reason, 'private_session_invite_invalid');
+	assert.equal((await read('salon:0x12')).body.reason, 'private_session_invite_invalid');
+	// Only the group the invite names is checked, once per request.
+	assert.deepEqual(checked, ['salon', 'salon']);
+	// An upload never sees the invite: a session whose own rule names the group still refuses a non-member.
+	const groupSession = createEnvelopeConfig({ payloadAccessControl: { accessConditions: rule }, config: { sessionId: WORKER_GROUP_SESSION_ID } });
+	const upload = await storageRoute({
+		path: '/storage/upload',
+		method: 'POST',
+		request: new Request('https://worker.example/storage/upload', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', 'X-CE-Group-Invite': await invite() },
+			body: JSON.stringify({ data: 'from a reader', contentType: 'text/plain', resource: 'docsContext' }),
+		}),
+		env, config: groupSession, slug: 'session-a', uploaderAddress: '0x0000000000000000000000000000000000000eee', authScopes: { storage: true },
+		baseHeaders: {},
+		deps: {
+			json,
+			randomBytes: createSequenceRandomBytes(),
+			now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+			isWorkerGroupMember: async () => ({ ok: false, status: 403, reason: 'worker_group_membership_denied' }),
+			checkWorkerGroupReadInvite: async () => ({ ok: true }),
+		},
+	});
+	assert.equal(upload.status, 403);
+	assert.equal((await readJson(upload)).reason, 'private_session_invite_required');
 });
 
 test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope metadata only', async () => {
