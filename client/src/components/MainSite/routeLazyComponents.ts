@@ -12,6 +12,7 @@ export const AdminPage = React.lazy(() => import('../Admin/AdminPage'));
 export const SponsorPage = React.lazy(() => import('../Sponsor/SponsorPage'));
 export const SessionWizard = React.lazy(() => import('../Sessions/SessionWizard'));
 export const OnePageSession = React.lazy(() => import('../OnePageSession/OnePageSession'));
+export const PrivateSessionGate = React.lazy(() => import('../OnePageSession/PrivateSessionGate'));
 export const BenchmarksPage = React.lazy(() => import('../Benchmarks/BenchmarksPage'));
 export const SessionDocumentsPage = React.lazy(() => import('../DocumentLibrary/SessionDocumentsPage'));
 export const SessionSettingsPage = React.lazy(() => import('../Sessions/settings/SessionSettingsPage'));

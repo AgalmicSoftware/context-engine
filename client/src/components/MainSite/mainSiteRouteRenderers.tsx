@@ -84,6 +84,7 @@ import {
   CompareAddresses as CompareAddressesRaw,
   DocsPage as DocsPageRaw,
   OnePageSession as OnePageSessionRaw,
+  PrivateSessionGate as PrivateSessionGateRaw,
   SBTPage as SBTPageRaw,
   SBTsPage as SBTsPageRaw,
   SessionDocumentsPage as SessionDocumentsPageRaw,
@@ -145,6 +146,7 @@ const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
 const SBTPage = asMainSiteRouteComponent(SBTPageRaw);
 const SBTsPage = asMainSiteRouteComponent(SBTsPageRaw);
 const SessionDocumentsPage = asMainSiteRouteComponent(SessionDocumentsPageRaw);
+const PrivateSessionGate = asMainSiteRouteComponent(PrivateSessionGateRaw);
 const SessionSettingsPage = asMainSiteRouteComponent(SessionSettingsPageRaw);
 const SessionWizard = asMainSiteRouteComponent(SessionWizardRaw);
 const SimulatedUserPage = asMainSiteRouteComponent(SimulatedUserPageRaw);
@@ -1154,6 +1156,24 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     );
     if (slug && sessionConfigSlug !== slug && !sessionConfigHasRegistryIdentity) {
       host.resolveSessionPathSlug(slug);
+    }
+
+    // A private session's Worker sends a shell to a visitor it can't admit: every page of the session shows only
+    // the way in, so nothing loads, or saves, from a config without the session in it.
+    if (effectiveSessionConfig.privateAccess === true) {
+      return (
+        <InitialRouteBoundary fallback={<LazyFallback label="Loading Session..." />} resetKey={fullPath}>
+          <div data-testid={E2E_TESTIDS.PAGE_SESSION_ROOT}>
+            <PrivateSessionGate
+              sessionSlug={normalizeSessionSlug(effectiveSessionConfig.slug || slug)}
+              sessionId={resolveWorkerCanonicalSessionIdHex(effectiveSessionConfig)}
+              workerUrl={workerOrigin || effectiveSessionConfig.corsWorkerUrl || ''}
+              account={host.props.account}
+              toggleLoginModal={(loginModalIsOpen?: boolean) => host.props.toggleLoginModal(loginModalIsOpen)}
+            />
+          </div>
+        </InitialRouteBoundary>
+      );
     }
 
     if (isDocsRoute) {
