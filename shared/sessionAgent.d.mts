@@ -22,6 +22,8 @@ export type SessionAgentSetting = {
   instructions?: Partial<Record<SessionAgentStyle, string>>;
   /** Fewest members who must have answered a question for a non-admin to hear from it; 3 unless set, 1 is off. */
   minAnswers?: number;
+  /** True lets an asker have a chat stored; absent, nothing asked or answered is kept. */
+  history?: true;
 };
 
 export type SessionAgentError = { path: string; message: string };
@@ -46,6 +48,7 @@ export const SESSION_AGENT_LIMITS: Readonly<{
   instructionsChars: number;
   minAnswers: number;
   questionChars: number;
+  nameChars: number;
   answerWords: number;
   answerChars: number;
   contextChars: number;
@@ -70,6 +73,9 @@ export function sessionAgentSettingOf(value: unknown): SessionAgentSetting | nul
 
 /** How many members must have answered a question before someone who is not an admin hears from it. */
 export function sessionAgentMinAnswers(setting: SessionAgentSetting | null | undefined): number;
+
+/** Whether an asker may have an exchange stored in this session. */
+export function sessionAgentStoresChats(setting: SessionAgentSetting | null | undefined): boolean;
 
 /** The instructions a style is sent: the admin's, or the default. */
 export function sessionAgentInstructions(setting: SessionAgentSetting | null | undefined, style: SessionAgentStyle): string;

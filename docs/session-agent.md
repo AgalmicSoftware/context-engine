@@ -27,7 +27,8 @@ session's Settings:
     }
   ],
   "instructions": { "general": "…", "detailed": "…" },
-  "minAnswers": 1
+  "minAnswers": 1,
+  "history": true
 }
 ```
 
@@ -36,6 +37,8 @@ session's Settings:
   else. `/new` and Settings put a new audience first. If an audience before the
   match can't be checked just now, such as an SBT rule while the chain can't be
   reached, the question is refused rather than passed to a later audience.
+- **`history`** lets an asker have a chat stored: see
+  [Recorded chats](#recorded-chats). It is off unless set to `true`.
 - **Admins** always get Detailed answers, whatever the audiences say.
 - **AI access.** Everyone who asks, admins included, also needs the session's
   AI access (the `ai` scope), as on the `/ai` route.
@@ -246,6 +249,7 @@ agent itself reads:
 | `results` | general | The published results analysis, a line an item, when everyone the session admits may see Results |
 | `counts` | detailed | How many answered a question and how many chose each option |
 | `written` | detailed | What a member wrote, cut to 300 characters |
+| `asked` | the style it was answered in | A [recorded chat](#recorded-chats), while the session records them: `question`, the answer as `text`, its `day`, and the `name` its asker gave, if any |
 
 `question` on a `counts` or `written` item is the question's words in full, the
 same as on its own `question` item. Anyone the session admits can read the
@@ -257,7 +261,8 @@ item says, its address included when it has one.
 
 **Addresses on items.** A `written` item, and a `context` item made from a file
 or link someone added, carries `by`: the account address of the person who
-wrote or added it. No item carries a name, and questions, counts, results and
+wrote or added it. An `asked` item carries `by` only when its asker chose to
+store the chat with their address. No item carries a name, and questions, counts, results and
 the session's own notes carry no address. Anyone signed in with an address can
 turn off **Include my address with my answers** in the Session Agent's dialog:
 their answers and files are still exported, without `by`. Answers without an
@@ -337,13 +342,55 @@ members in a single request. A session with several hundred members in the
 groups its rules name may be more than one request can read, and then answers
 `503` each time.
 
+## Recorded chats
+
+Nothing asked or answered is kept unless an admin turns on **Record chats** in
+the Session Agent's settings (`history: true`). It is off by default, and
+turning it on or off signs no one out.
+
+While it is on, the dialog shows **Store this chat**, ticked to start, with a
+"?" saying what that means. A chat is stored only when its asker leaves the
+box ticked. Signed in with an address, they choose **No address**, which is
+selected to start, or **My address**; and anyone may add a **Name** of up to 60
+characters, kept as typed and not checked. Unticked, nothing is kept.
+
+What is stored for a chat: the day (no time of day), the answer style, the
+question, the answer, how much the answer drew on, and the address or name only
+if the asker gave them. A question holding an email address, an account
+address, an ENS name or a run of ten or more digits is answered but not kept,
+and the reply says so. If the chat can't be stored the answer still comes back,
+with a note.
+
+- **Who reads them.** The session's full admins, on the Admin page under
+  **Session Agent chats**, newest first. Results admins and agent keys can't.
+  Stored chats are never fed back into an answer.
+- **Deleting.** An admin deletes one chat or all of them there. Turning
+  **Record chats** off stops new ones and leaves the stored ones until an admin
+  clears them. An asker can't find and delete their own later.
+- **How many.** At most 5,000 a session; past that the oldest go first.
+- **Exports.** While the session records chats they are in the
+  [export](#export) as `asked` items. Someone who turned off **Include my
+  address with my answers** has their address left off their chats there too.
+- **Backups.** A session backup carries the chats stored when it began; one
+  stored while it runs waits for the next backup. A restore puts them back
+  under their own ids, and refuses if the target already holds different
+  chats.
+
+The Worker's routes: `GET /admin/session-agent/chats?slug=<slug>[&cursor=][&limit=]`
+with an admin's sign-in returns `{ entries, cursor?, stored }`, 100 a page at
+most; the signed admin action `session-agent/chats/delete` takes `{ ids }`
+(100 at most) or `{ through }`, an id up to and including which every chat is
+deleted, and returns `{ deleted, stored }`. A Worker that stores chats lists
+`session_agent_chats` among its features.
+
 ## Routes
 
 Each is a `POST` with JSON and the person's session sign-in, like the Worker's
 other signed-in routes.
 
 - `POST /session-agent/status` with `{}` returns
-  `{ on, answers, audience, optedOut, unattributed?, closed? }`. `on` is false
+  `{ on, answers, audience, optedOut, unattributed?, recording, closed? }`.
+  `recording` says whether the session lets an asker store a chat. `on` is false
   when the session has no setting. `answers` is `general`, `detailed`, or `null`
   when the person lacks AI access or no audience admits them; `audience` is the
   admitting audience's position, or `admin`. Someone signed in without an
@@ -354,7 +401,11 @@ other signed-in routes.
   person can still set their switches; `ask` then refuses with `410` or with
   `403` (`ai_disabled`).
 - `POST /session-agent/ask` with `{ question }` (at most 500 characters) returns
-  `{ answer, answers, audience, read, note? }`. `read` says how much the answer
+  `{ answer, answers, audience, read, note?, stored? }`. While the session
+  records chats it also takes `store` (true to keep this chat), `attribution`
+  (`address` or `anonymous`, the default) and `name` (60 characters at most),
+  and `stored` says whether the chat was kept; nothing is kept without
+  `store: true`. `read` says how much the answer
   drew on: `{ context, results, answers }`, as a count of context items, whether
   it read the results, and a count of members' answers. The answer is at most
   1,500 characters. `note` says what wasn't read: members' answers past the
@@ -388,7 +439,7 @@ never as a `401`, which the page would take for its own sign-in failing.
 While the setting is on, the session's Context has a **Session Agent** button for
 anyone signed in. The dialog says it's a preview and how the person will be
 answered, asks one question at a time, and shows only the latest answer, with
-what it drew on. It keeps no history, and errors say what went wrong.
+what it drew on. Errors say what went wrong. A chat is kept only as
+[Recorded chats](#recorded-chats) says.
 
-Not yet: keeping questions and answers, and letting participants decide an
-audience's `match`.
+Not yet: letting participants decide an audience's `match`.

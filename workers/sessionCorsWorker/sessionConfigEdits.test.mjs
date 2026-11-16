@@ -191,6 +191,30 @@ test('a Session Agent setting saves in its checked form, signs no one out, and n
   assert.equal(Object.hasOwn(off.config, 'sessionAgent'), false);
 });
 
+test('turning chat recording on or off later saves, and signs no one out', () => {
+  const everyone = { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] };
+  const sessionAgent = { audiences: [{ who: everyone, answers: 'general' }] };
+  const recording = { ...sessionAgent, history: true };
+  let stored = { ...workerCanonicalConfig(), sessionAgent, authzEpoch: 7 };
+  // On, then off again, on a session people are already signed in to.
+  for (const [next, kept] of [[recording, recording], [{ ...sessionAgent, history: false }, sessionAgent]]) {
+    const saved = applySessionConfigMutation({
+      existingConfig: stored, mutation: { kind: 'set-config', incomingConfig: { sessionAgent: next } }, slug: 'session-a',
+    });
+    assert.equal(saved.ok, true, JSON.stringify(saved));
+    assert.deepEqual(saved.config.sessionAgent, kept);
+    // The sign-in epoch is what a session token is checked against: unchanged, every token still works.
+    assert.equal(saved.config.authzEpoch, 7);
+    // And the Settings page says so before saving.
+    const edited = { ...stored, sessionAgent: next };
+    assert.equal(revokes(stored, edited), false);
+    assert.deepEqual(classify(stored, edited), { content: ['sessionAgent'], authority: [], signsParticipantsOut: false });
+    stored = saved.config;
+  }
+  const refused = setConfig({ sessionAgent: { ...sessionAgent, history: 'yes' } });
+  assert.deepEqual(refused, { ok: false, status: 400, error: 'Invalid Session Agent setting: Whether chats may be stored must be on or off.' });
+});
+
 test('lists each edited path as content or as a sign-out', () => {
   const before = {
     sessionName: 'A',

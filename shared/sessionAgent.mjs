@@ -8,7 +8,8 @@ import { buildSessionContextPrompt } from './sessionContextText.mjs';
 // sets how they are answered. Admins always get Detailed answers. `minAnswers`
 // is how many members must have answered a question before someone who is not
 // an admin hears anything from it. Off is no setting. The answer style decides what the Worker reads; instructions only
-// change how the agent writes.
+// change how the agent writes. `history: true` lets an asker have an exchange
+// stored; without it nothing asked or answered is kept.
 
 export const SESSION_AGENT_STYLES = Object.freeze(['general', 'detailed']);
 
@@ -21,6 +22,8 @@ export const SESSION_AGENT_LIMITS = Object.freeze({
   // someone who is not an admin: this unless an admin lowers it. 1 is off.
   minAnswers: 3,
   questionChars: 500,
+  // The name an asker may send with a question they have stored.
+  nameChars: 60,
   answerWords: 150,
   answerChars: 1500,
   // What one question may read, in characters of prompt.
@@ -174,7 +177,10 @@ export const validateSessionAgent = (value) => {
     fail(errors, 'sessionAgent', 'The Session Agent setting must list who may ask.');
     return { ok: false, errors };
   }
-  refuseUnknown(value, ['audiences', 'instructions', 'minAnswers'], errors, 'sessionAgent', 'The Session Agent setting');
+  refuseUnknown(value, ['audiences', 'instructions', 'minAnswers', 'history'], errors, 'sessionAgent', 'The Session Agent setting');
+  if (value.history !== undefined && typeof value.history !== 'boolean') {
+    fail(errors, 'sessionAgent.history', 'Whether chats may be stored must be on or off.');
+  }
   const audiences = [];
   if (!Array.isArray(value.audiences)) fail(errors, 'sessionAgent.audiences', 'Who may ask must be a list.');
   else if (value.audiences.length > L.audiences) {
@@ -187,7 +193,9 @@ export const validateSessionAgent = (value) => {
   const instructions = readInstructions(value.instructions, errors);
   const minAnswers = readMinAnswers(value.minAnswers, errors);
   if (errors.length) return { ok: false, errors };
-  return { ok: true, value: { audiences, ...(instructions ? { instructions } : {}), ...(minAnswers ? { minAnswers } : {}) }, errors };
+  // Off is stored as nothing, as the other defaults are.
+  const history = value.history === true ? { history: true } : {};
+  return { ok: true, value: { audiences, ...(instructions ? { instructions } : {}), ...(minAnswers ? { minAnswers } : {}), ...history }, errors };
 };
 
 /** For readers: the stored setting, or null when it is off or not valid. */
@@ -198,6 +206,9 @@ export const sessionAgentSettingOf = (value) => {
 
 /** How many members must have answered a question before someone who is not an admin hears from it. */
 export const sessionAgentMinAnswers = (setting) => setting?.minAnswers || L.minAnswers;
+
+/** Whether an asker may have an exchange stored in this session. */
+export const sessionAgentStoresChats = (setting) => setting?.history === true;
 
 /** The instructions a style is sent: the admin's, or the default. */
 export const sessionAgentInstructions = (setting, style) =>

@@ -486,10 +486,11 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       });
       }
 
-      if (['admin-results-analysis-status', 'admin-session-diagnostics', 'admin-feedback-list'].includes(routeSelection.kind)) {
+      if (['admin-results-analysis-status', 'admin-session-diagnostics', 'admin-feedback-list', 'admin-session-agent-chats'].includes(routeSelection.kind)) {
         return await dispatchAdminResultsAnalysisStatusRequest({
           diagnostics: routeSelection.kind === 'admin-session-diagnostics',
           feedback: routeSelection.kind === 'admin-feedback-list',
+          chats: routeSelection.kind === 'admin-session-agent-chats',
           request,
           env,
           baseHeaders: routeBaseHeaders,

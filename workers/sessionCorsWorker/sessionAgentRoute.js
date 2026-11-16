@@ -1,6 +1,7 @@
 import {
-  SESSION_AGENT_LIMITS, buildSessionAgentMessages, sessionAgentMinAnswers, sessionAgentSettingOf,
+  SESSION_AGENT_LIMITS, buildSessionAgentMessages, sessionAgentMinAnswers, sessionAgentSettingOf, sessionAgentStoresChats,
 } from '../../shared/sessionAgent.mjs';
+import { namesSomeone } from '../../shared/sessionAgentExport.mjs';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 import { proxyWorkersAi } from './aiProviderExecution.js';
@@ -27,7 +28,8 @@ import {
 // POST /session-agent/ask answers one question, and POST /session-agent/opt-out
 // turns the agent's use of their answers and files off or on. Each question
 // judges who may ask afresh and gathers what the person's answer style may
-// read; the page sends only the question.
+// read; the page sends the question and, where the session stores chats,
+// whether to store this one, with the asker's address or without, and a name.
 export const SESSION_AGENT_PATHS = Object.freeze([
   '/session-agent/status', '/session-agent/ask', '/session-agent/opt-out', '/session-agent/attribution',
 ]);
@@ -35,6 +37,10 @@ const OPT_OUTS_UNAVAILABLE = 'Who turned the Session Agent off couldn’t be rea
 
 const callOptOutStore = (env, slug, operation, payload = {}) =>
   callSessionConfigCoordinator({ env, slug, path: `session-agent/${operation}`, ...payload });
+
+/** The session's stored chats, in its coordinator: `add`, `list`, `all` and `delete`. */
+export const callSessionAgentHistoryStore = (env, slug, operation, payload = {}) =>
+  callSessionConfigCoordinator({ env, slug, path: `session-agent-history/${operation}`, ...payload });
 
 const trim = (value) => (typeof value === 'string' ? value.trim() : '');
 const lower = (value) => trim(value).toLowerCase();
@@ -224,6 +230,44 @@ const askAi = async ({ messages, config, secrets, address, scopes, env, headers,
   return answer ? { ok: true, answer } : { ok: false, status: 502, body: { error: 'The Session Agent gave no answer. Try again.' } };
 };
 
+// What the asker wants kept of this exchange: nothing unless the session
+// stores chats and they asked for it, and their address only if they chose it.
+const storeRequestOf = ({ body, setting, address }) => {
+  const { store, attribution, name } = body || {};
+  if (store !== undefined && typeof store !== 'boolean') return { error: 'Say whether to store this chat.' };
+  if (attribution !== undefined && !['address', 'anonymous'].includes(attribution)) {
+    return { error: 'A stored chat carries your address or no address.' };
+  }
+  if (name !== undefined && typeof name !== 'string') return { error: 'A name must be text.' };
+  if (trim(name).length > SESSION_AGENT_LIMITS.nameChars) {
+    return { error: `A name can be at most ${SESSION_AGENT_LIMITS.nameChars} characters.` };
+  }
+  if (!sessionAgentStoresChats(setting) || store !== true) return { keep: false };
+  return { keep: true, by: attribution === 'address' && canOptOut(address) ? lower(address) : '', name: trim(name) };
+};
+
+// Stores one exchange the asker asked to keep. A question that may name
+// someone is answered but not kept, and a failed write never fails the answer.
+const storeExchange = async ({ env, slug, request, question, reply, style, read, deps }) => {
+  if (namesSomeone(question)) return { stored: false, why: 'This chat wasn’t stored: the question holds an address, an email or a long number.' };
+  const entry = {
+    day: new Date(deps.now?.() ?? Date.now()).toISOString().slice(0, 10),
+    answers: style,
+    question,
+    answer: reply,
+    read,
+    ...(request.by ? { by: request.by } : {}),
+    ...(request.name ? { name: request.name } : {}),
+  };
+  try {
+    const saved = await (deps.callSessionAgentHistoryStore || callSessionAgentHistoryStore)(env, slug, 'add', { entry });
+    if (saved?.ok) return { stored: true };
+  } catch {
+    // Said below.
+  }
+  return { stored: false, why: 'This chat couldn’t be stored just now.' };
+};
+
 const accessFor = ({ env, config, slug, address, scopes, deps }) =>
   createRequesterAccessChecks({ env, config, slug, requesterAddress: address, authScopes: scopes, deps });
 
@@ -268,6 +312,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
       on: true, answers: asker.ok ? asker.answers : null, audience: asker.ok ? asker.audience : null, optedOut: own.body.optedOut === true,
       // Only someone signed in with an address has an address to leave off.
       ...(canOptOut(address) ? { unattributed: own.body.unattributed === true } : {}),
+      recording: sessionAgentStoresChats(setting),
       ...(closed ? { closed } : {}),
     });
   }
@@ -279,6 +324,8 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   if (question.length > SESSION_AGENT_LIMITS.questionChars) {
     return json({ error: `A question can be at most ${SESSION_AGENT_LIMITS.questionChars} characters.` }, 400);
   }
+  const storeRequest = storeRequestOf({ body, setting, address });
+  if (storeRequest.error) return json({ error: storeRequest.error }, 400);
   // The /ai route's checks: the current AI scope, which every asker needs,
   // then its rate limit, counted once nothing below can refuse the question.
   const preflight = await deps.evaluateAuthenticatedRoutePreflight({
@@ -313,6 +360,9 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   const { messages, read, contextOmitted } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
   const reply = await askAi({ messages, config, secrets: secretContext?.ok ? secretContext.secrets : {}, address, scopes: currentScopes, env, headers, deps });
   if (!reply.ok) return json(reply.body, reply.status);
+  const kept = storeRequest.keep
+    ? await storeExchange({ env, slug, request: storeRequest, question, reply: reply.answer, style: asker.answers, read, deps })
+    : null;
   const notes = [
     answersUnavailable === 'too_many'
       ? `Members’ answers weren’t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} question and answer versions, the most the Session Agent can read at once.`
@@ -320,12 +370,15 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
     contextLeftOut > 0 || contextOmitted > 0
       ? `Some of the session’s context wasn’t read: the Session Agent reads at most ${SESSION_AGENT_LIMITS.contextChars.toLocaleString('en-US')} characters or ${CONTEXT_READ_LIMITS.sources} items of it.`
       : '',
+    kept?.why || '',
   ].filter(Boolean);
   return json({
     answer: reply.answer,
     answers: asker.answers,
     audience: asker.audience,
     read,
+    // Said whenever the session stores chats, so an asker knows what became of this one.
+    ...(sessionAgentStoresChats(setting) ? { stored: kept?.stored === true } : {}),
     ...(notes.length ? { note: notes.join(' ') } : {}),
   });
 };

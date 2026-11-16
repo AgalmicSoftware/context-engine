@@ -185,6 +185,70 @@ test('a restore keeps everyone who turned the Session Agent off opted out, and e
   assert.deepEqual(await restoreOnto(await signBackupPage(older, source.env)), [[already], [already]]);
 });
 
+test('a backup carries the stored chats it began with, and a restore puts them back under their ids', async () => {
+  const chat = (question, extra = {}) => ({
+    day: '2026-11-24', answers: 'general', question, answer: 'Shorter meetings.', read: { context: 1, results: false, answers: 0 }, ...extra,
+  });
+  const store = (env, operation, payload = {}) => callSessionConfigCoordinator({ env, slug, path: `session-agent-history/${operation}`, ...payload });
+  const source = fixture();
+  // Enough stored answers that the backup takes more than one page.
+  for (let n = 0; n < 120; n += 1) {
+    const id = `cf_chat_${String(n).padStart(3, '0')}`;
+    const metadata = { id, resource: 'responses', responder: admin, storageLayer: 'kv', size: 6 };
+    source.kv.values.set(`ce-storage:${slug}:responses:${id}`, JSON.stringify(metadata));
+    source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('answer').toString('base64url') }));
+  }
+  await store(source.env, 'add', { entry: chat('First?') });
+  await store(source.env, 'add', { entry: chat('Second?', { by: `0x${'a'.repeat(40)}`, name: 'Sam' }) });
+  const first = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  assert.ok(first.nextCursor);
+  assert.deepEqual(first.coordinator.sessionAgentHistory.map((entry) => [entry.id, entry.question]),
+    [['000000000001', 'First?'], ['000000000002', 'Second?']]);
+  // Someone asks while the backup runs: it carries on, and that chat waits for the next backup.
+  await store(source.env, 'add', { entry: chat('Asked during the backup?') });
+  const pages = [first];
+  for (let cursor = first.nextCursor; cursor;) {
+    const page = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor });
+    assert.equal(page.reason, undefined, JSON.stringify(page).slice(0, 200));
+    pages.push(page);
+    cursor = page.nextCursor;
+  }
+  assert.equal(pages.at(-1).manifest.complete, true);
+  assert.ok(!JSON.stringify(pages).includes('Asked during the backup?'));
+  // A chat the backup holds being cleared while it runs does change it: that backup starts again.
+  const again = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  assert.equal((await store(source.env, 'delete', { ids: ['000000000001'] })).body.deleted, 1);
+  await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: again.nextCursor }),
+    (error) => error.status === 409 && error.reason === 'backup_session_changed');
+
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  let result;
+  for (const page of pages) result = await importPage(target.env, page);
+  assert.equal(result.body.complete, true, JSON.stringify(result).slice(0, 300));
+  assert.deepEqual((await store(target.env, 'all')).body.entries, first.coordinator.sessionAgentHistory);
+  // The next chat stored on the restored session follows the restored ones.
+  assert.equal((await store(target.env, 'add', { entry: chat('After the restore?') })).body.id, '000000000003');
+});
+
+test('a restore refuses chats that are not whole exchanges', async () => {
+  const source = fixture();
+  await callSessionConfigCoordinator({ env: source.env, slug, path: 'session-agent-history/add',
+    entry: { day: '2026-11-24', answers: 'general', question: 'First?', answer: 'An answer.', read: { context: 0, results: false, answers: 0 } } });
+  const [page] = await allPages(source.env);
+  const altered = structuredClone(page);
+  altered.coordinator.sessionAgentHistory[0].asker = `0x${'a'.repeat(40)}`;
+  const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+  altered.snapshotDigest = sha256(JSON.stringify(altered.coordinator));
+  altered.archiveId = sha256(`${altered.manifest.sessionId}:${altered.manifest.exportedAt}:${altered.snapshotDigest}`);
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  const refused = await importPage(target.env, await signBackupPage(altered, source.env));
+  assert.notEqual(refused.body.complete, true);
+  assert.match(JSON.stringify(refused.body), /Invalid backup Session Agent chats/);
+  assert.deepEqual((await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent-history/all' })).body.entries, []);
+});
+
 test('restore refuses missing or altered pages, foreign keys, and mismatched session ids', async () => {
   const source = fixture();
   const [original] = await allPages(source.env);

@@ -1,4 +1,4 @@
-import { sessionAgentMinAnswers, sessionAgentSettingOf } from '../../shared/sessionAgent.mjs';
+import { sessionAgentMinAnswers, sessionAgentSettingOf, sessionAgentStoresChats } from '../../shared/sessionAgent.mjs';
 import {
   buildSessionAgentExport, serializeSessionAgentExport, sessionAgentExportFilename,
 } from '../../shared/sessionAgentExport.mjs';
@@ -6,7 +6,7 @@ import { CONTEXT_ROLE, contextRoleOf, groupLockedIds, isAdminsOnlyAccess } from 
 import { CONTEXT_READ_LIMITS, forEveryone, loadParticipantContextSources } from './contextSourceLoader.js';
 import { PAYLOAD_ACCESS_GATES, PAYLOAD_ENCRYPTION_MODES } from './payloadAccessControl.js';
 import { evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact } from './resultsAnalysisGeneration.js';
-import { TOO_MANY_STORED, readMemberAnswers, resultsText } from './sessionAgentRoute.js';
+import { TOO_MANY_STORED, callSessionAgentHistoryStore, readMemberAnswers, resultsText } from './sessionAgentRoute.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { resolvePayloadAccessControl } from './storageRouteExecution.js';
@@ -225,6 +225,18 @@ export const exportSessionAgent = async ({ env, slug, config, address, deps = {}
   if (context.unavailable || context.failed) return unavailable('its context');
   if (answers === null) return unavailable('members’ answers');
   if (published === null) return unavailable('the results');
+  // The chats askers chose to store, while the session stores them.
+  let asked = [];
+  if (sessionAgentStoresChats(setting)) {
+    let chats = null;
+    try {
+      chats = await (deps.callSessionAgentHistoryStore || callSessionAgentHistoryStore)(env, slug, 'all');
+    } catch {
+      chats = null;
+    }
+    if (!chats?.ok || !Array.isArray(chats.body?.entries)) return unavailable('its stored chats');
+    asked = chats.body.entries;
+  }
   const tooMany = answers === TOO_MANY_STORED;
 
   const sessionId = resolveCanonicalWorkerSessionIdHex(config);
@@ -249,6 +261,7 @@ export const exportSessionAgent = async ({ env, slug, config, address, deps = {}
     results: published.text || '',
     resultsForEveryone: !published.hidden,
     answers: tooMany ? [] : answers.groups,
+    asked,
     unattributed: choices.body.unattributed,
     groups,
     leftOut: {

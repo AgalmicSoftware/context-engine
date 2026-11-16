@@ -17,6 +17,8 @@ export const FEATURES = Object.freeze([
   'recovery_key_export',
   'response_upload_receipts',
   'results_analysis_retry_v1',
+  // Chats with the Session Agent can be stored, read by admins and cleared.
+  'session_agent_chats',
   'session_backup_v1',
   'session_feedback',
   'storage_read_batch_v1',

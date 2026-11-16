@@ -8,6 +8,7 @@ import { ethers } from 'ethers';
 import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import { installSessionCoordinatorBinding } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 import { loadParticipantContextSources } from '../../workers/sessionCorsWorker/contextSourceLoader.js';
+import { callSessionConfigCoordinator } from '../../workers/sessionCorsWorker/sessionConfigAuthority.js';
 import { createParticipant } from '../../mcp/lib/participant.mjs';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 
@@ -1438,6 +1439,35 @@ test('context the Worker refuses is reported in terms of what the agent can do',
   }
 });
 
+test('a chat is stored through the real Worker only when its asker says so, with their address only if they chose it', async (t) => {
+  const config = sessionConfig();
+  config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
+  config.sessionAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' }], history: true };
+  const env = createEnv([config]);
+  await env.GROUP_KV.put(`session:${SLUG}:secrets`, JSON.stringify({ anthropicKey: ['synthetic', 'anthropic', 'key'].join('-') }));
+  const alice = await createAgent(env, 'alice.delve.town', []);
+  await alice.participant.joinSession({ link: LINK });
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Most agree.' }] }), {
+    headers: { 'Content-Type': 'application/json' },
+  }));
+  const client = createWorkerClient({
+    workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: ['https://contextengine.sh'], wallet: alice.wallet, fetchImpl: workerFetch(env),
+  });
+  const ask = (body) => client.request('/session-agent/ask', { method: 'POST', auth: true, body });
+  assert.equal((await client.request('/session-agent/status', { method: 'POST', auth: true, body: {} })).recording, true);
+  assert.equal((await ask({ question: 'Kept with my address?', store: true, attribution: 'address', name: 'Alice’s agent' })).stored, true);
+  assert.equal((await ask({ question: 'Kept with no address?', store: true })).stored, true);
+  assert.equal((await ask({ question: 'Not kept?' })).stored, false);
+  const { body } = await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/all' });
+  assert.deepEqual(body.entries.map(({ question, answer, answers, by, name }) => ({ question, answer, answers, by, name })), [
+    { question: 'Kept with my address?', answer: 'Most agree.', answers: 'general', by: alice.wallet.address.toLowerCase(), name: 'Alice’s agent' },
+    { question: 'Kept with no address?', answer: 'Most agree.', answers: 'general', by: undefined, name: undefined },
+  ]);
+  assert.match(body.entries[0].day, /^\d{4}-\d{2}-\d{2}$/);
+  // Nothing else about the asker is kept: no time of day, no network address, no session token.
+  assert.deepEqual(Object.keys(body.entries[1]).sort(), ['answer', 'answers', 'day', 'id', 'question', 'read']);
+});
+
 test('the Session Agent answers a member from stored answers through the real Worker, naming no one', async (t) => {
   const config = sessionConfig();
   config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
@@ -1472,7 +1502,7 @@ test('the Session Agent answers a member from stored answers through the real Wo
     workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: ['https://contextengine.sh'], wallet: alice.wallet, fetchImpl: workerFetch(env),
   });
   assert.deepEqual(await client.request('/session-agent/status', { method: 'POST', auth: true, body: {} }), {
-    on: true, answers: 'detailed', audience: 0, optedOut: false, unattributed: false,
+    on: true, answers: 'detailed', audience: 0, optedOut: false, unattributed: false, recording: false,
   });
   const reply = await client.request('/session-agent/ask', { method: 'POST', auth: true, body: { question: 'Do people want labels?' } });
   assert.deepEqual({ answer: reply.answer, answers: reply.answers, read: reply.read.answers }, {

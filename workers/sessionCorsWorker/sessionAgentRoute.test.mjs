@@ -6,6 +6,8 @@ import { resolveAuthenticatedRouteSecrets } from './authenticatedRouteSecretsRes
 import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretActionRouteDispatch.js';
 import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, harness, idOf, json } from './contextSourceTestFixture.mjs';
+import { dispatchSessionAgentHistoryStore, listSessionAgentHistory } from './sessionAgentHistory.js';
+import { createDurableStorage } from './workerGroupTestFixture.mjs';
 
 const MEMBER = `0x${'3'.repeat(40)}`;
 const encode = (text) => new TextEncoder().encode(text);
@@ -94,9 +96,9 @@ test('with no setting the Session Agent is off: status says so, and a question i
 test('the first audience that admits someone sets their answers, admins get Detailed, and the reply names the audience', async () => {
   const h = await seeded();
   const status = async (address) => (await ask(h, { path: '/session-agent/status', body: {}, address })).body;
-  assert.deepEqual(await status(MEMBER), { on: true, answers: 'detailed', audience: 0, optedOut: false, unattributed: false });
-  assert.deepEqual(await status(PARTICIPANT), { on: true, answers: 'general', audience: 1, optedOut: false, unattributed: false });
-  assert.deepEqual(await status(ADMIN), { on: true, answers: 'detailed', audience: 'admin', optedOut: false, unattributed: false });
+  assert.deepEqual(await status(MEMBER), { on: true, answers: 'detailed', audience: 0, optedOut: false, unattributed: false, recording: false });
+  assert.deepEqual(await status(PARTICIPANT), { on: true, answers: 'general', audience: 1, optedOut: false, unattributed: false, recording: false });
+  assert.deepEqual(await status(ADMIN), { on: true, answers: 'detailed', audience: 'admin', optedOut: false, unattributed: false, recording: false });
   // The path decides, whatever action the body names.
   const answered = await ask(h, { address: MEMBER });
   assert.equal(answered.status, 200);
@@ -113,7 +115,7 @@ test('every asker needs the session’s AI access, whichever audience would admi
   for (const address of [MEMBER, ADMIN]) {
     const withoutAi = { address, scopes: { storage: true } };
     assert.deepEqual((await ask(h, { ...withoutAi, path: '/session-agent/status', body: {} })).body, {
-      on: true, answers: null, audience: null, optedOut: false, unattributed: false,
+      on: true, answers: null, audience: null, optedOut: false, unattributed: false, recording: false,
     });
     const refused = await ask(h, withoutAi);
     assert.deepEqual([refused.status, refused.body.reason], [403, 'session_agent_not_admitted']);
@@ -123,7 +125,7 @@ test('every asker needs the session’s AI access, whichever audience would admi
 
 test('no audience admits someone in no listed group', async () => {
   const h = await seeded({ audiences: [{ who: salonMembers, answers: 'general' }] });
-  assert.deepEqual((await ask(h, { path: '/session-agent/status', body: {} })).body, { on: true, answers: null, audience: null, optedOut: false, unattributed: false });
+  assert.deepEqual((await ask(h, { path: '/session-agent/status', body: {} })).body, { on: true, answers: null, audience: null, optedOut: false, unattributed: false, recording: false });
   const outsider = await ask(h);
   assert.equal(outsider.status, 403);
   assert.deepEqual(outsider.calls.ai, []);
@@ -212,7 +214,7 @@ test('the session’s own gate comes first: someone it keeps out may not ask, wh
   assert.equal(outsider.body.reason, 'session_agent_not_admitted');
   assert.deepEqual(outsider.calls.ai, []);
   assert.deepEqual((await ask(h, { path: '/session-agent/status', body: {} })).body, {
-    on: true, answers: null, audience: null, optedOut: false, unattributed: false,
+    on: true, answers: null, audience: null, optedOut: false, unattributed: false, recording: false,
   });
   const member = await ask(h, { address: MEMBER });
   assert.equal(member.status, 200);
@@ -348,7 +350,7 @@ test('a question must be there and short, and an ended session or AI turned off 
   const off = await ask(h);
   assert.deepEqual([off.status, off.body.reason], [403, 'ai_disabled']);
   assert.deepEqual([(await status()).status, (await status()).body],
-    [200, { on: true, answers: null, audience: null, optedOut: false, unattributed: false, closed: 'ai_disabled' }]);
+    [200, { on: true, answers: null, audience: null, optedOut: false, unattributed: false, recording: false, closed: 'ai_disabled' }]);
   h.state.config.scopes = {};
   h.state.config.sessionEndsAt = '2020-01-01T00:00:00.000Z';
   const ended = await ask(h);
@@ -358,7 +360,7 @@ test('a question must be there and short, and an ended session or AI turned off 
   assert.deepEqual((await ask(h, { path: '/session-agent/opt-out', body: { optedOut: true } })).body, { optedOut: true });
   assert.deepEqual((await ask(h, { path: '/session-agent/attribution', body: { unattributed: true } })).body, { unattributed: true });
   assert.deepEqual([(await status()).status, (await status()).body],
-    [200, { on: true, answers: null, audience: null, optedOut: true, unattributed: true, closed: 'session_ended' }]);
+    [200, { on: true, answers: null, audience: null, optedOut: true, unattributed: true, recording: false, closed: 'session_ended' }]);
   // Who may ask is never worked out for a session that answers no one.
   const unreached = await ask(h, { path: '/session-agent/status', body: {}, deps: { isWorkerGroupMember: async () => { throw new Error('not asked'); } } });
   assert.equal(unreached.status, 200);
@@ -367,7 +369,7 @@ test('a question must be there and short, and an ended session or AI turned off 
 test('someone signed in without an address has no switch, and status still says how they’d be answered', async () => {
   const status = await ask(await seeded(), { path: '/session-agent/status', body: {}, address: 'agent:delve-town' });
   // No address, so neither switch: nothing of theirs could carry one.
-  assert.deepEqual(status.body, { on: true, answers: 'general', audience: 1, optedOut: false });
+  assert.deepEqual(status.body, { on: true, answers: 'general', audience: 1, optedOut: false, recording: false });
 });
 
 test('each person can turn off the Session Agent’s use of their answers and files, and turn it back on', async () => {
@@ -409,6 +411,100 @@ test('each person can leave their address off exported items, which changes noth
   assert.equal((await leaveOff('agent:delve-town', true)).status, 400);
   const down = async () => ({ ok: false, status: 503, body: {} });
   assert.equal((await ask(h, { path: '/session-agent/attribution', body: { unattributed: true }, deps: { callSessionAgentOptOutStore: down } })).status, 503);
+});
+
+// The session's own store of chats, as its coordinator keeps them.
+const chatStore = () => {
+  const { storage } = createDurableStorage();
+  const callSessionAgentHistoryStore = async (env, slug, operation, payload) => {
+    const response = await dispatchSessionAgentHistoryStore({ state: { storage } }, operation, payload);
+    return { ok: response.ok, status: response.status, body: await response.json() };
+  };
+  return { deps: { callSessionAgentHistoryStore, now: () => Date.parse('2026-11-24T23:30:00.000Z') }, kept: () => listSessionAgentHistory(storage) };
+};
+const recording = { ...twoAudiences, history: true };
+
+test('nothing asked is kept unless the session stores chats and the asker asked for it', async () => {
+  const off = chatStore();
+  const h = await seeded();
+  const unasked = await ask(h, { body: { question: 'What do people want?', store: true, attribution: 'address', name: 'Sam' }, deps: off.deps });
+  assert.equal(unasked.status, 200);
+  // A session that stores nothing says nothing about storing.
+  assert.equal('stored' in unasked.body, false);
+  assert.deepEqual(await off.kept(), []);
+  assert.equal((await ask(h, { path: '/session-agent/status', body: {} })).body.recording, false);
+
+  const on = chatStore();
+  const stores = await seeded(recording);
+  assert.equal((await ask(stores, { path: '/session-agent/status', body: {} })).body.recording, true);
+  for (const body of [{ question: 'What do people want?' }, { question: 'What do people want?', store: false, attribution: 'address', name: 'Sam' }]) {
+    const reply = await ask(stores, { body, deps: on.deps });
+    assert.deepEqual([reply.status, reply.body.stored, reply.body.note], [200, false, undefined]);
+  }
+  assert.deepEqual(await on.kept(), []);
+});
+
+test('a stored chat holds the exchange, and who asked only as far as they chose', async () => {
+  const { deps, kept } = chatStore();
+  const h = await seeded(recording);
+  const question = 'What do people want?';
+  const anonymous = await ask(h, { address: MEMBER, body: { question, store: true }, deps });
+  assert.deepEqual([anonymous.status, anonymous.body.stored], [200, true]);
+  const named = await ask(h, { address: MEMBER, body: { question, store: true, attribution: 'anonymous', name: '  Sam’s agent ' }, deps });
+  const withAddress = await ask(h, {
+    address: PARTICIPANT.toUpperCase().replace('0X', '0x'), body: { question, store: true, attribution: 'address' }, deps,
+  });
+  // Someone signed in without an address has none to store.
+  const agent = await ask(h, { address: 'agent:delve-town', body: { question, store: true, attribution: 'address' }, deps });
+  assert.deepEqual([named.body.stored, withAddress.body.stored, agent.body.stored], [true, true, true]);
+  const exchange = (answers, read, extra = {}) => ({ day: '2026-11-24', answers, question, answer: 'They want shorter meetings.', read, ...extra });
+  assert.deepEqual((await kept()).map(({ id, ...entry }) => entry), [
+    exchange('detailed', anonymous.body.read),
+    exchange('detailed', named.body.read, { name: 'Sam’s agent' }),
+    exchange('general', withAddress.body.read, { by: PARTICIPANT }),
+    exchange('general', agent.body.read),
+  ]);
+  // What the answer drew on is what the asker was told, and no asker rides along unasked.
+  assert.ok(anonymous.body.read.context > 0);
+  assert.ok(!JSON.stringify(await kept()).includes(MEMBER));
+});
+
+test('a question that may name someone is answered but not kept, and a failed write never fails the answer', async () => {
+  const { deps, kept } = chatStore();
+  const h = await seeded(recording);
+  const mail = ['dee', 'mail.example'].join('@');
+  for (const question of [`What did ${mail} say?`, `Is ${MEMBER} for it?`, 'Call 07700 900123?']) {
+    const reply = await ask(h, { body: { question, store: true }, deps });
+    assert.deepEqual([reply.status, reply.body.answer, reply.body.stored], [200, 'They want shorter meetings.', false], question);
+    assert.match(reply.body.note, /This chat wasn’t stored: the question holds an address, an email or a long number\./);
+  }
+  assert.deepEqual(await kept(), []);
+  for (const callSessionAgentHistoryStore of [
+    async () => { throw new Error('coordinator down'); },
+    async () => ({ ok: false, status: 503, body: {} }),
+  ]) {
+    const reply = await ask(h, { body: { question: 'What do people want?', store: true }, deps: { ...deps, callSessionAgentHistoryStore } });
+    assert.deepEqual([reply.status, reply.body.answer, reply.body.stored], [200, 'They want shorter meetings.', false]);
+    assert.match(reply.body.note, /This chat couldn’t be stored just now\./);
+  }
+});
+
+test('what to store is checked before the AI is asked', async () => {
+  const { deps, kept } = chatStore();
+  for (const h of [await seeded(recording), await seeded()]) {
+    for (const [extra, error] of [
+      [{ store: 'yes' }, 'Say whether to store this chat.'],
+      [{ store: true, attribution: 'name' }, 'A stored chat carries your address or no address.'],
+      [{ store: true, name: 7 }, 'A name must be text.'],
+      [{ store: true, name: 'x'.repeat(61) }, 'A name can be at most 60 characters.'],
+    ]) {
+      const refused = await ask(h, { body: { question: 'What do people want?', ...extra }, deps });
+      assert.deepEqual([refused.status, refused.body.error, refused.calls.ai.length, refused.calls.rate.length], [400, error, 0, 0]);
+    }
+  }
+  const longest = await ask(await seeded(recording), { body: { question: 'What do people want?', store: true, name: 'x'.repeat(60) }, deps });
+  assert.equal(longest.body.stored, true);
+  assert.equal((await kept()).length, 1);
 });
 
 test('answers without an address stay out, and no question goes ahead when opt-outs can’t be read', async () => {

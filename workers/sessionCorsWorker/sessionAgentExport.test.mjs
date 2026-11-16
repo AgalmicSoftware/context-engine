@@ -530,6 +530,41 @@ test('a session with more stored versions than the agent reads says so, and expo
   assert.match(content, /OPEN agenda/);
 });
 
+test('chats askers chose to store are items for the style they were answered in, while the session stores them', async () => {
+  const chat = (extra) => ({ id: '000000000001', day: '2026-11-24', answers: 'general', question: 'What do people want?', answer: 'Shorter meetings.', read: { context: 2, results: true, answers: 0 }, ...extra });
+  const chats = [
+    chat({ id: '000000000001' }),
+    chat({ id: '000000000002', answers: 'detailed', by: ANA, name: 'Ana’s agent' }),
+    chat({ id: '000000000003', by: BEN }),
+    // The same exchange twice with no address: one item with a count.
+    chat({ id: '000000000004' }),
+  ];
+  const callSessionAgentHistoryStore = async (env, slug, operation) => {
+    assert.equal(operation, 'all');
+    return { ok: true, body: { ok: true, entries: chats } };
+  };
+  const stores = { ...SETTING, history: true };
+  const { file } = await exported({ setting: stores, unattributed: [BEN], deps: { callSessionAgentHistoryStore } });
+  const asked = of(file, 'asked').map(({ id, ...item }) => item).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  assert.deepEqual(asked, [
+    // Ben left his address off exports, so his chat is one of the three with none.
+    { kind: 'asked', tier: 'general', question: 'What do people want?', text: 'Shorter meetings.', day: '2026-11-24', count: 3 },
+    { kind: 'asked', tier: 'detailed', question: 'What do people want?', text: 'Shorter meetings.', day: '2026-11-24', by: ANA, name: 'Ana’s agent' },
+  ].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+  assert.ok(of(file, 'asked').every((item) => /^a-[0-9a-f]{16}$/.test(item.id)));
+  assert.equal(file.manifest.byKind.asked, 2);
+  assert.equal(JSON.stringify(file.items).includes(BEN), false, 'Ben’s address is on none of his items, asked or written');
+
+  // A session that doesn't store chats never reads them, and exports none.
+  const off = await exported({ deps: { callSessionAgentHistoryStore: async () => { throw new Error('not read'); } } });
+  assert.deepEqual(of(off.file, 'asked'), []);
+  // While it stores them, chats that can't be read stop the export.
+  const { run } = await seeded({ setting: stores });
+  for (const down of [async () => { throw new Error('coordinator down'); }, async () => ({ ok: false, status: 503, body: {} }), async () => ({ ok: true, body: {} })]) {
+    refusedAsUnavailable(await run({ callSessionAgentHistoryStore: down }), 'its stored chats');
+  }
+});
+
 test('the file carries the session’s sign-in rule and its reading rule as the Worker enforces them', () => {
   const gateOf = (loginGate, payloadAccessControl = { gate: 'none', encryption: 'none' }, base = WORKER_RUN) =>
     sessionAgentExportGate({ ...base, ...(loginGate ? { workerAuthority: { version: 1, loginGate } } : {}), storageProfile: { payloadAccessControl } });

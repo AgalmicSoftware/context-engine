@@ -8,6 +8,7 @@ import {
   sessionAgentInstructions,
   sessionAgentMinAnswers,
   sessionAgentSettingOf,
+  sessionAgentStoresChats,
   validateSessionAgent,
 } from '../../shared/sessionAgent.mjs';
 
@@ -55,6 +56,18 @@ test('null is off, and no audiences means only admins may ask', () => {
   assert.deepEqual(validateSessionAgent(null), { ok: true, value: null, errors: [] });
   assert.deepEqual(validateSessionAgent({ audiences: [] }).value, { audiences: [] });
   assert.deepEqual(validateSessionAgent({ audiences: [], instructions: { general: ' ', detailed: '' } }).value, { audiences: [] });
+});
+
+test('chats are stored only when the setting says so, and off is stored as nothing', () => {
+  assert.deepEqual(validateSessionAgent({ audiences: [], history: true }).value, { audiences: [], history: true });
+  assert.deepEqual(validateSessionAgent({ audiences: [], history: false }).value, { audiences: [] });
+  assert.equal(messageOf({ audiences: [], history: 'yes' }), 'Whether chats may be stored must be on or off.');
+  assert.equal(messageOf({ audiences: [], history: 1 }), 'Whether chats may be stored must be on or off.');
+  assert.deepEqual(
+    [{ audiences: [], history: true }, { audiences: [] }, null, { audiences: [], history: 'yes' }].map((value) =>
+      sessionAgentStoresChats(sessionAgentSettingOf(value))),
+    [true, false, false, false],
+  );
 });
 
 test('only the stored form’s fields are accepted, at every level', () => {

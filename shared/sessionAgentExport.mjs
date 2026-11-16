@@ -22,7 +22,7 @@ const SESSION_AGENT_EXPORT_VERSION = 1;
 export const sessionAgentExportFilename = (slug) => `${slug}.session-agent.json`;
 
 const L = SESSION_AGENT_LIMITS;
-const ID_PREFIX = { question: 'q', context: 'c', results: 'r', counts: 'n', written: 'w' };
+const ID_PREFIX = { question: 'q', context: 'c', results: 'r', counts: 'n', written: 'w', asked: 'a' };
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
 const clip = (value, max) => (value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1)).trimEnd()}…`);
@@ -43,7 +43,7 @@ const IDENTITY_PATTERNS = [
   /\b[a-z0-9-]{3,}\.eth\b/i,
   /(?:\d[\s().-]?){9,}\d/,
 ];
-const namesSomeone = (value) => IDENTITY_PATTERNS.some((pattern) => pattern.test(value));
+export const namesSomeone = (value) => IDENTITY_PATTERNS.some((pattern) => pattern.test(value));
 
 const sha256Hex = async (value) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -79,6 +79,8 @@ const countsText = (rows) => {
  *   pass the session's gate may see them;
  * - `answers`: `[{ question, answers: [{ choices, text, from }] }]`, one entry per member's answer, from
  *   members who let the agent use them, `from` being the writer's address;
+ * - `asked`: the chats askers chose to store, `[{ day, answers, question, answer, by?, name? }]`, `answers`
+ *   being the style the answer was given in and `by` the asker's address when they chose to give it;
  * - `unattributed`: the addresses that asked for their address to be left off;
  * - `groups`: `[{ groupId, members }]` for the groups the rules and the items name, kept under the gate
  *   and apart from every item;
@@ -95,6 +97,7 @@ export const buildSessionAgentExport = async ({
   results = '',
   resultsForEveryone = false,
   answers = [],
+  asked = [],
   unattributed = [],
   groups = [],
   leftOut = {},
@@ -161,6 +164,17 @@ export const buildSessionAgentExport = async ({
     });
   });
 
+  // A stored chat is for the style its answer was given in: a Detailed answer
+  // may have drawn on what General askers never hear.
+  asked.filter(isRecord).forEach((chat) => {
+    const question = text(chat.question);
+    const answer = text(chat.answer);
+    if (!question || !answer || !['general', 'detailed'].includes(chat.answers)) return;
+    add('asked', chat.answers, {
+      question, text: answer, ...(text(chat.day) ? { day: text(chat.day) } : {}), ...(text(chat.name) ? { name: text(chat.name) } : {}), ...by(chat.by),
+    });
+  });
+
   // An item's id is a hash of the item. Without an address on it, the same
   // words on the same question are one item with a count, so nothing tells two
   // people's identical answers apart or links two answers by one person.
@@ -173,7 +187,7 @@ export const buildSessionAgentExport = async ({
     else merged.set(id, { id, ...item });
   }
   const items = [...merged.values()].sort((a, b) => byCodePoint(a.id, b.id)).map(({ count, ...item }) =>
-    item.kind === 'written' && count > 1 ? { ...item, count } : item,
+    ['written', 'asked'].includes(item.kind) && count > 1 ? { ...item, count } : item,
   );
 
   const byKind = {};

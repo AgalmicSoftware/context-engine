@@ -242,6 +242,9 @@ export const createMemoryKv = (seed = {}) => {
   };
 };
 
+// As a Durable Object's storage does: one key, or a list of them.
+const deleteCoordinatorTestKeys = (map, key) => (Array.isArray(key) ? key.filter((name) => map.delete(name)).length : map.delete(key));
+
 const cloneCoordinatorTestValue = (value) => (
   value == null ? value : typeof globalThis.structuredClone === 'function'
     ? globalThis.structuredClone(value)
@@ -263,7 +266,7 @@ export const installSessionCoordinatorBinding = (env = {}, CoordinatorClass = Se
             const result = await callback({
               get: async (key) => cloneCoordinatorTestValue(staged.get(key)),
               put: async (key, value) => staged.set(key, cloneCoordinatorTestValue(value)),
-              delete: async (key) => staged.delete(key),
+              delete: async (key) => deleteCoordinatorTestKeys(staged, key),
               list: async ({ prefix = '', startAfter = '', limit = 1000 } = {}) => new Map([...staged]
                 .filter(([key]) => key.startsWith(prefix) && key > startAfter)
                 .sort(([a], [b]) => a < b ? -1 : 1).slice(0, limit)),
@@ -279,7 +282,7 @@ export const installSessionCoordinatorBinding = (env = {}, CoordinatorClass = Se
           storage: {
             get: async (key) => cloneCoordinatorTestValue(values.get(key)),
             put: async (key, value) => values.set(key, cloneCoordinatorTestValue(value)),
-            delete: async (key) => values.delete(key),
+            delete: async (key) => deleteCoordinatorTestKeys(values, key),
             list: async ({ prefix = '', startAfter = '', limit = 1000 } = {}) => new Map([...values]
               .filter(([key]) => key.startsWith(prefix) && key > startAfter)
               .sort(([a], [b]) => a < b ? -1 : 1).slice(0, limit)),
