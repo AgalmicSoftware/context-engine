@@ -1187,7 +1187,7 @@ test('an agent adds a file, a link and a note that everyone sees as its own, and
   assert.equal((await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() })).sources.length, 3);
 });
 
-test('an agent makes a file or a note visible to some of the session’s groups, as the website’s Visible to does', async (t) => {
+test('an agent makes a file, a link or a note visible to some of the session’s groups, as the website’s Visible to does', async (t) => {
   const env = createEnv([groupSessionConfig()]);
   const host = groupHost(env);
   const salon = await createGroup(host, { label: 'Salon', joinMode: 'open' });
@@ -1207,6 +1207,11 @@ test('an agent makes a file or a note visible to some of the session’s groups,
   const file = await kami.participant.addContext({ file: notes, groups: [hosts.groupId, salon.groupId.toUpperCase(), hosts.groupId] });
   const both = [hosts.groupId, salon.groupId].sort();
   assert.equal(file.visibleTo, 'members of “Hosts” or “Salon”, and the session’s admins');
+  t.mock.method(globalThis, 'fetch', async () => new Response('<html><title>Essay</title><body><p>For the salon.</p></body></html>', {
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+  }));
+  const link = await kami.participant.addContext({ url: 'https://example.org/essay', groups: [salon.groupId] });
+  assert.equal(link.visibleTo, 'members of “Salon”, and the session’s admins');
 
   // Stored under the website's own rule, which the Worker applies to whoever lists: someone in neither
   // group sees nothing, and a member of one of the file's two groups sees the file, not Salon's note.
@@ -1227,8 +1232,6 @@ test('an agent makes a file or a note visible to some of the session’s groups,
   // Refused before anything is sent: the choices the website doesn't offer.
   const refused = async (args, message) => assert.rejects(kami.participant.addContext(args), { message });
   await refused({ text: 'x', groups: [salon.groupId], adminsOnly: true }, 'Pass groups or adminsOnly, not both.');
-  await refused({ url: 'https://example.org/essay', groups: [salon.groupId] },
-    'A link is for everyone in the session or its admins alone. Only a file or text can be for groups.');
   await refused({ text: 'x', groups: 'salon' }, 'groups must be a list of group IDs.');
   await refused({ text: 'x', groups: Array.from({ length: 21 }, (_, index) => `g${index}`) }, 'Name at most 20 groups.');
   await refused({ text: 'x', groups: ['no-such-group'] }, 'This session lists no group "no-such-group". get_session lists the groups you can name.');
@@ -1414,6 +1417,21 @@ const workerWith = (env, seen, change) => {
   return async (url, init = {}) => (await change(new URL(url).pathname, init, () => worker(url, init))) || worker(url, init);
 };
 const editJson = async (response, edit) => Response.json(edit(await response.json()), { status: response.status });
+
+test('a link for some groups needs a Worker that says it takes them, and reaches no older one', async (t) => {
+  const env = createEnv([groupSessionConfig()]);
+  const salon = await createGroup(groupHost(env), { label: 'Salon', joinMode: 'open' });
+  const seen = [];
+  const older = workerWith(env, seen, (pathname, init, send) => pathname === '/capabilities'
+    ? send().then((response) => editJson(response, (body) => ({ ...body, features: body.features.filter((feature) => feature !== 'context_link_groups_v1') })))
+    : null);
+  const kami = await createAgent(env, 'Test Kami', seen, older);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  await kami.participant.joinSession({ link: LINK });
+  await assert.rejects(kami.participant.addContext({ url: 'https://example.org/essay', groups: [salon.groupId] }),
+    /Worker doesn’t limit links to groups yet/);
+  assert.equal(seen.some((call) => new URL(call.url).pathname === '/storage/context'), false);
+});
 
 test('a Worker that takes no links from participants is invited and asked only for a file or text', async (t) => {
   for (const [features, invitation] of [

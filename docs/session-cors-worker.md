@@ -847,9 +847,11 @@ Authenticated clients can use the worker as the session storage boundary:
   against `limits.perWalletPerDay` as a fetch as well as a storage request (`403 context_link_fetch_denied` when the
   token lacks the scope; any other refusal, such as a failed authorization check or `429` over the limit, is
   `fetch_url`'s own). Every `add-link` passes the upload's access check before the Worker fetches the page.
-  `{ action: "add-link", url, title?, adminsOnly?, replaces?, adder?, adderName? }`
+  `{ action: "add-link", url, title?, adminsOnly?, groupIds?, replaces?, adder?, adderName? }`
   fetches the page under the public-artifact link policy and stores it as a context link record with its text
-  snapshot and fetch date (`replaces` refreshes an existing one: the same `url`, else `400`, keeping its title,
+  snapshot and fetch date. `groupIds` (1 to 20) locks the link to those groups as a file's lock does, not with
+  `adminsOnly` (`400 context_policy_unsupported`, before any fetch); Workers that take it advertise
+  `context_link_groups_v1`, and the reply's `source` carries `adminsOnly` and `lockedGroupIds` (`replaces` refreshes an existing one: the same `url`, else `400`, keeping its title,
   privacy and adder, and an agent's mark; `adder: "agent"` and an optional `adderName` store an agent's
   self-declared mark, as the `CE-AdderKind` and `CE-AdderName` tags a context file may carry,
   `400 context_adder_invalid` for any other value);

@@ -1505,15 +1505,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const [kind] = chosen;
       if (kind === 'file' && title !== undefined) throw new Error('A file keeps its own name; pass title only with url or text.');
       if (adminsOnly !== undefined && typeof adminsOnly !== 'boolean') throw new Error('adminsOnly must be true or false.');
-      // The website's "Visible to", for a file or a note: the members of any of these groups, and the admins.
+      // The website's "Visible to": the members of any of these groups, and the admins.
       if (groups !== undefined && (!Array.isArray(groups) || groups.some((id) => typeof id !== 'string'))) {
         throw new Error('groups must be a list of group IDs.');
       }
       const groupIds = [...new Set((groups || []).map((id) => id.trim().toLowerCase()).filter(Boolean))];
       if (groupIds.length && adminsOnly) throw new Error('Pass groups or adminsOnly, not both.');
-      if (groupIds.length && kind === 'url') {
-        throw new Error('A link is for everyone in the session or its admins alone. Only a file or text can be for groups.');
-      }
       if (groupIds.length > CONTEXT_SOURCE_LIMITS.lockedGroups) {
         throw new Error(`Name at most ${CONTEXT_SOURCE_LIMITS.lockedGroups} groups.`);
       }
@@ -1536,6 +1533,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         if (kind === 'url' && features && !features.includes('participant_context_links_v1')) throw new Error(CONTEXT_NO_LINKS);
         if (kind === 'url' && !mayAddLinks(ctx, sessionConfig)) throw new Error(CONTEXT_NO_FETCH);
       }
+      // An older Worker would store the link for everyone, so it must say it takes groups.
+      if (kind === 'url' && groupIds.length && !(await ctx.client.readFeatures())?.includes('context_link_groups_v1')) {
+        throw new Error('This session’s Worker doesn’t limit links to groups yet. Add the link for everyone or adminsOnly, or add its text as a note for the groups.');
+      }
       // Cleaned as the Worker requires, for links as for files and notes.
       const adderName = agentAdderName(profile().displayName);
       let visibleTo = adminsOnly ? 'the session’s admins' : 'everyone in the session';
@@ -1557,6 +1558,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
             url: link.url,
             ...(link.title ? { title: link.title } : {}),
             adminsOnly,
+            ...(groupIds.length ? { groupIds } : {}),
             adder: CONTEXT_AGENT_ADDER,
             ...(adderName ? { adderName } : {}),
           }, { signal });

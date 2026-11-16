@@ -8,7 +8,9 @@ import {
   contextAdderProblem,
   contextRoleOf,
   contextTagValue,
+  groupLockedAccess,
   isAdminsOnlyAccess,
+  lockedGroupsOf,
   participantsMayAddContext,
 } from '../../shared/sessionContextSources.mjs';
 import { looksSecret } from '../../shared/secretText.mjs';
@@ -72,6 +74,26 @@ const adderTagsOf = (body) => [
   { name: TAGS.adderName, value: trim(body.adderName) },
 ].filter((tag) => tag.value);
 
+// Who may read a link, as for a file: everyone the session admits, its admins
+// alone, or the members of some of its groups. A refresh keeps the link's own.
+const linkAccessOf = (body, replaces) => {
+  const kept = replaces?.accessConditions;
+  if (replaces) {
+    if (isAdminsOnlyAccess(kept)) return { accessConditions: ADMINS_ONLY_ACCESS };
+    const groups = lockedGroupsOf(kept);
+    return { accessConditions: groups.length ? groupLockedAccess(groups) : null };
+  }
+  const named = body.groupIds;
+  if (named === undefined || (Array.isArray(named) && !named.length)) {
+    return { accessConditions: body.adminsOnly === true ? ADMINS_ONLY_ACCESS : null };
+  }
+  if (body.adminsOnly === true) return { error: 'Choose some groups or the admins alone, not both.' };
+  const access = Array.isArray(named) ? groupLockedAccess(named) : null;
+  return access && lockedGroupsOf(access).length
+    ? { accessConditions: access }
+    : { error: `Name between 1 and ${LIMITS.lockedGroups} of the session’s groups.` };
+};
+
 // A link: the Worker fetches the page under the strict link policy and stores
 // its text with the link. With `replaces`, a refresh of that link: the same
 // page read again, whose snapshot keeps the link's title, privacy and adder,
@@ -99,6 +121,8 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
     : body);
   const adderProblem = contextAdderProblem(adderTags);
   if (adderProblem) return json({ error: adderProblem, reason: 'context_adder_invalid' }, 400);
+  const access = linkAccessOf(body, replaces);
+  if (access.error) return json({ error: access.error, reason: 'context_policy_unsupported' }, 400);
   const fetched = await fetchContextSnapshotText({
     url: parsed.toString(),
     deps: { safeFetch: deps?.safeFetch, isBlockedOutboundUrl: deps?.isBlockedOutboundUrl, fetchTimeoutMs: deps?.fetchTimeoutMs },
@@ -112,7 +136,6 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
   if (!text.trim()) return json({ error: 'The page has no text to read.', reason: 'context_link_empty' }, 422);
   const title = clip((replaces ? contextTagValue(replaces.tags, TAGS.name) : trim(body.title)) || fetched.title || parsed.hostname,
     LIMITS.titleChars);
-  const adminsOnly = replaces ? isAdminsOnlyAccess(replaces.accessConditions) : body.adminsOnly === true;
   const fetchedAt = now();
   const record = {
     v: 1,
@@ -125,7 +148,7 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
   const stored = await storeRecord(store, {
     bytes: encoder.encode(JSON.stringify(record)),
     contentType: 'application/json',
-    accessConditions: adminsOnly ? ADMINS_ONLY_ACCESS : null,
+    accessConditions: access.accessConditions,
     // A refreshed link stays its first adder's, who may still remove it. A new
     // one is counted by its address: its page text and time change each fetch.
     ...(replaces ? { contextUploader: replaces.uploader } : { countKey: `link:${record.url}` }),
@@ -144,7 +167,8 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
   return json({
     ok: true,
     source: {
-      id: stored.id, kind: 'link', title, url: record.url, fetchedAt, adminsOnly,
+      id: stored.id, kind: 'link', title, url: record.url, fetchedAt,
+      adminsOnly: isAdminsOnlyAccess(access.accessConditions), lockedGroupIds: lockedGroupsOf(access.accessConditions),
       chars: text.length, truncated: record.snapshot.truncated,
     },
   });

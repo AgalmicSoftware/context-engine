@@ -460,6 +460,42 @@ test('a link is fetched by the Worker under the strict policy and stored with it
   assert.equal((await h.list(ADMIN)).length, 1);
 });
 
+test('a link locked to some groups reaches their members and admins, keeps its lock on refresh, and is refused before any fetch when the lock is wrong', async () => {
+  const MEMBER = `0x${'3'.repeat(40)}`;
+  const h = harness({ pages: { 'https://example.org/post': () => pageResponse('Group reading.', 'text/plain') } });
+  h.deps.isWorkerGroupMember = async ({ groupId, requesterAddress }) =>
+    String(requesterAddress).toLowerCase() === MEMBER && groupId === 'salon'
+      ? { ok: true, principal: { kind: 'address', address: MEMBER } }
+      : { ok: false, status: 403, reason: 'worker_group_membership_denied' };
+  for (const [extra, label] of [
+    [{ groupIds: ['salon'], adminsOnly: true }, 'groups and admins only together'],
+    [{ groupIds: [' '] }, 'no group named'],
+    [{ groupIds: 'salon' }, 'not a list'],
+    [{ groupIds: Array.from({ length: 21 }, (_, index) => `group-${index}`) }, 'too many groups'],
+  ]) {
+    const refused = await h.context({ action: 'add-link', url: 'https://example.org/post', ...extra });
+    assert.deepEqual([refused.status, (await refused.json()).reason], [400, 'context_policy_unsupported'], label);
+  }
+  assert.deepEqual(h.pageCalls, [], 'a wrong lock never reaches the network');
+
+  const added = await h.context({ action: 'add-link', url: 'https://example.org/post', groupIds: ['Salon', 'Hosts'] }, MEMBER);
+  const { source } = await added.json();
+  assert.equal(added.status, 200);
+  assert.deepEqual([source.adminsOnly, source.lockedGroupIds], [false, ['hosts', 'salon']]);
+  assert.equal((await (await h.read(source.id, MEMBER)).json()).snapshot.text, 'Group reading.');
+  assert.equal((await h.read(source.id, PARTICIPANT)).status, 403);
+  assert.deepEqual(await h.list(PARTICIPANT), [], 'someone outside the groups never learns it exists');
+  const [item] = await h.list(ADMIN);
+  assert.deepEqual([item.metadata.lockedGroupIds, item.metadata.adminsOnly], [['hosts', 'salon'], false]);
+
+  // A refresh keeps the lock, whatever the refresh asks for.
+  const refreshed = await h.context({ action: 'add-link', url: 'https://example.org/post', replaces: source.id, adminsOnly: true });
+  const again = (await refreshed.json()).source;
+  assert.deepEqual([refreshed.status, again.adminsOnly, again.lockedGroupIds], [200, false, ['hosts', 'salon']]);
+  assert.equal((await h.read(again.id, PARTICIPANT)).status, 403);
+  assert.equal((await h.read(again.id, MEMBER)).status, 200);
+});
+
 test('Refresh stores a new snapshot with the same privacy and title, then drops the old one', async () => {
   let version = 0;
   const h = harness({ pages: { 'https://example.org/post': () => pageResponse(`Post text, version ${++version}.`, 'text/plain') } });
