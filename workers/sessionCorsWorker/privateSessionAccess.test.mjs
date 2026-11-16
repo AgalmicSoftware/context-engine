@@ -17,7 +17,7 @@ import { issueInterviewCatalogTicket } from './interviewCatalogTicket.js';
 import { createWorkerRouteShellWithWorkerDeps } from './workerRouteShellBinding.js';
 import { dispatchAuthenticatedRouteEntry } from './authenticatedRouteEntry.js';
 import { AGENT_ROUTES } from './agent/routes.mjs';
-import { STORAGE_GROUP_READ_INVITE, authorizeCloudflareStorageResourceRead } from './storageRouteExecution.js';
+import { STORAGE_GROUP_READ_INVITE, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks } from './storageRouteExecution.js';
 import {
   PRIVATE_SESSION_INVITE_INVALID,
   PRIVATE_SESSION_INVITE_REQUIRED,
@@ -410,6 +410,20 @@ test('results open to a signed-out invite holder where members see every answer,
   // An invite opens nothing in a session whose rule names no group, even one open to all.
   const open = withResults('session_member_full', { ...privateConfig(), storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } });
   assert.equal((await answers(open, await readInvite(key))).ok, false);
+});
+
+test('an item carrying its own rule is still held to a private session\'s rule', async () => {
+  const { f, key } = await setup();
+  const readsItem = async (rule, { address = '', invite } = {}) => createRequesterAccessChecks({
+    env: f.env, config: { ...f.sessionConfig, ...rule }, slug: 'fixture', requesterAddress: address, authScopes: { storage: true },
+    deps: invite ? { [STORAGE_GROUP_READ_INVITE]: invite } : {},
+  }).canRead({ resource: 'docsContext', accessConditions: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'storage' }] } });
+  // Its own rule admits anyone holding the storage scope; the session's admits members.
+  assert.equal(await readsItem(groupRule(), { address: principal(5).address }), false);
+  assert.equal(await readsItem(groupRule(), { address: principal(1).address }), true);
+  // An invite passes the session's rule; a stale one does not, whatever the item's rule.
+  assert.equal(await readsItem(groupRule(), { invite: await readInvite(key) }), true);
+  assert.equal(await readsItem(groupRule(), { invite: await readInvite(passwordKey('22')) }), false);
 });
 
 test('signed in, a private session admits its members and invite holders, and lets anyone join', async () => {

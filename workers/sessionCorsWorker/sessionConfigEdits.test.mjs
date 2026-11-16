@@ -415,6 +415,32 @@ test('adding a group keeps the authorization epoch on save; removing one raises 
   assert.equal(open.config.authzEpoch, 5);
 });
 
+test('a Worker-run session saves a group access rule; the first one signs people out, a group added after does not', () => {
+  const ruleWith = (gate, accessConditions) => {
+    const base = workerCanonicalConfig();
+    const payloadAccessControl = { gate, encryption: 'worker_envelope', ...(accessConditions ? { accessConditions } : {}) };
+    return {
+      ...base,
+      sessionModeProfile: { ...base.sessionModeProfile, storage: { backend: 'cloudflare', payloadAccessControl } },
+      storageProfile: { backend: 'cloudflare', payloadAccessControl },
+    };
+  };
+  const groups = (...groupIds) => ({ match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupIds }] });
+  const save = (existing, next) => applySessionConfigMutation({
+    existingConfig: { ...existing, authzEpoch: 3 },
+    mutation: { kind: 'set-config', incomingConfig: { sessionModeProfile: next.sessionModeProfile, storageProfile: next.storageProfile } },
+    slug: 'session-a',
+  });
+  for (const gate of ['none', 'role_gate']) {
+    const first = save(ruleWith('none'), ruleWith(gate, groups('salon')));
+    assert.equal(first.ok, true, `${gate}: ${first.error}`);
+    assert.equal(first.config.authzEpoch, 4, gate);
+  }
+  const widened = save(ruleWith('role_gate', groups('salon')), ruleWith('role_gate', groups('salon', 'hosts')));
+  assert.equal(widened.ok, true, widened.error);
+  assert.equal(widened.config.authzEpoch, 3);
+});
+
 test('a session without a capability profile keeps sign-ins when its group read gate gains a group', () => {
   const stored = { ...workerCanonicalConfig(), authzEpoch: 4 };
   delete stored.sessionModeProfile;
