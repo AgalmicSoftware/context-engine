@@ -101,7 +101,7 @@ const BUILDS = [
   {
     kind: 'debate-atlas',
     label: 'Build atlas',
-    tooltip: 'Builds a debate atlas',
+    tooltip: 'Builds an atlas',
     name: 'atlas',
     prompt: 'Planning prompt',
     build,
@@ -267,7 +267,7 @@ async function inspectStates(page, control, name, target) {
 
 export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', theme = '' } = {}) {
   const nav = page.getByTestId('ce-session-results-view-nav');
-  await nav.getByRole('button', { name: 'Debate Atlas', exact: true }).click();
+  await nav.getByRole('button', { name: 'Atlas', exact: true }).click();
   const atlas = page.getByTestId('ce-session-debate-atlas');
   await atlas.waitFor();
   await page.getByTestId('ce-atlas-node').first().waitFor();
@@ -362,7 +362,7 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   await panel.getByTitle('Close').click();
   await page.getByLabel('Open Transport').click();
   const categoryPanel = page.locator('[class*="modalContent"]').last();
-  await step('open category', () => categoryPanel.getByText('Category', { exact: true }).waitFor({ timeout: 15000 }));
+  await step('open category', () => categoryPanel.getByText('Topic', { exact: true }).waitFor({ timeout: 15000 }));
   await step('category compass', () => categoryPanel.getByText('Participant', { exact: true }).waitFor({ timeout: 15000 }));
   await step('category panel', () => assertReadable(categoryPanel));
   if (screenshotDir) await categoryPanel.screenshot({ path: `${screenshotDir}/debate-atlas-category-${tag}.png` });
