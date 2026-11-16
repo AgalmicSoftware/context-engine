@@ -82,7 +82,7 @@ it('opens the node a link asked for, first showing the build it belongs to', () 
   expect(props.buildQuestionLink('0xABC')).toBe(
     '/question/0xabc?session=salon&worker=https%3A%2F%2Fce-salon.workers.dev',
   );
-  expect(props.levelLabels).toEqual(['Category', 'Topic']);
+  expect(props.levelLabels).toEqual(['Topic', 'Subtopic']);
 
   // Picking another build afterwards is the reader's choice, and leaves the node shut.
   rerender(view(build));
