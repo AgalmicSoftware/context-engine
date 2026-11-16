@@ -147,6 +147,36 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(host.state.generatedResultsAnalysis?.status).toBe('ready');
   });
 
+  it('leaves the reader on the built Risk Matrix when an AI Views build arrives', async () => {
+    const host = buildHost();
+    host.state.resultsViewMode = 'riskMatrix';
+    const readStatus = jest.fn(async () =>
+      buildStatusBody({
+        settings: { ...settings, views: { circles: true, breakdown: true, riskMatrix: false } },
+        state: { jobState: 'succeeded', lastGood: { ...(getLastGoodStatusDraft() as UnknownRecord), draftId: 'next' } },
+      }),
+    );
+
+    await generateResultsForHost(host, {
+      ports: {
+        pollAttempts: 2,
+        pollIntervalMs: 0,
+        randomUUID: () => 'request-1',
+        readQuestionsCache: () => ({}),
+        readStatus,
+        startGeneration: async () => ({
+          ok: true,
+          httpStatus: 202,
+          jobState: 'running',
+          reservation: { requestId: 'request-1' },
+        }),
+      },
+    });
+
+    expect(host.state.generatedResultsAnalysis?.lastGoodDraftId).toBe('next');
+    expect(host.state.resultsViewMode).toBe('riskMatrix');
+  });
+
   it('polls running admin status checks until the latest artifact is ready', async () => {
     const host = buildHost({ ok: false });
     const readStatus = jest

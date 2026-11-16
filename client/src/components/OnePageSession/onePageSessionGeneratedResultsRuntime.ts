@@ -3,7 +3,6 @@ import {
   buildInitialGeneratedResultsControllerState,
   resolveGeneratedResultsControllerState,
 } from '../../domains/sessionResults/sessionResultsAnalysisController';
-import { SESSION_GENERATED_RESULTS_VIEW_KEYS } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
 import { buildResultsAnalysisBrowserSnapshotFromCacheNode } from '../../domains/sessionResults/sessionResultsAnalysisBrowserSnapshot';
 import { getBlockedQuestionIdsSet } from '../SurveyTool/surveyToolScope';
 import {
@@ -89,7 +88,6 @@ const readChainId = (host: OnePageGeneratedResultsHost, sessionConfig: UnknownRe
       toRecord(host.props.network).chainId ||
       1,
   ) || 1;
-const GENERATED_RESULTS_VIEW_KEYS = new Set<string>(Object.values(SESSION_GENERATED_RESULTS_VIEW_KEYS));
 
 const defaultPorts: RuntimePorts = {
   now: () => Date.now(),
@@ -308,30 +306,24 @@ const normalizePendingArtifactResponseBody = ({
 const markGeneratedResultsPollExpired = ({
   host,
   previousStatusBody,
-  resultDraft,
 }: {
   host: OnePageGeneratedResultsHost;
   previousStatusBody: unknown;
-  resultDraft: unknown;
 }): void => {
   const previous = toRecord(previousStatusBody);
   const previousState = toRecord(previous.state);
-  applyGeneratedResultsStatusBody(
-    host,
-    {
-      ...previous,
-      ok: true,
-      pollExpired: true,
-      state: {
-        ...previousState,
-        active: null,
-        jobState: 'idle',
-        lastFailure: null,
-        lastGood: previousState.lastGood || null,
-      },
+  applyGeneratedResultsStatusBody(host, {
+    ...previous,
+    ok: true,
+    pollExpired: true,
+    state: {
+      ...previousState,
+      active: null,
+      jobState: 'idle',
+      lastFailure: null,
+      lastGood: previousState.lastGood || null,
     },
-    resultDraft,
-  );
+  });
 };
 
 const normalizeTransientStatusFailureBody = ({
@@ -425,7 +417,7 @@ export const authorizeGeneratedResultsForHost = async (
         previousStatusBody: host.state.generatedResultsStatusBody,
       })
     : body;
-  applyGeneratedResultsStatusBody(host, nextBody, toRecord(toRecord(nextBody).state).lastGood);
+  applyGeneratedResultsStatusBody(host, nextBody);
   if (isRunningJobStatus(nextBody)) {
     await pollGeneratedResultsStatusForHost({ host, mergedPorts, requestSeq, runtime, sessionConfig });
   }
@@ -441,23 +433,14 @@ const enabledSectionsFromStatus = (statusBody: unknown): string[] => {
   return out;
 };
 
-const isGeneratedResultsViewMode = (value: unknown): boolean => GENERATED_RESULTS_VIEW_KEYS.has(toText(value));
-
-const applyGeneratedResultsStatusBody = (
-  host: OnePageGeneratedResultsHost,
-  statusBody: unknown,
-  resultDraft: unknown,
-): void => {
-  const currentResultsViewMode = host.state.resultsViewMode;
-  const nextControllerState = resolveGeneratedResultsControllerState({
-    previousSelectedView: currentResultsViewMode,
-    statusBody,
-  });
-  const shouldAdoptGeneratedViewMode = !!resultDraft && isGeneratedResultsViewMode(currentResultsViewMode);
+// Results has no AI Views tab, so a status read leaves the reader's view as it is.
+const applyGeneratedResultsStatusBody = (host: OnePageGeneratedResultsHost, statusBody: unknown): void => {
   host.setState({
     generatedResultsStatusBody: statusBody,
-    generatedResultsAnalysis: nextControllerState,
-    resultsViewMode: shouldAdoptGeneratedViewMode ? nextControllerState.selectedView : currentResultsViewMode,
+    generatedResultsAnalysis: resolveGeneratedResultsControllerState({
+      previousSelectedView: host.state.resultsViewMode,
+      statusBody,
+    }),
   });
 };
 
@@ -500,7 +483,7 @@ const pollGeneratedResultsStatusForHost = async ({
             previousStatusBody: host.state.generatedResultsStatusBody,
           })
         : body;
-    applyGeneratedResultsStatusBody(host, nextBody, toRecord(toRecord(nextBody).state).lastGood);
+    applyGeneratedResultsStatusBody(host, nextBody);
     if (isAuthFailureStatus(body)) return;
     if (!isRunningJobStatus(nextBody)) return;
   }
@@ -508,7 +491,6 @@ const pollGeneratedResultsStatusForHost = async ({
   markGeneratedResultsPollExpired({
     host,
     previousStatusBody: host.state.generatedResultsStatusBody,
-    resultDraft: toRecord(toRecord(host.state.generatedResultsStatusBody).state).lastGood,
   });
 };
 
@@ -546,19 +528,18 @@ const pollGeneratedResultsArtifactForHost = async ({
           ? previousStatusBody
           : { ...previousStatusBody, settings: toRecord(sessionConfig).resultsAnalysis },
       });
-      applyGeneratedResultsStatusBody(host, statusBody, toRecord(toRecord(statusBody).state).lastGood);
+      applyGeneratedResultsStatusBody(host, statusBody);
       if (!isRunningJobStatus(statusBody)) return;
       continue;
     }
     if (isAuthFailureStatus(artifactBody)) {
-      applyGeneratedResultsStatusBody(host, artifactBody, null);
+      applyGeneratedResultsStatusBody(host, artifactBody);
       return;
     }
     if (!isRunningJobStatus(artifactBody)) {
       markGeneratedResultsPollExpired({
         host,
         previousStatusBody: host.state.generatedResultsStatusBody,
-        resultDraft: toRecord(toRecord(host.state.generatedResultsStatusBody).state).lastGood,
       });
       return;
     }
@@ -567,13 +548,12 @@ const pollGeneratedResultsArtifactForHost = async ({
       previousStatusBody: host.state.generatedResultsStatusBody,
       sessionConfig,
     });
-    applyGeneratedResultsStatusBody(host, pendingStatusBody, toRecord(toRecord(pendingStatusBody).state).lastGood);
+    applyGeneratedResultsStatusBody(host, pendingStatusBody);
   }
   if (requestSeq !== host._generatedResultsRequestSeq) return;
   markGeneratedResultsPollExpired({
     host,
     previousStatusBody: host.state.generatedResultsStatusBody,
-    resultDraft: toRecord(toRecord(host.state.generatedResultsStatusBody).state).lastGood,
   });
 };
 
@@ -623,7 +603,7 @@ export const loadGeneratedResultsArtifactForHost = async (
   if (requestSeq !== host._generatedResultsRequestSeq) return;
   if (artifactBody.ok !== true) {
     if (isAuthFailureStatus(artifactBody)) {
-      applyGeneratedResultsStatusBody(host, artifactBody, null);
+      applyGeneratedResultsStatusBody(host, artifactBody);
       return;
     }
     if (isRunningJobStatus(artifactBody)) {
@@ -632,31 +612,26 @@ export const loadGeneratedResultsArtifactForHost = async (
         previousStatusBody: host.state.generatedResultsStatusBody,
         sessionConfig,
       });
-      applyGeneratedResultsStatusBody(host, pendingStatusBody, toRecord(toRecord(pendingStatusBody).state).lastGood);
+      applyGeneratedResultsStatusBody(host, pendingStatusBody);
       await pollGeneratedResultsArtifactForHost({ host, mergedPorts, requestSeq, runtime, sessionConfig });
       return;
     }
     if (toStatusCode(artifactBody) === 404) {
       // No report yet, which is not an expired poll: an admin must still be able to sign in and generate one.
       const previous = toRecord(host.state.generatedResultsStatusBody);
-      applyGeneratedResultsStatusBody(
-        host,
-        {
-          ...previous,
-          ok: true,
-          viewerAuthorized: true,
-          pollExpired: false,
-          settings: previous.settings || toRecord(sessionConfig).resultsAnalysis,
-          state: { ...toRecord(previous.state), active: null, jobState: 'idle' },
-        },
-        toRecord(previous.state).lastGood,
-      );
+      applyGeneratedResultsStatusBody(host, {
+        ...previous,
+        ok: true,
+        viewerAuthorized: true,
+        pollExpired: false,
+        settings: previous.settings || toRecord(sessionConfig).resultsAnalysis,
+        state: { ...toRecord(previous.state), active: null, jobState: 'idle' },
+      });
       return;
     }
     markGeneratedResultsPollExpired({
       host,
       previousStatusBody: host.state.generatedResultsStatusBody,
-      resultDraft: toRecord(toRecord(host.state.generatedResultsStatusBody).state).lastGood,
     });
     return;
   }
@@ -667,7 +642,7 @@ export const loadGeneratedResultsArtifactForHost = async (
       ? previousStatusBody
       : { ...previousStatusBody, settings: toRecord(sessionConfig).resultsAnalysis },
   });
-  applyGeneratedResultsStatusBody(host, statusBody, toRecord(toRecord(statusBody).state).lastGood);
+  applyGeneratedResultsStatusBody(host, statusBody);
   if (isRunningJobStatus(statusBody)) {
     await pollGeneratedResultsArtifactForHost({ host, mergedPorts, requestSeq, runtime, sessionConfig });
   }
@@ -761,7 +736,7 @@ export const generateResultsForHost = async (
       fallbackBody: authFailureBody,
       previousStatusBody,
     });
-    applyGeneratedResultsStatusBody(host, nextBody, toRecord(toRecord(nextBody).state).lastGood);
+    applyGeneratedResultsStatusBody(host, nextBody);
     return;
   }
   const nextStatusBody = {
@@ -777,7 +752,7 @@ export const generateResultsForHost = async (
       lastGood: result.draft || previousState.lastGood || null,
     },
   };
-  applyGeneratedResultsStatusBody(host, nextStatusBody, result.draft);
+  applyGeneratedResultsStatusBody(host, nextStatusBody);
   if (
     (result.jobState === 'running' || result.jobState === 'queued' || toStatusCode(result) === 202) &&
     !transientFailure
