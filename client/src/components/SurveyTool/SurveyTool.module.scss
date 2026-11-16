@@ -3832,6 +3832,14 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   gap: 10px;
 }
 
+// Discard beside Continue on the kept-review question: the control colours keep it readable in every theme.
+.sessionInterviewActions .sessionInterviewKeptDiscard,
+.sessionInterviewActions .sessionInterviewKeptDiscard:is(:hover, :focus, :active):not(:disabled) {
+  color: var(--ce-control-text) !important;
+  background: var(--ce-control-face) !important;
+  border-color: color-mix(in srgb, var(--ce-control-text) 62%, transparent) !important;
+}
+
 // The microphone in the middle column, so it stays centered whatever sits to its right, unless that
 // needs more room than half of what is left: then the column grows and the microphone moves left.
 .sessionInterviewPrimaryAction {

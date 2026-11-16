@@ -2,6 +2,7 @@
  * @file sessionInterviewKeptReview.ts: an interview's draft review, kept in this browser until it is submitted
  * or discarded, so a reload, Back, or reopening the tab brings it back. It is stored only on this device, for
  * one session and one owner: the signed-in account, or this browser when signed out. Nothing is sent anywhere.
+ * One kept signed out is asked about before anything of it shows, and goes after an hour.
  * Another browser, such as Safari after a chat app's own browser, has its own storage and starts empty.
  */
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
@@ -13,6 +14,8 @@ import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGenerator
 const KEY_PREFIX = 'ce:interview-review:v1:';
 /** A kept review goes a day after it was first kept, like a held group-conversation part. */
 export const KEPT_REVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** One kept signed out goes after an hour: the next person on a shared phone may find it. */
+export const SIGNED_OUT_REVIEW_MAX_AGE_MS = 60 * 60 * 1000;
 const SAVE_DELAY_MS = 300;
 
 type SharingChoice = { contextToken: string; included: boolean } | null;
@@ -74,8 +77,10 @@ const dropExpired = (store: Storage, now: number) => {
     const key = store.key(index);
     if (!key?.startsWith(KEY_PREFIX)) continue;
     try {
-      const age = now - Number(JSON.parse(store.getItem(key) || 'null')?.savedAt);
-      if (!(age >= 0 && age < KEPT_REVIEW_MAX_AGE_MS)) store.removeItem(key);
+      const kept = JSON.parse(store.getItem(key) || 'null');
+      const age = now - Number(kept?.savedAt);
+      const maxAge = kept?.owner === 'browser' ? SIGNED_OUT_REVIEW_MAX_AGE_MS : KEPT_REVIEW_MAX_AGE_MS;
+      if (!(age >= 0 && age < maxAge)) store.removeItem(key);
     } catch {
       store.removeItem(key);
     }

@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import type { TranscriptClaim } from './sessionTranscriptClaim';
 
 jest.mock('./SessionInterviewRecommendedGroups', () => ({ __esModule: true, default: () => null }));
 jest.mock('./useSessionInterviewGroupRecommendations', () => ({
@@ -47,7 +48,11 @@ const prefillPacket = {
 };
 type Who = { account?: string; loginComplete?: boolean; shareByDefault?: boolean };
 const onSubmitResponses = jest.fn();
-const modal = ({ account = alice, loginComplete = true, shareByDefault = false }: Who = {}, packet: unknown = null) => (
+const modal = (
+  { account = alice, loginComplete = true, shareByDefault = false }: Who = {},
+  packet: unknown = null,
+  claim: TranscriptClaim | null = null,
+) => (
   <SessionVoiceModeModal
     isOpen
     mode="interview"
@@ -61,6 +66,7 @@ const modal = ({ account = alice, loginComplete = true, shareByDefault = false }
     sessionConfig={{ interviewMode: { shareDraftChangesByDefault: shareByDefault } }}
     questionPool={questionPool}
     prefillPacket={packet as typeof prefillPacket | null}
+    claim={claim}
     onApplyAnswer={jest.fn()}
     onApplyAdditional={jest.fn()}
     onApplyImportance={jest.fn()}
@@ -212,6 +218,7 @@ it('clears the account’s kept review on discard after signing out', async () =
 it('takes a restored review that moved to an account off the screen when that account signs out', async () => {
   (await startReview({ account: '', loginComplete: false }, 'browser')).unmount();
   const view = render(modal({ account: '', loginComplete: false }));
+  fireEvent.click(screen.getByRole('button', { name: 'Continue it' }));
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   view.rerender(modal());
   await waitFor(() => expect(kept(`account:${alice}`)).toContain('Disagree'));
@@ -219,4 +226,82 @@ it('takes a restored review that moved to an account off the screen when that ac
   await waitFor(() => expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument());
   expect(kept(`account:${alice}`)).toContain('Disagree');
   expect(kept('browser')).toBeNull();
+});
+
+describe('a review kept signed out, on a phone that may be shared', () => {
+  const signedOut = { account: '', loginComplete: false };
+  const keptSignedOut = async () => (await startReview(signedOut, 'browser')).unmount();
+
+  it('asks first and shows nothing of it until they continue', async () => {
+    await keptSignedOut();
+    render(modal(signedOut));
+    expect(screen.getByText('This device has an unsubmitted interview review.')).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).not.toBeInTheDocument();
+    expect(document.body.querySelectorAll('input, textarea')).toHaveLength(0);
+    expect(document.body.textContent).not.toMatch(/Disagree|Synthetic context|Statement one/);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue it' }));
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(answer('b1')).toHaveValue('Disagree');
+  });
+
+  it('asks first even when the same link brings it back', async () => {
+    await keptSignedOut();
+    render(modal(signedOut, prefillPacket));
+    expect(screen.getByRole('button', { name: 'Continue it' })).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
+  });
+
+  it('clears it when they discard it and start fresh', async () => {
+    await keptSignedOut();
+    render(modal(signedOut, prefillPacket));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard and start fresh' }));
+    expect(kept('browser')).toBeNull();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
+  });
+
+  it('clears it when a new interview starts from a link with other evidence', async () => {
+    await keptSignedOut();
+    const replacement = { ...prefillPacket, responses: [{ questionId: 'b1', answer: 'Agree', confidence: 0.9 }] };
+    render(modal(signedOut, replacement));
+    expect(kept('browser')).toBeNull();
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(answer('b1')).toHaveValue('Agree');
+  });
+
+  it('clears it when a link or a code arrives while it asks', async () => {
+    const claim = { sessionSlug: 'demo', person: 'Sam', transcript: 'Responder: Mine.' };
+    for (const arriving of [
+      (view: ReturnType<typeof render>) => view.rerender(modal(signedOut, null, claim)),
+      (view: ReturnType<typeof render>) =>
+        view.rerender(modal(signedOut, { ...prefillPacket, responses: [{ questionId: 'b2', answer: 'Agree' }] })),
+    ]) {
+      await keptSignedOut();
+      const view = render(modal(signedOut));
+      expect(screen.getByRole('button', { name: 'Continue it' })).toBeInTheDocument();
+      arriving(view);
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Continue it' })).not.toBeInTheDocument());
+      expect(kept('browser')).toBeNull();
+      expect(screen.queryByDisplayValue('Disagree')).not.toBeInTheDocument();
+      view.unmount();
+      window.localStorage.clear();
+    }
+  });
+
+  it('clears it when a new interview starts from a code', async () => {
+    await keptSignedOut();
+    render(modal(signedOut, null, { sessionSlug: 'demo', person: 'Sam', transcript: 'Responder: Mine.' }));
+    expect(kept('browser')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Continue it' })).not.toBeInTheDocument();
+  });
+
+  it('never offers it to someone who signs in before choosing', async () => {
+    await keptSignedOut();
+    const view = render(modal(signedOut));
+    view.rerender(modal());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Continue it' })).not.toBeInTheDocument());
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
+    expect(kept(`account:${alice}`)).toBeNull();
+  });
 });

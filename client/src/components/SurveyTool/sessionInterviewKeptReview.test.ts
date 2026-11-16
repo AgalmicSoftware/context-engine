@@ -1,5 +1,6 @@
 import {
   KEPT_REVIEW_MAX_AGE_MS,
+  SIGNED_OUT_REVIEW_MAX_AGE_MS,
   clearKeptReview,
   keptReviewOwner,
   readKeptReview,
@@ -50,12 +51,17 @@ it('keeps one review per session and owner, and clears it', () => {
   expect(readKeptReview('demo', 'account:0xabc', now)).toBeNull();
 });
 
-it('lets a review run out a day after it was first kept, whoever it belongs to', () => {
+it('lets an account’s review run out a day after it was first kept, and a signed-out one after an hour', () => {
+  writeKeptReview('demo', 'account:0xabc', review(), now);
+  writeKeptReview('demo', 'account:0xdef', review(), now - KEPT_REVIEW_MAX_AGE_MS);
   writeKeptReview('demo', 'browser', review(), now);
-  writeKeptReview('demo', 'account:0xabc', review(), now - KEPT_REVIEW_MAX_AGE_MS);
-  expect(readKeptReview('demo', 'browser', now + KEPT_REVIEW_MAX_AGE_MS - 1)).not.toBeNull();
-  expect(window.localStorage.getItem('ce:interview-review:v1:demo:account:0xabc')).toBeNull();
-  expect(readKeptReview('demo', 'browser', now + KEPT_REVIEW_MAX_AGE_MS)).toBeNull();
+  expect(readKeptReview('demo', 'account:0xabc', now + SIGNED_OUT_REVIEW_MAX_AGE_MS)).not.toBeNull();
+  expect(window.localStorage.getItem('ce:interview-review:v1:demo:account:0xdef')).toBeNull();
+  expect(window.localStorage.getItem('ce:interview-review:v1:demo:browser')).toBeNull();
+  writeKeptReview('demo', 'browser', review(), now);
+  expect(readKeptReview('demo', 'browser', now + SIGNED_OUT_REVIEW_MAX_AGE_MS - 1)).not.toBeNull();
+  expect(readKeptReview('demo', 'account:0xabc', now + KEPT_REVIEW_MAX_AGE_MS - 1)).not.toBeNull();
+  expect(readKeptReview('demo', 'account:0xabc', now + KEPT_REVIEW_MAX_AGE_MS)).toBeNull();
   expect(window.localStorage.length).toBe(0);
 });
 
