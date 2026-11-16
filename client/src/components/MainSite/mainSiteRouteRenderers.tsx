@@ -1160,7 +1160,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
 
     // A private session's Worker sends a shell to a visitor it can't admit: every page of the session shows only
     // the way in, so nothing loads, or saves, from a config without the session in it.
-    if (effectiveSessionConfig.privateAccess === true) {
+    const privateSession = effectiveSessionConfig.privateSession;
+    if (privateSession === 'invite_required' || privateSession === 'invite_invalid') {
       return (
         <InitialRouteBoundary fallback={<LazyFallback label="Loading Session..." />} resetKey={fullPath}>
           <div data-testid={E2E_TESTIDS.PAGE_SESSION_ROOT}>
@@ -1168,7 +1169,10 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               sessionSlug={normalizeSessionSlug(effectiveSessionConfig.slug || slug)}
               sessionId={resolveWorkerCanonicalSessionIdHex(effectiveSessionConfig)}
               workerUrl={workerOrigin || effectiveSessionConfig.corsWorkerUrl || ''}
+              shell={privateSession}
+              sessionConfig={effectiveSessionConfig}
               account={host.props.account}
+              provider={host.props.provider}
               toggleLoginModal={(loginModalIsOpen?: boolean) => host.props.toggleLoginModal(loginModalIsOpen)}
             />
           </div>

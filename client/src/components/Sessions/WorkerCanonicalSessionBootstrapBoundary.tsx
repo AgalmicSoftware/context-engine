@@ -17,6 +17,7 @@ import {
   upsertWorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming';
+import { heldSessionToken } from '../../utilities/worker/workerAuthTokenCache';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import setupStyles from './setup/SessionSetup.module.scss';
 
@@ -117,6 +118,7 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
               environment,
               fetchImpl,
               signal: abortController.signal,
+              memberToken: heldSessionToken,
             });
           } catch (error) {
             const retryCount = Math.min(retryDelaysMs.length, MAX_AUTOMATIC_RETRY_ATTEMPTS);

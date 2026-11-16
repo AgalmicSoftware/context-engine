@@ -379,6 +379,48 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
     }
   });
 
+  it('marks a private session’s shell, and asks again with this tab’s sign-in only then', async () => {
+    const worker = 'https://session-a.example.workers.dev';
+    const shell = { ...buildPayload(), privateSession: 'invite_required' };
+    const reply = (payload: unknown) =>
+      new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const load = (fetchImpl: jest.Mock, memberToken?: () => string) =>
+      fetchWorkerCanonicalSessionBootstrap({
+        fetchImpl,
+        sessionSlug: 'session-a',
+        workerQueryValue: worker,
+        environment: 'production',
+        memberToken,
+      });
+
+    // A member: the shell, then the full config for the sign-in.
+    const member = jest.fn().mockResolvedValueOnce(reply(shell)).mockResolvedValueOnce(reply(buildPayload()));
+    const memberToken = jest.fn(() => 'member-token');
+    const admitted = await load(member, memberToken);
+    expect(admitted.config.privateSession).toBeUndefined();
+    expect(memberToken).toHaveBeenCalledWith(worker, 'session-a');
+    expect(member.mock.calls[0][1].headers.Authorization).toBeUndefined();
+    expect(member.mock.calls[1][1].headers.Authorization).toBe('Bearer member-token');
+
+    // Signed out: the shell, marked, from one request.
+    const signedOut = jest.fn().mockResolvedValue(reply(shell));
+    expect((await load(signedOut, () => '')).config.privateSession).toBe('invite_required');
+    expect(signedOut).toHaveBeenCalledTimes(1);
+
+    // A refused proof says so; an unknown reason still shows only the way in.
+    const refused = jest.fn().mockResolvedValue(reply({ ...shell, privateSession: 'invite_invalid' }));
+    expect((await load(refused)).config.privateSession).toBe('invite_invalid');
+    const unknown = jest.fn().mockResolvedValue(reply({ ...shell, privateSession: 'something_new' }));
+    expect((await load(unknown)).config.privateSession).toBe('invite_required');
+
+    // Any other session never sends the sign-in to its config.
+    const open = jest.fn().mockResolvedValue(reply(buildPayload()));
+    const unused = jest.fn(() => 'member-token');
+    expect((await load(open, unused)).config.privateSession).toBeUndefined();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(unused).not.toHaveBeenCalled();
+  });
+
   it('fails before fetch for unsafe origins and rejects HTTP or JSON failures', async () => {
     const unusedFetch = jest.fn();
     await expect(
