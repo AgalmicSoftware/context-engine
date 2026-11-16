@@ -6,7 +6,58 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
-- The site lists the Reverse Alignment salon's session, `rxc-ra-2`, so its normal link opens it and agents can find its Worker in `/known-sessions.json`.
+- The site lists the Reverse Alignment salon's session, `rxc-ra-2`, so its normal link opens it and agents can find its Worker in `/known-sessions.json`. A listing changes only the link: who can read a session stays as its admins set it.
+- The Docs page has a Session Agent section: what it is, who may ask it, its two answer styles, how to keep your answers out of it, and which agent is which.
+- In the prompt you copy for your own AI, the link it returns is now labelled "Review your drafted answers", which is where it goes, instead of "Open prefilled interview".
+- The interview shows a spinner while it works: preparing responses, submitting, connecting or stopping, checking setup, preparing its opening, checking that a copied prompt fits the session, and finding or joining groups.
+- After a voice interview, **AI submission info** no longer opens to an empty box when nothing is shared. It says the session’s AI drafted the answers (naming its model when known), that only the answers you submit are saved, and what Share for research would add.
+- A hidden draft says it once: “Your AI's predicted response is hidden until you answer.”, with its **?**, above the grey area; the **AI guess hidden** heading is gone.
+- After an interview, the red **Discard interview** button sits right of the microphone, level with its label and set apart from it; the transcript stays beside the microphone, which stays centered.
+- On a phone, the interview's header fits on one row. **Share for research** always sits inside the **AI submission info** box, on its summary row or along its foot, with **What’s this?** beside it, which says what sharing keeps on a tap, hover or focus, in place of a **?** and a **What’s kept** link.
+- Session Agent settings, in setup and in Settings, offer **Answer with an open model on Cloudflare**. In Settings it shows only where the session's Worker can reach Cloudflare's models; a session already using it on a Worker that can't is told to redeploy or untick it.
+- Sessions can add a short note on where research data goes (Interview settings → **Where the data goes**, on `/new` and in Settings). It shows in the hidden-drafts and **Share for research** tooltips. Only https addresses become links. It needs a Worker from this release.
+- **Where the data goes** shows in Settings only where the session's Worker accepts it, which Workers from this release say they do, so saving Settings on an older Worker no longer fails. On-chain sessions keep the field.
+- The AI prefill review says how many drafts are still hidden until you answer, and why.
+- The **Share for research** tooltip's link is readable on its dark background.
+- The draft-review page's **How it works** link and the **What’s this?** tooltip's link open a plain-language summary on GitHub, led by a diagram, of what interview research sharing keeps and how the Mirror Score is measured.
+- The **AI submission info** bar keeps its middle free, so tapping it opens the summary instead of ticking **Share for research**.
+- Context items on the session page show their kind and size, preview in place (a file's start, or a PDF's first page), and open in the docs viewer from their name.
+- People who may add context can add a typed note. Signed out, **Add** opens the sign-in.
+- A session opened with a `worker=` link keeps that Worker on its docs viewer and profile links.
+- The Doc Library page and its viewer are readable in all three themes, and items stored on the session's Worker show when they were added and by whom.
+- Admins can export what the Session Agent may give a member as one file (`<slug>.session-agent.json`), from Admin. The same session state always gives the same file.
+- The Session Agent's dialog has a second switch, **Include my address with my answers**, on unless you turn it off. Off, your address is left off exported items; it still shows wherever the session shows your answers. Both switches stay available after a session ends.
+- The notice by the session's title and the two switches' help say who your answers are available to, following the session's results setting, and the session's note on where research data goes follows the notice.
+- Admins can turn on **Record chats** for the Session Agent; it is off by default. People asking then see **Store this chat**, ticked to start, and choose whether their address goes with it. Admins read and clear stored chats in Admin.
+- People who aren't signed in can ask the Session Agent, for General answers only, unless an admin turns off **Anyone can ask**. Where a session lets only some people sign in, gives a sign-in no AI access, or uses its own AI endpoint, a visitor is asked to sign in.
+- A hidden draft's **?** no longer says only your own answer is submitted. It says that while Share for research is on, the AI's prediction, its confidence and what you changed are saved with your answer.
+- In the account menu's **Your AI agent**, each command and prompt has a copy icon in its box that turns to a tick once copied, replacing the **Copy** buttons. **On my behalf** names the session when Agents (HTTP API) are off there, and its **?** opens below the line, where it no longer covers the tabs. The **As itself** prompt tells the agent to set its display name when you give your name, and says it may add links or files where the session invites it.
+- An Interview's draft review now survives a reload, Back, or reopening the tab. Its transcript, drafts, edits, sharing choices and any AI prefill are kept in this browser until you submit or discard, for at most 24 hours from when it was first kept, and nothing more is sent anywhere. Each is kept for the signed-in account, or for this browser when signed out, and is never shown to another account. Another browser starts empty, including Safari after a chat app's own browser.
+- A private session shows a way in where its content would be. Without an invite, a visitor is told the session is private and can paste an invite link. A valid group invite link opens the session, signed in or not, and keeps working in that browser until the invite stops holding.
+- A link's group invite is no longer lost when the page saves it late in start-up, on ordinary sessions too.
+
+### Workers — requires redeployment
+
+- The Session Agent can answer with GLM 5.3, an open model, on Cloudflare Workers AI, through the Worker's own AI binding. It is off by default and set per session. It is billed to the Cloudflare account that hosts the Worker, needs no AI key, and still counts toward a person's AI calls a day. Every other AI task (drafting, AI Views, voice) keeps the session's provider. Each call asks the model for low reasoning, so its thinking does not use up the reply limit.
+- A deploy from this release adds the AI binding to the Session Worker. Deploy requests started before this release and resumed after it are refused, since their bindings differ; start them again.
+- The first deploy shows whether your Cloudflare token can attach the AI binding; this has not been tried with a token that has only the two usual permissions. If Cloudflare refuses with "Authentication error", add the account permission **Workers AI: Read** to the token and deploy again.
+- New for the Session Agent: a signed admin export of its material, an address switch for exported items (`POST /session-agent/attribution`), chat recording with an admin read and delete, and questions from people who aren't signed in. Stored chats go into the export and session backups; one answered to an admin is never exported.
+- **On by default after a redeploy:** a session that already has a Session Agent starts answering visitors who aren't signed in, under the rules above. Signed-out asking has its own daily limits: 10 questions from one network address (fewer if the session's limit for signed-out addresses is lower) and 300 for the session. Turn off **Anyone can ask** to stop it.
+- The Session Agent is told to leave out what a member writes about themselves (a name, role, workplace or other detail), not to say it is there, and not to use it to pick out an answer; asked about a particular participant, it says only that it can't tell who took part. These are instructions to a model, not a filter: in trials it never named a participant, but asked what a participant described by their role had said, it still passed on that person's view, unnamed, in most replies. A session that needs stronger protection should give every audience General answers.
+- `POST /session-agent/status` now answers after a session has ended or its AI is off, with `closed` saying why, where it used to refuse.
+- Session settings accept a note on where research data goes (`interviewMode.dataNote`, up to 300 characters). Saving it signs no one out.
+- **Private sessions.** A session whose access rule names Worker groups shows its questions, context and results only to its admins, to signed-in members of a named group, and to anyone whose request carries a read invite for one, signed in or not. Each request reads the rule and the groups afresh, so removing a group, a member or a password refuses on the next request.
+- A read invite comes from a group password's link. The browser signs a read statement with a key derived from the password and sends it as `X-CE-Group-Invite`; the Worker never sees the password. A read spends nothing and cannot be used to join. A one-use code makes no read invite: its holder joins first.
+- Everyone else gets a shell from `GET /session-config`, with only what signing in and joining need and never the session's name, description, context or instructions, and `403` (`private_session_invite_required` or `private_session_invite_invalid`) on other routes.
+- The rule is a `worker_group` condition in the session's access conditions, any-of with the admin role so admins are never locked out, saved with `set-config`. This release has no control for it on `/new` or in Settings.
+- Adding a group to an access rule, or another condition to an any-of rule, signs no one out. Every narrowing still does.
+
+### Agents and MCP
+
+- MCP 0.5.0. A new tool, `ask_session_agent`, asks a session's own Session Agent one question, where the session has one and lets the agent ask. `join_session` and `get_session` say whether the session records those chats.
+- `join_session` tells a joining agent what it may do and is never required to: set a display name that says it is an AI agent, join a group the session lists as open, and add context where the session invites it. The agent guide and `llms.txt` say the same.
+- `join_session` and `join_group` join a private session from its invite link.
+- A private session's interview catalog opens only with a ticket from a signed-in member, since an AI fetching a catalog link sends no invite.
 
 ## [0.9.10] - 2026-11-15
 
