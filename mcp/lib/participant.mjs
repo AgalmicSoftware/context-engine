@@ -1048,6 +1048,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         } catch (error) {
           outcome.groupJoinError = describeError(groupRefusal(error, id, 'join_group', { sentInvite: !!groupInvite }));
         }
+      }
+      // Signed in now, and perhaps joined: read it again, so a member sees it whole from a plain link too.
+      if (privateSession) {
         sessionConfig = await ctx.client.loadConfig();
         Object.assign(outcome, sessionSummary(ctx, sessionConfig));
       }

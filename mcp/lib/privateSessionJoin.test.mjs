@@ -112,6 +112,15 @@ test('join_group takes a pasted invite link, naming its group, and reads the ses
   await assert.rejects(participant.joinGroup({ invite: elsewhere }), /another session/);
 });
 
+test('a member rejoining from a plain link reads the session whole once signed in', async (t) => {
+  const { participant, seen } = await setup(t);
+  await participant.joinSession({ link: link(`#groupInvite=${CODE}`) });
+  const again = await participant.joinSession({ link: `https://contextengine.sh/session/${slug}?worker=${encodeURIComponent(corsWorkerUrl)}` });
+  assert.equal(again.privateSession, undefined);
+  assert.equal(again.title, 'Secret salon');
+  assert.equal(seen.configs.at(-1), 'whole');
+});
+
 test('a one-use code makes no read invite, so the session is read whole once the join it pays for is made', async (t) => {
   const { participant, seen } = await setup(t);
   const joined = await participant.joinSession({ link: link(`#groupInvite=${CODE}`) });
