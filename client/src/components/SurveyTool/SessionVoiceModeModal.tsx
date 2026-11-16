@@ -24,7 +24,8 @@ import {
   clearKeptReview,
   keptReviewOwner,
   readKeptReview,
-  type KeptInterviewReview,
+  KeptInterviewReviewContext,
+  type RestoredReview,
 } from './sessionInterviewKeptReview';
 import type { SessionVoiceModeModalProps } from './sessionVoiceModeTypes';
 import styles from './SurveyTool.module.scss';
@@ -90,14 +91,17 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const owner = keptReviewOwner(props.account, Boolean(props.loginComplete));
   const readKept = () => {
     if (claim || !sessionSlug) return null;
-    const review = readKeptReview(sessionSlug, owner);
-    const sameLink = !prefillPacket || JSON.stringify(review?.packet) === JSON.stringify(prefillPacket);
-    return review && sameLink ? { owner, review } : null;
+    const kept = readKeptReview(sessionSlug, owner);
+    const sameLink = !prefillPacket || JSON.stringify(kept?.review.packet) === JSON.stringify(prefillPacket);
+    return sameLink ? kept : null;
   };
-  const [keptReview, setKeptReview] = useState<{ owner: string; review: KeptInterviewReview } | null>(readKept);
+  const [keptReview, setKeptReview] = useState<RestoredReview | null>(readKept);
+  // Whose key holds the review on screen, which the panel updates as it keeps it.
+  const keptForRef = useRef('');
   useEffect(() => {
     // One kept for another account is never left on screen; it stays kept for them. Signing in keeps your own.
-    if (keptReview && keptReview.owner !== owner && keptReview.owner !== 'browser') {
+    const holder = keptForRef.current || keptReview?.owner || '';
+    if (keptReview && holder !== owner && holder !== 'browser') {
       setKeptReview(null);
       setInterviewVersion((version) => version + 1);
     } else if (!keptReview && !hasUnsavedReview) {
@@ -134,6 +138,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   // Leaving the interview drops what fed it, so choosing Interview again starts afresh.
   const leaveInterview = () => {
     clearKeptReview(sessionSlug, owner);
+    if (keptForRef.current) clearKeptReview(sessionSlug, keptForRef.current);
+    keptForRef.current = '';
     setKeptReview(null);
     setHasUnsavedReview(false);
     setGroupsUnjoined(false);
@@ -219,18 +225,21 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         {mode === 'interview' ? (
           <VoiceModeBackContext.Provider value={goBack}>
             <VoiceModeUnjoinedGroupsContext.Provider value={setGroupsUnjoined}>
-              <SessionInterviewPanel
-                key={`${interviewVersion}:${prefillIdentity}:${keptReview ? 'kept' : ''}`}
-                {...props}
-                prefillPacket={reviewPacket}
-                keptReview={keptReview}
-                claim={claim}
-                onClose={requestClose}
-                questions={questions}
-                onSubmitResponses={submitResponses}
-                onReviewStateChange={setHasUnsavedReview}
-                onRequestDiscard={() => setConfirmDiscard('close')}
-              />
+              <KeptInterviewReviewContext.Provider
+                value={{ sessionSlug, owner, restored: keptReview, keptFor: keptForRef }}
+              >
+                <SessionInterviewPanel
+                  key={`${interviewVersion}:${prefillIdentity}:${keptReview ? 'kept' : ''}`}
+                  {...props}
+                  prefillPacket={reviewPacket}
+                  claim={claim}
+                  onClose={requestClose}
+                  questions={questions}
+                  onSubmitResponses={submitResponses}
+                  onReviewStateChange={setHasUnsavedReview}
+                  onRequestDiscard={() => setConfirmDiscard('close')}
+                />
+              </KeptInterviewReviewContext.Provider>
             </VoiceModeUnjoinedGroupsContext.Provider>
             <SessionInterviewAgentUse use={agentUse} className={styles.sessionInterviewAgentUse} />
             {/* Until the interview has something to review. */}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { hashSeed, mulberry32 } from '../../utilities/survey/seededPrng.js';
+import { useRestoredHiddenDrafts } from './sessionInterviewKeptReview';
 import {
   hasDraftValue,
   responseCommentValue,
@@ -130,22 +131,15 @@ const showUnrevealed = (current: HiddenDrafts, questionIds: string[]) => {
 
 type Options = ReviewValues & {
   questions: InterviewQuestion[];
-  /** A review kept in the browser: which drafts it hid, and what it revealed. */
-  initial?: HiddenDrafts;
   researchOn: boolean;
   // Told which still-hidden drafts' questions now have an answer, so review can drop them.
   onAnswered: (questionIds: string[]) => void;
 };
 
 /** Hidden-draft state for one review: which drafts are hidden, and each one's blind answer once revealed. */
-export function useInterviewHiddenDrafts({
-  questions,
-  editedDrafts,
-  savedResponses,
-  researchOn,
-  onAnswered,
-  initial,
-}: Options) {
+export function useInterviewHiddenDrafts({ questions, editedDrafts, savedResponses, researchOn, onAnswered }: Options) {
+  // A review kept in this browser: which drafts it hid, and what it revealed.
+  const initial = useRestoredHiddenDrafts();
   const [hidden, setHidden] = useState<HiddenDrafts>(() => initial || {});
   // A kept review already chose what to hide, so nothing it showed is hidden again.
   const assignedRef = useRef(Boolean(initial));

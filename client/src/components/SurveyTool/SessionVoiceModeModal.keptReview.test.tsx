@@ -45,9 +45,9 @@ const prefillPacket = {
     { questionId: 'b2', answer: 'Agree', confidence: 0.7 },
   ],
 };
-type Who = { account?: string; loginComplete?: boolean };
+type Who = { account?: string; loginComplete?: boolean; shareByDefault?: boolean };
 const onSubmitResponses = jest.fn();
-const modal = ({ account = alice, loginComplete = true }: Who = {}, packet: unknown = null) => (
+const modal = ({ account = alice, loginComplete = true, shareByDefault = false }: Who = {}, packet: unknown = null) => (
   <SessionVoiceModeModal
     isOpen
     mode="interview"
@@ -58,7 +58,7 @@ const modal = ({ account = alice, loginComplete = true }: Who = {}, packet: unkn
     account={account}
     loginComplete={loginComplete}
     workerUrl="https://worker.example"
-    sessionConfig={{ interviewMode: { shareDraftChangesByDefault: false } }}
+    sessionConfig={{ interviewMode: { shareDraftChangesByDefault: shareByDefault } }}
     questionPool={questionPool}
     prefillPacket={packet as typeof prefillPacket | null}
     onApplyAnswer={jest.fn()}
@@ -165,4 +165,58 @@ it('starts afresh when a link brings different evidence', async () => {
   render(modal({}, replacement));
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   expect(answer('b1')).toHaveValue('Agree');
+});
+
+const share = () => screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
+
+it.each([true, false])('keeps the Share for research choice against a default of %s', async (shareByDefault) => {
+  const first = render(modal({ shareByDefault }, prefillPacket));
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  expect(share()).toHaveProperty('checked', shareByDefault);
+  fireEvent.click(share());
+  await waitFor(() => expect(kept(`account:${alice}`)).toContain(`"included":${!shareByDefault}`));
+  first.unmount();
+  render(modal({ shareByDefault }));
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  expect(share()).toHaveProperty('checked', !shareByDefault);
+});
+
+it('keeps the review through a submit that fails', async () => {
+  onSubmitResponses.mockResolvedValue({ status: 'failed', message: 'Try again.' });
+  await startReview();
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+  await waitFor(() => expect(onSubmitResponses).toHaveBeenCalled());
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  expect(kept(`account:${alice}`)).toContain('Disagree');
+});
+
+it('counts the day from when the review was first kept, not from each restore', async () => {
+  (await startReview()).unmount();
+  const firstKept = JSON.parse(kept(`account:${alice}`)!).savedAt;
+  render(modal());
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  fireEvent.change(answer('b2'), { target: { value: 'Disagree' } });
+  await waitFor(() => expect(kept(`account:${alice}`)).toMatch(/"editedDrafts":\{[^]*"b2"/));
+  expect(JSON.parse(kept(`account:${alice}`)!).savedAt).toBe(firstKept);
+});
+
+it('clears the account’s kept review on discard after signing out', async () => {
+  const view = await startReview();
+  view.rerender(modal({ account: '', loginComplete: false }, prefillPacket));
+  fireEvent.click(screen.getByRole('button', { name: 'Discard interview' }));
+  const confirmation = await screen.findByRole('dialog', { name: 'Discard this interview?' });
+  fireEvent.click(within(confirmation).getByRole('button', { name: 'Discard interview' }));
+  await waitFor(() => expect(kept(`account:${alice}`)).toBeNull());
+});
+
+it('takes a restored review that moved to an account off the screen when that account signs out', async () => {
+  (await startReview({ account: '', loginComplete: false }, 'browser')).unmount();
+  const view = render(modal({ account: '', loginComplete: false }));
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  view.rerender(modal());
+  await waitFor(() => expect(kept(`account:${alice}`)).toContain('Disagree'));
+  view.rerender(modal({ account: '', loginComplete: false }));
+  await waitFor(() => expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument());
+  expect(kept(`account:${alice}`)).toContain('Disagree');
+  expect(kept('browser')).toBeNull();
 });

@@ -69,7 +69,6 @@ import {
   buildResearchPacket,
   describeInterviewStatus,
   describeResearchCoverage,
-  displayResponderContext,
   omitConcealedInterviewFacts,
   hasDraftValue,
   responseFieldValue,
@@ -87,7 +86,7 @@ import {
 import { draftsWithUnseenComments, useStartingInterviewComments } from './sessionInterviewComments';
 import { lockEncryptedFields } from './sessionInterviewResearch';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
-import { keptReviewOwner, useKeepInterviewReview, type KeptInterviewReview } from './sessionInterviewKeptReview';
+import { useKeptInterviewReview } from './sessionInterviewKeptReview';
 
 type UnknownRecord = SessionInterviewModalRecord;
 
@@ -105,8 +104,6 @@ type SessionInterviewPanelProps = SessionInterviewPanelBaseProps & {
   onReviewStateChange: (dirty: boolean) => void;
   // Asks the modal to confirm discarding this interview.
   onRequestDiscard: () => void;
-  // A review this browser kept through a reload, and whose it was.
-  keptReview?: { owner: string; review: KeptInterviewReview } | null;
 };
 
 export default function SessionInterviewPanel({
@@ -148,13 +145,11 @@ export default function SessionInterviewPanel({
   onClose,
   onReviewStateChange,
   onRequestDiscard,
-  keptReview = null,
 }: SessionInterviewPanelProps) {
-  const kept = keptReview?.review;
+  const kept = useKeptInterviewReview(prefillPacket, Boolean(claim));
   const disposedRef = useRef(false);
-  // A kept review's drafts already came from its prefill, so the link is neither imported nor checked again.
-  const importedRef = useRef(Boolean(kept?.drafts.length));
-  const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(kept?.drafts.length ? prefillPacket : null);
+  const importedRef = useRef(kept.drafts.length > 0);
+  const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(kept.drafts.length ? prefillPacket : null);
   const catalogAbortRef = useRef<AbortController | null>(null);
   const validatedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
   // The question set a prefill link was last checked against.
@@ -179,15 +174,13 @@ export default function SessionInterviewPanel({
     sessionSlug,
     hasQuestions: initialQuestions.length > 0,
   });
-  const [responderContext, setResponderContext] = useState(
-    () => kept?.responderContext ?? displayResponderContext(prefillPacket),
-  );
-  const [status, setStatus] = useState(initialError ? 'Error' : kept?.drafts.length ? 'Review drafts' : 'Ready');
-  const [transcript, setTranscript] = useState(kept?.transcript || '');
-  const transcriptRef = useRef(transcript);
-  const roundBaseTranscriptRef = useRef(transcript);
+  const [responderContext, setResponderContext] = useState(kept.responderContext);
+  const [status, setStatus] = useState(initialError ? 'Error' : kept.drafts.length ? 'Review drafts' : 'Ready');
+  const [transcript, setTranscript] = useState(kept.transcript);
+  const transcriptRef = useRef(kept.transcript);
+  const roundBaseTranscriptRef = useRef(kept.transcript);
   // The transcript the current drafts came from; a later round that was not mapped can still be.
-  const [mappedTranscript, setMappedTranscript] = useState(kept?.mappedTranscript || '');
+  const [mappedTranscript, setMappedTranscript] = useState(kept.mappedTranscript);
   const receiveTranscript = (current: string) => {
     const combined = appendInterviewTranscript(roundBaseTranscriptRef.current, current);
     transcriptRef.current = combined;
@@ -197,8 +190,8 @@ export default function SessionInterviewPanel({
   const [mappingNotice, setMappingNotice] = useState('');
   // Drafts left out of review because the person already answered their questions, and of those,
   // the answers a claim's AI reconsidered and repeated.
-  const [leftOutIds, setLeftOutIds] = useState<string[]>(kept?.leftOutIds || []);
-  const [stillFitIds, setStillFitIds] = useState<string[]>(kept?.stillFitIds || []);
+  const [leftOutIds, setLeftOutIds] = useState<string[]>([]);
+  const [stillFitIds, setStillFitIds] = useState<string[]>([]);
   const [applying, setApplying] = useState(false);
   const [pendingSubmitAfterLogin, setPendingSubmitAfterLogin] = useState(false);
   const pendingSubmitBaseContextRef = useRef('');
@@ -212,16 +205,14 @@ export default function SessionInterviewPanel({
     setError(initialError);
     setStatus('Error');
   }, [initialError]);
-  const [suggestedQuestions, setSuggestedQuestions] = useState<GeneratedSurveyStatement[]>(
-    kept?.suggestedQuestions || [],
-  );
+  const [suggestedQuestions, setSuggestedQuestions] = useState<GeneratedSurveyStatement[]>(kept.suggestedQuestions);
   const [groupRecommendationRequest, setGroupRecommendationRequest] =
     useState<SessionInterviewGroupRecommendationRequest | null>(null);
-  const [drafts, setDrafts] = useState<InterviewDraftResponse[]>(kept?.drafts || []);
-  const [selected, setSelected] = useState<Record<string, boolean>>(kept?.selected || {});
+  const [drafts, setDrafts] = useState<InterviewDraftResponse[]>(kept.drafts);
+  const [selected, setSelected] = useState<Record<string, boolean>>(kept.selected);
   // Explicitly removed cards stay hidden; saved-answer conflicts still need review.
-  const [removedDraftIds, setRemovedDraftIds] = useState<Record<string, boolean>>(kept?.removedDraftIds || {});
-  const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>(kept?.editedDrafts || {});
+  const [removedDraftIds, setRemovedDraftIds] = useState<Record<string, boolean>>(kept.removedDraftIds);
+  const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>(kept.editedDrafts);
   // The latest review, for work that resumes after an await.
   const latestReviewRef = useRef({ drafts, selected, editedDrafts, removedDraftIds });
   latestReviewRef.current = { drafts, selected, editedDrafts, removedDraftIds };
@@ -235,14 +226,14 @@ export default function SessionInterviewPanel({
     [sessionSlug, sessionConfig],
   );
   const researchPacket = buildResearchPacket(prefillPacket, sessionSlug, mappingModelId);
-  const [includeProvenance, setIncludeProvenance] = useState(true);
+  const [includeProvenance, setIncludeProvenance] = useState(kept.includeProvenance);
   const [researchSharingChoice, setResearchSharingChoice] = useState<{
     contextToken: string;
     included: boolean;
-  } | null>(null);
-  const [includeResponderName, setIncludeResponderName] = useState(false);
+  } | null>(kept.researchSharingChoice);
+  const [includeResponderName, setIncludeResponderName] = useState(kept.includeResponderName);
   // Like research sharing, kept across signing in to submit, which resets consentOverrides.
-  const [draftTextKept, setDraftTextKept] = useState<{ contextToken: string; included: boolean } | null>(null);
+  const [draftTextKept, setDraftTextKept] = useState(kept.draftText);
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
   const [submissionInfoOpen, setSubmissionInfoOpen] = useState(false);
   const sessionResearchDetail = normalizeInterviewSettings(sessionConfig?.interviewMode).researchDetail;
@@ -252,7 +243,7 @@ export default function SessionInterviewPanel({
   if (sessionResearchDetail === 'minimal' && shownResearchDetail !== 'minimal') setShownResearchDetail('minimal');
   const [showTranscript, setShowTranscript] = useState(false);
   // The questions an imported AI prefill drafted; its status line counts those still in review.
-  const [prefillDraftIds, setPrefillDraftIds] = useState<string[]>(kept?.prefillDraftIds || []);
+  const [prefillDraftIds, setPrefillDraftIds] = useState<string[]>(kept.prefillDraftIds);
   const prefillDraftCount = drafts.filter((draft) => prefillDraftIds.includes(draft.questionId)).length;
   const [contextExpanded, setContextExpanded] = useState(false);
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
@@ -367,7 +358,7 @@ export default function SessionInterviewPanel({
   // Drafts the person changed, or submitted from this review, are theirs to decide on.
   const submittedDraftIdsRef = useRef(new Set<string>());
   // Questions whose drafts last came from the person's own words in this interview.
-  const ownEvidenceIdsRef = useRef(new Set<string>(kept?.ownEvidenceIds));
+  const ownEvidenceIdsRef = useRef(kept.ownEvidenceIds);
   const participantOwned = useCallback(
     (questionId: string) =>
       Boolean(editedDrafts[questionId]?.userEditedFields?.length) || submittedDraftIdsRef.current.has(questionId),
@@ -448,7 +439,6 @@ export default function SessionInterviewPanel({
     savedResponses: existingResponseSlice,
     researchOn: includePredictionComparison,
     onAnswered: (questionIds) => dropDrafts(questionIds.filter((id) => !participantOwned(id))),
-    initial: kept?.drafts.length ? kept.hidden : undefined,
   });
   const {
     assign: assignHiddenDrafts,
@@ -1186,31 +1176,9 @@ export default function SessionInterviewPanel({
   useEffect(() => {
     onReviewStateChange(hasUnsavedReview);
   }, [hasUnsavedReview, onReviewStateChange]);
-  // Kept in this browser until it is submitted or discarded; a group conversation's part has its own keeping.
-  useKeepInterviewReview({
-    sessionSlug,
-    owner: keptReviewOwner(account, authenticatedForSubmit),
-    restoredFor: keptReview?.owner,
-    review:
-      hasUnsavedReview && !applying && !claim
-        ? {
-            packet: prefillPacket,
-            transcript,
-            mappedTranscript,
-            responderContext,
-            drafts,
-            selected,
-            removedDraftIds,
-            editedDrafts,
-            leftOutIds,
-            stillFitIds,
-            prefillDraftIds,
-            suggestedQuestions,
-            ownEvidenceIds: [...ownEvidenceIdsRef.current],
-            hidden: hiddenDrafts.hidden,
-          }
-        : null,
-  });
+  const keptText = { transcript, mappedTranscript, responderContext, suggestedQuestions, prefillDraftIds };
+  const keptChoices = { includeProvenance, researchSharingChoice, includeResponderName, draftText: draftTextKept };
+  kept.keep(hasUnsavedReview && { ...latestReviewRef.current, ...keptText, ...keptChoices }, hiddenDrafts.hidden);
   const scoreScreenShown = Boolean(submitSucceeded && fidelityScore);
   useEffect(() => {
     // The submission choices are settled; fold them away so the score has the room.
