@@ -5,11 +5,7 @@
  * Another browser, such as Safari after a chat app's own browser, has its own storage and starts empty.
  */
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import {
-  normalizeInterviewPrefillPacket,
-  type InterviewDraftResponse,
-  type InterviewPrefillPacket,
-} from './sessionInterview';
+import type { InterviewDraftResponse, InterviewPrefillPacket } from './sessionInterview';
 import type { HiddenInterviewDraft } from './sessionInterviewHiddenDrafts';
 import { displayResponderContext } from './sessionInterviewModalState';
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
@@ -121,11 +117,24 @@ export const readKeptReview = (sessionSlug: string, owner: string, now = Date.no
       : [];
     const transcript = text(review.transcript);
     if (!drafts.length && !transcript.trim()) return null;
+    // The packet as this page held it, which a link read or a paste had already checked. One that has lost its
+    // shape would break the review, so the whole record is dropped instead.
+    const packet = review.packet;
+    const packetBroken =
+      packet != null &&
+      !(
+        isRecord(packet) &&
+        packet.version === 1 &&
+        isRecord(packet.source) &&
+        typeof packet.source.modelId === 'string' &&
+        (packet.responses === undefined || Array.isArray(packet.responses))
+      );
+    if (packetBroken) return null;
     return {
       owner,
       since: Number(kept.savedAt),
       review: {
-        packet: review.packet ? normalizeInterviewPrefillPacket(review.packet) : null,
+        packet: isRecord(packet) ? (packet as InterviewPrefillPacket) : null,
         transcript,
         mappedTranscript: text(review.mappedTranscript),
         responderContext: text(review.responderContext),

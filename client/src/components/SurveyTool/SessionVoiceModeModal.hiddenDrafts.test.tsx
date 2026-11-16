@@ -135,6 +135,9 @@ const submit = () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTE
 const reviewed = (props: ReturnType<typeof renderReview>, questionId: string) =>
   props.onRecordProvenance.mock.calls[0][6].find((entry: { questionId: string }) => entry.questionId === questionId);
 
+// A review left unsubmitted is kept in this browser and would open in the next test.
+beforeEach(() => window.localStorage.clear());
+
 it('hides the same share of AI prefill drafts on every load while research sharing is on', async () => {
   const { unmount } = renderReview();
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
@@ -247,6 +250,29 @@ it('reveals a statement guess after the answer and records the first answer', as
     }),
   );
   expect(reviewed(props, shownStatement).predictionCondition).toBeUndefined();
+});
+
+it('keeps hidden drafts hidden, and a revealed one with its first answer, through a reload', async () => {
+  const first = renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  answerWith(hiddenStatement, 'Disagree');
+  await waitFor(() =>
+    expect(window.localStorage.getItem(`ce:interview-review:v1:demo:account:${account}`)).toContain('"blindAnswer"'),
+  );
+  first.unmount();
+  const props = renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  expect(answer(hiddenStatement)).toHaveValue('Disagree');
+  expect(card(hiddenStatement)).toHaveTextContent('Your AI guessed: Agree · 80% sure');
+  for (const id of hiddenIds.filter((hiddenId) => hiddenId !== hiddenStatement)) {
+    expect(card(id)).toHaveTextContent(HIDDEN_DRAFT_NOTE);
+    expect(answer(id)).toHaveValue('');
+  }
+  submit();
+  await waitFor(() => expect(props.onSubmitResponses).toHaveBeenCalled());
+  expect(reviewed(props, hiddenStatement)).toEqual(
+    expect.objectContaining({ predictionCondition: 'blind', blindAnswer: 'Disagree' }),
+  );
 });
 
 it('reveals a rating guess once the person moves to another question', async () => {

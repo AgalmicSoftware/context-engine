@@ -59,7 +59,7 @@ it('lets a review run out a day after it was first kept, whoever it belongs to',
   expect(window.localStorage.length).toBe(0);
 });
 
-it('ignores a kept review whose stored owner differs from its key, or that holds nothing', () => {
+it('ignores a kept review whose owner differs from its key, that holds nothing, or whose packet broke', () => {
   window.localStorage.setItem(
     'ce:interview-review:v1:demo:account:0xabc',
     JSON.stringify({ v: 1, owner: 'account:0xdef', savedAt: now, review: review() }),
@@ -69,6 +69,18 @@ it('ignores a kept review whose stored owner differs from its key, or that holds
   expect(readKeptReview('demo', 'browser', now)).toBeNull();
   window.localStorage.setItem('ce:interview-review:v1:demo:browser', '{not json');
   expect(readKeptReview('demo', 'browser', now)).toBeNull();
+  for (const packet of [
+    { version: 1 },
+    { version: 1, source: {}, responses: [] },
+    { version: 1, source: { modelId: 'm' }, responses: 'x' },
+    'packet',
+  ]) {
+    writeKeptReview('demo', 'browser', review({ packet: packet as never }), now);
+    expect(readKeptReview('demo', 'browser', now)).toBeNull();
+  }
+  const packet = { version: 1, sessionSlug: 'demo', source: { modelId: 'm' } };
+  writeKeptReview('demo', 'browser', review({ packet: packet as never }), now);
+  expect(readKeptReview('demo', 'browser', now)?.review.packet).toEqual(packet);
 });
 
 it('reads back only well-formed parts of a review', () => {
