@@ -226,7 +226,9 @@ view toggles for Circles, Breakdown, and Risk Matrix,
 `autoAfter: { threshold: 10, unit: "distinctParticipants" }`,
 `inputScope: "submitted"`, and `publication: "latest_success_visible"`.
 The threshold counts newly seen distinct submitted participants since the last
-successful run. Circles renders the DebateMap-style argument map and atlas.
+successful run. Results shows no view of its own for the build; the Session
+Agent reads it as its summary of results. Admins build the atlas and risk
+matrix separately, from the open Results menu.
 Risk Matrix axes are generated from the session subject matter rather than a
 fixed likelihood/impact template. Generation inherits the session's configured
 AI provider and model routing, including object-shaped `ai.models.thinking`

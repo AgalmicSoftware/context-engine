@@ -1,5 +1,4 @@
 import { resolveGeneratedResultsControllerState } from './sessionResultsAnalysisController';
-import { buildGeneratedBreakdownAnalysisData } from '../../components/SessionResults/sessionResultsGeneratedViewAdapters';
 import { buildResultsAnalysisBrowserSnapshotFromCacheNode } from './sessionResultsAnalysisBrowserSnapshot';
 import { loadAdminSnapshotResultsAnalysisSource } from '../../../../workers/sessionCorsWorker/resultsAnalysisGeneration';
 
@@ -296,7 +295,7 @@ it('counts a note-only encrypted response as locked like the Worker', () => {
 });
 
 it.each(['Two  spaces', 'Non\u00a0breaking'])(
-  'keeps option whitespace from Worker through the live controller and Breakdown: %s',
+  'keeps option whitespace from Worker through the live controller: %s',
   async (option) => {
     const source = await loadAdminSnapshotResultsAnalysisSource({
       slug: 'edge',
@@ -326,18 +325,7 @@ it.each(['Two  spaces', 'Non\u00a0breaking'])(
         state: { jobState: 'succeeded', lastGood: { snapshot } },
       },
     });
-    const result = buildGeneratedBreakdownAnalysisData({ questions: state.questions, responses: state.responses });
-    expect(
-      result.analysisData?.flatResponses.map(({ responseText, count, participantCount, totalVotes, rate }) => [
-        responseText,
-        count,
-        participantCount,
-        totalVotes,
-        rate,
-      ]),
-    ).toEqual([
-      [option, 1, 2, 2, 0.5],
-      ['Other', 1, 2, 2, 0.5],
-    ]);
+    expect(state.questions).toEqual([expect.objectContaining({ id: 'q1', options: [option, 'Other'] })]);
+    expect(state.responses.map(({ answer }) => answer)).toEqual(expect.arrayContaining([[option], ['Other']]));
   },
 );

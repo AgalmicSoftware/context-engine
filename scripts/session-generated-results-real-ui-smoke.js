@@ -243,96 +243,6 @@ async function capture(page, name, viewport) {
   await page.screenshot({ path: path.join(OUTPUT, `${viewport.width}-${name}.png`), fullPage: true });
 }
 
-async function getCircleNodeForLabel(page, label) {
-  const marker = `data-smoke-circle-node-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-  const foundInteractiveNode = await page.evaluate(
-    ({ attributeName, expectedLabel }) => {
-      const nodes = Array.from(document.querySelectorAll('[data-ce-node-layout="packed"]'));
-      const target = nodes.find((node) => (node.textContent || '').includes(expectedLabel));
-      if (!(target instanceof HTMLElement)) return false;
-      target.setAttribute(attributeName, 'true');
-      return true;
-    },
-    { attributeName: marker, expectedLabel: label },
-  );
-  assert.ok(foundInteractiveNode, `expected ${label} to be inside an interactive circle node`);
-  const node = page.locator(`[${marker}="true"]`).first();
-  await node.waitFor({ state: 'visible', timeout: 20000 });
-  return node;
-}
-
-async function closeDebateMapDetailIfOpen(page) {
-  const closeButton = page.getByRole('button', { name: 'Close', exact: true }).first();
-  if ((await closeButton.count()) === 0) return;
-  if (await closeButton.isVisible()) {
-    await closeButton.click();
-  }
-}
-
-async function assertRiskMatrixDetailInsideScrollBounds(page, scrollTarget) {
-  const detailText = page.getByText('Dual-use release without review.', { exact: true }).first();
-  await detailText.waitFor({ state: 'visible', timeout: 20000 });
-  const detailBox = await detailText.boundingBox();
-  const scrollBox = await scrollTarget.boundingBox();
-  assert.ok(detailBox, 'mobile Risk Matrix detail paragraph should be measurable');
-  assert.ok(scrollBox, 'mobile Risk Matrix scroll container should be measurable for detail bounds');
-  assert.ok(
-    detailBox.x + 0.5 >= scrollBox.x,
-    `mobile Risk Matrix detail should not be clipped at the scroll container leading edge: ${JSON.stringify({ detailBox, scrollBox })}`,
-  );
-  assert.ok(
-    detailBox.x + detailBox.width <= scrollBox.x + scrollBox.width + 0.5,
-    `mobile Risk Matrix detail should not be clipped at the scroll container trailing edge: ${JSON.stringify({ detailBox, scrollBox })}`,
-  );
-}
-
-async function captureMobileRiskMatrixAccess(page, viewport) {
-  if (viewport.width > 480) return;
-
-  const targetSelector = 'data-smoke-risk-scroll-target';
-  const foundScrollableRiskGrid = await page.evaluate((attributeName) => {
-    const candidates = Array.from(document.querySelectorAll('*')).filter((node) => node instanceof HTMLElement);
-    const scored = candidates
-      .map((node) => {
-        const text = node.textContent || '';
-        const className = typeof node.className === 'string' ? node.className : '';
-        const id = node.id || '';
-        const testId = node.getAttribute('data-testid') || '';
-        const riskTextScore = /Misuse|Publication impact|likelihood|risk|matrix|Release|Monitoring/i.test(text) ? 1 : 0;
-        const identityScore = /risk|matrix|heat|grid/i.test(`${className} ${id} ${testId}`) ? 2 : 0;
-        const overflowScore = node.scrollWidth > node.clientWidth + 24 && node.clientWidth >= 180 && node.clientHeight >= 80 ? 4 : 0;
-        return { node, score: overflowScore + identityScore + riskTextScore };
-      })
-      .filter(({ score, node }) => score >= 5 && node.scrollWidth > node.clientWidth + 24)
-      .sort((left, right) => right.score - left.score || (right.node.scrollWidth - right.node.clientWidth) - (left.node.scrollWidth - left.node.clientWidth));
-    const target = scored[0]?.node;
-    if (!target) return false;
-    target.setAttribute(attributeName, 'true');
-    target.scrollLeft = 0;
-    return true;
-  }, targetSelector);
-
-  assert.ok(foundScrollableRiskGrid, 'mobile Risk Matrix should expose a horizontal scroll container');
-  const scrollTarget = page.locator(`[${targetSelector}="true"]`).first();
-  const box = await scrollTarget.boundingBox();
-  assert.ok(box, 'mobile Risk Matrix scroll target should be visible');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.wheel(700, 0);
-  const didScroll = await scrollTarget.evaluate((node) => {
-    if (!(node instanceof HTMLElement)) return false;
-    if (node.scrollLeft <= 0) node.scrollLeft = node.scrollWidth;
-    return node.scrollLeft > 0 && node.scrollWidth > node.clientWidth;
-  });
-  assert.ok(didScroll, 'mobile Risk Matrix should scroll horizontally to offscreen cells');
-  await capture(page, 'risk-matrix-mobile-scrolled', viewport);
-
-  const detailTarget = page.getByRole('button', { name: /Misuse release/i }).first();
-  await detailTarget.click();
-  await assertVisibleText(page, 'Dual-use release without review');
-  await assertRiskMatrixDetailInsideScrollBounds(page, scrollTarget);
-  await capture(page, 'risk-matrix-mobile-details', viewport);
-}
-
 async function assertVisibleText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({ state: 'visible', timeout: 20000 });
 }
@@ -373,6 +283,16 @@ async function assertDesktopReportButtonInsideResultsScroller(page, viewport) {
   );
 }
 
+// AI Views has no tabs of its own: its build feeds the Session Agent. This checks that Results shows none of
+// its views, and that an admin can still check, refresh and retry it.
+async function assertNoAiViewsTabs(page) {
+  const nav = page.getByTestId('ce-session-results-view-nav');
+  await nav.getByRole('button', { name: 'Report', exact: true }).first().waitFor({ state: 'visible', timeout: 20000 });
+  for (const name of ['Circles', 'Breakdown', 'Risk Matrix', 'Atlas']) {
+    assert.equal(await nav.getByRole('button', { name, exact: true }).count(), 0, `${name} should not be a Results tab`);
+  }
+}
+
 async function run() {
   await fs.mkdir(OUTPUT, { recursive: true });
   const headed = process.env.HEADED === '1' || process.env.PWDEBUG === '1';
@@ -388,47 +308,21 @@ async function run() {
       await page.goto(`${BASE_URL}/generated-results-smoke`, { waitUntil: 'domcontentloaded', timeout: 60000 });
       await page.getByTestId('ce-real-generated-results-smoke').waitFor();
       await page.getByTestId('ce-session-results-toggle').click();
-      await page.getByRole('button', { name: 'Breakdown' }).waitFor();
+      await assertNoAiViewsTabs(page);
       await assertDesktopReportButtonInsideResultsScroller(page, viewport);
-      await page.getByRole('button', { name: 'Circles' }).click();
-      await assertVisibleText(page, 'Independent review before release');
-      await assertVisibleText(page, 'Source trust');
-      assert.ok(await page.getByText(/Release governance|Source trust|Independent review/).count() >= 2);
-      await capture(page, 'circles', viewport);
-      const sourceTrustNode = await getCircleNodeForLabel(page, 'Source trust');
-      await sourceTrustNode.hover();
-      await capture(page, 'circles-hover', viewport);
-      await sourceTrustNode.click();
-      await assertVisibleText(page, 'Reload latest successful analysis for viewers');
-      await capture(page, 'circles-category-drill', viewport);
-      const reloadLeafNode = await getCircleNodeForLabel(page, 'Reload latest successful analysis for viewers');
-      await reloadLeafNode.click();
-      await assertVisibleText(page, 'Viewers should see the latest published artifact');
-      await capture(page, 'circles-leaf-detail', viewport);
-      await closeDebateMapDetailIfOpen(page);
-      await page.getByRole('button', { name: 'Breakdown' }).click();
-      await assertVisibleText(page, 'Synthetic generated interpretation');
-      await capture(page, 'breakdown', viewport);
-      await page.getByRole('button', { name: 'Risk Matrix' }).click();
-      await assertVisibleText(page, 'Misuse');
-      await capture(page, 'risk-matrix', viewport);
-      await captureMobileRiskMatrixAccess(page, viewport);
+      await capture(page, 'results', viewport);
       await page.getByRole('button', { name: 'Check AI Views' }).click();
       await page.getByRole('button', { name: 'Refresh AI Views' }).waitFor();
       await capture(page, 'permission', viewport);
       await page.getByRole('button', { name: 'Refresh AI Views' }).click();
-      await assertVisibleText(page, 'Refreshing generated views');
-      await capture(page, 'refresh-running', viewport);
-      await assertVisibleText(page, 'Post-refresh misuse');
-      await capture(page, 'refresh-success', viewport);
+      await page.getByRole('button', { name: 'Refresh AI Views' }).waitFor();
       await page.getByRole('button', { name: 'Refresh AI Views' }).click();
       await assertVisibleText(page, 'AI provider timeout');
-      await assertVisibleText(page, 'Post-refresh misuse');
-      await capture(page, 'provider-failure-preserves-artifact', viewport);
+      await capture(page, 'provider-failure', viewport);
       await page.getByRole('button', { name: 'Retry AI Views' }).click();
-      await assertVisibleText(page, 'Authenticate with the session Worker');
-      await assertVisibleText(page, 'Post-refresh misuse');
-      await capture(page, 'permission-error-preserves-artifact', viewport);
+      await page.getByTestId('ce-session-generated-results-check').waitFor({ state: 'visible', timeout: 20000 });
+      await capture(page, 'permission-error', viewport);
+      await assertNoAiViewsTabs(page);
       results.push({ viewport, ok: true });
       await page.close();
 
@@ -438,19 +332,10 @@ async function run() {
       await anonPage.goto(`${BASE_URL}/generated-results-smoke?viewer=anonymous`, { waitUntil: 'domcontentloaded', timeout: 60000 });
       await anonPage.getByTestId('ce-real-generated-results-smoke').waitFor();
       await anonPage.getByTestId('ce-session-results-toggle').click();
-      await anonPage.getByRole('button', { name: 'Breakdown' }).waitFor();
-      await anonPage.getByRole('button', { name: 'Breakdown' }).click();
-      await assertVisibleText(anonPage, 'Synthetic refreshed interpretation');
+      await assertNoAiViewsTabs(anonPage);
       assert.equal(await anonPage.getByTestId('ce-session-generated-results-check').count(), 0);
       assert.equal(await anonPage.getByTestId('ce-session-generated-results-generate').count(), 0);
       await capture(anonPage, 'anonymous-viewer', viewport);
-      await anonPage.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
-      await anonPage.getByTestId('ce-real-generated-results-smoke').waitFor();
-      await anonPage.getByTestId('ce-session-results-toggle').click();
-      await anonPage.getByRole('button', { name: 'Risk Matrix' }).click();
-      await assertVisibleText(anonPage, 'Post-refresh misuse');
-      assert.equal(await anonPage.getByTestId('ce-session-generated-results-generate').count(), 0);
-      await capture(anonPage, 'anonymous-reload', viewport);
       await anonPage.close();
     }
   } finally {

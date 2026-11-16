@@ -695,9 +695,8 @@ Admin test panel:
   new build shows at once through the instance that made it.
 - Generated-results AI calls inherit the session's existing AI provider/model
   routing, especially the analysis/thinking assignment. They do not hardcode a
-  separate provider or model. Inputs are submitted responses only; Circles is
-  the DebateMap argument-map plus atlas view, and Risk Matrix axes are generated
-  from the session subject matter.
+  separate provider or model. Inputs are submitted responses only. Results
+  shows no view of its own for the build; the Session Agent reads it.
 - Research CSV exports quote all cells and prefix formula-like text with an apostrophe, matching browser exports. Plain numeric strings remain numeric-looking values; JSONL preserves original text exactly.
 - Agent groups JSON and images share the minimum-size group projection. The JSON participant count includes only kept groups, and images draw only their listed aliases; unmatched participants are omitted.
 - Generated Breakdown `groups` obey `anonymizedGroupsEnabled` and `minGroupSize`.
@@ -814,10 +813,10 @@ BASE_URL=http://127.0.0.1:3100 node scripts/session-generated-results-real-ui-sm
 ```
 
 The fixture uses synthetic submitted questions/responses and synthetic
-generated artifacts. It exercises real OnePageSession refresh success, provider
-timeout with the newer artifact preserved, admin-auth `403` with the allowed
-viewer artifact preserved, a second anonymous viewer plus reload, mobile Risk
-Matrix scroll/detail behavior, and Circles hover/drill interactions.
+generated artifacts. Results shows no AI Views tab; the build feeds the Session
+Agent. The smoke checks that no such tab appears, and exercises real
+OnePageSession refresh success, provider timeout, admin-auth `403` offering the
+check again, and an anonymous viewer without admin controls.
 
 ## Session Storage Routes
 

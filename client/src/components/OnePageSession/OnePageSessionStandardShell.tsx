@@ -26,12 +26,6 @@ import { hasDemoAnalysisFixture } from '../../utilities/demo/demoFixtureSessionS
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
 import type { RiskMatrixBuild } from '../../domains/riskMatrix/riskMatrixTypes';
-import type { SessionGeneratedResultsViewKey } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
-import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
-import type {
-  GeneratedResultsSnapshotQuestion,
-  GeneratedResultsSnapshotResponse,
-} from '../../domains/sessionResults/sessionResultsAnalysisController';
 import styles from './OnePageSession.module.scss';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
 import SessionContextSources from './SessionContextSources';
@@ -48,7 +42,6 @@ const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const CorpusViewer = lazyWithRetry(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
-const SessionGeneratedResultsViews = React.lazy(() => import('../SessionResults/SessionGeneratedResultsViews'));
 // Loaded only for a session whose context is an uploaded HTML page, with its sanitizer.
 const SessionContextHtml = React.lazy(() => import('./SessionContextHtml'));
 const SessionDebateAtlasView = React.lazy(() => import('../DebateAtlas/SessionDebateAtlasView'));
@@ -193,31 +186,25 @@ const renderSectionHeading = (title: React.ReactNode, subtitle?: React.ReactNode
   </span>
 );
 
-const DEBATE_ATLAS_VIEW_OPTION: ResultsViewOption = { key: 'debateAtlas', label: 'Debate Atlas', icon: '🗺️' };
+const DEBATE_ATLAS_VIEW_OPTION: ResultsViewOption = { key: 'debateAtlas', label: 'Atlas', icon: '🗺️' };
 const RISK_MATRIX_VIEW_OPTION: ResultsViewOption = { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' };
 
+// A demo session shows its fixtures; any other shows the views an admin has built, and to those who may build
+// them, the views not built yet.
 const buildResultsViewOptions = (
   isDemoSlug: boolean,
   showDemoAnalysisView: boolean,
-  generatedOptions: ResultsViewOption[] = [],
-  builtOptions: ResultsViewOption[] = [],
-): ResultsViewOption[] => {
-  const demoOptions =
-    isDemoSlug && generatedOptions.length === 0
-      ? [
-          DEBATE_ATLAS_VIEW_OPTION,
-          ...(showDemoAnalysisView ? [{ key: 'analysis', label: 'Breakdown', icon: '📊' }] : []),
-          RISK_MATRIX_VIEW_OPTION,
-        ]
-      : [];
-  // A built view takes the place of the AI Views one of its name.
-  const builtKeys = new Set(builtOptions.map(({ key }) => key));
-  return [
-    { key: 'polis', label: 'Report', icon: '🧾' },
-    ...(demoOptions.length === 0 ? builtOptions : []),
-    ...(generatedOptions.length > 0 ? generatedOptions.filter(({ key }) => !builtKeys.has(key)) : demoOptions),
-  ];
-};
+  builtOptions: ResultsViewOption[],
+): ResultsViewOption[] => [
+  { key: 'polis', label: 'Report', icon: '🧾' },
+  ...(isDemoSlug
+    ? [
+        DEBATE_ATLAS_VIEW_OPTION,
+        ...(showDemoAnalysisView ? [{ key: 'analysis', label: 'Breakdown', icon: '📊' }] : []),
+        RISK_MATRIX_VIEW_OPTION,
+      ]
+    : builtOptions),
+];
 
 // The shared reader's limits apply here as in MCP and on the Worker.
 const normalizeSessionContextView = (config: unknown): SessionContextView | null => {
@@ -381,8 +368,8 @@ export default function OnePageSessionStandardShell({
   // Risk Matrix and Context links open nodes of the demo atlas, so it stays the one shown for them.
   const showDemoAtlas = isDemoSlug && (!showBuiltAtlas || !!embeddedAtlasNodeId);
   const builtViewOptions = [
-    ...(showBuiltAtlas ? [DEBATE_ATLAS_VIEW_OPTION] : []),
-    ...(riskMatrix.build ? [RISK_MATRIX_VIEW_OPTION] : []),
+    ...(atlas.build || atlas.canBuild ? [DEBATE_ATLAS_VIEW_OPTION] : []),
+    ...(riskMatrix.build || riskMatrix.canBuild ? [RISK_MATRIX_VIEW_OPTION] : []),
   ];
   const builtViewKeys = new Set(builtViewOptions.map(({ key }) => key));
   const buildAtlasHelpId = `build-atlas-help-${React.useId().replace(/:/g, '')}`;
@@ -396,7 +383,7 @@ export default function OnePageSessionStandardShell({
       helpId: buildAtlasHelpId,
       label: 'Build atlas',
       busyLabel: 'Building atlas…',
-      help: 'Builds a debate atlas from the responses right now: the categories and topics people raised, the positions in each, and where everyone stands. Takes a few minutes. Everyone who sees Results sees it, and earlier builds stay to compare.',
+      help: 'Builds an atlas from the responses right now: the topics and subtopics people raised, the positions in each, and where everyone stands. Takes a few minutes. Everyone who sees Results sees it, and earlier builds stay to compare.',
     },
     {
       kind: 'risk-matrix' as const,
@@ -413,39 +400,15 @@ export default function OnePageSessionStandardShell({
     generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}
   ) as UnknownRecord;
   const generatedHasArtifact = !!generatedState.artifact;
-  const generatedViewOptions =
-    generatedState.viewerAuthorized === true && generatedHasArtifact
-      ? (Array.isArray(generatedState.viewOptions) ? generatedState.viewOptions : [])
-          .map((option: unknown) => {
-            const record = option && typeof option === 'object' ? (option as UnknownRecord) : {};
-            const key = String(record.key || '');
-            return {
-              key,
-              label: String(record.label || key),
-              icon: key === 'circles' ? '◎' : key === 'breakdown' ? '📊' : '⚠️',
-            };
-          })
-          .filter((option) => option.key)
-      : [];
-  const generatedViewKeys = new Set(
-    generatedViewOptions.map((option) => option.key).filter((key) => !builtViewKeys.has(key)),
-  );
   const requestedResultsViewMode = resultsViewMode;
-  const effectiveResultsViewMode = generatedViewKeys.has(requestedResultsViewMode)
-    ? requestedResultsViewMode
-    : isDemoSlug
-      ? requestedResultsViewMode === 'analysis' && !showDemoAnalysisView
-        ? 'polis'
-        : requestedResultsViewMode
-      : requestedResultsViewMode === 'polis' || builtViewKeys.has(requestedResultsViewMode)
-        ? requestedResultsViewMode
-        : 'polis';
-  const resultsViewOptions = buildResultsViewOptions(
-    isDemoSlug,
-    showDemoAnalysisView,
-    generatedViewOptions,
-    builtViewOptions,
-  );
+  const effectiveResultsViewMode = isDemoSlug
+    ? requestedResultsViewMode === 'analysis' && !showDemoAnalysisView
+      ? 'polis'
+      : requestedResultsViewMode
+    : requestedResultsViewMode === 'polis' || builtViewKeys.has(requestedResultsViewMode)
+      ? requestedResultsViewMode
+      : 'polis';
+  const resultsViewOptions = buildResultsViewOptions(isDemoSlug, showDemoAnalysisView, builtViewOptions);
   const generatedStatus = String(generatedState.status || 'idle');
   const generatedIsRunning = generatedState.isRunning === true || generatedStatus === 'running';
   const generatedCanCheckStatus = generatedState.canCheckStatus === true;
@@ -1080,55 +1043,31 @@ export default function OnePageSessionStandardShell({
                     />
                   </Suspense>
                 )}
-                {isDemoSlug &&
-                  !riskMatrix.build &&
-                  effectiveResultsViewMode === 'riskMatrix' &&
-                  !generatedViewKeys.has(effectiveResultsViewMode) && (
-                    <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
-                      <RiskMatrix
-                        embedded={true}
-                        onOpenAtlasNode={onCorpusAtlasIssueOpen}
-                        restoreState={riskMatrixRestoreState}
-                        onRestoreApplied={onRiskMatrixRestoreApplied}
-                      />
-                    </Suspense>
-                  )}
-                {generatedViewKeys.has(effectiveResultsViewMode) && (
-                  <div className={styles.generatedResultsPanel} data-testid="ce-session-generated-results-panel">
-                    <div className={styles.generatedResultsStatus}>
-                      <span>{String(generatedState.statusLabel || '')}</span>
-                    </div>
-                    {generatedState.artifact ? (
-                      <Suspense fallback={<LazyFallback label="Loading generated AI view..." minHeight="30vh" />}>
-                        <SessionGeneratedResultsViews
-                          artifact={generatedState.artifact as SessionResultsGeneratedAnalysisArtifact}
-                          questions={
-                            (Array.isArray(generatedState.questions)
-                              ? generatedState.questions
-                              : []) as GeneratedResultsSnapshotQuestion[]
-                          }
-                          responses={
-                            (Array.isArray(generatedState.responses)
-                              ? generatedState.responses
-                              : []) as GeneratedResultsSnapshotResponse[]
-                          }
-                          selectedView={effectiveResultsViewMode as SessionGeneratedResultsViewKey}
-                          sessionSlug={displaySessionSlug}
-                        />
-                      </Suspense>
-                    ) : (
-                      <div className={styles.generatedResultsEmpty} data-testid="ce-session-generated-results-empty">
-                        <p>
-                          {String(
-                            generatedState.unsupportedReason ||
-                              generatedState.statusLabel ||
-                              'No generated view is available yet.',
-                          )}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                {isDemoSlug && !riskMatrix.build && effectiveResultsViewMode === 'riskMatrix' && (
+                  <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
+                    <RiskMatrix
+                      embedded={true}
+                      onOpenAtlasNode={onCorpusAtlasIssueOpen}
+                      restoreState={riskMatrixRestoreState}
+                      onRestoreApplied={onRiskMatrixRestoreApplied}
+                    />
+                  </Suspense>
                 )}
+                {/* Shown only to those who may build it: nothing stands in for a view before an admin builds it. */}
+                {!isDemoSlug &&
+                  resultsBuilds.map(({ kind, mode, results, busy, label, busyLabel }) =>
+                    effectiveResultsViewMode === mode && !results.build && !results.loading ? (
+                      <p key={kind} className={styles.resultsBuildEmpty} data-testid={`ce-session-${kind}-empty`}>
+                        {busy ? (
+                          busyLabel
+                        ) : (
+                          <>
+                            Not built yet. Press <strong>{label}</strong> above to build it from the responses so far.
+                          </>
+                        )}
+                      </p>
+                    ) : null,
+                  )}
               </div>
             </div>
           )}

@@ -218,14 +218,6 @@ jest.mock('../ResultsBuilds/useSessionResultsBuild', () => ({
       selectBuild: () => {},
     },
 }));
-jest.mock('../SessionResults/SessionGeneratedResultsViews', () => ({
-  __esModule: true,
-  default: (props) => (
-    <div data-testid="session-generated-results-view">
-      Generated {props.selectedView} for {props.sessionSlug}
-    </div>
-  ),
-}));
 jest.mock('../DemoViews/CorpusViewer', () => {
   const React = require('react');
   const fullCorpusUrl =
@@ -969,7 +961,7 @@ describe('OnePageSession results routing', () => {
     expect(screen.getByRole('button', { name: /^Report$/i })).toBeInTheDocument();
   });
 
-  it('shows real generated artifacts ahead of seeded demo result fixtures for demo-interview-3', async () => {
+  it('shows no AI Views tab for an AI Views build, nor any seeded demo view', async () => {
     const props = buildProps();
     const demoSessionId = `0x${'2'.repeat(32)}`;
     const fetchMock = jest.fn().mockResolvedValue({
@@ -1043,19 +1035,15 @@ describe('OnePageSession results routing', () => {
         expect.objectContaining({ method: 'GET' }),
       );
     });
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /^Circles$/i })).toBeInTheDocument();
-    });
-
-    expect(screen.queryByRole('button', { name: /^Debate Atlas$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Breakdown$/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^Circles$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('session-generated-results-view')).toHaveTextContent(
-        'Generated circles for demo-interview-3',
-      );
-    });
+    const nav = screen.getByTestId('ce-session-results-view-nav');
+    await waitFor(() =>
+      expect(
+        within(nav)
+          .getAllByRole('button')
+          .map((button) => button.textContent.trim()),
+      ).toEqual(['🧾Report', 'Raw Results']),
+    );
+    expect(screen.queryByRole('button', { name: /^(Circles|Breakdown|Risk Matrix|Atlas)$/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
   });
 
@@ -1257,7 +1245,7 @@ describe('OnePageSession results routing', () => {
   });
 
   it.each(['rxc-test', 'rxc-ra-test'])(
-    'shows %s its own context, with no built-in atlas or pre-filled Debate Atlas',
+    'shows %s its own context, with no built-in atlas or pre-filled Atlas',
     async (slug) => {
       const props = buildProps();
       const sessionRef = React.createRef();
@@ -1369,7 +1357,7 @@ describe('OnePageSession results routing', () => {
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
     };
 
-    it.each(['rxc-test', 'rxc-ra-test', 'edge'])('shows the built atlas as Debate Atlas on %s', async (slug) => {
+    it.each(['rxc-test', 'rxc-ra-test', 'edge'])('shows the built atlas as Atlas on %s', async (slug) => {
       mockDebateAtlasState = atlasState();
       renderSession(slug);
       const nav = screen.getByTestId('ce-session-results-view-nav');
@@ -1377,8 +1365,8 @@ describe('OnePageSession results routing', () => {
         within(nav)
           .getAllByRole('button')
           .map((button) => button.textContent.trim()),
-      ).toEqual(['🧾Report', '🗺️Debate Atlas', 'Raw Results']);
-      fireEvent.click(within(nav).getByRole('button', { name: 'Debate Atlas' }));
+      ).toEqual(['🧾Report', '🗺️Atlas', 'Raw Results']);
+      fireEvent.click(within(nav).getByRole('button', { name: 'Atlas' }));
       const view = await screen.findByTestId('ce-session-debate-atlas');
       expect(within(view).getByRole('heading', { name: 'Salon atlas' })).toBeVisible();
       expect(view).toHaveTextContent('12 responses · 4 participants');
@@ -1395,7 +1383,7 @@ describe('OnePageSession results routing', () => {
     it('shows a built atlas in place of the demo atlas on a demo session', async () => {
       mockDebateAtlasState = atlasState();
       renderSession('demo');
-      fireEvent.click(await screen.findByRole('button', { name: /^Debate Atlas$/i }));
+      fireEvent.click(await screen.findByRole('button', { name: /^Atlas$/i }));
       await screen.findByTestId('ce-session-debate-atlas');
       expect(mockDebateMap).toHaveBeenCalled();
       expect(
@@ -1403,7 +1391,36 @@ describe('OnePageSession results routing', () => {
       ).toBe(true);
     });
 
-    it('offers Build atlas to those who may build and opens Debate Atlas when it finishes', async () => {
+    it('shows no Atlas before a build to those who may not build one', () => {
+      mockDebateAtlasState = atlasState({ builds: [], build: null });
+      renderSession('edge');
+      const nav = screen.getByTestId('ce-session-results-view-nav');
+      expect(
+        within(nav)
+          .getAllByRole('button')
+          .map((button) => button.textContent.trim()),
+      ).toEqual(['🧾Report', 'Raw Results']);
+    });
+
+    it('tells those who may build that the atlas is not built yet, in place of any view', async () => {
+      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true });
+      renderSession('edge');
+      fireEvent.click(screen.getByRole('button', { name: 'Atlas' }));
+      expect(await screen.findByTestId('ce-session-debate-atlas-empty')).toHaveTextContent(
+        'Not built yet. Press Build atlas above to build it from the responses so far.',
+      );
+      expect(screen.queryByTestId('ce-session-debate-atlas')).not.toBeInTheDocument();
+      expect(mockDebateMap).not.toHaveBeenCalled();
+    });
+
+    it('says the first atlas is building while it builds', async () => {
+      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, building: true });
+      renderSession('edge');
+      fireEvent.click(screen.getByRole('button', { name: 'Atlas' }));
+      expect(await screen.findByTestId('ce-session-debate-atlas-empty')).toHaveTextContent(/^Building atlas…$/);
+    });
+
+    it('offers Build atlas to those who may build and opens Atlas when it finishes', async () => {
       const startBuild = jest.fn(async () => true);
       mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, startBuild });
       const sessionRef = React.createRef();
@@ -1556,7 +1573,7 @@ describe('OnePageSession results routing', () => {
       expect(mockRiskMatrix.mock.calls.every(([props]) => typeof props.onOpenAtlasNode !== 'function')).toBe(true);
     });
 
-    it("takes the place of AI Views' risk matrix and leaves its other views", async () => {
+    it('shows only the built risk matrix beside an AI Views build', async () => {
       jest.spyOn(OnePageSession.prototype, 'loadGeneratedResultsArtifact').mockImplementation(() => Promise.resolve());
       mockRiskMatrixState = riskState();
       const sessionRef = React.createRef();
@@ -1578,11 +1595,8 @@ describe('OnePageSession results routing', () => {
           },
         });
       });
-      expect(viewButtons()).toEqual(['🧾Report', '⚠️Risk Matrix', '◎Circles']);
+      expect(viewButtons()).toEqual(['🧾Report', '⚠️Risk Matrix']);
       await expectBuiltMatrix();
-      expect(screen.queryByTestId('ce-session-generated-results-panel')).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Circles' }));
-      expect(await screen.findByTestId('ce-session-generated-results-panel')).toBeVisible();
     });
 
     it('offers Build risk matrix beside Build atlas and opens Risk Matrix when it finishes', async () => {
@@ -2102,78 +2116,6 @@ describe('OnePageSession results routing', () => {
     expect(tabletResultsBlock).toContain('padding: 6px 10px;');
   });
 
-  it('renders generated Risk Matrix instead of seeded demo RiskMatrix when a demo artifact provides it', async () => {
-    const props = buildProps();
-    const demoSessionId = `0x${'3'.repeat(32)}`;
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        ok: true,
-        sessionSlug: 'demo-interview-3',
-        sessionId: demoSessionId,
-        settings: {
-          version: 1,
-          generationMode: 'manual',
-          views: { circles: true, breakdown: true, riskMatrix: true },
-          autoAfter: { threshold: 10, unit: 'distinctParticipants' },
-          inputScope: 'submitted',
-          publication: 'latest_success_visible',
-        },
-        artifact: {
-          kind: 'ce_session_results_analysis_artifact',
-          source: 'ai-generated',
-          version: 1,
-          sections: {
-            argumentMap: { available: true, debates: [] },
-            atlas: { available: true, nodes: [], edges: [] },
-            breakdown: {
-              available: true,
-              summary: { overview: 'Generated demo artifact' },
-              dimensions: [],
-              groups: [],
-            },
-            riskMatrix: { available: true, categories: [], comments: [], heatmap: {}, scenarioLinks: [] },
-          },
-        },
-        snapshot: { questions: [], responses: [] },
-        source: { responseCount: 2, participantCount: 2 },
-      }),
-    });
-    Object.defineProperty(global, 'fetch', { writable: true, value: fetchMock });
-
-    render(
-      <MemoryRouter initialEntries={['/session/demo-interview-3']}>
-        <OnePageSession
-          {...props}
-          slug="demo-interview-3"
-          sessionConfig={{
-            ...props.sessionConfig,
-            slug: 'demo-interview-3',
-            sessionId: demoSessionId,
-            corsWorkerUrl: 'https://worker.example',
-            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-            storageProfile: {
-              backend: 'cloudflare',
-              resources: { questions: 'active', surveys: 'active', responses: 'active' },
-            },
-          }}
-        />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-    await screen.findByRole('button', { name: /^Risk Matrix$/i });
-    fireEvent.click(screen.getByRole('button', { name: /^Risk Matrix$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('session-generated-results-view')).toHaveTextContent(
-        'Generated riskMatrix for demo-interview-3',
-      );
-    });
-    expect(screen.queryByTestId('risk-matrix-view')).not.toBeInTheDocument();
-  });
-
   it('renders the shared risk matrix view in embedded mode for demo results', async () => {
     const props = buildProps();
 
@@ -2368,7 +2310,7 @@ describe('OnePageSession results routing', () => {
     expect(reportButton).not.toHaveTextContent('🐝');
   });
 
-  it('orders Debate Atlas ahead of Breakdown in the demo results mode switcher', async () => {
+  it('orders Atlas ahead of Breakdown in the demo results mode switcher', async () => {
     const props = buildProps();
 
     render(<OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />);
@@ -2376,7 +2318,7 @@ describe('OnePageSession results routing', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
     const reportButton = await screen.findByRole('button', { name: /^Report$/i });
-    const debateMapButton = screen.getByRole('button', { name: /^Debate Atlas$/i });
+    const debateMapButton = screen.getByRole('button', { name: /^Atlas$/i });
     const breakdownButton = screen.getByRole('button', { name: /^Breakdown$/i });
     const riskMatrixButton = screen.getByRole('button', { name: /^Risk Matrix$/i });
 
@@ -2403,7 +2345,7 @@ describe('OnePageSession results routing', () => {
         .getAllByRole('button')
         .slice(0, 4)
         .map((button) => button.getAttribute('title') || button.textContent?.trim()),
-    ).toEqual(['Report', 'Debate Atlas', 'Breakdown', 'Risk Matrix']);
+    ).toEqual(['Report', 'Atlas', 'Breakdown', 'Risk Matrix']);
 
     const polisButton = screen.getByRole('button', { name: /^Report$/i });
     const analysisButton = screen.getByRole('button', { name: /^Breakdown$/i });
