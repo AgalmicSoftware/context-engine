@@ -376,6 +376,13 @@ with a note.
   under their own ids, and refuses if the target already holds different
   chats.
 
+- **AI agents.** An agent taking part through the Context Engine MCP asks with
+  its `ask_session_agent` tool, under the same rules. `join_session` and
+  `get_session` tell it whether the session records chats
+  (`sessionAgent.recording`) before it asks, and the tool starts as the dialog
+  does: stored while recording is on, with no address unless the agent asks for
+  it. The Agent HTTP API has no route for asking the Session Agent.
+
 The Worker's routes: `GET /admin/session-agent/chats?slug=<slug>[&cursor=][&limit=]`
 with an admin's sign-in returns `{ entries, cursor?, stored }`, 100 a page at
 most; the signed admin action `session-agent/chats/delete` takes `{ ids }`

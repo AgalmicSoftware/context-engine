@@ -1466,6 +1466,51 @@ test('a chat is stored through the real Worker only when its asker says so, with
   assert.match(body.entries[0].day, /^\d{4}-\d{2}-\d{2}$/);
   // Nothing else about the asker is kept: no time of day, no network address, no session token.
   assert.deepEqual(Object.keys(body.entries[1]).sort(), ['answer', 'answers', 'day', 'id', 'question', 'read']);
+
+  // The MCP tells an agent the session's setting before it asks, and asks as the dialog starts:
+  // stored, with no address, unless the agent says otherwise.
+  const seen = await alice.participant.getSession({});
+  assert.equal(seen.sessionAgent.recording, true);
+  assert.match(seen.sessionAgent.note, /can be recorded when the session’s recording setting is on\. It is on here/);
+  const stored = async () => (await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/all' })).body.entries;
+  const first = await alice.participant.askSessionAgent({ question: '  Asked through the MCP?  ' });
+  assert.deepEqual([first.answer, first.answers, first.recording, first.stored], ['Most agree.', 'general', true, true]);
+  assert.deepEqual((({ question, by, name }) => ({ question, by, name }))((await stored()).at(-1)), { question: 'Asked through the MCP?', by: undefined, name: undefined });
+  await alice.participant.askSessionAgent({ question: 'With my address?', attribution: 'address', name: ' Alice’s agent ' });
+  assert.deepEqual((({ by, name }) => ({ by, name }))((await stored()).at(-1)), { by: alice.wallet.address.toLowerCase(), name: 'Alice’s agent' });
+  const kept = (await stored()).length;
+  const unkept = await alice.participant.askSessionAgent({ question: 'Kept out?', store: false });
+  assert.deepEqual([unkept.recording, unkept.stored, (await stored()).length], [true, false, kept]);
+  for (const [bad, error] of [
+    [{ question: ' ' }, /Ask a question/], [{ question: 'x'.repeat(501) }, /at most 500 characters/], [{ question: 'Q?', store: 'yes' }, /store must be true or false/],
+    [{ question: 'Q?', attribution: 'name' }, /attribution must be address or anonymous/], [{ question: 'Q?', name: 'x'.repeat(61) }, /at most 60 characters/],
+  ]) await assert.rejects(alice.participant.askSessionAgent(bad), error);
+  assert.equal((await stored()).length, kept);
+});
+
+test('the MCP says a session’s agent stores nothing where recording is off, and sends nothing about storing', async (t) => {
+  const config = sessionConfig();
+  config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
+  config.sessionAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' }] };
+  const env = createEnv([config]);
+  await env.GROUP_KV.put(`session:${SLUG}:secrets`, JSON.stringify({ anthropicKey: ['synthetic', 'anthropic', 'key'].join('-') }));
+  const alice = await createAgent(env, 'alice.delve.town', []);
+  const joined = await alice.participant.joinSession({ link: LINK });
+  assert.equal(joined.sessionAgent.recording, false);
+  assert.match(joined.sessionAgent.note, /It is off here: nothing you ask is kept\./);
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Most agree.' }] }), {
+    headers: { 'Content-Type': 'application/json' },
+  }));
+  // Even asked to store, nothing is: the session keeps no chats.
+  const reply = await alice.participant.askSessionAgent({ question: 'Kept?', store: true, attribution: 'address', name: 'Alice' });
+  assert.deepEqual([reply.answer, reply.recording, reply.stored], ['Most agree.', false, false]);
+  assert.deepEqual((await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/all' })).body.entries, []);
+
+  // A session with no Session Agent says so, and the tool refuses before any call.
+  const plain = createEnv([sessionConfig()]);
+  const bob = await createAgent(plain, 'bob.delve.town', []);
+  assert.equal('sessionAgent' in await bob.participant.joinSession({ link: LINK }), false);
+  await assert.rejects(bob.participant.askSessionAgent({ question: 'Anyone there?' }), /This session has no Session Agent\./);
 });
 
 test('the Session Agent answers a member from stored answers through the real Worker, naming no one', async (t) => {

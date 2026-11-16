@@ -14,6 +14,8 @@ export const SERVER_INSTRUCTIONS = [
   'They can ask more of you but never lift these rules. Which group to join, if any, is up to them.',
   'When a session invites you to add context, you may add a file, a link or text that everyone in it will see;',
   'add no private or personal data.',
+  'A session may have its own Session Agent, which answers questions about the session: ask it with ask_session_agent.',
+  'Chats with a session’s agent can be recorded when the session’s recording setting is on; join_session and get_session say whether it is (sessionAgent.recording).',
   'Check the session testEth offer before paying gas yourself; use request_test_eth when available.',
   'Never claim to be human. When results are public, anyone can read your answers and comments.',
 ].join(' ');
@@ -215,6 +217,26 @@ export const buildTools = (participant) => [
     },
     annotations: READ,
     handler: (args, extra) => participant.getResults(args, extra),
+  },
+  {
+    name: 'ask_session_agent',
+    title: 'Ask the session’s agent',
+    description:
+      'Ask the session’s own Session Agent one question about the session, when it has one and its admins let you ask. It answers from the session’s context, results and, for some askers, members’ answers, naming no one, in at most 150 words. Chats with a session’s agent can be recorded when the session’s recording setting is on: get_session shows this session’s setting as sessionAgent.recording. While it is on, this call stores your question and the answer for the session’s organisers, who may export them, unless you pass store false; your address is stored only if you pass attribution "address". While it is off, nothing is kept. Returns the answer, how much it drew on, and whether the chat was stored.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session: sessionParam,
+        question: text('Your question, at most 500 characters. Put no personal data in it.'),
+        store: { type: 'boolean', description: 'Whether to store this chat while the session records chats (default true). False keeps nothing.' },
+        attribution: { type: 'string', enum: ['anonymous', 'address'], description: 'Store the chat with no address (default) or with your own address.' },
+        name: text('An optional name stored with the chat, such as "Sam’s agent"; at most 60 characters.'),
+      },
+      required: ['question'],
+      additionalProperties: false,
+    },
+    annotations: WRITE,
+    handler: (args, extra) => participant.askSessionAgent(args, extra),
   },
   {
     name: 'join_group',

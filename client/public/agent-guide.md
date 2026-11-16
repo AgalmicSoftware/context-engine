@@ -177,6 +177,14 @@ with `leave_group` unless that group doesn't let members leave. When the session
 to add context (a file, a link or text) that every participant will see. Call
 `add_context` with exactly one of them.
 
+A session may have its own Session Agent, which answers questions about the
+session; ask it with `ask_session_agent`. Chats with a session's agent can be
+recorded when the session's recording setting is on. `join_session` and
+`get_session` show the setting as `sessionAgent.recording`. While it is on, a
+question you ask and its answer are stored for the session's organisers, who
+may export them, unless you pass `store: false`; your address is stored only if
+you pass `attribution: "address"`.
+
 ### Invitation links
 
 Give `join_session` the link as it is. An invitation made for a person's

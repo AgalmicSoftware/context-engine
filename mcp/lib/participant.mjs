@@ -8,6 +8,7 @@ import { readAgentState, updateAgentState } from './agentState.mjs';
 import { buildQuestionRecord, buildResponseRecord, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
 import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorageVersions.mjs';
 import { htmlToPlainText, normalizeSessionContext } from '../../shared/sessionContext.mjs';
+import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
 import { MAX_AGENT_INSTRUCTIONS_CHARS } from '../../shared/sessionConfigEdits.mjs';
 import { CONTEXT_AGENT_ADDER, agentAdderName, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { buildNote, checkContextLink, contextInvitation, contextUploadForm, readContextFile, workerReadsContext } from './contextAdditions.mjs';
@@ -184,6 +185,21 @@ const sameAuthoringInputs = (stored, record) => {
       Number(question.voiceCredits ?? 99),
     ]);
   return inputs(stored) === inputs(record);
+};
+
+// What join_session and get_session say about the session's own agent, when
+// it has one: whether chats with it are recorded here, said before any is asked.
+const RECORDING_NOTICE = 'Chats with a session’s agent can be recorded when the session’s recording setting is on.';
+const sessionAgentOf = (config) => {
+  if (!isRecord(config?.sessionAgent) || !Array.isArray(config.sessionAgent.audiences)) return null;
+  const recording = config.sessionAgent.history === true;
+  return {
+    recording,
+    note: recording
+      ? `${RECORDING_NOTICE} It is on here: ask_session_agent stores your question and its answer for the session’s organisers, who may export them, unless you pass store false. Your address is stored only if you pass attribution "address".`
+      : `${RECORDING_NOTICE} It is off here: nothing you ask is kept.`,
+    how: 'Call ask_session_agent with a question about the session. It answers only the people its admins let ask.',
+  };
 };
 
 // The session's own instructions for agents: shown in full up to the cap
@@ -1013,6 +1029,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       outcome.context = contextOf(sessionConfig);
       const instructions = instructionsOf(sessionConfig);
       if (instructions) outcome.agentInstructions = instructions;
+      const sessionAgent = ctx.registry ? null : sessionAgentOf(sessionConfig);
+      if (sessionAgent) outcome.sessionAgent = sessionAgent;
       const sessionSbts = listSessionSbts(sessionConfig);
       if (sessionSbts.length) outcome.sessionSbts = sessionSbts;
       // The link's group is named, not joined, so the agent can read the session's instructions first.
@@ -1042,12 +1060,14 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const endsAt = text(sessionConfig.sessionEndsAt);
       const sessionSbts = listSessionSbts(sessionConfig);
       const instructions = instructionsOf(sessionConfig);
+      const sessionAgent = ctx.registry ? null : sessionAgentOf(sessionConfig);
       return {
         ...sessionSummary(ctx, sessionConfig),
         testEth: await ctx.client.describeTestEth(),
         description: text(sessionConfig.sessionInfo).slice(0, MAX_DESCRIPTION_LENGTH),
         context: contextOf(sessionConfig),
         ...(instructions ? { agentInstructions: instructions } : {}),
+        ...(sessionAgent ? { sessionAgent } : {}),
         ...(endsAt ? { endsAt } : {}),
         ...(sessionSbts.length ? { sessionSbts } : {}),
         ...(ctx.registry ? {} : await describeGroups(ctx)),
@@ -1420,6 +1440,46 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       } catch (error) {
         throw contextRefusal(error, { olderLink: kind === 'url' && featuresUnread });
       }
+    },
+
+    async askSessionAgent({ session, question, store, attribution, name } = {}) {
+      const asked = trim(question);
+      if (!asked) throw new Error('Ask a question.');
+      if (asked.length > SESSION_AGENT_LIMITS.questionChars) {
+        throw new Error(`A question can be at most ${SESSION_AGENT_LIMITS.questionChars} characters.`);
+      }
+      if (store !== undefined && typeof store !== 'boolean') throw new Error('store must be true or false.');
+      if (attribution !== undefined && !['address', 'anonymous'].includes(attribution)) {
+        throw new Error('attribution must be address or anonymous.');
+      }
+      if (name !== undefined && typeof name !== 'string') throw new Error('name must be text.');
+      if (trim(name).length > SESSION_AGENT_LIMITS.nameChars) {
+        throw new Error(`A name can be at most ${SESSION_AGENT_LIMITS.nameChars} characters.`);
+      }
+      const ctx = await resolveSession(session);
+      if (ctx.registry) throw new Error('On-chain sessions have no Session Agent.');
+      const sessionAgent = sessionAgentOf(await ensureReady(ctx));
+      if (!sessionAgent) throw new Error('This session has no Session Agent.');
+      checkpoint();
+      // As the session page's dialog starts: stored while the session records chats, with no address.
+      // Where it records none, nothing about storing is sent, and the Worker keeps nothing.
+      const keep = sessionAgent.recording
+        ? { store: store !== false, attribution: attribution || 'anonymous', ...(trim(name) ? { name: trim(name) } : {}) }
+        : {};
+      const reply = await ctx.client.request('/session-agent/ask', {
+        method: 'POST', auth: true, signal, body: { question: asked, ...keep },
+      });
+      const stored = typeof reply?.stored === 'boolean';
+      return {
+        session: ctx.info.slug,
+        answer: text(reply?.answer),
+        answers: text(reply?.answers),
+        ...(isRecord(reply?.read) ? { read: reply.read } : {}),
+        ...(text(reply?.note) ? { note: text(reply.note) } : {}),
+        // The Worker's own word on both: its setting may have changed since this session was read.
+        recording: stored,
+        stored: reply?.stored === true,
+      };
     },
 
     async claimSbt({ session, sbt: sbtAddress, inviteCode, groupPassword, claimPassword } = {}) {
