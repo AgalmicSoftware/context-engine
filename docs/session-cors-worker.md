@@ -2022,7 +2022,9 @@ Upload policy `group_allowlist` may be supplied on Cloudflare storage uploads wi
 
 A session whose access rule (`payloadAccessControl.accessConditions`) has a
 `worker_group` condition (`{ "kind": "worker_group", "groupIds": [...] }`, one
-to twenty stored group ids) is private. Its questions, context and results show
+to twenty stored group ids) is private. Such a rule must be any-of (`match:
+"any"`) and include `{ "kind": "worker_role", "role": "admin" }`, so admins are
+never locked out. Its questions, context and results show
 only to its admins, to signed-in members of a named group, and to anyone whose
 request carries a read invite for one, signed in or not. Each request reads the
 rule and the groups afresh, so adding a group signs no one out and removing a
@@ -2052,10 +2054,15 @@ group, a member or a password refuses on the next request.
 - **Routes.** Signed out: the session config, `/llms.txt`,
   `/resource-presence`, `/interview/starter`, the interview catalog, the
   Session Agent, `/ai`, `/transcribe`, `/realtime/call`, `/groups/list`, the
-  results routes and storage reads. Signed in: every route except storage
-  reads and uploads (which apply the rule to each request themselves) and
+  results routes and storage reads. The session config, `/llms.txt`,
+  `/resource-presence`, `/interview/starter` and `/realtime/call` also read an
+  optional bearer, so a member who has no invite to send passes; a bearer that
+  doesn't hold counts as signed out. Signed in: every route except storage
+  reads and uploads (which apply the rule to each request themselves),
   `/groups/my-memberships`, `/groups/join` and `/groups/leave`, so anyone
-  signed in can still join a group by its id. Agent HTTP holds agent, participant and
+  signed in can still join a group by its id, and `/session-agent/opt-out`,
+  `/session-agent/attribution` and `/storage/draft-text/delete`, which stay
+  each person's own after they lose access. Agent HTTP holds agent, participant and
   wrapped credentials to the rule by their account. Open to all: CORS
   preflights, `/capabilities`, sign-in, signed-out feedback (a note to the
   admins), sponsored deploy codes, agent descriptors and `session-meta`
