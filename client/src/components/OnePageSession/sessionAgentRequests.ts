@@ -139,7 +139,7 @@ export const askSessionAgent = async (
 export const setSessionAgentOptOut = async (optedOut: boolean, options: SessionAgentRequestOptions): Promise<boolean> =>
   (await post('/session-agent/opt-out', { optedOut }, options)).optedOut === true;
 
-/** Leaves this person's address off what an admin exports (true), or puts it back. */
+/** Leaves this person's address off what they wrote and added in an admin's export (true), or puts it back. */
 export const setSessionAgentUnattributed = async (
   unattributed: boolean,
   options: SessionAgentRequestOptions,

@@ -33,8 +33,9 @@ describe('sessionAgentWording', () => {
     );
     expect(sessionAgentAddressNotice(config)).toBe(
       `What you wrote and the files you added are available with your account address ${reach}, ` +
-        'and may be exported with it. Turning this off leaves your address off exports only; it still shows ' +
-        'wherever this session shows your answers. Copies already made keep it.',
+        'and may be exported with it. Turn this off and exports leave your address off what you wrote and added; ' +
+        'a group’s member list in an export still includes it, and it still shows wherever this session shows ' +
+        'your answers. Copies already made keep it.',
     );
   });
 

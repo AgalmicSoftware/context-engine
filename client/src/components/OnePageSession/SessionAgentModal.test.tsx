@@ -163,11 +163,12 @@ describe('SessionAgentModal', () => {
     expect(include).toBeChecked();
     const help = dialog.getByRole('button', { name: 'About your address on your answers' });
     // This session's config names no results setting, so only its organisers are claimed; the switch
-    // changes exports and nothing else, and says so.
+    // takes the address off what the person wrote and added in exports, not off a group's member list, and says so.
     expect(help).toHaveAccessibleDescription(
       'What you wrote and the files you added are available with your account address to this session’s ' +
-        'organisers, and may be exported with it. Turning this off leaves your address off exports only; it ' +
-        'still shows wherever this session shows your answers. Copies already made keep it.',
+        'organisers, and may be exported with it. Turn this off and exports leave your address off what you ' +
+        'wrote and added; a group’s member list in an export still includes it, and it still shows wherever ' +
+        'this session shows your answers. Copies already made keep it.',
     );
 
     setUnattributed.mockResolvedValueOnce(true);

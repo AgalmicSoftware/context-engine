@@ -27,8 +27,12 @@ export const SESSION_AGENT_USE_NOTICE =
   'you. Turning it off stops future use and keeps them out of exports made from then on; it can’t take back ' +
   'answers already given.';
 
-/** Behind the "?" of "Include my address with my answers". The switch changes exports and nothing else. */
+/**
+ * Behind the "?" of "Include my address with my answers". The switch changes exports and nothing else, and there
+ * only what the person wrote and added: an export's group member lists carry every member's address.
+ */
 export const sessionAgentAddressNotice = (sessionConfig: unknown): string =>
   `What you wrote and the files you added are available with your account address ${answersReach(sessionConfig)}, ` +
-  'and may be exported with it. Turning this off leaves your address off exports only; it still shows wherever ' +
-  'this session shows your answers. Copies already made keep it.';
+  'and may be exported with it. Turn this off and exports leave your address off what you wrote and added; a ' +
+  'group’s member list in an export still includes it, and it still shows wherever this session shows your ' +
+  'answers. Copies already made keep it.';

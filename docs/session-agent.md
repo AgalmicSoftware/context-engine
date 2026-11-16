@@ -185,8 +185,9 @@ older backup has none: after restoring one, tell people to set the switch again.
 A second switch there, **Include my address with my answers**, is also on
 until the person turns it off. Off, their answers and files stay in, and the
 [export](#export) leaves their account address off them. It changes the
-export only: the address still shows wherever the session shows their
-answers. The Worker stores
+export only, and there only what they wrote and added: the export's group
+member lists still include their address, and it still shows wherever the
+session shows their answers. The Worker stores
 who turned it off, and backs that up, the same way, from 0.9.11. Only someone
 signed in with an address has it. The interview dialog carries the first
 switch only.
