@@ -359,6 +359,11 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
     const header = `rxc:0x${'ab'.repeat(65)}`;
     const worker = 'https://session-a.example.workers.dev';
     saveGroupReadHeader({ workerUrl: worker, sessionSlug: 'session-a', sessionId: SESSION_ID, header });
+    // Proofs for the same session on another Worker, and for another session on this one, are never sent here.
+    const otherWorker = 'https://session-b.example.workers.dev';
+    const decoy = `rxc:0x${'cd'.repeat(65)}`;
+    saveGroupReadHeader({ workerUrl: otherWorker, sessionSlug: 'session-a', sessionId: SESSION_ID, header: decoy });
+    saveGroupReadHeader({ workerUrl: worker, sessionSlug: 'session-b', sessionId: SESSION_ID, header: decoy });
     const respond = async () =>
       new Response(JSON.stringify(buildPayload()), { status: 200, headers: { 'Content-Type': 'application/json' } });
     try {
@@ -376,6 +381,8 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
       });
     } finally {
       forgetGroupReadHeader(worker, 'session-a');
+      forgetGroupReadHeader(otherWorker, 'session-a');
+      forgetGroupReadHeader(worker, 'session-b');
     }
   });
 
