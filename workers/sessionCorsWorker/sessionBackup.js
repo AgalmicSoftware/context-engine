@@ -9,6 +9,7 @@ import { bytesToBase64url } from './storageEnvelopeEncryption.js';
 import {
   getStorageIndexBinding, getStorageR2Binding, buildPayloadKey, readStoredCloudflarePayloadBytes,
 } from './storageRouteExecution.js';
+import { BACKUP_EXPORT_SETTLE_MS } from './storageBackupRevision.js';
 import { STORAGE_EXPORT_PAGE_LIMITS, createStorageExportBudget, jsonByteLength, storageExportCursor, parseStorageExportCursor } from './storageScanBudget.js';
 
 const encoder = new TextEncoder();
@@ -17,9 +18,14 @@ const fail = (message, status = 409, reason) => { throw Object.assign(new Error(
 const digestBytes = async (bytes) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((v) => v.toString(16).padStart(2, '0')).join('');
 const prefixes = (slug) => [null, `ce-storage-hidden:${slug}:`, `ce-storage-owner:${slug}:`, `ce-storage-payload:${slug}:`, `ce-storage:${slug}:`, `sessions/${slug}/storage/`];
 
+// The first page waits after taking the export lease so that every write that
+// skipped its marks (markStorageBackupWrite) has finished before it reads the
+// revision it starts from.
+const settleAfterLease = () => new Promise((resolve) => setTimeout(resolve, BACKUP_EXPORT_SETTLE_MS));
+
 // Access state is pinned across pages. Storage writes must be quiescent during
 // export: KV and R2 do not offer a joint, point-in-time snapshot.
-export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = '' }) => {
+export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor = '', settle = settleAfterLease }) => {
   const keySlug = sessionSlugStorageKey(slug);
   // Authenticate the entire position before trusting scan offsets or revisions.
   // Page MACs alone would let an admin ask us to sign an incomplete archive.
@@ -34,8 +40,16 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   const rawIndex = getStorageIndexBinding(env);
   const index = rawIndex ? budget.wrap(rawIndex) : null;
   if (!index?.list || !index?.get) fail('Backup storage is unavailable.', 503);
-  const current = await callSessionConfigCoordinator({ env, slug, path: 'backup/export', expectedAuthority });
-  if (!current.ok) fail(current.body?.error || 'Backup authority is unavailable.', current.status);
+  const readExport = async () => {
+    const result = await callSessionConfigCoordinator({ env, slug, path: 'backup/export', expectedAuthority });
+    if (!result.ok) fail(result.body?.error || 'Backup authority is unavailable.', result.status);
+    return result;
+  };
+  let current = await readExport();
+  if (!cursor) {
+    await settle();
+    current = await readExport();
+  }
   const coordinator = current.body.coordinator;
   const sessionId = resolveCanonicalWorkerSessionIdHex(coordinator.configAuthority.config);
   if (!sessionId) fail('The session has no canonical identity.');
@@ -48,8 +62,10 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
     fail('Invalid backup cursor. Restart the export.', 400, 'backup_cursor_invalid');
   }
   const position = parsed.continuation || { phase: 0, listCursor: '', lastKey: '', chunk: -1, pageNumber: 0,
-    exportedAt: new Date().toISOString(), writeRevision: current.body.writeRevision,
+    exportedAt: new Date().toISOString(), writeRevision: current.body.writeRevision, leaseSince: current.body.leaseSince,
     configDigest: await sha256Hex(JSON.stringify(coordinator)), counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 } };
+  // A write marked since the start, or the lease lapsed so writes skipped marks.
+  const changedSince = (result) => position.writeRevision !== result.body.writeRevision || position.leaseSince !== result.body.leaseSince;
   const nextCursor = () => signBackupCursor(storageExportCursor({ prefix, sessionId, continuation: position }), env);
   if (position.configDigest !== await sha256Hex(JSON.stringify(coordinator))) fail('Session config changed during backup. Restart the export.', 409, 'backup_session_changed');
   const groups = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: 'export', snapshotId: position.groupSnapshotId });
@@ -83,11 +99,10 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   const page = { ok: true, manifest, pageNumber: position.pageNumber, entries: [], nextCursor: '', snapshotDigest,
     archiveId: position.archiveId };
   const finish = async () => {
-    const latest = await callSessionConfigCoordinator({ env, slug, path: 'backup/export', expectedAuthority });
-    if (!latest.ok) fail(latest.body?.error || 'Backup authority is unavailable.', latest.status);
+    const latest = await readExport();
     const groupCheck = await coordinateWorkerGroupBackup({ env, slug, sessionId, operation: 'export', snapshotId: position.groupSnapshotId, checkOnly: true });
     if (!groupCheck.ok && groupCheck.status !== 409) fail(groupCheck.error || 'Group backup is unavailable.', groupCheck.status);
-    if (!groupCheck.ok || position.writeRevision !== latest.body.writeRevision) {
+    if (!groupCheck.ok || changedSince(latest)) {
       manifest.complete = false;
       page.nextCursor = '';
       page.reason = 'backup_session_changed';
@@ -95,7 +110,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
     }
     return signBackupPage(page, env);
   };
-  if (position.writeRevision !== current.body.writeRevision) return finish();
+  if (changedSince(current)) return finish();
   let used = jsonByteLength(page) + 16384;
   let rows = 0;
   const append = (entry) => {

@@ -98,29 +98,147 @@ Each recipe lists the files to touch, in order. Run tests with
 3. Run `npm run worker:cloudflare-template` to regenerate
    `deploy/cloudflare/session-worker/`. CI fails if the template is stale.
 4. Document it in `docs/session-cors-worker.md` and the endpoint list in
-   `spec.md`. If clients need to detect it, add a feature to `FEATURES` in
-   `workerCapabilities.js`.
+   `spec.md`. If clients need to detect it, give it a feature flag (below).
+   If it calls the session coordinator, see "A coordinator store" and "A
+   request that is safe to retry".
 
-### A session config field
+### A session setting
 
-1. Add the key to `WORKER_CANONICAL_SET_CONFIG_KEYS` in
-   `shared/sessionConfigEdits.mjs`, which is what `POST /admin/set-config`
-   accepts. Add it to `CONTENT_FIELDS` there only if changing it should sign no
-   one out.
-2. Validate it in `workers/sessionCorsWorker/sessionConfigMutation.js` and,
-   for the first deploy, `workers/shared/deployHelperCore.mjs`. Share one
-   validator from `shared/` between them.
-3. Add it to `DEPLOY_CANONICAL_CONFIG_KEYS` in
-   `workers/shared/workerSessionConfig.mjs`. Add it to
-   `PUBLIC_WORKER_CONFIG_FIELDS` in `shared/workerSessionPublicConfig.mjs` only
-   if signed-out visitors may read it.
-4. In `client/src/components/Sessions/`, add the input under `setup/`, send it
-   from `sessionWizardWriteNormalization.ts`, show or hide it per profile in
-   `sessionWizardModeFieldPolicy.ts`, and let admins edit it later in
-   `settings/sessionSettingsEdits.ts`.
-5. Regenerate the Worker template and document the field in
-   `docs/session-cors-worker.md`, `spec.md`, and
-   `docs/session-creation-guide.md`.
+A setting is a field of the session's config. `groupMemberCeiling` is a
+recent one that reaches most steps below; `git grep -n groupMemberCeiling`
+shows where.
+
+1. Accept it. Add the key to `WORKER_CANONICAL_SET_CONFIG_KEYS` in
+   `shared/sessionConfigEdits.mjs`; that is what `POST /admin/set-config`
+   takes. Any change to a setting raises the session's `authzEpoch`, which
+   signs participants out, unless the key is also in `CONTENT_FIELDS` there.
+   Add it to `CONTENT_FIELDS` only if the Worker reads it on each request and
+   never keeps it in a sign-in.
+2. Check it. Add one `[check, refusal]` pair to `SETTINGS_CHECKS` in
+   `workers/sessionCorsWorker/sessionConfigMutation.js`. Set-config runs the
+   list on the settings sent, and every config change runs it again on the
+   merged record; the first failing pair answers. (A few older settings,
+   such as `sessionContext`, are still checked inline after the list.) If the site or the MCP
+   needs the same check, put the check in `shared/` and import it.
+3. Store it at deploy. Add the key to `DEPLOY_CANONICAL_CONFIG_KEYS` in
+   `workers/shared/workerSessionConfig.mjs`. The deploy helper copies those
+   keys into a new session's first config without the checks in step 2
+   (only `agentHttp`, `agentInstructions` and `allowOrigins` are checked
+   there); `/new` then saves the config through set-config, which runs them.
+4. Serve it. Add the key to `PUBLIC_WORKER_CONFIG_FIELDS` in
+   `shared/workerSessionPublicConfig.mjs`. The Worker's only config read is
+   public and serves just those fields, so no client can read a setting left
+   out, the Settings page included; only the Worker sees it.
+5. If an older Worker would refuse or ignore the setting, give it a support
+   field (see "A Worker feature flag") and have the site offer the setting
+   only when the field is there.
+6. Let admins set it. In `client/src/components/Sessions/`:
+   - `/new`: the input under `setup/`, its value written in
+     `sessionWizardWriteNormalization.ts`, and, if only some session profiles
+     have it, its rule in `sessionWizardModeFieldPolicy.ts`.
+   - Settings: the input in `settings/` (for a switch,
+     `SettingsListFields.tsx`), and in `settings/sessionSettingsEdits.ts` its
+     reading into the draft, its writing into the save, how two values
+     compare, and its label in the list of changes.
+   - Type it on `SessionConfig` in `client/src/utilities/session/sessionTypes.ts`
+     if the session page reads it.
+   - If session templates should carry it, give it a default in `DEFAULTS`
+     and a check in `shared/sessionTemplate.mjs`, and add it to
+     `TEMPLATE_FIELDS` in `settings/sessionSettingsEdits.ts`.
+7. Use it where it applies: the Worker route that honours it, the session
+   page, and `mcp/lib/` if agents need it.
+8. Regenerate the Worker template (`npm run worker:cloudflare-template`).
+   Document the setting in `docs/session-cors-worker.md` (under set-config,
+   and in the list of settings that sign no one out if step 1 put it there),
+   and in `docs/session-creation-guide.md` if `/new` shows it.
+
+`workers/sessionCorsWorker/sessionConfigEdits.test.mjs` fails if a key in
+step 1 is refused as unsupported, and `sessionSettingsWorkerSave.test.js`
+fails if the Settings page saves a key step 1 lacks. Nothing checks steps 3,
+4 or 6 for you.
+
+### A Worker feature flag
+
+A flag tells the site or the MCP that a session's Worker has something an
+older Worker lacks. There are two kinds; use the first for a setting and the
+second for anything else.
+
+- A support field on the config read, for a setting an older Worker would
+  refuse or ignore. In `shared/workerSessionPublicConfig.mjs`, export a named
+  constant for the field with a comment saying what it promises (as
+  `SESSION_AGENT_READY_FIELD` does), declare it in
+  `workerSessionPublicConfig.d.mts`, and add it to `WORKER_SUPPORT_FIELDS`.
+  The Worker then sets it to `true` on every config read, and `/new`'s
+  check of the config it wrote skips it. Read it as `config[FIELD] === true`,
+  as `settings/sessionSettingsEdits.ts` does for the Session Agent.
+- A string in `/capabilities`, for a route, or for a setting saved through a
+  route of its own (`ai_daily_limit_v1` goes with `/admin/set-limits`). Add
+  it, ending in `_v1`, to `FEATURES` in
+  `workers/sessionCorsWorker/workerCapabilities.js`, and list it where
+  `GET /capabilities` is described in `docs/session-cors-worker.md`. The site
+  reads it through `readWorkerCapabilities` in
+  `client/src/utilities/worker/workerCapabilities.ts`, which keeps an answer
+  for five minutes; give the string a constant and a small reader in
+  `client/src/domains/worker/workerRelease.ts`, as `AI_DAILY_LIMIT_FEATURE`
+  and `readWorkerCountsAiLimit` do. The MCP reads it through `readFeatures()` in
+  `mcp/lib/workerClient.mjs`. Add it to `KNOWN_WORKER_FEATURES` in the site
+  only if the admin page should ask for a Worker update when it is missing.
+  Pin the string the site reads to `FEATURES` with a test that imports both,
+  as `client/src/domains/worker/workerReleaseContract.test.js` does.
+
+### A coordinator store
+
+The session coordinator (`sessionWriteCoordinator.js`) is one Durable Object
+per session. Newer stores in it live in their own file behind one function;
+`sessionFeedback.js` is the one to copy.
+
+1. Write `workers/sessionCorsWorker/<store>.js` exporting
+   `dispatch<Store>Store(coordinator, operation, payload)`. Keep its keys
+   under a prefix of its own in `coordinator.state.storage`. When a limit
+   and a write must agree, read and write them in one
+   `storage.transaction`, as feedback does with its daily cap.
+2. Route it in the coordinator's `fetch`: one
+   `if (url.pathname.startsWith('/session-config/<store>/'))` line next to
+   the other `dispatch…Store` lines.
+3. Call it from the Worker route with
+   `callSessionConfigCoordinator({ env, slug, path: '<store>/<operation>', ...payload })`
+   from `sessionConfigAuthority.js`.
+4. If the store never changes the session's config, add `'<store>/'` to
+   `KEEPS_CONFIG_PREFIXES` in `sessionConfigAuthority.js`. Without it every
+   call drops the Worker's one-second copy of the config, and the next read
+   goes back to the coordinator: correct, but slower when a room is busy.
+5. Decide whether backups carry it. `exportCoordinatorBackup` in
+   `sessionBackupCoordinator.js` carries the config, keys, secrets and
+   Session Agent opt-outs only. To carry the store, add it there and to the
+   import in `sessionBackupImport.js`; either way, say in the backup section
+   of `docs/session-cors-worker.md` whether it is carried.
+6. Test the dispatch function against a stand-in coordinator, as
+   `sessionFeedback.test.mjs` does, and regenerate the Worker template.
+
+### A request that is safe to retry
+
+When the session coordinator is briefly overloaded, or its reply is lost,
+the Worker answers `503` with `retryable: true` (described in
+`docs/session-cors-worker.md` after group joins). The work may have been done anyway, so a
+client sends a request again only if repeating it does no harm.
+`shared/sessionCoordinatorBusy.mjs` holds the rule both clients share
+(`isRetryableBusy`) and the delays (`coordinatorRetryDelayMs`).
+
+1. Make the route safe to repeat: a read, an upsert per key, or a write the
+   Worker recognises by a request id and doesn't store twice.
+2. In the Worker, a busy coordinator answer is marked `retryable: true` on
+   its way out (`retryableBusy.js`). Any other busy answer that may be
+   repeated is built with `coordinatorBusyBody()`, or carries
+   `retryable: true` and a `reason`. A busy answer that must not be repeated
+   (such as a sign-in, whose nonce may be spent) carries `retryable: false`.
+3. In the site, add the path to `READ_PATHS` or `REPEATABLE_WRITE_PATHS` in
+   `client/src/utilities/worker/coordinatorRetry.ts`, and send it through a
+   `fetch` wrapped in `withCoordinatorRetry`. `GET` requests, and uploads
+   that carry a `requestId`, are retried without listing.
+4. In the MCP, add the path to `replaySafe` in `mcp/lib/workerClient.mjs` if
+   agents call it. That list is kept apart from the site's, so check both.
+5. Add a case to `client/src/utilities/worker/coordinatorRetry.test.ts`,
+   and to `mcp/lib/workerClientCoordinatorRetry.test.mjs` if step 4 applied.
 
 ### A question type
 

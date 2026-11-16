@@ -319,6 +319,14 @@ test('resolveAuthLoginRequestAuthority preserves signature, SIWE, and nonce fail
       },
     },
   );
+
+  // A busy nonce check may already have spent the nonce: never send the same signature again.
+  const busy = await resolveAuthLoginRequestAuthority(createRequestArgs({
+    deps: createAuthorityDeps({
+      consumeNonce: async () => ({ ok: false, status: 503, error: 'Session config coordination is unavailable; retry.' }),
+    }),
+  }));
+  assert.deepEqual([busy.response.status, busy.response.body.retryable], [503, false]);
 });
 
 test('resolveAuthLoginRequestAuthority rejects originless and mismatched SIWE login redemption before nonce use', async () => {

@@ -85,4 +85,6 @@ export function buildSessionAgentMessages(input: {
 }): {
   messages: Array<{ role: 'system' | 'user'; content: string }>;
   read: { context: number; results: boolean; answers: number };
+  /** Context items that didn't fit the block. */
+  contextOmitted: number;
 };

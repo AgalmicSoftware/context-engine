@@ -12,7 +12,7 @@ import { handleAgentHttpRequest } from './dispatch.mjs';
 import { aggregateResultsEnabledForAgent, authorizeSessionMemberAggregateResults } from './results.mjs';
 import { createAgentServices } from './services.mjs';
 
-export const dispatchSessionAgentRequest = async ({ request, env, deps, baseHeaders = {} }) => {
+export const dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders = {} }) => {
   const url = new URL(request.url);
   const route = resolveAgentRoute(url.pathname);
   if (!route) return json({ ok: false, reason: 'agent_route_not_found' }, { status: 404 });

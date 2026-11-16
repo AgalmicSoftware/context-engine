@@ -330,7 +330,8 @@ it('loads an owner answer beyond a capped public listing before submitting its n
   await act(async () => h.sync());
   expect(h.state.isResponsesCacheReady).toBe(false);
   await h.mount();
-  expect(h.engine().state.surveysResponseState[0].answers[QID].value).toBe('');
+  // The saved-answers pass lists the owner's own answers, so the one the capped listing missed loads at mount.
+  expect(h.engine().state.surveysResponseState[0].answers[QID].value).toBe(SAVED.answer.value);
   await act(async () => h.engine().handleAdditionalPile(QID, 'New comment'));
   await h.click();
   await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
@@ -375,10 +376,12 @@ it('keeps a legacy Worker with an incomplete public listing blocked instead of o
 
 it('restores completed readiness after the mount-time refresh fails once', async () => {
   let calls = 0;
-  const h = await fixture({ failGlobal: () => ++calls === 2 });
+  const h = await fixture({ failGlobal: () => [2, 3].includes(++calls) });
   await act(async () => h.sync());
   await h.mount();
-  await waitFor(() => expect(h.host.loadWorkerResponses).toHaveBeenCalledTimes(2));
+  // The mount-time refresh fails both its own-answer read and its full listing fallback.
+  await waitFor(() => expect(h.host.loadWorkerResponses).toHaveBeenCalledTimes(3));
+  expect(h.host.loadWorkerResponses.mock.calls.map(([opts]) => !!opts.ownResponses)).toEqual([false, true, false]);
   expect(h.state.isResponsesCacheReady).toBe(true);
   await act(async () => h.engine().handleAnswerPile(QID, 'First answer'));
   await h.click();

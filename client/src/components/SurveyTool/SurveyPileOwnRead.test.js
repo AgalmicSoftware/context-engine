@@ -122,7 +122,9 @@ const fixture = async () => {
   };
   QUESTION_IDS.forEach((id) => add('questions', { id, type: 'freeform', prompt: 'Example question' }));
   const listPage = jest.fn(async ({ resource, ownResponses, signal }) => {
-    if (ownResponses && hooks.ownRead) await hooks.ownRead(signal);
+    // Holds the pile's own read before a submit (it can be aborted); the saved-answers
+    // refresh after a submit, which also lists only the owner's answers, is not held.
+    if (ownResponses && signal && hooks.ownRead) await hooks.ownRead(signal);
     const filtered = rows[resource].filter((row) => !ownResponses || row.metadata.responder === ownResponses.account);
     return { items: filtered, cursor: null, listComplete: true };
   });
@@ -313,7 +315,8 @@ const setup = async () => {
 };
 const slice = (h) => h.engine().state.surveysResponseState[0];
 const editComment = async (h) => act(async () => h.engine().handleAdditionalPile(QID, 'Updated comment'));
-const ownCalls = (h) => h.listPage.mock.calls.filter(([args]) => args.ownResponses);
+// The pile's own reads carry an abort signal; the saved-answers refresh after a submit does not.
+const ownCalls = (h) => h.listPage.mock.calls.filter(([args]) => args.ownResponses && args.signal);
 const completeSync = async (h) => {
   await act(async () => {
     h.globalGate.resolve();

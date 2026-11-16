@@ -1,3 +1,4 @@
+import { SESSION_COORDINATOR_UNAVAILABLE } from '@ce-shared/sessionCoordinatorBusy.mjs';
 import { toStr } from '../shared/primitives.js';
 
 type UnknownRecord = Record<string, unknown>;
@@ -27,6 +28,12 @@ class WorkerAuthRemoteError extends Error {
 
 export const getWorkerAuthRemoteErrorMessage = (error: unknown): string =>
   error instanceof WorkerAuthRemoteError ? error.message : '';
+
+const BUSY_SIGN_IN = 'worker_auth_busy_sign_in';
+const BUSY_SIGN_IN_ERRORS = [SESSION_COORDINATOR_UNAVAILABLE, 'Authorization state coordination is unavailable.'];
+/** A sign-in the Worker was too busy to finish; its nonce may be spent, so only a fresh one can follow. */
+export const isWorkerAuthBusySignIn = (error: unknown): boolean =>
+  error instanceof WorkerAuthRemoteError && error.reason === BUSY_SIGN_IN;
 
 const normalizeWorkerAuthResponseStatus = (value: unknown): number => {
   const status = Number(value);
@@ -60,6 +67,14 @@ export const createWorkerAuthRemoteError = ({
       'Worker authentication failed: on-chain gate data unavailable.',
       normalizedStatus,
     );
+  }
+  // A busy sign-in: marked either way by the Worker, or (older Workers) one of its two busy sentences.
+  if (
+    kind === 'worker_login' &&
+    normalizedStatus === 503 &&
+    (typeof source.retryable === 'boolean' || BUSY_SIGN_IN_ERRORS.includes(toStr(source.error)))
+  ) {
+    return new WorkerAuthRemoteError(BUSY_SIGN_IN, 'The session is busy. Try signing in again in a moment.', 503);
   }
   // The Worker rate-limits nonce requests per caller, and per caller and wallet.
   if (normalizedStatus === 429) {

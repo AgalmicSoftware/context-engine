@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.10] - 2026-11-15
+
+### Client — available when the site deploys
+
+- Opening a session takes far fewer requests. Measured in a browser on a session of 40 questions and 1,200 answers: a signed-in member's page load went from 86 requests to 37 on a public session, and from 122 to 39 on a members-only one; signed out, from 71 to 32.
+- A session page no longer reloads every question, answer and survey while the on-chain session registry can't be reached (offline, or its RPC blocked). It did so about 3, 6, 12, 24 and 48 seconds after loading, then every 30 seconds for as long as the page stayed open. On the same session, signed in, the first minute went from 108 requests and 5.6 MB to 35 and 2.0 MB.
+- Your saved answers come from a listing of your own, not everyone's.
+- A members-only session is asked signed in from the start once the tab knows it needs that, instead of being refused signed out first on every read.
+- AI Views refreshes without downloading its answers again unless the build changed: each refresh reads about 5 KB where it read about 365 KB.
+- Questions are read a hundred at a time.
+- The Admin page's note on stored versions says each person's latest answer to each question counts, and that for answers saved before 0.9.10 every saved change counts.
+- When a session is busy, the site retries only what the Worker says is safe to send again. A busy sign-in starts over with a new nonce instead of resending one that may be spent; a wallet user may be asked to sign a second time.
+- The QR reader now loads only when you scan, so every first visit downloads about 46 KB less compressed. The Debate Atlas's historical cases load in their own file.
+
+### Workers — requires redeployment
+
+- Each participant or agent may add 20 context items to a session; admins have no limit. The 21st is refused with a plain sentence. An item sent again after a busy answer is counted once.
+- AI Views, the atlas, the risk matrix and the Session Agent's Detailed answers read only each person's latest answer to each question, so editing an answer no longer uses up the 10,000 an AI build can read. Answers saved before this release still count every saved change. At 2,600 answers a build makes 51 storage calls where it made 82.
+- Saving an answer no longer marks the session's backup twice when no backup is being taken: 20 answers made 81 calls to the session's coordinator and now make 41. While an export runs, every write is marked as before. An export's first page now waits 5 seconds before it starts, and each page holds a 10-minute lease; an export left longer than that starts again. Pause writes while exporting, as before.
+- A busy answer now says whether the request is safe to send again (`retryable`), so the site and the MCP follow one rule instead of each keeping its own list of paths.
+- A page of stored records is read from storage in one call, not one call a row: a 100-row list page used 100 reads and now uses 1.
+- Group joins and Session Agent opt-out changes no longer drop the session's one-second copy of its settings.
+- Browsers may reuse a cross-origin check for ten minutes, so a page sends fewer preflight requests. The list of allowed origins is still enforced on every request.
+- The AI reads context only until its part of the prompt is full, or 16 items: the admins' first, then each person's oldest in turn. The Session Agent says when context was left out.
+
+### Agents and MCP
+
+- MCP 0.4.3. `get_results` reads stored records 100 at a time where the session's Worker offers it: at 250 answers, 251 requests become 4.
+- The MCP retries a busy call only when the Worker marks it safe to send again and repeating it does no harm (reads, a nonce, a group join, an answer with a request id). Its busy message now says the request may not have gone through and to check before trying again.
+
 ## [0.9.9] - 2026-11-14
 
 ### Client — available when the site deploys

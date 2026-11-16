@@ -47,7 +47,7 @@ test('a busy group join is sent again; leaving a group is sent once', async (t) 
   t.mock.timers.reset();
 
   const leave = setup(t, 1);
-  await assert.rejects(leave.settle(leave.client.leaveGroup('salon')), /session is busy and this request did not go through; nothing changed/);
+  await assert.rejects(leave.settle(leave.client.leaveGroup('salon')), /session is busy, so this request may not have gone through/);
   assert.deepEqual(leave.sent, ['/groups/leave']);
 });
 
@@ -58,6 +58,29 @@ test('a write without a request id is sent once, and retries stop after three', 
   t.mock.timers.reset();
 
   const stuck = setup(t, 10);
-  await assert.rejects(stuck.settle(stuck.client.listAll({ resource: 'responses' })), /Wait a few seconds and try again/);
+  await assert.rejects(stuck.settle(stuck.client.listAll({ resource: 'responses' })), /Wait a few seconds, check whether it did, and try again/);
   assert.equal(stuck.sent.length, 4);
+});
+
+test('a busy reply is sent again as the Worker marks it, whatever its sentence', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const sent = [];
+  let nonceRefusals = 2;
+  const fetchImpl = async (url) => {
+    const path = new URL(url).pathname;
+    sent.push(path);
+    // A busy sign-in names its own coordinator.
+    if (path === '/auth/nonce') return nonceRefusals-- > 0 ? json({ error: 'Authorization state coordination is unavailable.', retryable: true }, 503) : json({ nonce: 'n1abcdefgh' });
+    if (path === '/auth/login') return json({ token: 'e30.sig', exp: 9999999999 });
+    // A read the Worker says not to repeat.
+    return json({ error: SESSION_COORDINATOR_UNAVAILABLE, retryable: false }, 503);
+  };
+  const client = createWorkerClient({ workerOrigin: 'https://w.example.dev', slug: 's', trustedOrigins: TRUSTED,
+    wallet: ethers.Wallet.createRandom(), fetchImpl, registryConfigLoader: async () => ({ sessionId: '0x00112233445566778899aabbccddeeff' }) });
+  const pending = client.listAll({ resource: 'responses' });
+  let done = false;
+  pending.finally(() => { done = true; }).catch(() => {});
+  while (!done) { await new Promise((resolve) => setImmediate(resolve)); t.mock.timers.tick(5_000); }
+  await assert.rejects(pending, /session is busy/);
+  assert.deepEqual(sent, ['/auth/nonce', '/auth/nonce', '/auth/nonce', '/auth/login', '/storage/list']);
 });

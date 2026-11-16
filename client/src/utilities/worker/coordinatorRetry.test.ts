@@ -1,3 +1,4 @@
+import { coordinatorBusyBody } from '@ce-shared/sessionCoordinatorBusy.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE, withCoordinatorRetry } from './coordinatorRetry';
 
 const busy = () => new Response(JSON.stringify({ error: SESSION_COORDINATOR_UNAVAILABLE }), { status: 503 });
@@ -19,7 +20,7 @@ describe('withCoordinatorRetry', () => {
     jest.useRealTimers();
   });
 
-  it('retries a busy coordinator for reads, voice starts, group joins, draft text, sign-in and answers with a request id', async () => {
+  it('retries a busy coordinator for reads, voice starts, group joins, draft text, nonces and answers with a request id', async () => {
     const answer = JSON.stringify({ resource: 'responses', requestId: 'answer:v1:op:q1:0', data: {} });
     for (const [url, init] of [
       [`${worker}/storage/list?resource=responses`, {}],
@@ -30,7 +31,6 @@ describe('withCoordinatorRetry', () => {
       [`${worker}/storage/draft-text/put`, { method: 'POST', body: '{"items":[]}' }],
       [`${worker}/storage/draft-text/delete`, { method: 'POST', body: '{"questionIds":["q1"]}' }],
       [`${worker}/auth/nonce`, { method: 'POST', body: '{"address":"0x1"}' }],
-      [`${worker}/auth/login`, { method: 'POST', body: '{"signature":"0x2"}' }],
     ] as Array<[string, RequestInit]>) {
       const { response, calls } = await run([busy, busy], url, init);
       expect(response.status).toBe(200);
@@ -48,6 +48,16 @@ describe('withCoordinatorRetry', () => {
     const other = () =>
       new Response(JSON.stringify({ error: 'Upload settlement is unavailable; retry.' }), { status: 503 });
     expect((await run([other], `${worker}/storage/list`)).calls).toBe(1);
+  });
+
+  it('retries what the Worker marks safe to send again, and nothing it marks unsafe', async () => {
+    const marked = (body: object) => () => new Response(JSON.stringify(body), { status: 503 });
+    const countUnavailable = marked(coordinatorBusyBody({ reason: 'rate_limit_unavailable' }));
+    expect((await run([countUnavailable], `${worker}/storage/list`)).calls).toBe(2);
+    const unsafe = marked({ error: SESSION_COORDINATOR_UNAVAILABLE, retryable: false });
+    expect((await run([unsafe], `${worker}/storage/list`)).calls).toBe(1);
+    // A busy sign-in may have spent its nonce, so it is never sent again as it was.
+    expect((await run([busy], `${worker}/auth/login`, { method: 'POST', body: '{"signature":"0x2"}' })).calls).toBe(1);
   });
 
   it('gives up after three retries and returns the last answer', async () => {

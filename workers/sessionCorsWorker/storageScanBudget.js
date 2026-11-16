@@ -7,6 +7,8 @@ const decoder = new TextDecoder();
 export const RESULTS_ANALYSIS_SCAN_LIMITS = Object.freeze({
   operations: 800,
   rows: 10_000,
+  // Answer keys listed but left unread: older versions of an answer.
+  listed: 50_000,
   metadataBytes: 8 * 1024 * 1024,
   payloadBytes: 8 * 1024 * 1024,
 });
@@ -27,8 +29,9 @@ export class StorageReadLimitError extends Error {
 export const isStorageReadLimitError = (error) => error?.code === 'storage_read_limit';
 export const jsonByteLength = (value) => encoder.encode(typeof value === 'string' ? value : JSON.stringify(value)).byteLength;
 
-export const createResultsAnalysisScanBudget = () => {
-  const used = { operations: 0, rows: 0, metadataBytes: 0, payloadBytes: 0 };
+// `operationsUsed` carries on from an earlier pass in the same invocation.
+export const createResultsAnalysisScanBudget = ({ operationsUsed = 0 } = {}) => {
+  const used = { operations: operationsUsed, rows: 0, listed: 0, metadataBytes: 0, payloadBytes: 0 };
   const consume = (kind, amount = 1) => {
     if (used[kind] + amount > RESULTS_ANALYSIS_SCAN_LIMITS[kind]) throw new StorageReadLimitError(kind);
     used[kind] += amount;
@@ -36,9 +39,11 @@ export const createResultsAnalysisScanBudget = () => {
   return {
     operation: () => consume('operations'),
     rows: (count = 1) => consume('rows', count),
+    listed: (count) => consume('listed', count),
     metadata: (value) => consume('metadataBytes', jsonByteLength(value)),
     payload: (count) => consume('payloadBytes', count),
     get remainingPayloadBytes() { return RESULTS_ANALYSIS_SCAN_LIMITS.payloadBytes - used.payloadBytes; },
+    get operationsUsed() { return used.operations; },
   };
 };
 

@@ -40,7 +40,7 @@ const seeded = async (options = {}) => {
 test('the Worker’s AI gets only what every participant may read', async () => {
   for (const encryption of ['none', 'worker_envelope']) {
     const h = await seeded({ encryption });
-    const sources = await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps });
+    const { sources } = await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps });
     assert.deepEqual(sources.map((source) => [source.title, source.kind, source.text]), [
       ['agenda.md', 'file', '# Agenda for everyone'],
       ['example.org', 'link', 'The essay says institutions adapt.'],
@@ -71,7 +71,7 @@ test('a participant’s file, an agent’s included, reaches the AI as data, nev
 });
 
 const titlesFor = async (h, deps = h.deps) =>
-  (await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps })).map((source) => source.title);
+  (await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps })).sources.map((source) => source.title);
 const contextKeys = (h) => [...h.kv.store.keys()].filter((key) => key.startsWith(buildIndexPrefix({ slug: 'salon', resource: 'docsContext' })));
 // Uploads a second apart, so the order they were added is the order of their times.
 const ticking = (h) => {
@@ -159,10 +159,10 @@ test('past 300 rows the newest participant source is the one left out', async ()
   const oldest = await manyNotes(h);
   // Only the oldest and the newest may be read here, so which was looked at shows.
   const readable = (row) => row.id === oldest || row.id === 'cf_note_299';
-  const sources = await loadParticipantContextSources({
+  const { sources, leftOut } = await loadParticipantContextSources({
     env: h.env, slug: 'salon', config: h.state.config, deps: { ...h.deps, log: { warn: () => {} } }, readable,
   });
-  assert.equal(sources.length, 1);
+  assert.deepEqual([sources.length, leftOut], [1, 1]);
 });
 
 test('a list too long to finish, or rows that can’t be fetched, leave sources out, never all', async () => {
@@ -191,6 +191,37 @@ test('a list too long to finish, or rows that can’t be fetched, leave sources 
   assert.deepEqual(warnings.pop(), ['[context] sources left out of an AI prompt', { slug: 'salon', reason: 'rows limit, row bytes limit', leftOut: 300 }]);
 });
 
+test('sources are read until their texts fill the caller’s block, and the rest are counted as left out', async () => {
+  const h = harness({ provider: async () => json({ content: [{ type: 'text', text: 'Deck: coalition goals.' }] }) });
+  ticking(h);
+  for (const name of ['first', 'second', 'unread', 'third']) {
+    // A PDF the AI hasn't read has no text, so it isn't counted as left out.
+    const file = name === 'unread' ? { name: 'unread.pdf' } : { name: `${name}.md`, type: 'text/markdown', bytes: encode('x'.repeat(3000)) };
+    await idOf(await h.uploadFile(file));
+  }
+  // Two PDFs the AI read are: one that names its reading, and one from before
+  // PDFs named it, whose reading is listed as rows were then.
+  for (const name of ['deck.pdf', 'old-deck.pdf']) {
+    const pdf = await idOf(await h.uploadFile({ name }));
+    const reading = await idOf(await h.context({ action: 'read-pdf', id: pdf }));
+    if (name === 'old-deck.pdf') {
+      const key = buildIndexKey({ slug: 'salon', resource: 'docsContext', id: pdf });
+      const { contextReadingId, ...row } = JSON.parse(h.kv.store.get(key));
+      assert.equal(contextReadingId, reading);
+      h.kv.store.set(key, JSON.stringify(row));
+      h.kv.listMetadata.delete(buildIndexKey({ slug: 'salon', resource: 'docsContext', id: reading }));
+    }
+  }
+  const load = (totalChars) => loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, totalChars });
+  const small = await load(4000);
+  assert.deepEqual([small.sources.map((source) => source.title), small.leftOut], [['first.md', 'second.md'], 3]);
+  const roomy = await load(20000);
+  assert.deepEqual([roomy.sources.map((source) => source.title), roomy.leftOut], [['first.md', 'second.md', 'third.md', 'deck.pdf', 'old-deck.pdf'], 0]);
+  // The prompt block reads to the size its caller gives.
+  const prompt = await buildParticipantContextPrompt({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, totalChars: 20000 });
+  assert.match(prompt, /third\.md/);
+});
+
 test('rows stored before list entries said who added them read as they did', async () => {
   const h = await seeded();
   const expected = ['agenda.md', 'example.org', 'deck.pdf'];
@@ -208,7 +239,7 @@ test('a context row whose access no longer matches the session’s is left out',
     ...h.state.config,
     storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate', encryption: 'none', accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] } } },
   };
-  assert.deepEqual(await loadParticipantContextSources({ env: h.env, slug: 'salon', config: tightened, deps: h.deps }), []);
+  assert.deepEqual(await loadParticipantContextSources({ env: h.env, slug: 'salon', config: tightened, deps: h.deps }), { sources: [], leftOut: 0 });
 });
 
 test('the interview opening carries the participants’ context as untrusted data', async () => {

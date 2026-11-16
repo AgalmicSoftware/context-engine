@@ -11,6 +11,10 @@ import { resolveGeneratedResultsControllerState } from '../../domains/sessionRes
 
 type GeneratedHost = Parameters<typeof generateResultsForHost>[0];
 type UnknownRecord = Record<string, unknown>;
+type ArtifactRead = { includeSnapshot?: boolean } | undefined;
+// Which reads asked for the answers snapshot, in order.
+const snapshotFlags = (read: { mock: { calls: unknown[][] } }) =>
+  read.mock.calls.map(([options]) => (options as ArtifactRead)?.includeSnapshot);
 type TestStatusBody = UnknownRecord & { state: UnknownRecord };
 
 const artifact = {
@@ -289,9 +293,84 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
       ports: { readQuestionsCache: () => ({}), readArtifact },
     });
 
-    expect(readArtifact).toHaveBeenCalledTimes(1);
+    // The shown job state differs from the Worker's, so the light read leads to the full one.
+    expect(snapshotFlags(readArtifact)).toEqual([false, true]);
     expect(host.state.generatedResultsAnalysis?.viewerAuthorized).toBe(true);
     expect(host.state.generatedResultsAnalysis?.artifact).not.toBeNull();
+  });
+
+  describe('the 15-second AI Views refresh', () => {
+    const shownStatus = () => buildStatusBody({ state: { ...buildStatusBody().state, jobState: 'succeeded' } });
+    const published = (generatedAt: string, views: UnknownRecord = artifact) => ({
+      ok: true,
+      jobState: 'succeeded',
+      generatedAt,
+      artifact: views,
+      source: { responseCount: 3, participantCount: 3 },
+    });
+    const reader = (generatedAt: string, views?: UnknownRecord) =>
+      jest.fn(async (options?: ArtifactRead): Promise<UnknownRecord> => ({
+        ...published(generatedAt, views),
+        ...(options?.includeSnapshot ? { snapshot: { questions: [], responses: [] } } : {}),
+      }));
+
+    it('asks without the answers snapshot and stops when nothing changed', async () => {
+      const shown = shownStatus();
+      const host = buildHost(shown);
+      const readArtifact = reader('2026-09-17T12:00:00.000Z');
+      await loadGeneratedResultsArtifactForHost(host, { ports: { readQuestionsCache: () => ({}), readArtifact } });
+      expect(snapshotFlags(readArtifact)).toEqual([false]);
+      expect(host.state.generatedResultsStatusBody).toBe(shown);
+    });
+
+    it('reads the whole build once it is newer', async () => {
+      const host = buildHost(shownStatus());
+      const readArtifact = reader('2026-09-17T13:00:00.000Z');
+      await loadGeneratedResultsArtifactForHost(host, { ports: { readQuestionsCache: () => ({}), readArtifact } });
+      expect(snapshotFlags(readArtifact)).toEqual([false, true]);
+      expect(host.state.generatedResultsStatusBody).toMatchObject({
+        state: { lastGood: { generatedAt: '2026-09-17T13:00:00.000Z' } },
+      });
+    });
+
+    it('reads a running build in full, so the poll that shows it finish starts', async () => {
+      const host = buildHost(buildStatusBody({ state: { ...buildStatusBody().state, jobState: 'running' } }));
+      let finished = false;
+      const readArtifact = jest.fn(async (options?: ArtifactRead): Promise<UnknownRecord> => ({
+        ...published(finished ? '2026-09-17T13:00:00.000Z' : '2026-09-17T12:00:00.000Z'),
+        jobState: finished ? 'succeeded' : 'running',
+        ...(options?.includeSnapshot ? { snapshot: { questions: [], responses: [] } } : {}),
+      }));
+      const sleep = async () => {
+        finished = true;
+      };
+      await loadGeneratedResultsArtifactForHost(host, {
+        ports: { readQuestionsCache: () => ({}), readArtifact, sleep },
+      });
+      expect(snapshotFlags(readArtifact).slice(0, 2)).toEqual([false, true]);
+      expect(host.state.generatedResultsStatusBody).toMatchObject({
+        state: { lastGood: { generatedAt: '2026-09-17T13:00:00.000Z' } },
+      });
+    });
+
+    // The Worker applies the current sharing settings on each read, so an admin
+    // who turns a section off changes the views without a new build.
+    it('shows views the sharing settings changed, keeping the snapshot it has', async () => {
+      const shown = shownStatus();
+      const host = buildHost(shown);
+      const narrowed = { ...artifact, sections: { ...artifact.sections, riskMatrix: { available: false } } };
+      const readArtifact = reader('2026-09-17T12:00:00.000Z', narrowed);
+      await loadGeneratedResultsArtifactForHost(host, { ports: { readQuestionsCache: () => ({}), readArtifact } });
+      expect(snapshotFlags(readArtifact)).toEqual([false]);
+      expect(host.state.generatedResultsStatusBody).toMatchObject({
+        state: {
+          lastGood: {
+            artifact: { sections: { riskMatrix: { available: false } } },
+            snapshot: (shown.state.lastGood as UnknownRecord).snapshot,
+          },
+        },
+      });
+    });
   });
 
   it('reloads viewer-visible artifacts after generated state resets', async () => {

@@ -1,15 +1,19 @@
-import { COORDINATOR_RETRY_DELAYS_MS, SESSION_COORDINATOR_UNAVAILABLE } from '@ce-shared/sessionCoordinatorBusy.mjs';
+import {
+  SESSION_COORDINATOR_UNAVAILABLE,
+  coordinatorRetryDelayMs,
+  isRetryableBusy,
+} from '@ce-shared/sessionCoordinatorBusy.mjs';
 
 export { SESSION_COORDINATOR_UNAVAILABLE };
 
-// Requests that are safe to send again wait a moment and retry the Worker's
-// busy-coordinator 503 instead of failing.
-const RETRY_DELAYS_MS = COORDINATOR_RETRY_DELAYS_MS;
+// Requests that are safe to send again wait a moment and retry a 503 the Worker
+// marks as safe to send again (a busy coordinator or an unreachable count).
 const READ_PATHS = /\/(capabilities|storage\/(list|read|read-batch)|realtime\/call)$/;
 // Joining a group again is a no-op that finishes an interrupted join; draft text is
 // stored or deleted per question, so sending it twice leaves the same rows. A busy
-// sign-in answers before its nonce is issued or used, so it simply starts again.
-const REPEATABLE_WRITE_PATHS = /\/(groups\/join|storage\/draft-text\/(put|delete)|auth\/(nonce|login))$/;
+// nonce request answers before a nonce is issued. A busy sign-in may have spent its
+// nonce, so it is not sent again here; sign-in starts over with a new one.
+const REPEATABLE_WRITE_PATHS = /\/(groups\/join|storage\/draft-text\/(put|delete)|auth\/nonce)$/;
 
 const wait = (ms: number, signal?: AbortSignal | null) =>
   new Promise<void>((resolve, reject) => {
@@ -43,13 +47,14 @@ export const withCoordinatorRetry =
     const safe = !(input instanceof Request) && replaySafe(url, init);
     for (let attempt = 0; ; attempt += 1) {
       const response = await fetchImpl(input, init);
-      if (!safe || response.status !== 503 || attempt >= RETRY_DELAYS_MS.length) return response;
+      // Spread retries so a crowd does not return in step.
+      const delayMs = coordinatorRetryDelayMs(attempt);
+      if (!safe || response.status !== 503 || delayMs == null) return response;
       const body = await response
         .clone()
         .json()
         .catch(() => null);
-      if (body?.error !== SESSION_COORDINATOR_UNAVAILABLE) return response;
-      // Spread retries so a crowd does not return in step.
-      await wait(RETRY_DELAYS_MS[attempt] * (0.5 + Math.random()), init.signal);
+      if (!isRetryableBusy(response.status, body)) return response;
+      await wait(delayMs, init.signal);
     }
   };

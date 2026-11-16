@@ -108,6 +108,7 @@ const makeHost = (overrides: Record<string, unknown> = {}) => ({
   getAccount: jest.fn(() => '0xaccount'),
   isMounted: jest.fn(() => true),
   bumpResolutionNonce: jest.fn(),
+  rerender: jest.fn(),
   normalizeRoutePath: jest.fn((path = '') => String(path || '')),
   getSessionTokenFromPath: jest.fn((path = '') => getSessionTokenFromPath(path)),
   warn: jest.fn(),
@@ -293,7 +294,9 @@ describe('createSessionPathResolverController', () => {
 
     await advanceTimersAndFlush(3200);
 
-    expect(host.bumpResolutionNonce).toHaveBeenCalledTimes(2);
+    // The failure only redraws; the config that arrives reloads the page's data.
+    expect(host.rerender).toHaveBeenCalledTimes(1);
+    expect(host.bumpResolutionNonce).toHaveBeenCalledTimes(1);
     expect(controller._errorCounts.id[sessionId]).toBeUndefined();
     expect(controller._lastErrors.id[sessionId]).toBeUndefined();
     expect(controller._retryTimers.id[sessionId]).toBeUndefined();
@@ -382,6 +385,55 @@ describe('createSessionPathResolverController', () => {
     await flushMicrotasks();
 
     expect(pendingHost.bumpResolutionNonce).not.toHaveBeenCalled();
+    expect(pendingHost.rerender).not.toHaveBeenCalled();
+  });
+
+  // Each bump reloads every question, answer page and survey from the session's Worker.
+  it('never reloads the page while the registry lookup keeps failing', async () => {
+    const host = makeHost();
+    const controller = createSessionPathResolverController(host);
+
+    sessionRegistryModule.sessionRegistryUtils.fetchSessionFromRegistry.mockRejectedValue(new Error('offline'));
+
+    controller.resolveSlug('alpha');
+    controller.resolveId('0xabc');
+    await flushMicrotasks();
+    for (const delay of [3200, 3200, 6000, 12000]) {
+      await advanceTimersAndFlush(delay);
+    }
+
+    expect(sessionRegistryModule.sessionRegistryUtils.fetchSessionFromRegistry).toHaveBeenCalledTimes(10);
+    expect(host.rerender).toHaveBeenCalledTimes(10);
+    expect(host.bumpResolutionNonce).not.toHaveBeenCalled();
+  });
+
+  it('only redraws for a slug the registry does not hold', async () => {
+    const host = makeHost();
+    const controller = createSessionPathResolverController(host);
+
+    controller.resolveSlug('worker-only');
+    await flushMicrotasks();
+
+    expect(host.rerender).toHaveBeenCalledTimes(1);
+    expect(host.bumpResolutionNonce).not.toHaveBeenCalled();
+    expect(controller.getSlugStatus('worker-only')).toEqual(
+      expect.objectContaining({ hasAttempted: true, isPending: false, retryCount: 0 }),
+    );
+  });
+
+  it('reloads when a known session id rewrites the address, even with no new registry answer', async () => {
+    const sessionId = '0xabc';
+    const host = makeHost();
+    const controller = createSessionPathResolverController(host);
+    storedConfigsById[sessionId] = { sessionId, slug: 'alpha' };
+    setWindowPath('/session/0xabc');
+
+    controller.resolveId(sessionId);
+    await flushMicrotasks();
+
+    expect(window.location.pathname).toBe('/session/alpha');
+    expect(host.bumpResolutionNonce).toHaveBeenCalledTimes(1);
+    expect(host.rerender).not.toHaveBeenCalled();
   });
 
   it('canonicalizes /session/:id routes to the resolved slug path', async () => {

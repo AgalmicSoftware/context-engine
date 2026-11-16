@@ -1,9 +1,9 @@
-// Runs the Session Worker's agent behavior tests.
+// Runs Agent HTTP's tests (the Session Agent's run with the Session Worker's).
 'use strict';
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-function runSessionAgentTests(rootDir = path.resolve(__dirname, '..')) {
+function runAgentHttpTests(rootDir = path.resolve(__dirname, '..')) {
   const dir = path.join(rootDir, 'workers/sessionCorsWorker');
   const files = fs.readdirSync(dir).filter(name => /^agent.*\.test\.mjs$/.test(name))
     .map(name => path.join(dir, name));
@@ -14,5 +14,5 @@ function runSessionAgentTests(rootDir = path.resolve(__dirname, '..')) {
   if (result.error) throw result.error;
   return typeof result.status === 'number' ? result.status : 1;
 }
-if (require.main === module) process.exit(runSessionAgentTests());
-module.exports = { runSessionAgentTests };
+if (require.main === module) process.exit(runAgentHttpTests());
+module.exports = { runAgentHttpTests };

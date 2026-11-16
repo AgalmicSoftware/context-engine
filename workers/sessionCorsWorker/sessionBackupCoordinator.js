@@ -1,7 +1,7 @@
 import { readSessionSecretsAuthority } from './sessionSecretsAuthority.js';
 import { stripAgentAdmissionFromBackup } from './agent/backup.mjs';
 import { readBackupGroupSnapshot } from './sessionBackupGroupSnapshot.js';
-import { STORAGE_BACKUP_REVISION_KEY } from './storageBackupRevision.js';
+import { STORAGE_BACKUP_REVISION_KEY, takeBackupExportLease } from './storageBackupRevision.js';
 import { resolveWorkerGroupsKv, workerGroupBackupPrefixes } from './workerGroups.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
@@ -44,13 +44,14 @@ const scopedGroupRecords = (records, slug, sessionId) => {
 export const exportCoordinatorBackup = async (coordinator, payload) => {
   const authority = await coordinator.assertSessionAuthority(payload);
   if (!authority) fail('Session config is not initialized.', 409);
+  const leaseSince = await takeBackupExportLease(coordinator.state.storage);
   await coordinator.repairPendingSessionConfigProjection();
   const current = await coordinator.state.storage.get('session-config-authority');
   const signer = await coordinator.state.storage.get('session-lit-authorization-signer-v1');
   const secretAuthority = await coordinator.state.storage.transaction((transaction) => readSessionSecretsAuthority(coordinator, transaction, current.slug));
   const secrets = secretAuthority?.envelope || null;
   if (signer && !isEncryptedSessionSecretsEnvelope(signer.envelope)) fail('Invalid wrapped authorization signer.', 409);
-  return json({ ok: true, writeRevision: await coordinator.state.storage.get(STORAGE_BACKUP_REVISION_KEY) || 0, coordinator: {
+  return json({ ok: true, writeRevision: await coordinator.state.storage.get(STORAGE_BACKUP_REVISION_KEY) || 0, leaseSince, coordinator: {
     configAuthority: { ...current, config: stripAgentAdmissionFromBackup(current.config) },
     wrappedSessionKeys: {
       activeSessionKey: current.activeSessionKey || null,

@@ -213,7 +213,10 @@ const prompts = (questions) => questions.map(({ id, prompt }) => ({ id, prompt }
 const createQuestionStore = () => {
   const store = new Map();
   const kv = {
-    async get(key) { return store.has(key) ? store.get(key) : null; },
+    async get(key) {
+      if (Array.isArray(key)) return new Map(key.map((name) => [name, store.get(name) ?? null]));
+      return store.has(key) ? store.get(key) : null;
+    },
     async put(key, value) { store.set(key, value); },
     async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
       const names = [...store.keys()].filter((key) => key.startsWith(prefix)).sort();

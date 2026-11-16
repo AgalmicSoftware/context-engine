@@ -18,10 +18,12 @@ import {
 import {
   getStorageIndexBinding,
   listCloudflareMetadataRows,
+  listLatestResponseRows,
   readStoredCloudflarePayloadBytes,
   readStoredCloudflarePayloadsBulk,
 } from './storageRouteExecution.js';
 import { listHiddenStorageResourceIds, selectCanonicalStorageVersions } from './storageResourceOwnership.js';
+import { buildSessionIdOf, compareIdentity, normalizeQuestionId, normalizeSessionIdHex } from './answerVersionStamp.js';
 import { blockedQuestionIds } from './blockedQuestionIds.js';
 import {
   isModelAllowed,
@@ -100,11 +102,6 @@ const applyCurrentArtifactPolicy = (artifact, config) => applyResultsAnalysisExp
   sections: normalizeRequestedSections([], getResultsAnalysisSettings(config)),
 });
 
-const normalizeSessionIdHex = (value) => {
-  const raw = lower(value).replace(/^0x/, '').replace(/-/g, '');
-  return /^[0-9a-f]{32}$/.test(raw) ? `0x${raw}` : '';
-};
-
 const parseJsonBytes = (bytes) => {
   try {
     return JSON.parse(decoder.decode(bytes || new Uint8Array()));
@@ -179,7 +176,6 @@ const rowLooksLocked = (row) => {
 };
 
 const VALIDATED_QUESTION_TYPES = new Set(['binary', 'rating', 'multichoice', 'quadratic', 'freeform']);
-const normalizeQuestionId = (value) => trim(value).slice(0, 128);
 const normalizeQuestionPrompt = (value) => trim(value).replace(/\s+/g, ' ').slice(0, 1200);
 const normalizeQuestionType = (value) => trim(value).slice(0, 64) || 'text';
 // The shared rating scale and step, with labels clipped for the prompt.
@@ -251,19 +247,6 @@ export const resolveResultsAnalysisCapability = ({ config } = {}) => {
   };
 };
 
-const compareIdentity = ({ slug, config, suppliedSlug, suppliedSessionId, allowInherited = false }) => {
-  const expectedSlug = normalizeWorkerSessionSlug(slug || config?.slug);
-  const actualSlug = normalizeWorkerSessionSlug(suppliedSlug);
-  if (!allowInherited && expectedSlug && !actualSlug) return false;
-  if (expectedSlug && actualSlug && expectedSlug !== actualSlug) return false;
-  const expectedSessionId = normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
-  const actualSessionId = normalizeSessionIdHex(suppliedSessionId);
-  if (!allowInherited && expectedSessionId && !actualSessionId) return false;
-  if (expectedSessionId && actualSessionId && expectedSessionId !== actualSessionId) return false;
-  return true;
-};
-
-
 const participantDigest = async (sourceKey) => sha256Hex(`participant:${trim(sourceKey).toLowerCase()}`);
 
 const normalizeQuestionRecord = (question) => {
@@ -320,7 +303,7 @@ const isNewerResponseRow = (candidate, current) => (
   (candidate.rowTime === current.rowTime && candidate.storageRefId > current.storageRefId)
 );
 
-const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false }) => {
+const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false, listedVersions = null }) => {
   const expectedSlug = normalizeWorkerSessionSlug(slug || config?.slug);
   const expectedSessionId = normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
   const blocked = new Set(blockedQuestionIds(config));
@@ -342,7 +325,8 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       excludedCount += 1;
       continue;
     }
-    if (!compareIdentity({ slug: expectedSlug, config: { ...config, sessionIdHex: expectedSessionId }, suppliedSlug: row.sessionSlug, suppliedSessionId: row.sessionId || row.sessionIdHex, allowInherited: strictLocked === true })) {
+    // A listed older version passed this check when it was stored (answerVersionStamp).
+    if (!listedVersions?.has(row) && !compareIdentity({ slug: expectedSlug, config: { ...config, sessionIdHex: expectedSessionId }, suppliedSlug: row.sessionSlug, suppliedSessionId: row.sessionId || row.sessionIdHex, allowInherited: strictLocked === true })) {
       excludedCount += 1;
       continue;
     }
@@ -370,6 +354,11 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     const dedupeKey = `${questionId}:${candidate.participantKey}`;
     const existing = latestByQuestionParticipant.get(dedupeKey);
     if (!existing || isNewerResponseRow(candidate, existing)) latestByQuestionParticipant.set(dedupeKey, candidate);
+  }
+  // An unread older version can win only if its newer one failed to read as
+  // stamped; the caller then reads every version.
+  if (listedVersions && [...latestByQuestionParticipant.values()].some(({ row }) => listedVersions.has(row))) {
+    return { ok: false, listedVersionWon: true };
   }
 
   const includedRows = [];
@@ -533,7 +522,7 @@ const toResponseRow = (metadata, payload, config) => ({
   encrypted: metadata.encrypted === true || metadata.payloadEncrypted === true || payload.encrypted === true || payload.payloadEncrypted === true,
 });
 
-const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, committedResponses = [], budget }) => {
+const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, committedResponses = [], budget, latestOnly = true }) => {
   const index = getStorageIndexBinding(env);
   if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
     return { ok: false, status: 501, error: 'Cloudflare storage index binding not configured.' };
@@ -588,13 +577,26 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
     .filter((candidate) => !candidate.withheld)
     .map((candidate) => candidate.question);
 
-  const rows = await listCloudflareMetadataRows({ index, slug, resource: 'responses', budget, strict: true });
+  // Each person's older answers to a question stay unread when list entries
+  // show a newer one; they still take part, unread, in choosing the latest.
+  const listedVersions = latestOnly ? new WeakSet() : null;
+  const rows = latestOnly
+    ? await listLatestResponseRows({ index, slug, sessionId: buildSessionIdOf(config), budget })
+    : await listCloudflareMetadataRows({ index, slug, resource: 'responses', budget, strict: true });
   const readResponsePayload = await readPayloads(rows.map((row) => row?.metadata)
     .filter((metadata) => isObj(metadata) && trim(metadata.responder) && !isEncrypted(metadata)));
   const responseRows = [];
   let excludedCount = 0;
   let lockedCount = 0;
   for (const row of rows) {
+    if (row?.listed) {
+      const { questionId, responder, id, createdAt } = row.listed;
+      const version = { questionId, __trustedParticipantId: responder, __storageRefId: id, responder,
+        createdAt, submittedAt: createdAt, timestamp: createdAt };
+      listedVersions.add(version);
+      responseRows.push(version);
+      continue;
+    }
     const metadata = row?.metadata;
     if (!isObj(metadata) || !trim(metadata.responder)) {
       excludedCount += 1;
@@ -627,7 +629,7 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
     }
     responseRows.push(toResponseRow(metadata, payload, config));
   }
-  const normalized = await normalizeSanitizedRows({ rows: responseRows, questions, slug, config, strictLocked: false, requireKnownQuestion: true });
+  const normalized = await normalizeSanitizedRows({ rows: responseRows, questions, slug, config, strictLocked: false, requireKnownQuestion: true, listedVersions });
   if (!normalized.ok) return normalized;
   return {
     ...normalized,
@@ -639,14 +641,33 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
   };
 };
 
-// Every saved version counts, so an answer changed five times is five rows.
-const snapshotLimitText = (kind) => (kind === 'rows'
-  ? `AI builds read at most ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} stored question and answer versions at once, and this session stores more (each saved change to an answer counts).`
+// Each person's latest answer to a question counts, with every version of
+// answers stored before answers named their question.
+const snapshotLimitText = (kind) => (kind === 'rows' || kind === 'listed'
+  ? `AI builds read at most ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} stored question and answer versions at once, and this session stores more.`
   : 'This session’s stored questions and answers are too large for an AI build to read at once.');
+
+const SNAPSHOT_CHANGED = {
+  ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable',
+  error: 'Answers changed while the results were read. No report was generated; the last successful report is unchanged. Try again.',
+};
 
 export const loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
   try {
-    return await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: createResultsAnalysisScanBudget() });
+    const first = createResultsAnalysisScanBudget();
+    const source = await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: first });
+    if (!source.listedVersionWon) return source;
+    // A newer answer read as listed was gone or changed (withdrawn mid-build,
+    // say), so every version is read. Both passes share one operation count,
+    // which keeps them inside one invocation's KV limit; a session too large
+    // for both fails this build only, and the next build starts afresh.
+    try {
+      return await readWorkerCanonicalResultsAnalysisSource({ ...args,
+        budget: createResultsAnalysisScanBudget({ operationsUsed: first.operationsUsed }), latestOnly: false });
+    } catch (error) {
+      if (isStorageReadLimitError(error) && error.kind === 'operations') return SNAPSHOT_CHANGED;
+      throw error;
+    }
   } catch (error) {
     if (!isStorageReadLimitError(error)) return {
       ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable',

@@ -743,6 +743,17 @@ Admin test panel:
   10,000 stored question and answer versions at once…"), and the Session Agent's
   Detailed answers note the same limit; `GET /admin/diagnostics` returns the
   count as `storedVersions`.
+  An answer stored with one question and this session's id (not a survey
+  bundle, and readable by the Worker) lists that question, the session id and
+  its time in its KV list entry. A build lists answer keys 1,000 at a time and
+  leaves unread every stamped answer that the same person later replaced with
+  a stamped answer to the same question; those count against a separate limit
+  of 50,000 listed answers, not the 10,000 rows. They still take part, unread,
+  in choosing each person's latest answer, so a build comes out as if every
+  version were read. If one would be chosen (its newer answer did not read as
+  stamped), the build reads every version instead. Answers stored before
+  0.9.10 carry no stamp and are all read, as before. At 50 people, 40 questions
+  and 600 changed answers, one build fell from 82 KV calls to 51.
   Larger histories require a future bounded background snapshot/current-version
   index. This guard covers Worker storage history, not the separate existing
   admin-snapshot contract.
@@ -1005,7 +1016,7 @@ Authenticated clients can use the worker as the session storage boundary:
   (`415` otherwise). Items are read five at a time; once the batch holds 8 MiB
   of text the rest answer `413`, to be read one by one. The reply is
   `private, no-store` when any item is private.
-- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in batches of at most eight concurrent KV reads. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Question and survey rows include `metadata.uploader` and `metadata.resourceId` when they were recorded, and `metadata.uploadAuthority` for new uploads. `metadata.uploaderIsAdmin` is derived strictly from `uploadAuthority === "admin"`. Clients use the explicit upload authority stamp for precedence and ignore legacy flags and current public admin configuration. A version of an id that an admin hid is listed only as a marker, `{ "hidden": true, "metadata": { "resource", "resourceId", "hidden": true } }`, with no storage reference, so clients can drop a copy they cached earlier. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
+- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in bulk KV gets of up to 100 keys, one per page of rows. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Question and survey rows include `metadata.uploader` and `metadata.resourceId` when they were recorded, and `metadata.uploadAuthority` for new uploads. `metadata.uploaderIsAdmin` is derived strictly from `uploadAuthority === "admin"`. Clients use the explicit upload authority stamp for precedence and ignore legacy flags and current public admin configuration. A version of an id that an admin hid is listed only as a marker, `{ "hidden": true, "metadata": { "resource", "resourceId", "hidden": true } }`, with no storage reference, so clients can drop a copy they cached earlier. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
   - Worker-canonical question and survey authoring writes payloads to this
     session's Cloudflare storage and does not register them in the Surveys
     contract. Fresh clients paginate the `questions` and `surveys` indexes,
@@ -1297,6 +1308,32 @@ visibility changes during export, returning `complete: false` and
 cannot provide a joint point-in-time snapshot. Keep the complete JSONL archive with the deployment's
 recovery key; a fingerprint cannot decrypt it.
 
+A write marks that revision before its first change and after its last, but
+only when an export could see the mark. Each export page takes or renews a
+10-minute export lease. The first page then waits 5 seconds before it reads
+the revision it starts from. A write skips a mark only when a settings view
+asked for at most 2 seconds earlier showed no lease. A skipped mark therefore
+falls before the export's starting read, where it could not have changed the
+outcome. If the lease lapses between pages, the next page restarts the export,
+because writes in the gap skipped their marks.
+
+Skipping saves both marks only while the write finds a settings view cached
+(for up to 1 second); a slower write asks for a fresh view in place of each
+mark. During an export, and until its lease lapses 10 minutes after the last
+page, a write costs up to two views and two marks.
+
+A finished backup holds every write that finished before the export began. A
+write that changed anything after the export read its starting revision makes
+the export restart, so a finished backup holds none of it, with three
+exceptions. A write whose final mark fails is not refused, since it is already
+done. An upload whose listing fails leaves its payload stored with no listing
+row. And the timing: the 5-second wait exceeds the 2-second view age by
+3 seconds, less the time a write computes between its view and its check
+(Worker clocks stand still while code runs; about half a second for a 25 MB
+payload), and assumes the coordinator's clock never steps back. Any of these
+can leave part of one write in a finished backup; pausing writes avoids all
+three.
+
 Backup restore reads JSONL as a UTF-8 stream, validating the complete file before
 signing and holding only one page while importing. Resuming reopens the selected
 file and skips completed pages. Restore requires an empty target session: no
@@ -1576,6 +1613,16 @@ finds the coordinator busy answers `503` with
 again is a no-op that finishes an interrupted join, so the website and the MCP
 send it again after a short wait. A busy or timed-out join may still have landed;
 joining again then succeeds at once, even when the group is full.
+
+Every busy answer with that sentence, from any route, also carries
+`retryable: true`, so a client may send a request that is safe to repeat again.
+The sentence also covers a coordinator reply that was lost after the work was
+done, so only a request whose repeat does no harm should be sent again. `isRetryableBusy` and
+`coordinatorRetryDelayMs` in `shared/sessionCoordinatorBusy.mjs` are the shared
+rule; they also accept the sentence alone, as Workers before 0.9.10 send it. A
+busy nonce request (`503`) is marked `retryable: true` too. A busy sign-in (`/auth/login`)
+is marked `retryable: false`, since its nonce may already be spent: signing in
+starts again from a new nonce instead.
 
 Member reads and roster pages use only canonical session-identity keys. Legacy
 slug-only or case-folded membership rows are ignored and never migrated during
@@ -2241,6 +2288,7 @@ Runtime:
       coordinator config revision. Callers cannot set it directly.
     - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array. New config mutations reject `*` and wildcard hosts because runtime CORS matching requires exact origins.
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist). The `/new` native verification path refuses an empty list for new or attached Workers so clearing the field cannot accidentally publish an unrestricted CORS policy.
+    - Session routes' answers carry `Access-Control-Max-Age: 600`, so a browser checks an origin before a request at most every ten minutes. The Worker still refuses a request from an origin the list leaves out (`403 Origin not allowed.`), so a removed origin cannot act while its check is cached.
     - `limits.perWalletPerDay` is the authenticated per-wallet daily route budget, counted separately for each kind of route; every signed-in storage call (saving an answer, listing or reading) shares one count.
     - `limits.aiPerWalletPerDay`, when a positive whole number, is how many signed-in AI calls one address may make in 24 hours: the `/ai` route, Session Agent questions and Agent HTTP's AI, counted together. A call is counted only once nothing else will refuse it, so a disallowed model, a Session Agent question its asker may not put, or an Agent HTTP call turned away while two others run costs nothing. It bounds AI spend without touching answer saves or reads. Empty or `0` leaves AI calls on `limits.perWalletPerDay`. Signed-out AI calls (when the session lets visitors use AI) are bounded by `limits.perAnonymousIpPerDay` instead, and transcription stays on the general limit, since it is part of answering by voice. Admins set it under AI on the session's settings page, which shows the field only when the Worker's capabilities list `ai_daily_limit_v1` and sends it alone through `/admin/set-limits`: that merges it into the stored limits and, unlike a `limits` change through `/admin/set-config`, signs no one out. `/new` has no field for it; when it saves the session's config it reads the stored limit and sends it back, so the limit survives.
     - When the count cannot be reached, a limited request (signed-in routes, signed-out routes, feedback, and the interview brief and starter) is refused as busy (`503` with the coordinator's retry sentence and `reason: "rate_limit_unavailable"`), not as `429`, so clients send it again; Agent HTTP's AI answers `503 agent_ai_rate_unavailable`. A request the count refuses as malformed is a plain refusal. The faucet's payout and Agent HTTP's poster still answer `429`.
@@ -2903,9 +2951,10 @@ Signed login/bootstrap requests:
   use the stale projection to retain access.
   The first page (no cursor) also has `storedVersions: { count, limit, overLimit }`:
   how many stored question and answer versions, with hidden-question marks, an AI
-  build would read, against its 10,000-row limit (every saved change to an answer
-  counts). It is counted from key lists and stops just past the limit, so an
-  over-limit session shows `limit + 1`; it is `null` when the count can't be read.
+  build would read, against its 10,000-row limit (a replaced stamped answer
+  does not count; every saved change to an answer stored before 0.9.10 does).
+  It is counted from key lists, so an over-limit session shows `limit + 1`; it
+  is `null` when the count can't be read.
   The card shows it as "N of 10,000", "More than 10,000" or "Couldn't be
   counted", and from 8,000 says what stops past the limit.
   Receipt counts are sampled from up to 25 participant coordinators per page;

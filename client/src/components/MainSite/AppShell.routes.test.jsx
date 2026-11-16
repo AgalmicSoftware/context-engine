@@ -3055,6 +3055,30 @@ describe('AppShell route render smoke', () => {
     subject.componentWillUnmount();
   });
 
+  // The path resolver's nonce makes the page reload every question, answer page and survey from the Worker.
+  it('reloads session data only when the registry lookup finds the session', async () => {
+    const { fetchSessionFromRegistry } = jest.requireMock('../../utilities/web3/sessionRegistry.js');
+    const subject = createSubject({ path: '/session/worker-only' });
+    subject._mounted = true;
+    subject.forceUpdate = jest.fn();
+
+    fetchSessionFromRegistry.mockRejectedValue(new Error('offline'));
+    subject._sessionPathResolver.resolveSlug('worker-only');
+    await waitFor(() => expect(subject.forceUpdate).toHaveBeenCalledTimes(1));
+    expect(subject.state.sessionPathResolutionNonce).toBe(0);
+
+    fetchSessionFromRegistry.mockResolvedValue(null);
+    subject._sessionPathResolver.resolveSlug('not-registered');
+    await waitFor(() => expect(subject.forceUpdate).toHaveBeenCalledTimes(2));
+    expect(subject.state.sessionPathResolutionNonce).toBe(0);
+
+    fetchSessionFromRegistry.mockResolvedValue(buildSessionConfig({ slug: 'on-chain' }));
+    subject._sessionPathResolver.resolveSlug('on-chain');
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBe(1));
+    expect(subject.forceUpdate).toHaveBeenCalledTimes(2);
+    subject.componentWillUnmount();
+  });
+
   it('does not initialize a resolved Worker session while a static route remains active', () => {
     const workerConfig = buildSessionConfig({
       slug: 'demo-sh',

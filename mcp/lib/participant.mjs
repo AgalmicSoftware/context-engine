@@ -48,6 +48,10 @@ const MAX_LISTED_QUESTIONS = 100;
 // one: a 30-question salon of 80 people, some changing answers, lists ~2,900.
 const MAX_RESULT_RECORDS = 10000;
 const READ_CONCURRENCY = 16;
+// A batch read takes 100 ids; an agent sends two at a time, each of which the
+// Worker reads five records at a time.
+const READ_BATCH_IDS = 100;
+const READ_BATCH_CONCURRENCY = 2;
 // Reading stored records is bounded per tool call, whatever a Worker lists.
 const READ_DEADLINE_MS = 90_000;
 const MAX_CACHED_RECORDS = 20_000;
@@ -591,11 +595,17 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     if (ctx.records.size > MAX_CACHED_RECORDS) ctx.records.delete(ctx.records.keys().next().value);
   };
 
+  const recentlyMissing = (ctx, storageId) => now() - (ctx.missing.get(storageId) ?? -Infinity) < MISSING_RECORD_RETRY_MS;
+  const markMissing = (ctx, storageId) => {
+    ctx.missing.set(storageId, now());
+    if (ctx.missing.size > MAX_CACHED_RECORDS) ctx.missing.delete(ctx.missing.keys().next().value);
+  };
+
   const readCached = async (ctx, storageId) => {
     if (ctx.records.has(storageId)) return ctx.records.get(storageId);
     // A listed 404 is unread, including during its retry minute. A fetched
     // malformed/null payload is instead excluded by the normal record rules.
-    if (now() - (ctx.missing.get(storageId) ?? -Infinity) < MISSING_RECORD_RETRY_MS) return undefined;
+    if (recentlyMissing(ctx, storageId)) return undefined;
     try {
       const payload = await ctx.client.read(storageId);
       ctx.missing.delete(storageId);
@@ -603,10 +613,33 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       return payload;
     } catch (error) {
       if (!(error instanceof WorkerRequestError) || error.status !== 404) throw error;
-      ctx.missing.set(storageId, now());
-      if (ctx.missing.size > MAX_CACHED_RECORDS) ctx.missing.delete(ctx.missing.keys().next().value);
+      markMissing(ctx, storageId);
       return undefined;
     }
+  };
+
+  // Where the Worker offers it, records the cache lacks are read 100 a
+  // request into the cache (which holds more than a read asks for); whatever
+  // a batch doesn't return is read on its own after, as before. A batch that
+  // fails leaves its records to those single reads.
+  const readBatches = async (ctx, storageIds, deadline, stopped) => {
+    if (ctx.registry || typeof ctx.client.readBatch !== 'function') return;
+    const wanted = [...new Set(storageIds)].filter((id) => id && !ctx.records.has(id) && !recentlyMissing(ctx, id));
+    if (!wanted.length || !(await ctx.client.readFeatures())?.includes('storage_read_batch_v1')) return;
+    const chunks = [];
+    for (let start = 0; start < wanted.length; start += READ_BATCH_IDS) chunks.push(wanted.slice(start, start + READ_BATCH_IDS));
+    await mapLimit(chunks, READ_BATCH_CONCURRENCY, async (chunk) => {
+      if (now() >= deadline || stopped()) return;
+      const items = await ctx.client.readBatch(chunk, { signal }).catch(() => []);
+      for (const item of items) {
+        if (item.status === 200) {
+          ctx.missing.delete(item.id);
+          cacheRecord(ctx, item.id, item.record);
+        } else if (item.status === 404) {
+          markMissing(ctx, item.id);
+        }
+      }
+    });
   };
 
   /** Records not reached or not readable come back undefined and keep the read incomplete. */
@@ -614,6 +647,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   // read that outlives its call passes its own.
   const readMany = async (ctx, storageIds, { deadlineMs = READ_DEADLINE_MS, stopped = () => signal?.aborted } = {}) => {
     const deadline = now() + deadlineMs;
+    await readBatches(ctx, storageIds, deadline, stopped);
     const payloads = await mapLimit(storageIds, READ_CONCURRENCY, async (storageId) => {
       if (!ctx.records.has(storageId) && (now() >= deadline || stopped())) return undefined;
       return readCached(ctx, storageId).catch(() => undefined);

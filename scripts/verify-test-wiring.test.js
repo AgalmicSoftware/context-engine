@@ -265,10 +265,10 @@ test('release workflow fetches preserve public ancestry for exact release refs',
 });
 
 test('agent behavior runner fails when maintained tests are missing', () => {
-  const { runSessionAgentTests } = require('./run-session-agent-tests');
+  const { runAgentHttpTests } = require('./run-agent-http-tests');
 
   withTempRepo((rootDir) => {
-    assert.throws(() => runSessionAgentTests(rootDir), /ENOENT|missing/);
+    assert.throws(() => runAgentHttpTests(rootDir), /ENOENT|missing/);
   });
 });
 
@@ -286,7 +286,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:root:jest':
             "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js'",
           'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
-          'test:worker:agent': 'node scripts/run-session-agent-tests.js',
+          'test:worker:agent': 'node scripts/run-agent-http-tests.js',
           'test:node': 'node scripts/run-node-tests.js',
           'test:node:tracked': 'node scripts/run-node-tests.js --tracked-only',
           'client-boundaries:check': 'node scripts/check-client-boundaries.mjs',
@@ -602,7 +602,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/verify-public-release-pii.sh',
       'scripts/verify-public-release-pii.test.js',
       'scripts/lib/public-release-strip-patterns.sh',
-      'scripts/run-session-agent-tests.js',
+      'scripts/run-agent-http-tests.js',
       'workers/sessionCorsWorker/package.json',
       'workers/sessionCorsWorker/agent/requestBoundary.mjs',
       'workers/deploy-helper/wrangler.example.toml',

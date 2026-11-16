@@ -2,14 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { Wallet } from 'ethers';
-import { SESSION_CONFIG_COORDINATION_ERROR } from './sessionConfigAuthority.js';
+import { SESSION_CONFIG_COORDINATION_ERROR, callSessionConfigCoordinator, forgetSessionConfig } from './sessionConfigAuthority.js';
+import { isRetryableBusy } from '../../shared/sessionCoordinatorBusy.mjs';
 import {
   SESSION_ID, SLUG, createSessionEnv, fetchWorker, login, makeRequest, readJson, uploadJson,
 } from './sessionWorkerRuntimeFixture.mjs';
 
-// An answer marks the session's backup revision before and after it writes.
-// A coordinator too busy for either mark must not leave the answer refused,
-// stored twice, or stuck behind its own retry lease.
+// While a backup export runs, an answer marks the session's backup revision
+// before and after it writes. A coordinator too busy for either mark must not
+// leave the answer refused, stored twice, or stuck behind its own retry lease.
 const session = { sessionId: SESSION_ID, sessionSlug: SLUG };
 
 const setup = async () => {
@@ -24,6 +25,13 @@ const setup = async () => {
   const admin = await login({ env, wallet: created.admin });
   assert.equal((await uploadJson({ env, token: admin, resource: 'questions', data: { id: 'q-1', type: 'binary', prompt: 'Statement', ...session } })).status, 200);
   const token = await login({ env, wallet: Wallet.createRandom() });
+  // An export takes its lease; this isolate's settings copy, which predates
+  // it, ages out during the export's wait.
+  const { body: { revision } } = await callSessionConfigCoordinator({ env, slug: SLUG, path: 'current' });
+  const exporting = await callSessionConfigCoordinator({ env, slug: SLUG, path: 'backup/export',
+    expectedAuthority: { actor: created.admin.address.toLowerCase(), revision, authzEpoch: 0 } });
+  assert.equal(exporting.ok, true, JSON.stringify(exporting.body));
+  forgetSessionConfig(env, SLUG);
   return {
     // Fails the given mark of the next answer: 1 before its write, 2 after.
     failNextAnswersMark: (which) => { failMark = marks + which; },
@@ -39,6 +47,9 @@ test('a coordinator too busy to mark an answer before its write gets the busy re
   const busy = await s.send();
   assert.equal(busy.status, 503, JSON.stringify(busy.body));
   assert.equal(busy.body.error, SESSION_CONFIG_COORDINATION_ERROR);
+  // The Worker says it is safe to send again, which the retry shows.
+  assert.equal(busy.body.retryable, true);
+  assert.equal(isRetryableBusy(busy.status, busy.body), true);
   assert.equal(await s.stored(), 0);
 
   const retried = await s.send();

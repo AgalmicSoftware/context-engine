@@ -1,4 +1,5 @@
-import { CONTEXT_TEXT_ROLE, contextRoleOf, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { CONTEXT_ROLE, CONTEXT_SOURCE_LIMITS, CONTEXT_TEXT_ROLE, contextRoleOf, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import { markStorageBackupWrite } from './storageBackupRevision.js';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import {
@@ -63,7 +64,7 @@ import {
   writeStorageResourceHidden,
   writeStorageResourceOwner,
 } from './storageResourceOwnership.js';
-import { checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt } from './sessionWriteCoordinator.js';
+import { checkCoordinatedAuthRateLimit, checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt, settleCoordinatedAuthRateKey } from './sessionWriteCoordinator.js';
 import { executeCoordinatedStoragePublication, SUPERSEDED_AUTHORITY_ERROR } from './sessionConfigAuthority.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
@@ -72,6 +73,7 @@ import { DRAFT_TEXT_PATHS, draftTextRoute } from './draftTextRoute.js';
 import { checkContextSourceUpload, contextSourceListFields } from './contextSourcePolicy.js';
 import { contextSourceRoute } from './contextSourceRoute.js';
 import { toStr } from './stringCoercion.js';
+import { answerVersionStamp } from './answerVersionStamp.js';
 import {
   isStorageReadLimitError, jsonByteLength, parseStorageExportCursor, readStorageBytesBounded,
   STORAGE_EXPORT_PAGE_LIMITS, StorageReadLimitError, storageExportCursor,
@@ -172,8 +174,17 @@ export const storageIndexPutOptions = (metadata) => {
     };
   }
   const responder = resource === 'responses' ? trim(metadata?.responder).toLowerCase() : '';
-  return responder ? { metadata: { responder } } : undefined;
+  if (!responder) return undefined;
+  // A stamped readable answer also lists its question, session and time, so
+  // AI builds read only each person's latest answer to each question.
+  const readable = metadata.encrypted !== true && metadata.payloadEncrypted !== true;
+  // Untrimmed: a question id cut at 128 characters may end in a space.
+  const questionId = readable ? toStr(metadata.answerQuestionId) : '';
+  const sessionId = trim(metadata.answerSessionId);
+  return { metadata: { responder, ...(questionId && sessionId ? { questionId, sessionId, createdAt: trim(metadata.createdAt) } : {}) } };
 };
+// Long enough to outlast a session, so its count of adds doesn't reset.
+const CONTEXT_ADD_WINDOW_MS = 366 * 24 * 60 * 60 * 1000;
 const safeGroupId = (value) => trim(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
 const normalizeGroupIdList = (value) => {
   let raw = value;
@@ -1701,6 +1712,10 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
       ...(accessConditions?.conditions?.length ? { accessConditions } : {}),
       ...(envelope ? { envelope } : {}),
       storageLayer,
+      // A readable answer says which question it answers, for its list entry.
+      ...(resource === 'responses' && trim(uploaderAddress) && payload.payloadEncrypted !== true &&
+        payloadAccess.encryption !== PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE
+        ? answerVersionStamp({ payload: parsedPayload, slug, config }) : {}),
     };
     assertNoCloudflarePrivateMaterial({
       id,
@@ -1744,6 +1759,37 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   } catch (error) {
     if (error?.status === 503) return responseJson(deps, { error: error.message }, 503, baseHeaders);
     throw error;
+  }
+  // Each person, an agent included, adds at most CONTEXT_SOURCE_LIMITS.perAdder
+  // context sources to a session; admins are not limited. The session
+  // coordinator counts each add once it is ready to store. The count is keyed
+  // by the item's bytes (a link's, by its address) and stays open until the
+  // store finishes, so sending the same item again after a busy reply or a
+  // failed store is not counted twice; a copy sent while the first is still
+  // being stored gets the busy reply. A removal gives none back. The count is kept per session id, so a session
+  // reset under the same link starts afresh. Refreshing a link is an admin's,
+  // so never counted.
+  let contextCount = null;
+  if (contextCheck.role === CONTEXT_ROLE && !contextUploaderIsAdmin) {
+    const linkKey = payload.contextOrigin === 'worker' && typeof payload.countKey === 'string' ? payload.countKey : '';
+    const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256',
+      linkKey ? new TextEncoder().encode(linkKey) : payload.bytes || new Uint8Array());
+    contextCount = {
+      env, slug, route: 'context-add', identity: `${trim(config?.sessionId || config?.sessionIdHex)}:${uploader}`,
+      key: Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''),
+    };
+    const counted = await (deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit)({
+      ...contextCount, limit: CONTEXT_SOURCE_LIMITS.perAdder, windowMs: CONTEXT_ADD_WINDOW_MS, now: deps?.now,
+    });
+    if (counted?.ok !== true) return responseJson(deps, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: 'context_count_unavailable' }, 503, baseHeaders);
+    // The same item is being added by another request right now.
+    if (counted.busy === true) return responseJson(deps, { error: SESSION_COORDINATOR_UNAVAILABLE, reason: 'context_add_in_progress' }, 503, baseHeaders);
+    if (counted.allowed !== true) {
+      return responseJson(deps, {
+        error: `You’ve added ${CONTEXT_SOURCE_LIMITS.perAdder} context items to this session, the most one person may add. A session admin can add more.`,
+        reason: 'context_adder_limit',
+      }, 403, baseHeaders);
+    }
   }
   // Every answer takes a receipt, which also counts it against the person's limits;
   // without a usable request id it gets one of its own and is never replayed.
@@ -1844,7 +1890,14 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (owned || metadata.contextSource) {
     const publish = deps?.executeCoordinatedStoragePublication || executeCoordinatedStoragePublication;
     const result = await publish({ env, slug, expectedAuthority, metadata, createOwner: owned && !owner && !!uploader });
-    if (!result.ok) return responseJson(deps, { error: result.body?.error || 'Storage publication is unavailable; retry.' }, result.status || 503, baseHeaders);
+    const settle = deps?.settleCoordinatedAuthRateKey || settleCoordinatedAuthRateKey;
+    if (!result.ok) {
+      // A retry may go ahead at once; without this it waits out the lease.
+      if (contextCount) await settle({ ...contextCount, release: true }).catch(() => {});
+      return responseJson(deps, { error: result.body?.error || 'Storage publication is unavailable; retry.' }, result.status || 503, baseHeaders);
+    }
+    // Unsettled, the same bytes stay free to add again for an hour.
+    if (contextCount) await settle(contextCount).catch(() => {});
   } else if (index && typeof index.put === 'function') {
     await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata, storageIndexPutOptions(metadata));
   }
@@ -2177,8 +2230,8 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     // Hidden markers also cover a version whose own flag a hide has not
     // written yet, such as one uploaded in another region during the hide.
     if (isOwnedStorageResource(resource)) hiddenIds = await listHiddenStorageResourceIds({ index, slug, resource });
-    // An own-answer page may hold up to 10,000 older rows with no author, so
-    // it reads them in bulk gets of 100 and keeps only rows that may be the
+    // Rows are read in bulk gets of 100. An own-answer page may hold up to
+    // 10,000 older rows with no author, so it keeps only rows that may be the
     // requester's; a row it can't parse is kept, to fail the page below.
     const othersRow = (raw) => {
       try {
@@ -2188,16 +2241,12 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
         return false;
       }
     };
-    for (let offset = 0; mine && offset < keys.length; offset += KV_BULK_GET_KEYS) {
-      const batch = keys.slice(offset, offset + KV_BULK_GET_KEYS).map((keyEntry) => trim(keyEntry?.name || keyEntry)).filter(Boolean);
+    const names = keys.map((keyEntry) => trim(keyEntry?.name || keyEntry)).filter(Boolean);
+    for (let offset = 0; offset < names.length; offset += KV_BULK_GET_KEYS) {
+      const batch = names.slice(offset, offset + KV_BULK_GET_KEYS);
       const got = await index.get(batch);
-      rows.push(...batch.map((name) => ({ name, raw: got?.get?.(name) ?? null })).filter(({ raw }) => typeof raw !== 'string' || !othersRow(raw)));
-    }
-    for (let offset = 0; !mine && offset < keys.length; offset += 8) {
-      rows.push(...await Promise.all(keys.slice(offset, offset + 8).map(async (keyEntry) => {
-        const name = trim(keyEntry?.name || keyEntry);
-        return { name, raw: name ? await index.get(name) : null };
-      })));
+      rows.push(...batch.map((name) => ({ name, raw: got?.get?.(name) ?? null }))
+        .filter(({ raw }) => !mine || typeof raw !== 'string' || !othersRow(raw)));
     }
   } catch {
     return responseJson(deps, { error: 'Cloudflare storage index metadata is unavailable.' }, 503, baseHeaders);
@@ -2296,6 +2345,70 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
 // operation, and refuses a bulk reply over 25 MB.
 const KV_BULK_GET_KEYS = 100;
 const KV_BULK_REPLY_BYTES = 16 * 1024 * 1024;
+
+// An answer key's stamped list entry (storageIndexPutOptions), or null, with
+// `older: true` when the same person has a newer stamped answer to the same
+// question in `entries`, by the build's order: time, then storage id.
+export const listedAnswerVersions = (entries, { prefix, sessionId }) => {
+  const versions = entries.map(({ name, metadata }) => {
+    const key = trim(name);
+    if (!sessionId || !toStr(metadata?.questionId) || !trim(metadata?.responder) || trim(metadata?.sessionId) !== sessionId) return null;
+    return { key, id: key.slice(prefix.length), questionId: toStr(metadata.questionId), responder: trim(metadata.responder),
+      createdAt: trim(metadata.createdAt), rowTime: Date.parse(trim(metadata.createdAt)) || 0, older: false };
+  });
+  const newest = new Map();
+  const group = (version) => `${version.questionId}\n${version.responder}`;
+  for (const version of versions) {
+    if (!version) continue;
+    const current = newest.get(group(version));
+    if (!current || version.rowTime > current.rowTime || (version.rowTime === current.rowTime && version.id > current.id)) newest.set(group(version), version);
+  }
+  for (const version of versions) if (version && newest.get(group(version)) !== version) version.older = true;
+  return versions;
+};
+
+// Every stored answer for an AI build, leaving unread a person's older answers
+// to a question when list entries show a newer one (storageIndexPutOptions).
+// Keys are listed 1,000 a call; the rest are read 100 a call, strictly, as
+// listCloudflareMetadataRows reads them. An older answer comes back in its
+// place in key order as `{ key, listed }`, so the build still weighs it.
+// Rows without a stamp, such as those written before stamps, are all read.
+export const listLatestResponseRows = async ({ index, slug, sessionId, budget }) => {
+  const prefix = buildIndexPrefix({ slug, resource: 'responses' });
+  const entries = [];
+  let cursor = '';
+  const seenCursors = new Set();
+  do {
+    budget.operation();
+    const listed = await index.list({ prefix, ...(cursor ? { cursor } : {}), limit: MINE_LIST_KV_KEYS });
+    const keys = (Array.isArray(listed?.keys) ? listed.keys : []).filter((keyEntry) => trim(keyEntry?.name));
+    budget.listed(keys.length);
+    entries.push(...keys);
+    cursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
+    if (listed?.list_complete === false && (!cursor || seenCursors.has(cursor))) throw new Error('Cloudflare storage list cursor is unavailable or did not advance.');
+    if (cursor) seenCursors.add(cursor);
+  } while (cursor);
+  const versions = listedAnswerVersions(entries, { prefix, sessionId });
+  const older = (version) => version?.older === true;
+  const toRead = entries.map((entry, i) => (older(versions[i]) ? null : trim(entry.name))).filter(Boolean);
+  const read = new Map();
+  for (let offset = 0; offset < toRead.length; offset += KV_BULK_GET_KEYS) {
+    const batch = toRead.slice(offset, offset + KV_BULK_GET_KEYS);
+    budget.rows(batch.length);
+    budget.operation();
+    const got = await index.get(batch);
+    for (const key of batch) {
+      const raw = got?.get?.(key) ?? null;
+      if (raw != null) budget.metadata(raw);
+      const metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!isObj(metadata) || !trim(metadata.id)) throw new Error('Storage metadata is missing or invalid.');
+      read.set(key, metadata);
+    }
+  }
+  return entries.map((entry, i) => (older(versions[i])
+    ? { key: versions[i].key, listed: versions[i] }
+    : { key: trim(entry.name), metadata: read.get(trim(entry.name)) }));
+};
 
 // `skipKey` passes over a listed key, from its list metadata, without reading it.
 // A budgeted scan reads each listed page in one bulk get.

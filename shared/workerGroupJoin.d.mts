@@ -3,7 +3,6 @@ export type WorkerGroupInviteToken =
   { kind: 'password'; password: string } | { kind: 'one_use'; secret: string } | { kind: 'invite' };
 
 export const WORKER_GROUP_JOIN_MODES: readonly WorkerGroupJoinMode[];
-export const WORKER_GROUP_SECRET_MODES: readonly WorkerGroupJoinMode[];
 export const WORKER_GROUP_JOIN_REFUSED: 'worker_group_join_refused';
 export const WORKER_GROUP_MEMBER_CEILING_DEFAULT: number;
 export const WORKER_GROUP_MEMBER_CEILING_MAX: number;
@@ -26,7 +25,6 @@ export function formatGroupInviteToken(token: {
 export function generateOneUseSecret(): string;
 export function hashOneUseSecret(secret: string): Promise<string>;
 export function isOneUseSecretHash(value: unknown): boolean;
-export function inviteIdOfHash(hash: string): string;
 export function workerGroupJoinStatement(input: { sessionId: string; groupId: string; address: string }): string;
 
 type PasswordInput = { password: string; sessionId: string; groupId: string };

@@ -84,7 +84,7 @@ function AutoJoinIntent({
   // The link's invite, or one the person typed; it stays in this tab.
   const [token, setToken] = useState(intent.token || '');
   const [publicGroup, setPublicGroup] = useState<PublicGroup>('unknown');
-  // A refused token isn't sent again, even for another account: each send spends a guess.
+  // A refused token isn't sent again, even for another account: it would only be refused again.
   const refusedTokenRef = useRef('');
 
   useEffect(() => {
@@ -132,7 +132,7 @@ function AutoJoinIntent({
     cancelRef.current = stop;
     const fail = (error: unknown) => {
       if (!active) return;
-      // A refused invite leaves the tab, so a reload doesn't spend another of this person's guesses on it.
+      // A refused invite leaves the tab, so a reload doesn't send it again only to be refused.
       if (isRefusedWorkerGroupError(error)) {
         refusedTokenRef.current = token;
         const { token: _refused, ...withoutToken } = intent;

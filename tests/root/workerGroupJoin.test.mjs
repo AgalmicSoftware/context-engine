@@ -7,7 +7,6 @@ import {
   formatGroupInviteToken,
   generateOneUseSecret,
   hashOneUseSecret,
-  inviteIdOfHash,
   isOneUseSecretHash,
   parseGroupInviteToken,
   readWorkerGroupMemberCeiling,
@@ -74,7 +73,6 @@ test('hashes a claim code the same whatever its case', async () => {
   assert.ok(isOneUseSecretHash(hash));
   assert.equal(hash, await hashOneUseSecret('ABCDEF0123456789ABCDEF0123456789'));
   assert.equal(hash, createHash('sha256').update('abcdef0123456789abcdef0123456789').digest('hex'));
-  assert.equal(inviteIdOfHash(hash), hash.slice(0, 8));
   await assert.rejects(hashOneUseSecret('not a code'));
 });
 

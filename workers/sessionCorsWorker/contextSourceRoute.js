@@ -126,8 +126,9 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
     bytes: encoder.encode(JSON.stringify(record)),
     contentType: 'application/json',
     accessConditions: adminsOnly ? ADMINS_ONLY_ACCESS : null,
-    // A refreshed link stays its first adder's, who may still remove it.
-    ...(replaces ? { contextUploader: replaces.uploader } : {}),
+    // A refreshed link stays its first adder's, who may still remove it. A new
+    // one is counted by its address: its page text and time change each fetch.
+    ...(replaces ? { contextUploader: replaces.uploader } : { countKey: `link:${record.url}` }),
     tags: [
       ...commonTags('link'),
       { name: TAGS.role, value: CONTEXT_ROLE },

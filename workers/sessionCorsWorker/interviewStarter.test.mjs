@@ -266,7 +266,7 @@ test('a question hidden from the Storage panel retires the opening, and later st
   const withStorageIndex = (f) => {
     const records = new Map();
     f.args.env.CE_STORAGE_INDEX_KV = {
-      get: async (key) => records.get(key) ?? null,
+      get: async (key) => (Array.isArray(key) ? new Map(key.map((name) => [name, records.get(name) ?? null])) : records.get(key) ?? null),
       put: async (key, value) => { records.set(key, value); },
       delete: async (key) => { records.delete(key); },
       list: async ({ prefix = '' } = {}) => ({ keys: [...records.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
@@ -399,7 +399,7 @@ const BLOCKED = 'https://127.0.0.1/v1/chat/completions';
 
 const runtimeFixture = async (mode) => {
   const values = new Map();
-  const kv = { get: async k => values.get(k) ?? null, put: async (k, v) => values.set(k, v), delete: async k => values.delete(k),
+  const kv = { get: async k => (Array.isArray(k) ? new Map(k.map(n => [n, values.get(n) ?? null])) : values.get(k) ?? null), put: async (k, v) => values.set(k, v), delete: async k => values.delete(k),
     list: async ({ prefix = '' } = {}) => ({ keys: [...values.keys()].filter(k => k.startsWith(prefix)).map(name => ({ name })), list_complete: true }) };
   const wallet = new Wallet(`0x${'1'.repeat(64)}`);
   const sessionId = `0x${'a'.repeat(32)}`;

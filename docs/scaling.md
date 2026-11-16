@@ -111,6 +111,30 @@ private-compute services. They do not require a public or private EVM.
   storage, AI, networking, key-release, and observability adapters. A private
   EVM or rollup is optional, never foundational.
 
+## Operating Limits
+
+The limits a Worker-canonical session runs into, for whoever runs one. Each
+is described in full in the [Cloudflare worker reference](session-cors-worker.md).
+
+| What | Limit | Past it |
+|---|---|---|
+| Answers AI builds read (AI Views, the atlas, the risk matrix and the Session Agent's Detailed answers) | 10,000 stored question and answer versions, and about 8 MiB of answer text; an answer replaced by a newer stamped answer to the same question counts instead toward 50,000 listed | The build stops with a plain message and the last good one stays; the Session Agent leaves members' answers out. `GET /admin/diagnostics` shows the count as `storedVersions`; the admin page shows it and warns from 8,000. |
+| One AI Views build | About 4.6 million characters of views and the answers they cover | `413`, saying how large it was; the last AI Views stays |
+| One person's versions of one answer | 20 | `422` `response_limit_versions` |
+| One person's answers in all | Five times the session's question count | `422` `response_limit_rows` |
+| One batch read (`/storage/read-batch`) | 100 records, about 8 MiB of text | Records past 8 MiB come back `413`, to be read on their own |
+| Members of one group | 1,000, or the session's `groupMemberCeiling` (at most 10,000) | Joins are refused; lowering it removes no one |
+| One-use codes added at once | 500 | Add them in more than one batch |
+| Context the session's AI reads | Looks at 300 context rows, admins' first, and reads at most 16 sources | The rest are left out; only the Session Agent says so |
+| Context one person adds | 20 files and links; admins aren't limited | Refused |
+| Signed-in requests a day (`limits.perWalletPerDay`) | Per address per 24 hours, counted for each kind of route; saving, listing and reading answers share one count. Empty or `0` sets no limit | `429` |
+| Signed-in AI calls a day (`limits.aiPerWalletPerDay`) | When set, the `/ai` route, Session Agent questions and Agent HTTP's AI together, per address per 24 hours | `429`; when unset, AI calls count under `perWalletPerDay` |
+| Feedback about the app | 5 per person a day, 200 per session a UTC day, 2,000 stored | `429`, or `409` when full until an admin clears some |
+
+The per-person counts above live in the session's coordinator and its rate
+limit objects, not in backups, so a session restored from a backup starts
+them at zero. Session Agent opt-outs are in backups.
+
 ## Related
 
 - [Architecture overview](architecture-overview.md)

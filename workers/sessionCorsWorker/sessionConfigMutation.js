@@ -10,7 +10,7 @@ import {
   validCuratedIdList,
   validResultsAdminAddresses,
 } from '../../shared/sessionConfigEdits.mjs';
-import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
+import { validAgentHttpConfig } from '../../shared/agentHttpConfig.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
 import { normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { stableCanonicalSerialize } from '../shared/deployHelperCore.mjs';
@@ -265,6 +265,30 @@ const resolveWorkerCanonicalPublicationWrite = ({
   };
 };
 
+// Each settings check and its refusal, in the order they answer. Set-config
+// runs them on the settings sent, and every mutation runs them again on the
+// merged record. Limits arrive by their own mutation, so the daily AI limit
+// is checked on the merged record only.
+const SETTINGS_CHECKS = Object.freeze([
+  [(config) => !findForbiddenCloudflareDeploymentTokenPath(config), 'Cloudflare deployment tokens are not allowed in session config.'],
+  [(config) => !findForbiddenWorkerConfigSecretPath(config), 'Secret-like values are not allowed in public session config fields.'],
+  [validAgentHttpConfig, 'Invalid agent configuration.'],
+  [validAllowOrigins, 'Worker CORS allowlists must contain exact origins.'],
+  [validGroupCreationPolicy, 'Invalid group creation policy.'],
+  [validContextAdditionPolicy, 'Invalid context addition policy.'],
+  [validGroupMemberCeiling, `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.`],
+  [validAppearanceConfig, 'Invalid session appearance config.'],
+  [validPileAutoAdvanceConfig, 'Invalid pile auto-advance config.'],
+  [validFeedbackConfig, 'feedbackEnabled must be true or false.'],
+  [validAiDailyLimit, `limits.aiPerWalletPerDay must be a whole number from 0 to ${AI_DAILY_LIMIT_MAX}, or empty.`, { mergedOnly: true }],
+  [validInterviewModeConfig, 'Invalid interview mode config.'],
+  [validResultsAnalysisSettingsConfig, 'Invalid results analysis settings config.'],
+]);
+const refuseInvalidSettings = (config, { merged = false } = {}) => {
+  const failed = SETTINGS_CHECKS.find(([valid, , options]) => (merged || !options?.mergedOnly) && !valid(config));
+  return failed ? { ok: false, status: 400, error: failed[1] } : null;
+};
+
 export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
   const authorityExisting = normalizeWorkerConfigRecord(existingConfig) || {};
   let existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
@@ -306,40 +330,8 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     ) {
       return { ok: false, status: 400, error: 'Worker Group bootstrap state is server-managed.' };
     }
-    if (findForbiddenCloudflareDeploymentTokenPath(incomingConfig)) {
-      return { ok: false, status: 400, error: 'Cloudflare deployment tokens are not allowed in session config.' };
-    }
-    if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
-      return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
-    }
-    if (!validSessionAgentConfig(incomingConfig)) return { ok: false, status: 400, error: 'Invalid agent configuration.' };
-    if (!validAllowOrigins(incomingConfig)) {
-      return { ok: false, status: 400, error: 'Worker CORS allowlists must contain exact origins.' };
-    }
-    if (!validGroupCreationPolicy(incomingConfig)) {
-      return { ok: false, status: 400, error: 'Invalid group creation policy.' };
-    }
-    if (!validContextAdditionPolicy(incomingConfig)) {
-      return { ok: false, status: 400, error: 'Invalid context addition policy.' };
-    }
-    if (!validGroupMemberCeiling(incomingConfig)) {
-      return { ok: false, status: 400, error: `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.` };
-    }
-    if (!validAppearanceConfig(incomingConfig)) {
-      return { ok: false, status: 400, error: 'Invalid session appearance config.' };
-    }
-    if (!validPileAutoAdvanceConfig(incomingConfig)) {
-      return { ok: false, status: 400, error: 'Invalid pile auto-advance config.' };
-    }
-    if (!validFeedbackConfig(incomingConfig)) {
-      return { ok: false, status: 400, error: 'feedbackEnabled must be true or false.' };
-    }
-    if (!validInterviewModeConfig(incomingConfig)) {
-      return { ok: false, status: 400, error: 'Invalid interview mode config.' };
-    }
-    if (!validResultsAnalysisSettingsConfig(incomingConfig)) {
-      return { ok: false, status: 400, error: 'Invalid results analysis settings config.' };
-    }
+    const refusedSent = refuseInvalidSettings(incomingConfig);
+    if (refusedSent) return refusedSent;
     const invalidIdList = CURATED_ID_LIST_KEYS.find(
       (key) => hasOwn(incomingConfig, key) && !validCuratedIdList(incomingConfig[key]),
     );
@@ -425,43 +417,8 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   // Validate the complete merged record before persistence. This covers limit
   // and Lit-descriptor mutations as well as set-config, so a rejected
   // secret-like value never lands in public config storage.
-  if (findForbiddenCloudflareDeploymentTokenPath(mergedConfig)) {
-    return { ok: false, status: 400, error: 'Cloudflare deployment tokens are not allowed in session config.' };
-  }
-  if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
-    return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
-  }
-  if (!validSessionAgentConfig(mergedConfig)) return { ok: false, status: 400, error: 'Invalid agent configuration.' };
-  if (!validAllowOrigins(mergedConfig)) {
-    return { ok: false, status: 400, error: 'Worker CORS allowlists must contain exact origins.' };
-  }
-  if (!validGroupCreationPolicy(mergedConfig)) {
-    return { ok: false, status: 400, error: 'Invalid group creation policy.' };
-  }
-  if (!validContextAdditionPolicy(mergedConfig)) {
-    return { ok: false, status: 400, error: 'Invalid context addition policy.' };
-  }
-  if (!validGroupMemberCeiling(mergedConfig)) {
-    return { ok: false, status: 400, error: `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.` };
-  }
-  if (!validAppearanceConfig(mergedConfig)) {
-    return { ok: false, status: 400, error: 'Invalid session appearance config.' };
-  }
-  if (!validPileAutoAdvanceConfig(mergedConfig)) {
-    return { ok: false, status: 400, error: 'Invalid pile auto-advance config.' };
-  }
-  if (!validFeedbackConfig(mergedConfig)) {
-    return { ok: false, status: 400, error: 'feedbackEnabled must be true or false.' };
-  }
-  if (!validAiDailyLimit(mergedConfig)) {
-    return { ok: false, status: 400, error: `limits.aiPerWalletPerDay must be a whole number from 0 to ${AI_DAILY_LIMIT_MAX}, or empty.` };
-  }
-  if (!validInterviewModeConfig(mergedConfig)) {
-    return { ok: false, status: 400, error: 'Invalid interview mode config.' };
-  }
-  if (!validResultsAnalysisSettingsConfig(mergedConfig)) {
-    return { ok: false, status: 400, error: 'Invalid results analysis settings config.' };
-  }
+  const refusedMerged = refuseInvalidSettings(mergedConfig, { merged: true });
+  if (refusedMerged) return refusedMerged;
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {
     return {

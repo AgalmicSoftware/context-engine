@@ -218,7 +218,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent notes\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
     writeFile(sourceDir, path.join('client', 'public', 'agent-guide.md'), 'public guide for AI agents\n');
-    writeFile(sourceDir, path.join('scripts', 'run-session-agent-tests.js'), 'session agent test runner\n');
+    writeFile(sourceDir, path.join('scripts', 'run-agent-http-tests.js'), 'agent HTTP test runner\n');
     writeFile(sourceDir, path.join('workers', 'deploy-helper', '.dev.vars'), 'LOCAL_WORKER_VALUE=fixture\n');
     writeFile(sourceDir, path.join('workers', 'retiredWorker', 'dev.vars'), 'LOCAL_WORKER_VALUE=fixture\n');
     writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.js'), 'private companion test runner\n');
@@ -241,7 +241,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
             test: 'node scripts/run-node-tests.js',
             'test:cc': 'node scripts/run-contextengine-cc-tests.js',
             'test:ci': 'npm run test && npm run test:cc',
-            'test:worker:agent': 'node scripts/run-session-agent-tests.js',
+            'test:worker:agent': 'node scripts/run-agent-http-tests.js',
             'ai:test-cf-envelope:worker': 'npm run -s ai:node -- scripts/e2e/cloudflare-worker-envelope.js',
             'ai:test-cf-envelope:all': 'npm run -s ai:test-cf-envelope:worker',
             'ai:test-session:demo-smoke': 'npm run -s ai:node -- scripts/test-session-demo.ui.js',
@@ -325,7 +325,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
       'test:ci': 'npm run test',
-      'test:worker:agent': 'node scripts/run-session-agent-tests.js',
+      'test:worker:agent': 'node scripts/run-agent-http-tests.js',
       tests: 'npm run test',
     });
     assert.equal(fs.existsSync(path.join(outputDir, '.DS_Store')), false);
@@ -387,7 +387,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-bridge.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'agent-guide.md')), true);
-    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-session-agent-tests.js')), true);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-agent-http-tests.js')), true);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.test.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'e2e-env-example.test.js')), false);

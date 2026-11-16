@@ -4,7 +4,7 @@ const booleanFields = new Set(['managedAccountSubmitAllowed', 'asyncSubmitEnable
 const fields = new Set([...booleanFields, 'questionAuthoringPermissionMode', 'submitMaxAttempts',
   'submitRetryDelaySeconds', 'wrapped', 'invites', 'riskCeiling']);
 
-export const validSessionAgentConfig = config => {
+export const validAgentHttpConfig = config => {
   if (config.agentHttp === undefined) return true;
   const value = config.agentHttp;
   if (!record(value) || Object.keys(value).some(key => !fields.has(key))) return false;

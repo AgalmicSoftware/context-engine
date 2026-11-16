@@ -8,7 +8,13 @@ import { peekCacheSync } from '../../utilities/cache/cacheScripts';
 import { questionIdMatchesContent } from '../../utilities/shared/questionUtils.mjs';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
-import { listSessionStorageRefsPage, readSessionStorageBlob } from '../../utilities/storage/storageClient';
+import {
+  STORAGE_READ_BATCH_MAX_IDS,
+  listSessionStorageRefsPage,
+  readSessionStorageBatch,
+  readSessionStorageBlob,
+} from '../../utilities/storage/storageClient';
+import { type WorkerCapabilities, readWorkerCapabilities } from '../../utilities/worker/workerCapabilities';
 import {
   STORAGE_BACKENDS,
   STORAGE_RESOURCE_KEYS,
@@ -36,6 +42,8 @@ type WorkerStoragePage = {
 type WorkerCanonicalMetadataHydrationDeps = {
   listSessionStorageRefsPage?: (options: UnknownRecord) => Promise<WorkerStoragePage>;
   readSessionStorageBlob?: (options: UnknownRecord) => Promise<Response>;
+  readSessionStorageBatch?: (options: UnknownRecord & { ids: string[] }) => Promise<unknown[]>;
+  readWorkerCapabilities?: (workerUrl: string, slug: string) => Promise<WorkerCapabilities>;
 };
 
 type WorkerCanonicalMetadataHydrationInput = {
@@ -340,19 +348,10 @@ const loadWorkerCanonicalMetadata = async (
     if (!cachedStorageRefIds.has(storageRefId)) uniqueItems.push(normalized);
   });
 
-  const readRow = async ({
-    createdAtMs,
-    storageRef,
-    uploadAuthority,
-  }: ListedStorageRef): Promise<WorkerCanonicalMetadataRow | null> => {
-    const response = await readBlob({
-      storageRef,
-      sessionSlug: target.sessionSlug,
-      sessionConfig: target.sessionConfig,
-      context,
-      workerUrl: target.workerUrl,
-    });
-    const payload = await response.json().catch(() => null);
+  const toRow = (
+    { createdAtMs, storageRef, uploadAuthority }: ListedStorageRef,
+    payload: unknown,
+  ): WorkerCanonicalMetadataRow | null => {
     if (!isRecord(payload) || !payloadMatchesTarget(payload, target)) return null;
     // A non-text title crashes survey views; such a row cannot be a survey.
     if (resource === STORAGE_RESOURCE_KEYS.SURVEYS && typeof payload.title !== 'string') return null;
@@ -387,7 +386,34 @@ const loadWorkerCanonicalMetadata = async (
       uploadAuthority,
     };
   };
-  const readRows = await mapWithConcurrency(uniqueItems, METADATA_READ_CONCURRENCY, readRow);
+  // A Worker that reads up to a hundred items in one request gets them that way;
+  // older Workers are read one item at a time, a few at once.
+  const readTarget = {
+    sessionSlug: target.sessionSlug,
+    sessionConfig: target.sessionConfig,
+    context,
+    workerUrl: target.workerUrl,
+  };
+  const batched =
+    uniqueItems.length > 0 &&
+    (
+      await (deps.readWorkerCapabilities || readWorkerCapabilities)(readString(target.workerUrl), target.sessionSlug)
+    ).features.includes('storage_read_batch_v1');
+  const readBatch = deps.readSessionStorageBatch || readSessionStorageBatch;
+  const readRows: (WorkerCanonicalMetadataRow | null)[] = [];
+  if (batched) {
+    for (let offset = 0; offset < uniqueItems.length; offset += STORAGE_READ_BATCH_MAX_IDS) {
+      const chunk = uniqueItems.slice(offset, offset + STORAGE_READ_BATCH_MAX_IDS);
+      const payloads = await readBatch({ ...readTarget, ids: chunk.map((item) => readString(item.storageRef.id)) });
+      chunk.forEach((item, index) => readRows.push(toRow(item, payloads[index])));
+    }
+  } else {
+    readRows.push(
+      ...(await mapWithConcurrency(uniqueItems, METADATA_READ_CONCURRENCY, async (item) =>
+        toRow(item, await (await readBlob({ ...readTarget, storageRef: item.storageRef })).json().catch(() => null)),
+      )),
+    );
+  }
   const rows = readRows
     .filter((row): row is WorkerCanonicalMetadataRow => !!row)
     .sort(

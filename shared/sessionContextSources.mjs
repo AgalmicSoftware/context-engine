@@ -37,6 +37,8 @@ export const CONTEXT_SOURCE_LIMITS = Object.freeze({
   lockedGroups: 20,
   // An agent's display name, as long as its profile allows.
   adderNameChars: 80,
+  // Context items one person or agent may add to a session; admins are not limited.
+  perAdder: 20,
 });
 
 // File types a context source may have; others (Office files, images) are refused.

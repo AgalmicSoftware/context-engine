@@ -5,7 +5,7 @@ import { executeAgentQuestionQueueAdvance } from './agent/agentQuestionQueue.mjs
 import { dispatchWrappedResearch } from './agent/wrappedJournal.mjs';
 import { controlCoordinatorBackupImport, assertNoActiveBackupImport } from './sessionBackupLifecycle.js';
 import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
-import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
+import { backupExportActive, bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { createOperationQueue } from './operationQueue.js';
 import {
@@ -18,11 +18,7 @@ import {
   workerGroupInviteKey,
   workerGroupInvitePrefix,
 } from './workerGroupInvites.js';
-import {
-  WORKER_GROUP_JOIN_REFUSED,
-  WORKER_GROUP_MEMBER_CEILING_DEFAULT,
-  WORKER_GROUP_MEMBER_CEILING_MAX,
-} from '../../shared/workerGroupJoin.mjs';
+import { WORKER_GROUP_JOIN_REFUSED } from '../../shared/workerGroupJoin.mjs';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import {
   SESSION_CONFIG_COORDINATION_ERROR, assertExpectedSessionAuthority, forgetResultsAnalysisStatus, forgetSessionConfig,
@@ -98,6 +94,11 @@ const SESSION_CONFIG_AUTHORITY_KEY = 'session-config-authority';
 const AUTH_NONCE_ACTIVE_KEY = 'auth-nonce-active';
 const AUTH_NONCE_USED_KEY = 'auth-nonce-used';
 const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
+// A keyed count stays open this long for a retry of the same request, but
+// while a request holds it (up to the lease) a copy of it is turned away.
+const AUTH_RATE_KEY_HOLD_MS = 60 * 60_000;
+const AUTH_RATE_KEY_LEASE_MS = 30_000;
+const AUTH_RATE_KEY_RE = /^[0-9a-f]{64}$/;
 const HOSTED_FAUCET_QUOTA_KEY = 'hosted-faucet-quota-v1';
 const FAUCET_WALLET_TURN_KEY = 'faucet-wallet-turn-v1';
 // A crashed request's turn expires after this; a live one renews it while it sends.
@@ -163,7 +164,8 @@ const RESULTS_ANALYSIS_RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 50
 const RUNNING_LEASE_MS = 65_000;
 const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
 const AUTH_NONCE_MAC_KEY = 'auth-nonce-mac-key';
-const MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
+// Daily limits use a day; a session's count of context adds outlasts the session.
+const MAX_AUTH_RATE_WINDOW_MS = 400 * 24 * 60 * 60 * 1000;
 const WRAPPED_SESSION_KEY_FIELDS = [
   'alg',
   'createdAt',
@@ -2599,7 +2601,9 @@ export class SessionWriteCoordinator {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     if (!slug) return jsonResponse({ error: 'Invalid session slug.' }, 400);
     try {
-      return jsonResponse({ ok: true, ...(await this.readCurrentSessionConfig(slug)) });
+      // Writes skip their backup marks only while no export holds its lease.
+      const backupExport = await backupExportActive(this.state.storage);
+      return jsonResponse({ ok: true, ...(await this.readCurrentSessionConfig(slug)), backupExportActive: backupExport });
     } catch (error) {
       if (error?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
         const safeError = legacySessionConfigMigrationError();
@@ -3013,26 +3017,58 @@ export class SessionWriteCoordinator {
       nowMs,
       MAX_AUTH_RATE_WINDOW_MS,
     );
-    if (!slug || !route || !identity || !limit || !resetAtMs) {
+    const key = payload?.key === undefined ? '' : toTrimmedString(payload.key);
+    if (!slug || !route || !identity || !limit || !resetAtMs || (payload?.key !== undefined && !AUTH_RATE_KEY_RE.test(key))) {
       return jsonResponse({ error: 'Invalid auth rate-limit request.' }, 400);
     }
     const result = await this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(AUTH_RATE_RECORD_KEY);
-      const current = Number(existing?.resetAtMs || 0) > nowMs
-        ? normalizePositiveSafeInteger(existing?.count)
-        : 0;
+      const active = Number(existing?.resetAtMs || 0) > nowMs;
+      const current = active ? normalizePositiveSafeInteger(existing?.count) : 0;
+      const effectiveResetAtMs = active ? existing.resetAtMs : resetAtMs;
+      const open = (active && Array.isArray(existing?.open) ? existing.open : [])
+        .filter((entry) => Number(entry?.atMs) > nowMs - AUTH_RATE_KEY_HOLD_MS);
+      // A retry of a counted request that never said it finished (a lost
+      // reply, or a failure after counting) is not counted again; a copy sent
+      // while the first still runs is told to wait.
+      const held = key ? open.find((entry) => entry.key === key) : null;
+      if (held && Number(held.untilMs) > nowMs) {
+        return { ok: true, allowed: false, busy: true, count: current, resetAtMs: effectiveResetAtMs };
+      }
+      if (held) {
+        held.untilMs = nowMs + AUTH_RATE_KEY_LEASE_MS;
+        await transaction.put(AUTH_RATE_RECORD_KEY, { ...existing, open });
+        return { ok: true, allowed: true, count: current, resetAtMs: effectiveResetAtMs, repeated: true };
+      }
       const count = current + 1;
-      const effectiveResetAtMs = Number(existing?.resetAtMs || 0) > nowMs
-        ? existing.resetAtMs
-        : resetAtMs;
+      const allowed = count <= limit;
+      if (key && allowed) open.push({ key, atMs: nowMs, untilMs: nowMs + AUTH_RATE_KEY_LEASE_MS });
       await transaction.put(AUTH_RATE_RECORD_KEY, {
         version: 1,
         count,
         resetAtMs: effectiveResetAtMs,
+        ...(open.length ? { open } : {}),
       });
-      return { ok: true, allowed: count <= limit, count, resetAtMs: effectiveResetAtMs };
+      return { ok: true, allowed, count, resetAtMs: effectiveResetAtMs };
     });
     return jsonResponse(result);
+  }
+
+  // The keyed request finished: stored, so the same key counts anew next
+  // time, or (`release`) failed, so a retry may go ahead at once.
+  async executeAuthRateSettle(payload) {
+    const key = toTrimmedString(payload?.key);
+    if (!AUTH_RATE_KEY_RE.test(key)) return jsonResponse({ error: 'Invalid auth rate-limit request.' }, 400);
+    await this.state.storage.transaction(async (transaction) => {
+      const existing = await transaction.get(AUTH_RATE_RECORD_KEY);
+      if (!existing?.open?.some((entry) => entry?.key === key)) return;
+      const { open, ...rest } = existing;
+      const kept = payload?.release === true
+        ? open.map((entry) => (entry?.key === key ? { ...entry, untilMs: 0 } : entry))
+        : open.filter((entry) => entry?.key !== key);
+      await transaction.put(AUTH_RATE_RECORD_KEY, kept.length ? { ...rest, open: kept } : rest);
+    });
+    return jsonResponse({ ok: true });
   }
 
   async executeHostedFaucetQuota(payload, finalize = false) {
@@ -3516,6 +3552,9 @@ export class SessionWriteCoordinator {
     if (url.pathname === '/auth-state/rate/check') {
       return this.executeAuthRateCheck(payload);
     }
+    if (url.pathname === '/auth-state/rate/settle') {
+      return this.executeAuthRateSettle(payload);
+    }
     if (url.pathname === '/worker-groups/ready') {
       return this.executeWorkerGroupReady(payload);
     }
@@ -3846,6 +3885,7 @@ export const checkCoordinatedAuthRateLimit = async ({
   limit,
   windowMs,
   now = Date.now,
+  key,
 } = {}) => {
   const nowMs = Number(typeof now === 'function' ? now() : now) || Date.now();
   const normalizedRoute = toTrimmedString(route).toLowerCase();
@@ -3860,9 +3900,18 @@ export const checkCoordinatedAuthRateLimit = async ({
       identity: normalizedIdentity,
       limit,
       resetAtMs: nowMs + normalizePositiveSafeInteger(windowMs),
+      ...(key === undefined ? {} : { key }),
     },
   });
 };
+
+/** Closes a keyed count once its request finished, or releases it for a retry (see executeAuthRateCheck). */
+export const settleCoordinatedAuthRateKey = ({ env, slug, route, identity, key, release = false } = {}) => callAuthStateCoordinator({
+  env,
+  identity: `auth-rate:${toTrimmedString(slug)}:${toTrimmedString(route).toLowerCase()}:${toTrimmedString(identity).toLowerCase()}`,
+  path: '/auth-state/rate/settle',
+  payload: { key, release },
+});
 
 export const getOrCreateCoordinatedStorageEnvelopeSessionKey = async ({
   env,

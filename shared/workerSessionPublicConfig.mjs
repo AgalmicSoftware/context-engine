@@ -83,3 +83,14 @@ export const SESSION_AGENT_READY_FIELD = 'sessionAgentReady';
 // Set the same way: this Worker takes one-use codes and group passwords for
 // group joins and honours groupMemberCeiling, which older Workers refuse.
 export const GROUP_JOIN_CHOICES_FIELD = 'groupJoinChoices';
+
+// Every "this Worker supports X" field above, in one list: the Worker sets
+// each on every public config read, and Create's readback check skips them.
+export const WORKER_SUPPORT_FIELDS = Object.freeze([
+  SET_CONFIG_MERGES_AI_FIELD,
+  DEBATE_ATLAS_FIELD,
+  RISK_MATRIX_FIELD,
+  MEMBER_RESULTS_FIELD,
+  SESSION_AGENT_READY_FIELD,
+  GROUP_JOIN_CHOICES_FIELD,
+]);

@@ -193,7 +193,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/release-version.test.mjs');
   expectFile('workers/sessionCorsWorker/package.json');
   expectFile('workers/sessionCorsWorker/agent/requestBoundary.mjs');
-  expectFile('scripts/run-session-agent-tests.js');
+  expectFile('scripts/run-agent-http-tests.js');
   expectFile(publishWorkflowPath);
   expectFile(promoteWorkflowPath);
   expectFile('workers/deploy-helper/wrangler.example.toml');

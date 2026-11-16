@@ -1,4 +1,4 @@
-import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
+import { validAgentHttpConfig } from '../../shared/agentHttpConfig.mjs';
 import { MAX_AGENT_INSTRUCTIONS_CHARS, validAgentInstructions } from '../../shared/sessionConfigEdits.mjs';
 import { stableCanonicalSerialize } from '../../shared/canonicalJson.mjs';
 import { recoveryKeyFingerprint, withFreshRecoveryKey } from './recoveryKey.mjs';
@@ -1240,7 +1240,7 @@ const resolveDeploymentAccountId = async ({
 };
 
 export const validateDeployHelperPublicConfigInputs = (body = {}) => {
-  if (!validSessionAgentConfig(body)) return 'Invalid agent configuration.';
+  if (!validAgentHttpConfig(body)) return 'Invalid agent configuration.';
   if (body?.deploymentKind) return 'Separate agent deployments are no longer supported; configure the Session Worker.';
   if (Object.hasOwn(body || {}, 'agentInstructions') && !validAgentInstructions(body.agentInstructions)) {
     return `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`;

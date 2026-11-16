@@ -185,7 +185,9 @@ other signed-in routes.
   `{ answer, answers, audience, read, note? }`. `read` says how much the answer
   drew on: `{ context, results, answers }`, as a count of context items, whether
   it read the results, and a count of members' answers. The answer is at most
-  1,500 characters.
+  1,500 characters. `note` says what wasn't read: members' answers past the
+  stored-versions limit, or context past the 8,000 characters or 16 items
+  ("Some of the session's context wasn't read: …").
 - `POST /session-agent/opt-out` with `{ optedOut: true | false }` returns
   `{ optedOut }`.
 

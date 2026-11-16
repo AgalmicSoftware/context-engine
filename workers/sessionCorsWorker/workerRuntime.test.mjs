@@ -7,10 +7,11 @@ import {
 } from './endpointConfig.js';
 import { createWorkerRuntime } from './worker.js';
 
-test('createWorkerRuntime returns a frozen runtime contract from the route runtime', () => {
+test('createWorkerRuntime returns a frozen runtime contract from the route runtime', async () => {
+  const answered = new Response('ok');
   const routeRuntime = {
     workerAuthGateUtils: { id: 'workerAuthGateUtils' },
-    fetch: 'fetch',
+    fetch: async (...args) => (args.length === 3 ? answered : null),
   };
 
   const result = createWorkerRuntime(undefined, {
@@ -21,7 +22,8 @@ test('createWorkerRuntime returns a frozen runtime contract from the route runti
   assert.deepEqual(result.workerLowLevelHelpers, { id: 'low-level' });
   assert.equal(result.workerRouteRuntime, routeRuntime);
   assert.equal(result.workerAuthGateUtils, routeRuntime.workerAuthGateUtils);
-  assert.equal(result.fetch, routeRuntime.fetch);
+  // Its fetch is the route runtime's, with busy answers marked on the way out (retryableBusy.js).
+  assert.equal(await result.fetch('request', 'env', 'ctx'), answered);
   assert.equal(Object.isFrozen(result), true);
 });
 

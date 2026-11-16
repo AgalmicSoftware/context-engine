@@ -108,7 +108,7 @@ function verifyRootScripts(rootDir, failures) {
     ['test:node:tracked', 'scripts/run-node-tests.js --tracked-only'],
     ['test:root:jest', '--testMatch'],
     ['test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test'],
-    ['test:worker:agent', 'scripts/run-session-agent-tests.js'],
+    ['test:worker:agent', 'scripts/run-agent-http-tests.js'],
     ['test:e2e', 'npm run -s test:e2e:smoke'],
     ['test:e2e:quick', 'npm run -s test:e2e:smoke'],
     ['test:e2e:smoke', 'npm run -s ai:test-nav:smoke'],

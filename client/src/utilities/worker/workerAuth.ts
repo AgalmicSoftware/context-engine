@@ -1,5 +1,6 @@
 import { getClientAuthGeneration, invalidateClientAuthGeneration } from '../session/clientAuthGeneration';
 import { withCoordinatorRetry } from './coordinatorRetry';
+import { forgetSignInRoutes, rememberSignInRoute, signInRouteKey, signInRouteRemembered } from './workerSignInRoutes';
 import { buildSiweMessage as buildSharedSiweMessage } from '@ce-shared/auth/siweMessage.mjs';
 /**
  * @file workerAuth.ts
@@ -48,6 +49,7 @@ import {
 import {
   isTokenScopeDenialResponse,
   readRequestApiKey,
+  readResponseErrorMessage,
   shouldFallbackToAuthenticatedFlow,
   shouldRetryAuthenticatedResponse,
 } from './workerAuthFallbackPolicy.js';
@@ -63,6 +65,7 @@ import {
 } from './workerAuthSessionIdentity.js';
 import {
   createWorkerAuthRemoteError,
+  isWorkerAuthBusySignIn,
   NONCE_MISMATCH_ERROR,
   ONCHAIN_GATE_UNAVAILABLE_ERROR,
 } from './workerAuthRemoteError.js';
@@ -319,6 +322,7 @@ const invalidateWorkerAuthState = ({ nextAddress = '' } = {}) => {
   // Access noted for the previous sign-in says nothing about the next one's tokens.
   workerAccessChangedAtMs = 0;
   tokensIssuedForCurrentAccess.clear();
+  forgetSignInRoutes();
   trackedWorkerAuthAddress = normalizeAddress(nextAddress);
   return getClientAuthGeneration();
 };
@@ -898,17 +902,17 @@ export const getWorkerSessionToken = async ({
     };
 
     let loginData = null;
-    let retriedNonceMismatch = false;
+    let retriedWithFreshNonce = false;
     for (let attempt = 0; attempt <= LOGIN_GATE_UNAVAILABLE_RETRIES; attempt += 1) {
       try {
         loginData = await performLogin();
         break;
       } catch (err) {
         if (isAbortError(err)) throw err;
-        if (isNonceMismatchError(getErrorMessage(err)) && !retriedNonceMismatch) {
-          // The Worker refused this nonce: it expired, or it was issued for
-          // another wallet or request. Retry once with a fresh nonce.
-          retriedNonceMismatch = true;
+        if ((isNonceMismatchError(getErrorMessage(err)) || isWorkerAuthBusySignIn(err)) && !retriedWithFreshNonce) {
+          // The Worker refused this nonce (it expired, or was issued for another wallet or request),
+          // or was too busy to sign in and may have spent it. Retry once with a fresh nonce.
+          retriedWithFreshNonce = true;
           continue;
         }
         const canRetryGateUnavailable =
@@ -1064,7 +1068,7 @@ export const fetchWorkerWithAuth = async (
   url: RequestInfo | URL,
   options: RequestInit = {},
   opts: WorkerFetchAuthOptions = {},
-) => {
+): Promise<Response> => {
   const resolvedSession = resolveWorkerSessionContext({
     sessionSlug: opts.sessionSlug,
     sessionConfig: opts.sessionConfig,
@@ -1078,16 +1082,29 @@ export const fetchWorkerWithAuth = async (
   const anonymousOnly = opts.anonymousOnly === true;
   const startedSignedOut = !getCurrentWorkerAuthStoreAddress();
   const startingAuthEpoch = getClientAuthGeneration();
-  const canAttemptAnonymous = (opts.preferAnonymous || anonymousOnly) && (!bodyIsStream || anonymousOnly);
-  let anonymousResponse: Response | null = null;
-  if (canAttemptAnonymous) {
-    const requestApiKey = readRequestApiKey(options?.body);
+  const routeKey = signInRouteKey(url, slug);
+  const anonymousAllowed = (opts.preferAnonymous || anonymousOnly) && (!bodyIsStream || anonymousOnly);
+  // Only while a token is held: one route key can cover reads that differ (blob ids, batch bodies), so a
+  // public one must not start a sign-in just because a private one needed it.
+  const signInKnownNeeded =
+    anonymousAllowed &&
+    !anonymousOnly &&
+    !startedSignedOut &&
+    signInRouteRemembered(routeKey) &&
+    (await hasCachedWorkerSessionToken({
+      sessionSlug: slug,
+      sessionConfig: resolvedSession.sessionConfig,
+      context: { ...(opts.context as object), account: getCurrentWorkerAuthStoreAddress() },
+      workerUrl,
+      allowDemoFallback: opts.allowDemoFallback,
+    }));
+  const sendAnonymously = async (): Promise<Response> => {
     const anonymousHeaders = buildAnonymousHeaders({
       baseHeaders: options.headers,
       slug,
     });
     try {
-      anonymousResponse = await send(url, { ...options, headers: anonymousHeaders });
+      return await send(url, { ...options, headers: anonymousHeaders });
     } catch (anonymousError) {
       if (bodyIsStream) throw anonymousError;
       // Backward compatibility: older workers may reject preflight when this header is unknown.
@@ -1099,9 +1116,15 @@ export const fetchWorkerWithAuth = async (
         options,
       });
       if (!canRetryWithoutRateId) throw anonymousError;
-      const fallbackAnonymousHeaders = stripAnonymousRateIdHeader(anonymousHeaders);
-      anonymousResponse = await send(url, { ...options, headers: fallbackAnonymousHeaders });
+      return send(url, { ...options, headers: stripAnonymousRateIdHeader(anonymousHeaders) });
     }
+  };
+  let anonymousResponse: Response | null = null;
+  // Whether the signed-out refusal was a sign-in rule, not a rate limit or a gate outage.
+  let refusedForSignIn = false;
+  if (anonymousAllowed && !signInKnownNeeded) {
+    const requestApiKey = readRequestApiKey(options?.body);
+    anonymousResponse = await sendAnonymously();
     // Explicitly anonymous-only callers (such as background suggestions) must
     // never turn a denial into an interactive wallet or passkey signing prompt.
     if (anonymousOnly) return anonymousResponse;
@@ -1114,6 +1137,9 @@ export const fetchWorkerWithAuth = async (
     if (!shouldFallback) {
       return anonymousResponse;
     }
+    refusedForSignIn =
+      anonymousResponse.status !== 429 &&
+      !/gate data unavailable/i.test(await readResponseErrorMessage(anonymousResponse));
   }
   // An unlocked extension is not an app login. Keep the useful route denial
   // when signed out; account changes during a request still use abort handling.
@@ -1151,18 +1177,19 @@ export const fetchWorkerWithAuth = async (
     authRequestContext = authResult.requestContext;
     authToken = toStr(authResult.token);
   } catch (err) {
+    const signInNeeded = isWorkerSignInNeededError(err) || /authenticate with the worker/i.test(getErrorMessage(err));
+    // A remembered route whose token lapsed in between is asked signed out as before.
+    if (signInKnownNeeded && signInNeeded) return sendAnonymously();
     // When anonymous-first is enabled and no wallet is connected, surface
     // the original anonymous worker denial instead of a wallet-auth error.
-    if (
-      anonymousResponse &&
-      (isWorkerSignInNeededError(err) || /authenticate with the worker/i.test(getErrorMessage(err)))
-    ) {
+    if (anonymousResponse && signInNeeded) {
       return anonymousResponse;
     }
     throw err;
   }
   const headers = mergeHeaders(options.headers, authHeaders);
   const response = await send(url, { ...options, headers });
+  if (refusedForSignIn && response.ok && startingAuthEpoch === getClientAuthGeneration()) rememberSignInRoute(routeKey);
   if ((response.status !== 401 && response.status !== 403) || opts.retry === false) return response;
   const tokenRefused = await shouldRetryAuthenticatedResponse(response);
   const scopeOutdated =
@@ -1183,6 +1210,8 @@ export const fetchWorkerWithAuth = async (
         allowDemoFallback: opts.allowDemoFallback,
       });
     }
+    // The remembered route skipped the signed-out try, which may serve this request: start over from it, once.
+    if (signInKnownNeeded) return fetchWorkerWithAuth(url, options, { ...opts, retry: false });
     let retryToken: string;
     try {
       retryToken = await getWorkerSessionToken({ requestContext: authRequestContext, prompt: opts.prompt });

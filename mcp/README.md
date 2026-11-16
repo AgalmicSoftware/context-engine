@@ -234,6 +234,16 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.4.3
+
+- `get_results` reads stored records 100 at a time where the session's Worker
+  offers it: at 250 answers, 251 requests become 4. Results are the same, and
+  on an older Worker the tool reads one record a request as before.
+- A busy call is sent again only when the Worker marks it safe to send again
+  (`retryable`) and repeating it does no harm: reads, a nonce, a group join, an
+  answer with a request id. The busy message now says the request may not have
+  gone through, and to check before trying again.
+
 ## Upgrading to 0.4.2
 
 - `list_questions` describes its default correctly: it lists only unanswered
@@ -452,7 +462,9 @@ unknown `CE_MCP_*` name.
   ended and on-chain sessions refuse it. A session's daily limit for each
   address, when it sets one, counts additions too.
 - **Results reading is bounded.** `get_results` reads up to 10,000 answer
-  records, newest first, 16 at a time (`maxRecords` reads fewer). It lists
+  records, newest first (`maxRecords` reads fewer): 100 to a request, two
+  requests at a time, from a Worker that offers batch reads, and otherwise
+  one to a request, 16 at a time. Questions are read the same way. It lists
   answers for at most 20 seconds and reads them until 40, then answers with
   `partial: true`, so it returns within a host's usual 60-second limit. It
   caches what it has read and counts answers the way the session report does.

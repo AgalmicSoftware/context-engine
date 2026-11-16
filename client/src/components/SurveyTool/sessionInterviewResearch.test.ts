@@ -4,9 +4,11 @@ import {
   redactInterviewEncryptedRatings,
   buildSelectedInterviewResearch,
   buildUnselectedInterviewResearch,
+  INTERVIEW_DRAFT_ORIGINS,
   resolveInterviewDraftOrigin,
   withoutEncryptedFields,
 } from './sessionInterviewResearch';
+import { DRAFT_ORIGINS } from '../../../../shared/agentFidelity.mjs';
 
 describe('what someone encrypted, in interview review', () => {
   const fields = {
@@ -321,4 +323,9 @@ describe('interview draft origin', () => {
   ])('labels %j', (value, prefill, source, expected) => {
     expect(resolveInterviewDraftOrigin(value, prefill, source)).toBe(expected);
   });
+});
+
+// The site's interview origins are the shared ones an interview can produce; the Worker refuses others.
+it('labels interview drafts only with shared draft origins', () => {
+  expect(DRAFT_ORIGINS).toEqual(expect.arrayContaining(INTERVIEW_DRAFT_ORIGINS));
 });
