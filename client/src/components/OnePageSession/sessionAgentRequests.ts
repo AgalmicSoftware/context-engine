@@ -20,6 +20,8 @@ export type SessionAgentStatus = {
   closed: 'session_ended' | 'ai_disabled' | null;
   /** The session lets an asker have a chat stored. */
   recording: boolean;
+  /** Asked for without signing in: answers are General at most, and there are no switches. */
+  signedOut: boolean;
 };
 
 /** What to keep of one chat: with the asker's address or without, and a name if they gave one; null keeps nothing. */
@@ -42,7 +44,11 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 const styleOf = (value: unknown): SessionAgentStyle | null =>
   value === 'general' || value === 'detailed' ? value : null;
 
-// Every route takes a signed-in person's JSON POST; the Worker's errors are plain sentences.
+/** The Worker asks for a sign-in: thrown for someone not signed in whom it won't answer as they are. */
+export class SignInToAsk extends Error {}
+
+// Each route takes a JSON POST: a signed-in person's with their sign-in, anyone else's with no sign-in and the
+// session named in the query, and it never asks for a signature. The Worker's errors are plain sentences.
 const post = async (path: string, body: Record<string, unknown>, options: SessionAgentRequestOptions) => {
   const session = {
     sessionSlug: options.sessionSlug,
@@ -53,20 +59,43 @@ const post = async (path: string, body: Record<string, unknown>, options: Sessio
   const base = toStr(await getCorsProxyUrlOrThrow(session))
     .trim()
     .replace(/\/+$/, '');
-  const response = await fetchWorkerWithAuth(
-    `${base}${path}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-    { ...session, workerUrl: base },
-  );
+  const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  const response = options.account
+    ? await fetchWorkerWithAuth(`${base}${path}`, init, { ...session, workerUrl: base })
+    : await fetch(`${base}${path}?slug=${encodeURIComponent(options.sessionSlug)}`, {
+        ...init,
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+      });
   const result = asRecord(await response.json().catch(() => ({})));
+  // A Session Worker from before signed-out asking answers 401 too.
+  if (!options.account && response.status === 401) throw new SignInToAsk('Sign in to ask the Session Agent.');
   if (!response.ok) {
     throw new Error(toStr(result.error) || `The Session Worker couldn’t answer (${response.status}). Try again.`);
   }
   return result;
 };
 
+// Not signed in and not answered as they are, the Session Agent is on but closed to them until they sign in.
+const SIGN_IN_FIRST: SessionAgentStatus = {
+  on: true,
+  answers: null,
+  audience: null,
+  optedOut: false,
+  unattributed: null,
+  closed: null,
+  recording: false,
+  signedOut: true,
+};
+
 export const readSessionAgentStatus = async (options: SessionAgentRequestOptions): Promise<SessionAgentStatus> => {
-  const result = await post('/session-agent/status', {}, options);
+  let result: Record<string, unknown>;
+  try {
+    result = await post('/session-agent/status', {}, options);
+  } catch (error) {
+    if (error instanceof SignInToAsk) return SIGN_IN_FIRST;
+    throw error;
+  }
   const audience = result.audience === 'admin' || typeof result.audience === 'number' ? result.audience : null;
   return {
     on: result.on === true,
@@ -77,6 +106,7 @@ export const readSessionAgentStatus = async (options: SessionAgentRequestOptions
     unattributed: typeof result.unattributed === 'boolean' ? result.unattributed : null,
     closed: result.closed === 'session_ended' || result.closed === 'ai_disabled' ? result.closed : null,
     recording: result.recording === true,
+    signedOut: !options.account,
   };
 };
 

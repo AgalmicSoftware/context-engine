@@ -155,6 +155,26 @@ describe('SetupSessionAgent', () => {
     expect(describeSessionAgentProblem({ audiences: [everyone], history: true })).toBe('');
   });
 
+  it('lets people who aren’t signed in ask unless an admin turns that off, and says what it costs', () => {
+    const last = renderAgent({ value: { audiences: [everyone] } });
+    const anyone = screen.getByRole('checkbox', { name: 'Anyone can ask' });
+    // On to start, stored as nothing.
+    expect(anyone).toBeChecked();
+    expect(anyone).toHaveAccessibleDescription(expect.stringContaining('They get General answers only.'));
+    expect(anyone).toHaveAccessibleDescription(
+      expect.stringContaining('At most 10 questions a day from one network address and 300 a day in all'),
+    );
+    fireEvent.click(anyone);
+    expect(last()).toEqual({ audiences: [everyone], anyoneCanAsk: false });
+    expect(anyone).not.toBeChecked();
+    // Off stays off through other edits, and on again is stored as nothing.
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Record chats' }));
+    expect(last()).toEqual({ audiences: [everyone], history: true, anyoneCanAsk: false });
+    fireEvent.click(anyone);
+    expect(last()).toEqual({ audiences: [everyone], history: true });
+    expect(describeSessionAgentProblem({ audiences: [everyone], anyoneCanAsk: false })).toBe('');
+  });
+
   it('names the number a stored rule holds, and returns to 3 when turned off and on again', () => {
     const last = renderAgent({ value: { audiences: [everyone], minAnswers: 2 } });
     const skip = screen.getByRole('checkbox', { name: 'Skip questions with under 2 answers' });

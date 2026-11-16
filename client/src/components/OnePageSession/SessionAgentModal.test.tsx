@@ -32,6 +32,7 @@ const member: SessionAgentStatus = {
   unattributed: false,
   closed: null,
   recording: false,
+  signedOut: false,
 };
 const reply = (answer: string, read = { context: 0, results: false, answers: 0 }, note = ''): SessionAgentReply => ({
   answer,
@@ -366,6 +367,36 @@ describe('SessionAgentModal', () => {
     askQuestion(dialog, 'Why?');
     await dialog.findByText('An answer.');
     expect(ask).toHaveBeenLastCalledWith('Why?', OPTIONS, { attribution: 'anonymous', name: '' });
+  });
+
+  it('answers someone not signed in with General answers, and offers them no switches or address', async () => {
+    readStatus.mockResolvedValue({ ...member, unattributed: null, recording: true, signedOut: true });
+    render(<SessionAgentModal {...OPTIONS} account="" onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    expect(await dialog.findByText('Not signed in, you get General answers.')).toBeInTheDocument();
+    expect(readStatus).toHaveBeenCalledWith({ ...OPTIONS, account: '' });
+    expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
+    // They may store a chat, with a name if they like, and never an address.
+    expect(dialog.getByRole('checkbox', { name: 'Store this chat' })).toBeChecked();
+    expect(dialog.queryByRole('radio')).not.toBeInTheDocument();
+    fireEvent.change(dialog.getByLabelText('Name (optional)'), { target: { value: 'A visitor' } });
+    ask.mockResolvedValueOnce({ ...reply('An answer.'), stored: true });
+    askQuestion(dialog, 'Why?');
+    await dialog.findByText('An answer.');
+    expect(ask).toHaveBeenLastCalledWith(
+      'Why?',
+      { ...OPTIONS, account: '' },
+      { attribution: 'anonymous', name: 'A visitor' },
+    );
+  });
+
+  it('asks someone not signed in to sign in where the Session Agent won’t answer them as they are', async () => {
+    readStatus.mockResolvedValue({ ...member, answers: null, audience: null, unattributed: null, signedOut: true });
+    render(<SessionAgentModal {...OPTIONS} account="" onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    expect(await dialog.findByText('Sign in to ask the Session Agent.')).toBeInTheDocument();
+    expect(dialog.queryByLabelText('Your question')).not.toBeInTheDocument();
+    expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
   });
 
   it('shows the switch as off for someone who opted out', async () => {

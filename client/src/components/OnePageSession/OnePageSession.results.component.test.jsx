@@ -1758,7 +1758,7 @@ describe('OnePageSession results routing', () => {
       );
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       expect(screen.getByTestId('ce-session-context-sources')).toBeInTheDocument();
-      expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
+      // Nothing is asked of the Worker until the dialog is opened.
       expect(mockSessionAgentStatus).not.toHaveBeenCalled();
     });
 
@@ -1800,6 +1800,34 @@ describe('OnePageSession results routing', () => {
           'They are available with your account address to anyone with this session’s link, and may be exported;',
         ),
       );
+    });
+
+    it('offers the Session Agent to someone signed out unless the admins turned that off', async () => {
+      mockSessionAgentStatus.mockResolvedValue({
+        on: true,
+        answers: 'general',
+        audience: 0,
+        optedOut: false,
+        signedOut: true,
+      });
+      await renderSession([], false, withSessionAgent());
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      fireEvent.click(screen.getByTestId('ce-session-agent-open'));
+      const dialog = await screen.findByRole('dialog', { name: 'Session Agent' });
+      expect(await within(dialog).findByText('Not signed in, you get General answers.')).toBeInTheDocument();
+      // Asked with no account: the request goes without a sign-in.
+      expect(mockSessionAgentStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionSlug: 'edge', account: '' }),
+      );
+    });
+
+    it('hides the Session Agent from someone signed out once the admins turned that off', async () => {
+      await renderSession([file, link], false, {
+        sessionConfig: { ...buildProps().sessionConfig, sessionAgent: { ...sessionAgent, anyoneCanAsk: false } },
+      });
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      expect(screen.getByTestId('ce-session-agent-notice-page')).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
     });
 
     it('shows no Session Agent while it is off, even to admins', async () => {

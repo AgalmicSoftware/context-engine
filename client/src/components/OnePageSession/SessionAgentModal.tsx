@@ -179,60 +179,62 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     }
   };
 
-  const switches = status ? (
-    <div className={styles.switches}>
-      <div className={styles.switchRow}>
-        <label htmlFor={`${baseId}-use`}>
-          <input
-            id={`${baseId}-use`}
-            type="checkbox"
-            role="switch"
-            checked={!status.optedOut}
-            disabled={savingSwitch}
-            data-testid="ce-session-agent-use-mine"
-            onChange={(event) => {
-              const optOut = !event.target.checked;
-              void saveSwitch(async () => ({ optedOut: await setSessionAgentOptOut(optOut, options) }));
-            }}
-          />
-          Use my answers and files
-        </label>
-        <SessionAgentNotice id={`${baseId}-notice`} where="switch" className={styles.helpLink} />
-      </div>
-      {status.unattributed === null ? null : (
+  // Someone not signed in has no answers or files of their own here, so no switches.
+  const switches =
+    status && !status.signedOut ? (
+      <div className={styles.switches}>
         <div className={styles.switchRow}>
-          <label htmlFor={`${baseId}-address`}>
+          <label htmlFor={`${baseId}-use`}>
             <input
-              id={`${baseId}-address`}
+              id={`${baseId}-use`}
               type="checkbox"
               role="switch"
-              // On is the default: the Worker stores only who turned it off.
-              checked={!status.unattributed}
+              checked={!status.optedOut}
               disabled={savingSwitch}
-              data-testid="ce-session-agent-include-address"
+              data-testid="ce-session-agent-use-mine"
               onChange={(event) => {
-                const leaveOff = !event.target.checked;
-                void saveSwitch(async () => ({
-                  unattributed: await setSessionAgentUnattributed(leaveOff, options),
-                }));
+                const optOut = !event.target.checked;
+                void saveSwitch(async () => ({ optedOut: await setSessionAgentOptOut(optOut, options) }));
               }}
             />
-            Include my address with my answers
+            Use my answers and files
           </label>
-          <Help
-            id={`${baseId}-address-help`}
-            label="About your address on your answers"
-            text={sessionAgentAddressNotice(sessionConfig)}
-          />
+          <SessionAgentNotice id={`${baseId}-notice`} where="switch" className={styles.helpLink} />
         </div>
-      )}
-      {switchError ? (
-        <p className={styles.error} role="alert">
-          {switchError}
-        </p>
-      ) : null}
-    </div>
-  ) : null;
+        {status.unattributed === null ? null : (
+          <div className={styles.switchRow}>
+            <label htmlFor={`${baseId}-address`}>
+              <input
+                id={`${baseId}-address`}
+                type="checkbox"
+                role="switch"
+                // On is the default: the Worker stores only who turned it off.
+                checked={!status.unattributed}
+                disabled={savingSwitch}
+                data-testid="ce-session-agent-include-address"
+                onChange={(event) => {
+                  const leaveOff = !event.target.checked;
+                  void saveSwitch(async () => ({
+                    unattributed: await setSessionAgentUnattributed(leaveOff, options),
+                  }));
+                }}
+              />
+              Include my address with my answers
+            </label>
+            <Help
+              id={`${baseId}-address-help`}
+              label="About your address on your answers"
+              text={sessionAgentAddressNotice(sessionConfig)}
+            />
+          </div>
+        )}
+        {switchError ? (
+          <p className={styles.error} role="alert">
+            {switchError}
+          </p>
+        ) : null}
+      </div>
+    ) : null;
 
   const style = status?.answers;
   let body: React.ReactNode;
@@ -263,7 +265,11 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   } else if (!style) {
     body = (
       <>
-        <p>The Session Agent isn’t open to you in this session.</p>
+        <p>
+          {status.signedOut
+            ? 'Sign in to ask the Session Agent.'
+            : 'The Session Agent isn’t open to you in this session.'}
+        </p>
         {switches}
       </>
     );
@@ -273,7 +279,9 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
         <p className={styles.styleRow}>
           {status.audience === 'admin'
             ? 'As an admin, you get Detailed answers.'
-            : `You get ${style === 'detailed' ? 'Detailed' : 'General'} answers.`}
+            : status.signedOut
+              ? 'Not signed in, you get General answers.'
+              : `You get ${style === 'detailed' ? 'Detailed' : 'General'} answers.`}
           <button
             type="button"
             id={`${baseId}-style`}

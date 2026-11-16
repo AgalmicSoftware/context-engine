@@ -70,6 +70,7 @@ describe('sessionAgentRequests', () => {
       unattributed: true,
       closed: null,
       recording: false,
+      signedOut: false,
     });
     expect(fetchWorker.mock.calls[0][0]).toBe('https://worker.example/session-agent/status');
     reply(200, { on: true, answers: 'everything', audience: 'owner' });
@@ -82,6 +83,7 @@ describe('sessionAgentRequests', () => {
       unattributed: null,
       closed: null,
       recording: false,
+      signedOut: false,
     });
     reply(200, {
       on: true,
@@ -115,6 +117,50 @@ describe('sessionAgentRequests', () => {
     reply(200, { answer: 'A.', answers: 'general', read: {} });
     await askSessionAgent('Why?', OPTIONS);
     expect(sent()).toEqual({ question: 'Why?' });
+  });
+
+  it('asks without a sign-in for someone signed out, naming the session, and never asks for a signature', async () => {
+    const signedOut = { ...OPTIONS, account: '' };
+    const fetchMock = jest.fn();
+    const realFetch = global.fetch;
+    global.fetch = fetchMock as unknown as typeof fetch;
+    try {
+      const answer = (status: number, body: unknown) =>
+        fetchMock.mockResolvedValueOnce({ ok: status < 400, status, json: async () => body } as unknown as Response);
+      answer(200, { on: true, answers: 'general', audience: 0, optedOut: false, recording: true, signedOut: true });
+      await expect(readSessionAgentStatus(signedOut)).resolves.toEqual(
+        expect.objectContaining({ answers: 'general', recording: true, signedOut: true, unattributed: null }),
+      );
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://worker.example/session-agent/status?slug=salon');
+      expect(init).toEqual(
+        expect.objectContaining({ method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer' }),
+      );
+      expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+
+      answer(200, { answer: 'A.', answers: 'general', read: {}, stored: true });
+      await askSessionAgent('Why?', signedOut, { attribution: 'anonymous', name: 'A visitor' });
+      expect(fetchMock.mock.calls[1][0]).toBe('https://worker.example/session-agent/ask?slug=salon');
+      expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+        question: 'Why?',
+        store: true,
+        attribution: 'anonymous',
+        name: 'A visitor',
+      });
+
+      // The Worker asks for a sign-in, as one from before signed-out asking does: the dialog says so, with no error.
+      answer(401, { error: 'Sign in to ask the Session Agent.', reason: 'session_agent_sign_in_required' });
+      await expect(readSessionAgentStatus(signedOut)).resolves.toEqual(
+        expect.objectContaining({ on: true, answers: null, signedOut: true }),
+      );
+      answer(401, {});
+      await expect(askSessionAgent('Why?', signedOut)).rejects.toThrow('Sign in to ask the Session Agent.');
+      answer(429, { error: 'The Session Agent has answered all it can today for people who aren’t signed in.' });
+      await expect(askSessionAgent('Why?', signedOut)).rejects.toThrow('answered all it can today');
+      expect(fetchWorker).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = realFetch;
+    }
   });
 
   it('throws the Worker’s own sentence, or says which status failed', async () => {

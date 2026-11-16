@@ -37,7 +37,7 @@ import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } 
 import SessionContextSources from './SessionContextSources';
 import SessionAgentNotice from './SessionAgentNotice';
 import { useSessionContextSources } from '../../utilities/docLibrary/useSessionContextSources';
-import { sessionAgentSettingOf } from '@ce-shared/sessionAgent.mjs';
+import { sessionAgentOpenToAnyone, sessionAgentSettingOf } from '@ce-shared/sessionAgent.mjs';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: Record<string, unknown>) => <SurveyPage {...props} />);
@@ -481,11 +481,15 @@ export default function OnePageSessionStandardShell({
     (contextSources.isAdmin && contextSources.supported) || contextSources.participantsCanAdd || signInToAddContext;
   // Everyone signed in sees the Session Agent once an admin turns it on: the
   // dialog says whether it answers them, and lets them keep their answers and
-  // files out of it. The robot by the title tells everyone else it is on.
-  const sessionAgentOn =
-    !isDemoSlug && !!sessionAgentSettingOf((resolvedSessionConfig as UnknownRecord | null)?.sessionAgent);
+  // files out of it. Someone not signed in sees it too unless the admins turned
+  // that off, and the dialog asks them to sign in where the Worker won't answer
+  // them as they are. The robot by the title tells everyone it is on.
+  const sessionAgentSetting = isDemoSlug
+    ? null
+    : sessionAgentSettingOf((resolvedSessionConfig as UnknownRecord | null)?.sessionAgent);
+  const sessionAgentOn = !!sessionAgentSetting;
   const viewerAccount = loginComplete && typeof account === 'string' ? account : '';
-  const showSessionAgent = sessionAgentOn && !!viewerAccount;
+  const showSessionAgent = sessionAgentOn && (!!viewerAccount || sessionAgentOpenToAnyone(sessionAgentSetting));
   const [sessionAgentOpen, setSessionAgentOpen] = React.useState(false);
   // Signing out or switching account closes the dialog, so it never shows one
   // person's answer to another, or opens again by itself at the next sign-in.

@@ -51,6 +51,7 @@ const status = (optedOut = false, on = true) => ({
   unattributed: false,
   closed: null,
   recording: false,
+  signedOut: false,
 });
 
 const renderReview = (sessionConfig: Record<string, unknown>) => {
