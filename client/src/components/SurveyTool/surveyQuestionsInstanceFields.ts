@@ -146,6 +146,8 @@ export interface SurveyQuestions {
 export type SurveyQuestionsInstanceFields = {
   _emptySubmitTimer: SurveyQuestionsTimerRef;
   _persistTimer: SurveyQuestionsTimerRef;
+  // The draft key a pending _persistTimer write was scheduled under.
+  _persistTimerKey: string | null;
   _draftParseCache: SurveyQuestionsDraftParseCache;
   _lastDraftKey: string;
   _lastDraftJSON: unknown;
@@ -228,6 +230,7 @@ export type SurveyQuestionsInstanceFields = {
 export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFields => ({
   _emptySubmitTimer: null,
   _persistTimer: null,
+  _persistTimerKey: null,
   _draftParseCache: null,
   _lastDraftKey: '',
   _lastDraftJSON: null,

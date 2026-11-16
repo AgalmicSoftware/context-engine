@@ -1680,6 +1680,7 @@ const SurveyQuestionsInner = (
     persistDraft,
     clearDraft,
     clearDraftFor,
+    flushPendingDraft,
     getCurrentRenderedQuestionIds,
     getHydrationQuestionIds,
     buildLocalCacheHydrationSignature,
@@ -2159,7 +2160,9 @@ const SurveyQuestionsInner = (
 
   useLayoutEffect(() => {
     void runComponentDidMount();
+    window.addEventListener('pagehide', flushPendingDraft);
     return () => {
+      window.removeEventListener('pagehide', flushPendingDraft);
       void runComponentWillUnmount();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

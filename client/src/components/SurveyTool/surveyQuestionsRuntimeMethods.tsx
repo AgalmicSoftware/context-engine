@@ -433,6 +433,7 @@ export const createSurveyQuestionsRuntimeMethods = (
   const {
     clearDraft,
     clearDraftFor,
+    flushPendingDraft,
     getDraftKey,
     loadDraft,
     migratePersistedDraftForActiveAccount,
@@ -2611,6 +2612,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     persistDraft,
     clearDraft,
     clearDraftFor,
+    flushPendingDraft,
     getCurrentRenderedQuestionIds,
     getHydrationQuestionIds,
     buildLocalCacheHydrationSignature,

@@ -350,3 +350,35 @@ it('clears a stale memory-only warning after the user empties the draft', () => 
   expect(context.stateRef.current.draftPersistenceError).toBe('');
   expect(runtime.loadDraft()).toBeNull();
 });
+
+describe('flushPendingDraft', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    sessionStorage.clear();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('writes a debounced draft at once, so a reload inside the delay keeps it', () => {
+    const context = createRealDraftContext();
+    const runtime = createSurveyQuestionsDraftPersistenceRuntime(context);
+    runtime.persistDraftSafely();
+    expect(sessionStorage.length).toBe(0);
+    runtime.flushPendingDraft();
+    expect(runtime.loadDraft()?.answers.q1.value).toBe('draft A');
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('does nothing without a pending write, or after its source authority changes', () => {
+    const context = createRealDraftContext();
+    const runtime = createSurveyQuestionsDraftPersistenceRuntime(context);
+    runtime.flushPendingDraft();
+    expect(sessionStorage.length).toBe(0);
+    runtime.persistDraftSafely();
+    context.propsRef.current.sessionConfig = makeWorkerConfig('https://b.example.com');
+    runtime.flushPendingDraft();
+    jest.advanceTimersByTime(200);
+    expect(sessionStorage.length).toBe(0);
+  });
+});
