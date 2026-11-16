@@ -5,7 +5,7 @@ import { compareChainOrder } from './registryChain.mjs';
 import { normalizeLabel } from './config.mjs';
 import { describeError } from './mcpServer.mjs';
 import { readAgentState, updateAgentState } from './agentState.mjs';
-import { buildQuestionRecord, buildResponseRecord, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
+import { buildQuestionRecord, buildResponseRecord, closestQuestionId, isLockedQuestion, isSingleSelect, LOCKED_QUESTION_ERROR, ratingScaleFor } from './records.mjs';
 import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorageVersions.mjs';
 import { htmlToPlainText, normalizeSessionContext } from '../../shared/sessionContext.mjs';
 import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
@@ -362,6 +362,28 @@ const contextRefusal = (error, { olderLink = false } = {}) => {
 // nothing left to add. An unread answer still may be newer, so it keeps the note.
 const lookupMoot = (questions, mine) =>
   mine.pending && !mine.unread && questions.length > 0 && questions.every((question) => mine.has(question.id));
+
+// A locked question is named as locked only when this reader's own list holds it, so the reply
+// tells them nothing the list did not; any other id gets the same words whether or not it exists.
+const unknownQuestionError = (questionId, loaded) => {
+  if (loaded.lockedIds.has(questionId)) return LOCKED_QUESTION_ERROR;
+  // Some questions could not be read just now (a busy session), so this one may exist.
+  if (loaded.complete === false) return 'This question could not be read just now; the session may be busy. Retry in a few seconds.';
+  const closestId = closestQuestionId(questionId, loaded.map((question) => question.id));
+  const closest = closestId && loaded.find((question) => question.id === closestId);
+  return closest
+    ? `No question in list_questions has this id; it looks mistyped. Did you mean ${closest.id} (“${text(closest.prompt).replace(/\s+/g, ' ').slice(0, 80)}”)? This answer was not stored: send it again with the right id.`
+    : 'No question in list_questions has this id. This answer was not stored: copy the id from list_questions and send it again.';
+};
+
+// An upload that failed may still have been stored, so the rest "did not go through" rather than "were not stored".
+const storedSummary = (stored, failed) => {
+  const ids = failed.map((result) => result.questionId || '(no questionId)').join(', ');
+  const why = failed.length === 1 ? 'Its error in results says why; fix it and send only that one.' : 'Each one’s error in results says why; fix them and send only those.';
+  return stored
+    ? `${stored} of ${stored + failed.length} answers were stored and stay stored; don’t send those again. ${failed.length} did not go through: ${ids}. ${why}`
+    : `None of these answers went through: ${ids}. ${why}`;
+};
 
 const progressNotes = (questions, mine) => ({
   ...(questions.locked ? { lockedQuestions: questions.locked } : {}),
@@ -1197,6 +1219,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           continue;
         }
         const questionId = trim(item.questionId).toLowerCase();
+        if (!questionId) {
+          results.push({ questionId, ok: false, error: `This answer has no questionId; copy one from list_questions. ${ANSWERS_EXAMPLE}` });
+          continue;
+        }
         if (seen.has(questionId)) {
           results.push({ questionId, ok: false, error: 'This question appears more than once in the call; send one answer per question.' });
           continue;
@@ -1204,10 +1230,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         seen.add(questionId);
         const question = questions.get(questionId);
         if (!question) {
-          // Some questions could not be read just now (a busy session), so this one may exist.
-          results.push({ questionId, ok: false, error: loaded.complete === false
-            ? 'This question could not be read just now; the session may be busy. Retry in a few seconds.'
-            : 'Unknown question id, or a question locked to certain members; call list_questions.' });
+          results.push({ questionId, ok: false, error: unknownQuestionError(questionId, loaded) });
           continue;
         }
         let built;
@@ -1293,13 +1316,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           warning = 'Answers were submitted, but the local answer history could not be saved. Do not resubmit them to fix this warning.';
         }
       }
+      const failed = results.filter((result) => !result.ok);
       return {
         session: ctx.info.slug,
         ...(txHash ? { txHash } : {}),
         ...(reconciliationRequired ? { reconciliationRequired: true } : {}),
         ...(warning ? { warning } : {}),
-        submitted: results.filter((result) => result.ok).length,
-        failed: results.filter((result) => !result.ok).length,
+        submitted: results.length - failed.length,
+        failed: failed.length,
+        // A model that reads one refusal can take the whole call for lost, or the refused answer for sent.
+        ...(failed.length && !reconciliationRequired ? { next: storedSummary(results.length - failed.length, failed) } : {}),
         results,
       };
     },

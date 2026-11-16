@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ethers } from 'ethers';
 import { questionIdFixtures } from '../../tests/helpers/questionIdFixtures.mjs';
-import { buildQuestionRecord, buildResponseRecord, generateQuestionId, normalizeAnswerValue } from './records.mjs';
+import { buildQuestionRecord, buildResponseRecord, closestQuestionId, generateQuestionId, normalizeAnswerValue } from './records.mjs';
 
 const RESPONDER = '0x00000000000000000000000000000000000000aa';
 const SESSION = { sessionSlug: 'town-hall', sessionId: '0x00112233445566778899aabbccddeeff', sessionName: 'Town Hall' };
@@ -190,4 +190,26 @@ test('a quadratic answer sent as an object says to send a list of votes', () => 
   assert.equal(built.ok, false);
   assert.match(built.error, /a list of signed whole-number votes, one per option in the question’s order, such as \[2, -1, 0\]/);
   assert.equal(buildResponseRecord({ question, value: [2, -1], responder: RESPONDER, session: { sessionSlug: 's', sessionId: '0x' + '3'.repeat(32) } }).ok, true);
+});
+
+test('a mistyped question id finds the one listed id it is a slip of, and never a guess', () => {
+  const ids = ['binary:a', 'binary:b', 'rating:c'].map((seed) => ethers.utils.id(seed));
+  const [first] = ids;
+  const swapped = `${first.slice(0, 30)}${first[30] === 'f' ? '0' : 'f'}${first.slice(31)}`;
+  assert.equal(closestQuestionId(first.slice(0, -1), ids), first, 'last character dropped');
+  assert.equal(closestQuestionId(swapped, ids), first, 'one character changed');
+  assert.equal(closestQuestionId(first.slice(2), ids), first, 'no 0x');
+  assert.equal(closestQuestionId(`${first}00`, ids), first, 'two characters added');
+  const changed = (count) => [...first].map((char, index) => (index >= 10 && index < 10 + count ? (char === 'f' ? '0' : 'f') : char)).join('');
+  assert.equal(closestQuestionId(changed(3), ids), first, 'three characters changed');
+  assert.equal(closestQuestionId(changed(4), ids), undefined, 'four characters changed is too far');
+  assert.equal(closestQuestionId(first.slice(0, -4), ids), undefined, 'four characters dropped is too far');
+  assert.equal(closestQuestionId(ethers.utils.id('binary:other'), ids), undefined, 'another id altogether');
+  // Equally near two ids, it is nobody's slip.
+  assert.equal(closestQuestionId('0xaaaaaaaaaaaaaaac', ['0xaaaaaaaaaaaaaaaa', '0xaaaaaaaaaaaaaaab']), undefined);
+  assert.equal(closestQuestionId('0xaaaaaaaaaaaaaaab0', ['0xaaaaaaaaaaaaaaaa', '0xaaaaaaaaaaaaaaab']), '0xaaaaaaaaaaaaaaab', 'the nearer of two');
+  assert.equal(closestQuestionId('0xaaaaaaaaaaaaaaab0', ['0xaaaaaaaaaaaaaaab', '0xaaaaaaaaaaaaaaaa']), '0xaaaaaaaaaaaaaaab', 'whichever comes first');
+  // Short ids are too alike for a slip to point anywhere.
+  assert.equal(closestQuestionId('q2', ['q1']), undefined);
+  assert.equal(closestQuestionId('', ids), undefined);
 });

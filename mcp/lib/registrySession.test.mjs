@@ -795,6 +795,8 @@ test('registry log scans and transactions keep RPC details out of tool output an
   const answered = await call('answer', { answers: [{ questionId: qid, value: 'Agree' }] });
   assert.equal(answered.structuredContent.reconciliationRequired, true);
   assert.equal(answered.structuredContent.txHash, transactionHash);
+  // The transaction may have landed, so nothing says the answer did not go through.
+  assert.equal(answered.structuredContent.next, undefined);
   assert.match(answered.structuredContent.results[0].error, new RegExp(`^Transaction ${transactionHash} may have been submitted.*\\(SERVER_ERROR: processing response error\\)`));
   assert.doesNotMatch(exposed(answered), RPC_DETAILS);
   const added = await call('add_statement', { prompt: 'A statement agents should see' });

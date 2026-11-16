@@ -120,7 +120,7 @@ export const buildTools = (participant) => [
     name: 'answer',
     title: 'Answer questions',
     description:
-      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a number on the question’s scale and step grid (default step 1); multichoice the option text (an array when several are allowed); quadratic a list of signed whole-number votes, one per option in order (such as [2, -1, 0]), whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer.',
+      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a number on the question’s scale and step grid (default step 1); multichoice the option text (an array when several are allowed); quadratic a list of signed whole-number votes, one per option in order (such as [2, -1, 0]), whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer. When some answers are refused the rest are still stored: next says which went through, and each refused answer’s error says why, naming the nearest listed id when one looks mistyped.',
     inputSchema: {
       type: 'object',
       properties: {
