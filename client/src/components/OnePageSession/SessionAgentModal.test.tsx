@@ -117,6 +117,9 @@ describe('SessionAgentModal', () => {
       'href',
       expect.stringMatching(/README\.md#session-agent$/),
     );
+    expect(dialog.getByTestId('ce-session-agent-notice-switch')).toHaveAccessibleDescription(
+      expect.stringContaining('keeps them out of exports made from then on'),
+    );
 
     setOptOut.mockResolvedValueOnce(true);
     fireEvent.click(use);
@@ -148,51 +151,55 @@ describe('SessionAgentModal', () => {
     expect(use).not.toBeChecked();
   });
 
-  it('lets someone keep their address off exported items, and says what that changes', async () => {
+  it('includes a person’s address unless they turn that off, and says what it changes', async () => {
     const { dialog } = await renderModal(member);
-    const leaveOff = dialog.getByRole('switch', { name: 'Leave my address off exported items' });
-    expect(leaveOff).not.toBeChecked();
-    const help = dialog.getByRole('button', { name: 'About your address on exported items' });
-    expect(help).toHaveAccessibleDescription(/carries your account address in that file unless you turn this on/);
-    expect(help).toHaveAccessibleDescription(/Your answers and files stay in either way/);
+    const include = dialog.getByRole('switch', { name: 'Include my address with my answers' });
+    // On to start, like the switch above it: both are turned off to opt out.
+    expect(include).toBeChecked();
+    const help = dialog.getByRole('button', { name: 'About your address on your answers' });
+    expect(help).toHaveAccessibleDescription(
+      /will be available to this session’s organisers with your account address, and may be exported with it/,
+    );
+    expect(help).toHaveAccessibleDescription(/Turn this off and exports leave your address off them/);
 
     setUnattributed.mockResolvedValueOnce(true);
-    fireEvent.click(leaveOff);
-    await waitFor(() => expect(leaveOff).toBeChecked());
+    fireEvent.click(include);
+    await waitFor(() => expect(include).not.toBeChecked());
     expect(setUnattributed).toHaveBeenCalledWith(true, OPTIONS);
     // The other switch is untouched, and was never saved.
     expect(dialog.getByRole('switch', { name: 'Use my answers and files' })).toBeChecked();
     expect(setOptOut).not.toHaveBeenCalled();
 
     setUnattributed.mockRejectedValueOnce(new Error('Your choice couldn’t be saved just now.'));
-    fireEvent.click(leaveOff);
+    fireEvent.click(include);
     expect(await dialog.findByRole('alert')).toHaveTextContent('couldn’t be saved just now');
     expect(setUnattributed).toHaveBeenLastCalledWith(false, OPTIONS);
-    expect(leaveOff).toBeChecked();
+    expect(include).not.toBeChecked();
   });
 
-  it('shows the address switch as on for someone who chose it, and not at all for someone who has none', async () => {
+  it('shows the address switch as off for someone who turned it off, and not at all for someone who has none', async () => {
     const chosen = await renderModal({ ...member, unattributed: true });
-    expect(chosen.dialog.getByRole('switch', { name: 'Leave my address off exported items' })).toBeChecked();
+    expect(chosen.dialog.getByRole('switch', { name: 'Include my address with my answers' })).not.toBeChecked();
     cleanup();
-    const older = await renderModal({ ...member, unattributed: null });
-    expect(older.dialog.getByRole('switch', { name: 'Use my answers and files' })).toBeInTheDocument();
-    expect(older.dialog.queryByRole('switch', { name: 'Leave my address off exported items' })).not.toBeInTheDocument();
+    const none = await renderModal({ ...member, unattributed: null });
+    expect(none.dialog.getByRole('switch', { name: 'Use my answers and files' })).toBeInTheDocument();
+    expect(none.dialog.queryByRole('switch', { name: 'Include my address with my answers' })).not.toBeInTheDocument();
   });
 
   it('keeps an address choice saved while a status check was on its way', async () => {
     readStatus.mockResolvedValueOnce(member);
     const view = render(<SessionAgentModal {...OPTIONS} onClose={() => {}} />);
     const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
-    const leaveOff = await dialog.findByRole('switch', { name: 'Leave my address off exported items' });
+    const include = await dialog.findByRole('switch', { name: 'Include my address with my answers' });
     let answer: (status: SessionAgentStatus) => void = () => {};
     readStatus.mockReturnValueOnce(new Promise<SessionAgentStatus>((resolve) => (answer = resolve)));
     view.rerender(<SessionAgentModal {...OPTIONS} sessionConfig={{ slug: 'salon' }} onClose={() => {}} />);
     setUnattributed.mockResolvedValueOnce(true);
-    fireEvent.click(leaveOff);
-    await waitFor(() => expect(leaveOff).toBeChecked());
+    fireEvent.click(include);
+    await waitFor(() => expect(include).not.toBeChecked());
+    // That check was sent before the save, so it still says their address is included.
     await act(async () => answer(member));
-    expect(leaveOff).toBeChecked();
+    expect(include).not.toBeChecked();
   });
 
   it('still offers both switches once the session has ended or its AI is off, and no question box', async () => {
@@ -202,9 +209,10 @@ describe('SessionAgentModal', () => {
     ).toBeInTheDocument();
     expect(ended.dialog.queryByLabelText('Your question')).not.toBeInTheDocument();
     setUnattributed.mockResolvedValueOnce(true);
-    const leaveOff = ended.dialog.getByRole('switch', { name: 'Leave my address off exported items' });
-    fireEvent.click(leaveOff);
-    await waitFor(() => expect(leaveOff).toBeChecked());
+    const include = ended.dialog.getByRole('switch', { name: 'Include my address with my answers' });
+    fireEvent.click(include);
+    await waitFor(() => expect(include).not.toBeChecked());
+    expect(setUnattributed).toHaveBeenCalledWith(true, OPTIONS);
     expect(ended.dialog.getByRole('switch', { name: 'Use my answers and files' })).toBeChecked();
     cleanup();
     const aiOff = await renderModal({ ...member, answers: null, audience: null, closed: 'ai_disabled' });
@@ -220,7 +228,7 @@ describe('SessionAgentModal', () => {
     const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
     let saved: (unattributed: boolean) => void = () => {};
     setUnattributed.mockReturnValueOnce(new Promise<boolean>((resolve) => (saved = resolve)));
-    fireEvent.click(await dialog.findByRole('switch', { name: 'Leave my address off exported items' }));
+    fireEvent.click(await dialog.findByRole('switch', { name: 'Include my address with my answers' }));
     // Someone else signs in before that save answers.
     let answer: (status: SessionAgentStatus) => void = () => {};
     readStatus.mockReturnValueOnce(new Promise<SessionAgentStatus>((resolve) => (answer = resolve)));
@@ -230,9 +238,10 @@ describe('SessionAgentModal', () => {
     expect(await dialog.findByText('Checking…')).toBeInTheDocument();
     expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
     await act(async () => answer(member));
-    const theirs = await dialog.findByRole('switch', { name: 'Leave my address off exported items' });
+    const theirs = await dialog.findByRole('switch', { name: 'Include my address with my answers' });
+    // The first person turned theirs off; this person's is still on.
     await act(async () => saved(true));
-    expect(theirs).not.toBeChecked();
+    expect(theirs).toBeChecked();
     await waitFor(() => expect(theirs).toBeEnabled());
   });
 

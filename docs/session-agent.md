@@ -160,11 +160,12 @@ the Session Agent off, and a session backup made by a 0.9.9 or later Worker
 carries them, so its restore keeps everyone who turned it off opted out. An
 older backup has none: after restoring one, tell people to set the switch again.
 
-A second switch there, **Leave my address off exported items**, keeps a
-person's answers and files in while taking their account address off them in
-the [export](#export). It is stored and backed up the same way, from 0.9.11.
-Only someone signed in with an address has it. The interview dialog carries
-the first switch only.
+A second switch there, **Include my address with my answers**, is also on
+until the person turns it off. Off, their answers and files stay in, and the
+[export](#export) leaves their account address off them. The Worker stores
+who turned it off, and backs that up, the same way, from 0.9.11. Only someone
+signed in with an address has it. The interview dialog carries the first
+switch only.
 
 Both switches stay open after the session has ended or its AI is turned off,
 when the Session Agent answers no one: an export can still be made then, and
@@ -253,7 +254,7 @@ item says, its address included when it has one.
 or link someone added, carries `by`: the account address of the person who
 wrote or added it. No item carries a name, and questions, counts, results and
 the session's own notes carry no address. Anyone signed in with an address can
-turn on **Leave my address off exported items** in the Session Agent's dialog:
+turn off **Include my address with my answers** in the Session Agent's dialog:
 their answers and files are still exported, without `by`. Answers without an
 address that say the same words to the same question are one item with a
 `count`, so they can't be told apart. The live Session Agent never sees an

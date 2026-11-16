@@ -30,9 +30,9 @@ const STYLE_HELP = {
 };
 
 const ADDRESS_HELP =
-  'An admin can export what the Session Agent may draw on, as a file to keep. Each answer you wrote and each ' +
-  'file you added carries your account address in that file unless you turn this on. Your answers and files ' +
-  'stay in either way; copies already exported keep what they had.';
+  'On unless you turn it off. What you wrote and the files you added will be available to this session’s ' +
+  'organisers with your account address, and may be exported with it. Turn this off and exports leave your ' +
+  'address off them; your answers and files stay in. Copies already made keep it.';
 
 // It answers no one, but each person's switches still count for what an admin exports.
 const CLOSED = {
@@ -159,24 +159,25 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
               id={`${baseId}-address`}
               type="checkbox"
               role="switch"
-              checked={status.unattributed}
+              // On is the default: the Worker stores only who turned it off.
+              checked={!status.unattributed}
               disabled={savingSwitch}
-              data-testid="ce-session-agent-leave-address-off"
+              data-testid="ce-session-agent-include-address"
               onChange={(event) => {
-                const leaveOff = event.target.checked;
+                const leaveOff = !event.target.checked;
                 void saveSwitch(async () => ({
                   unattributed: await setSessionAgentUnattributed(leaveOff, options),
                 }));
               }}
             />
-            Leave my address off exported items
+            Include my address with my answers
           </label>
           <button
             type="button"
             id={`${baseId}-address-help`}
             className={styles.helpLink}
             data-ce-control-appearance="frameless"
-            aria-label="About your address on exported items"
+            aria-label="About your address on your answers"
             aria-describedby={`${baseId}-address-text`}
             onClick={(event) => event.currentTarget.focus()}
           >

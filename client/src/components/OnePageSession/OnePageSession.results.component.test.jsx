@@ -1747,6 +1747,17 @@ describe('OnePageSession results routing', () => {
         'href',
         expect.stringMatching(/README\.md#session-agent$/),
       );
+      // Behind the icon, not on the page: who gets what they give, and that two switches turn it off.
+      const notice = screen.getByTestId('ce-session-agent-notice-page');
+      expect(notice).toHaveAccessibleDescription(
+        expect.stringContaining(
+          'will be available to this session’s organisers with your account address, and may be exported',
+        ),
+      );
+      expect(notice).toHaveAccessibleDescription(
+        expect.stringContaining('a summary without names or addresses may be published'),
+      );
+      expect(notice).toHaveAccessibleDescription(expect.stringContaining('Two switches in the Session Agent turn off'));
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       expect(screen.getByTestId('ce-session-context-sources')).toBeInTheDocument();
       expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
