@@ -403,9 +403,14 @@ it('explains the grey answer area with a keyboard-accessible tooltip', async () 
   renderReview();
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   const help = within(card(hiddenStatement)).getByRole('button', { name: 'Why is the prediction hidden?' });
-  expect(help).toHaveAccessibleDescription(/Give your own answer first/);
+  expect(help).toHaveAccessibleDescription(/^Answer first, so the AI’s prediction can’t sway you/);
+  // It says what is saved with the answer, never that only the answer is.
+  expect(help).toHaveAccessibleDescription(
+    /prediction, its confidence and what you changed are saved with your answer/,
+  );
+  expect(help).not.toHaveAccessibleDescription(/Only your own answer/);
   fireEvent.focus(help);
-  expect(await screen.findByRole('tooltip')).toHaveTextContent('Give your own answer first');
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('Answer first, so the AI’s prediction can’t sway you');
   expect(answer(hiddenStatement)).toBeEnabled();
   expect(card(hiddenStatement).innerHTML).not.toContain('EVIDENCE-');
 });

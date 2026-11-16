@@ -5,8 +5,10 @@ import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionInterviewDraftCard.module.scss';
 import { HIDDEN_DRAFT_NOTE } from './sessionInterviewHiddenDrafts';
 
+// Drafts are hidden only while Share for research is on, which keeps the prediction with the answer. Who can
+// read answers is said once, in the session's consent text.
 const explanation =
-  'Give your own answer first so the AI’s prediction cannot influence it. The grey area conceals it until you answer and move on. Only your own answer is submitted.';
+  'Answer first, so the AI’s prediction can’t sway you; the grey area hides it until you do. While Share for research is on, the prediction, its confidence and what you changed are saved with your answer.';
 
 // This surface receives no prediction, so hiding it never relies on CSS or ARIA.
 export default function SessionInterviewHiddenAnswer() {

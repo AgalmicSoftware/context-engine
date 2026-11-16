@@ -42,7 +42,7 @@ try {
     const help = card.getByRole('button', { name: 'Why is the prediction hidden?' });
     await help.focus();
     await page.getByRole('tooltip').waitFor();
-    assert((await page.getByRole('tooltip').innerText()).includes('Give your own answer first'));
+    assert((await page.getByRole('tooltip').innerText()).includes('Answer first, so the AI’s prediction can’t sway you'));
     const contrast = await hidden.first().evaluate(element => {
       const luminance = color => { const rgb = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722; };
       const css = getComputedStyle(element); const a = luminance(getComputedStyle(element.querySelector('strong')).color); const b = luminance(css.backgroundColor);
