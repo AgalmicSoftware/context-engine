@@ -266,5 +266,7 @@ export function useInterviewHiddenDrafts({ questions, editedDrafts, savedRespons
     [submittable],
   );
 
-  return { assign, isConcealed, reviewedValues, view, noteEdit, submittable, prepareSubmit };
+  // How many drafts this review hid, answered or not; none once research sharing is off.
+  const count = Object.keys(hidden).length;
+  return { assign, isConcealed, reviewedValues, view, noteEdit, submittable, prepareSubmit, count };
 }

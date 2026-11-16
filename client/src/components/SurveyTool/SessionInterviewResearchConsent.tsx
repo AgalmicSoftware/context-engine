@@ -5,6 +5,7 @@ import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { INTERVIEW_PROMPT_VERSION, type InterviewPrefillPacket } from './sessionInterview';
 import { describeInterviewPlatform } from './sessionInterviewModalState';
+import SessionDataNote from './SessionDataNote';
 import styles from './SessionInterviewResearchConsent.module.scss';
 
 const RESEARCH_DOC_URL =
@@ -210,6 +211,8 @@ type ShareProps = {
   researchDetail?: 'minimal' | 'full';
   // The session keeps the AI's drafted text for admins when the person agrees.
   draftTextOffered?: boolean;
+  // The session's note on where research data goes (interviewMode.dataNote); empty shows none.
+  dataNote?: string;
   className?: string;
   onChange: (included: boolean) => void;
 };
@@ -221,6 +224,7 @@ export function SessionInterviewResearchShare({
   disabled,
   researchDetail = 'minimal',
   draftTextOffered = false,
+  dataNote = '',
   className,
   onChange,
 }: ShareProps) {
@@ -260,6 +264,7 @@ export function SessionInterviewResearchShare({
           ? 'Includes the AI’s predicted answers, ratings and confidence, its revision history, and which fields you changed. It excludes the AI’s notes and drafted text, drafts you did not select, encrypted answers, full interview transcripts, and imported conversation history. Edits are not treated as agreement.'
           : 'Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported conversation history are excluded.'}
         {draftTextNote}
+        {dataNote.trim() ? ` ${dataNote.trim()}` : ''}
         {mixed ? ' Your saved responses have different choices; ticking or unticking sets them all.' : ''}
       </span>
       <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus" autohide={false}>
@@ -267,6 +272,11 @@ export function SessionInterviewResearchShare({
           ? 'Records the AI’s predicted answers and confidence and which ones you changed, not its notes or drafted text.'
           : 'Records draft provenance, revisions, selected status, and changed fields. It excludes encrypted answer text, transcripts, and imported conversation history.'}
         {draftTextNote}{' '}
+        {dataNote.trim() ? (
+          <>
+            <SessionDataNote note={dataNote} />{' '}
+          </>
+        ) : null}
         <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
           How research data is handled
         </a>

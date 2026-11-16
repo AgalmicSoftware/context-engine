@@ -31,12 +31,15 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   fidelityMinimumPeople: 5,
   recordingQuestionCount: 3,
   recordingQuestionTiming: 'end',
+  dataNote: '',
 });
 // At most half of a person's AI drafts can be hidden, so most stay useful to them.
 const MAX_HIDDEN_DRAFT_SHARE = 0.5;
 const MAX_FIDELITY_MINIMUM_PEOPLE = 50;
 export const MAX_RECORDING_QUESTION_COUNT = 10;
 const RECORDING_QUESTION_TIMINGS = ['chunk', 'end'];
+// A sentence or two from the admin on where research data goes; shown as text, with https links.
+export const MAX_DATA_NOTE_CHARS = 300;
 export const normalizeInterviewSettings = (value = {}) => {
   const source = value && typeof value === 'object' ? value : {};
   return {
@@ -93,6 +96,7 @@ export const normalizeInterviewSettings = (value = {}) => {
       ? Math.max(1, Math.min(MAX_RECORDING_QUESTION_COUNT, source.recordingQuestionCount))
       : DEFAULT_INTERVIEW_SETTINGS.recordingQuestionCount,
     recordingQuestionTiming: source.recordingQuestionTiming === 'chunk' ? 'chunk' : 'end',
+    dataNote: typeof source.dataNote === 'string' ? source.dataNote.trim().slice(0, MAX_DATA_NOTE_CHARS) : '',
   };
 };
 export const validInterviewSettings = (value = {}) => {
@@ -148,6 +152,8 @@ export const validInterviewSettings = (value = {}) => {
     value.recordingQuestionTiming !== undefined &&
     !RECORDING_QUESTION_TIMINGS.includes(value.recordingQuestionTiming)
   )
+    return false;
+  if (value.dataNote !== undefined && (typeof value.dataNote !== 'string' || value.dataNote.length > MAX_DATA_NOTE_CHARS))
     return false;
   return [
     'autoRegenerate',

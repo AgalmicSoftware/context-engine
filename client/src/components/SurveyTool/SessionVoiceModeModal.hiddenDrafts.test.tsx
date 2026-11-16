@@ -160,10 +160,50 @@ it('hides the same share of AI prefill drafts on every load while research shari
   for (const id of hiddenIds) expect(card(id)).toHaveTextContent(HIDDEN_DRAFT_NOTE);
 });
 
+it('says how many drafts are hidden and why, with the session note on where the data goes, until sharing stops', async () => {
+  const dataNote = 'Part of a study funded by Example. https://example.test/study';
+  renderReview({ hiddenDraftShare: share, shareDraftChangesByDefault: true, dataNote });
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const status = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS);
+  expect(status).toHaveTextContent(
+    `Your AI drafted 6 answers · Claude, self-reported${hiddenIds.length} are hidden until you answer, to test how well your AI predicts you.`,
+  );
+  const help = within(status).getByRole('button', { name: 'About hidden drafts' });
+  expect(help).toHaveAccessibleDescription(/so you answer before you see its guess.*Part of a study funded by Example/);
+  fireEvent.focus(help);
+  const tooltip = await screen.findByRole('tooltip');
+  expect(within(tooltip).getByRole('link', { name: 'https://example.test/study' })).toHaveAttribute(
+    'href',
+    'https://example.test/study',
+  );
+  const sharing = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
+  expect(screen.getByRole('button', { name: 'About sharing for research' })).toHaveAccessibleDescription(
+    /Part of a study funded by Example/,
+  );
+  fireEvent.click(sharing);
+  await waitFor(() => expect(status).not.toHaveTextContent('hidden until you answer'));
+  expect(status).toHaveTextContent('Your AI drafted 6 answers');
+});
+
+it('names no study when the session has no note on where the data goes', async () => {
+  renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const help = within(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).getByRole('button', {
+    name: 'About hidden drafts',
+  });
+  expect(help).toHaveAccessibleDescription(
+    'Some of your AI’s drafts start blank, so you answer before you see its guess. This measures how well your AI predicts you. Untick “Share for research” to see every draft and keep no research record.',
+  );
+  expect(screen.queryByTestId('session-data-note')).not.toBeInTheDocument();
+});
+
 it('hides nothing when research sharing is off', async () => {
   renderReview({ hiddenDraftShare: share, shareDraftChangesByDefault: false });
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   expect(screen.queryByText(HIDDEN_DRAFT_NOTE)).not.toBeInTheDocument();
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).not.toHaveTextContent(
+    'hidden until you answer',
+  );
   for (const id of statements) expect(answer(id)).toHaveValue('Agree');
 });
 

@@ -574,6 +574,24 @@ test('set-config rejects malformed or unsupported interview mode config', () => 
   }
 });
 
+test('set-config keeps a note on where the data goes only as text of up to 300 characters', () => {
+  const apply = (dataNote) => applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true, dataNote } } },
+    slug: 'session-a',
+  });
+  for (const dataNote of ['', 'Part of a funded study: https://example.test/study', 'x'.repeat(300)]) {
+    const result = apply(dataNote);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.config.interviewMode.dataNote, dataNote);
+  }
+  for (const dataNote of ['x'.repeat(301), 42, null, ['a note']]) {
+    const result = apply(dataNote);
+    assert.equal(result.ok, false, JSON.stringify(dataNote));
+    assert.equal(result.status, 400);
+  }
+});
+
 test('set-config accepts the switch that shows fidelity results in Results only as a boolean', () => {
   const apply = (showFidelityResults) => applySessionConfigMutation({
     existingConfig: cloneJson(profileBearingConfig),

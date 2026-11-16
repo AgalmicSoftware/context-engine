@@ -191,6 +191,11 @@ Interview settings for research:
   how much seeing a draft sways answers. It applies only while they share draft
   changes.
 
+- **Where the data goes** (`interviewMode.dataNote`, empty by default) is an
+  optional sentence or two for participants, such as who funds a study, with
+  `https://` links. It shows in the hidden-drafts and **Share for research**
+  tooltips; when empty, no study is named.
+
 - **Show participants how well their AI predicted them**
   (`interviewMode.showFidelityScore`, off by default) shows a private score
   after someone submits AI-prefill drafts.

@@ -130,6 +130,12 @@ questions the person hasn't already answered. Voice and typed-context drafts,
 freeform questions and anything shown with research sharing off are never
 hidden.
 
+On the review page, a line under "Your AI drafted N answers" says how many are
+hidden and why, with a "?" that says untick **Share for research** to see every
+draft. The session's optional `interviewMode.dataNote` (**Where the data
+goes**, up to 300 characters) follows in that tooltip and in the **Share for
+research** one, as text with only `https://` addresses as links.
+
 - **Choice.** When review starts with research sharing on, the drafts are
   ranked by a hash of `sessionSlug|participant|questionId` and the first
   `round(count × share)` are hidden, at least one of three or more.

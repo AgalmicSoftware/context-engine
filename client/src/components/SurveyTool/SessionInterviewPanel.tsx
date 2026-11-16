@@ -63,10 +63,10 @@ import {
   useInterviewHiddenDrafts,
 } from './sessionInterviewHiddenDrafts';
 import SessionInterviewFidelityScore, { summarizeOwnInterviewFidelity } from './SessionInterviewFidelityScore';
+import SessionInterviewPrefillStatus from './SessionInterviewPrefillStatus';
 import type { ParticipantFidelitySummary } from '../../../../shared/agentFidelity.mjs';
 import {
   buildResearchPacket,
-  describeInterviewPlatform,
   describeInterviewStatus,
   describeResearchCoverage,
   displayResponderContext,
@@ -253,7 +253,7 @@ export default function SessionInterviewPanel({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   // joinMatchingGroups is off by default. On, the AI suggests groups; the ones the person ticks join on submit.
-  const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins, suggestQuestions } =
+  const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins, suggestQuestions, dataNote } =
     normalizeInterviewSettings(sessionConfig?.interviewMode);
   const [draftTextShown, setDraftTextShown] = useState(keepDraftTextForAdmins);
   if (draftTextShown && !keepDraftTextForAdmins) setDraftTextShown(false);
@@ -1183,7 +1183,6 @@ export default function SessionInterviewPanel({
   const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
   // A prefill link goes straight to its drafts; the interview then talks them through.
   const showPrefillStatus = hasAiPrefill && prefillDraftCount > 0;
-  const prefillPlatform = prefillPacket?.source.platform;
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
     : isStarting
@@ -1323,15 +1322,12 @@ export default function SessionInterviewPanel({
           ) : null}
 
           {showPrefillStatus ? (
-            <p
-              className={styles.sessionInterviewPrefillStatus}
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS}
-            >
-              Your AI drafted {prefillDraftCount} {prefillDraftCount === 1 ? 'answer' : 'answers'}
-              {prefillPlatform && prefillPlatform !== 'other'
-                ? ` · ${describeInterviewPlatform(prefillPlatform)}, self-reported`
-                : ''}
-            </p>
+            <SessionInterviewPrefillStatus
+              draftCount={prefillDraftCount}
+              platform={prefillPacket?.source.platform}
+              hiddenCount={hiddenDrafts.count}
+              dataNote={dataNote}
+            />
           ) : null}
 
           {ownAnswers.error ? (
@@ -1486,6 +1482,7 @@ export default function SessionInterviewPanel({
                       disabled={applying}
                       researchDetail={shownResearchDetail}
                       draftTextOffered={draftTextShown}
+                      dataNote={dataNote}
                       onChange={(included) => {
                         setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
                         setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));

@@ -13,4 +13,11 @@ describe('withoutNewInterviewDefaults', () => {
     expect(withoutNewInterviewDefaults({ recordingQuestionCount: 4 })).toEqual({});
     expect(withoutNewInterviewDefaults({ recordingQuestionCount: 3 })).toEqual({ recordingQuestionCount: 3 });
   });
+
+  it('saves a note on where the data goes only when there is one, so older Workers still save', () => {
+    expect(withoutNewInterviewDefaults({ dataNote: '', steeringPrompt: 'Listen.' })).toEqual({
+      steeringPrompt: 'Listen.',
+    });
+    expect(withoutNewInterviewDefaults({ dataNote: 'Funded study.' })).toEqual({ dataNote: 'Funded study.' });
+  });
 });

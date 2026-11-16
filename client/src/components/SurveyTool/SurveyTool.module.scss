@@ -3748,10 +3748,22 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 .sessionInterviewPrefillStatus {
-  margin: 0;
+  display: grid;
+  gap: 2px;
   color: var(--ce-panel-text-muted);
   font-size: 0.9rem;
   text-align: center;
+}
+
+.sessionInterviewPrefillStatusLine {
+  margin: 0;
+
+  button {
+    width: 24px;
+    height: 24px;
+    margin-left: 2px;
+    vertical-align: middle;
+  }
 }
 
 .sessionInterviewContext {

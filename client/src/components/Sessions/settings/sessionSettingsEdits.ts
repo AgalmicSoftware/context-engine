@@ -484,6 +484,7 @@ const LABELS: Record<string, string> = {
   interviewMode: 'Interview settings',
   'interviewMode.openingPrompt': 'Opening question',
   'interviewMode.steeringPrompt': 'Interview guidance',
+  'interviewMode.dataNote': 'Where the data goes',
   groupCreationPolicy: 'Who can create groups',
   contextAdditionPolicy: 'Who can add files to context',
   resultsAnalysis: 'Results analysis',
