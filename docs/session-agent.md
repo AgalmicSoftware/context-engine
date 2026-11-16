@@ -349,25 +349,40 @@ groups its rules name may be more than one request can read, and then answers
 ## Asking without signing in
 
 Unless an admin turns off **Anyone can ask** (`anyoneCanAsk: false`), someone
-who hasn't signed in can ask too. The Worker admits them exactly as it would a
-first sign-in with no memberships, so the session's own rules still hold:
+who hasn't signed in can ask too. The Worker admits them as it would a first
+sign-in with no memberships, and never more widely, so the session's own rules
+still hold:
 
 - If the session lets only some people sign in (a group or a role), a visitor
   is asked to sign in.
 - If no audience takes everyone signed in, or the session gives a sign-in no AI
   access, a visitor is asked to sign in. A group, an SBT or an admin role can
   only be shown by signing in.
+- If the session's AI is its own endpoint (a custom provider), a visitor is
+  asked to sign in: that endpoint takes no signed-out request on any route.
 - A visitor gets **General** answers only, even where everyone signed in gets
-  Detailed ones, and reads only what a first sign-in could.
+  Detailed ones, and reads no more than a first sign-in could. Results a
+  session shows only to its signed-in members are not read for a visitor.
 
-Each question spends the session's AI, so signed-out asking is bounded: at
-most 10 questions a day from one network address (fewer if the session's own
-daily AI limit is lower; the count is shared with the session's other
-signed-out AI use), and at most 300 a day for the session whatever addresses
-they come from. Past either, the Worker answers `429`
-(`session_agent_signed_out_limit`) until the next day. Nothing else about a
-visitor is kept: where the session records chats they may store one, with a
-name if they like and never an address.
+Each question spends the session's AI, so signed-out asking is bounded twice a
+day, by counts of its own that the session's other AI use doesn't share:
+
+- at most 10 questions from one network address, or fewer if the session sets
+  a lower daily limit for addresses that aren't signed in
+  (`limits.perAnonymousIpPerDay`);
+- at most 300 for the session, whatever addresses they come from.
+
+Past either, the Worker answers `429` (`session_agent_signed_out_limit`) until
+the next day; a refused question still counts towards the address's ten. The
+network address is the one Cloudflare reports for the request. A session with
+no list of allowed sites (`allowOrigins`) can be asked from any web page, so
+there only the 300 a day bounds what other sites' visitors can spend: set the
+list.
+
+Nothing about a visitor is kept but the count. Where the session records chats
+they may store one, with a name if they like and never an address; it is
+marked as asked without signing in. Stored chats share the session's limit of
+5,000, so a busy open session can push out older ones.
 
 Signed out, the page sends `POST /session-agent/status` and
 `POST /session-agent/ask` with no sign-in and `?slug=<slug>`; a body is 4 KB
@@ -389,7 +404,8 @@ selected to start, or **My address**; and anyone may add a **Name** of up to 60
 characters, kept as typed and not checked. Unticked, nothing is kept.
 
 What is stored for a chat: the day (no time of day), the answer style, the
-question, the answer, and the address or name only if the asker gave them. A
+question, the answer, whether it was asked without signing in, and the address
+or name only if the asker gave them. A
 question holding an email address, an account address, an ENS name or a run of
 ten or more digits is answered but not kept, and the reply says so. If the chat
 can't be stored the answer still comes back, with a note.

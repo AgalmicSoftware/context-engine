@@ -4,7 +4,8 @@
 // who asked only when they chose that. It also says whom the answer was fit
 // for, since an answer may hold what only they may read: `scope: 'admin'` for
 // one given to an admin or results admin, `groups` for one that drew on files
-// locked to those groups. Nothing reads these back into an answer.
+// locked to those groups. `signedOut` marks one asked without signing in.
+// Nothing reads these back into an answer.
 import { SESSION_AGENT_LIMITS, sessionAgentSettingOf, sessionAgentStoresChats } from '../../shared/sessionAgent.mjs';
 import { backupExportActive } from './storageBackupRevision.js';
 
@@ -42,6 +43,7 @@ export const sessionAgentHistoryEntry = (value) => {
   if (!question || question.length > L.questionChars || !answer || answer.length > L.answerChars) return null;
   if ((by && !ADDRESS.test(by)) || name.length > L.nameChars) return null;
   if (value.scope !== undefined && value.scope !== 'admin') return null;
+  if (value.signedOut !== undefined && value.signedOut !== true) return null;
   const groups = value.groups === undefined ? [] : value.groups;
   if (!Array.isArray(groups) || groups.length > MAX_GROUPS || !groups.every((id) => typeof id === 'string' && GROUP_ID.test(id))) return null;
   return {
@@ -51,6 +53,7 @@ export const sessionAgentHistoryEntry = (value) => {
     answer,
     ...(value.scope ? { scope: 'admin' } : {}),
     ...(groups.length ? { groups: [...new Set(groups)].sort() } : {}),
+    ...(value.signedOut ? { signedOut: true } : {}),
     ...(by ? { by } : {}),
     ...(name ? { name } : {}),
   };

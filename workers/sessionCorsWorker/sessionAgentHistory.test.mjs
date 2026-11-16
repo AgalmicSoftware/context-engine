@@ -74,7 +74,10 @@ test('a chat says whom its answer was fit for: an admin, or the groups whose fil
   await add({ groups: ['salon', 'hosts.2026', 'salon'] });
   const [groups, admin] = (await call('list')).body.entries;
   assert.deepEqual([admin.scope, admin.groups, groups.scope, groups.groups], ['admin', undefined, undefined, ['hosts.2026', 'salon']]);
-  for (const bad of [{ scope: 'member' }, { scope: true }, { groups: 'salon' }, { groups: ['Not An Id'] }, { groups: Array.from({ length: 41 }, (_, i) => `g${i}`) }]) {
+  // One asked without signing in says so, and nothing else about the visitor.
+  await add({ signedOut: true });
+  assert.equal((await call('list')).body.entries[0].signedOut, true);
+  for (const bad of [{ scope: 'member' }, { scope: true }, { groups: 'salon' }, { groups: ['Not An Id'] }, { groups: Array.from({ length: 41 }, (_, i) => `g${i}`) }, { signedOut: 'yes' }, { signedOut: false }]) {
     assert.equal((await call('add', { entry: exchange(bad) })).status, 400, JSON.stringify(bad).slice(0, 60));
   }
 });

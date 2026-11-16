@@ -620,6 +620,13 @@ test('a sign-in is asked for where the setting is off, the session keeps people 
     const status = await askSignedOut(h, { ...options, path: '/session-agent/status', body: {} });
     assert.deepEqual([status.status, status.body.answers, status.body.signedOut], [200, null, true], label);
   }
+  // A session's own AI endpoint takes nothing from someone who isn't signed in, as on the Worker's other routes.
+  const own = await seeded();
+  own.state.config.ai = { mode: 'custom', models: { fast: { provider: 'custom', model: 'own-model' }, thinking: { provider: 'custom', model: 'own-model' } } };
+  let reached = 0;
+  const custom = await askSignedOut(own, { deps: { proxyCustomRPC: async () => { reached += 1; return json({ completion: 'From the session’s own endpoint.' }); } } });
+  assert.deepEqual([custom.status, custom.body, custom.calls.rate.length, reached], [401, signIn, 0, 0]);
+  assert.equal((await askSignedOut(own, { path: '/session-agent/status', body: {} })).body.answers, null);
   // A check that can't be made is an outage, not a refusal to sign in over.
   const down = await askSignedOut(await seeded({ audiences: [{ who: salonMembers, answers: 'detailed' }, { who: everyone, answers: 'general' }] }), {
     deps: { isWorkerGroupMember: async () => ({ ok: false, status: 503, reason: 'worker_group_store_unavailable' }) },
@@ -635,20 +642,24 @@ test('signed-out questions are counted by network and for the whole session, aft
   const h = await seeded();
   const reply = await askSignedOut(h);
   assert.equal(reply.status, 200);
-  // The network's count is the session's own daily AI count; the session's is the Session Agent's own.
+  // Both are the Session Agent's own counts: neither the session's other signed-out AI use nor anyone's
+  // signed-in use shares them, so one can't use up the other.
   assert.deepEqual(reply.calls.rate, [
-    [NETWORK, SESSION_AGENT_SIGNED_OUT.perNetworkPerDay, 'ai'],
-    ['anon:session-agent', SESSION_AGENT_SIGNED_OUT.perSessionPerDay, 'session-agent-signed-out'],
+    [NETWORK, SESSION_AGENT_SIGNED_OUT.perNetworkPerDay, 'session-agent-signed-out'],
+    ['anon:everyone', SESSION_AGENT_SIGNED_OUT.perSessionPerDay, 'session-agent-signed-out-all'],
   ]);
   assert.deepEqual([SESSION_AGENT_SIGNED_OUT.perNetworkPerDay, SESSION_AGENT_SIGNED_OUT.perSessionPerDay], [10, 300]);
-  // A session whose own daily AI limit is lower keeps it.
-  h.state.config.limits = { aiPerWalletPerDay: 3 };
-  assert.deepEqual((await askSignedOut(h)).calls.rate[0], [NETWORK, 3, 'ai']);
-  h.state.config.limits = { aiPerWalletPerDay: 50 };
-  assert.deepEqual((await askSignedOut(h)).calls.rate[0], [NETWORK, 10, 'ai']);
+  // A session's own daily limit for a network address that isn't signed in, when lower, is kept;
+  // its limits for signed-in people say nothing about visitors.
+  h.state.config.limits = { perAnonymousIpPerDay: 3, perWalletPerDay: 200, aiPerWalletPerDay: 2 };
+  assert.deepEqual((await askSignedOut(h)).calls.rate[0], [NETWORK, 3, 'session-agent-signed-out']);
+  h.state.config.limits = { perAnonymousIpPerDay: 50, aiPerWalletPerDay: 2 };
+  assert.deepEqual((await askSignedOut(h)).calls.rate[0], [NETWORK, 10, 'session-agent-signed-out']);
+  h.state.config.limits = { aiPerWalletPerDay: 2 };
+  assert.deepEqual((await askSignedOut(h)).calls.rate[0], [NETWORK, 10, 'session-agent-signed-out']);
 
   const over = { error: 'The Session Agent has answered all it can today for people who aren’t signed in. Sign in to ask, or try again tomorrow.', reason: 'session_agent_signed_out_limit' };
-  for (const used of ['ai', 'session-agent-signed-out']) {
+  for (const used of ['session-agent-signed-out', 'session-agent-signed-out-all']) {
     const refused = await askSignedOut(h, { limits: ({ route }) => route !== used });
     assert.deepEqual([refused.status, refused.body, refused.calls.ai.length], [429, over, 0], used);
   }
@@ -674,9 +685,12 @@ test('a signed-out chat is stored only if asked, and never with an address', asy
   const unasked = await askSignedOut(h, { deps });
   assert.equal(unasked.body.stored, false);
   const entries = await kept();
-  assert.deepEqual(entries.map(({ question, name, by, answers }) => ({ question, name, by, answers })), [
-    { question: 'What do people want?', name: 'A visitor', by: undefined, answers: 'general' },
+  // Marked as asked without signing in, so an admin can tell it from a member's chat with no address.
+  assert.deepEqual(entries.map(({ question, name, by, answers, signedOut }) => ({ question, name, by, answers, signedOut })), [
+    { question: 'What do people want?', name: 'A visitor', by: undefined, answers: 'general', signedOut: true },
   ]);
+  await ask(h, { body: { question: 'What do people want?', store: true }, deps });
+  assert.equal('signedOut' in (await kept()).at(-1), false);
   // The network address the limit counts is never written with the chat.
   assert.ok(!JSON.stringify(entries).includes('203.0.113.9'));
 });

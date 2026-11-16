@@ -67,7 +67,7 @@ export const dispatchSignedOutSessionAgentRequest = async ({ request, env, path,
   } catch {
     scopes = {};
   }
-  return dispatchSessionAgentRoute({
+  return (deps.dispatchSessionAgentRoute || dispatchSessionAgentRoute)({
     path, body, config, slug, address: '', env, headers: cors.headers, scopes, deps,
     signedOut: { identity: deps.resolveAnonymousRateIdentity(request) },
   });

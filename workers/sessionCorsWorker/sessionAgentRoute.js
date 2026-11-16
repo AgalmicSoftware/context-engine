@@ -18,6 +18,7 @@ import { canOptOut } from './sessionAgentOptOuts.js';
 import { isListedResultsBuilder } from './resultsBuild.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
+import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { RESULTS_ANALYSIS_SCAN_LIMITS } from './storageScanBudget.js';
 import {
   authorizeCloudflareStorageResourceRead,
@@ -64,13 +65,15 @@ const SIGNED_OUT_LIMIT = {
 };
 
 // Counts one signed-out question against both limits; a response when either
-// is used up or can't be counted, otherwise nothing. The network's count is
-// the session's own daily AI count, shared with its other signed-out AI use.
+// is used up or can't be counted, otherwise nothing. Both are the Session
+// Agent's own counts, apart from the session's other signed-out AI use, so
+// neither can use up the other. The session's own daily limit for a network
+// address that isn't signed in, when it sets one, lowers the ten.
 const countSignedOutQuestion = async ({ env, slug, config, identity, deps, json }) => {
-  const daily = resolveAiDailyLimit(config);
+  const own = resolveAnonymousIpDailyLimit(config);
   for (const [address, limit, route] of [
-    [identity, daily > 0 ? Math.min(daily, SESSION_AGENT_SIGNED_OUT.perNetworkPerDay) : SESSION_AGENT_SIGNED_OUT.perNetworkPerDay, 'ai'],
-    ['anon:session-agent', SESSION_AGENT_SIGNED_OUT.perSessionPerDay, 'session-agent-signed-out'],
+    [identity, own > 0 ? Math.min(own, SESSION_AGENT_SIGNED_OUT.perNetworkPerDay) : SESSION_AGENT_SIGNED_OUT.perNetworkPerDay, 'session-agent-signed-out'],
+    ['anon:everyone', SESSION_AGENT_SIGNED_OUT.perSessionPerDay, 'session-agent-signed-out-all'],
   ]) {
     const allowed = await deps.checkRateLimit({ env, slug, address, limit, route });
     if (allowed === null) return json({ error: UNCHECKED.error }, 503);
@@ -239,6 +242,10 @@ const sessionAgentRequest = ({ messages, config, deps }) => (deps.normalizeAiReq
   config,
 });
 
+// The provider a question would go to. A session's own AI endpoint takes no
+// request from someone who isn't signed in, here as on the Worker's other routes.
+const answersSignedOut = ({ config, deps }) => sessionAgentRequest({ messages: [], config, deps }).provider !== 'custom';
+
 const askAi = async ({ messages, config, secrets, address, scopes, env, headers, deps }) => {
   const { provider, payload } = sessionAgentRequest({ messages, config, deps });
   if (!isModelAllowed(payload.model, provider)) return { ok: false, status: 403, body: AI_MODEL_NOT_ALLOWED };
@@ -280,7 +287,7 @@ const storeRequestOf = ({ body, setting, address }) => {
 // The entry says whom the answer was fit for, because an answer can hold what
 // only they may read: an admin's or results admin's (admins-only context,
 // thinly answered questions, results not yet open), or a group's locked files.
-const storeExchange = async ({ env, slug, request, question, reply, style, adminOnly, lockedTo, deps }) => {
+const storeExchange = async ({ env, slug, request, question, reply, style, adminOnly, lockedTo, signedOut, deps }) => {
   if (namesSomeone(question)) return { stored: false, why: 'This chat wasn’t stored: the question holds an address, an email or a long number.' };
   const entry = {
     day: new Date(deps.now?.() ?? Date.now()).toISOString().slice(0, 10),
@@ -289,6 +296,8 @@ const storeExchange = async ({ env, slug, request, question, reply, style, admin
     answer: reply,
     ...(adminOnly ? { scope: 'admin' } : {}),
     ...(!adminOnly && lockedTo.length ? { groups: lockedTo } : {}),
+    // So an admin can tell a visitor's chats from members' with no address.
+    ...(signedOut ? { signedOut: true } : {}),
     ...(request.by ? { by: request.by } : {}),
     ...(request.name ? { name: request.name } : {}),
   };
@@ -318,7 +327,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   if (signedOut && (path === '/session-agent/opt-out' || path === '/session-agent/attribution')) {
     return json({ error: 'Sign in to change this.', reason: 'session_agent_sign_in_required' }, 401);
   }
-  const openToThem = !signedOut || sessionAgentOpenToAnyone(setting);
+  const openToThem = !signedOut || (sessionAgentOpenToAnyone(setting) && answersSignedOut({ config, deps }));
   if (path === '/session-agent/opt-out') {
     const saved = await store(env, slug, 'set', { address, optedOut: body?.optedOut });
     if (!saved.ok) return json({ error: saved.status === 400 ? saved.body?.error : OPT_OUTS_UNAVAILABLE }, saved.status === 400 ? 400 : 503);
@@ -428,7 +437,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   if (!reply.ok) return json(reply.body, reply.status);
   const kept = storeRequest.keep
     ? await storeExchange({
-      env, slug, request: storeRequest, question, reply: reply.answer, style: asker.answers, lockedTo, deps,
+      env, slug, request: storeRequest, question, reply: reply.answer, style: asker.answers, lockedTo, deps, signedOut: !!signedOut,
       adminOnly: asker.audience === 'admin' || isListedResultsBuilder(config, address),
     })
     : null;
