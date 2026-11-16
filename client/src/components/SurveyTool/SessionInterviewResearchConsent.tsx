@@ -277,7 +277,7 @@ export function SessionInterviewResearchShare({
             <SessionDataNote note={dataNote} />{' '}
           </>
         ) : null}
-        <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
+        <a className={styles.tooltipLink} href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
           How research data is handled
         </a>
       </UncontrolledTooltip>

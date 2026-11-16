@@ -156,3 +156,9 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+// The tooltip's default link color is too dim on its dark background; take the text color, underlined.
+.tooltipLink {
+  color: inherit;
+  text-decoration: underline;
+}
