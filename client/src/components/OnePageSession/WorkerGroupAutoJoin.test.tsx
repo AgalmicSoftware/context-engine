@@ -12,6 +12,7 @@ import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/se
 import { AUTO_JOIN_CLAIM_ATTRIBUTE, VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
 import { rememberWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
 import { buildWorkerGroupJoinCredentials } from '../../domains/worker/workerGroupSecrets';
+import { forgetGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
 jest.mock('../../utilities/session/sessionWorkerDiscovery', () => ({
   ...jest.requireActual<Record<string, unknown>>('../../utilities/session/sessionWorkerDiscovery'),
   fetchWorkerCanonicalSessionBootstrap: jest.fn(),
@@ -505,14 +506,29 @@ describe('WorkerGroupAutoJoin', () => {
       expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
     });
 
-    it('joins an unlisted group by the link’s id when its credential is in the link, even without join choices', async () => {
+    it('joins a private session’s unlisted group by the link’s id, even without join choices', async () => {
       listing([]);
       window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026#groupInvite=gp%3Ariver-stone');
       const proof = `0x${'ab'.repeat(65)}`;
       credentials.mockResolvedValueOnce({ proof });
+      const readProof = `participants-2026:0x${'cd'.repeat(65)}`;
+      saveGroupReadHeader({ workerUrl: 'https://worker.example', sessionSlug: 'alpha', sessionId, header: readProof });
+      try {
+        render(<WorkerGroupAutoJoin {...props} sessionConfig={{ ...config, groupJoinChoices: undefined }} />);
+        await settle();
+        expect(JSON.parse(String(joins()[0][1]?.body))).toEqual({ groupId: group.groupId, proof, sessionId });
+      } finally {
+        forgetGroupReadHeader('https://worker.example', 'alpha');
+      }
+    });
+
+    it('on a Worker before private sessions, still says a missing group is gone without posting a join', async () => {
+      listing([]);
+      window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026#groupInvite=gp%3Ariver-stone');
       render(<WorkerGroupAutoJoin {...props} sessionConfig={{ ...config, groupJoinChoices: undefined }} />);
       await settle();
-      expect(JSON.parse(String(joins()[0][1]?.body))).toEqual({ groupId: group.groupId, proof, sessionId });
+      expect(screen.getByRole('alert')).toHaveTextContent('This group is unavailable in this session.');
+      expect(joins()).toHaveLength(0);
     });
 
     it('asks for a code without one, and sends a typed claim code as the secret', async () => {

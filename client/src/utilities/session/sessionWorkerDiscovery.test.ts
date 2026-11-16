@@ -10,7 +10,7 @@ import {
   validateWorkerCanonicalSessionBootstrap,
   WorkerSessionBootstrapRequestError,
 } from './sessionWorkerDiscovery';
-import { forgetGroupReadHeader, saveGroupReadHeader } from '../worker/workerGroupReadProof';
+import { forgetGroupReadHeader, isKnownPrivateSession, saveGroupReadHeader } from '../worker/workerGroupReadProof';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from './sessionModeProfile';
 
 const SESSION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -384,6 +384,23 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
       forgetGroupReadHeader(otherWorker, 'session-a');
       forgetGroupReadHeader(worker, 'session-b');
     }
+  });
+
+  it('knows a session private only once its Worker answers with a private shell', async () => {
+    const reply = (payload: unknown) =>
+      new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const load = (worker: string, payload: unknown) =>
+      fetchWorkerCanonicalSessionBootstrap({
+        fetchImpl: jest.fn().mockResolvedValue(reply(payload)) as unknown as typeof fetch,
+        sessionSlug: 'session-a',
+        workerQueryValue: worker,
+        environment: 'production',
+      });
+    const open = 'https://session-a.example.workers.dev';
+    await load(open, buildPayload());
+    expect(isKnownPrivateSession(open, 'session-a')).toBe(false);
+    await load(open, { ...buildPayload(), privateSession: 'invite_required' });
+    expect(isKnownPrivateSession(open, 'session-a')).toBe(true);
   });
 
   it('marks a private session’s shell, and asks again with this tab’s sign-in only then', async () => {

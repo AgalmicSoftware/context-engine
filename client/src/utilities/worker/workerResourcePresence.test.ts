@@ -1,6 +1,6 @@
 import { resolveCorsProxyUrl } from './corsProxy.js';
 import { getCachedWorkerResourcePresence, readWorkerResourcePresence } from './workerResourcePresence';
-import { holdSignInAndProof, TEST_READ_PROOF } from './workerSessionReadHeaders.testUtils';
+import { holdSignIn, holdSignInAndProof, TEST_READ_PROOF } from './workerSessionReadHeaders.testUtils';
 
 jest.mock('./corsProxy.js', () => ({
   resolveCorsProxyUrl: jest.fn(),
@@ -59,6 +59,17 @@ describe('workerResourcePresence', () => {
       expect(getCachedWorkerResourcePresence({ sessionSlug: 'demo-1', workerUrl })).toBeNull();
     } finally {
       jest.restoreAllMocks();
+    }
+  });
+
+  it('sends an older Worker nothing new: a sign-in held for a session not known private stays home', async () => {
+    const release = holdSignIn(workerUrl, 'salon');
+    try {
+      const fetchImpl = jest.fn(async () => new Response('{}', { status: 200 })) as unknown as typeof fetch;
+      await readWorkerResourcePresence({ sessionSlug: 'salon', fetchImpl });
+      expect(jest.mocked(fetchImpl).mock.calls[0][1]?.headers).toEqual({ 'X-Session-Slug': 'salon' });
+    } finally {
+      release();
     }
   });
 

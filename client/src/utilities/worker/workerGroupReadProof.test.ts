@@ -1,5 +1,7 @@
 import {
   forgetGroupReadHeader,
+  groupReadHeaders,
+  isKnownPrivateSession,
   readGroupReadHeader,
   readGroupReadProofSessionId,
   saveGroupReadHeader,
@@ -57,4 +59,12 @@ it('still works for the page when storage is refused', () => {
   } finally {
     setItem.mockRestore();
   }
+});
+
+it('sends a Worker before private sessions nothing new: without a proof, no header and no private mark', () => {
+  // A 0.9.10 Worker's CORS allows no X-CE-Group-Invite header, so a request carrying one would never arrive.
+  const plain = new Headers({ 'X-Session-Slug': 'open' });
+  expect(groupReadHeaders('https://old.example', 'open')).toEqual({});
+  expect([...withGroupReadHeader(plain, 'https://old.example', 'open').keys()]).toEqual(['x-session-slug']);
+  expect(isKnownPrivateSession('https://old.example', 'open')).toBe(false);
 });

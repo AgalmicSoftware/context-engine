@@ -4,7 +4,7 @@ import {
   REALTIME_INTERVIEW_OPENING_INSTRUCTION,
   startSessionRealtimeInterview,
 } from './realtimeInterviewClient';
-import { holdSignInAndProof, TEST_READ_PROOF } from '../worker/workerSessionReadHeaders.testUtils';
+import { holdSignIn, holdSignInAndProof, TEST_READ_PROOF } from '../worker/workerSessionReadHeaders.testUtils';
 
 describe('realtime interview transcript collection', () => {
   it('collects only completed responder transcription events', () => {
@@ -172,6 +172,19 @@ describe('interview connection lifecycle', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     await session.stop();
+  });
+
+  it('sends a 0.9.10 Worker no sign-in on the call, which it would answer 404', async () => {
+    const release = holdSignIn('https://worker.example', 'demo');
+    try {
+      const h = harness();
+      const session = await h.start();
+      const headers = jest.mocked(h.options.fetchImpl as typeof fetch).mock.calls[0][1]?.headers;
+      expect(headers).toEqual({ 'content-type': 'application/json', 'x-session-slug': 'demo' });
+      await session.stop();
+    } finally {
+      release();
+    }
   });
 
   it('sends a private session’s sign-in and invite proof with the call', async () => {

@@ -23,6 +23,7 @@ import {
   REFUSED_WORKER_GROUP_JOIN_MESSAGE,
 } from '../../domains/worker/workerGroupBusy';
 import { workerOffersGroupJoinChoices } from '@ce-shared/workerGroupJoin.mjs';
+import { isKnownPrivateSession } from '../../utilities/worker/workerGroupReadProof';
 import WorkerGroupAutoJoinNotice from './WorkerGroupAutoJoinNotice';
 import WorkerGroupCodeField from './WorkerGroupCodeField';
 import styles from './WorkerGroupAutoJoinNotice.module.scss';
@@ -188,8 +189,9 @@ function AutoJoinIntent({
         }
         if (group?.joinMode === 'admin_add') throw new Error('This group is not open for joining.');
         // Without join choices every group is listed, so a missing one is gone, unless the link carries its
-        // credential: a private session shows an unlisted group to no one before they join, so that joins by id.
-        if (!group && !token && overview && !workerOffersGroupJoinChoices(configRef.current))
+        // credential to a private session, which shows an unlisted group to no one before they join: that joins by id.
+        const byId = !!token && isKnownPrivateSession(workerUrl, sessionSlug);
+        if (!group && !byId && overview && !workerOffersGroupJoinChoices(configRef.current))
           throw new Error('worker_group_not_found');
         if (!token) {
           setProgress({ phase: 'code', message: NEEDS_CODE_MESSAGE });
