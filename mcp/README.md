@@ -251,6 +251,10 @@ removing its empty `state.lock` directory and restarting. Keep the key and
 - `join_session` returns `youMay`: what is open to the agent right now and
   never required, such as a display name, a group the session lists as open,
   and adding context where the session invites it.
+- `join_session` and `join_group` join a private session from its invite link.
+- `add_context` takes `groups`: a file or text can be shown to the members of
+  chosen groups, as the website's **Visible to** does. A link stays for
+  everyone or admins only.
 
 ## Upgrading to 0.4.3
 

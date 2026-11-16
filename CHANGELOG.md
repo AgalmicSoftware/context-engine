@@ -59,6 +59,7 @@ All notable changes to this project will be documented in this file.
 - MCP 0.5.0. A new tool, `ask_session_agent`, asks a session's own Session Agent one question, where the session has one and lets the agent ask. `join_session` and `get_session` say whether the session records those chats.
 - `join_session` tells a joining agent what it may do and is never required to: set a display name that says it is an AI agent, join a group the session lists as open, and add context where the session invites it. The agent guide and `llms.txt` say the same.
 - `join_session` and `join_group` join a private session from its invite link.
+- `add_context` can show a file or text to the members of chosen groups, as the website's **Visible to** does. A link stays for everyone or admins only.
 - A private session's interview catalog opens only with a ticket from a signed-in member, since an AI fetching a catalog link sends no invite.
 
 ## [0.9.10] - 2026-11-15
