@@ -4,7 +4,7 @@ import {
   REALTIME_INTERVIEW_OPENING_INSTRUCTION,
   startSessionRealtimeInterview,
 } from './realtimeInterviewClient';
-import { forgetGroupReadHeader, saveGroupReadHeader } from '../worker/workerGroupReadProof';
+import { holdSignInAndProof, TEST_READ_PROOF } from '../worker/workerSessionReadHeaders.testUtils';
 
 describe('realtime interview transcript collection', () => {
   it('collects only completed responder transcription events', () => {
@@ -174,18 +174,21 @@ describe('interview connection lifecycle', () => {
     await session.stop();
   });
 
-  it('sends a private session’s invite proof with the call', async () => {
-    const header = `rxc:0x${'ab'.repeat(65)}`;
-    saveGroupReadHeader({ workerUrl: 'https://worker.example', sessionSlug: 'demo', sessionId: '0xabc', header });
+  it('sends a private session’s sign-in and invite proof with the call', async () => {
+    const release = holdSignInAndProof('https://worker.example', 'demo');
     try {
       const h = harness();
       const session = await h.start();
       expect(jest.mocked(h.options.fetchImpl as typeof fetch).mock.calls[0][1]?.headers).toEqual(
-        expect.objectContaining({ 'x-session-slug': 'demo', 'X-CE-Group-Invite': header }),
+        expect.objectContaining({
+          'x-session-slug': 'demo',
+          'X-CE-Group-Invite': TEST_READ_PROOF,
+          Authorization: 'Bearer member-token',
+        }),
       );
       await session.stop();
     } finally {
-      forgetGroupReadHeader('https://worker.example', 'demo');
+      release();
     }
   });
 

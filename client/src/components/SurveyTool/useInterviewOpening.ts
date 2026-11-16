@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
-import { groupReadHeaders } from '../../utilities/worker/workerGroupReadProof';
+import { sessionReadHeaders } from '../../utilities/worker/workerSessionReadHeaders';
 
 export function useInterviewOpening({
   config,
@@ -28,7 +28,7 @@ export function useInterviewOpening({
     setLoading(true);
     void fetch(`${workerUrl.replace(/\/+$/, '')}/interview/starter?slug=${encodeURIComponent(sessionSlug || '')}`, {
       method: 'POST',
-      headers: groupReadHeaders(workerUrl, sessionSlug),
+      headers: sessionReadHeaders(workerUrl, sessionSlug),
       signal: controller.signal,
     })
       .then(async (response) => {
