@@ -145,3 +145,16 @@ test('an AI Views request run again gives back the reservation its stopped run l
   assert.equal((await coordinator.readResultsAnalysisStatus()).active, null);
   assert.deepEqual(await reserve('manual:a'), { kind: 'failed', status: 503, error: 'The build stopped before it finished.' });
 });
+
+test('a run again finds the build its stopped run kept before it could say so, and no older one', async () => {
+  const { coordinator, post, clock } = createCoordinator();
+  const reserved = await post('debate-atlas/reserve', { builder: BUILDER });
+  const startedAtMs = clock.ms;
+  const builtAt = new Date(clock.ms + 1000).toISOString();
+  const build = { id: 'atlas_k1_00000001', version: 1, builtAt, builtBy: BUILDER, counts: {}, title: 'Atlas', missingTopics: [], branches: [] };
+  assert.equal((await post('debate-atlas/finalize', { attemptId: reserved.body.attemptId, build })).status, 200);
+  const job = { kind: 'debate-atlas', slug: 'salon', runs: 2, startedAtMs, attemptId: reserved.body.attemptId, input: { builder: BUILDER } };
+  assert.deepEqual(await RESULTS_JOB_RUNNERS['debate-atlas'].run({ coordinator, job }), { ok: true, status: 200, buildId: build.id });
+  const later = await RESULTS_JOB_RUNNERS['debate-atlas'].run({ coordinator, job: { ...job, startedAtMs: clock.ms + 2000 } });
+  assert.deepEqual([later.ok, later.status], [false, 409]);
+});

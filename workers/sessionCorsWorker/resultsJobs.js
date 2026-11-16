@@ -17,12 +17,14 @@ const ERROR_CHARS = 500;
 
 const keyOf = (kind) => `results-job-v1:${kind}`;
 const nowOf = (coordinator) => Number(coordinator.now()) || Date.now();
-const running = (coordinator) => (coordinator.resultsJobsRunning ??= new Map());
+// Kinds this coordinator is claiming at this moment, so two callers never claim one job.
+const claiming = (coordinator) => (coordinator.resultsJobsClaiming ??= new Set());
 const text = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '');
 const randomHex = (coordinator, bytes) => [...(coordinator.crypto || globalThis.crypto).getRandomValues(new Uint8Array(bytes))]
   .map((byte) => byte.toString(16).padStart(2, '0')).join('');
-const isLive = (coordinator, job) => running(coordinator).has(job.kind) ||
-  nowOf(coordinator) - (Number(job.heartbeatAtMs) || 0) < RESULTS_JOB_STALE_MS;
+// Only a fresh heartbeat says a run is alive: a run held in memory whose
+// heartbeat stopped may never finish, and is run again.
+const isLive = (coordinator, job) => nowOf(coordinator) - (Number(job.heartbeatAtMs) || 0) < RESULTS_JOB_STALE_MS;
 
 /** What a job shows a request waiting on it: never its input. */
 export const resultsJobSummary = (job) => (job ? {
@@ -45,14 +47,17 @@ const keptOutcome = (result) => ({
   ...(text(result?.requestId, 200) ? { requestId: result.requestId } : {}),
 });
 
-/** When the alarm must next look at a running job: when its heartbeat would go stale; Infinity with none. */
+/**
+ * When the alarm must next look at a running job: when its heartbeat would go
+ * stale, and never sooner than a second from now; Infinity with none.
+ */
 export const nextResultsJobAt = async (coordinator) => {
   let next = Infinity;
   for (const kind of RESULTS_JOB_KINDS) {
     const job = await coordinator.state.storage.get(keyOf(kind));
     if (job?.state === 'running') next = Math.min(next, (Number(job.heartbeatAtMs) || 0) + RESULTS_JOB_STALE_MS);
   }
-  return next;
+  return Number.isFinite(next) ? Math.max(next, nowOf(coordinator) + 1000) : next;
 };
 
 const alarmBy = async (coordinator, at) => {
@@ -107,16 +112,19 @@ export const runResultsJobs = async (coordinator, runners, kinds = RESULTS_JOB_K
   const storage = coordinator.state.storage;
   const started = [];
   for (const kind of kinds) {
-    if (!runners?.[kind] || running(coordinator).has(kind)) continue;
-    const job = await storage.get(keyOf(kind));
-    // A new job has no heartbeat yet, so it is never live.
-    if (job?.state !== 'running' || isLive(coordinator, job)) continue;
-    // Claimed in this coordinator before any wait, so no other caller runs it too.
-    const claimed = { ...job, runs: (Number(job.runs) || 0) + 1, heartbeatAtMs: nowOf(coordinator) };
-    await storage.put(keyOf(kind), claimed);
-    const run = runJob(coordinator, runners, claimed).finally(() => running(coordinator).delete(kind));
-    running(coordinator).set(kind, run);
-    started.push(run);
+    if (!runners?.[kind] || claiming(coordinator).has(kind)) continue;
+    claiming(coordinator).add(kind);
+    try {
+      const job = await storage.get(keyOf(kind));
+      // A new job has no heartbeat yet, so it is never live.
+      if (job?.state !== 'running' || isLive(coordinator, job)) continue;
+      // The claim's fresh heartbeat keeps every other caller off this run.
+      const claimed = { ...job, runs: (Number(job.runs) || 0) + 1, heartbeatAtMs: nowOf(coordinator) };
+      await storage.put(keyOf(kind), claimed);
+      started.push(runJob(coordinator, runners, claimed));
+    } finally {
+      claiming(coordinator).delete(kind);
+    }
   }
   await Promise.all(started);
   const next = await nextResultsJobAt(coordinator);

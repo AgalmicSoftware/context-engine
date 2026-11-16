@@ -1134,7 +1134,8 @@ export class SessionWriteCoordinator {
 
   async alarm() {
     // A results job whose heartbeat stopped runs again here, beside the alarm's
-    // other work, which never waits on it.
+    // other work, and the alarm ends when it does: the alarm's 15 minutes are
+    // the surest place for it, though the next alarm waits behind it.
     const resultsJobs = runResultsJobs(this, this.resultsJobRunners).catch(() => {});
     try {
       await repairAgentSubmitProjections(this);

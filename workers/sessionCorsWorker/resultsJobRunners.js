@@ -20,7 +20,12 @@ const resultsBuildRunner = (kind, build) => ({
     const store = storeCall(coordinator, kind);
     // A build run again restarts its lease, which may have run out while the first stopped.
     const touched = await store(null, job.slug, 'touch', { attemptId: job.attemptId });
-    if (!touched.ok) return { ok: false, status: touched.status || 409, error: touched.body?.error || 'This build is no longer current.' };
+    if (!touched.ok) {
+      // The stopped run may have kept its build before it could say so.
+      const kept = (await store(null, job.slug, 'read', {})).body?.builds?.[0];
+      if (kept && Date.parse(kept.builtAt) >= job.startedAtMs) return { ok: true, status: 200, buildId: kept.id };
+      return { ok: false, status: touched.status || 409, error: touched.body?.error || 'This build is no longer current.' };
+    }
     const config = await configOf(coordinator, job.slug);
     if (!config) {
       await store(null, job.slug, 'finalize', { attemptId: job.attemptId });

@@ -22,8 +22,13 @@ const createJobs = (runners) => {
     }
     return { ok: true, body: { job: await readResultsJob(coordinator, kind, runners) } };
   };
-  // The wait lets the job's run take its turn, and moves the clock.
-  const wait = async (ms) => { await new Promise((resolve) => { setImmediate(resolve); }); clock.ms += ms; };
+  // The wait lets the job's run take its turn and moves the clock, with the
+  // heartbeat a live run writes meanwhile.
+  const wait = async (ms) => {
+    await new Promise((resolve) => { setImmediate(resolve); });
+    clock.ms += ms;
+    for (const job of values.values()) if (job.state === 'running') job.heartbeatAtMs = clock.ms;
+  };
   return { call, wait, now: () => clock.ms, clock };
 };
 
@@ -71,8 +76,8 @@ test('a press the build would refuse starts no job', async () => {
   assert.equal(started, false);
 });
 
-test('an AI Views press joining another’s job finds the draft under that job’s request, with no second call', async () => {
-  const generated = [];
+test('an AI Views press joining another’s job answers with the views it kept, read without another scan or call', async () => {
+  const reads = [];
   let finish;
   const jobs = createJobs({ 'ai-views': { run: ({ job }) => new Promise((resolve) => { finish = () => resolve({ ok: true, status: 200, jobState: 'succeeded', requestId: job.input.body.requestId }); }) } });
   // The first press's job is running when the second press comes; it finishes while the second waits.
@@ -84,13 +89,22 @@ test('an AI Views press joining another’s job finds the draft under that job�
       callResultsJob: jobs.call,
       wait: async (ms) => { finish?.(); await jobs.wait(ms); },
       now: jobs.now,
-      generateResultsAnalysisDraft: async ({ body, trigger }) => { generated.push({ body, trigger }); return { ok: true, status: 200, jobState: 'succeeded', draft: { draftId: 'd1' } }; },
+      readCoordinatedResultsAnalysisStatus: async () => { reads.push('status'); return { ok: true, state: { lastGood: { draftId: 'd1', reservationKey: 'private' } } }; },
     },
   });
-  assert.deepEqual(result.draft, { draftId: 'd1' });
-  assert.equal(generated.length, 1);
-  assert.equal(generated[0].body.requestId, 'manual:first');
-  assert.equal(generated[0].trigger, 'manual');
+  assert.deepEqual([result.status, result.jobState, result.draft.draftId, 'reservationKey' in result.draft], [200, 'succeeded', 'd1', false]);
+  assert.deepEqual(result.reservation, { kind: 'terminal', requestId: 'manual:first' });
+  assert.deepEqual(reads, ['status']);
+
+  // With the status unreadable, it says the views were kept and where to find them.
+  const done = createJobs({ 'ai-views': { run: async () => ({ ok: true, status: 200, jobState: 'succeeded' }) } });
+  const unread = await pressResultsAnalysis({
+    config: {},
+    body: { requestId: 'manual:third' },
+    deps: { callResultsJob: done.call, wait: done.wait, now: done.now, readCoordinatedResultsAnalysisStatus: async () => ({ ok: false, status: 503 }) },
+  });
+  assert.deepEqual([unread.ok, unread.status], [false, 503]);
+  assert.match(unread.error, /kept; reload/);
 });
 
 test('an AI Views press answers 202 while its job runs, and with the job’s failure when it fails', async () => {
@@ -103,7 +117,7 @@ test('an AI Views press answers 202 while its job runs, and with the job’s fai
   const failed = await pressResultsAnalysis({
     config: {},
     body: { requestId: 'manual:b' },
-    deps: { callResultsJob: failing.call, wait: failing.wait, now: failing.now, generateResultsAnalysisDraft: async () => { generated = true; } },
+    deps: { callResultsJob: failing.call, wait: failing.wait, now: failing.now, readKeptResultsAnalysisDraft: async () => { generated = true; } },
   });
   assert.deepEqual(failed, { ok: false, status: 422, jobState: 'failed', error: 'Results analysis input is not eligible.', reasons: ['Too few answers.'] });
   assert.equal(generated, false, 'a failure is never generated again');
@@ -114,7 +128,7 @@ test('an AI Views press answers 202 while its job runs, and with the job’s fai
   const queued = await pressResultsAnalysis({
     config: {},
     body: { requestId: 'manual:c', refresh: true, sections: ['summary'], source: { kind: 'admin-snapshot' } },
-    deps: { callResultsJob: behind.call, wait: behind.wait, now: behind.now, generateResultsAnalysisDraft: async () => { generated = true; } },
+    deps: { callResultsJob: behind.call, wait: behind.wait, now: behind.now, readKeptResultsAnalysisDraft: async () => { generated = true; } },
   });
   assert.equal(queued.status, 202);
   assert.equal(generated, false);

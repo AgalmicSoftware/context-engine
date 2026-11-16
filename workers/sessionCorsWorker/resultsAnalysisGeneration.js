@@ -901,6 +901,20 @@ export const readResultsAnalysisAdminStatus = async ({ env, slug, config, includ
   return buildResultsAnalysisStatusBody({ slug, config, coordinatorState, includeDraft });
 };
 
+/**
+ * The AI Views a finished job kept, as a press that ran them would answer:
+ * read from the coordinator's status, so the answers are not scanned again.
+ * A newer automatic run's views stand in for the job's own.
+ */
+export const readKeptResultsAnalysisDraft = async ({ env, slug, config, requestId = '', deps } = {}) => {
+  const capability = resolveResultsAnalysisCapability({ config });
+  const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
+  const status = await readStatus({ env, slug });
+  const draft = publicDraft(status?.state?.lastGood, config);
+  if (!draft) return { ok: false, status: 503, jobState: 'failed', error: 'AI Views were built and kept; reload to see them.', capability };
+  return { ok: true, status: 200, jobState: 'succeeded', reservation: summarizeReservation({ kind: 'terminal' }, requestId), capability, draft };
+};
+
 export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {}, headers, trigger = 'manual', loadedSource, deps } = {}) => {
   const settings = getResultsAnalysisSettings(config);
   const capability = resolveResultsAnalysisCapability({ config });

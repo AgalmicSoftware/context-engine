@@ -653,7 +653,9 @@ Admin test panel:
   heartbeat every 15 seconds. If the heartbeat goes a minute stale (the
   coordinator restarted), the next alarm, read of builds, AI Views status or
   press runs the job again; a job cut off twice ends with "The build stopped
-  before it finished. Press again to start a new one." AI Views from a
+  before it finished. Press again to start a new one." A job the alarm runs
+  again holds that alarm until it ends, so automatic AI Views and the other
+  alarm work wait up to a build's length behind it. AI Views from a
   snapshot the browser supplies still runs in the request, since those rows
   are not stored.
 - Manual generation uses signed admin action

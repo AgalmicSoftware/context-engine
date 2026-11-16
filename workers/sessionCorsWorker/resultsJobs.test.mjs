@@ -132,7 +132,7 @@ test('a build cut off with its coordinator runs again once its heartbeat is stal
   assert.equal(runner.runs.length, 0, 'a fresh heartbeat means the build may still be running');
 
   clock.ms += 1;
-  assert.equal(await nextResultsJobAt(after), clock.ms, 'the alarm is due now');
+  assert.equal(await nextResultsJobAt(after), clock.ms + 1000, 'the alarm is due, a second from now at the soonest');
   const read = await readResultsJob(after, 'debate-atlas', runners);
   assert.equal(read.state, 'running');
   await settle();
@@ -146,6 +146,36 @@ test('a build cut off with its coordinator runs again once its heartbeat is stal
   await settle();
 
   assert.deepEqual((await readResultsJob(after, 'debate-atlas', runners)).outcome, { ok: true, status: 200, buildId: 'atlas_2' });
+});
+
+test('a run still held in memory whose heartbeat stopped runs again, and the old run changes nothing', async () => {
+  const coordinator = createCoordinator();
+  const hung = createRunner();
+  const runners = { 'debate-atlas': hung };
+  await start(coordinator, hung);
+  await settle();
+  // The run never settles, and its heartbeat writes nothing more.
+  coordinator.clock.ms += RESULTS_JOB_STALE_MS;
+  await readResultsJob(coordinator, 'debate-atlas', runners);
+  await settle();
+  assert.equal(hung.runs.length, 2, 'the same coordinator runs it again');
+  assert.equal(await nextResultsJobAt(coordinator), coordinator.clock.ms + RESULTS_JOB_STALE_MS, 'no alarm in the past');
+  hung.runs[0].finish({ ok: false, status: 500, error: 'late' });
+  hung.runs[1].finish({ ok: true, status: 200, buildId: 'atlas_2' });
+  await settle();
+  assert.equal((await readResultsJob(coordinator, 'debate-atlas', runners)).outcome.buildId, 'atlas_2');
+});
+
+test('two callers at once claim a job once', async () => {
+  const coordinator = createCoordinator();
+  const runner = createRunner();
+  const runners = { 'debate-atlas': runner };
+  // Kept with no claim yet, as a press leaves it before its kick runs.
+  await coordinator.state.storage.put('results-job-v1:debate-atlas', { kind: 'debate-atlas', slug: 'salon', jobId: 'j1', state: 'running', startedAtMs: 1, runs: 0, input: {} });
+  runResultsJobs(coordinator, runners);
+  runResultsJobs(coordinator, runners);
+  await settle();
+  assert.equal(runner.runs.length, 1);
 });
 
 test('the alarm runs a cut-off build again and waits for it to finish', async () => {

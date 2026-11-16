@@ -2,7 +2,7 @@
 // job in the session's coordinator (resultsJobs.js), or joins the one running,
 // and answers when the job finishes while the page is still waiting. If the
 // page drops, the job carries on and keeps its build; the next read finds it.
-import { generateResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
+import { readKeptResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
 import { resultsBuildRefusal, resultsBuildReserveFailure } from './resultsBuild.js';
 import { RESULTS_BUILD_KINDS } from './resultsBuildStore.js';
 import { awaitResultsJob } from './resultsJobs.js';
@@ -64,7 +64,7 @@ export const pressResultsBuild = async ({ env, slug, kindName, config, body = {}
  * request gave when it ran the build itself, or 202 while the job runs, which
  * the site follows on the status route.
  */
-export const pressResultsAnalysis = async ({ env, slug, config, body = {}, headers, deps = {} } = {}) => {
+export const pressResultsAnalysis = async ({ env, slug, config, body = {}, deps = {} } = {}) => {
   const requestId = trim(body.requestId || body.id) || `manual:${globalThis.crypto.randomUUID()}`;
   const jobBody = {
     requestId,
@@ -90,8 +90,5 @@ export const pressResultsAnalysis = async ({ env, slug, config, body = {}, heade
     };
   }
   if (outcome.jobState === 'running') return running;
-  // The job kept its draft under its request's id, which now finds it without another AI call.
-  return (deps.generateResultsAnalysisDraft || generateResultsAnalysisDraft)({
-    env, slug, config, body: { ...jobBody, requestId: outcome.requestId || requestId }, headers, trigger: 'manual', deps,
-  });
+  return (deps.readKeptResultsAnalysisDraft || readKeptResultsAnalysisDraft)({ env, slug, config, requestId: outcome.requestId || requestId, deps });
 };

@@ -256,7 +256,7 @@ export const dispatchAdminRequest = async ({
           deps,
         })
         : await (deps?.pressResultsAnalysis || pressResultsAnalysis)({
-          env, slug: targetSlug, config: existingConfig, body, headers: privateHeaders, deps,
+          env, slug: targetSlug, config: existingConfig, body, deps,
         });
       return deps?.json?.(
         result?.ok ? result : { ...result, error: result?.error || 'Results analysis generation failed.' },
