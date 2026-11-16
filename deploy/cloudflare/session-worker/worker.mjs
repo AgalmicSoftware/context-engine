@@ -27115,7 +27115,7 @@ var init_workerScriptName = __esm({
 });
 
 // workers/shared/deployHelperCore.mjs
-var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, SESSION_WORKER_OBSERVABILITY, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr9, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret, sha256Hex, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, normalizeRequestedWorkerName, buildFreshDeploymentName, buildPreLimitDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
+var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_URL, DEFAULT_FAUCET_AMOUNT_ETH, DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH, DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED, SESSION_WORKER_OBSERVABILITY, DEFAULT_ALLOWED_ORIGINS, DEPLOYMENT_JOURNAL_PREFIX, DEPLOYMENT_JOURNAL_VERSION, DEPLOYMENT_JOURNAL_TTL_SECONDS, DEPLOYMENT_REQUEST_ID_RE, KV_NAMESPACE_TITLE_MAX_LENGTH, SESSION_SLUG_MAX_LENGTH, TRUE_STRINGS, FALSE_STRINGS, STORAGE_RESOURCE_STAGES, DEFAULT_STORAGE_RESOURCES, DEFAULT_PAYLOAD_ACCESS_RESOURCES, DEFAULT_CLOUDFLARE_PRIMITIVES, PAYLOAD_ACCESS_MODES2, PAYLOAD_ACCESS_GATES2, PAYLOAD_ENCRYPTION_MODES2, STORAGE_ENVELOPE_KEK_SECRET_NAME, DEPLOYMENT_ID_BINDING_NAME, DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, BUNDLE_SHA256_BINDING_NAME, SESSION_COORDINATOR_BINDING_NAME, WORKERS_AI_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME, SESSION_COORDINATOR_MIGRATION_TAG, R2_BUCKET_NAME_RE, ALLOWED_WORKER_AUTHORITY_SCOPES, DEFAULT_WORKER_CANONICAL_AUTHORITY, toStr9, isObj4, hasScheme, ensureHttpUrl, normalizeOrigin, normalizeOriginList, normalizeAllowList, validateInboundSlug, readJsonOrText, cfFetch, NEW_KV_NAMESPACE_RETRY_DELAYS_MS, NEW_KV_NAMESPACE_WRITE_RETRY_DELAYS_MS, FINAL_CONFIG_READBACK_RETRY_DELAYS_MS, isNewKvNamespacePropagationFailure, putFreshKvNamespaceValue, lookupCloudflareAccount, randomSecret, sha256Hex, buildBundleDiagnostics, formatBundleDiagnostics, normalizeSecretValue, sanitizeSecrets, sanitizeBlockLimits, normalizeWorkerAuthorityScopes, normalizeWorkerAuthorityLoginGate, resolveWorkerCanonicalAuthorityForDeploy, workerAuthorityPoliciesMatch, normalizeRequestedWorkerName, buildFreshDeploymentName, buildPreLimitDeploymentName, normalizeDeploymentRequestId, collectKnownRequestCredentials, redactKnownCredentials, buildSafeDeployJournalResult, resolveDeployJournalBinding, buildDeploymentRequestContext, readDeployJournalRecord, writeDeployJournalRecord, writeDurableDeployJournalRecord, normalizeResourceStage, normalizePayloadAccessMode, normalizePayloadAccessGate, normalizePayloadEncryptionMode, deriveLegacyPayloadAccessMode, cloneAccessConditions, normalizePayloadAccessControl, normalizeStorageProfileInput, normalizeDeployStorageProfile, firstTrimmed, resolveRequestedR2BucketName, truthyR2Marker, hasExplicitR2Request, resolveDeployStorageBindingPlan, normalizeEmbeddedDeployHelperEnabled, buildFailure, buildSuccess, shouldAllowFallbackForCloudflareFailure, isAmbiguousCloudflareMutationFailure, isDefinitiveWorkerUploadRejection, ensureWorkersDevAccountSubdomain, ensureWorkersDevSubdomain, resolveDeploymentAccountId, validateDeployHelperPublicConfigInputs, executeDeployHelperRequestCore, resolveDeploymentBundleProvenance, validateDeployHelperLocalInputs, executeDeployHelperRequest;
 var init_deployHelperCore = __esm({
   "workers/shared/deployHelperCore.mjs"() {
     init_agentHttpConfig();
@@ -27202,6 +27202,7 @@ var init_deployHelperCore = __esm({
     DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME = "CE_DEPLOYMENT_REQUEST_DIGEST";
     BUNDLE_SHA256_BINDING_NAME = "CE_BUNDLE_SHA256";
     SESSION_COORDINATOR_BINDING_NAME = "CE_SESSION_COORDINATOR";
+    WORKERS_AI_BINDING_NAME = "AI";
     SESSION_COORDINATOR_CLASS_NAME = "SessionWriteCoordinator";
     SESSION_COORDINATOR_MIGRATION_TAG = "ce-session-write-coordinator-v1";
     R2_BUCKET_NAME_RE = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
@@ -28479,6 +28480,10 @@ var init_deployHelperCore = __esm({
           const matches = named(name);
           return matches.length === 1 && toStr9(matches[0]?.type).trim() === "durable_object_namespace" && toStr9(matches[0]?.class_name).trim() === expectedClassName;
         };
+        const hasAi = (name) => {
+          const matches = named(name);
+          return matches.length === 1 && toStr9(matches[0]?.type).trim() === "ai";
+        };
         const observedMainModule = toStr9(settings?.main_module).trim();
         const moduleIdentityMatches = !observedMainModule || observedMainModule === "worker.mjs";
         const storageIndexMatches = storageBindingPlan.requiresStorageIndexKv ? hasExactKv("CE_STORAGE_INDEX_KV", namespaceId) : named("CE_STORAGE_INDEX_KV").length === 0;
@@ -28489,7 +28494,7 @@ var init_deployHelperCore = __esm({
         const expectedWorkerBundleSha256 = expectedBundleSha256 || bundleDiagnostics?.sha256 || expectedInlineBundleSha256 || toStr9(idempotencyContext?.bundleSha256).trim().toLowerCase();
         const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) && (ignoreBundleIdentity || !expectedWorkerBundleSha256 || observedBundleSha256 === expectedWorkerBundleSha256);
         const requestDigestMatches = requestMarker ? hasExactPlainText(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, toStr9(idempotencyContext?.requestDigest).trim()) : named(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME).length === 0;
-        return moduleIdentityMatches && hasExactPlainText(DEPLOYMENT_ID_BINDING_NAME, deploymentId) && requestDigestMatches && bundleIdentityMatches && hasExactDurableObject(SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME) && hasExactKv("GROUP_KV", namespaceId) && storageIndexMatches && r2Matches && adminMatches && hasExactPlainText("DEFAULT_SESSION_SLUG", sessionSlug) && hasExactPlainText("DEPLOY_HELPER_ENABLED", embeddedDeployHelperEnabled ? "1" : "0");
+        return moduleIdentityMatches && hasExactPlainText(DEPLOYMENT_ID_BINDING_NAME, deploymentId) && requestDigestMatches && bundleIdentityMatches && hasExactDurableObject(SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME) && hasExactKv("GROUP_KV", namespaceId) && hasAi(WORKERS_AI_BINDING_NAME) && storageIndexMatches && r2Matches && adminMatches && hasExactPlainText("DEFAULT_SESSION_SLUG", sessionSlug) && hasExactPlainText("DEPLOY_HELPER_ENABLED", embeddedDeployHelperEnabled ? "1" : "0");
       };
       const readWorkerBundleSha256 = (settingsResult) => {
         const bindings = Array.isArray(settingsResult?.data?.result?.bindings) ? settingsResult.data.result.bindings : [];
@@ -28724,6 +28729,9 @@ var init_deployHelperCore = __esm({
             class_name: SESSION_COORDINATOR_CLASS_NAME
           },
           { name: "DEPLOY_HELPER_ENABLED", type: "plain_text", text: embeddedDeployHelperEnabled ? "1" : "0" },
+          // Workers AI, for a Session Agent that answers on Cloudflare's models.
+          // It costs nothing until a session uses it.
+          { name: WORKERS_AI_BINDING_NAME, type: "ai" },
           ...sessionReleaseVerified ? [
             { name: "WORKER_BUNDLE_URL", type: "plain_text", text: bundleUrl },
             { name: "WORKER_BUNDLE_MANIFEST_URL", type: "plain_text", text: bundleManifestUrl }
@@ -70798,6 +70806,7 @@ var init_aiModelFamily = __esm({
       if (!name) return "";
       if (name.startsWith("claude")) return "anthropic";
       if (/^(?:gpt-|o[1-9]|chatgpt)/.test(name)) return "openai";
+      if (name.startsWith("@cf/")) return "workers-ai";
       return name.includes("/") ? "openrouter" : "";
     };
     isGpt5Or6 = (leaf) => /^gpt-[56](?:$|[.-])/.test(leaf);
@@ -70990,8 +70999,23 @@ var init_aiRequestPolicy = __esm({
   }
 });
 
+// shared/workersAiModels.mjs
+var WORKERS_AI_PROVIDER, WORKERS_AI_TASK, WORKERS_AI_MODELS, DEFAULT_WORKERS_AI_MODEL, WORKERS_AI_MODEL_IDS, workersAiModel;
+var init_workersAiModels = __esm({
+  "shared/workersAiModels.mjs"() {
+    WORKERS_AI_PROVIDER = "workers-ai";
+    WORKERS_AI_TASK = "session-agent";
+    WORKERS_AI_MODELS = Object.freeze([
+      Object.freeze({ id: "@cf/zai-org/glm-5.3", tokenField: "max_completion_tokens" })
+    ]);
+    DEFAULT_WORKERS_AI_MODEL = WORKERS_AI_MODELS[0].id;
+    WORKERS_AI_MODEL_IDS = Object.freeze(WORKERS_AI_MODELS.map((entry2) => entry2.id));
+    workersAiModel = (model) => WORKERS_AI_MODELS.find((entry2) => entry2.id === String(model ?? "").trim()) || null;
+  }
+});
+
 // workers/sessionCorsWorker/aiProviderExecution.js
-var ANTHROPIC_URL, OPENAI_CHAT_URL, OPENAI_RESPONSES_URL, OPENROUTER_CHAT_URL, CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR, extractOpenAiCompletion, normalizeComparableRpcUrl, resolveJson, jsonSchemaOf, toResponsesTextFormat, claudeOutputConfig, proxyAnthropic, proxyOpenAI, proxyOpenRouter, proxyCustomRPC;
+var ANTHROPIC_URL, OPENAI_CHAT_URL, OPENAI_RESPONSES_URL, OPENROUTER_CHAT_URL, CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR, extractOpenAiCompletion, normalizeComparableRpcUrl, resolveJson, jsonSchemaOf, toResponsesTextFormat, claudeOutputConfig, proxyAnthropic, proxyOpenAI, proxyOpenRouter, answerText, workersAiReply, workersAiAnswer, WORKERS_AI_BUSY, proxyWorkersAi, proxyCustomRPC;
 var init_aiProviderExecution = __esm({
   "workers/sessionCorsWorker/aiProviderExecution.js"() {
     init_aiRequestPolicy();
@@ -71001,6 +71025,7 @@ var init_aiProviderExecution = __esm({
     init_aiModelParams();
     init_responseKvHelpers();
     init_stringCoercion();
+    init_workersAiModels();
     ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
     OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
     OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -71305,6 +71330,58 @@ var init_aiProviderExecution = __esm({
       }
       const completion = data?.choices?.[0]?.message?.content || "";
       return json9({ completion, raw: data }, 200, baseHeaders);
+    };
+    answerText = (parts) => (Array.isArray(parts) ? parts : []).filter((part) => ["text", "output_text"].includes(part?.type) && typeof part.text === "string").map((part) => part.text).join("");
+    workersAiReply = (data) => {
+      if (typeof data?.response === "string" && data.response.trim()) return data.response;
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content === "string") return content;
+      if (Array.isArray(content)) return answerText(content);
+      if (typeof data?.output_text === "string") return data.output_text;
+      return (Array.isArray(data?.output) ? data.output : []).filter((item) => item?.type === "message").map((item) => answerText(item.content)).join("");
+    };
+    workersAiAnswer = (data) => {
+      const afterThinking = workersAiReply(data).split(/<\/think>/i).pop();
+      return afterThinking.replace(/<think>[\s\S]*$/i, "").trim();
+    };
+    WORKERS_AI_BUSY = /\b(?:3036|3040|429)\b|capacity|rate limit|too many requests/i;
+    proxyWorkersAi = async ({ payload, config, env, baseHeaders, deps } = {}) => {
+      const json9 = resolveJson(deps);
+      if (payload?.taskType !== WORKERS_AI_TASK) {
+        return json9({ error: "Cloudflare\u2019s models answer only the Session Agent.", reason: "workers_ai_task_not_allowed" }, 403, baseHeaders);
+      }
+      const ai = env?.AI;
+      if (typeof ai?.run !== "function") {
+        return json9({
+          error: "This Session Worker has no Workers AI binding. Redeploy it to use Cloudflare\u2019s models.",
+          reason: "workers_ai_unbound"
+        }, 503, baseHeaders);
+      }
+      const policy = boundSessionAiRequest({ payload, provider: WORKERS_AI_PROVIDER, config });
+      if (!policy.ok) return json9({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+      const { model, messages, prompt, max_tokens: maxTokens } = policy.payload;
+      const listed = workersAiModel(model);
+      if (!listed) return json9({ error: AI_MODEL_NOT_ALLOWED.error, reason: AI_MODEL_NOT_ALLOWED.reason }, 403, baseHeaders);
+      const inputs = {
+        messages: Array.isArray(messages) ? messages : [{ role: "user", content: String(prompt || "") }],
+        [listed.tokenField]: maxTokens
+      };
+      let data;
+      try {
+        data = await ai.run(listed.id, inputs);
+      } catch (error) {
+        const busy2 = WORKERS_AI_BUSY.test(toStr6(error?.message));
+        return json9(
+          busy2 ? { error: "Cloudflare\u2019s AI is busy. Try again shortly.", reason: "workers_ai_busy" } : { error: "Cloudflare\u2019s AI couldn\u2019t answer. Try again.", reason: "workers_ai_failed" },
+          busy2 ? 429 : 502,
+          baseHeaders
+        );
+      }
+      const completion = workersAiAnswer(data);
+      if (!completion) {
+        return json9({ error: "Cloudflare\u2019s AI returned an empty answer.", reason: "ai_empty" }, 422, baseHeaders);
+      }
+      return json9({ completion }, 200, baseHeaders);
     };
     proxyCustomRPC = async ({
       payload,
@@ -77349,13 +77426,15 @@ var ANONYMOUS_CUSTOM_RPC_URL_REQUIRED_ERROR, DEFAULT_MODEL_WHITELIST, matchesMod
 var init_aiRequestNormalization = __esm({
   "workers/sessionCorsWorker/aiRequestNormalization.js"() {
     init_aiModelFamily();
+    init_workersAiModels();
     init_aiRequestPolicy();
     init_stringCoercion();
     ANONYMOUS_CUSTOM_RPC_URL_REQUIRED_ERROR = "Anonymous custom provider requires request rpcUrl when using apiKey bypass.";
     DEFAULT_MODEL_WHITELIST = {
       anthropic: ["claude-*"],
       openai: ["gpt-*", "o1-*", "o3-*", "o4-*", "chatgpt-*"],
-      openrouter: null
+      openrouter: null,
+      [WORKERS_AI_PROVIDER]: WORKERS_AI_MODEL_IDS
     };
     matchesModelGlob = (model, pattern) => {
       const normalizedModel = toTrimmedString2(model).toLowerCase();
@@ -104856,6 +104935,7 @@ var FEATURES = Object.freeze([
   "upload_authority_stamps",
   "worker_groups"
 ]);
+var WORKERS_AI_FEATURE = "workers_ai_v1";
 var workerRelease = () => "0.9.11" ? "0.9.11" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const body = {
@@ -104866,6 +104946,8 @@ var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 =
     release: workerRelease(),
     features: FEATURES.filter((feature) => feature !== "recovery_key_export")
   };
+  const ai = typeof env.AI?.run === "function" ? [WORKERS_AI_FEATURE] : [];
+  body.features = [...body.features, ...ai];
   const responseHeaders = new Headers(headers2);
   responseHeaders.set("Cache-Control", "public, max-age=30");
   const url = new URL(request.url);
@@ -104873,7 +104955,7 @@ var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 =
     const validated = validateInboundWorkerSessionSlug(url.searchParams.get("slug"));
     if (!validated.ok) return Response.json({ error: validated.error }, { status: 400, headers: responseHeaders });
     const pinnedSlug = getDefaultWorkerSessionSlug(env);
-    if (pinnedSlug && pinnedSlug === validated.slug) body.features = FEATURES;
+    if (pinnedSlug && pinnedSlug === validated.slug) body.features = [...FEATURES, ...ai];
     const bound = !!env.CE_SESSION_COORDINATOR?.idFromName && !!env.CE_SESSION_COORDINATOR?.get;
     const current = bound ? await callSessionConfigCoordinator({ env, slug: validated.slug, path: "current" }) : null;
     const migration = current?.body?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON;
@@ -105431,6 +105513,8 @@ var dispatchAnonymousRoute = async ({
 init_sessionAgent();
 init_sessionLifecycle();
 init_aiRequestPolicy();
+init_aiProviderExecution();
+init_workersAiModels();
 init_aiRequestNormalization();
 init_contextSourceLoader();
 init_resultsAnalysisGeneration();
@@ -105750,20 +105834,22 @@ var gatherMaterial = async ({ env, slug, config, setting, address: address3, sco
   };
 };
 var checkSessionAgentPayment = async () => ({ ok: true });
-var PROXIES = { anthropic: "proxyAnthropic", openai: "proxyOpenAI", openrouter: "proxyOpenRouter", custom: "proxyCustomRPC" };
-var askAi = async ({ messages, config, secrets, address: address3, scopes, headers: headers2, deps }) => {
-  const request = (deps.normalizeAiRequestPayload || normalizeAiRequestPayload)({
-    payload: { taskType: "session-agent", messages, max_tokens: 3e3, max_output_tokens: 3e3 },
-    config
-  });
-  const { provider, payload } = request;
+var PROXIES = { anthropic: "proxyAnthropic", openai: "proxyOpenAI", openrouter: "proxyOpenRouter", custom: "proxyCustomRPC", "workers-ai": "proxyWorkersAi" };
+var DIRECT_PROXIES = { "workers-ai": proxyWorkersAi };
+var sessionAgentRequest = ({ messages, config, deps }) => (deps.normalizeAiRequestPayload || normalizeAiRequestPayload)({
+  payload: { taskType: "session-agent", messages, max_tokens: 3e3, max_output_tokens: 3e3 },
+  config
+});
+var askAi = async ({ messages, config, secrets, address: address3, scopes, env, headers: headers2, deps }) => {
+  const { provider, payload } = sessionAgentRequest({ messages, config, deps });
   if (!isModelAllowed(payload.model, provider)) return { ok: false, status: 403, body: AI_MODEL_NOT_ALLOWED };
-  const proxy = deps[PROXIES[provider]];
+  const proxy = deps[PROXIES[provider]] || DIRECT_PROXIES[provider];
   if (!proxy) return { ok: false, status: 503, body: { error: "The session\u2019s AI provider can\u2019t answer the Session Agent." } };
   const response3 = await proxy({
     payload,
     config,
     secrets,
+    env,
     baseHeaders: headers2,
     ...provider === "custom" ? { auth: { address: address3, scopes } } : {}
   });
@@ -105840,7 +105926,8 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
     headers: headers2,
     deps: { getSessionSecrets: deps.getSessionSecrets, json: deps.json }
   });
-  if (!secretContext?.ok) return json9({ error: "The session\u2019s AI isn\u2019t set up." }, 503);
+  const keyless = sessionAgentRequest({ messages: [], config, deps }).provider === WORKERS_AI_PROVIDER;
+  if (!secretContext?.ok && !keyless) return json9({ error: "The session\u2019s AI isn\u2019t set up." }, 503);
   const optOuts = await store(env, slug, "list");
   if (!optOuts.ok) return json9({ error: OPT_OUTS_UNAVAILABLE }, 503);
   const refused = await preflight.count?.();
@@ -105861,7 +105948,7 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
   const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
   if (!payment?.ok) return json9({ error: payment?.error || "This answer needs payment first.", reason: "session_agent_payment_required" }, 402);
   const { messages, read, contextOmitted } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
-  const reply5 = await askAi({ messages, config, secrets: secretContext.secrets, address: address3, scopes: currentScopes, headers: headers2, deps });
+  const reply5 = await askAi({ messages, config, secrets: secretContext?.ok ? secretContext.secrets : {}, address: address3, scopes: currentScopes, env, headers: headers2, deps });
   if (!reply5.ok) return json9(reply5.body, reply5.status);
   const notes = [
     answersUnavailable === "too_many" ? `Members\u2019 answers weren\u2019t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString("en-US")} question and answer versions, the most the Session Agent can read at once.` : answersUnavailable ? "Members\u2019 answers couldn\u2019t be read for this answer." : "",
