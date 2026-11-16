@@ -3572,6 +3572,37 @@ describe('AppShell route render smoke', () => {
     expect(window.location.search).toBe(search);
   });
 
+  it('marks a listed session’s question opened from another Worker, as the session page does', async () => {
+    const questionId = `0x${'cd'.repeat(32)}`;
+    const otherOrigin = 'https://other-worker.example.com';
+    // Every request is answered here; nothing reaches a real Worker.
+    const otherConfig = {
+      slug: 'rxc-ra-2',
+      sessionId: '0x11111111111111111111111111111111',
+      configRevision: 'other-revision-1',
+      corsWorkerUrl: otherOrigin,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, sessionSlug: otherConfig.slug, config: otherConfig }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const subject = createSubject({
+      path: `/question/${questionId}`,
+      search: `?session=rxc-ra-2&worker=${encodeURIComponent(otherOrigin)}`,
+      sessionConfig: null,
+    });
+    const view = render(subject.render());
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+    view.rerender(subject.render());
+    await screen.findByTestId('mock-survey-tool');
+    expect(screen.getByTestId('ce-unlisted-worker-notice')).toHaveTextContent(
+      'This link opens “rxc-ra-2” from other-worker.example.com, not the Worker this site lists for it.',
+    );
+  });
+
   it.each([false, true])('pins a bare General question only after a cache hit (cached=%s)', async (cached) => {
     const questionId = `0x${'ab'.repeat(32)}`;
     const config = buildSessionConfig({ slug: '', sessionName: 'General' });

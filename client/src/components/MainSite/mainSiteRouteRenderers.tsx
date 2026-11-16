@@ -973,7 +973,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     // A link from an unlisted session carries its Worker, as the session page's own link does: the session comes
     // from that Worker, and the address keeps it.
     const workerRoute =
-      queryQuestionSlug && urlParams.has('worker')
+      queryQuestionSlug && urlParams.has('session') && urlParams.has('worker')
         ? resolveMainSiteGroupWorkerRoute({
             workerSessionSlug: queryQuestionSlug,
             sessionConfig: null,
@@ -1037,6 +1037,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     return (
       <InitialRouteBoundary fallback={<LazyFallback label="Loading Question..." />} resetKey={fullPath}>
         <div data-testid={E2E_TESTIDS.PAGE_QUESTIONS_ROOT}>
+          {workerRoute ? renderListedWorkerNotice(workerRoute) : null}
           <SurveyTool
             key={`${effectiveQuestionSlug}-${String(questionID || '').toLowerCase()}-${String(responderAddress || '').toLowerCase()}`}
             questionID={questionID}
