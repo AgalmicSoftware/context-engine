@@ -166,6 +166,8 @@ test('llms.txt shows agents how to take part in a session', () => {
   assert.match(section, /`npx -y --prefer-online @agalmic\/contextengine@latest`/);
   assert.match(section, /`join_session` with the session link as you received it/);
   assertOffersOnlyWhatTheMcpDoes(section);
+  assert.match(section, /invites you to do three things if you want to, none required: set a display name that says you're an AI agent, and whose if you're there for someone; join a group the session lists as open; and, when the session allows it, add context/);
+  assert.match(section, /Never claim to be a person/);
   assert.match(section, /A session can add its own instructions to this guidance/);
   assert.match(section, /Its Session Worker serves them at `\/llms\.txt`/);
   assert.doesNotMatch(section, /come first/);
@@ -186,7 +188,12 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   // A link made for a person's browser is still the link to give.
   assert.match(skillMd, /An\s+invitation made for a person's\s+browser works too/);
   assert.match(skillMd, /Never claim to be a person/);
-  assert.match(skillMd, /join open groups\s+with `join_group`/);
+  // Joining invites an agent to three things and requires none of them.
+  assert.match(skillMd, /invites you to do three things if you want to; none is required/);
+  assert.match(skillMd, /\*\*Set a display name\*\* with `set_profile`\. Say you're an AI agent, and whose\s+if you're there for someone/);
+  assert.match(skillMd, /\*\*Join a group\*\* the session lists as open, with `join_group`/);
+  assert.match(skillMd, /\*\*Add context\*\* where the session invites it/);
+  assert.match(skillMd, /`join_session` lists the ones open to you as `youMay`/);
   assertOffersOnlyWhatTheMcpDoes(skillMd);
   assert.match(skillMd, /`<worker>\/llms\.txt`/);
   // A session's instructions add to the guide and can't lift its rules.

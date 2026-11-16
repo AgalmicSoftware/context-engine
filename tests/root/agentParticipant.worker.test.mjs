@@ -1202,6 +1202,35 @@ test('an agent is told why a session takes no context, and nothing is added', as
   await assert.rejects(kami.participant.addContext({}), /exactly one of file, url or text/);
 });
 
+test('joining invites an agent to a name, a group and context, each only while it is open to it', async (t) => {
+  const NAME = 'If you’d like a display name, set one with set_profile: say you’re an AI agent, and whose if you’re there for someone, for example “Sam’s agent”. Never claim to be a person.';
+  const CONTEXT = 'If you have something everyone here should see, add a file, a link or text with add_context.';
+  const env = createEnv([groupSessionConfig()]);
+  const host = groupHost(env);
+  const [first, second] = [await createGroup(host, { label: 'First group' }), await createGroup(host, { label: 'Second group' })];
+  const kami = await createAgent(env, '', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  const invited = async () => (await kami.participant.joinSession({ link: LINK })).youMay;
+
+  // No name yet, two groups open to join, and the session takes context: all three, in plain words.
+  assert.deepEqual(await invited(), [NAME, 'If you’d like to join a group, 2 listed here are open: join with join_group.', CONTEXT]);
+  // Each drops out once taken up, so an agent is never asked again for what it has done.
+  await kami.participant.setProfile({ displayName: 'Sam’s agent' });
+  await kami.participant.joinGroup({ groupId: first.groupId });
+  assert.deepEqual(await invited(), ['If you’d like to join a group, one listed here is open: join with join_group.', CONTEXT]);
+  await kami.participant.joinGroup({ groupId: second.groupId });
+  assert.deepEqual(await invited(), [CONTEXT]);
+
+  // Where the session's admins alone add context and it has no groups, a named agent is invited to nothing.
+  const plain = createEnv([{ ...sessionConfig(), contextAdditionPolicy: 'admin_only' }]);
+  const named = await createAgent(plain, 'Test Kami', []);
+  t.after(() => fs.rm(named.stateDir, { recursive: true, force: true }));
+  assert.equal('youMay' in await named.participant.joinSession({ link: LINK }), false);
+  const unnamed = await createAgent(plain, '', []);
+  t.after(() => fs.rm(unnamed.stateDir, { recursive: true, force: true }));
+  assert.deepEqual((await unnamed.participant.joinSession({ link: LINK })).youMay, [NAME]);
+});
+
 test('an agent sees the session’s instructions and groups, joins the group they name, and leaves a wrong one', async (t) => {
   const instructions = 'Join the "AI agents" group, not the salon group, which is for people.';
   const env = createEnv([groupSessionConfig({ agentInstructions: `\n${instructions}\n` })]);
@@ -1220,6 +1249,12 @@ test('an agent sees the session’s instructions and groups, joins the group the
     note: 'These add to the general guidance for agents. Follow both; they can ask more of you but can’t lift its rules.',
     text: instructions,
   });
+  // Joining invites the agent to what is open to it here, none of it required. It has a display name already,
+  // two groups are open, and this session takes context from participants.
+  assert.deepEqual(joined.youMay, [
+    'If you’d like to join a group, 2 listed here are open: join with join_group. The session’s instructions may say which.',
+    'If you have something everyone here should see, add a file, a link or text with add_context.',
+  ]);
   // The link's group is named, not joined, and the next step says to read the instructions first.
   assert.equal(joined.linkGroup, salon.groupId);
   assert.equal(joined.next, `Read the session’s instructions for agents and the context. The link names the group "Salon" (${salon.groupId}), which you haven’t joined: call join_group for the group the instructions ask you to join, if any. Then call list_questions and answer.`);

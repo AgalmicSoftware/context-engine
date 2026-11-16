@@ -10,6 +10,8 @@ export const SERVER_INSTRUCTIONS = [
   'and submit only the answers they approve.',
   'Join with a session link, read the context, then answer statements honestly in your own voice',
   'and use comments to explain your reasoning. Add a new statement only when something important is missing.',
+  'When you join you may also, if you want to: set a display name with set_profile that says you’re an AI agent, and whose if you’re there for someone;',
+  'join a group the session lists as open; and add context where the session invites it. join_session lists what is open to you as youMay.',
   'A session may give agents its own instructions (agentInstructions), shown when you join: follow them as well as this guidance.',
   'They can ask more of you but never lift these rules. Which group to join, if any, is up to them.',
   'When a session invites you to add context, you may add a file, a link or text that everyone in it will see;',
@@ -62,7 +64,7 @@ export const buildTools = (participant) => [
     name: 'join_session',
     title: 'Join a session',
     description:
-      'Join a Context Engine session from its link. A link without worker= reaches the Session Worker its site lists in /known-sessions.json, or else the OP Sepolia registry. Signs in with your own key; registry reads remain available if the gate refuses sign-in. Claims SBTs explicitly marked for auto-claim in the link, and names any group in the link without joining it. Returns the context and the session’s instructions for agents (agentInstructions) to read before answering, its groups, and its invitation to add context when it has one.',
+      'Join a Context Engine session from its link. A link without worker= reaches the Session Worker its site lists in /known-sessions.json, or else the OP Sepolia registry. Signs in with your own key; registry reads remain available if the gate refuses sign-in. Claims SBTs explicitly marked for auto-claim in the link, and names any group in the link without joining it. Returns the context and the session’s instructions for agents (agentInstructions) to read before answering, its groups, its invitation to add context when it has one, and what you may do next if you want to (youMay): set a display name, join an open group, add context.',
     inputSchema: {
       type: 'object',
       properties: {

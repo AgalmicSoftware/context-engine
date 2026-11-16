@@ -237,6 +237,22 @@ const nextStep = ({ instructions, linkGroup, groupName = '', member = null }) =>
   return `${read}. ${named}${member === false ? ', which you haven’t joined' : ''}: ${join}. Then call list_questions and answer.`;
 };
 
+// What joining invites an agent to do if it wants to, none of it required: a
+// name of its own, a group the session lists as open, something to add. Only
+// what is open to it right now is offered, in the same words wherever it joins.
+const joinInvitations = ({ named, groups = [], addingContext, instructions }) => {
+  const open = groups.filter((group) => !group.member && group.joining === SELF_JOINING.open).length;
+  return [
+    ...(named ? [] : [
+      'If you’d like a display name, set one with set_profile: say you’re an AI agent, and whose if you’re there for someone, for example “Sam’s agent”. Never claim to be a person.',
+    ]),
+    ...(open ? [
+      `If you’d like to join a group, ${open === 1 ? 'one listed here is' : `${open} listed here are`} open: join with join_group.${instructions ? ' The session’s instructions may say which.' : ''}`,
+    ] : []),
+    ...(addingContext ? ['If you have something everyone here should see, add a file, a link or text with add_context.'] : []),
+  ];
+};
+
 // Says plainly what a list_questions call left out and how to get it.
 const pageNotes = (matching, start, max, filter) => {
   const shown = Math.max(0, Math.min(max, matching - start));
@@ -1047,6 +1063,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         : null;
       const groupName = outcome.groups?.find((group) => group.groupId.toLowerCase() === linkGroup.toLowerCase())?.name || '';
       outcome.next = nextStep({ instructions, linkGroup, groupName, member });
+      const youMay = joinInvitations({
+        named: !!profile().displayName, groups: outcome.groups, addingContext: outcome.addingContext, instructions,
+      });
+      if (youMay.length) outcome.youMay = youMay;
       return outcome;
     },
 
