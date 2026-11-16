@@ -185,12 +185,18 @@ test('a restore keeps everyone who turned the Session Agent off opted out, and e
   assert.deepEqual(await restoreOnto(await signBackupPage(older, source.env)), [[already], [already]]);
 });
 
+// A session whose Session Agent records chats: its coordinator stores one only while that setting is on.
+const recordingFixture = () => {
+  const made = fixture();
+  const key = `session:${slug}:config`;
+  made.kv.values.set(key, JSON.stringify({ ...JSON.parse(made.kv.values.get(key)), sessionAgent: { audiences: [], history: true } }));
+  return made;
+};
+
 test('a backup carries the stored chats it began with, and a restore puts them back under their ids', async () => {
-  const chat = (question, extra = {}) => ({
-    day: '2026-11-24', answers: 'general', question, answer: 'Shorter meetings.', read: { context: 1, results: false, answers: 0 }, ...extra,
-  });
+  const chat = (question, extra = {}) => ({ day: '2026-11-24', answers: 'general', question, answer: 'Shorter meetings.', ...extra });
   const store = (env, operation, payload = {}) => callSessionConfigCoordinator({ env, slug, path: `session-agent-history/${operation}`, ...payload });
-  const source = fixture();
+  const source = recordingFixture();
   // Enough stored answers that the backup takes more than one page.
   for (let n = 0; n < 120; n += 1) {
     const id = `cf_chat_${String(n).padStart(3, '0')}`;
@@ -198,14 +204,15 @@ test('a backup carries the stored chats it began with, and a restore puts them b
     source.kv.values.set(`ce-storage:${slug}:responses:${id}`, JSON.stringify(metadata));
     source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('answer').toString('base64url') }));
   }
-  await store(source.env, 'add', { entry: chat('First?') });
-  await store(source.env, 'add', { entry: chat('Second?', { by: `0x${'a'.repeat(40)}`, name: 'Sam' }) });
+  assert.equal((await store(source.env, 'add', { entry: chat('First?', { scope: 'admin' }) })).ok, true);
+  await store(source.env, 'add', { entry: chat('Second?', { by: `0x${'a'.repeat(40)}`, name: 'Sam', groups: ['salon'] }) });
   const first = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
   assert.ok(first.nextCursor);
-  assert.deepEqual(first.coordinator.sessionAgentHistory.map((entry) => [entry.id, entry.question]),
-    [['000000000001', 'First?'], ['000000000002', 'Second?']]);
+  // Whom each answer was fit for goes with it, so a restored session exports no more than this one would.
+  assert.deepEqual(first.coordinator.sessionAgentHistory.map((entry) => [entry.id, entry.question, entry.scope, entry.groups]),
+    [['000000000001', 'First?', 'admin', undefined], ['000000000002', 'Second?', undefined, ['salon']]]);
   // Someone asks while the backup runs: it carries on, and that chat waits for the next backup.
-  await store(source.env, 'add', { entry: chat('Asked during the backup?') });
+  assert.equal((await store(source.env, 'add', { entry: chat('Asked during the backup?') })).ok, true);
   const pages = [first];
   for (let cursor = first.nextCursor; cursor;) {
     const page = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor });
@@ -232,9 +239,10 @@ test('a backup carries the stored chats it began with, and a restore puts them b
 });
 
 test('a restore refuses chats that are not whole exchanges', async () => {
-  const source = fixture();
-  await callSessionConfigCoordinator({ env: source.env, slug, path: 'session-agent-history/add',
-    entry: { day: '2026-11-24', answers: 'general', question: 'First?', answer: 'An answer.', read: { context: 0, results: false, answers: 0 } } });
+  const source = recordingFixture();
+  const added = await callSessionConfigCoordinator({ env: source.env, slug, path: 'session-agent-history/add',
+    entry: { day: '2026-11-24', answers: 'general', question: 'First?', answer: 'An answer.' } });
+  assert.equal(added.ok, true, JSON.stringify(added));
   const [page] = await allPages(source.env);
   const altered = structuredClone(page);
   altered.coordinator.sessionAgentHistory[0].asker = `0x${'a'.repeat(40)}`;

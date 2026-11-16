@@ -530,8 +530,32 @@ test('a session with more stored versions than the agent reads says so, and expo
   assert.match(content, /OPEN agenda/);
 });
 
+test('a stored chat is exported only as widely as its answer was fit for: never an admin’s, a group’s for that group', async () => {
+  const chat = (id, extra) => ({ id, day: '2026-11-24', answers: 'detailed', question: 'What is planned?', answer: 'An answer.', ...extra });
+  const chats = [
+    // Answered to an admin or a results admin: it may hold admins-only context, thinly answered questions or results not yet open.
+    chat('000000000001', { scope: 'admin', answer: 'ADMINS plan, in the agent’s words.' }),
+    chat('000000000002', { scope: 'admin', answers: 'general', answer: 'HIDDEN results, in the agent’s words.', by: ANA }),
+    // Answered to a member of two groups, from files locked to them.
+    chat('000000000003', { groups: ['zeta', 'salon'], answer: 'GROUP notes, in the agent’s words.' }),
+    chat('000000000004', { answers: 'general', answer: 'For anyone.' }),
+  ];
+  const callSessionAgentHistoryStore = async () => ({ ok: true, body: { ok: true, entries: chats } });
+  const { content, file } = await exported({ setting: { ...SETTING, history: true }, deps: { callSessionAgentHistoryStore } });
+  assert.doesNotMatch(content, /ADMINS plan|HIDDEN results/);
+  assert.equal(file.manifest.leftOut.adminChats, 2);
+  assert.deepEqual(of(file, 'asked').map(({ tier, groups, text }) => ({ tier, groups, text })).sort((a, b) => a.text.localeCompare(b.text)), [
+    { tier: 'general', groups: undefined, text: 'For anyone.' },
+    { tier: 'detailed', groups: ['salon', 'zeta'], text: 'GROUP notes, in the agent’s words.' },
+  ]);
+  // The groups a chat is for are listed under the gate, as an item's are; an admin's chat names none.
+  assert.deepEqual(file.session.gate.groups.map((group) => group.groupId), ['salon', 'zeta']);
+  // A session that records no chats has no such count in its manifest.
+  assert.equal('adminChats' in (await exported()).file.manifest.leftOut, false);
+});
+
 test('chats askers chose to store are items for the style they were answered in, while the session stores them', async () => {
-  const chat = (extra) => ({ id: '000000000001', day: '2026-11-24', answers: 'general', question: 'What do people want?', answer: 'Shorter meetings.', read: { context: 2, results: true, answers: 0 }, ...extra });
+  const chat = (extra) => ({ id: '000000000001', day: '2026-11-24', answers: 'general', question: 'What do people want?', answer: 'Shorter meetings.', ...extra });
   const chats = [
     chat({ id: '000000000001' }),
     chat({ id: '000000000002', answers: 'detailed', by: ANA, name: 'Ana’s agent' }),

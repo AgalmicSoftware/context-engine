@@ -262,8 +262,9 @@ item says, its address included when it has one.
 **Addresses on items.** A `written` item, and a `context` item made from a file
 or link someone added, carries `by`: the account address of the person who
 wrote or added it. An `asked` item carries `by` only when its asker chose to
-store the chat with their address. No item carries a name, and questions, counts, results and
-the session's own notes carry no address. Anyone signed in with an address can
+store the chat with their address, and a `name` only when they typed one for
+it. No other item carries a name, and questions, counts, results and the
+session's own notes carry no address. Anyone signed in with an address can
 turn off **Include my address with my answers** in the Session Agent's dialog:
 their answers and files are still exported, without `by`. Answers without an
 address that say the same words to the same question are one item with a
@@ -355,26 +356,38 @@ selected to start, or **My address**; and anyone may add a **Name** of up to 60
 characters, kept as typed and not checked. Unticked, nothing is kept.
 
 What is stored for a chat: the day (no time of day), the answer style, the
-question, the answer, how much the answer drew on, and the address or name only
-if the asker gave them. A question holding an email address, an account
-address, an ENS name or a run of ten or more digits is answered but not kept,
-and the reply says so. If the chat can't be stored the answer still comes back,
-with a note.
+question, the answer, and the address or name only if the asker gave them. A
+question holding an email address, an account address, an ENS name or a run of
+ten or more digits is answered but not kept, and the reply says so. If the chat
+can't be stored the answer still comes back, with a note.
+
+An answer can hold what only its asker may read, so a chat also keeps whom its
+answer was fit for: `scope: "admin"` when it was given to an admin or a results
+admin (it may draw on admins-only context, thinly answered questions or results
+not yet open), or `groups` when it drew on files locked to those groups. That,
+and the answer style, say something about who asked even with no address: in a
+session with one admin, or a small group, a chat stored with **No address** can
+still point to its asker.
 
 - **Who reads them.** The session's full admins, on the Admin page under
   **Session Agent chats**, newest first. Results admins and agent keys can't.
   Stored chats are never fed back into an answer.
 - **Deleting.** An admin deletes one chat or all of them there. Turning
-  **Record chats** off stops new ones and leaves the stored ones until an admin
-  clears them. An asker can't find and delete their own later.
+  **Record chats** off stops new ones, including one whose answer was still on
+  its way, and leaves the stored ones until an admin clears them. An asker
+  can't find and delete their own later.
 - **How many.** At most 5,000 a session; past that the oldest go first.
 - **Exports.** While the session records chats they are in the
-  [export](#export) as `asked` items. Someone who turned off **Include my
-  address with my answers** has their address left off their chats there too.
+  [export](#export) as `asked` items: one that drew on a group's files carries
+  that group in `groups`, and one answered to an admin or results admin is left
+  out and counted (`adminChats`). Someone who turned off **Include my address
+  with my answers** has their address left off their chats there too. A stored
+  answer stays as it was given: if someone opts out later, an earlier answer
+  that drew on theirs is still exported until an admin deletes the chat.
 - **Backups.** A session backup carries the chats stored when it began; one
-  stored while it runs waits for the next backup. A restore puts them back
-  under their own ids, and refuses if the target already holds different
-  chats.
+  stored while it runs waits for the next backup, and none is dropped for the
+  5,000 limit until it has finished. A restore puts them back under their own
+  ids, and refuses if the target already holds different chats.
 
 - **AI agents.** An agent taking part through the Context Engine MCP asks with
   its `ask_session_agent` tool, under the same rules. `join_session` and

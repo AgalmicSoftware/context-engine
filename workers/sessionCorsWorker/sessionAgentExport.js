@@ -116,11 +116,13 @@ export const sessionAgentExportGate = (config) => {
 
 // Every group a reader of the file needs the members of: those the session's
 // rules and the agent's audiences name, and those an exported item is locked to.
-const groupsNamed = (gate, setting, sources) => [...new Set([
+const groupsNamed = (gate, setting, sources, asked) => [...new Set([
   ...[...gate.signIn.conditions, ...gate.read.conditions, ...setting.audiences.flatMap((audience) => audience.who.conditions)]
     .filter((condition) => condition.kind === 'worker_group')
     .flatMap((condition) => condition.groupIds),
   ...sources.flatMap((source) => (source.everyone ? [] : source.groupIds)),
+  // An admin's stored chat isn't exported, so its groups need no list.
+  ...asked.flatMap((chat) => (chat?.scope === undefined && Array.isArray(chat?.groups) ? chat.groups : [])),
 ].map(normalizeWorkerGroupId).filter(Boolean))].sort();
 
 // The addresses in one group, a page at a time, within what is left of the
@@ -242,7 +244,7 @@ export const exportSessionAgent = async ({ env, slug, config, address, deps = {}
   const sessionId = resolveCanonicalWorkerSessionIdHex(config);
   const budget = { left: LIMITS.members };
   const groups = [];
-  for (const [index, groupId] of groupsNamed(gate, setting, context.sources).entries()) {
+  for (const [index, groupId] of groupsNamed(gate, setting, context.sources, asked).entries()) {
     const group = index < LIMITS.groups
       ? await membersOf({ env, slug, sessionId, groupId, budget, deps })
       : { groupId, members: [], withoutAddress: 0, complete: false };

@@ -194,6 +194,8 @@ const gatherMaterial = async ({ env, slug, config, setting, address, scopes, ask
     material: { sessionContext: config?.sessionContext, sources: context.sources, results, answers: answers?.groups || [] },
     answersUnavailable: answers === TOO_MANY_STORED ? 'too_many' : answers === null,
     contextLeftOut: context.leftOut,
+    // The groups whose locked files this answer may draw on.
+    lockedTo: [...new Set(context.sources.filter((source) => !source.everyone).flatMap((source) => source.groupIds))].sort(),
   };
 };
 
@@ -248,24 +250,31 @@ const storeRequestOf = ({ body, setting, address }) => {
 
 // Stores one exchange the asker asked to keep. A question that may name
 // someone is answered but not kept, and a failed write never fails the answer.
-const storeExchange = async ({ env, slug, request, question, reply, style, read, deps }) => {
+// The entry says whom the answer was fit for, because an answer can hold what
+// only they may read: an admin's or results admin's (admins-only context,
+// thinly answered questions, results not yet open), or a group's locked files.
+const storeExchange = async ({ env, slug, request, question, reply, style, adminOnly, lockedTo, deps }) => {
   if (namesSomeone(question)) return { stored: false, why: 'This chat wasn’t stored: the question holds an address, an email or a long number.' };
   const entry = {
     day: new Date(deps.now?.() ?? Date.now()).toISOString().slice(0, 10),
     answers: style,
     question,
     answer: reply,
-    read,
+    ...(adminOnly ? { scope: 'admin' } : {}),
+    ...(!adminOnly && lockedTo.length ? { groups: lockedTo } : {}),
     ...(request.by ? { by: request.by } : {}),
     ...(request.name ? { name: request.name } : {}),
   };
+  let saved = null;
   try {
-    const saved = await (deps.callSessionAgentHistoryStore || callSessionAgentHistoryStore)(env, slug, 'add', { entry });
-    if (saved?.ok) return { stored: true };
+    saved = await (deps.callSessionAgentHistoryStore || callSessionAgentHistoryStore)(env, slug, 'add', { entry });
   } catch {
-    // Said below.
+    saved = null;
   }
-  return { stored: false, why: 'This chat couldn’t be stored just now.' };
+  if (saved?.ok) return { stored: true };
+  return saved?.body?.reason === 'session_agent_history_off'
+    ? { stored: false, why: 'This chat wasn’t stored: the session no longer records chats.' }
+    : { stored: false, why: 'This chat couldn’t be stored just now.' };
 };
 
 const accessFor = ({ env, config, slug, address, scopes, deps }) =>
@@ -352,7 +361,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   const refused = await preflight.count?.();
   if (refused) return refused;
   const optedOut = new Set(optOuts.body.addresses);
-  const { material, answersUnavailable, contextLeftOut } = await gatherMaterial({
+  const { material, answersUnavailable, contextLeftOut, lockedTo } = await gatherMaterial({
     env, slug, config, setting, address, scopes: currentScopes, asker, access, optedOut, deps,
   });
   const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
@@ -361,7 +370,10 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   const reply = await askAi({ messages, config, secrets: secretContext?.ok ? secretContext.secrets : {}, address, scopes: currentScopes, env, headers, deps });
   if (!reply.ok) return json(reply.body, reply.status);
   const kept = storeRequest.keep
-    ? await storeExchange({ env, slug, request: storeRequest, question, reply: reply.answer, style: asker.answers, read, deps })
+    ? await storeExchange({
+      env, slug, request: storeRequest, question, reply: reply.answer, style: asker.answers, lockedTo, deps,
+      adminOnly: asker.audience === 'admin' || isListedResultsBuilder(config, address),
+    })
     : null;
   const notes = [
     answersUnavailable === 'too_many'

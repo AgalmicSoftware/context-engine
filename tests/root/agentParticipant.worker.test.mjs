@@ -1465,7 +1465,7 @@ test('a chat is stored through the real Worker only when its asker says so, with
   ]);
   assert.match(body.entries[0].day, /^\d{4}-\d{2}-\d{2}$/);
   // Nothing else about the asker is kept: no time of day, no network address, no session token.
-  assert.deepEqual(Object.keys(body.entries[1]).sort(), ['answer', 'answers', 'day', 'id', 'question', 'read']);
+  assert.deepEqual(Object.keys(body.entries[1]).sort(), ['answer', 'answers', 'day', 'id', 'question']);
 
   // The MCP tells an agent the session's setting before it asks, and asks as the dialog starts:
   // stored, with no address, unless the agent says otherwise.

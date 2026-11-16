@@ -21,18 +21,22 @@ const exchange = (extra = {}) => ({
   answers: 'general',
   question: 'What do people want?',
   answer: 'Shorter meetings.',
-  read: { context: 2, results: true, answers: 0 },
   ...extra,
 });
+const RECORDS = { audiences: [], history: true };
 
+// The store as the session's coordinator runs it; the coordinator holds the
+// session's setting as it is now, which `setting.current` stands for.
 const createStore = () => {
   const { storage, store } = createDurableStorage();
+  const setting = { current: RECORDS };
+  const coordinator = { state: { storage }, readSessionConfigAuthority: async () => ({ config: { sessionAgent: setting.current } }) };
   const call = async (operation, payload = {}) => {
-    const response = await dispatchSessionAgentHistoryStore({ state: { storage } }, operation, payload);
+    const response = await dispatchSessionAgentHistoryStore(coordinator, operation, { slug: 'salon', ...payload });
     return { status: response.status, body: await response.json() };
   };
   const add = async (extra) => (await call('add', { entry: exchange(extra) })).body.id;
-  return { storage, store, call, add };
+  return { storage, store, call, add, setting };
 };
 
 test('a stored chat keeps the exchange and nothing about who asked, unless they chose that', async () => {
@@ -48,8 +52,31 @@ test('a stored chat keeps the exchange and nothing about who asked, unless they 
   ]);
   // Nothing else is written: no time of day, and no asker on the anonymous one.
   const anonymous = [...store].find(([key, value]) => key.startsWith('session-agent-history-v1:') && !value.by)[1];
-  assert.deepEqual(Object.keys(anonymous).sort(), ['answer', 'answers', 'day', 'question', 'read']);
+  assert.deepEqual(Object.keys(anonymous).sort(), ['answer', 'answers', 'day', 'question']);
   assert.ok(entries.every((entry) => /^\d{12}$/.test(entry.id)));
+});
+
+test('nothing is stored once the session’s setting, as its coordinator holds it, no longer records chats', async () => {
+  const { call, add, setting } = createStore();
+  await add({ question: 'While it was on?' });
+  for (const off of [{ audiences: [] }, { audiences: [], history: false }, null, { audiences: [], history: 'yes' }]) {
+    setting.current = off;
+    assert.deepEqual(await call('add', { entry: exchange() }), { status: 409, body: { ok: false, reason: 'session_agent_history_off' } });
+  }
+  // What was stored stays, to be read and cleared.
+  assert.deepEqual((await call('list')).body.entries.map((entry) => entry.question), ['While it was on?']);
+  assert.equal((await call('delete', { through: '000000000001' })).body.deleted, 1);
+});
+
+test('a chat says whom its answer was fit for: an admin, or the groups whose files it drew on', async () => {
+  const { call, add } = createStore();
+  await add({ scope: 'admin' });
+  await add({ groups: ['salon', 'hosts.2026', 'salon'] });
+  const [groups, admin] = (await call('list')).body.entries;
+  assert.deepEqual([admin.scope, admin.groups, groups.scope, groups.groups], ['admin', undefined, undefined, ['hosts.2026', 'salon']]);
+  for (const bad of [{ scope: 'member' }, { scope: true }, { groups: 'salon' }, { groups: ['Not An Id'] }, { groups: Array.from({ length: 41 }, (_, i) => `g${i}`) }]) {
+    assert.equal((await call('add', { entry: exchange(bad) })).status, 400, JSON.stringify(bad).slice(0, 60));
+  }
 });
 
 test('only a whole exchange is stored, and what was sent beside it is dropped', async () => {
@@ -63,10 +90,11 @@ test('only a whole exchange is stored, and what was sent beside it is dropped', 
   }
   assert.equal((await call('add', {})).status, 400);
   assert.equal((await call('list')).body.stored, 0);
-  // An address or anything else sent under another name never reaches storage.
+  // An address or anything else sent under another name never reaches storage, nor how much the answer drew on,
+  // which differs by who asks.
   assert.deepEqual(
-    sessionAgentHistoryEntry(exchange({ address: ASKER, asker: ASKER, ip: '203.0.113.7', askedAt: '10:00', read: { context: 1, results: 'yes', answers: -3, who: ASKER } })),
-    exchange({ read: { context: 1, results: false, answers: 0 } }),
+    sessionAgentHistoryEntry(exchange({ address: ASKER, asker: ASKER, ip: '203.0.113.7', askedAt: '10:00', read: { context: 4, results: true, answers: 1 } })),
+    exchange(),
   );
 });
 
@@ -105,6 +133,17 @@ test('past the most a session keeps, the oldest chats go first', async () => {
   const [first, second, third] = [await add({ question: 'First' }), await add({ question: 'Second' }), await add({ question: 'Third' })];
   assert.deepEqual([first, second, third], ['000000010001', '000000010002', '000000010003']);
   assert.deepEqual((await listSessionAgentHistory(storage)).map((entry) => entry.question), ['Second', 'Third']);
+  assert.equal((await call('list')).body.stored, SESSION_AGENT_HISTORY_LIMITS.stored);
+
+  // While a backup runs it holds the chats it began with, so none is dropped under it;
+  // the first chat stored after it brings the session back to its limit.
+  await storage.put('backup-export-lease', { since: Date.now(), until: Date.now() + 60_000 });
+  await add({ question: 'Fourth' });
+  await add({ question: 'Fifth' });
+  assert.deepEqual((await listSessionAgentHistory(storage)).map((entry) => entry.question), ['Second', 'Third', 'Fourth', 'Fifth']);
+  await storage.put('backup-export-lease', { since: 0, until: Date.now() - 1 });
+  await add({ question: 'Sixth' });
+  assert.deepEqual((await listSessionAgentHistory(storage)).map((entry) => entry.question), ['Fifth', 'Sixth']);
   assert.equal((await call('list')).body.stored, SESSION_AGENT_HISTORY_LIMITS.stored);
 });
 
@@ -157,7 +196,9 @@ test('a backup’s chats must each be a whole exchange under its own id, in orde
   const row = (id, extra = {}) => ({ id, ...exchange(extra) });
   assert.equal(isSessionAgentHistoryBackup([]), true);
   assert.equal(isSessionAgentHistoryBackup([row('000000000001'), row('000000000002', { by: ASKER, name: 'Sam' })]), true);
+  assert.equal(isSessionAgentHistoryBackup([row('000000000001', { scope: 'admin' }), row('000000000002', { groups: ['a', 'b'] })]), true);
   for (const bad of [
+    [row('000000000001', { scope: 'member' })], [row('000000000001', { groups: ['b', 'a'] })], [row('000000000001', { groups: [] })],
     null, {}, [row('1')], [row('000000000002'), row('000000000001')], [row('000000000001'), row('000000000001')],
     [row('000000000001', { by: ASKER.toUpperCase().replace('0X', '0x') })], [row('000000000001', { askedAt: '10:00' })],
     [row('000000000001', { question: ' padded ' })], [{ id: '000000000001' }], [row('000000000001', { answers: 'admin' })],
@@ -176,7 +217,9 @@ test('through the whole Worker: a full admin reads stored chats a page at a time
     { kind: 'admin-session-agent-chats' },
   );
   const resultsAdmin = Wallet.createRandom();
-  const { admin, env } = createSessionEnv({ configOverrides: { resultsAdminAddresses: [resultsAdmin.address.toLowerCase()] } });
+  const { admin, env } = createSessionEnv({
+    configOverrides: { resultsAdminAddresses: [resultsAdmin.address.toLowerCase()], sessionAgent: RECORDS },
+  });
   for (const extra of [{ question: 'First?' }, { question: 'Second?', by: ASKER, name: 'Sam' }, { question: 'Third?' }]) {
     const added = await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/add', entry: exchange(extra) });
     assert.equal(added.ok, true, JSON.stringify(added));

@@ -79,8 +79,9 @@ const countsText = (rows) => {
  *   pass the session's gate may see them;
  * - `answers`: `[{ question, answers: [{ choices, text, from }] }]`, one entry per member's answer, from
  *   members who let the agent use them, `from` being the writer's address;
- * - `asked`: the chats askers chose to store, `[{ day, answers, question, answer, by?, name? }]`, `answers`
- *   being the style the answer was given in and `by` the asker's address when they chose to give it;
+ * - `asked`: the chats askers chose to store, `[{ day, answers, question, answer, scope?, groups?, by?, name? }]`,
+ *   `answers` being the style the answer was given in, `scope: 'admin'` marking one given to an admin or results
+ *   admin, `groups` the groups whose locked files it drew on, and `by` the asker's address when they gave it;
  * - `unattributed`: the addresses that asked for their address to be left off;
  * - `groups`: `[{ groupId, members }]` for the groups the rules and the items name, kept under the gate
  *   and apart from every item;
@@ -165,13 +166,27 @@ export const buildSessionAgentExport = async ({
   });
 
   // A stored chat is for the style its answer was given in: a Detailed answer
-  // may have drawn on what General askers never hear.
+  // may have drawn on what General askers never hear. One given to an admin
+  // or results admin may hold what no member is given, so it stays out, as
+  // admins-only context does; one that drew on a group's locked files is for
+  // that group, as the files are.
+  let adminChats = 0;
   asked.filter(isRecord).forEach((chat) => {
     const question = text(chat.question);
     const answer = text(chat.answer);
     if (!question || !answer || !['general', 'detailed'].includes(chat.answers)) return;
+    if (chat.scope !== undefined) {
+      adminChats += 1;
+      return;
+    }
+    const lockedTo = [...new Set((Array.isArray(chat.groups) ? chat.groups : []).map(text).filter(Boolean))].sort(byCodePoint);
     add('asked', chat.answers, {
-      question, text: answer, ...(text(chat.day) ? { day: text(chat.day) } : {}), ...(text(chat.name) ? { name: text(chat.name) } : {}), ...by(chat.by),
+      question,
+      text: answer,
+      ...(text(chat.day) ? { day: text(chat.day) } : {}),
+      ...(lockedTo.length ? { groups: lockedTo } : {}),
+      ...(text(chat.name) ? { name: text(chat.name) } : {}),
+      ...by(chat.by),
     });
   });
 
@@ -210,6 +225,8 @@ export const buildSessionAgentExport = async ({
       patternMatches,
       contextNotRead: (leftOut.contextNotRead || 0) + notes.omitted,
       unreadableContext: (leftOut.unreadableContext || 0) + withoutText,
+      // Counted only where the session records chats, so other sessions' manifests are unchanged.
+      ...(asked.length ? { adminChats } : {}),
     })
       .filter(([, count]) => Number.isSafeInteger(count) && count >= 0),
   );

@@ -413,16 +413,21 @@ test('each person can leave their address off exported items, which changes noth
   assert.equal((await ask(h, { path: '/session-agent/attribution', body: { unattributed: true }, deps: { callSessionAgentOptOutStore: down } })).status, 503);
 });
 
-// The session's own store of chats, as its coordinator keeps them.
+const recording = { ...twoAudiences, history: true };
+// The session's own store of chats, as its coordinator keeps them. The
+// coordinator holds the setting as it is now, which `setting.current` stands for.
 const chatStore = () => {
   const { storage } = createDurableStorage();
+  const setting = { current: recording };
+  const coordinator = { state: { storage }, readSessionConfigAuthority: async () => ({ config: { sessionAgent: setting.current } }) };
   const callSessionAgentHistoryStore = async (env, slug, operation, payload) => {
-    const response = await dispatchSessionAgentHistoryStore({ state: { storage } }, operation, payload);
+    const response = await dispatchSessionAgentHistoryStore(coordinator, operation, { slug, ...payload });
     return { ok: response.ok, status: response.status, body: await response.json() };
   };
-  return { deps: { callSessionAgentHistoryStore, now: () => Date.parse('2026-11-24T23:30:00.000Z') }, kept: () => listSessionAgentHistory(storage) };
+  return {
+    deps: { callSessionAgentHistoryStore, now: () => Date.parse('2026-11-24T23:30:00.000Z') }, kept: () => listSessionAgentHistory(storage), setting,
+  };
 };
-const recording = { ...twoAudiences, history: true };
 
 test('nothing asked is kept unless the session stores chats and the asker asked for it', async () => {
   const off = chatStore();
@@ -457,16 +462,52 @@ test('a stored chat holds the exchange, and who asked only as far as they chose'
   // Someone signed in without an address has none to store.
   const agent = await ask(h, { address: 'agent:delve-town', body: { question, store: true, attribution: 'address' }, deps });
   assert.deepEqual([named.body.stored, withAddress.body.stored, agent.body.stored], [true, true, true]);
-  const exchange = (answers, read, extra = {}) => ({ day: '2026-11-24', answers, question, answer: 'They want shorter meetings.', read, ...extra });
+  const exchange = (answers, extra = {}) => ({ day: '2026-11-24', answers, question, answer: 'They want shorter meetings.', ...extra });
+  // The member's Detailed answers drew on the file locked to their group, so those chats are for that group.
   assert.deepEqual((await kept()).map(({ id, ...entry }) => entry), [
-    exchange('detailed', anonymous.body.read),
-    exchange('detailed', named.body.read, { name: 'Sam’s agent' }),
-    exchange('general', withAddress.body.read, { by: PARTICIPANT }),
-    exchange('general', agent.body.read),
+    exchange('detailed', { groups: ['salon'] }),
+    exchange('detailed', { groups: ['salon'], name: 'Sam’s agent' }),
+    exchange('general', { by: PARTICIPANT }),
+    exchange('general'),
   ]);
-  // What the answer drew on is what the asker was told, and no asker rides along unasked.
+  // No asker rides along unasked, and how much each answer drew on, which differs by who asks, isn't kept.
   assert.ok(anonymous.body.read.context > 0);
   assert.ok(!JSON.stringify(await kept()).includes(MEMBER));
+  assert.ok((await kept()).every((entry) => !('read' in entry)));
+  // Only the signed-in person's own address is ever stored: one sent in the body is not read.
+  await ask(h, { address: PARTICIPANT, body: { question, store: true, attribution: 'address', address: ADMIN, by: ADMIN }, deps });
+  assert.equal((await kept()).at(-1).by, PARTICIPANT);
+});
+
+test('a stored chat says whom its answer was fit for: an admin’s, a results admin’s, or a group’s', async () => {
+  const { deps, kept } = chatStore();
+  const h = await seeded(recording);
+  h.state.config.resultsAdminAddresses = [PARTICIPANT];
+  const body = { question: 'What do people want?', store: true };
+  // An admin's answer may hold admins-only context and thinly answered questions.
+  const admin = await ask(h, { address: ADMIN, body, deps });
+  assert.match(admin.prompt, /ADMINS plan/);
+  // A results admin's may hold results not yet open to everyone, whatever style they are answered in.
+  const builder = await ask(h, { address: PARTICIPANT, body, deps });
+  assert.equal(builder.body.answers, 'general');
+  const member = await ask(h, { address: MEMBER, body, deps });
+  assert.match(member.prompt, /GROUP notes/);
+  assert.deepEqual((await kept()).map(({ answers, scope, groups }) => ({ answers, scope, groups })), [
+    { answers: 'detailed', scope: 'admin', groups: undefined },
+    { answers: 'general', scope: 'admin', groups: undefined },
+    { answers: 'detailed', scope: undefined, groups: ['salon'] },
+  ]);
+});
+
+test('a chat whose answer comes back after recording was turned off is not kept', async () => {
+  const { deps, kept, setting } = chatStore();
+  const h = await seeded(recording);
+  // The admin turns recording off while the AI is answering: the route's own view is from before.
+  setting.current = twoAudiences;
+  const reply = await ask(h, { body: { question: 'What do people want?', store: true }, deps });
+  assert.deepEqual([reply.status, reply.body.answer, reply.body.stored], [200, 'They want shorter meetings.', false]);
+  assert.match(reply.body.note, /This chat wasn’t stored: the session no longer records chats\./);
+  assert.deepEqual(await kept(), []);
 });
 
 test('a question that may name someone is answered but not kept, and a failed write never fails the answer', async () => {

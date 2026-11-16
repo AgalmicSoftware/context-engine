@@ -1,9 +1,12 @@
 // Chats with the Session Agent that the person asking chose to store: one
 // entry per exchange in the session's coordinator, under its own prefix. An
-// entry holds the day, the answer style, the question, the answer and what the
-// answer drew on, and says who asked only when they chose that. Nothing reads
-// these back into an answer.
-import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
+// entry holds the day, the answer style, the question and the answer, and says
+// who asked only when they chose that. It also says whom the answer was fit
+// for, since an answer may hold what only they may read: `scope: 'admin'` for
+// one given to an admin or results admin, `groups` for one that drew on files
+// locked to those groups. Nothing reads these back into an answer.
+import { SESSION_AGENT_LIMITS, sessionAgentSettingOf, sessionAgentStoresChats } from '../../shared/sessionAgent.mjs';
+import { backupExportActive } from './storageBackupRevision.js';
 
 const PREFIX = 'session-agent-history-v1:';
 const META_KEY = 'session-agent-history-meta-v1';
@@ -11,6 +14,9 @@ const DELETE_BATCH = 128;
 const ID = /^\d{12}$/;
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+// As the Worker's groups are named.
+const GROUP_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/;
+const MAX_GROUPS = 40;
 
 export const SESSION_AGENT_HISTORY_LIMITS = Object.freeze({ stored: 5000, page: 100 });
 const L = { ...SESSION_AGENT_HISTORY_LIMITS, ...SESSION_AGENT_LIMITS };
@@ -35,12 +41,16 @@ export const sessionAgentHistoryEntry = (value) => {
   if (!DAY.test(text(value.day)) || !['general', 'detailed'].includes(value.answers)) return null;
   if (!question || question.length > L.questionChars || !answer || answer.length > L.answerChars) return null;
   if ((by && !ADDRESS.test(by)) || name.length > L.nameChars) return null;
+  if (value.scope !== undefined && value.scope !== 'admin') return null;
+  const groups = value.groups === undefined ? [] : value.groups;
+  if (!Array.isArray(groups) || groups.length > MAX_GROUPS || !groups.every((id) => typeof id === 'string' && GROUP_ID.test(id))) return null;
   return {
     day: text(value.day),
     answers: value.answers,
     question,
     answer,
-    read: { context: count(value.read?.context), results: value.read?.results === true, answers: count(value.read?.answers) },
+    ...(value.scope ? { scope: 'admin' } : {}),
+    ...(groups.length ? { groups: [...new Set(groups)].sort() } : {}),
     ...(by ? { by } : {}),
     ...(name ? { name } : {}),
   };
@@ -120,6 +130,10 @@ export const dispatchSessionAgentHistoryStore = async (coordinator, operation, p
   if (operation === 'add') {
     const entry = sessionAgentHistoryEntry(payload.entry);
     if (!entry) return refuse(400, 'session_agent_history_invalid');
+    // The coordinator holds the setting as it is now: a chat whose answer came
+    // back after an admin turned recording off is not kept.
+    const authority = await coordinator.readSessionConfigAuthority(payload.slug);
+    if (!sessionAgentStoresChats(sessionAgentSettingOf(authority?.config?.sessionAgent))) return refuse(409, 'session_agent_history_off');
     // Ids count up, so they sort in the order chats were stored and say nothing
     // of the time of day.
     const added = await storage.transaction(async (transaction) => {
@@ -130,8 +144,10 @@ export const dispatchSessionAgentHistoryStore = async (coordinator, operation, p
       await transaction.put(META_KEY, { next, stored });
       return { id: idOf(next), stored };
     });
-    // Past the most a session keeps, the oldest go.
-    if (added.stored > L.stored) {
+    // Past the most a session keeps, the oldest go. Not while a backup is
+    // running, which holds the chats it began with: the next chat stored after
+    // it catches up.
+    if (added.stored > L.stored && !await backupExportActive(storage)) {
       await removeKeys(storage, [...(await storage.list({ prefix: PREFIX, limit: added.stored - L.stored })).keys()]);
     }
     return json({ ok: true, id: added.id });
