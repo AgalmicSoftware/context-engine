@@ -152,7 +152,7 @@ function AutoJoinIntent({
     setProgress({ phase: 'loading', message: 'Preparing to join group…' });
     void (async () => {
       try {
-        const { getWorkerSessionToken, joinWorkerGroup, loadWorkerGroupOverview } =
+        const { getWorkerSessionToken, isPrivateSessionRefusal, joinWorkerGroup, loadWorkerGroupOverview } =
           await import('../../domains/worker/workerGroupPorts');
         if (!active) return;
         const credentialToken = await getWorkerSessionToken({
@@ -163,16 +163,20 @@ function AutoJoinIntent({
         });
         if (!active) return;
         const request = { workerUrl, credentialToken, sessionId, sessionSlug };
-        const overview = await loadWorkerGroupOverview(request);
+        // A private session lists its groups only to those its rule admits; anyone else joins by the link's id.
+        const overview = await loadWorkerGroupOverview(request).catch((error: unknown) => {
+          if (isPrivateSessionRefusal(error)) return null;
+          throw error;
+        });
         if (!active) return;
-        const membership = overview.memberships.find(({ group }) => group.groupId === groupId);
+        const membership = overview?.memberships.find(({ group }) => group.groupId === groupId);
         if (membership) {
           setGroupLabel(membership.group.label);
           complete('');
           return;
         }
         // An unlisted group shows only to its members, so with an invite it is joined without being listed.
-        const group = overview.groups.find((candidate) => candidate.groupId === groupId);
+        const group = overview?.groups.find((candidate) => candidate.groupId === groupId);
         if (group) setGroupLabel(group.label);
         if (group?.joinMode === 'open') {
           if (!canAutoJoinWorkerGroup(group)) throw new Error('This group is not open for joining.');
@@ -184,7 +188,8 @@ function AutoJoinIntent({
         }
         if (group?.joinMode === 'admin_add') throw new Error('This group is not open for joining.');
         // Without join choices every group is listed, so a missing one is gone.
-        if (!group && !workerOffersGroupJoinChoices(configRef.current)) throw new Error('worker_group_not_found');
+        if (!group && overview && !workerOffersGroupJoinChoices(configRef.current))
+          throw new Error('worker_group_not_found');
         if (!token) {
           setProgress({ phase: 'code', message: NEEDS_CODE_MESSAGE });
           return;

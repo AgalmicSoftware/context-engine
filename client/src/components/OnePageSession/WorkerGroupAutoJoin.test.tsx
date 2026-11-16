@@ -488,6 +488,23 @@ describe('WorkerGroupAutoJoin', () => {
       expect(readPendingAutoJoin()).toBeNull();
     });
 
+    it('joins by the link’s group id when a private session keeps its group list from outsiders', async () => {
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/groups/list')) return response({ reason: 'private_session_invite_required' }, 403);
+        if (String(input).includes('/groups/my-memberships')) return response({ memberships: [] });
+        if (String(input).includes('/groups/join')) return response({ group: secretGroup, memberCount: 1 });
+        throw new Error(`Unexpected request: ${input}`);
+      });
+      window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026#groupInvite=gp%3Ariver-stone');
+      const proof = `0x${'ab'.repeat(65)}`;
+      credentials.mockResolvedValueOnce({ proof });
+      // Without join choices a missing group would read as gone; a refused list says nothing either way.
+      render(<WorkerGroupAutoJoin {...props} sessionConfig={{ ...config, groupJoinChoices: undefined }} />);
+      await settle();
+      expect(JSON.parse(String(joins()[0][1]?.body))).toEqual({ groupId: group.groupId, proof, sessionId });
+      expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
+    });
+
     it('asks for a code without one, and sends a typed claim code as the secret', async () => {
       listing([secretGroup]);
       render(<WorkerGroupAutoJoin {...props} />);
