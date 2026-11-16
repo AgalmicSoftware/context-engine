@@ -1664,6 +1664,16 @@ export const isWorkerGroupMember = async ({ env, slug, sessionId, groupId, princ
 	});
 };
 
+/** Whether a read invite's signer holds the group's current password; a read spends nothing. */
+export const checkWorkerGroupReadInvite = ({ env, slug, sessionId, groupId, signer } = {}) =>
+	callWorkerGroupCoordinator({
+		env,
+		slug,
+		sessionId,
+		path: '/worker-groups/read-invite',
+		payload: { groupId: normalizeWorkerGroupId(groupId), signer },
+	});
+
 export const forwardWorkerGroupMutation = async ({
 	env,
 	slug,

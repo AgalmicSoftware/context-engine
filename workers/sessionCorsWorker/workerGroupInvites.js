@@ -7,7 +7,9 @@ import {
 	WORKER_GROUP_INVITE_BATCH_MAX,
 	hashOneUseSecret,
 	isOneUseSecretHash,
+	parseWorkerGroupReadInvite,
 	workerGroupJoinStatement,
+	workerGroupReadStatement,
 } from '../../shared/workerGroupJoin.mjs';
 
 // The Worker's ethers is v6 (`verifyMessage`); v5 keeps it under `utils`.
@@ -75,5 +77,21 @@ export const resolveWorkerGroupJoinCredential = async ({ credential, sessionId, 
 		return { kind: 'password', signer: signer.toLowerCase() };
 	} catch {
 		return { kind: 'invalid' };
+	}
+};
+
+/**
+ * A read invite header as `{ groupId, signer }`: the group it names and the key that signed its read statement for
+ * this session. Null when there is no header; `{ invalid: true }` when there is one that can't be read.
+ */
+export const readWorkerGroupReadInvite = ({ header, sessionId }) => {
+	if (header == null || String(header).trim() === '') return null;
+	const parsed = parseWorkerGroupReadInvite(header);
+	if (!parsed || !sessionId) return { invalid: true };
+	try {
+		const signer = verifyMessage(workerGroupReadStatement({ sessionId, groupId: parsed.groupId }), parsed.proof);
+		return { groupId: parsed.groupId, signer: signer.toLowerCase() };
+	} catch {
+		return { invalid: true };
 	}
 };

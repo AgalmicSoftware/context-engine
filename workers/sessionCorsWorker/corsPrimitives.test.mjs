@@ -25,7 +25,7 @@ test('corsHeaders reflects origin without an allowlist but omits ACAO when no or
 
   assert.equal(withOrigin.get('Access-Control-Allow-Origin'), 'https://allowed.example');
   assert.equal(withOrigin.get('Access-Control-Allow-Methods'), 'GET, POST, OPTIONS');
-  assert.equal(withOrigin.get('Access-Control-Allow-Headers'), 'Content-Type, Authorization, X-Session-Slug, X-Group-Slug, X-Anonymous-Client-Id');
+  assert.equal(withOrigin.get('Access-Control-Allow-Headers'), 'Content-Type, Authorization, X-Session-Slug, X-Group-Slug, X-Anonymous-Client-Id, X-CE-Group-Invite');
   assert.equal(withOrigin.get('Vary'), 'Origin');
   // Browsers reuse a preflight for ten minutes instead of sending one per request.
   assert.equal(withOrigin.get('Access-Control-Max-Age'), '600');

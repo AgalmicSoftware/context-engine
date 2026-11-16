@@ -27,7 +27,8 @@ import {
   writeStorageEnvelopeKeyReleaseAudit,
   writeStorageVisibilityAudit,
 } from './storageEnvelopeEncryption.js';
-import { isWorkerGroupMember } from './workerGroups.js';
+import { checkWorkerGroupReadInvite, isWorkerGroupMember } from './workerGroups.js';
+import { readWorkerGroupReadInvite } from './workerGroupInvites.js';
 import {
   MAX_STORAGE_METADATA_BYTES,
   STORAGE_METADATA_TAG_LIMITS,
@@ -83,6 +84,8 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
 const STORAGE_GROUP_MEMBERSHIP_CACHE = Symbol('storage-group-membership-cache');
+// The request's `X-CE-Group-Invite` header, set on a route's deps: a way through a Worker group condition.
+export const STORAGE_GROUP_READ_INVITE = 'groupReadInvite';
 const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -755,6 +758,31 @@ const checkWorkerGroupMembership = async ({
   return pending;
 };
 
+// The request's read invite, checked once per request: whether it admits to
+// `groupId`. A request without one gets null; one whose invite names another
+// group, or doesn't hold the group's password, gets a refusal.
+const checkGroupReadInvite = async ({ env, slug, config, groupId, deps }) => {
+  const header = deps?.[STORAGE_GROUP_READ_INVITE];
+  if (header == null || String(header).trim() === '') return null;
+  const cache = deps?.[STORAGE_GROUP_MEMBERSHIP_CACHE];
+  const key = `read-invite:${groupId}`;
+  if (cache?.has(key)) return cache.get(key);
+  const sessionId = resolveCanonicalWorkerSessionIdHex(config);
+  const invite = readWorkerGroupReadInvite({ header, sessionId });
+  const refused = { ok: false, outcome: 'denied', status: 403, reason: 'worker_group_read_invite_invalid' };
+  const check = typeof deps?.checkWorkerGroupReadInvite === 'function' ? deps.checkWorkerGroupReadInvite : checkWorkerGroupReadInvite;
+  const pending = invite?.groupId !== groupId
+    ? Promise.resolve(refused)
+    : Promise.resolve().then(() => check({ env, slug, sessionId, groupId, signer: invite.signer })).then(
+      (result) => (result?.ok === true ? { ok: true, outcome: 'allowed' }
+        : [400, 403, 404].includes(Number(result?.status)) ? refused
+          : { ok: false, outcome: 'unavailable', status: 503, reason: 'worker_group_membership_unavailable' }),
+      () => ({ ok: false, outcome: 'unavailable', status: 503, reason: 'worker_group_membership_unavailable' }),
+    );
+  cache?.set(key, pending);
+  return pending;
+};
+
 const evaluateWorkerGroupCondition = async ({
   condition,
   env,
@@ -768,6 +796,14 @@ const evaluateWorkerGroupCondition = async ({
   let firstFailure = null;
   let unavailable = null;
   for (const groupId of groupIds) {
+    // An invite that doesn't hold is only remembered, so a member whose browser
+    // still sends an old one is let in by the membership check below.
+    const invite = await checkGroupReadInvite({ env, slug, config, groupId, deps });
+    if (invite?.ok) {
+      return { ok: true, matchedCondition: { kind: 'worker_group', groupId, readInvite: true } };
+    }
+    if (invite?.outcome === 'unavailable') unavailable ||= invite;
+    else if (invite && !firstFailure) firstFailure = invite;
     const result = await checkWorkerGroupMembership({
       env,
       slug,
