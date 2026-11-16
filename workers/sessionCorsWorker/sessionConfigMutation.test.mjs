@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
+import { FEATURES } from './workerCapabilities.js';
 import { resolveRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
 import { resolveSessionConfigSessionIdHex } from './sessionConfigMutation.js';
@@ -590,6 +591,8 @@ test('set-config keeps a note on where the data goes only as text of up to 300 c
     assert.equal(result.ok, false, JSON.stringify(dataNote));
     assert.equal(result.status, 400);
   }
+  // Settings offers the note only to a Worker that says it accepts it; older ones refuse the whole save.
+  assert.ok(FEATURES.includes('interview_data_note_v1'));
 });
 
 test('set-config accepts the switch that shows fidelity results in Results only as a boolean', () => {

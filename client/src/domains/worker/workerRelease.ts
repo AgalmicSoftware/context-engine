@@ -36,6 +36,17 @@ export const readWorkerTakesFeedback = async (
   return found.features.includes('session_feedback');
 };
 
+/** Whether the Session Worker accepts a note on where research data goes (0.9.11 on); false when it can't be read. */
+export const readWorkerTakesDataNote = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> => {
+  if (!workerOrigin) return false;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.features.includes('interview_data_note_v1');
+};
+
 export const WORKERS_AI_FEATURE = 'workers_ai_v1';
 
 /** Whether the Session Worker can answer the Session Agent on Cloudflare's models: it has the AI binding. */

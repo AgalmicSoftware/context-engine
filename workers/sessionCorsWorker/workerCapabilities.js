@@ -12,6 +12,8 @@ export const FEATURES = Object.freeze([
   'context_sources_v1',
   'draft_text_v1',
   'envelope_export_identity_v1',
+  // interviewMode.dataNote, the session's note on where research data goes; older Workers reject the key.
+  'interview_data_note_v1',
   'participant_context_links_v1',
   'participant_context_v1',
   'recovery_key_export',

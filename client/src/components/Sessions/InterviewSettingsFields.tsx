@@ -61,7 +61,7 @@ const DRAFT_TEXT_HELP =
 const HIDDEN_DRAFTS_HELP =
   'Hides this share of each participant’s AI prefill drafts until they answer, to measure how much seeing a draft sways answers. Only for participants sharing draft changes for research.';
 const DATA_NOTE_HELP =
-  'Optional. A sentence or two shown to participants beside research sharing and hidden AI drafts, such as who funds the study and where the data goes. Plain text; https links open in a new tab. Up to 300 characters, saved in the session’s public settings. Needs a Session Worker from 0.9.11 on.';
+  'Optional. A sentence or two shown to participants beside research sharing and hidden AI drafts, such as who funds the study and where the data goes. Plain text; https links open in a new tab. Up to 300 characters, saved in the session’s public settings.';
 const VOICE_MODEL_HELP = `The OpenAI live model that holds voice interviews. Keep ${DEFAULT_REALTIME_INTERVIEW_MODEL} unless you need another; the session’s OpenAI key must have access to it.`;
 const OPENING_HELP =
   'How each voice interview starts. Generate: the AI writes an opening from the session’s information and questions once there are questions it can use, and reuses it until it is regenerated. Owner-written: every interview opens with your question.';
@@ -125,6 +125,8 @@ type Props = {
   onTurnOnInterviews?: () => void;
   // Why AI draft text can't be kept for admins here (an older Worker, or no Session Worker); empty when it can.
   draftTextUnavailable?: string;
+  // False where the session's Worker predates the data note: it would refuse the whole save, so the field is hidden.
+  dataNoteSupported?: boolean;
 };
 export const DRAFT_TEXT_NEEDS_WORKER = 'Needs a session hosted on a Session Worker.';
 export const DRAFT_TEXT_NEEDS_NEWER_WORKER = 'Needs a newer Session Worker (0.9.6 or later).';
@@ -134,6 +136,7 @@ export default function InterviewSettingsFields({
   disabled = false,
   onTurnOnInterviews,
   draftTextUnavailable = '',
+  dataNoteSupported = true,
 }: Props) {
   const id = useId();
   const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
@@ -237,17 +240,19 @@ export default function InterviewSettingsFields({
           ))}
         </Input>
       </HelpField>
-      <HelpField htmlFor={`${id}-data-note`} label="Where the data goes" help={DATA_NOTE_HELP}>
-        <Input
-          id={`${id}-data-note`}
-          type="textarea"
-          rows={2}
-          maxLength={MAX_DATA_NOTE_CHARS}
-          value={String(raw.dataNote ?? '')}
-          aria-describedby={setupHelpId(`${id}-data-note`)}
-          onChange={(e) => change('dataNote', e.target.value)}
-        />
-      </HelpField>
+      {dataNoteSupported ? (
+        <HelpField htmlFor={`${id}-data-note`} label="Where the data goes" help={DATA_NOTE_HELP}>
+          <Input
+            id={`${id}-data-note`}
+            type="textarea"
+            rows={2}
+            maxLength={MAX_DATA_NOTE_CHARS}
+            value={String(raw.dataNote ?? '')}
+            aria-describedby={setupHelpId(`${id}-data-note`)}
+            onChange={(e) => change('dataNote', e.target.value)}
+          />
+        </HelpField>
+      ) : null}
       <HelpField htmlFor={`${id}-model`} label="Interview voice model" help={VOICE_MODEL_HELP}>
         <Input
           id={`${id}-model`}

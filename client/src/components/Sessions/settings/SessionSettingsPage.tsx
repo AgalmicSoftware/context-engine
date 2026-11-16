@@ -44,6 +44,7 @@ import {
   readWorkerCountsAiLimit,
   readWorkerRunsWorkersAi,
   readWorkerKeepsDraftText,
+  readWorkerTakesDataNote,
   readWorkerReleaseLabel,
   readWorkerTakesFeedback,
 } from '../../../domains/worker/workerRelease';
@@ -229,6 +230,8 @@ const SessionSettingsPage = ({
   // Whether it counts a separate AI daily limit; an older one would store the field and ignore it.
   const [workerCountsAiLimit, setWorkerCountsAiLimit] = useState(false);
   const [workerRunsWorkersAi, setWorkerRunsWorkersAi] = useState(false);
+  // Whether it accepts the note on where research data goes; an older one would refuse the whole save.
+  const [workerTakesDataNote, setWorkerTakesDataNote] = useState(false);
   useEffect(() => {
     let stale = false;
     setWorkerRelease('');
@@ -236,6 +239,7 @@ const SessionSettingsPage = ({
     setWorkerTakesFeedback(false);
     setWorkerCountsAiLimit(false);
     setWorkerRunsWorkersAi(false);
+    setWorkerTakesDataNote(false);
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
       if (!stale) setWorkerRelease(release);
     });
@@ -250,6 +254,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerRunsWorkersAi(workerOrigin, sessionSlug, fetchImpl).then((runs) => {
       if (!stale) setWorkerRunsWorkersAi(runs);
+    });
+    void readWorkerTakesDataNote(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
+      if (!stale) setWorkerTakesDataNote(takes);
     });
     return () => {
       stale = true;
@@ -597,6 +604,7 @@ const SessionSettingsPage = ({
           workerHosted={!onChain}
           groupCeilingSupported={workerOffersGroupJoinChoices(saved)}
           draftTextSupported={workerKeepsDraftText !== false}
+          dataNoteSupported={workerTakesDataNote}
         />
         <SetupResultsSection
           {...section('results')}

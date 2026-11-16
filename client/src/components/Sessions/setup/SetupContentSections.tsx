@@ -573,6 +573,8 @@ type ParticipationProps = SetupSectionProps & {
   draftTextSupported?: boolean;
   /** False when the session's Worker predates group join choices, which brought the ceiling. */
   groupCeilingSupported?: boolean;
+  /** False when the session's Worker would refuse the note on where research data goes. */
+  dataNoteSupported?: boolean;
 };
 
 export const SetupParticipationSection = ({
@@ -583,6 +585,7 @@ export const SetupParticipationSection = ({
   workerHosted,
   draftTextSupported,
   groupCeilingSupported = true,
+  dataNoteSupported = true,
 }: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
@@ -607,6 +610,7 @@ export const SetupParticipationSection = ({
         draftTextUnavailable={
           !workerHosted ? DRAFT_TEXT_NEEDS_WORKER : draftTextSupported === false ? DRAFT_TEXT_NEEDS_NEWER_WORKER : ''
         }
+        dataNoteSupported={dataNoteSupported}
       />
     ) : null}
     <SetupField id="ce-setup-group-creation" label="Who can create groups" help={GROUP_CREATION_HELP}>
