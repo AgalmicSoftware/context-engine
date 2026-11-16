@@ -30,6 +30,8 @@ export const initializeMainSiteWorkerCanonicalCaches = async ({
 }: MainSiteWorkerCanonicalCacheRuntimeOptions): Promise<boolean> => {
   const projection = resolveSessionCapabilityProjection(sessionConfig);
   if (!projection.profileValid || !projection.isWorkerCanonical) return false;
+  // A private session's shell holds nothing to load; the page reads the session again once it is let in.
+  if ((sessionConfig as UnknownRecord | null)?.privateSession) return true;
 
   await host.initializeQuestionCacheForGroup(sessionSlug);
   if (!isCurrent()) return true;
