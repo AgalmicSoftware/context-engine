@@ -2,6 +2,7 @@
 // who is refused and why, and that each narrowing holds on the next request.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { Wallet } from 'ethers';
 
 import { formatWorkerGroupReadInvite, workerGroupJoinStatement, workerGroupReadStatement } from '../../shared/workerGroupJoin.mjs';
@@ -15,6 +16,7 @@ import { dispatchInterviewBriefRequest } from './interviewBriefDispatch.js';
 import { issueInterviewCatalogTicket } from './interviewCatalogTicket.js';
 import { createWorkerRouteShellWithWorkerDeps } from './workerRouteShellBinding.js';
 import { dispatchAuthenticatedRouteEntry } from './authenticatedRouteEntry.js';
+import { AGENT_ROUTES } from './agent/routes.mjs';
 import { STORAGE_GROUP_READ_INVITE, authorizeCloudflareStorageResourceRead } from './storageRouteExecution.js';
 import {
   PRIVATE_SESSION_INVITE_INVALID,
@@ -437,4 +439,57 @@ test('signed in, a private session admits its members and invite holders, and le
     ['/groups/join', 'POST'], ['/groups/list', 'GET'], ['/groups/my-memberships', 'GET'], ['/groups/leave', 'POST']]) {
     assert.equal((await send(path, method, outsider)).body.marker, true, path);
   }
+});
+
+// Every route the Worker selects, and what a private session does there. A
+// new route fails here until it is placed: behind the rule, or open with the
+// reason it shows nothing of the session.
+const RULE = 'the rule';
+const ROUTE_KINDS = {
+  'session-config': RULE, // the shell for anyone it refuses
+  'agent-instructions': RULE,
+  'resource-presence': RULE,
+  'interview-starter': RULE,
+  'interview-brief': RULE,
+  'session-agent-signed-out': RULE,
+  'results-analysis-artifact': RULE,
+  'debate-atlas': RULE,
+  'risk-matrix': RULE,
+  anonymous: RULE, // AI and the group list here; storage checks each read itself
+  authenticated: RULE, // at the entry, but for storage reads and uploads, and joining a group
+  'interview-catalog-ticket': 'held to the rule where the ticket is used, the catalog',
+  'arweave-upload': 'an admin-signed bootstrap upload; otherwise the signed-in entry',
+  options: 'open: a CORS preflight',
+  capabilities: 'open: what the Worker can do',
+  'auth-nonce': 'open: signing in',
+  'auth-login': 'open: signing in',
+  'auth-logout': 'open: signing out',
+  feedback: 'open: a note to the admins that shows nothing back',
+  'sponsored-bootstrap-redeem': 'open: a sponsorship code for deploying, no session in it',
+  admin: 'admins',
+  'admin-abuse-summary': 'admins',
+  'admin-results-analysis-status': 'admins',
+  'admin-session-diagnostics': 'admins',
+  'admin-feedback-list': 'admins',
+  'admin-session-agent-chats': 'admins',
+};
+const AGENT_ACCESS = {
+  agent: RULE, wrapped: RULE, participant: RULE, cache: RULE, // cache reads are agent reads; writes are an operator's
+  public: 'open: descriptors, ids and an admin-issued invite',
+  exchange: 'open: swaps a credential for a sign-in, which the rule then holds',
+  operator: 'admins', admin: 'admins', status: 'admins', skillAdmin: 'admins',
+};
+const PUBLIC_AGENT_ROUTES = ['/api/agent/invite/onboard', '/api/agent/session-meta', '/api/agent/skill', '/api/agent/skill-version',
+  '/api/agent/session-wrapped/skill', '/api/agent/session-wrapped/skill-version', '/api/agent/agent-only/start',
+  '/api/agent/agent-only/wrapped-image/view/:id'];
+
+test('every route the Worker serves is placed for a private session', () => {
+  const source = readFileSync(new URL('./topLevelRouteSelection.js', import.meta.url), 'utf8');
+  const kinds = new Set([...source.matchAll(/kind: '([a-z-]+)'/g)].map((match) => match[1]));
+  // The two results builds take their kind from their path.
+  assert.match(source, /\(path === '\/debate-atlas' \|\| path === '\/risk-matrix'\)[^]*?kind: path\.slice\(1\)/);
+  ['debate-atlas', 'risk-matrix'].forEach((kind) => kinds.add(kind));
+  assert.deepEqual([...kinds].sort(), Object.keys(ROUTE_KINDS).sort());
+  assert.deepEqual([...new Set(Object.values(AGENT_ROUTES).map((route) => route.access))].sort(), Object.keys(AGENT_ACCESS).sort());
+  assert.deepEqual(Object.keys(AGENT_ROUTES).filter((path) => AGENT_ROUTES[path].access === 'public').sort(), PUBLIC_AGENT_ROUTES.sort());
 });
