@@ -248,3 +248,18 @@ test('shared operator result caches recheck exposure for every authorized princi
   assert.equal((await f.request(path, { token: agent.token })).status, 403);
   assert.equal((await f.request('/api/agent/results?demo=true', { token: agent.token })).status, 403);
 });
+
+test('a private session serves an agent only if its rule admits the account behind it', async () => {
+  const f = fixture(); const { token } = await f.credential();
+  const rule = (conditions) => {
+    f.config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate', encryption: 'none', accessConditions: { match: 'any', conditions } } };
+  };
+  const actions = async () => { const response = await f.request('/api/agent/actions', { token }); return [response.status, (await response.json()).reason]; };
+  rule([{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupIds: ['salon'] }]);
+  assert.equal((await actions())[0], 200); // the account is the session's admin
+  f.config.adminAddress = `0x${'cc'.repeat(20)}`;
+  // Membership can't be read on this Worker, so the agent is refused, not let in.
+  assert.deepEqual(await actions(), [503, 'private_session_unavailable']);
+  // Session meta carries no content, so it answers anyone.
+  assert.equal((await f.request('/api/agent/session-meta?sessionSlug=fixture')).status, 200);
+});

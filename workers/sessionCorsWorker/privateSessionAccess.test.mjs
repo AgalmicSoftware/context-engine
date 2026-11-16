@@ -14,6 +14,7 @@ import { dispatchResourcePresenceRequest } from './resourcePresenceDispatch.js';
 import { dispatchInterviewBriefRequest } from './interviewBriefDispatch.js';
 import { issueInterviewCatalogTicket } from './interviewCatalogTicket.js';
 import { createWorkerRouteShellWithWorkerDeps } from './workerRouteShellBinding.js';
+import { dispatchAuthenticatedRouteEntry } from './authenticatedRouteEntry.js';
 import { STORAGE_GROUP_READ_INVITE, authorizeCloudflareStorageResourceRead } from './storageRouteExecution.js';
 import {
   PRIVATE_SESSION_INVITE_INVALID,
@@ -407,4 +408,33 @@ test('results open to a signed-out invite holder where members see every answer,
   // An invite opens nothing in a session whose rule names no group, even one open to all.
   const open = withResults('session_member_full', { ...privateConfig(), storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } });
   assert.equal((await answers(open, await readInvite(key))).ok, false);
+});
+
+test('signed in, a private session admits its members and invite holders, and lets anyone join', async () => {
+  const { f, key } = await setup();
+  const config = privateConfig();
+  const send = (path, method, address, invite) => dispatchAuthenticatedRouteEntry({
+    path, method, env: f.env, baseHeaders: {},
+    request: new Request(`https://worker.test${path}`, { method, headers: invite ? { 'X-CE-Group-Invite': invite } : {} }),
+    deps: {
+      json: (body, status) => ({ body, status }),
+      requireAuth: async () => ({ ok: true }),
+      resolveAuthenticatedRouteContext: async () => ({ ok: true, config, slug: 'fixture', address, scopes: { storage: true, ai: true }, headers: {} }),
+      dispatchAuthenticatedRoute: async () => ({ body: { marker: true } }),
+    },
+  });
+  const outsider = principal(2).address;
+  for (const [path, method] of [['/ai', 'POST'], ['/session-agent/ask', 'POST'], ['/groups/members', 'GET'],
+    ['/storage/response-field-key/unwrap', 'POST'], ['/storage/export-envelopes', 'GET'], ['/groups/create', 'POST']]) {
+    assert.equal((await send(path, method, outsider)).body.reason, PRIVATE_SESSION_INVITE_REQUIRED, path);
+    assert.equal((await send(path, method, outsider, await readInvite(passwordKey('22')))).body.reason, PRIVATE_SESSION_INVITE_INVALID, path);
+    assert.equal((await send(path, method, outsider, await readInvite(key))).body.marker, true, path);
+    assert.equal((await send(path, method, principal(1).address)).body.marker, true, path);
+    assert.equal((await send(path, method, ADMIN)).body.marker, true, path);
+  }
+  // Storage checks each request itself, and joining needs no membership.
+  for (const [path, method] of [['/storage/read', 'GET'], ['/storage/list', 'POST'], ['/storage/read-batch', 'POST'], ['/storage/upload', 'POST'],
+    ['/groups/join', 'POST'], ['/groups/list', 'GET'], ['/groups/my-memberships', 'GET'], ['/groups/leave', 'POST']]) {
+    assert.equal((await send(path, method, outsider)).body.marker, true, path);
+  }
 });

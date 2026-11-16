@@ -1,4 +1,5 @@
 import { SESSION_AGENT_PATHS } from './sessionAgentRoute.js';
+import { evaluatePrivateSessionAccess, privateSessionRefusal } from './privateSessionAccess.js';
 
 // Every path a signed-in request other than a POST can reach. A POST may carry
 // its action in the body to any path, so only POSTs reach sign-in unrouted.
@@ -7,6 +8,15 @@ export const NON_POST_PATHS = new Set([
   '/storage/read', '/storage/list', '/storage/export-envelopes',
   '/groups/my-memberships', '/groups/members', '/groups/list',
   ...SESSION_AGENT_PATHS,
+]);
+
+// What a private session lets someone signed in reach without its rule
+// admitting them: storage reads and uploads, which hold each request to the
+// rule themselves, and what joining a group needs. Each is routed by its path
+// in every method that gets this far, never by an action named in a body.
+const OPEN_TO_NON_MEMBERS = new Set([
+  '/storage/read', '/storage/list', '/storage/read-batch', '/storage/upload',
+  '/groups/list', '/groups/my-memberships', '/groups/join', '/groups/leave',
 ]);
 
 export const dispatchAuthenticatedRouteEntry = async ({
@@ -35,6 +45,11 @@ export const dispatchAuthenticatedRouteEntry = async ({
     baseHeaders,
   });
   if (!authenticatedContext?.ok) return authenticatedContext?.response;
+  if (!OPEN_TO_NON_MEMBERS.has(path)) {
+    const { config, slug, address, scopes, headers } = authenticatedContext;
+    const access = await evaluatePrivateSessionAccess({ env, slug, config, request, requesterAddress: address, authScopes: scopes });
+    if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers });
+  }
 
   return deps?.dispatchAuthenticatedRoute?.({
     path,

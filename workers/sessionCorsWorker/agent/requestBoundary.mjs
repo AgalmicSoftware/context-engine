@@ -11,6 +11,7 @@ import { resolveAgentRoute } from './routes.mjs';
 import { handleAgentHttpRequest } from './dispatch.mjs';
 import { aggregateResultsEnabledForAgent, authorizeSessionMemberAggregateResults } from './results.mjs';
 import { createAgentServices } from './services.mjs';
+import { evaluatePrivateSessionAccess } from '../privateSessionAccess.js';
 
 export const dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders = {} }) => {
   const url = new URL(request.url);
@@ -106,6 +107,15 @@ export const dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders
     if (ctx.address) {
       try { ctx.scopes = await deps.computeScopesForLogin({ env, slug, config, address: ctx.address }); }
       catch { throw authorityError('agent_membership_denied'); }
+    }
+    // A private session serves an agent, or a participant's credential for
+    // one, only if its rule admits that account. Public routes carry no
+    // session content; admin routes are the session's own admins.
+    if (['agent', 'wrapped', 'participant'].includes(access)) {
+      const privateAccess = await evaluatePrivateSessionAccess({
+        env, slug, config, request, requesterAddress: ctx.address, authScopes: ctx.scopes,
+      });
+      if (!privateAccess.ok) throw authorityError(privateAccess.reason, privateAccess.status);
     }
     agentEnv.AGENT_SERVICES = createAgentServices({ env, agentEnv, deps });
     if (route.hosted && config.sessionModeProfile?.authority?.mode !== 'worker_canonical') throw authorityError('hosted_session_required');
