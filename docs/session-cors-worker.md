@@ -640,6 +640,22 @@ Admin test panel:
   /risk-matrix?sessionSlug=<slug>&id=` reads them under the atlas rule, with
   `canBuild` and, for builders, `nextBuild`, and the public config sets
   `riskMatrix: true`.
+- An atlas, a risk matrix or a manual AI Views run from stored responses runs
+  as a job in the session's coordinator, not in the request that pressed for
+  it, so a page that drops, reloads or closes loses nothing. One job of each
+  kind runs at a time; a press while one runs joins it and pays for nothing
+  more. The press waits while the page is connected (5 minutes for a build, 9
+  for AI Views) and answers with the result. After that the atlas and risk
+  matrix answer `409` with the running build's `reason` and `active`, and AI
+  Views answers `202`, as for a build someone else started; the page's own
+  checks, or a reload on any device, find the result when it lands. A build
+  that fails says why and frees the next press at once. A running job writes a
+  heartbeat every 15 seconds. If the heartbeat goes a minute stale (the
+  coordinator restarted), the next alarm, read of builds, AI Views status or
+  press runs the job again; a job cut off twice ends with "The build stopped
+  before it finished. Press again to start a new one." AI Views from a
+  snapshot the browser supplies still runs in the request, since those rows
+  are not stored.
 - Manual generation uses signed admin action
   `POST /admin/results-analysis/generate` with action
   `results-analysis/generate`. Worker-canonical Cloudflare sessions can request

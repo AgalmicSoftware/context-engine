@@ -93,7 +93,7 @@ const topicReply = {
 const isPlanPrompt = (prompt) => prompt.startsWith('You are planning');
 const isBranchPrompt = (prompt) => prompt.startsWith('You are mapping one branch');
 
-const runBuild = async ({ source = createSource(), provider, store = createStore(), config = {}, body = {}, now } = {}) => {
+const runBuild = async ({ source = createSource(), provider, store = createStore(), config = {}, body = {}, now, attemptId } = {}) => {
   const prompts = [];
   const result = await buildDebateAtlas({
     env: {},
@@ -101,6 +101,7 @@ const runBuild = async ({ source = createSource(), provider, store = createStore
     config: { sessionName: 'Salon', ai: { model: 'test-model' }, ...config },
     body,
     builderAddress: RESULTS_ADMIN.toUpperCase().replace('0X', '0x'),
+    ...(attemptId ? { attemptId } : {}),
     deps: {
       callBuildStore: store.callBuildStore,
       loadSource: async () => source,
@@ -466,7 +467,7 @@ const dispatchAs = async ({ action, signer, config }) => {
           ? { ok: true, address: signer, existingConfig: config, headers: {}, targetSlug: 'atlas-session' }
           : { ok: false, response: { body: { error: 'Admin authorization failed.' }, status: 403 } }
       ),
-      buildDebateAtlas: async ({ builderAddress }) => {
+      pressResultsBuild: async ({ builderAddress }) => {
         built = true;
         return { ok: true, status: 200, build: { builtBy: builderAddress } };
       },
@@ -483,4 +484,22 @@ test('results admins and co-admins may build atlases and nothing else; strangers
   assert.deepEqual(await dispatchAs({ action: DEBATE_ATLAS_BUILD_ACTION, signer: address(6), config }), { status: 403, built: false });
   assert.equal((await dispatchAs({ action: 'set-config', signer: RESULTS_ADMIN, config })).status, 403);
   assert.equal((await dispatchAs({ action: 'set-secrets', signer: RESULTS_ADMIN, config })).status, 403);
+});
+
+test('a build its job runs uses the lease the job holds, and ends it even when the session no longer allows the build', async () => {
+  const provider = async (prompt) => ({ ok: true, value: isPlanPrompt(prompt) ? planFor(['q1', 'q2', 'q3', 'q4']) : topicReply });
+  const store = createStore();
+  const held = await store.callBuildStore({}, 'atlas-session', 'reserve', {});
+  const { result } = await runBuild({ provider, store, attemptId: held.body.attemptId });
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual(store.calls, ['reserve', 'finalize'], 'no second lease is taken');
+  assert.equal((await store.callBuildStore({}, 'atlas-session', 'read', {})).body.build.id, result.build.id);
+
+  const off = createStore();
+  const offHeld = await off.callBuildStore({}, 'atlas-session', 'reserve', {});
+  const { result: refused, prompts } = await runBuild({ provider, store: off, attemptId: offHeld.body.attemptId, config: { scopes: { ai: false } } });
+  assert.deepEqual([refused.ok, refused.status], [false, 403]);
+  assert.equal(prompts.length, 0);
+  assert.deepEqual(off.calls, ['reserve', 'finalize']);
+  assert.equal((await off.callBuildStore({}, 'atlas-session', 'read', {})).body.active, null);
 });

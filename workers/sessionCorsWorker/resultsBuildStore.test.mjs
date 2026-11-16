@@ -62,6 +62,20 @@ test('one build runs at a time until it finishes or its lease runs out', async (
   assert.equal((await call(coordinator, 'read', {})).body.build, null);
 });
 
+test('a build run again restarts the lease it holds, and no other', async () => {
+  const coordinator = createCoordinator();
+  const held = await call(coordinator, 'reserve', { builder: '0xABC' });
+  coordinator.nowMs += RESULTS_BUILD_LEASE_MS - 1;
+  assert.equal((await call(coordinator, 'touch', { attemptId: held.body.attemptId })).status, 200);
+  coordinator.nowMs += RESULTS_BUILD_LEASE_MS - 1;
+  assert.equal((await call(coordinator, 'reserve', { builder: '0xDEF' })).status, 409, 'the lease runs from the touch');
+  assert.equal((await call(coordinator, 'touch', { attemptId: 'another' })).status, 409);
+  assert.equal((await call(coordinator, 'touch', {})).status, 409);
+  coordinator.nowMs += 1;
+  assert.equal((await call(coordinator, 'reserve', { builder: '0xDEF' })).status, 200);
+  assert.equal((await call(coordinator, 'touch', { attemptId: held.body.attemptId })).status, 409, 'a lease taken over is not taken back');
+});
+
 test('a failed build frees the next one and keeps nothing', async () => {
   const coordinator = createCoordinator();
   const reserved = await call(coordinator, 'reserve', {});

@@ -90,6 +90,18 @@ export const dispatchResultsBuildStore = async (coordinator, kindName, operation
       return json({ ok: true, attemptId });
     });
   }
+  // A job running its build again restarts the lease it holds.
+  if (operation === 'touch') {
+    return storage.transaction(async (transaction) => {
+      const index = await readIndex(transaction);
+      if (!trim(payload.attemptId) || index.active?.attemptId !== trim(payload.attemptId)) {
+        return json({ ok: false, error: `This ${kind.name} build is no longer current.` }, 409);
+      }
+      index.active = { ...index.active, startedAtMs: nowMs };
+      await transaction.put(kind.key, index);
+      return json({ ok: true });
+    });
+  }
   if (operation === 'finalize') {
     const build = isObj(payload.build) ? payload.build : null;
     const invalid = !!build && !idPattern.test(trim(build.id));

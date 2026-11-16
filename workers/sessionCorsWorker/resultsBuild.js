@@ -71,29 +71,46 @@ const createBuildId = (prefix, nowMs) => `${prefix}_${nowMs.toString(36)}_${[...
 
 const failure = (status, error, extra = {}) => ({ ok: false, status, error, ...extra });
 
-// One build of a kind: reserves the session's lease for it, reads the stored
-// responses whole, lets `compose` make the AI calls, and keeps the build it
-// returns, stamped with its time, builder, model and response counts.
-// `compose({ source, callAi, contextText })` returns a failure or
-// `{ ok: true, build }`, the kind's own fields.
-export const runResultsBuild = async ({
-  kindName, limits, compose, env, slug, config, body = {}, headers, builderAddress, deps = {},
-} = {}) => {
+/** Why a build of this kind can't start from this press, or null. */
+export const resultsBuildRefusal = (kindName, config, body = {}) => {
   const kind = RESULTS_BUILD_KINDS[kindName];
   if (config?.scopes?.ai === false) return failure(403, 'AI is turned off for this session.');
   if (trim(body?.source?.kind || 'worker-canonical') !== 'worker-canonical') {
     return failure(400, `${kind.plural} are built from the responses this session's Worker stores.`);
   }
-  const store = deps.callBuildStore || callBuildStore(kindName);
-  const reserved = await store(env, slug, 'reserve', { builder: lower(builderAddress) });
-  if (!reserved.ok) {
+  return null;
+};
+
+/** The store's reply to a reserve that failed, as a build's failure. */
+export const resultsBuildReserveFailure = (kindName, reserved) => failure(
+  reserved?.status || 503,
+  reserved?.body?.error || `${capitalize(RESULTS_BUILD_KINDS[kindName].name)} builds are unavailable; retry.`,
+  {
     // The reason lets the site show the build that is running and check back for it.
-    return failure(reserved.status || 503, reserved.body?.error || `${capitalize(kind.name)} builds are unavailable; retry.`, {
-      ...(reserved.body?.reason ? { reason: reserved.body.reason } : {}),
-      ...(reserved.body?.active ? { active: reserved.body.active } : {}),
-    });
+    ...(reserved?.body?.reason ? { reason: reserved.body.reason } : {}),
+    ...(reserved?.body?.active ? { active: reserved.body.active } : {}),
+  },
+);
+
+// One build of a kind: reserves the session's lease for it, unless the job
+// running it already holds `attemptId`, reads the stored responses whole, lets
+// `compose` make the AI calls, and keeps the build it returns, stamped with
+// its time, builder, model and response counts. Every result ends the lease.
+// `compose({ source, callAi, contextText })` returns a failure or
+// `{ ok: true, build }`, the kind's own fields.
+export const runResultsBuild = async ({
+  kindName, limits, compose, env, slug, config, body = {}, headers, builderAddress, attemptId: heldAttemptId = '', deps = {},
+} = {}) => {
+  const kind = RESULTS_BUILD_KINDS[kindName];
+  const store = deps.callBuildStore || callBuildStore(kindName);
+  const refusal = resultsBuildRefusal(kindName, config, body);
+  if (refusal && !heldAttemptId) return refusal;
+  let attemptId = heldAttemptId;
+  if (!attemptId) {
+    const reserved = await store(env, slug, 'reserve', { builder: lower(builderAddress) });
+    if (!reserved.ok) return resultsBuildReserveFailure(kindName, reserved);
+    attemptId = reserved.body.attemptId;
   }
-  const attemptId = reserved.body.attemptId;
   const now = () => Number(deps.now?.() ?? Date.now());
   const startedAtMs = now();
   const finish = async (result) => {
@@ -101,6 +118,7 @@ export const runResultsBuild = async ({
     if (result.ok && !saved.ok) return failure(saved.status || 503, saved.body?.error || `The ${kind.name} was built but could not be kept; retry.`);
     return result;
   };
+  if (refusal) return finish(refusal);
   try {
     const source = deps.loadSource
       ? await deps.loadSource({ env, slug, config })
