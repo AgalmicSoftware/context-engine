@@ -6,7 +6,18 @@ import { defaultStrictAllowDemoFallback } from '../../utilities/worker/workerSes
 import panel from './AdminSessionBackupPanel.module.scss';
 import styles from './AdminSessionAgentChatsPanel.module.scss';
 
-type Chat = { id: string; day: string; answers: string; question: string; answer: string; by: string; name: string };
+type Chat = {
+  id: string;
+  day: string;
+  answers: string;
+  question: string;
+  answer: string;
+  by: string;
+  name: string;
+  // Whom the answer was fit for: an admin, or members of these groups; otherwise anyone its style reaches.
+  forAdmins: boolean;
+  groups: string[];
+};
 
 type Props = {
   workerUrl: string;
@@ -35,10 +46,15 @@ const chatOf = (value: unknown): Chat => {
     answer: text(row.answer),
     by: text(row.by),
     name: text(row.name),
+    forAdmins: row.scope === 'admin',
+    groups: (Array.isArray(row.groups) ? row.groups : []).map(text).filter(Boolean),
   };
 };
 // Who asked, only as far as they chose to say.
 const asker = ({ by, name }: Chat) => [name, by].filter(Boolean).join(', ') || 'No address or name';
+// An admin's answer may hold what no member is given, so the export leaves it out.
+const reach = ({ forAdmins, groups }: Chat) =>
+  forAdmins ? ' · Answered to an admin; not exported' : groups.length ? ` · For ${groups.join(', ')}` : '';
 
 /**
  * The chats people chose to store, newest first, a page at a time. Read with the admin's sign-in, so paging
@@ -57,6 +73,8 @@ const AdminSessionAgentChatsPanel = ({
   const [stored, setStored] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Deleting all takes a second click, on a button that says how many go.
+  const [confirmingAll, setConfirmingAll] = useState(false);
   if (!canAdminWorker || !workerUrl) return null;
 
   const run = async (work: () => Promise<void>) => {
@@ -96,6 +114,7 @@ const AdminSessionAgentChatsPanel = ({
     setChats((shown) => (from && shown ? [...shown, ...page] : page));
     setCursor(text(result.cursor));
     setStored(Number(result.stored) || 0);
+    setConfirmingAll(false);
   };
 
   const remove = (what: { ids: string[] } | { through: string }) =>
@@ -129,16 +148,32 @@ const AdminSessionAgentChatsPanel = ({
         >
           {chats ? 'Refresh' : 'Show stored chats'}
         </button>
-        {chats?.length ? (
-          <button
-            type="button"
-            className={panel.actionButton}
-            disabled={busy}
-            // Through the newest one shown: a chat stored since then stays, unread.
-            onClick={() => void remove({ through: chats[0].id })}
-          >
+        {chats?.length && !confirmingAll ? (
+          <button type="button" className={panel.actionButton} disabled={busy} onClick={() => setConfirmingAll(true)}>
             Delete all
           </button>
+        ) : null}
+        {chats?.length && confirmingAll ? (
+          <>
+            <button
+              type="button"
+              className={panel.actionButton}
+              disabled={busy}
+              // Every chat up to the newest one shown, the ones not yet shown included; one
+              // stored since the list was read stays, unread.
+              onClick={() => void remove({ through: chats[0].id })}
+            >
+              {stored === 1 ? 'Delete the 1 stored chat' : `Delete all ${stored.toLocaleString('en-US')} stored chats`}
+            </button>
+            <button
+              type="button"
+              className={panel.actionButton}
+              disabled={busy}
+              onClick={() => setConfirmingAll(false)}
+            >
+              Keep them
+            </button>
+          </>
         ) : null}
       </div>
       {chats ? (
@@ -154,6 +189,7 @@ const AdminSessionAgentChatsPanel = ({
             <li key={chat.id} className={styles.chat} data-testid="ce-admin-session-agent-chat">
               <p className={styles.meta}>
                 {chat.day} · {chat.answers} answer · {asker(chat)}
+                {reach(chat)}
               </p>
               <p>
                 <strong>Asked:</strong> {chat.question}

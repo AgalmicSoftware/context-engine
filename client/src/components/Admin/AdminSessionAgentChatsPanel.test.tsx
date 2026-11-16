@@ -57,8 +57,8 @@ describe('AdminSessionAgentChatsPanel', () => {
     renderPanel();
     answer(200, {
       entries: [
-        chat('000000000003', 'Third?'),
-        chat('000000000002', 'Second?', { by: ASKER, name: 'Sam', answers: 'detailed' }),
+        chat('000000000003', 'Third?', { scope: 'admin' }),
+        chat('000000000002', 'Second?', { by: ASKER, name: 'Sam', answers: 'detailed', groups: ['salon', 'hosts'] }),
       ],
       cursor: '000000000002',
       stored: 3,
@@ -71,14 +71,18 @@ describe('AdminSessionAgentChatsPanel', () => {
     expect(init).toEqual({ method: 'GET' });
     expect(auth).toEqual(expect.objectContaining({ sessionSlug: 'salon', context: { account: '0xadmin' } }));
     const [third, second] = screen.getAllByTestId('ce-admin-session-agent-chat');
-    expect(third).toHaveTextContent('2026-11-24 · General answer · No address or name');
+    // Whom each answer was fit for is said too: an admin's is never exported, a group's is for that group.
+    expect(third).toHaveTextContent(
+      '2026-11-24 · General answer · No address or name · Answered to an admin; not exported',
+    );
     expect(third).toHaveTextContent('Asked: Third?');
     expect(third).toHaveTextContent('Answered: Answer to Third?');
-    expect(second).toHaveTextContent(`2026-11-24 · Detailed answer · Sam, ${ASKER}`);
+    expect(second).toHaveTextContent(`2026-11-24 · Detailed answer · Sam, ${ASKER} · For salon, hosts`);
 
     answer(200, { entries: [chat('000000000001', 'First?')], stored: 3 });
     fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
     await waitFor(() => expect(screen.getAllByTestId('ce-admin-session-agent-chat')).toHaveLength(3));
+    expect(screen.getAllByTestId('ce-admin-session-agent-chat')[2]).not.toHaveTextContent(/exported|For /);
     expect(fetchWorker.mock.calls[1][0]).toBe(
       'https://worker.example/admin/session-agent/chats?slug=salon&cursor=000000000002',
     );
@@ -100,9 +104,16 @@ describe('AdminSessionAgentChatsPanel', () => {
       body: { sessionSlug: 'salon', ids: ['000000000002'] },
     });
 
+    // Deleting all takes a second click on a button that says how many go, and can be backed out of.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+    expect(postSignedRequest).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Keep them' }));
+    expect(screen.queryByRole('button', { name: /Delete the 1 stored chat/ })).not.toBeInTheDocument();
+    expect(postSignedRequest).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
     // A chat stored since the list was read is newer than `through`, so it stays.
     answer(200, { entries: [], stored: 0 });
-    fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete the 1 stored chat' }));
     expect(await screen.findByText('No chats are stored.')).toBeInTheDocument();
     expect(postSignedRequest).toHaveBeenLastCalledWith({
       action: 'session-agent/chats/delete',
@@ -130,6 +141,7 @@ describe('AdminSessionAgentChatsPanel', () => {
     await screen.findByTestId('ce-admin-session-agent-chat');
     postSignedRequest.mockRejectedValueOnce(new Error('Stored chats couldn’t be reached just now. Try again shortly.'));
     fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete the 1 stored chat' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('couldn’t be reached just now');
     // Nothing was deleted, so the chat is still listed.
     expect(screen.getAllByTestId('ce-admin-session-agent-chat')).toHaveLength(1);

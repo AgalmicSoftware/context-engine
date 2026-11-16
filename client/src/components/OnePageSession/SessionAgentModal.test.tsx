@@ -334,6 +334,30 @@ describe('SessionAgentModal', () => {
     expect(dialog.queryByText('This chat was stored.')).not.toBeInTheDocument();
   });
 
+  it('starts the next person afresh: nothing the one before typed or chose is sent as theirs', async () => {
+    const recording = { ...member, recording: true };
+    readStatus.mockResolvedValueOnce(recording);
+    const view = render(<SessionAgentModal {...OPTIONS} onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    fireEvent.click(await dialog.findByRole('radio', { name: 'My address' }));
+    fireEvent.change(dialog.getByLabelText('Name (optional)'), { target: { value: 'Sam' } });
+    fireEvent.change(dialog.getByLabelText('Your question'), { target: { value: 'Sam’s own question' } });
+    // Someone else signs in with the dialog open.
+    readStatus.mockResolvedValueOnce(recording);
+    view.rerender(<SessionAgentModal {...OPTIONS} account="0xdef" onClose={() => {}} />);
+    expect(await dialog.findByRole('radio', { name: 'No address' })).toBeChecked();
+    expect(dialog.getByLabelText('Name (optional)')).toHaveValue('');
+    expect(dialog.getByLabelText('Your question')).toHaveValue('');
+    ask.mockResolvedValueOnce({ ...reply('An answer.'), stored: true });
+    askQuestion(dialog, 'Why?');
+    await dialog.findByText('An answer.');
+    expect(ask).toHaveBeenLastCalledWith(
+      'Why?',
+      { ...OPTIONS, account: '0xdef' },
+      { attribution: 'anonymous', name: '' },
+    );
+  });
+
   it('gives someone signed in without an address no address to store', async () => {
     const { dialog } = await renderModal({ ...member, recording: true, unattributed: null });
     expect(dialog.getByRole('checkbox', { name: 'Store this chat' })).toBeChecked();

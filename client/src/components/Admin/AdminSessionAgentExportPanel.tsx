@@ -18,7 +18,7 @@ type Props = {
 };
 
 const HELP =
-  'What the Session Agent may give a member, as one file: the questions, the context, the published results, counts, what members wrote, and any chats people chose to store, each marked for General or Detailed answers. Admins-only context is not in it. Each written answer and each added file carries its writer’s account address, unless that person chose to leave it off; nothing carries a name. It also lists the addresses in the groups the session’s rules and items name, people who opted out included: opting out keeps a person’s answers out, not their membership. It is a snapshot. A later export leaves out anyone who has opted out since, but copies already made keep their earlier answers and addresses, so keep them somewhere private.';
+  'What the Session Agent may give a member, as one file: the questions, the context, the published results, counts, what members wrote, and any chats people chose to store, each marked for General or Detailed answers. Admins-only context is not in it. Each written answer and each added file carries its writer’s account address, unless that person chose to leave it off. Nothing carries a name but a stored chat whose asker typed one, and a chat answered to an admin is left out. It also lists the addresses in the groups the session’s rules and items name, people who opted out included: opting out keeps a person’s answers out, not their membership. It is a snapshot. A later export leaves out anyone who has opted out since, but copies already made keep their earlier answers and addresses, so keep them somewhere private.';
 
 // What the Worker left out, in the order an admin would ask about it.
 const LEFT_OUT: Array<[string, (count: number) => string]> = [
@@ -35,6 +35,7 @@ const LEFT_OUT: Array<[string, (count: number) => string]> = [
   ['contextNotRead', (count) => `${count} context ${count === 1 ? 'item' : 'items'} past the reading limit`],
   ['unreadableContext', (count) => `${count} context ${count === 1 ? 'item' : 'items'} that can’t be read`],
   ['resultsNotForEveryone', () => 'the results, which not everyone may see'],
+  ['adminChats', (count) => `${count} stored ${count === 1 ? 'chat' : 'chats'} answered to an admin`],
   ['membersWithoutAddress', (count) => `${count} group ${count === 1 ? 'member' : 'members'} with no address`],
 ];
 

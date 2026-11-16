@@ -117,6 +117,11 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
       switchSaves.current = 0;
       setStatus(null);
       setReply(null);
+      // What the person before typed and chose is theirs: the next starts as anyone does.
+      setQuestion('');
+      setStore(STORE_TO_START);
+      setWithAddress(ADDRESS_TO_START);
+      setName('');
     }
     const savesBefore = switchSaves.current;
     setStatusError('');

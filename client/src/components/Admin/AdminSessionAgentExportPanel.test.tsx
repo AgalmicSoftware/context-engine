@@ -74,7 +74,7 @@ describe('AdminSessionAgentExportPanel', () => {
     expect(help).toHaveAccessibleDescription(/Admins-only context is not in it/);
     expect(help).toHaveAccessibleDescription(/and any chats people chose to store/);
     expect(help).toHaveAccessibleDescription(
-      /carries its writer’s account address, unless that person chose to leave it off; nothing carries a name/,
+      /carries its writer’s account address, unless that person chose to leave it off\. Nothing carries a name but a stored chat whose asker typed one, and a chat answered to an admin is left out\./,
     );
     expect(help).toHaveAccessibleDescription(
       /people who opted out included: opting out keeps a person’s answers out, not their membership/,
