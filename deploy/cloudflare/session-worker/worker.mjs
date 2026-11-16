@@ -107503,7 +107503,11 @@ var buildDebateAtlas = (args = {}) => runResultsBuild({
           id: topic.id,
           label: topic.label,
           ...result,
-          questions: topic.questionIds.map((id2) => ({ id: id2, prompt: text7(questionsById.get(id2).prompt, 400), type: questionsById.get(id2).type }))
+          // What the atlas shows of each question: its words, and the choices it offers.
+          questions: topic.questionIds.map((id2) => {
+            const { prompt, type, options, voiceCredits } = questionsById.get(id2);
+            return { id: id2, prompt: text7(prompt, 400), type, ...options?.length ? { options } : {}, ...voiceCredits ? { voiceCredits } : {} };
+          })
         };
       }).filter(Boolean);
       const own = branch.topics.length > 1;
