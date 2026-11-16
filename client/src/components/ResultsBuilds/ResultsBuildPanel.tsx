@@ -15,15 +15,15 @@ type Props = {
   builds: ResultsBuildSummary[];
   children: React.ReactNode;
   className?: string;
-  /** What the "?" beside the title says the view is. */
+  /** What the "?" says the view is. */
   help: React.ReactNode;
   kind: ResultsBuildKind;
-  /** The view's name, and its title when the build has none. */
+  /** The view's name, for those who cannot see its tab. */
   label: string;
   onSelectBuild: (id: string) => void;
 };
 
-const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`;
+const plural = (count: number, word: string): string => `${count.toLocaleString()} ${word}${count === 1 ? '' : 's'}`;
 
 const formatBuiltAt = (value: string): string => {
   const date = new Date(value);
@@ -32,11 +32,11 @@ const formatBuiltAt = (value: string): string => {
     : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 };
 
-// "8 Nov 2026, 14:05 · 512 responses · 47 participants"
+// "gpt-6.1 · 1,512 responses · 47 participants"
 const describeBuild = (build: ResultsBuildSummary): string => {
   const counts = build.counts || {};
   return [
-    formatBuiltAt(build.builtAt),
+    build.model || '',
     Number.isFinite(counts.responses) ? plural(Number(counts.responses), 'response') : '',
     Number.isFinite(counts.participants) ? plural(Number(counts.participants), 'participant') : '',
   ]
@@ -44,8 +44,8 @@ const describeBuild = (build: ResultsBuildSummary): string => {
     .join(' · ');
 };
 
-// A built Results view: its title and what it is, when it was built and from
-// how many responses, and a picker for the earlier builds the Worker keeps.
+// A built Results view under one small header: the version picked, with its
+// model and counts beneath, and what the view is behind a "?". The tab names the view.
 export default function ResultsBuildPanel({
   build,
   builds,
@@ -62,36 +62,33 @@ export default function ResultsBuildPanel({
   return (
     <section className={`${styles.panel} ${className}`} aria-label={label} data-testid={`ce-session-${kind}`}>
       <header className={styles.header}>
-        <div>
-          <div className={styles.titleRow}>
-            <h3>{build.title || label}</h3>
-            <button
-              type="button"
-              id={helpId}
-              className={styles.help}
-              data-ce-control-appearance="frameless"
-              aria-label={`About this ${RESULTS_BUILD_KINDS[kind].name}`}
-            >
-              <FontAwesomeIcon icon={faQuestionCircle} />
-            </button>
-            <CETooltip target={helpId} placement="bottom" trigger="hover focus" autohide={false}>
-              {help}
-              {sampled ? ` The AI read ${build.counts?.aiResponses} of the ${build.counts?.responses} responses.` : ''}
-            </CETooltip>
-          </div>
-          <p className={styles.meta}>Built {describeBuild(build)}</p>
-        </div>
         {/* Shown with one build too, so the time sits in the same place in every built view. */}
         <label className={styles.picker}>
           <span>Version</span>
           <select value={build.id} onChange={(event) => onSelectBuild(event.target.value)}>
             {builds.map((entry) => (
               <option key={entry.id} value={entry.id}>
-                {describeBuild(entry)}
+                {formatBuiltAt(entry.builtAt) || entry.id}
               </option>
             ))}
           </select>
         </label>
+        <p className={styles.meta}>
+          <span>{describeBuild(build)}</span>
+          <button
+            type="button"
+            id={helpId}
+            className={styles.help}
+            data-ce-control-appearance="frameless"
+            aria-label={`About this ${RESULTS_BUILD_KINDS[kind].name}`}
+          >
+            <FontAwesomeIcon icon={faQuestionCircle} />
+          </button>
+        </p>
+        <CETooltip target={helpId} placement="bottom" trigger="hover focus" autohide={false}>
+          {help}
+          {sampled ? ` The AI read ${build.counts?.aiResponses} of the ${build.counts?.responses} responses.` : ''}
+        </CETooltip>
       </header>
       {children}
     </section>

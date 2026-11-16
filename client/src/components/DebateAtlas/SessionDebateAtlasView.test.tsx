@@ -25,8 +25,8 @@ const older = { id: 'atlas_k1_00000001', builtAt: '2026-11-08T13:00:00.000Z', co
 
 it('draws the build read-only as circles, stamped, and names topics it could not map', () => {
   render(<SessionDebateAtlasView build={build} builds={[build]} onSelectBuild={jest.fn()} sessionSlug="salon" />);
-  expect(screen.getByRole('heading', { name: 'Salon atlas' })).toBeVisible();
-  expect(screen.getByText(/^Built .*500 responses · 40 participants$/)).toBeVisible();
+  expect(screen.getByRole('combobox', { name: 'Version' })).toBeVisible();
+  expect(screen.getByText(/500 responses · 40 participants$/)).toBeVisible();
   expect(screen.getByRole('status')).toHaveTextContent('Not mapped this time: Privacy, Labor.');
   // One build still shows its Version, so the time sits where it does with several.
   expect(screen.getByRole('combobox', { name: 'Version' })).toHaveDisplayValue(/2026/);

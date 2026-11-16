@@ -1368,7 +1368,7 @@ describe('OnePageSession results routing', () => {
       ).toEqual(['🧾Report', '🗺️Atlas', 'Raw Results']);
       fireEvent.click(within(nav).getByRole('button', { name: 'Atlas' }));
       const view = await screen.findByTestId('ce-session-debate-atlas');
-      expect(within(view).getByRole('heading', { name: 'Salon atlas' })).toBeVisible();
+      expect(within(view).getByRole('combobox', { name: 'Version' })).toBeVisible();
       expect(view).toHaveTextContent('12 responses · 4 participants');
       expect(mockDebateMap).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -1549,7 +1549,7 @@ describe('OnePageSession results routing', () => {
         .map((button) => button.textContent.trim());
     const expectBuiltMatrix = async () => {
       const view = await screen.findByTestId('ce-session-risk-matrix');
-      expect(within(view).getByRole('heading', { name: 'Salon risks' })).toBeVisible();
+      expect(within(view).getByRole('combobox', { name: 'Version' })).toBeVisible();
       expect(view).toHaveTextContent('12 responses · 4 participants');
       expect(mockRiskMatrix).toHaveBeenLastCalledWith(
         expect.objectContaining({ initialComments: riskBuild.notes, readOnly: true, commentEyebrow: 'AI note' }),

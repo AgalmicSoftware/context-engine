@@ -11,21 +11,9 @@
 
 .header {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  h3 {
-    margin: 0;
-    color: inherit;
-    font-size: 1.1rem;
-  }
-}
-
-.titleRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 2px;
 }
 
 .help {
@@ -41,8 +29,12 @@
 }
 
 .meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .picker {
@@ -52,7 +44,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   select {
     // A select is as wide as its longest option unless it may shrink.
     min-width: 0;

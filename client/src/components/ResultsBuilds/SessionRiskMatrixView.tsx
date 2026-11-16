@@ -11,7 +11,7 @@ type Props = {
   onSelectBuild: (id: string) => void;
 };
 
-// A built risk matrix replaces the demo's and AI Views' one: read-only, with the
+// A built risk matrix replaces the demo's: read-only, with the
 // areas the AI named and its notes on where two of them meet.
 export default function SessionRiskMatrixView({ build, builds, onSelectBuild }: Props) {
   const categories = useMemo(
