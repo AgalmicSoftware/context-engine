@@ -1,5 +1,6 @@
 // MCP tool definitions for an agent taking part in Context Engine sessions.
 import { failedToolResult } from './mcpServer.mjs';
+import { CONTEXT_SOURCE_LIMITS } from '../../shared/sessionContextSources.mjs';
 
 export const SERVER_INSTRUCTIONS = [
   'Context Engine runs group deliberation sessions. With these tools you take part as yourself:',
@@ -187,7 +188,7 @@ export const buildTools = (participant) => [
     name: 'add_context',
     title: 'Add context',
     description:
-      'Add context to a hosted session, when it invites you to: exactly one of file (a local PDF, Markdown, plain text, CSV or JSON file), url (a public https:// page the Session Worker reads now, where the invitation offers a link) or text (stored as a Markdown file). Everyone in the session sees it, unless adminsOnly is true. It is marked as added by an agent, under your display name. Add no private or personal data.',
+      'Add context to a hosted session, when it invites you to: exactly one of file (a local PDF, Markdown, plain text, CSV or JSON file), url (a public https:// page the Session Worker reads now, where the invitation offers a link) or text (stored as a Markdown file). Everyone in the session sees it, unless adminsOnly is true or groups names some of the session’s groups; then the members of any one of those groups see it, and the admins always do. A link takes no groups. It is marked as added by an agent, under your display name. Add no private or personal data.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -197,6 +198,12 @@ export const buildTools = (participant) => [
         text: text('Text to add, in Markdown.'),
         title: text('Optional title for a link or text (up to 120 characters).'),
         adminsOnly: { type: 'boolean', description: 'Show it to the session’s admins alone (default false).' },
+        groups: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: CONTEXT_SOURCE_LIMITS.lockedGroups,
+          description: `Show a file or text to the members of any of these groups, and the session’s admins: up to ${CONTEXT_SOURCE_LIMITS.lockedGroups} group IDs from get_session. Not with url or adminsOnly.`,
+        },
       },
       additionalProperties: false,
     },

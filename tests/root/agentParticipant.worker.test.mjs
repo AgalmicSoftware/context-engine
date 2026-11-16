@@ -1143,6 +1143,56 @@ test('an agent adds a file, a link and a note that everyone sees as its own, and
   assert.equal((await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() })).sources.length, 3);
 });
 
+test('an agent makes a file or a note visible to some of the session’s groups, as the website’s Visible to does', async (t) => {
+  const env = createEnv([groupSessionConfig()]);
+  const host = groupHost(env);
+  const salon = await createGroup(host, { label: 'Salon', joinMode: 'open' });
+  const hosts = await createGroup(host, { label: 'Hosts', joinMode: 'open' });
+  const kami = await createAgent(env, 'Test Kami', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  await kami.participant.joinSession({ link: LINK });
+  // get_session lists the groups it can name.
+  assert.deepEqual((await kami.participant.getSession()).groups.map((group) => group.groupId).sort(), [hosts.groupId, salon.groupId].sort());
+
+  const note = await kami.participant.addContext({ text: 'For the salon.', title: 'Salon', groups: [salon.groupId] });
+  assert.equal(note.visibleTo, 'members of “Salon”, and the session’s admins');
+  const notes = path.join(kami.stateDir, '..', `kami-groups-${process.pid}.md`);
+  await fs.writeFile(notes, '# For two groups');
+  t.after(() => fs.rm(notes, { force: true }));
+  // Any one of the groups is enough; naming one twice, or in capitals, is the same group.
+  const file = await kami.participant.addContext({ file: notes, groups: [hosts.groupId, salon.groupId.toUpperCase(), hosts.groupId] });
+  const both = [hosts.groupId, salon.groupId].sort();
+  assert.equal(file.visibleTo, 'members of “Hosts” or “Salon”, and the session’s admins');
+
+  // Stored under the website's own rule, which the Worker applies to whoever lists: someone in neither
+  // group sees nothing, and a member of one of the file's two groups sees the file, not Salon's note.
+  const listedFor = async (reader) =>
+    (await reader.request('/storage/list?resource=docsContext&role=context&limit=100', { auth: true })).items
+      .map((item) => [item.metadata.tags.find((entry) => entry.name === 'CE-DocName').value, item.metadata.lockedGroupIds])
+      .sort(([left], [right]) => left.localeCompare(right));
+  assert.deepEqual(await listedFor(host), []);
+  const mole = await createAgent(env, 'Test Mole', []);
+  t.after(() => fs.rm(mole.stateDir, { recursive: true, force: true }));
+  await mole.participant.joinSession({ link: LINK });
+  await mole.participant.joinGroup({ groupId: hosts.groupId });
+  const asMole = createWorkerClient({ workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: [SITE], wallet: mole.wallet, fetchImpl: workerFetch(env) });
+  assert.deepEqual(await listedFor(asMole), [[path.basename(notes), both]]);
+  // Neither is for everyone, so what the AI reads for everyone has neither.
+  assert.equal((await loadParticipantContextSources({ env, slug: SLUG, config: groupSessionConfig() })).sources.length, 0);
+
+  // Refused before anything is sent: the choices the website doesn't offer.
+  const refused = async (args, message) => assert.rejects(kami.participant.addContext(args), { message });
+  await refused({ text: 'x', groups: [salon.groupId], adminsOnly: true }, 'Pass groups or adminsOnly, not both.');
+  await refused({ url: 'https://example.org/essay', groups: [salon.groupId] },
+    'A link is for everyone in the session or its admins alone. Only a file or text can be for groups.');
+  await refused({ text: 'x', groups: 'salon' }, 'groups must be a list of group IDs.');
+  await refused({ text: 'x', groups: Array.from({ length: 21 }, (_, index) => `g${index}`) }, 'Name at most 20 groups.');
+  await refused({ text: 'x', groups: ['no-such-group'] }, 'This session lists no group "no-such-group". get_session lists the groups you can name.');
+  assert.deepEqual(await listedFor(asMole), [[path.basename(notes), both]]);
+  // No groups named is the session-wide choice, as before.
+  assert.equal((await kami.participant.addContext({ text: 'For everyone.', groups: [] })).visibleTo, 'everyone in the session');
+});
+
 // The agent's view of a session from before an admin's change, which the Worker already has.
 const staleView = (env, before, seen = []) => {
   const worker = workerFetch(env, seen);

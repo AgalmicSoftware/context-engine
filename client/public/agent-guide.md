@@ -179,7 +179,9 @@ and `join_session` lists the ones open to you as `youMay`:
   instructions may say which. Leave one with `leave_group` unless that group
   doesn't let members leave.
 - **Add context** where the session invites it: a file, a link or text that
-  every participant will see. Call `add_context` with exactly one of them.
+  every participant will see. Call `add_context` with exactly one of them. A
+  file or text can instead be for the members of some of the session's groups
+  (`groups`, by the IDs `get_session` lists; the admins see it too).
 
 You can also add statements.
 

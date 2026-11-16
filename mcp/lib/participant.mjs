@@ -10,7 +10,7 @@ import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorage
 import { htmlToPlainText, normalizeSessionContext } from '../../shared/sessionContext.mjs';
 import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
 import { MAX_AGENT_INSTRUCTIONS_CHARS } from '../../shared/sessionConfigEdits.mjs';
-import { CONTEXT_AGENT_ADDER, agentAdderName, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { CONTEXT_AGENT_ADDER, CONTEXT_SOURCE_LIMITS, agentAdderName, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { buildNote, checkContextLink, contextInvitation, contextUploadForm, readContextFile, workerReadsContext } from './contextAdditions.mjs';
 import { createKnownSessions } from './knownSessions.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
@@ -1472,13 +1472,25 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       return { session: ctx.info.slug, leftGroup: id };
     },
 
-    async addContext({ session, file, url, text: note, title, adminsOnly = false } = {}) {
+    async addContext({ session, file, url, text: note, title, adminsOnly = false, groups } = {}) {
       const given = { file, url, text: note };
       const chosen = Object.keys(given).filter((key) => given[key] !== undefined && given[key] !== '');
       if (chosen.length !== 1) throw new Error('Pass exactly one of file, url or text.');
       const [kind] = chosen;
       if (kind === 'file' && title !== undefined) throw new Error('A file keeps its own name; pass title only with url or text.');
       if (adminsOnly !== undefined && typeof adminsOnly !== 'boolean') throw new Error('adminsOnly must be true or false.');
+      // The website's "Visible to", for a file or a note: the members of any of these groups, and the admins.
+      if (groups !== undefined && (!Array.isArray(groups) || groups.some((id) => typeof id !== 'string'))) {
+        throw new Error('groups must be a list of group IDs.');
+      }
+      const groupIds = [...new Set((groups || []).map((id) => id.trim().toLowerCase()).filter(Boolean))];
+      if (groupIds.length && adminsOnly) throw new Error('Pass groups or adminsOnly, not both.');
+      if (groupIds.length && kind === 'url') {
+        throw new Error('A link is for everyone in the session or its admins alone. Only a file or text can be for groups.');
+      }
+      if (groupIds.length > CONTEXT_SOURCE_LIMITS.lockedGroups) {
+        throw new Error(`Name at most ${CONTEXT_SOURCE_LIMITS.lockedGroups} groups.`);
+      }
       const ctx = await resolveSession(session);
       if (ctx.registry) throw new Error('Adding context isn’t available in on-chain sessions yet.');
       const sessionConfig = await ensureReady(ctx);
@@ -1500,7 +1512,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       }
       // Cleaned as the Worker requires, for links as for files and notes.
       const adderName = agentAdderName(profile().displayName);
-      const visibleTo = adminsOnly ? 'the session’s admins' : 'everyone in the session';
+      let visibleTo = adminsOnly ? 'the session’s admins' : 'everyone in the session';
+      if (groupIds.length) {
+        // As the website's list does: only a group this agent can see can be named.
+        const listed = await describeGroups(ctx);
+        if (!listed.groups?.length) throw new Error(listed.groupsUnavailable || 'This session lists no groups you can name.');
+        const names = new Map(listed.groups.map((group) => [group.groupId.toLowerCase(), group.name || group.groupId]));
+        const unknown = groupIds.find((id) => !names.has(id));
+        if (unknown) throw new Error(`This session lists no group "${unknown}". get_session lists the groups you can name.`);
+        visibleTo = `members of ${groupIds.map((id) => `“${names.get(id)}”`).join(' or ')}, and the session’s admins`;
+      }
       try {
         if (kind === 'url') {
           const link = checkContextLink({ url, title });
@@ -1518,7 +1539,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         }
         const upload = kind === 'file' ? await readContextFile(file, { stateDir: config.stateDir }) : buildNote({ text: note, title });
         checkpoint();
-        const storageRef = await ctx.client.uploadForm(contextUploadForm(upload, { adminsOnly, adderName }), { signal });
+        const storageRef = await ctx.client.uploadForm(contextUploadForm(upload, { adminsOnly, groupIds, adderName }), { signal });
         return { session: ctx.info.slug, added: kind, id: text(storageRef?.id), name: upload.name, visibleTo };
       } catch (error) {
         throw contextRefusal(error, { olderLink: kind === 'url' && featuresUnread });

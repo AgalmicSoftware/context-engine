@@ -9,6 +9,7 @@ import {
   CONTEXT_TAGS,
   agentAdderTags,
   contextFileByteLimit,
+  groupLockedAccess,
   resolveContextFileType,
 } from '../../shared/sessionContextSources.mjs';
 
@@ -135,8 +136,11 @@ export const buildNote = ({ text, title }) => {
   return { name: `${base}.md`, contentType: CONTEXT_FILE_TYPES.md, bytes };
 };
 
-/** The multipart upload the web app sends for a participant's context file, with the agent's mark. */
-export const contextUploadForm = ({ name, contentType, bytes }, { adminsOnly = false, adderName = '' } = {}) => {
+/**
+ * The multipart upload the web app sends for a participant's context file, with the agent's mark:
+ * for everyone in the session, for its admins alone, or for the members of some of its groups.
+ */
+export const contextUploadForm = ({ name, contentType, bytes }, { adminsOnly = false, groupIds = [], adderName = '' } = {}) => {
   const form = new FormData();
   form.append('file', new Blob([bytes], { type: contentType }), name);
   form.append('backend', 'cloudflare');
@@ -153,5 +157,6 @@ export const contextUploadForm = ({ name, contentType, bytes }, { adminsOnly = f
     ...agentAdderTags(adderName),
   ]));
   if (adminsOnly) form.append('accessConditions', JSON.stringify(ADMINS_ONLY_ACCESS));
+  else if (groupIds.length) form.append('accessConditions', JSON.stringify(groupLockedAccess(groupIds)));
   return form;
 };

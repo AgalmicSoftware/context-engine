@@ -386,7 +386,7 @@ directory when upgrading; identities and saved session access do not change.
 | `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; only unanswered ones unless `filter` asks for `answered` or `all`. Up to 100 a call; `more` and `next` say how to get the rest. |
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
-| `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set. |
+| `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set, or `groups` names some of the session's groups for a file or text: then the members of any one of them see it, and the admins. |
 | `ask_session_agent` | Asks the session's own Session Agent one question, when it has one and its admins let the agent ask. Chats with it can be recorded when the session's recording setting is on (`get_session` shows `sessionAgent.recording`): the question and answer are then stored for the session's organisers unless `store` is false, with the agent's address only if `attribution` is `address`. |
 | `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
 | `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`: a code, a password or the group's whole invite link; or the one its link carried, held until the MCP restarts; after that, join with the link again). |
@@ -471,7 +471,12 @@ unknown `CE_MCP_*` name.
   its Worker takes it, `join_session` and `get_session` include an invitation
   with the limits: a file, a link or text, or a file or text where the Worker
   doesn't take participants' links or the agent's sign-in can't have it fetch
-  pages. `add_context` takes exactly one. Files are a PDF up to 20 MB, or
+  pages. `add_context` takes exactly one. As on the website's **Visible to**,
+  a file or text can be for everyone in the session, for its admins alone
+  (`adminsOnly`), or for the members of up to 20 of its groups (`groups`, by
+  the IDs `get_session` lists): belonging to any one of them is enough, and
+  admins always see it. A link is for everyone or for admins alone. Files are
+  a PDF up to 20 MB, or
   Markdown, plain text, CSV or JSON up to 1 MB. Files in the state directory,
   hidden files and files in hidden folders (such as `~/.config` or `~/.aws`)
   are never added. Text that looks like a key, token or password is refused,
