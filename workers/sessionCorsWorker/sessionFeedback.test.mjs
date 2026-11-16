@@ -328,8 +328,9 @@ test('nothing but the feedback modules names feedback’s storage or imports the
   const root = new URL('../../', import.meta.url);
   const named = new Set(['sessionFeedback.js', 'sessionFeedbackRoute.js', 'sessionWriteCoordinator.js', 'sessionConfigAuthority.js']
     .map((name) => `workers/sessionCorsWorker/${name}`));
+  // authenticatedRouteDispatch.js takes only the route's path, to keep a body's action from rerouting it.
   const importers = new Set(['sessionFeedbackRoute.js', 'sessionWriteCoordinator.js', 'adminRequestDispatch.js', 'adminResultsAnalysisDispatch.js',
-    'authenticatedSecretActionRouteDispatch.js', 'workerRouteShellBinding.js'].map((name) => `workers/sessionCorsWorker/${name}`));
+    'authenticatedRouteDispatch.js', 'authenticatedSecretActionRouteDispatch.js', 'workerRouteShellBinding.js'].map((name) => `workers/sessionCorsWorker/${name}`));
   let scanned = 0;
   for (const top of ['workers', 'shared', 'mcp/lib', 'mcp/bin']) {
     for (const name of await readdir(new URL(`${top}/`, root), { recursive: true })) {
