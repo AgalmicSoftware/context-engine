@@ -849,12 +849,13 @@ Authenticated clients can use the worker as the session storage boundary:
   `fetch_url`'s own). Every `add-link` passes the upload's access check before the Worker fetches the page.
   `{ action: "add-link", url, title?, adminsOnly?, groupIds?, replaces?, adder?, adderName? }`
   fetches the page under the public-artifact link policy and stores it as a context link record with its text
-  snapshot and fetch date. `groupIds` (1 to 20) locks the link to those groups as a file's lock does, not with
-  `adminsOnly` (`400 context_policy_unsupported`, before any fetch); Workers that take it advertise
-  `context_link_groups_v1`, and the reply's `source` carries `adminsOnly` and `lockedGroupIds` (`replaces` refreshes an existing one: the same `url`, else `400`, keeping its title,
-  privacy and adder, and an agent's mark; `adder: "agent"` and an optional `adderName` store an agent's
-  self-declared mark, as the `CE-AdderKind` and `CE-AdderName` tags a context file may carry,
-  `400 context_adder_invalid` for any other value);
+  snapshot and fetch date (`replaces` refreshes an existing one: the same `url`, else `400`, keeping its title,
+  privacy (everyone, admins or groups) and adder, and an agent's mark; `adder: "agent"` and an optional
+  `adderName` store an agent's self-declared mark, as the `CE-AdderKind` and `CE-AdderName` tags a context file
+  may carry, `400 context_adder_invalid` for any other value). `groupIds` (1 to 20) locks the link to those
+  groups as a file's lock does, not with `adminsOnly` (`400 context_policy_unsupported`, before any fetch);
+  Workers that take it advertise `context_link_groups_v1`, and the reply's `source` carries `adminsOnly` and
+  `lockedGroupIds`;
   `{ action: "read-pdf", id }` sends a context PDF to the session's own Claude or OpenAI model and stores the
   returned text beside it with the same privacy; `{ action: "remove", id }` deletes a context source and that
   text. A PDF has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the
@@ -3048,7 +3049,7 @@ Signed login/bootstrap requests:
 - `GET /capabilities` is public and returns the code-defined feature list, API
   version, optional bundle hash and the Worker's `release` (the version it was
   bundled from, `null` from unbundled source), cached for 30 seconds. Features
-  include `ai_daily_limit_v1` (`limits.aiPerWalletPerDay` is honoured), `draft_text_v1`, `session_feedback` and `storage_read_batch_v1`. With `?slug=<slug>`,
+  include `ai_daily_limit_v1` (`limits.aiPerWalletPerDay` is honoured), `context_link_groups_v1` (a context link may be locked to groups), `draft_text_v1`, `participant_context_links_v1`, `session_feedback` and `storage_read_batch_v1`. With `?slug=<slug>`,
   it also reports coordinator, config authority, storage-index and secret-presence
   readiness, plus fixed reasons for unavailable submit, publication, correction
   and backup operations. A fresh authority reports `seeding`; legacy config
