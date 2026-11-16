@@ -7,6 +7,8 @@ import { evaluateAuthenticatedRoutePreflight as evaluateAuthenticatedRoutePrefli
 import { dispatchInterviewStarterRequest } from './interviewStarter.js';
 import { dispatchAnonymousFeedbackRequest } from './sessionFeedbackRoute.js';
 import { dispatchSignedOutSessionAgentRequest } from './sessionAgentSignedOut.js';
+import { evaluatePrivateSessionAccess, privateSessionRefusal, readGroupReadInviteHeader } from './privateSessionAccess.js';
+import { STORAGE_GROUP_READ_INVITE } from './storageRouteExecution.js';
 import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import {
@@ -681,6 +683,15 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           address = context.address;
           scopes = context.scopes;
         }
+        // A private session's results follow its rule; the reads below see the
+        // invite too, so someone signed out reads what members are shown.
+        const resultsAccess = await evaluatePrivateSessionAccess({
+          env, slug: targetSlug, config, request: withQuerySlugHeader, requesterAddress: address, authScopes: scopes, part: 'results',
+        });
+        if (!resultsAccess.ok) {
+          return privateSessionRefusal({ access: resultsAccess, json: deps?.json, headers: corsContext?.headers || routeBaseHeaders });
+        }
+        const readInvite = { [STORAGE_GROUP_READ_INVITE]: readGroupReadInviteHeader(withQuerySlugHeader) };
         if (routeSelection.kind === 'debate-atlas' || routeSelection.kind === 'risk-matrix') {
           const dispatchBuildRead = routeSelection.kind === 'debate-atlas' ? dispatchDebateAtlasReadRequest : dispatchRiskMatrixReadRequest;
           return await dispatchBuildRead({
@@ -692,6 +703,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             scopes,
             headers: corsContext?.headers || routeBaseHeaders,
             deps: {
+              ...readInvite,
               json: deps?.json,
               validateAdmin: deps?.validateAdmin,
               authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
@@ -714,6 +726,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           scopes,
           headers: corsContext?.headers || routeBaseHeaders,
           deps: {
+            ...readInvite,
             json: deps?.json,
             authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
             readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,

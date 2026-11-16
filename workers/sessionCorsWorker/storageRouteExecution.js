@@ -1041,6 +1041,9 @@ const hasPrivateResponsePolicy = ({ config, resource }) => {
     !!profile?.results?.visibility && profile.results.visibility !== 'public_full_if_storage_public';
 };
 
+const admittedByReadInvite = (matched) =>
+  [matched?.condition, ...(Array.isArray(matched?.conditions) ? matched.conditions : [])].some((condition) => condition?.readInvite === true);
+
 const membersSeeAllResponses = (config) => config?.sessionModeProfile?.results?.visibility === 'session_member_full';
 
 const canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
@@ -1074,20 +1077,27 @@ const authorizeCloudflareStorageAccess = async ({
   if (!isStorageResource(resource)) {
     return { ok: false, response: responseJson(deps, { error: 'Invalid storage resource.' }, 400, baseHeaders) };
   }
-  if (!canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
-    return {
-      ok: false,
-      response: responseJson(deps, {
-        error: membersSeeAllResponses(config)
-          ? 'Access denied: answers are visible to signed-in session members.'
-          : 'Access denied: individual response access requires its author or a session admin.',
-        reason: 'private_response_owner_required',
-      }, 403, baseHeaders),
-    };
+  const privateResponseRefusal = () => ({
+    ok: false,
+    response: responseJson(deps, {
+      error: membersSeeAllResponses(config)
+        ? 'Access denied: answers are visible to signed-in session members.'
+        : 'Access denied: individual response access requires its author or a session admin.',
+      reason: 'private_response_owner_required',
+    }, 403, baseHeaders),
+  });
+  // Someone signed out with a group read invite reads answers as a member
+  // would where members see every answer, and only if the invite is what the
+  // session gate admits them by.
+  const asInvitee = !normalizeAddress(requesterAddress) && !!deps?.[STORAGE_GROUP_READ_INVITE] &&
+    membersSeeAllResponses(config) && hasPrivateResponsePolicy({ config, resource });
+  if (!asInvitee && !canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
+    return privateResponseRefusal();
   }
   // Payload restrictions are additional to the session gate, never a replacement.
   const args = { env, config, slug, resource, requesterAddress, authScopes, baseHeaders, deps };
   const sessionAccess = await authorizeCloudflareStorageGate(args);
+  if (sessionAccess.ok && asInvitee && !admittedByReadInvite(sessionAccess.conditionMatched)) return privateResponseRefusal();
   if (!sessionAccess.ok || !metadata) return sessionAccess;
   const groups = resolveGroupGateIds({ metadata, access: {} });
   if (groups.length) {

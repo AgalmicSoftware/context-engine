@@ -8,6 +8,13 @@ import { formatWorkerGroupReadInvite, workerGroupJoinStatement, workerGroupReadS
 import { ADMIN, SESSION_ID, createFixture, principal } from './workerGroupTestFixture.mjs';
 import { dispatchSessionAgentInstructionsRequest, dispatchSessionConfigBootstrapRequest } from './sessionConfigBootstrapDispatch.js';
 import { dispatchAnonymousRoute } from './anonymousRouteDispatch.js';
+import { dispatchSignedOutSessionAgentRequest } from './sessionAgentSignedOut.js';
+import { dispatchInterviewStarterRequest } from './interviewStarter.js';
+import { dispatchResourcePresenceRequest } from './resourcePresenceDispatch.js';
+import { dispatchInterviewBriefRequest } from './interviewBriefDispatch.js';
+import { issueInterviewCatalogTicket } from './interviewCatalogTicket.js';
+import { createWorkerRouteShellWithWorkerDeps } from './workerRouteShellBinding.js';
+import { STORAGE_GROUP_READ_INVITE, authorizeCloudflareStorageResourceRead } from './storageRouteExecution.js';
 import {
   PRIVATE_SESSION_INVITE_INVALID,
   PRIVATE_SESSION_INVITE_REQUIRED,
@@ -282,4 +289,122 @@ test('the AI routes of a private session answer only those its rule admits', asy
     assert.equal(reached.length, 0, path);
     assert.equal((await signedOut(f, path, { config, deps, invite: await readInvite(key) })).body.error, 'parsed', path);
   }
+});
+
+// The routes that read a session for someone signed out, each answering a
+// marker once past the rule. Every one is refused without an invite, told an
+// invite no longer holds, and let through with a good one.
+const sessionReads = {
+  json: (body, status = 200) => ({ body, status }),
+  resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 'fixture', explicitSlugProvided: true }),
+  resolveAnonymousRateIdentity: () => 'visitor',
+  getCorsContext: async () => ({ ok: true, headers: {} }),
+};
+const signedOutRoutes = {
+  'session agent': (f, config, request) => dispatchSignedOutSessionAgentRequest({
+    request, env: f.env, path: '/session-agent/ask', baseHeaders: {}, constants: {},
+    deps: { ...sessionReads, readCurrentSessionConfig: async () => ({ config }), dispatchSessionAgentRoute: async () => ({ body: { marker: true } }) },
+  }),
+  'interview starter': (f, config, request) => dispatchInterviewStarterRequest({
+    request, env: f.env, baseHeaders: {}, constants: {},
+    deps: { ...sessionReads, readCurrentSessionConfig: async () => ({ config }),
+      evaluateAnonymousRouteAccess: async () => ({ ok: false, status: 418, error: 'marker' }) },
+  }),
+  'resource presence': (f, config, request) => dispatchResourcePresenceRequest({
+    request, env: f.env, baseHeaders: {}, constants: {},
+    deps: { ...sessionReads, getSessionConfig: async () => config, getSessionSecrets: async () => ({}) },
+  }),
+  'interview catalog': (f, config, request) => dispatchInterviewBriefRequest({
+    request, env: f.env, baseHeaders: {}, constants: {},
+    deps: { ...sessionReads, readCurrentSessionConfig: async () => ({ config }),
+      loadPublicInterviewQuestions: async () => { throw Object.assign(new Error('marker'), { marker: true }); } },
+  }),
+};
+const passed = async (run) => {
+  try {
+    const result = await run();
+    return result?.body?.marker === true || result?.body?.error === 'marker' || result?.body?.ok === true;
+  } catch (error) {
+    return error?.marker === true;
+  }
+};
+
+test('the signed-out session agent, interview and presence routes follow the rule', async () => {
+  const { f, key } = await setup();
+  const config = privateConfig();
+  const ask = (invite) => new Request('https://worker.test/route?slug=fixture', {
+    method: 'POST', body: '{}', headers: invite ? { 'X-CE-Group-Invite': invite } : {},
+  });
+  for (const [name, route] of Object.entries(signedOutRoutes)) {
+    assert.equal((await route(f, config, ask())).body.reason, PRIVATE_SESSION_INVITE_REQUIRED, name);
+    assert.equal((await route(f, config, ask(await readInvite(passwordKey('22'))))).body.reason, PRIVATE_SESSION_INVITE_INVALID, name);
+    const invite = await readInvite(key);
+    assert.equal(await passed(() => route(f, config, ask(invite))), true, name);
+    // A session that isn't private is as before.
+    const open = privateConfig({ match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'agent_grant_scope', scope: 'storage' }] });
+    assert.equal(await passed(() => route(f, open, ask())), true, name);
+  }
+});
+
+test('a catalog ticket opens a private session to its person only if the rule admits them', async () => {
+  const { f } = await setup();
+  const env = { ...f.env, TOKEN_HMAC_SECRET: 'synthetic-ticket-hmac' };
+  const config = privateConfig();
+  const ticketFor = async (address) => (await issueInterviewCatalogTicket({
+    env, config, slug: 'fixture', sub: address, parent: 'sign-in-1', parentExp: Math.floor(Date.now() / 1000) + 600,
+  })).ticket;
+  const read = async (address) => {
+    const request = new Request(`https://worker.test/agent/interview-catalog?ticket=${await ticketFor(address)}`);
+    return dispatchInterviewBriefRequest({
+      request, env, baseHeaders: {}, constants: {},
+      deps: { ...sessionReads, readCurrentSessionConfig: async () => ({ config }),
+        validateAuthTokenRecord: async () => ({ ok: true }), computeScopesForLogin: async () => ({ storage: true }),
+        loadPublicInterviewQuestions: async ({ reader }) => { throw Object.assign(new Error('marker'), { marker: reader?.address }); } },
+    }).catch((error) => error.marker);
+  };
+  assert.equal(await read(principal(1).address), principal(1).address);
+  assert.equal((await read(principal(2).address)).body.reason, PRIVATE_SESSION_INVITE_REQUIRED);
+});
+
+test('results open to a signed-out invite holder where members see every answer, and to no one else', async () => {
+  const { f, key } = await setup();
+  const withResults = (visibility, base = privateConfig()) => ({
+    ...base,
+    sessionModeProfile: { ...base.sessionModeProfile, results: { ...base.sessionModeProfile.results, visibility } },
+  });
+  const shellFor = (config) => createWorkerRouteShellWithWorkerDeps({
+    deps: {
+      ...sessionReads,
+      toStr: String,
+      resolveTopLevelRouteSelection: () => ({ kind: 'results-analysis-artifact' }),
+      getRouteBaseHeaders: () => ({}),
+      getDefaultWorkerSessionSlug: () => 'fixture',
+      readCurrentSessionConfig: async () => ({ config }),
+      readPublishedResultsAnalysisArtifact: async () => ({ ok: true, marker: true }),
+    },
+    constants: {},
+  });
+  const view = async (config, invite) => (await shellFor(config).fetch(new Request('https://worker.test/results-analysis/artifact?slug=fixture', {
+    headers: invite ? { 'X-CE-Group-Invite': invite } : {},
+  }), f.env));
+  const full = withResults('session_member_full');
+  assert.equal((await view(full, await readInvite(key))).body.marker, true);
+  // Refused at the door, in the words the page shows, before any read.
+  assert.deepEqual((await view(full)).body, { error: 'This session is private. Open it from your group invite link.', reason: PRIVATE_SESSION_INVITE_REQUIRED });
+  assert.equal((await view(full, await readInvite(passwordKey('22')))).body.reason, PRIVATE_SESSION_INVITE_INVALID);
+
+  // Where members see only their own answers, an invite reads none.
+  const answers = (config, invite, requesterAddress = '') => authorizeCloudflareStorageResourceRead({
+    env: f.env, config, slug: 'fixture', resource: 'responses', requesterAddress, authScopes: { storage: true },
+    deps: { [STORAGE_GROUP_READ_INVITE]: invite },
+  });
+  assert.equal((await answers(full, await readInvite(key))).ok, true);
+  // A member whose browser still sends an old invite reads as a member.
+  assert.equal((await answers(full, await readInvite(passwordKey('22')), principal(1).address)).ok, true);
+  const own = await answers(withResults('participant_aggregate'), await readInvite(key));
+  assert.equal(own.ok, false);
+  assert.equal((await own.response.json()).reason, 'private_response_owner_required');
+  // An invite opens nothing in a session whose rule names no group, even one open to all.
+  const open = withResults('session_member_full', { ...privateConfig(), storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } });
+  assert.equal((await answers(open, await readInvite(key))).ok, false);
 });

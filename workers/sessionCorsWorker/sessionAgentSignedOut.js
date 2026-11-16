@@ -7,6 +7,7 @@ import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { SESSION_AGENT_SIGNED_OUT, dispatchSessionAgentRoute } from './sessionAgentRoute.js';
 import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 import { resolveWorkerCanonicalLoginScopes } from './workerCanonicalAuthority.js';
+import { evaluatePrivateSessionAccess, privateSessionRefusal } from './privateSessionAccess.js';
 
 export const SESSION_AGENT_SIGNED_OUT_PATHS = Object.freeze(['/session-agent/status', '/session-agent/ask']);
 
@@ -46,6 +47,9 @@ export const dispatchSignedOutSessionAgentRequest = async ({ request, env, path,
   if (!config) return deps.json({ error: constants?.sessionConfigNotFoundError }, 404, baseHeaders);
   const cors = await deps.getCorsContext({ request, config });
   if (!cors.ok) return cors.response;
+  // A private session's agent answers a visitor only if its rule admits them.
+  const access = await evaluatePrivateSessionAccess({ env, slug, config, request });
+  if (!access.ok) return privateSessionRefusal({ access, json: deps.json, headers: cors.headers });
   const raw = await request.text();
   if (new TextEncoder().encode(raw).length > SESSION_AGENT_SIGNED_OUT.bodyBytes) {
     return deps.json({ error: 'That is too long to send.' }, 400, cors.headers);

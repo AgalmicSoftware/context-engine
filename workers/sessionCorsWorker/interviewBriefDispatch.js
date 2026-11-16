@@ -4,6 +4,7 @@ import { rateLimitRefusal } from './rateLimitRefusal.js';
 import { resolveAuthenticatedRouteContext } from './authenticatedRouteContextResolution.js';
 import { evaluateAuthenticatedRoutePreflight } from './authenticatedRoutePreflight.js';
 import { issueInterviewCatalogTicket, verifyInterviewCatalogTicket } from './interviewCatalogTicket.js';
+import { evaluatePrivateSessionAccess, privateSessionRefusal } from './privateSessionAccess.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 import {
   listSelfJoinableWorkerGroupsForMember as listSelfJoinableWorkerGroupsForMemberBoundary,
@@ -211,6 +212,13 @@ export const dispatchInterviewBriefRequest = async ({
     if (!verified.ok) return deps?.json?.({ error: verified.error, reason: verified.reason }, verified.status, headers);
     reader = verified.reader;
   }
+  // A private session's catalog opens to a ticket whose person its rule
+  // admits, or to an invite; an AI fetching a link sends no invite, so its
+  // person signs in for a ticket.
+  const access = await evaluatePrivateSessionAccess({
+    env, slug, config, request, requesterAddress: reader?.address || '', authScopes: reader?.scopes,
+  });
+  if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers });
   const loadPublicInterviewQuestions = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestionsBoundary;
   const { questions, incomplete, refused } = await loadPublicInterviewQuestions({
     env,
