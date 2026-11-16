@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
   E2E_TESTIDS,
   mockGetGlobalLitHooks,
   mockListArweaveTransactionsByTags,
@@ -226,6 +227,59 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     expect(JSON.stringify(mockReadSessionStorageBlob.mock.calls[0][0].storageRef)).not.toMatch(
       /bucket|account|token|secret|r2:\/\//i,
     );
+  });
+
+  it('shows when a Worker-stored item was added and by whom, not where it is kept or an index wait', async () => {
+    mockResolveDocLibraryProvider.mockReturnValue('cloudflare');
+    const agent = `0x${'2'.repeat(40)}`;
+    mockListSessionStorageRefs.mockResolvedValueOnce(
+      [
+        [
+          'cf_docagent01',
+          'Agent notes',
+          agent,
+          [
+            { name: 'CE-AdderKind', value: 'agent' },
+            { name: 'CE-AdderName', value: 'Wren' },
+          ],
+        ],
+        ['cf_docmine001', 'My notes', '0x0000000000000000000000000000000000000123', []],
+      ].map(([id, name, addedBy, adderTags]) => ({
+        storageRef: { backend: 'cloudflare', id, contentType: 'text/markdown', resource: 'docsContext' },
+        metadata: {
+          size: 12,
+          createdAt: '2026-11-16T00:00:00.000Z',
+          addedBy,
+          tags: [{ name: 'CE-DocKind', value: 'file' }, { name: 'CE-DocName', value: name }, ...(adderTags as [])],
+        },
+      })),
+    );
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x0000000000000000000000000000000000000123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={{ storageProfile: { backend: 'cloudflare' } }}
+        mode="session"
+        sessionIdHex={`0x${'7'.repeat(32)}`}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getAllByTestId(E2E_TESTIDS.DOC_ROW)).toHaveLength(2));
+    const [byAgent, byMe] = screen.getAllByTestId(E2E_TESTIDS.DOC_ROW);
+    expect(byAgent).toHaveTextContent('Added by Wren');
+    expect(within(byAgent).getByText('agent')).toBeInTheDocument();
+    expect(within(byMe).queryByText('agent')).toBeNull();
+    expect(byMe).toHaveTextContent('Added by you');
+    expect(byAgent).toHaveTextContent(new Date('2026-11-16T00:00:00.000Z').toLocaleString());
+    for (const row of [byAgent, byMe]) {
+      expect(row).not.toHaveTextContent(/cloudflare/i);
+      expect(row).not.toHaveTextContent('Pending indexing');
+    }
   });
 
   it('keeps manual Cloudflare continuation available when an authorized page is empty', async () => {

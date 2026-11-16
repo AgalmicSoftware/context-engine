@@ -1,5 +1,13 @@
+// The library draws its text in the inverse colour, for the dark panels it sits on
+// elsewhere. Here it is a page of documents: the theme's document canvas and text,
+// which read together in every theme (the plain canvas is teal in Classic 95).
 .page {
+  --ce-text-inverse: var(--ce-document-text);
+
   padding: 16px;
+  border-radius: var(--ce-radius-12);
+  background: var(--ce-document-canvas);
+  color: var(--ce-document-text);
   max-width: 1050px;
   margin: 0 auto;
 }

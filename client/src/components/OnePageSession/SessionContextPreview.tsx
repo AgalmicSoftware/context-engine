@@ -12,6 +12,7 @@ import {
   type ContextSource,
 } from '../../utilities/docLibrary/contextSources';
 import { toViewerBlob } from '../../utilities/ui/viewerMime';
+import documentStyles from '../DocumentLibrary/DocumentLibraryPanel.module.scss';
 import styles from './SessionContextSources.module.scss';
 
 /** How much of a text file shows in place; the viewer shows all of it. */
@@ -117,7 +118,7 @@ export const ContextViewerModal = ({ source, pageHref, onClose, ...reader }: Vie
   const content = useSourceContent(source, reader);
   const title = contextSourceDisplayTitle(source);
   return (
-    <Modal isOpen toggle={onClose} size="lg" scrollable className={styles.viewerModal}>
+    <Modal isOpen toggle={onClose} size="lg" scrollable contentClassName={documentStyles.documentViewer}>
       <ModalHeader toggle={onClose}>{title}</ModalHeader>
       <ModalBody data-testid="ce-session-context-viewer">
         <DocumentLibraryViewerBody

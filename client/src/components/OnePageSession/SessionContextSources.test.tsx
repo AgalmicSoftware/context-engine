@@ -314,6 +314,8 @@ describe('the Context section for participants', () => {
       fireEvent.click(open);
       const viewer = await screen.findByTestId('ce-session-context-viewer');
       expect(await within(viewer).findByTestId('ce-doc-viewer-pdf')).toHaveAttribute('src', 'blob:pdf');
+      // The docs page's viewer, painted as a document.
+      expect(viewer.closest('.modal-content')).toHaveClass('documentViewer');
       const page = new URL(
         within(viewer).getByRole('link', { name: 'Open in its own page' }).getAttribute('href') || '',
         'https://site.example',

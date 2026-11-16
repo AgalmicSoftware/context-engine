@@ -35,12 +35,14 @@ import {
   uploadDocLibraryUrlRecord,
 } from '../../utilities/docLibrary/uploads.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { CONTEXT_AGENT_ADDER, CONTEXT_SOURCE_LIMITS, CONTEXT_TAGS } from '@ce-shared/sessionContextSources.mjs';
 import { isTextLikeMime, toViewerBlob } from '../../utilities/ui/viewerMime';
 import { createLogger } from '../../utilities/logging.js';
 import {
   DocumentLibraryList,
   DocumentLibraryUploadControls,
   DocumentLibraryViewerBody,
+  type DocAdder,
 } from './DocumentLibraryPanelViews';
 import {
   resolveDocumentLibraryCapabilityRoute,
@@ -103,6 +105,9 @@ type DocRecord = {
   block: DocBlock | null;
   data: DocData | null;
   storageRef?: StorageRef | null;
+  /** When a Worker-stored item was added, and by whom; Arweave items have their block instead. */
+  addedAt?: string;
+  adder?: DocAdder;
 };
 
 type CustomSbtEntry = {
@@ -257,7 +262,7 @@ const buildDocRecordFromStorageItem = (item: Record<string, unknown>): DocRecord
   tagMap['CE-DocStorage'] = storageRef.backend;
   tagMap['CE-DocKind'] = tagMap['CE-DocKind'] || 'file';
   if (storageRef.contentType && !tagMap['CE-DocMime']) tagMap['CE-DocMime'] = storageRef.contentType;
-  return buildPendingDocRecord({
+  const record = buildPendingDocRecord({
     txId: storageRef.id,
     tagMap,
     storageRef,
@@ -266,6 +271,18 @@ const buildDocRecordFromStorageItem = (item: Record<string, unknown>): DocRecord
       type: storageRef.contentType || toStr(metadata.contentType).trim() || null,
     },
   });
+  const addedByAgent = tagMap[CONTEXT_TAGS.adderKind] === CONTEXT_AGENT_ADDER;
+  return {
+    ...record,
+    addedAt: toStr(metadata.createdAt).trim(),
+    adder: {
+      addedBy: toStr(metadata.addedBy).trim().toLowerCase(),
+      addedByAgent,
+      adderName: addedByAgent
+        ? toStr(tagMap[CONTEXT_TAGS.adderName]).slice(0, CONTEXT_SOURCE_LIMITS.adderNameChars)
+        : '',
+    },
+  };
 };
 
 const buildAsyncContextKeyPart = (value: unknown): string => {
@@ -1585,9 +1602,17 @@ export default function DocumentLibraryPanel({
         network={documentNetwork}
         panelContextKey={panelContextKey}
         litHooks={allowsLitDocumentControls ? scopedLitHooks : null}
+        sessionConfig={sessionConfig}
       />
 
-      <Modal isOpen={viewerOpen} toggle={closeViewer} size="lg" centered data-testid={E2E_TESTIDS.DOC_VIEWER}>
+      <Modal
+        isOpen={viewerOpen}
+        toggle={closeViewer}
+        size="lg"
+        centered
+        contentClassName={styles.documentViewer}
+        data-testid={E2E_TESTIDS.DOC_VIEWER}
+      >
         <ModalHeader toggle={closeViewer} data-testid={E2E_TESTIDS.DOC_VIEWER_TITLE}>
           {viewerTitle || 'Document'}
         </ModalHeader>
