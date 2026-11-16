@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import {
   AGENT_KEY_ENV,
   AgentDelegateKeyError,
@@ -18,6 +18,8 @@ import styles from './Account.module.scss';
 export type LoginAgentHandoffPanelProps = {
   agentHttpEnabled: boolean;
   sessionUrl: string;
+  // The session's title, or its slug where it has none.
+  sessionName: string;
   requestKey: () => Promise<AgentDelegateKey>;
 };
 
@@ -31,8 +33,17 @@ const keyErrorMessage = (error: unknown): string => {
   return "Couldn't make a key. Try again.";
 };
 
-// A short label's "?": its words show on hover and focus, and describe the button.
-const Help = ({ id, children }: { id: string; children: React.ReactNode }) => (
+// A short label's "?": its words show on hover and focus, and describe the button. Below, where above would
+// cover the controls it explains.
+const Help = ({
+  id,
+  placement = 'top',
+  children,
+}: {
+  id: string;
+  placement?: 'top' | 'bottom';
+  children: React.ReactNode;
+}) => (
   <>
     <button
       type="button"
@@ -50,7 +61,7 @@ const Help = ({ id, children }: { id: string; children: React.ReactNode }) => (
     {/* networkTooltip lifts it above the login modal, like the other tooltips here. */}
     <UncontrolledTooltip
       target={id}
-      placement="top"
+      placement={placement}
       trigger="hover focus"
       autohide={false}
       className={styles.networkTooltip}
@@ -65,32 +76,41 @@ type StepProps = {
   label: React.ReactNode;
   shown: string;
   copyLabel: string;
+  copied: boolean;
   onCopy: () => void;
   children?: React.ReactNode;
 };
 
-const Step = ({ id, label, shown, copyLabel, onCopy, children }: StepProps) => (
+// The copy icon sits in its box's corner and turns to a tick once copied.
+const Step = ({ id, label, shown, copyLabel, copied, onCopy, children }: StepProps) => (
   <div className={styles.agentHandoffStep}>
     <div className={styles.agentHandoffStepLabel}>{label}</div>
-    <code className={styles.agentHandoffCommand} data-testid={`ce-agent-handoff-${id}`}>
-      {shown}
-    </code>
-    <div className={styles.agentHandoffActions}>
+    <div className={styles.agentHandoffCommandBox}>
+      <code className={styles.agentHandoffCommand} data-testid={`ce-agent-handoff-${id}`}>
+        {shown}
+      </code>
       <button
         type="button"
-        className={styles.agentHandoffButton}
+        className={styles.agentHandoffCopy}
+        data-ce-control-appearance="frameless"
         onClick={onCopy}
         aria-label={copyLabel}
+        title={copied ? 'Copied' : copyLabel}
         data-testid={`ce-agent-handoff-${id}-copy`}
       >
-        Copy
+        <FontAwesomeIcon icon={copied ? faCheck : faCopy} />
       </button>
-      {children}
     </div>
+    {children ? <div className={styles.agentHandoffActions}>{children}</div> : null}
   </div>
 );
 
-const LoginAgentHandoffPanel = ({ agentHttpEnabled, sessionUrl, requestKey }: LoginAgentHandoffPanelProps) => {
+const LoginAgentHandoffPanel = ({
+  agentHttpEnabled,
+  sessionUrl,
+  sessionName,
+  requestKey,
+}: LoginAgentHandoffPanelProps) => {
   const [way, setWay] = useState<'self' | 'behalf'>('self');
   const [ownerName, setOwnerName] = useState('');
   // The key lives only here, never in browser storage, and goes when the dialog closes.
@@ -101,12 +121,20 @@ const LoginAgentHandoffPanel = ({ agentHttpEnabled, sessionUrl, requestKey }: Lo
   const [copyStatus, setCopyStatus] = useState('');
   // A new node for each copy, so a screen reader announces a repeated message.
   const [copyCount, setCopyCount] = useState(0);
+  // The step whose icon shows a tick, for a moment after it was copied.
+  const [copiedStep, setCopiedStep] = useState('');
+  const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(copiedTimer.current), []);
   const displayName = agentDisplayName(ownerName);
 
-  const copy = async (what: string, text: string) => {
+  const copy = async (step: string, what: string, text: string) => {
+    clearTimeout(copiedTimer.current);
+    setCopiedStep('');
     try {
       await navigator.clipboard.writeText(text);
       setCopyStatus(`Copied the ${what}.`);
+      setCopiedStep(step);
+      copiedTimer.current = setTimeout(() => setCopiedStep(''), 1800);
     } catch {
       setCopyStatus(`Couldn't copy the ${what}. Select it and copy it yourself.`);
     }
@@ -199,20 +227,24 @@ const LoginAgentHandoffPanel = ({ agentHttpEnabled, sessionUrl, requestKey }: Lo
             }
             shown={mcpCommand}
             copyLabel="Copy the MCP command"
-            onCopy={() => copy('command', mcpCommand)}
+            copied={copiedStep === 'mcp'}
+            onCopy={() => copy('mcp', 'command', mcpCommand)}
           />
           <Step
             id="join"
             label="2. Ask your agent"
             shown={joinPrompt}
             copyLabel="Copy the prompt"
-            onCopy={() => copy('prompt', joinPrompt)}
+            copied={copiedStep === 'join'}
+            onCopy={() => copy('join', 'prompt', joinPrompt)}
           />
         </>
       ) : !agentHttpEnabled ? (
         <p className={styles.agentHandoffHint}>
-          Not on in this session
-          <Help id="ce-agent-handoff-off-about">Session admins can turn on Agents (HTTP API).</Help>
+          Not on in {sessionName}
+          <Help id="ce-agent-handoff-off-about" placement="bottom">
+            Session admins can turn on Agents (HTTP API).
+          </Help>
         </p>
       ) : !key ? (
         <div className={styles.agentHandoffActions}>
@@ -225,7 +257,7 @@ const LoginAgentHandoffPanel = ({ agentHttpEnabled, sessionUrl, requestKey }: Lo
           >
             {making ? 'Making a key…' : 'Make a key'}
           </button>
-          <Help id="ce-agent-handoff-key-about">
+          <Help id="ce-agent-handoff-key-about" placement="bottom">
             The key lets your agent read the questions, save drafts and submit the answers you approve, as you. It stops
             when your sign-in ends or when you make a new one. It needs an agent that runs commands on your computer,
             such as Claude Code or Codex.
@@ -246,7 +278,8 @@ const LoginAgentHandoffPanel = ({ agentHttpEnabled, sessionUrl, requestKey }: Lo
             }
             shown={buildAgentKeyCommand(keyShown ? key.token : MASKED_KEY)}
             copyLabel="Copy the key command"
-            onCopy={() => copy('command', buildAgentKeyCommand(key.token))}
+            copied={copiedStep === 'key'}
+            onCopy={() => copy('key', 'command', buildAgentKeyCommand(key.token))}
           >
             <button
               type="button"
@@ -265,7 +298,8 @@ const LoginAgentHandoffPanel = ({ agentHttpEnabled, sessionUrl, requestKey }: Lo
             label="2. Ask your agent"
             shown={buildOnMyBehalfPrompt(key)}
             copyLabel="Copy the prompt"
-            onCopy={() => copy('prompt', buildOnMyBehalfPrompt(key))}
+            copied={copiedStep === 'behalf-prompt'}
+            onCopy={() => copy('behalf-prompt', 'prompt', buildOnMyBehalfPrompt(key))}
           />
         </>
       )}
