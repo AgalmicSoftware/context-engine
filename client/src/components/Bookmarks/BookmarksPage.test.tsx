@@ -159,4 +159,20 @@ describe('BookmarksPage cache scan helpers', () => {
       '/question/0qsame?session=edge',
     ]);
   });
+
+  it('opens a bookmarked user in the session it was saved in, keeping each session’s nickname', async () => {
+    mockListNamespaceEntriesSync.mockImplementation((namespace: unknown) =>
+      namespace === 'bookmarksCache'
+        ? [
+            { key: 'dg:bookmarksCache:edge', slug: 'edge', value: { users: [{ address: '0xabc', nickname: 'Sam' }] } },
+            { key: 'dg:bookmarksCache:beta', slug: 'beta', value: { users: [{ address: '0xabc', nickname: 'S.' }] } },
+          ]
+        : [],
+    );
+
+    render(<BookmarksPage />);
+
+    expect((await screen.findByRole('link', { name: 'Sam' })).getAttribute('href')).toBe('/u/0xabc?session=edge');
+    expect(screen.getByRole('link', { name: 'S.' }).getAttribute('href')).toBe('/u/0xabc?session=beta');
+  });
 });
