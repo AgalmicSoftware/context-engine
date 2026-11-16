@@ -35,7 +35,7 @@ const createRunner = () => {
   return {
     runs,
     abandoned,
-    run: ({ job }) => new Promise((resolve) => { runs.push({ job, finish: resolve }); }),
+    run: ({ job }) => new Promise((resolve, reject) => { runs.push({ job, finish: resolve, fail: reject }); }),
     abandon: async ({ job }) => { abandoned.push(job.jobId); },
   };
 };
@@ -160,7 +160,9 @@ test('a run still held in memory whose heartbeat stopped runs again, and the old
   await settle();
   assert.equal(hung.runs.length, 2, 'the same coordinator runs it again');
   assert.equal(await nextResultsJobAt(coordinator), coordinator.clock.ms + RESULTS_JOB_STALE_MS, 'no alarm in the past');
-  hung.runs[0].finish({ ok: false, status: 500, error: 'late' });
+  hung.runs[0].fail(new Error('late'));
+  await settle();
+  assert.deepEqual(hung.abandoned, [], 'it leaves the lease to the run that replaced it');
   hung.runs[1].finish({ ok: true, status: 200, buildId: 'atlas_2' });
   await settle();
   assert.equal((await readResultsJob(coordinator, 'debate-atlas', runners)).outcome.buildId, 'atlas_2');

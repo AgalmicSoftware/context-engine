@@ -158,3 +158,19 @@ test('a run again finds the build its stopped run kept before it could say so, a
   const later = await RESULTS_JOB_RUNNERS['debate-atlas'].run({ coordinator, job: { ...job, startedAtMs: clock.ms + 2000 } });
   assert.deepEqual([later.ok, later.status], [false, 409]);
 });
+
+test('a run again whose build fails reports the build its stopped run kept meanwhile', async () => {
+  const { coordinator, post, clock } = createCoordinator();
+  const reserved = await post('debate-atlas/reserve', { builder: BUILDER });
+  const job = { kind: 'debate-atlas', slug: 'salon', runs: 2, startedAtMs: clock.ms, attemptId: reserved.body.attemptId, input: { builder: BUILDER } };
+  const build = { id: 'atlas_k2_00000002', version: 1, builtAt: new Date(clock.ms).toISOString(), builtBy: BUILDER, counts: {}, title: 'Atlas', missingTopics: [], branches: [] };
+  // The stopped run wakes and keeps its build after this run took the lease again.
+  coordinator.readCurrentSessionConfig = async () => {
+    await post('debate-atlas/finalize', { attemptId: reserved.body.attemptId, build });
+    return { config: { scopes: { ai: false } } };
+  };
+  assert.deepEqual(await RESULTS_JOB_RUNNERS['debate-atlas'].run({ coordinator, job }), { ok: true, status: 200, buildId: build.id });
+  // A first run reports its own failure as it is.
+  const first = await RESULTS_JOB_RUNNERS['debate-atlas'].run({ coordinator, job: { ...job, runs: 1, attemptId: (await post('debate-atlas/reserve', { builder: BUILDER })).body.attemptId } });
+  assert.deepEqual([first.ok, first.status], [false, 403]);
+});

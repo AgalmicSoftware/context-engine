@@ -13,6 +13,13 @@ const storeCall = (coordinator, kind) => async (_env, _slug, operation, payload 
   return { ok: response.ok && body?.ok === true, status: response.status, body };
 };
 
+// The newest build kept since this job started: a run stopped and run again
+// may have kept it before it could say so.
+const keptSince = async (store, job) => {
+  const kept = (await store(null, job.slug, 'read', {})).body?.builds?.[0];
+  return kept && Date.parse(kept.builtAt) >= job.startedAtMs ? { ok: true, status: 200, buildId: kept.id } : null;
+};
+
 const configOf = async (coordinator, slug) => (await coordinator.readCurrentSessionConfig(slug))?.config || null;
 
 const resultsBuildRunner = (kind, build) => ({
@@ -21,10 +28,8 @@ const resultsBuildRunner = (kind, build) => ({
     // A build run again restarts its lease, which may have run out while the first stopped.
     const touched = await store(null, job.slug, 'touch', { attemptId: job.attemptId });
     if (!touched.ok) {
-      // The stopped run may have kept its build before it could say so.
-      const kept = (await store(null, job.slug, 'read', {})).body?.builds?.[0];
-      if (kept && Date.parse(kept.builtAt) >= job.startedAtMs) return { ok: true, status: 200, buildId: kept.id };
-      return { ok: false, status: touched.status || 409, error: touched.body?.error || 'This build is no longer current.' };
+      return await keptSince(store, job) ||
+        { ok: false, status: touched.status || 409, error: touched.body?.error || 'This build is no longer current.' };
     }
     const config = await configOf(coordinator, job.slug);
     if (!config) {
@@ -41,6 +46,7 @@ const resultsBuildRunner = (kind, build) => ({
       attemptId: job.attemptId,
       deps: { now: coordinator.now, callBuildStore: store },
     });
+    if (!result?.ok && job.runs > 1) return await keptSince(store, job) || result;
     return { ...result, buildId: result?.build?.id };
   },
   abandon: ({ coordinator, job }) => storeCall(coordinator, kind)(null, job.slug, 'finalize', { attemptId: job.attemptId }),

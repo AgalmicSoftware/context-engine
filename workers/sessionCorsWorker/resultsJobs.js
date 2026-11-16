@@ -92,7 +92,10 @@ const runJob = async (coordinator, runners, job) => {
       result = await runner.run({ coordinator, job });
     }
   } catch (error) {
-    try { await runner.abandon?.({ coordinator, job }); } catch { /* The kind's own lease ends on its own. */ }
+    // A run already run again leaves the lease to the run that replaced it.
+    try {
+      if (isThisRun(await storage.get(keyOf(job.kind)), job)) await runner.abandon?.({ coordinator, job });
+    } catch { /* The kind's own lease ends on its own. */ }
     result = { ok: false, status: 500, error: error?.message || 'The build failed.' };
   } finally {
     clearInterval(timer);
