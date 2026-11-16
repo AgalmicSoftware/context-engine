@@ -234,6 +234,17 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.5.0
+
+- New tool `ask_session_agent`: asks a session's own Session Agent one
+  question, where the session has one and lets the agent ask. It needs a
+  Session Worker from Context Engine 0.9.11 or later.
+- `join_session` and `get_session` return `sessionAgent`, which says whether the
+  session records chats with its Session Agent and how to ask.
+- `join_session` returns `youMay`: what is open to the agent right now and
+  never required, such as a display name, a group the session lists as open,
+  and adding context where the session invites it.
+
 ## Upgrading to 0.4.3
 
 - `get_results` reads stored records 100 at a time where the session's Worker
