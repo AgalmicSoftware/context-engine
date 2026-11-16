@@ -674,6 +674,25 @@ describe('WorkerGroupAutoJoin', () => {
     expect(window.location.pathname).toBe('/session/beta');
   });
 
+  it('never brings back a link’s secret the tab dropped while the session loaded', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/session/alpha?joinGroup=participants-2026&worker=https%3A%2F%2Fworker.example#groupInvite=gp%3Ariver-stone',
+    );
+    let load: (value: Awaited<ReturnType<typeof fetchWorkerCanonicalSessionBootstrap>>) => void = () => {};
+    bootstrap.mockImplementationOnce(() => new Promise((resolve) => (load = resolve)));
+    render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} sessionConfig={null} />);
+    expect(readPendingAutoJoin()?.token).toBe('gp:river-stone');
+    // A private session refused the proof this secret made, and the page forgot it.
+    const { token: _refused, ...withoutToken } = readPendingAutoJoin()!;
+    savePendingAutoJoin(withoutToken);
+    load({ config, sessionId, sessionSlug: 'alpha', workerOrigin: 'https://worker.example', configRevision: 'v1' });
+    await flush();
+    expect(readPendingAutoJoin()).toMatchObject({ groupId: group.groupId, sessionId });
+    expect(readPendingAutoJoin()?.token).toBeUndefined();
+  });
+
   it('captures a link before session config loads and preserves it across a refresh elsewhere', async () => {
     window.history.replaceState(
       {},

@@ -377,7 +377,15 @@ export default function WorkerGroupAutoJoin(props: Props) {
       if (!controller.signal.aborted) {
         // Pin the canonical identity before login; browsing another session must
         // never redirect a remembered invitation to that session's Worker.
-        savePendingAutoJoin({ ...intent, sessionId: context.sessionId });
+        // Pinning never brings back a secret the tab has since dropped, as for a refused invite.
+        const stored = readPendingAutoJoin();
+        const { token: _dropped, ...withoutToken } = intent;
+        const dropped =
+          !!intent.token &&
+          stored?.sessionSlug === intent.sessionSlug &&
+          stored.groupId === intent.groupId &&
+          !stored.token;
+        savePendingAutoJoin({ ...(dropped ? withoutToken : intent), sessionId: context.sessionId });
         setResolved({ key: intentKey, config, context });
       }
     };
