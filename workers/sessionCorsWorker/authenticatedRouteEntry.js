@@ -12,11 +12,12 @@ export const NON_POST_PATHS = new Set([
 
 // What a private session lets someone signed in reach without its rule
 // admitting them: storage reads and uploads, which hold each request to the
-// rule themselves, and what joining a group needs. Each is routed by its path
+// rule themselves, and joining or leaving a group by its id. Its group list
+// stays behind the rule, as it does signed out. Each is routed by its path
 // in every method that gets this far, never by an action named in a body.
 const OPEN_TO_NON_MEMBERS = new Set([
   '/storage/read', '/storage/list', '/storage/read-batch', '/storage/upload',
-  '/groups/list', '/groups/my-memberships', '/groups/join', '/groups/leave',
+  '/groups/my-memberships', '/groups/join', '/groups/leave',
 ]);
 
 export const dispatchAuthenticatedRouteEntry = async ({

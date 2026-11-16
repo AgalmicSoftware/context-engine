@@ -2054,15 +2054,17 @@ group, a member or a password refuses on the next request.
   Session Agent, `/ai`, `/transcribe`, `/realtime/call`, `/groups/list`, the
   results routes and storage reads. Signed in: every route except storage
   reads and uploads (which apply the rule to each request themselves) and
-  `/groups/list`, `/groups/my-memberships`, `/groups/join` and `/groups/leave`,
-  so anyone signed in can still join. Agent HTTP holds agent, participant and
+  `/groups/my-memberships`, `/groups/join` and `/groups/leave`, so anyone
+  signed in can still join a group by its id. Agent HTTP holds agent, participant and
   wrapped credentials to the rule by their account. Open to all: CORS
   preflights, `/capabilities`, sign-in, signed-out feedback (a note to the
   admins), sponsored deploy codes, agent descriptors and `session-meta`
   (ids and flags only).
 - **Group list.** Signed out, a private session's `/groups/list` needs a read
   invite for the one group `joinGroup` names, and lists that group alone,
-  listed or not, without its admin.
+  listed or not, without its admin. Signed in, it lists as usual to those the
+  rule admits and refuses everyone else; a client joining from an invite link
+  joins by the link's group id rather than looking the group up first.
 - **Interview catalog.** An AI fetching a catalog link sends no header, so a
   private session's catalog opens only with a ticket from a signed-in member.
 - **Results.** A signed-out invite holder sees results as members do. Where the

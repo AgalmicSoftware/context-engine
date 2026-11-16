@@ -441,16 +441,16 @@ test('signed in, a private session admits its members and invite holders, and le
   });
   const outsider = principal(2).address;
   for (const [path, method] of [['/ai', 'POST'], ['/session-agent/ask', 'POST'], ['/groups/members', 'GET'],
-    ['/storage/response-field-key/unwrap', 'POST'], ['/storage/export-envelopes', 'GET'], ['/groups/create', 'POST']]) {
+    ['/storage/response-field-key/unwrap', 'POST'], ['/storage/export-envelopes', 'GET'], ['/groups/create', 'POST'], ['/groups/list', 'GET']]) {
     assert.equal((await send(path, method, outsider)).body.reason, PRIVATE_SESSION_INVITE_REQUIRED, path);
     assert.equal((await send(path, method, outsider, await readInvite(passwordKey('22')))).body.reason, PRIVATE_SESSION_INVITE_INVALID, path);
     assert.equal((await send(path, method, outsider, await readInvite(key))).body.marker, true, path);
     assert.equal((await send(path, method, principal(1).address)).body.marker, true, path);
     assert.equal((await send(path, method, ADMIN)).body.marker, true, path);
   }
-  // Storage checks each request itself, and joining needs no membership.
+  // Storage checks each request itself, and joining a group by its id needs no membership.
   for (const [path, method] of [['/storage/read', 'GET'], ['/storage/list', 'POST'], ['/storage/read-batch', 'POST'], ['/storage/upload', 'POST'],
-    ['/groups/join', 'POST'], ['/groups/list', 'GET'], ['/groups/my-memberships', 'GET'], ['/groups/leave', 'POST']]) {
+    ['/groups/join', 'POST'], ['/groups/my-memberships', 'GET'], ['/groups/leave', 'POST']]) {
     assert.equal((await send(path, method, outsider)).body.marker, true, path);
   }
 });
@@ -470,7 +470,7 @@ const ROUTE_KINDS = {
   'debate-atlas': RULE,
   'risk-matrix': RULE,
   anonymous: RULE, // AI and the group list here; storage checks each read itself
-  authenticated: RULE, // at the entry, but for storage reads and uploads, and joining a group
+  authenticated: RULE, // at the entry, but for storage reads and uploads, and joining a group by its id
   'interview-catalog-ticket': 'held to the rule where the ticket is used, the catalog',
   'arweave-upload': 'an admin-signed bootstrap upload; otherwise the signed-in entry',
   options: 'open: a CORS preflight',
