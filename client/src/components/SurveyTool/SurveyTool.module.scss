@@ -4657,7 +4657,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   margin: 6px 12px 0 0;
 }
 
-@container (max-width: 440px) {
+// The summary's text ends near 175px and the share control, with its “What’s kept” link, is about 306px wide.
+@container (max-width: 520px) {
   .sessionInterviewConsentGroup > .sessionInterviewResearchShare {
     grid-area: 2 / 1;
     justify-self: start;

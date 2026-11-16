@@ -168,6 +168,10 @@ it('says how many drafts are hidden and why, with the session note on where the 
   expect(status).toHaveTextContent(
     `Your AI drafted 6 answers · Claude, self-reported${hiddenIds.length} are hidden until you answer, to test how well your AI predicts you.`,
   );
+  expect(within(status).getByRole('link', { name: 'How it works' })).toHaveAttribute(
+    'href',
+    'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/research-data.md',
+  );
   const help = within(status).getByRole('button', { name: 'About hidden drafts' });
   expect(help).toHaveAccessibleDescription(/so you answer before you see its guess.*Part of a study funded by Example/);
   fireEvent.focus(help);

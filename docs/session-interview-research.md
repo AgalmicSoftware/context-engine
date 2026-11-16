@@ -37,7 +37,9 @@ settings** on the setup page or the session's settings page. The boolean
 initial **Share for research** checkbox for new responses, including imported
 and voice-generated drafts. The checkbox sits beside **AI submission info**, so
 the choice is visible before submitting without opening it, and its **?** says
-what sharing keeps. Participants can untick it before submitting. Saved per-question choices
+what sharing keeps. A **What’s kept** link beside it, and a **How it works** link
+on the hidden-drafts line, open [research data in interviews](research-data.md)
+on GitHub, a plain-language summary with a diagram. Participants can untick it before submitting. Saved per-question choices
 take precedence over this default; a session-config refresh does not overwrite
 an explicit choice made during review, including while logging in to submit.
 Settings save the key only while it is on: Session Workers before 0.7.0 reject

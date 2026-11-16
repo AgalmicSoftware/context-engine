@@ -5,6 +5,7 @@ import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { describeInterviewPlatform } from './sessionInterviewModalState';
 import SessionDataNote from './SessionDataNote';
+import { RESEARCH_DOC_URL } from './SessionInterviewResearchConsent';
 import type { InterviewPrefillPacket } from './sessionInterview';
 import styles from './SurveyTool.module.scss';
 import consentStyles from './SessionInterviewResearchConsent.module.scss';
@@ -34,7 +35,10 @@ export default function SessionInterviewPrefillStatus({ draftCount, platform, hi
       {hiddenCount > 0 ? (
         <p className={styles.sessionInterviewPrefillStatusLine}>
           {hiddenCount} {hiddenCount === 1 ? 'is' : 'are'} hidden until you answer, to test how well your AI predicts
-          you.
+          you.{' '}
+          <a className={consentStyles.researchLink} href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
+            How it works
+          </a>
           <button
             type="button"
             id={helpId}

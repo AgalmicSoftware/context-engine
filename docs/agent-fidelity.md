@@ -6,7 +6,9 @@ unusual views? `shared/agentFidelity.mjs` scores this, and
 `scripts/agent-fidelity-report.mjs` turns a session's results into a report.
 It implements the Agent Mirror Test from the
 [Agent Village Wrapped post](../posts/agent-village-wrapped/agent-village-wrapped.md),
-with the changes noted below.
+with the changes noted below. For participants, the plain-language summary
+with a diagram is [research data in interviews](research-data.md); the
+interview's research links open it.
 
 ## Data
 

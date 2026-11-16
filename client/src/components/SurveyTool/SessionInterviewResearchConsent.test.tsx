@@ -118,7 +118,7 @@ describe('SessionInterviewResearchConsent', () => {
     const link = screen.getByRole('link', { name: 'How research data is handled' });
     expect(link).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-interview-research.md',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/research-data.md',
     );
   });
 
@@ -165,6 +165,25 @@ it('shows mixed saved consent and lets an explicit click choose for all selected
 });
 
 describe('SessionInterviewResearchShare', () => {
+  it('links to a doc that exists, led by its diagram, with the section the link names', () => {
+    // The links open these on GitHub; a renamed file or heading would break them silently.
+    const docs = path.join(__dirname, '../../../../docs');
+    const doc = fs.readFileSync(path.join(docs, 'research-data.md'), 'utf8');
+    expect(doc).toMatch(/^## What is kept$/m);
+    const diagram = doc.match(/!\[[^\]]*\]\(([^)]+\.svg)\)/)?.[1];
+    expect(diagram && fs.existsSync(path.join(docs, diagram))).toBe(true);
+  });
+
+  it('shows a link to what is kept beside the checkbox, opening that section of the research data doc in a new tab', () => {
+    render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
+    const link = screen.getByRole('link', { name: 'What’s kept' });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/research-data.md#what-is-kept',
+    );
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
   it('names itself shortly, with what it shares behind its ?', () => {
     render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
     expect(screen.getByLabelText('Share for research')).toBeChecked();

@@ -6,10 +6,13 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { INTERVIEW_PROMPT_VERSION, type InterviewPrefillPacket } from './sessionInterview';
 import { describeInterviewPlatform } from './sessionInterviewModalState';
 import SessionDataNote from './SessionDataNote';
+import { buildPublicRepoBlobUrl } from '../../variables/publicRepoMetadata.js';
 import styles from './SessionInterviewResearchConsent.module.scss';
 
-const RESEARCH_DOC_URL =
-  'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-interview-research.md';
+// The plain-language research data doc on GitHub, led by its diagram: what is kept, how it's measured,
+// who sees it, how to stop. Links open it in a new tab, so the review in progress stays put.
+export const RESEARCH_DOC_URL = buildPublicRepoBlobUrl('docs/research-data.md');
+const RESEARCH_DOC_KEPT_URL = `${RESEARCH_DOC_URL}#what-is-kept`;
 
 type Props = {
   packet: InterviewPrefillPacket;
@@ -293,6 +296,9 @@ export function SessionInterviewResearchShare({
           How research data is handled
         </a>
       </UncontrolledTooltip>
+      <a className={styles.researchLink} href={RESEARCH_DOC_KEPT_URL} target="_blank" rel="noreferrer">
+        What’s kept
+      </a>
     </span>
   );
 }

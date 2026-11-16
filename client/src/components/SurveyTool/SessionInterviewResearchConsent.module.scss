@@ -171,3 +171,24 @@
   color: inherit;
   text-decoration: underline;
 }
+
+// The visible link beside "Share for research": the label's colour, underlined and bold, so it reads as a link.
+.researchLink {
+  flex: 0 0 auto;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+
+  &:hover,
+  &:focus-visible {
+    color: inherit;
+    text-decoration-thickness: 2px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
