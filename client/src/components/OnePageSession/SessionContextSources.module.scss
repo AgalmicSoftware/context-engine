@@ -128,7 +128,7 @@
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ce-session-chrome-contrast) 30%, transparent);
   border-radius: var(--ce-radius-6);
-  background: var(--ce-document-canvas, #fff);
+  background: var(--ce-document-canvas);
 
   iframe {
     width: 100%;
