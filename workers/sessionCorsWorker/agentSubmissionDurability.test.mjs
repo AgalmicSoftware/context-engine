@@ -33,6 +33,7 @@ async function submissionFixture({ registry = false, queued = false } = {}) {
         const payload = await input.request.clone().json();
         if (payload.resource !== 'responses') return real.storageRoute(input);
         state.uploads++; state.payloads.push(payload.data); state.uploadRequestIds.push(payload.requestId);
+        if (state.hold) { const hold = state.hold; state.hold = null; hold.entered(); await hold.released; }
         if (state.pending) { state.pending = false; return Response.json({ reason: 'upload_in_progress' }, { status: 503 }); }
         const response = registry ? Response.json({ id: pointer, backend: 'arweave', storageRef: { backend: 'arweave', id: pointer } }) : await real.storageRoute(input);
         if (!registry && state.bump) { state.bump = false; state.revision++; }
@@ -505,6 +506,29 @@ for (const queued of [false, true]) test(`${queued ? 'queued' : 'hosted'} A-B-A 
   assert.equal(current.length, 1); assert.equal(current[0].label, 'Agree'); assert.equal(current[0].answerRevision, 3);
   const heads = [...coordinated.durable.entries()].filter(([key]) => key.startsWith('ce-agent-answer-head:')).map(([, head]) => head);
   assert.equal(heads.length, 1); assert.equal(heads[0].revision, 3); assert.equal(heads[0].requestId, ids[2]);
+});
+
+test('A, B, then A again while the first A is still being stored ends on A', async () => {
+  const { f, state, submit, qid } = await submissionFixture();
+  const send = value => submit({ preferences: [{ questionId: qid, value }] });
+  let entered, release;
+  const firstStoring = new Promise(resolve => { entered = resolve; });
+  state.hold = { entered: () => entered(), released: new Promise(resolve => { release = resolve; }) };
+  const first = send('agree');
+  await firstStoring;
+  assert.equal((await send('disagree')).status, 200);
+  const last = send('agree');
+  setTimeout(release, 20);
+  const replies = [];
+  for (const response of await Promise.all([first, last])) {
+    assert.equal(response.status, 200, await response.clone().text());
+    replies.push((await response.json()).submitted[0]);
+  }
+  assert.equal(replies[1].replayed, false, 'the last A is stored, not taken for the first');
+  assert.notEqual(replies[1].requestId, replies[0].requestId);
+  assert.equal(state.uploads, 3);
+  const current = selectCurrentSubmittedAnswers(await loadSubmittedResultRecords(f.agentEnv, 'fixture'));
+  assert.deepEqual([current.length, current[0].label, current[0].answerRevision], [1, 'Agree', 3]);
 });
 
 test('concurrent answer claims serialize different content and retain retries at the current head', async () => {

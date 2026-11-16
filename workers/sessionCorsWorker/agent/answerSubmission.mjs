@@ -2,7 +2,6 @@ import { safeString, nowIso, safeEnvJsonParse as safeJsonParse, sanitizeSessionS
 import { AGENT_EVENT_TYPES, AGENT_ACTIONS, LEGACY_TRANSPORT_LANES } from './constants.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { submitAgentResponseOnChain, buildAgentResponsePayload } from './onChainResponses.mjs';
-import { buildSubmitIdempotencyKey } from './opaqueActions.mjs';
 import { normalizeAgentRatingScale } from './ratingScale.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { resolveSessionInvocation } from './sessionPolicy.mjs';
@@ -13,10 +12,6 @@ import { onChainAnswerFromDraft } from './draftAnswerEncoding.mjs';
 import { answerDraftFingerprint, writeDraftLifecycleEvent, buildDraftProvenance, readAnswerDraftFirstViewedAt } from './answerDrafts.mjs';
 
 const activeSubmissions = new Map();
-const submissionIdentity = (normalized, draft, slug, qid) => buildSubmitIdempotencyKey({
-  transport: 'telegram_bot_submit', principal: safeString(normalized.user?.telegramUserId), sessionSlug: slug, questionId: qid,
-  answer: { answerLabel: safeString(draft.answerLabel), answerValue: safeString(draft.answerValue), controlType: safeString(draft.controlType) },
-});
 const resultFromRecord = (record, replayed = false) => ({
   ok: ['direct_submitted', 'submit_queued'].includes(record.status),
   requestId: record.requestId, status: record.status, idempotencyKey: record.idempotencyKey,
@@ -27,13 +22,28 @@ const resultFromRecord = (record, replayed = false) => ({
 
 export async function persistAgentSubmitRequest(options = {}) {
   const { env = {}, normalized = {}, draft = {} } = options;
+  if (!env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function' || typeof env.AGENT_ACTION_KV.get !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
   const slug = sanitizeSessionSlug(options.sessionSlug || draft.sessionSlug);
   const qid = safeString(options.selectedQuestionId || draft.questionId);
-  const key = `${env.AGENT_CONTEXT?.origin}:${env.AGENT_CONTEXT?.sessionId}:${submissionIdentity(normalized, draft, slug, qid)}`;
-  // Coalesce identical in-flight requests in this isolate. Durable intent and
-  // hosted receipts still govern replay across isolates; KV is not a global lock.
+  if (!safeString(normalized.user?.telegramUserId) || !slug || !qid || draft.status !== 'draft_saved') {
+    return { ok: false, reason: 'submit_request_incomplete' };
+  }
+  const answerFingerprint = answerDraftFingerprint(draft);
+  const principal = (env.AGENT_CONTEXT.auth.delegation?.principal || env.AGENT_CONTEXT.auth.principal);
+  // The revision is claimed first: an answer sent again after a different one
+  // is a new revision, even while its first sending is still in flight.
+  const claimed = await env.AGENT_SERVICES.claimAnswerSubmission({
+    sessionId: env.AGENT_CONTEXT.sessionId, sessionSlug: slug, workerOrigin: env.AGENT_CONTEXT.origin,
+    principalId: principal.principalId, questionId: qid, transport: 'telegram_bot_submit', contentDigest: answerFingerprint,
+  });
+  if (!claimed.ok) return claimed;
+  // Coalesce in-flight sendings of one claimed revision in this isolate. Durable
+  // intent and hosted receipts still govern replay across isolates.
+  const key = `${env.AGENT_CONTEXT?.origin}:${env.AGENT_CONTEXT?.sessionId}:${claimed.head.requestId}`;
   if (activeSubmissions.has(key)) return { ...await activeSubmissions.get(key), replayed: true };
-  const pending = executeAgentSubmitRequest(options);
+  const pending = executeAgentSubmitRequest({ ...options, slug, qid, answerFingerprint, principal, head: claimed.head });
   activeSubmissions.set(key, pending);
   try { return await pending; } finally { activeSubmissions.delete(key); }
 }
@@ -42,28 +52,16 @@ async function executeAgentSubmitRequest({
   env = {},
   normalized = {},
   draft = {},
-  sessionSlug = '',
-  selectedQuestionId = '',
+  slug,
+  qid,
+  answerFingerprint,
+  principal,
+  head,
   question = null,
   createdAt = null,
 } = {}) {
-  if (!env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function' || typeof env.AGENT_ACTION_KV.get !== 'function') {
-    return { ok: false, reason: 'action_kv_unavailable' };
-  }
   const telegramUserId = safeString(normalized.user?.telegramUserId);
-  const slug = sanitizeSessionSlug(sessionSlug || draft.sessionSlug);
-  const qid = safeString(selectedQuestionId || draft.questionId);
-  if (!telegramUserId || !slug || !qid || draft.status !== 'draft_saved') {
-    return { ok: false, reason: 'submit_request_incomplete' };
-  }
-  const answerFingerprint = answerDraftFingerprint(draft);
-  const principal = (env.AGENT_CONTEXT.auth.delegation?.principal || env.AGENT_CONTEXT.auth.principal);
-  const claimed = await env.AGENT_SERVICES.claimAnswerSubmission({
-    sessionId: env.AGENT_CONTEXT.sessionId, sessionSlug: slug, workerOrigin: env.AGENT_CONTEXT.origin,
-    principalId: principal.principalId, questionId: qid, transport: 'telegram_bot_submit', contentDigest: answerFingerprint,
-  });
-  if (!claimed.ok) return claimed;
-  const { idempotencyKey, requestId, revision: answerRevision } = claimed.head;
+  const { idempotencyKey, requestId, revision: answerRevision } = head;
   const kvKey = submitRequestKvKey(requestId);
   let existing;
   try {
