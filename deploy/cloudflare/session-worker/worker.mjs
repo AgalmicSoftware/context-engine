@@ -25261,7 +25261,7 @@ var init_canonicalJson = __esm({
 });
 
 // shared/sessionConfigEdits.mjs
-var WORKER_CANONICAL_SET_CONFIG_KEYS, CURATED_ID_LIST_KEYS, MAX_CURATED_IDS, CURATED_ID, validCuratedIdList, MAX_RESULTS_ADMINS, ADDRESS, validResultsAdminAddresses, MAX_AGENT_INSTRUCTIONS_CHARS, validAgentInstructions, CONTENT_FIELDS, record2, same, mergeSetConfigAi, without, onlyAddsInvites, authorityView, sessionConfigRequiresReauthorization;
+var WORKER_CANONICAL_SET_CONFIG_KEYS, CURATED_ID_LIST_KEYS, MAX_CURATED_IDS, CURATED_ID, validCuratedIdList, MAX_RESULTS_ADMINS, ADDRESS, validResultsAdminAddresses, MAX_AGENT_INSTRUCTIONS_CHARS, validAgentInstructions, CONTENT_FIELDS, record2, same, mergeSetConfigAi, without, onlyAddsInvites, GROUP_GATES, keepsAll, widensCondition, widensRule, widensGroupGate, withoutWidenings, authorityView, sessionConfigRequiresReauthorization;
 var init_sessionConfigEdits = __esm({
   "shared/sessionConfigEdits.mjs"() {
     init_canonicalJson();
@@ -25375,6 +25375,28 @@ var init_sessionConfigEdits = __esm({
       const byHash = new Map(next.map((row) => [row.tokenHash, row]));
       return prior.every((row) => byHash.has(row.tokenHash) && same(row, byHash.get(row.tokenHash)));
     };
+    GROUP_GATES = /* @__PURE__ */ new Set(["group", "group_gate", "worker_group"]);
+    keepsAll = (before, after) => Array.isArray(before) && before.length > 0 && Array.isArray(after) && before.every((item) => after.some((next) => same(item, next)));
+    widensCondition = (before, after) => same(before, after) || record2(before) && record2(after) && before.kind === "worker_group" && after.kind === "worker_group" && keepsAll(before.groupIds, after.groupIds) && same(without(before, /* @__PURE__ */ new Set(["groupIds"])), without(after, /* @__PURE__ */ new Set(["groupIds"])));
+    widensRule = (before, after) => {
+      if (!record2(before) || !record2(after) || !same(without(before, /* @__PURE__ */ new Set(["conditions"])), without(after, /* @__PURE__ */ new Set(["conditions"])))) return false;
+      const prior = before.conditions;
+      const next = after.conditions;
+      if (!Array.isArray(prior) || !prior.length || !Array.isArray(next) || next.length < prior.length) return false;
+      if (!prior.every((condition) => record2(condition) && String(condition.kind ?? "").trim())) return false;
+      const anyOf = String(after.match ?? "").trim().toLowerCase() !== "all";
+      return (anyOf || next.length === prior.length) && prior.every((condition, index) => widensCondition(condition, next[index]));
+    };
+    widensGroupGate = (before, after) => record2(before) && record2(after) && same(before.gate, after.gate) && GROUP_GATES.has(String(after.gate ?? "").trim().toLowerCase().replace(/-/g, "_")) && keepsAll(before.groupIds, after.groupIds);
+    withoutWidenings = (before, after) => {
+      if (!record2(before) || !record2(after)) return after;
+      return Object.fromEntries(Object.entries(after).map(([key, value]) => {
+        const prior = before[key];
+        if ((key === "loginGate" || key === "accessConditions") && widensRule(prior, value)) return [key, prior];
+        if (key === "groupIds" && widensGroupGate(before, after)) return [key, prior];
+        return [key, withoutWidenings(prior, value)];
+      }));
+    };
     authorityView = (config, additiveInvites) => {
       const result = without(config, CONTENT_FIELDS);
       if (record2(result.agentHttp) && additiveInvites) {
@@ -25385,7 +25407,7 @@ var init_sessionConfigEdits = __esm({
     };
     sessionConfigRequiresReauthorization = (before, after) => {
       const additiveInvites = onlyAddsInvites(before?.agentHttp?.invites, after?.agentHttp?.invites);
-      return !same(authorityView(before, additiveInvites), authorityView(after, additiveInvites));
+      return !same(authorityView(before, additiveInvites), authorityView(withoutWidenings(before, after), additiveInvites));
     };
   }
 });
@@ -26373,7 +26395,7 @@ var init_sessionLifecycle = __esm({
 });
 
 // workers/shared/workerConfigModeValidation.mjs
-var isObj3, hasOwn, AUTHORITY_MODES, SESSION_PRESETS, SESSION_STORAGE_BACKENDS, DEPLOY_STORAGE_BACKENDS, PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES, PAYLOAD_ENCRYPTION_MODES, SESSION_KEY_PROVIDERS, IDENTITY_DEFAULTS, IDENTITY_METHODS, AUTHORIZATION_MECHANISMS, SURFACES, RESULTS_VISIBILITIES, EXPORT_SCOPES, ACCESS_MATCHES, ACCESS_KINDS, RESOURCE_KEYS, EVM_ADDRESS_PATTERN, MAX_ACCESS_CONDITION_TEXT_LENGTH, CANONICAL_NAMED_SESSION_MODE_PROFILES, valid, invalid, stableSessionModeValue, sessionModeValuesEqual, validateEnumField, validateRequiredEnumField, validateObjectField, validateExactKeys, validateRequiredObjectField, validateEnumArray, positiveChainId, validateAccessConditions, validatePayloadAccessControl, validateStorageProfile, validateVersionedSessionModeProfile, validateSessionModeProfile, resolveProfileStorageSide, profileStorageBackendMatches, validateCanonicalStorageAccessConditions, validateProfileStoragePolicyCoherence, validateSupplementalSessionPolicies, validateWorkerConfigModeValues, workerConfigAllowsAnonymousGroupDiscovery, validateDeploymentModeValues;
+var isObj3, hasOwn, AUTHORITY_MODES, SESSION_PRESETS, SESSION_STORAGE_BACKENDS, DEPLOY_STORAGE_BACKENDS, PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES, PAYLOAD_ENCRYPTION_MODES, SESSION_KEY_PROVIDERS, IDENTITY_DEFAULTS, IDENTITY_METHODS, AUTHORIZATION_MECHANISMS, SURFACES, RESULTS_VISIBILITIES, EXPORT_SCOPES, ACCESS_MATCHES, ACCESS_KINDS, MAX_ACCESS_CONDITION_GROUPS, WORKER_GROUP_ID_PATTERN, RESOURCE_KEYS, EVM_ADDRESS_PATTERN, MAX_ACCESS_CONDITION_TEXT_LENGTH, CANONICAL_NAMED_SESSION_MODE_PROFILES, valid, invalid, stableSessionModeValue, sessionModeValuesEqual, validateEnumField, validateRequiredEnumField, validateObjectField, validateExactKeys, validateRequiredObjectField, validateEnumArray, positiveChainId, validateAccessConditions, validatePayloadAccessControl, validateStorageProfile, validateVersionedSessionModeProfile, validateSessionModeProfile, resolveProfileStorageSide, profileStorageBackendMatches, validateCanonicalStorageAccessConditions, validateProfileStoragePolicyCoherence, validateSupplementalSessionPolicies, validateWorkerConfigModeValues, workerConfigAllowsAnonymousGroupDiscovery, validateDeploymentModeValues;
 var init_workerConfigModeValidation = __esm({
   "workers/shared/workerConfigModeValidation.mjs"() {
     init_sessionLifecycle();
@@ -26406,7 +26428,9 @@ var init_workerConfigModeValidation = __esm({
     ]);
     EXPORT_SCOPES = /* @__PURE__ */ new Set(["admin_raw", "all_session", "encrypted_envelopes_only"]);
     ACCESS_MATCHES = /* @__PURE__ */ new Set(["any", "all"]);
-    ACCESS_KINDS = /* @__PURE__ */ new Set(["worker_role", "sbt_onchain", "agent_grant_scope"]);
+    ACCESS_KINDS = /* @__PURE__ */ new Set(["worker_role", "sbt_onchain", "agent_grant_scope", "worker_group"]);
+    MAX_ACCESS_CONDITION_GROUPS = 20;
+    WORKER_GROUP_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
     RESOURCE_KEYS = /* @__PURE__ */ new Set([
       "docsContext",
       "questions",
@@ -26549,6 +26573,15 @@ var init_workerConfigModeValidation = __esm({
           }
           continue;
         }
+        if (condition.kind === "worker_group") {
+          result = validateExactKeys(condition, conditionPath, ["kind", "groupIds"]);
+          if (!result.ok) return result;
+          const { groupIds } = condition;
+          if (!Array.isArray(groupIds) || !groupIds.length || groupIds.length > MAX_ACCESS_CONDITION_GROUPS || !groupIds.every((groupId) => typeof groupId === "string" && WORKER_GROUP_ID_PATTERN.test(groupId)) || new Set(groupIds).size !== groupIds.length) {
+            return invalid(`${conditionPath}.groupIds`);
+          }
+          continue;
+        }
         if (condition.kind === "agent_grant_scope") {
           result = validateExactKeys(condition, conditionPath, ["kind", "scope"]);
           if (!result.ok) return result;
@@ -26566,6 +26599,9 @@ var init_workerConfigModeValidation = __esm({
         result = validateRequiredEnumField(condition, "anyOrAll", `${conditionPath}.anyOrAll`, ACCESS_MATCHES);
         if (!result.ok) return result;
         sbtChainIds.push(condition.chainId);
+      }
+      if (value.conditions.some((condition) => condition.kind === "worker_group") && (value.match !== "any" || !value.conditions.some((condition) => condition.kind === "worker_role" && condition.role === "admin"))) {
+        return invalid(path);
       }
       return { ok: true, sbtChainIds };
     };
@@ -30510,7 +30546,7 @@ var init_realtimeInterviewConfig = __esm({
 });
 
 // shared/workerGroupJoin.mjs
-var WORKER_GROUP_JOIN_MODES, WORKER_GROUP_JOIN_REFUSED, WORKER_GROUP_MEMBER_CEILING_DEFAULT, WORKER_GROUP_MEMBER_CEILING_MAX, WORKER_GROUP_INVITE_BATCH_MAX, ONE_USE_SECRET, SECRET_HASH, JOIN_STATEMENT, hex, hashOneUseSecret, isOneUseSecretHash, workerGroupJoinStatement;
+var WORKER_GROUP_JOIN_MODES, WORKER_GROUP_JOIN_REFUSED, WORKER_GROUP_MEMBER_CEILING_DEFAULT, WORKER_GROUP_MEMBER_CEILING_MAX, WORKER_GROUP_INVITE_BATCH_MAX, ONE_USE_SECRET, SECRET_HASH, JOIN_STATEMENT, hex, hashOneUseSecret, isOneUseSecretHash, workerGroupJoinStatement, READ_STATEMENT, WORKER_GROUP_READ_INVITE_HEADER, PRIVATE_SESSION_INVITE_REQUIRED, PRIVATE_SESSION_INVITE_INVALID, PRIVATE_SESSION_UNAVAILABLE, READ_PROOF, workerGroupReadStatement, parseWorkerGroupReadInvite;
 var init_workerGroupJoin = __esm({
   "shared/workerGroupJoin.mjs"() {
     init_workerSessionPublicConfig();
@@ -30534,6 +30570,23 @@ var init_workerGroupJoin = __esm({
 session:${String(sessionId).toLowerCase()}
 group:${String(groupId)}
 address:${String(address3).toLowerCase()}`;
+    READ_STATEMENT = "ContextEngine.WorkerGroup.Read:1";
+    WORKER_GROUP_READ_INVITE_HEADER = "X-CE-Group-Invite";
+    PRIVATE_SESSION_INVITE_REQUIRED = "private_session_invite_required";
+    PRIVATE_SESSION_INVITE_INVALID = "private_session_invite_invalid";
+    PRIVATE_SESSION_UNAVAILABLE = "private_session_unavailable";
+    READ_PROOF = /^0x[0-9a-f]{130}$/i;
+    workerGroupReadStatement = ({ sessionId, groupId }) => `${READ_STATEMENT}
+session:${String(sessionId).toLowerCase()}
+group:${String(groupId)}`;
+    parseWorkerGroupReadInvite = (value) => {
+      const text8 = typeof value === "string" ? value.trim() : "";
+      const at = text8.lastIndexOf(":");
+      if (at < 1 || text8.length > 300) return null;
+      const groupId = text8.slice(0, at).toLowerCase();
+      const proof = text8.slice(at + 1);
+      return /^[a-z0-9][a-z0-9._-]*$/.test(groupId) && READ_PROOF.test(proof) ? { groupId, proof } : null;
+    };
   }
 });
 
@@ -31490,7 +31543,7 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj8, WORKER_GROUP_JOIN_MODES2, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, JOIN_MODE_SET, resolveWorkerGroupMemberCeiling, normalizeWorkerGroupId, resolveWorkerGroupListed, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, TRANSIENT_WORKER_GROUP_REASONS, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, WORKER_GROUP_SECRET_ACTIONS, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj8, WORKER_GROUP_JOIN_MODES2, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, JOIN_MODE_SET, resolveWorkerGroupMemberCeiling, normalizeWorkerGroupId, resolveWorkerGroupListed, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, TRANSIENT_WORKER_GROUP_REASONS, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, checkWorkerGroupReadInvite, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, WORKER_GROUP_SECRET_ACTIONS, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_sessionConfigAuthority();
@@ -32465,7 +32518,8 @@ var init_workerGroups = __esm({
       actorPrincipalResult,
       admin = false,
       includeMemberCount = false,
-      expectedGroupCount
+      expectedGroupCount,
+      revealGroupId = ""
     } = {}) => {
       const store = resolveWorkerGroupStore(env);
       if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
@@ -32528,7 +32582,8 @@ var init_workerGroups = __esm({
           memberVisibility: authority.memberVisibility,
           listed: authority.listed
         };
-        if (!admin && !authority.listed && !authority.isMember) continue;
+        const revealed = !!revealGroupId && normalizeWorkerGroupId(group.groupId) === revealGroupId;
+        if (!admin && !authority.listed && !authority.isMember && !revealed) continue;
         visible.push({
           ...redactGroupForMember(authoritativeGroup),
           ...includeMemberCount ? { memberCount: authority.memberCount } : {},
@@ -32896,6 +32951,13 @@ var init_workerGroups = __esm({
         }
       });
     };
+    checkWorkerGroupReadInvite = ({ env, slug, sessionId, groupId, signer } = {}) => callWorkerGroupCoordinator({
+      env,
+      slug,
+      sessionId,
+      path: "/worker-groups/read-invite",
+      payload: { groupId: normalizeWorkerGroupId(groupId), signer }
+    });
     forwardWorkerGroupMutation = async ({
       env,
       slug,
@@ -32972,10 +33034,10 @@ var init_workerGroups = __esm({
       const joinEndsAt = Date.parse(trim2(group?.joinEndsAt));
       return group?.joinMode === WORKER_GROUP_JOIN_MODES2.OPEN && !(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs);
     };
-    listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, deps = {} } = {}) => {
+    listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, invitedOnly = false, deps = {} } = {}) => {
       const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
       if (!sessionIdentity.ok) return sessionIdentity;
-      const publicDiscovery = workerConfigAllowsAnonymousGroupDiscovery(config);
+      const publicDiscovery = !invitedOnly && workerConfigAllowsAnonymousGroupDiscovery(config);
       const invite = publicDiscovery ? "" : normalizeWorkerGroupId(inviteGroupId);
       if (!publicDiscovery && !invite) return { ok: false, status: 403, reason: "worker_group_discovery_not_public" };
       const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
@@ -32992,7 +33054,8 @@ var init_workerGroups = __esm({
           sessionId: sessionIdentity.sessionId,
           admin: false,
           includeMemberCount: false,
-          expectedGroupCount: ready.meta?.groupCount
+          expectedGroupCount: ready.meta?.groupCount,
+          ...invitedOnly ? { revealGroupId: invite } : {}
         });
       } catch {
         result = {
@@ -33007,7 +33070,7 @@ var init_workerGroups = __esm({
       if (!result.groups.some((group) => group.groupId === invite)) {
         return { ok: false, status: 403, reason: "worker_group_discovery_not_public" };
       }
-      const groups = result.groups.map(({ adminAddress: _adminAddress, ...group }) => group);
+      const groups = result.groups.filter((group) => !invitedOnly || group.groupId === invite).map(({ adminAddress: _adminAddress, ...group }) => group);
       return { ok: true, sessionIdentity, store: result.store, groups };
     };
     listSelfJoinableWorkerGroupsForVisitor = async (args = {}) => {
@@ -33056,7 +33119,7 @@ var init_workerGroups = __esm({
         return [];
       }
     };
-    dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+    dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, invitedOnly = false, deps = {} } = {}) => {
       const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
       if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
       let params = new URLSearchParams();
@@ -33088,7 +33151,7 @@ var init_workerGroups = __esm({
           baseHeaders
         );
       }
-      const result = await listWorkerGroupsForVisitor({ env, config, slug, inviteGroupId, deps });
+      const result = await listWorkerGroupsForVisitor({ env, config, slug, inviteGroupId, invitedOnly, deps });
       if (!result.ok) return routeError(deps, result, baseHeaders);
       return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
     };
@@ -69888,6 +69951,71 @@ var init_storageEnvelopeEncryption = __esm({
   }
 });
 
+// workers/sessionCorsWorker/workerGroupInvites.js
+var verifyMessage2, ONE_USE_SECRET2, JOIN_PROOF, SIGNER, WORKER_GROUP_INVITE_LIST_MAX, workerGroupInvitePrefix, workerGroupInviteKey, workerGroupInviteCounts, normalizeWorkerGroupInviteHashes, normalizeWorkerGroupSigner, constantTimeEqual, resolveWorkerGroupJoinCredential, readWorkerGroupReadInvite;
+var init_workerGroupInvites = __esm({
+  "workers/sessionCorsWorker/workerGroupInvites.js"() {
+    init_lib2();
+    init_workerGroupJoin();
+    verifyMessage2 = verifyMessage || (void 0)?.verifyMessage || (void 0)?.verifyMessage;
+    ONE_USE_SECRET2 = /^[0-9a-f]{32}$/i;
+    JOIN_PROOF = /^0x[0-9a-f]{130}$/i;
+    SIGNER = /^0x[0-9a-f]{40}$/i;
+    WORKER_GROUP_INVITE_LIST_MAX = 250;
+    workerGroupInvitePrefix = (groupId) => `worker-group-capacity-invite-v3:${encodeURIComponent(groupId)}:`;
+    workerGroupInviteKey = (groupId, hash2) => `${workerGroupInvitePrefix(groupId)}${hash2}`;
+    workerGroupInviteCounts = (state) => ({
+      unused: Math.max(0, Number(state?.invites?.unused) || 0),
+      used: Math.max(0, Number(state?.invites?.used) || 0),
+      revoked: Math.max(0, Number(state?.invites?.revoked) || 0)
+    });
+    normalizeWorkerGroupInviteHashes = (value, { max = WORKER_GROUP_INVITE_BATCH_MAX } = {}) => {
+      if (!Array.isArray(value) || value.length < 1 || value.length > max) return null;
+      const hashes = value.map((hash2) => typeof hash2 === "string" ? hash2.toLowerCase() : "");
+      if (!hashes.every(isOneUseSecretHash) || new Set(hashes).size !== hashes.length) return null;
+      return hashes;
+    };
+    normalizeWorkerGroupSigner = (value) => typeof value === "string" && SIGNER.test(value) ? value.toLowerCase() : "";
+    constantTimeEqual = (left, right) => {
+      const a = String(left);
+      const b2 = String(right);
+      let difference = a.length ^ b2.length;
+      for (let index = 0; index < Math.max(a.length, b2.length); index += 1) {
+        difference |= (a.charCodeAt(index) || 0) ^ (b2.charCodeAt(index) || 0);
+      }
+      return difference === 0;
+    };
+    resolveWorkerGroupJoinCredential = async ({ credential, sessionId, groupId, address: address3 }) => {
+      const secret = credential?.secret;
+      const proof = credential?.proof;
+      if (secret == null && proof == null) return null;
+      if (secret != null && proof != null) return { kind: "invalid" };
+      if (secret != null) {
+        return typeof secret === "string" && ONE_USE_SECRET2.test(secret) ? { kind: "one_use", hash: await hashOneUseSecret(secret) } : { kind: "invalid" };
+      }
+      if (!address3) return null;
+      if (typeof proof !== "string" || !JOIN_PROOF.test(proof)) return { kind: "invalid" };
+      try {
+        const signer = verifyMessage2(workerGroupJoinStatement({ sessionId, groupId, address: address3 }), proof);
+        return { kind: "password", signer: signer.toLowerCase() };
+      } catch {
+        return { kind: "invalid" };
+      }
+    };
+    readWorkerGroupReadInvite = ({ header, sessionId }) => {
+      if (header == null || String(header).trim() === "") return null;
+      const parsed = parseWorkerGroupReadInvite(header);
+      if (!parsed || !sessionId) return { invalid: true };
+      try {
+        const signer = verifyMessage2(workerGroupReadStatement({ sessionId, groupId: parsed.groupId }), parsed.proof);
+        return { groupId: parsed.groupId, signer: signer.toLowerCase() };
+      } catch {
+        return { invalid: true };
+      }
+    };
+  }
+});
+
 // workers/sessionCorsWorker/uploadSizeLimits.js
 var DEFAULT_MAX_UPLOAD_BYTES, DEFAULT_MAX_KV_VALUE_BYTES, MAX_STORAGE_METADATA_BYTES, STORAGE_METADATA_TAG_LIMITS, MAX_UPLOAD_BYTES_ENV, UPLOAD_TOO_LARGE_ERROR, KV_VALUE_TOO_LARGE_ERROR, toFinitePositiveInteger, resolveMaxUploadBytes, resolveMaxKvValueBytes, tooLarge, rejectContentLengthOverLimit, rejectBytesOverLimit, rejectKvValueOverLimit;
 var init_uploadSizeLimits = __esm({
@@ -72263,7 +72391,7 @@ var init_answerVersionStamp = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim15, isObj20, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, MINE_LIST_KV_KEYS, MINE_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, CONTEXT_ADD_WINDOW_MS, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, AUTOMATIC_ANALYSIS_MODES, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, KV_BULK_REPLY_BYTES, listedAnswerVersions, listLatestResponseRows, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
+var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_GROUP_READ_INVITE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim15, isObj20, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, MINE_LIST_KV_KEYS, MINE_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, CONTEXT_ADD_WINDOW_MS, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, checkGroupReadInvite, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, admittedByReadInvite, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, AUTOMATIC_ANALYSIS_MODES, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, KV_BULK_REPLY_BYTES, listedAnswerVersions, listLatestResponseRows, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_sessionContextSources();
@@ -72274,6 +72402,8 @@ var init_storageRouteExecution = __esm({
     init_payloadAccessControl();
     init_storageEnvelopeEncryption();
     init_workerGroups();
+    init_workerGroupInvites();
+    init_workerGroupJoin();
     init_uploadSizeLimits();
     init_gateRpcResolution();
     init_chainIdNormalization();
@@ -72297,6 +72427,7 @@ var init_storageRouteExecution = __esm({
     decoder6 = new TextDecoder();
     RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol("resolve-storage-gate-runtime-config");
     STORAGE_GROUP_MEMBERSHIP_CACHE = Symbol("storage-group-membership-cache");
+    STORAGE_GROUP_READ_INVITE = "groupReadInvite";
     STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol("storage-rpc-chain-attestation-cache");
     trim15 = (value) => toStr6(value).trim();
     isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -72888,6 +73019,23 @@ var init_storageRouteExecution = __esm({
       cache?.set(groupId, pending);
       return pending;
     };
+    checkGroupReadInvite = async ({ env, slug, config, groupId, deps }) => {
+      const header = deps?.[STORAGE_GROUP_READ_INVITE];
+      if (header == null || String(header).trim() === "") return null;
+      const cache = deps?.[STORAGE_GROUP_MEMBERSHIP_CACHE];
+      const key = `read-invite:${groupId}`;
+      if (cache?.has(key)) return cache.get(key);
+      const sessionId = resolveCanonicalWorkerSessionIdHex(config);
+      const invite = readWorkerGroupReadInvite({ header, sessionId });
+      const refused = { ok: false, outcome: "denied", status: 403, reason: "worker_group_read_invite_invalid" };
+      const check = typeof deps?.checkWorkerGroupReadInvite === "function" ? deps.checkWorkerGroupReadInvite : checkWorkerGroupReadInvite;
+      const pending = invite?.groupId !== groupId ? Promise.resolve(refused) : Promise.resolve().then(() => check({ env, slug, sessionId, groupId, signer: invite.signer })).then(
+        (result) => result?.ok === true ? { ok: true, outcome: "allowed" } : [400, 403, 404].includes(Number(result?.status)) ? refused : { ok: false, outcome: "unavailable", status: 503, reason: "worker_group_membership_unavailable" },
+        () => ({ ok: false, outcome: "unavailable", status: 503, reason: "worker_group_membership_unavailable" })
+      );
+      cache?.set(key, pending);
+      return pending;
+    };
     evaluateWorkerGroupCondition = async ({
       condition,
       env,
@@ -72901,6 +73049,12 @@ var init_storageRouteExecution = __esm({
       let firstFailure = null;
       let unavailable4 = null;
       for (const groupId of groupIds) {
+        const invite = await checkGroupReadInvite({ env, slug, config, groupId, deps });
+        if (invite?.ok) {
+          return { ok: true, matchedCondition: { kind: "worker_group", groupId, readInvite: true } };
+        }
+        if (invite?.outcome === "unavailable") unavailable4 || (unavailable4 = invite);
+        else if (invite && !firstFailure) firstFailure = invite;
         const result = await checkWorkerGroupMembership({
           env,
           slug,
@@ -73116,6 +73270,7 @@ var init_storageRouteExecution = __esm({
       const profile = config?.sessionModeProfile;
       return trim15(resource) === "responses" && profile?.authority?.mode === "worker_canonical" && !!profile?.results?.visibility && profile.results.visibility !== "public_full_if_storage_public";
     };
+    admittedByReadInvite = (matched) => [matched?.condition, ...Array.isArray(matched?.conditions) ? matched.conditions : []].some((condition) => condition?.readInvite === true);
     membersSeeAllResponses = (config) => config?.sessionModeProfile?.results?.visibility === "session_member_full";
     canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
       if (operation === "upload" || !hasPrivateResponsePolicy({ config, resource })) return true;
@@ -73141,17 +73296,20 @@ var init_storageRouteExecution = __esm({
       if (!isStorageResource(resource)) {
         return { ok: false, response: responseJson(deps, { error: "Invalid storage resource." }, 400, baseHeaders) };
       }
-      if (!canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
-        return {
-          ok: false,
-          response: responseJson(deps, {
-            error: membersSeeAllResponses(config) ? "Access denied: answers are visible to signed-in session members." : "Access denied: individual response access requires its author or a session admin.",
-            reason: "private_response_owner_required"
-          }, 403, baseHeaders)
-        };
+      const privateResponseRefusal = () => ({
+        ok: false,
+        response: responseJson(deps, {
+          error: membersSeeAllResponses(config) ? "Access denied: answers are visible to signed-in session members." : "Access denied: individual response access requires its author or a session admin.",
+          reason: "private_response_owner_required"
+        }, 403, baseHeaders)
+      });
+      const asInvitee = !normalizeAddress(requesterAddress) && !!deps?.[STORAGE_GROUP_READ_INVITE] && membersSeeAllResponses(config) && hasPrivateResponsePolicy({ config, resource });
+      if (!asInvitee && !canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
+        return privateResponseRefusal();
       }
       const args = { env, config, slug, resource, requesterAddress, authScopes, baseHeaders, deps };
       const sessionAccess = await authorizeCloudflareStorageGate(args);
+      if (sessionAccess.ok && asInvitee && !admittedByReadInvite(sessionAccess.conditionMatched)) return privateResponseRefusal();
       if (!sessionAccess.ok || !metadata) return sessionAccess;
       const groups = resolveGroupGateIds({ metadata, access: {} });
       if (groups.length) {
@@ -73195,13 +73353,15 @@ var init_storageRouteExecution = __esm({
             conditionMatched: conditionResult.conditionMatched
           };
         }
+        const namesGroup = payloadConditions.document.conditions.some((condition) => condition.kind === "worker_group");
+        const reason = !namesGroup || conditionResult.outcome === "unavailable" ? conditionResult.reason : deps?.[STORAGE_GROUP_READ_INVITE] ? PRIVATE_SESSION_INVITE_INVALID : PRIVATE_SESSION_INVITE_REQUIRED;
         return {
           ok: false,
           // An SBT rule the chain can't answer, as opposed to a membership outage.
           ...conditionResult.outcome === "unavailable" && conditionResult.condition?.kind === "sbt_onchain" ? { chainUnavailable: true } : {},
           response: responseJson(deps, {
             error: "Access denied: Cloudflare storage conditions failed.",
-            reason: conditionResult.reason,
+            reason,
             ...conditionResult.outcome === "unavailable" ? { retryable: true } : {}
           }, conditionResult.status || 403, baseHeaders)
         };
@@ -75019,6 +75179,9 @@ ${version2.responder}`;
       deps,
       answersChecked = false
     } = {}) => {
+      if (["/storage/read", "/storage/read-batch", "/storage/list"].includes(path)) {
+        deps = { ...deps || {}, [STORAGE_GROUP_READ_INVITE]: request?.headers?.get?.(WORKER_GROUP_READ_INVITE_HEADER) || "" };
+      }
       if (method === "POST" && ["/storage/response-field-key/wrap", "/storage/response-field-key/unwrap"].includes(path)) {
         const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
         return responseFieldKeyRoute({
@@ -75637,60 +75800,6 @@ var init_operationQueue = __esm({
           return run;
         }
       };
-    };
-  }
-});
-
-// workers/sessionCorsWorker/workerGroupInvites.js
-var verifyMessage2, ONE_USE_SECRET2, JOIN_PROOF, SIGNER, WORKER_GROUP_INVITE_LIST_MAX, workerGroupInvitePrefix, workerGroupInviteKey, workerGroupInviteCounts, normalizeWorkerGroupInviteHashes, normalizeWorkerGroupSigner, constantTimeEqual, resolveWorkerGroupJoinCredential;
-var init_workerGroupInvites = __esm({
-  "workers/sessionCorsWorker/workerGroupInvites.js"() {
-    init_lib2();
-    init_workerGroupJoin();
-    verifyMessage2 = verifyMessage || (void 0)?.verifyMessage || (void 0)?.verifyMessage;
-    ONE_USE_SECRET2 = /^[0-9a-f]{32}$/i;
-    JOIN_PROOF = /^0x[0-9a-f]{130}$/i;
-    SIGNER = /^0x[0-9a-f]{40}$/i;
-    WORKER_GROUP_INVITE_LIST_MAX = 250;
-    workerGroupInvitePrefix = (groupId) => `worker-group-capacity-invite-v3:${encodeURIComponent(groupId)}:`;
-    workerGroupInviteKey = (groupId, hash2) => `${workerGroupInvitePrefix(groupId)}${hash2}`;
-    workerGroupInviteCounts = (state) => ({
-      unused: Math.max(0, Number(state?.invites?.unused) || 0),
-      used: Math.max(0, Number(state?.invites?.used) || 0),
-      revoked: Math.max(0, Number(state?.invites?.revoked) || 0)
-    });
-    normalizeWorkerGroupInviteHashes = (value, { max = WORKER_GROUP_INVITE_BATCH_MAX } = {}) => {
-      if (!Array.isArray(value) || value.length < 1 || value.length > max) return null;
-      const hashes = value.map((hash2) => typeof hash2 === "string" ? hash2.toLowerCase() : "");
-      if (!hashes.every(isOneUseSecretHash) || new Set(hashes).size !== hashes.length) return null;
-      return hashes;
-    };
-    normalizeWorkerGroupSigner = (value) => typeof value === "string" && SIGNER.test(value) ? value.toLowerCase() : "";
-    constantTimeEqual = (left, right) => {
-      const a = String(left);
-      const b2 = String(right);
-      let difference = a.length ^ b2.length;
-      for (let index = 0; index < Math.max(a.length, b2.length); index += 1) {
-        difference |= (a.charCodeAt(index) || 0) ^ (b2.charCodeAt(index) || 0);
-      }
-      return difference === 0;
-    };
-    resolveWorkerGroupJoinCredential = async ({ credential, sessionId, groupId, address: address3 }) => {
-      const secret = credential?.secret;
-      const proof = credential?.proof;
-      if (secret == null && proof == null) return null;
-      if (secret != null && proof != null) return { kind: "invalid" };
-      if (secret != null) {
-        return typeof secret === "string" && ONE_USE_SECRET2.test(secret) ? { kind: "one_use", hash: await hashOneUseSecret(secret) } : { kind: "invalid" };
-      }
-      if (!address3) return null;
-      if (typeof proof !== "string" || !JOIN_PROOF.test(proof)) return { kind: "invalid" };
-      try {
-        const signer = verifyMessage2(workerGroupJoinStatement({ sessionId, groupId, address: address3 }), proof);
-        return { kind: "password", signer: signer.toLowerCase() };
-      } catch {
-        return { kind: "invalid" };
-      }
     };
   }
 });
@@ -83234,6 +83343,23 @@ ${expiry}`);
           return jsonResponse2(reconciled, reconciled.ok ? 200 : reconciled.status || 503);
         });
       }
+      // Whether a read invite's signer is the group password's: a read spends
+      // nothing, and a group being updated, deleted or no longer on a password
+      // refuses, the same way for each.
+      async executeWorkerGroupReadInvite(payload) {
+        const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+        const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+        const groupId = normalizeWorkerGroupId(payload?.groupId);
+        const signer = normalizeWorkerGroupSigner(payload?.signer);
+        if (!slug || !sessionId || !groupId || !signer) {
+          return jsonResponse2({ ok: false, status: 400, reason: "worker_group_read_invite_invalid" }, 400);
+        }
+        const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
+        if (!initialized.ok) return jsonResponse2(initialized, initialized.status || 503);
+        const group = await this.getActiveWorkerGroupCapacity(groupId);
+        const admitted = group.ok && group.state.joinMode === "group_password" && constantTimeEqual(signer, group.state.signer);
+        return admitted ? jsonResponse2({ ok: true, status: 200, groupId }, 200) : jsonResponse2({ ok: false, status: 403, reason: "worker_group_read_invite_invalid" }, 403);
+      }
       executeWorkerGroupAuthorization(payload) {
         const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || "";
         return this.runWorkerGroupMemberOperation(principalKey, async (shared) => {
@@ -84707,6 +84833,9 @@ ${expiry}`);
         }
         if (url.pathname === "/worker-groups/authorize") {
           return this.executeWorkerGroupAuthorization(payload);
+        }
+        if (url.pathname === "/worker-groups/read-invite") {
+          return this.executeWorkerGroupReadInvite(payload);
         }
         if (url.pathname === "/worker-groups/catalog") {
           return this.executeWorkerGroupCatalog(payload);
@@ -104477,6 +104606,87 @@ async function handleAgentHttpRequest({ request, env, body = {}, context, input,
   return handlers[route.path]({ request, env, body, context, input, method: request.method, waitUntil, fetchImpl });
 }
 
+// workers/sessionCorsWorker/privateSessionAccess.js
+init_workerGroupJoin();
+init_workerSessionPublicConfig();
+init_storageRouteExecution();
+var PRIVATE_SESSION_PARTS = Object.freeze({
+  questions: "questions",
+  context: "docsContext",
+  results: "responses"
+});
+var resolvePrivateSessionPartRule = (config, _part) => resolvePayloadAccessControl(config).conditions;
+var namesWorkerGroup = (rule) => !!rule?.conditions?.some((condition) => condition?.kind === "worker_group");
+var isPrivateSession = (config) => Object.keys(PRIVATE_SESSION_PARTS).some((part) => namesWorkerGroup(resolvePrivateSessionPartRule(config, part)));
+var readGroupReadInviteHeader = (request) => request?.headers?.get?.(WORKER_GROUP_READ_INVITE_HEADER) || "";
+var evaluatePrivateSessionAccess = async ({
+  env,
+  slug,
+  config,
+  request,
+  requesterAddress = "",
+  authScopes,
+  part = "questions",
+  resolveRequester,
+  deps
+} = {}) => {
+  const rule = resolvePrivateSessionPartRule(config, part);
+  if (!namesWorkerGroup(rule)) return { ok: true, private: false };
+  const header = readGroupReadInviteHeader(request);
+  const requester = resolveRequester ? await resolveRequester() || {} : { address: requesterAddress, scopes: authScopes };
+  const checks = createRequesterAccessChecks({
+    env,
+    config,
+    slug,
+    requesterAddress: requester.address || "",
+    authScopes: requester.scopes,
+    deps: { ...deps || {}, [STORAGE_GROUP_READ_INVITE]: header }
+  });
+  const result = await checks.admits(rule);
+  if (result?.ok) return { ok: true, private: true };
+  if (result?.outcome === "unavailable") {
+    return { ok: false, private: true, status: 503, reason: PRIVATE_SESSION_UNAVAILABLE, retryable: true };
+  }
+  return {
+    ok: false,
+    private: true,
+    status: 403,
+    // Header values arrive trimmed, so a blank one is no header.
+    reason: header ? PRIVATE_SESSION_INVITE_INVALID : PRIVATE_SESSION_INVITE_REQUIRED
+  };
+};
+var REFUSAL_TEXT = Object.freeze({
+  [PRIVATE_SESSION_INVITE_REQUIRED]: "This session is private. Open it from your group invite link.",
+  [PRIVATE_SESSION_INVITE_INVALID]: "This invite link no longer opens this session.",
+  [PRIVATE_SESSION_UNAVAILABLE]: "Access to this session could not be checked just now. Try again."
+});
+var privateSessionRefusal = ({ access, json: json10, headers: headers2 }) => json10(
+  {
+    error: REFUSAL_TEXT[access.reason] || REFUSAL_TEXT[PRIVATE_SESSION_INVITE_REQUIRED],
+    reason: access.reason,
+    ...access.retryable ? { retryable: true } : {}
+  },
+  access.status || 403,
+  headers2
+);
+var SHELL_FIELDS = Object.freeze([
+  "slug",
+  "sessionId",
+  "sessionIdHex",
+  "configRevision",
+  "authzEpoch",
+  "corsWorkerUrl",
+  "allowOrigins",
+  "appearance",
+  "sessionModeProfile",
+  "storageProfile",
+  "workerAuthority",
+  ...WORKER_SUPPORT_FIELDS
+]);
+var projectPrivateSessionShell = (publicConfig) => Object.fromEntries(
+  SHELL_FIELDS.filter((key) => Object.prototype.hasOwnProperty.call(publicConfig || {}, key)).map((key) => [key, publicConfig[key]])
+);
+
 // workers/sessionCorsWorker/agent/requestBoundary.mjs
 var dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders = {} }) => {
   const url = new URL(request.url);
@@ -104592,6 +104802,17 @@ var dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders = {} }) 
       } catch {
         throw authorityError("agent_membership_denied");
       }
+    }
+    if (["agent", "wrapped", "participant"].includes(access)) {
+      const privateAccess = await evaluatePrivateSessionAccess({
+        env,
+        slug,
+        config,
+        request,
+        requesterAddress: ctx.address,
+        authScopes: ctx.scopes
+      });
+      if (!privateAccess.ok) throw authorityError(privateAccess.reason, privateAccess.status);
     }
     agentEnv.AGENT_SERVICES = createAgentServices({ env, agentEnv, deps });
     if (route.hosted && config.sessionModeProfile?.authority?.mode !== "worker_canonical") throw authorityError("hosted_session_required");
@@ -105137,6 +105358,14 @@ var dispatchInterviewStarterRequest = async ({ request, env, slugHint, baseHeade
   if (!config) return deps.json({ error: constants.sessionConfigNotFoundError }, 404, baseHeaders);
   const cors = await deps.getCorsContext({ request, config });
   if (!cors.ok) return cors.response;
+  const privateAccess = await evaluatePrivateSessionAccess({
+    env,
+    slug,
+    config,
+    request,
+    resolveRequester: () => deps.resolveOptionalRequester?.({ request, env, slug, config, headers: cors.headers })
+  });
+  if (!privateAccess.ok) return privateSessionRefusal({ access: privateAccess, json: deps.json, headers: cors.headers });
   const ended = buildSessionEndedResponse({ config, headers: cors.headers, json: deps.json });
   if (ended) return ended;
   const access = await deps.evaluateAnonymousRouteAccess?.({ slug, config, route: "ai" });
@@ -106218,6 +106447,8 @@ var dispatchSignedOutSessionAgentRequest = async ({ request, env, path, slugHint
   if (!config) return deps.json({ error: constants?.sessionConfigNotFoundError }, 404, baseHeaders);
   const cors = await deps.getCorsContext({ request, config });
   if (!cors.ok) return cors.response;
+  const access = await evaluatePrivateSessionAccess({ env, slug, config, request });
+  if (!access.ok) return privateSessionRefusal({ access, json: deps.json, headers: cors.headers });
   const raw = await request.text();
   if (new TextEncoder().encode(raw).length > SESSION_AGENT_SIGNED_OUT.bodyBytes) {
     return deps.json({ error: "That is too long to send." }, 400, cors.headers);
@@ -106252,6 +106483,7 @@ var dispatchSignedOutSessionAgentRequest = async ({ request, env, path, slugHint
 };
 
 // workers/sessionCorsWorker/workerRouteShellBinding.js
+init_storageRouteExecution();
 init_bodyByteLimit();
 init_uploadSizeLimits();
 
@@ -106319,6 +106551,7 @@ init_aiDefaults();
 init_aiRequestNormalization();
 init_workerGroups();
 init_sessionLifecycle();
+init_workerGroupJoin();
 
 // workers/sessionCorsWorker/realtimeCallExecution.js
 init_realtimeInterviewConfig();
@@ -106459,6 +106692,16 @@ var resolveModelForProvider = ({ payload, provider } = {}) => {
   const model = typeof rawModel === "string" ? rawModel.trim() : rawModel == null ? "" : String(rawModel).trim();
   return model || resolveDefaultModelForProvider(provider);
 };
+var sameGroup = (header, request) => {
+  let joinGroups = [];
+  try {
+    joinGroups = new URL(request?.url || "").searchParams.getAll("joinGroup");
+  } catch {
+    return false;
+  }
+  const invite = parseWorkerGroupReadInvite(header);
+  return joinGroups.length === 1 && !!invite && invite.groupId === normalizeWorkerGroupId(joinGroups[0]);
+};
 var dispatchAnonymousRoute = async ({
   path,
   request,
@@ -106472,7 +106715,30 @@ var dispatchAnonymousRoute = async ({
     env
   } = anonymousContext || {};
   if (path === "/capabilities") return dispatchWorkerCapabilities({ request, env, headers: headers2 });
+  const privateSession = isPrivateSession(config);
+  const refusePrivate = async () => {
+    if (!privateSession) return null;
+    const access = await evaluatePrivateSessionAccess({
+      env,
+      slug,
+      config,
+      request,
+      part: "questions",
+      // Voice calls arrive here signed in too: the signed-in Worker has no route for them.
+      resolveRequester: () => deps?.resolveOptionalRequester?.({ request, env, slug, config, headers: headers2 })
+    });
+    return access.ok ? null : privateSessionRefusal({ access, json: deps?.json, headers: headers2 });
+  };
   if (path === "/groups/list") {
+    const refused2 = await refusePrivate();
+    if (refused2) return refused2;
+    if (privateSession && !sameGroup(readGroupReadInviteHeader(request), request)) {
+      return privateSessionRefusal({
+        access: { status: 403, reason: PRIVATE_SESSION_INVITE_INVALID },
+        json: deps?.json,
+        headers: headers2
+      });
+    }
     const dispatchPublicWorkerGroupListRequest2 = deps?.dispatchPublicWorkerGroupListRequest || dispatchPublicWorkerGroupListRequest;
     return dispatchPublicWorkerGroupListRequest2({
       request,
@@ -106480,6 +106746,7 @@ var dispatchAnonymousRoute = async ({
       env,
       slug,
       baseHeaders: headers2,
+      invitedOnly: privateSession,
       deps: {
         json: deps?.json
       }
@@ -106497,6 +106764,8 @@ var dispatchAnonymousRoute = async ({
       baseHeaders: headers2
     });
   }
+  const refused = await refusePrivate();
+  if (refused) return refused;
   const endedResponse = buildSessionEndedResponse({
     config,
     headers: headers2,
@@ -106653,6 +106922,18 @@ var NON_POST_PATHS = /* @__PURE__ */ new Set([
   "/groups/list",
   ...SESSION_AGENT_PATHS
 ]);
+var OPEN_TO_NON_MEMBERS = /* @__PURE__ */ new Set([
+  "/storage/read",
+  "/storage/list",
+  "/storage/read-batch",
+  "/storage/upload",
+  "/groups/my-memberships",
+  "/groups/join",
+  "/groups/leave",
+  "/session-agent/opt-out",
+  "/session-agent/attribution",
+  "/storage/draft-text/delete"
+]);
 var dispatchAuthenticatedRouteEntry = async ({
   path,
   method,
@@ -106676,6 +106957,11 @@ var dispatchAuthenticatedRouteEntry = async ({
     baseHeaders
   });
   if (!authenticatedContext?.ok) return authenticatedContext?.response;
+  if (!OPEN_TO_NON_MEMBERS.has(path)) {
+    const { config, slug, address: address3, scopes, headers: headers2 } = authenticatedContext;
+    const access = await evaluatePrivateSessionAccess({ env, slug, config, request, requesterAddress: address3, authScopes: scopes });
+    if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers: headers2 });
+  }
   return deps?.dispatchAuthenticatedRoute?.({
     path,
     method,
@@ -106685,6 +106971,7 @@ var dispatchAuthenticatedRouteEntry = async ({
 };
 
 // workers/sessionCorsWorker/authenticatedRouteDispatch.js
+var PATH_OWNED = /* @__PURE__ */ new Set([...SESSION_AGENT_PATHS, FEEDBACK_PATH]);
 var dispatchAuthenticatedRoute = async ({
   path,
   method,
@@ -106728,7 +107015,7 @@ var dispatchAuthenticatedRoute = async ({
     body = authenticatedAction.payload;
     action = authenticatedAction.action;
   }
-  const nonSecretActionRoute = await deps?.dispatchAuthenticatedNonSecretActionRoute?.({
+  const nonSecretActionRoute = PATH_OWNED.has(path) ? null : await deps?.dispatchAuthenticatedNonSecretActionRoute?.({
     action,
     body,
     config,
@@ -109631,6 +109918,14 @@ var dispatchResourcePresenceRequest = async ({
   }
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return corsContext?.response;
+  const access = await evaluatePrivateSessionAccess({
+    env,
+    slug,
+    config,
+    request,
+    resolveRequester: () => deps?.resolveOptionalRequester?.({ request, env, slug, config, headers: corsContext.headers })
+  });
+  if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers: corsContext.headers });
   const secrets = await deps?.getSessionSecrets?.(env, slug) || {};
   let interview;
   if (request?.url && new URL(request.url).searchParams.get("interview") === "1") {
@@ -109641,8 +109936,8 @@ var dispatchResourcePresenceRequest = async ({
     else if (String(settings.provider || "openai").trim().toLowerCase() !== "openai") reason = "Voice interviews require the OpenAI provider.";
     else if (!String(secrets.openaiKey || "").trim()) reason = "The session owner needs to configure an OpenAI key for voice interviews.";
     else {
-      const access = await deps?.evaluateAnonymousRouteAccess?.({ slug, config, route: "realtime" });
-      if (!access?.ok) reason = "Voice interview access is unavailable. Ask the session owner to check AI access settings.";
+      const access2 = await deps?.evaluateAnonymousRouteAccess?.({ slug, config, route: "realtime" });
+      if (!access2?.ok) reason = "Voice interview access is unavailable. Ask the session owner to check AI access settings.";
     }
     interview = { ready: !reason, ...reason ? { reason } : {} };
   }
@@ -109673,6 +109968,8 @@ var buildBootstrapHeaders = (headers2) => {
   );
   vary.add("Origin");
   vary.add("X-Session-Slug");
+  vary.add("Authorization");
+  vary.add("X-CE-Group-Invite");
   next.set("Vary", [...vary].join(", "));
   next.set("Cache-Control", "no-store");
   return next;
@@ -109716,6 +110013,23 @@ var readWorkerSessionConfig = async ({ request, env, slugHint, headers: headers2
   if (!corsContext?.ok) return { response: protectBootstrapResponse(corsContext?.response, headers2) };
   return { slug, config, headers: buildBootstrapHeaders(corsContext.headers) };
 };
+var readPrivateSessionAccess = async ({ request, env, slug, config, headers: headers2, deps }) => {
+  if (!isPrivateSession(config)) return {};
+  const requester = await deps?.resolveOptionalRequester?.({ request, env, slug, config, headers: headers2 }) || {};
+  const questions = await evaluatePrivateSessionAccess({
+    env,
+    slug,
+    config,
+    request,
+    requesterAddress: requester.address || "",
+    authScopes: requester.scopes,
+    part: "questions"
+  });
+  if (!questions.ok) {
+    return questions.status === 403 ? { shell: questions.reason, signedIn: !!requester.address } : { refusal: privateSessionRefusal({ access: questions, json: deps?.json, headers: headers2 }) };
+  }
+  return {};
+};
 var dispatchSessionConfigBootstrapRequest = async ({
   request,
   env,
@@ -109734,6 +110048,18 @@ var dispatchSessionConfigBootstrapRequest = async ({
   });
   if ("response" in read) return read.response;
   const { slug, config } = read;
+  const access = await readPrivateSessionAccess({ request, env, slug, config, headers: read.headers, deps });
+  if (access.refusal) return access.refusal;
+  if (access.shell) {
+    return deps?.json?.({
+      ok: true,
+      sessionSlug: slug,
+      privateSession: access.shell === PRIVATE_SESSION_INVITE_INVALID ? "invite_invalid" : "invite_required",
+      // Whether a sign-in counted, so a client whose bearer didn't can sign in again.
+      signedIn: access.signedIn,
+      config: projectPrivateSessionShell(projectPublicWorkerSessionConfig(config))
+    }, 200, read.headers);
+  }
   return deps?.json?.({
     ok: true,
     sessionSlug: slug,
@@ -109764,6 +110090,17 @@ var dispatchSessionAgentInstructionsRequest = async ({
     constants
   });
   if ("response" in read) return read.response;
+  if (isPrivateSession(read.config)) {
+    const access = await evaluatePrivateSessionAccess({
+      env,
+      slug: read.slug,
+      config: read.config,
+      request,
+      part: "questions",
+      resolveRequester: () => deps?.resolveOptionalRequester?.({ request, env, slug: read.slug, config: read.config, headers: read.headers })
+    });
+    if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers: read.headers });
+  }
   const { agentInstructions } = projectPublicWorkerSessionConfig(read.config);
   if (typeof agentInstructions !== "string" || !agentInstructions.trim()) {
     return deps?.json?.({ error: "This session has no instructions for AI agents." }, 404, read.headers);
@@ -110045,6 +110382,15 @@ var dispatchInterviewBriefRequest = async ({
     if (!verified.ok) return deps?.json?.({ error: verified.error, reason: verified.reason }, verified.status, headers2);
     reader = verified.reader;
   }
+  const access = await evaluatePrivateSessionAccess({
+    env,
+    slug,
+    config,
+    request,
+    requesterAddress: reader?.address || "",
+    authScopes: reader?.scopes
+  });
+  if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers: headers2 });
   const loadPublicInterviewQuestions2 = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestions;
   const { questions, incomplete, refused } = await loadPublicInterviewQuestions2({
     env,
@@ -110233,7 +110579,7 @@ var resolveTopLevelRouteSelection = ({
       action: path.replace("/admin/", "").trim()
     };
   }
-  if (!hasTrimmedAuthorization && method === "POST" && (path === "/ai" || path === "/transcribe" || path === "/realtime/call")) {
+  if (method === "POST" && (path === "/realtime/call" || !hasTrimmedAuthorization && (path === "/ai" || path === "/transcribe"))) {
     return {
       kind: "anonymous",
       anonymousRoute: path === "/transcribe" ? "transcribe" : path === "/realtime/call" ? "realtime" : "ai"
@@ -110285,6 +110631,26 @@ var createWorkerRouteShellWithWorkerDeps = ({
   const log2 = deps?.log || (() => {
   });
   const ResponseCtor = deps?.Response || Response;
+  const resolveOptionalRequester = async ({ request, env, slug, config, headers: headers2 }) => {
+    const signedOut = { address: "", scopes: {} };
+    if (!deps?.toStr?.(request.headers.get("authorization") || "").trim()) return signedOut;
+    const auth = await deps?.requireAuth?.({ request, env, baseHeaders: headers2, slugHint: slug });
+    if (!auth?.ok || auth.slug !== slug) return signedOut;
+    const context = await resolveAuthenticatedRouteContext2({
+      request,
+      env,
+      auth,
+      baseHeaders: headers2,
+      deps: {
+        readCurrentSessionConfig: async () => ({ config }),
+        getCorsContext: deps?.getCorsContext,
+        json: deps?.json,
+        toStr: deps?.toStr,
+        SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
+      }
+    });
+    return context?.ok ? { address: context.address, scopes: context.scopes } : signedOut;
+  };
   const handleRequest = async (request, env) => {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -110334,7 +110700,8 @@ var createWorkerRouteShellWithWorkerDeps = ({
             resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
             getSessionConfig: deps?.getSessionConfig,
             getCorsContext: deps?.getCorsContext,
-            json: deps?.json
+            json: deps?.json,
+            resolveOptionalRequester
           },
           constants: {
             missingSlugError: constants?.missingSlugError,
@@ -110413,7 +110780,8 @@ var createWorkerRouteShellWithWorkerDeps = ({
               safeFetch: deps?.safeFetch,
               isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
               log: deps?.log,
-              evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess
+              evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+              resolveOptionalRequester
             } : {},
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
             checkRateLimit: deps?.checkRateLimit,
@@ -110461,6 +110829,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             getCorsContext: deps?.getCorsContext,
             getSessionSecrets: deps?.getSessionSecrets,
             evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+            resolveOptionalRequester,
             json: deps?.json
           },
           constants: {
@@ -110781,6 +111150,19 @@ var createWorkerRouteShellWithWorkerDeps = ({
           address3 = context.address;
           scopes = context.scopes;
         }
+        const resultsAccess = await evaluatePrivateSessionAccess({
+          env,
+          slug: targetSlug,
+          config,
+          request: withQuerySlugHeader,
+          requesterAddress: address3,
+          authScopes: scopes,
+          part: "results"
+        });
+        if (!resultsAccess.ok) {
+          return privateSessionRefusal({ access: resultsAccess, json: deps?.json, headers: corsContext?.headers || routeBaseHeaders });
+        }
+        const readInvite = { [STORAGE_GROUP_READ_INVITE]: readGroupReadInviteHeader(withQuerySlugHeader) };
         if (routeSelection.kind === "debate-atlas" || routeSelection.kind === "risk-matrix") {
           const dispatchBuildRead = routeSelection.kind === "debate-atlas" ? dispatchDebateAtlasReadRequest2 : dispatchRiskMatrixReadRequest2;
           return await dispatchBuildRead({
@@ -110792,6 +111174,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             scopes,
             headers: corsContext?.headers || routeBaseHeaders,
             deps: {
+              ...readInvite,
               json: deps?.json,
               validateAdmin: deps?.validateAdmin,
               authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
@@ -110814,6 +111197,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
           scopes,
           headers: corsContext?.headers || routeBaseHeaders,
           deps: {
+            ...readInvite,
             json: deps?.json,
             authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
             readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
@@ -110851,6 +111235,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
                 storageRoute: deps?.storageRoute,
                 readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
                 evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+                resolveOptionalRequester,
                 getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
                 transcribe: deps?.transcribe,
                 readAiRequestPayload: deps?.readAiRequestPayload,
@@ -111970,7 +112355,7 @@ var originAllowed = (origin, allowList) => {
 var corsHeaders = (origin, allowList) => {
   const headers2 = new Headers({
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Session-Slug, X-Group-Slug, X-Anonymous-Client-Id",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Session-Slug, X-Group-Slug, X-Anonymous-Client-Id, X-CE-Group-Invite",
     // Browsers keep a preflight's answer this long (ten minutes), so a page
     // polling every 15 seconds stops checking first each time. A header the
     // list lacks still gets a fresh check.
