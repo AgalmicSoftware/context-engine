@@ -2012,10 +2012,73 @@ longer select a principal. Malformed principals fail closed.
 
 Don't use an open group as an access rule, because anyone who can sign in can
 join it. A `group_allowlist`, group gate or `worker_group` condition needs an
-`admin_add` group. Choosing **Admin adds members** in the app's forms also moves
+`admin_add` group, or a group joined by one-use code or group password, whose
+code or password is the invitation. Choosing **Admin adds members** in the app's forms also moves
 the member list back to admins.
 
 Upload policy `group_allowlist` may be supplied on Cloudflare storage uploads with `groupId`/`groupIds`; the uploader must be a member before payload bytes are persisted. Existing SBT upload behavior is unchanged.
+
+### Private sessions
+
+A session whose access rule (`payloadAccessControl.accessConditions`) has a
+`worker_group` condition (`{ "kind": "worker_group", "groupIds": [...] }`, one
+to twenty stored group ids) is private. Its questions, context and results show
+only to its admins, to signed-in members of a named group, and to anyone whose
+request carries a read invite for one, signed in or not. Each request reads the
+rule and the groups afresh, so adding a group signs no one out and removing a
+group, a member or a password refuses on the next request.
+
+- **Read invite.** A group password's derived key signs
+  `ContextEngine.WorkerGroup.Read:1`, `session:<sessionId>` and `group:<groupId>`
+  on three lines (EIP-191). The request sends
+  `X-CE-Group-Invite: <groupId>:<signature>`. The Worker recovers the signer and
+  asks the group's coordinator whether it is that `group_password` group's
+  current signer. A read spends nothing and cannot be used to join. A one-use
+  code makes no read invite: its holder joins first.
+- **Who is refused, and how.** The shell, for `GET /session-config`: `ok`,
+  `sessionSlug`, `privateSession` (`invite_required` or `invite_invalid`) and a
+  `config` cut to what signing in and joining need (`slug`, `sessionId`,
+  `sessionIdHex`, `configRevision`, `authzEpoch`, `corsWorkerUrl`,
+  `allowOrigins`, `appearance`, `sessionModeProfile`, `storageProfile`,
+  `workerAuthority` and the Worker support fields), never the name, the
+  description, the context or the instructions. Elsewhere 403
+  `private_session_invite_required` (no invite) or
+  `private_session_invite_invalid` (an invite that no longer holds), and 503
+  `private_session_unavailable` with `retryable: true` when the groups can't be
+  read. An invite that doesn't hold is ignored for someone the rule admits
+  without it. `/session-config` reads an optional bearer, so members see the
+  whole config; it answers with `Vary: Origin, X-Session-Slug, Authorization,
+  X-CE-Group-Invite`.
+- **Routes.** Signed out: the session config, `/llms.txt`,
+  `/resource-presence`, `/interview/starter`, the interview catalog, the
+  Session Agent, `/ai`, `/transcribe`, `/realtime/call`, `/groups/list`, the
+  results routes and storage reads. Signed in: every route except storage
+  reads and uploads (which apply the rule to each request themselves) and
+  `/groups/list`, `/groups/my-memberships`, `/groups/join` and `/groups/leave`,
+  so anyone signed in can still join. Agent HTTP holds agent, participant and
+  wrapped credentials to the rule by their account. Open to all: CORS
+  preflights, `/capabilities`, sign-in, signed-out feedback (a note to the
+  admins), sponsored deploy codes, agent descriptors and `session-meta`
+  (ids and flags only).
+- **Group list.** Signed out, a private session's `/groups/list` needs a read
+  invite for the one group `joinGroup` names, and lists that group alone,
+  listed or not, without its admin.
+- **Interview catalog.** An AI fetching a catalog link sends no header, so a
+  private session's catalog opens only with a ticket from a signed-in member.
+- **Results.** A signed-out invite holder sees results as members do. Where the
+  results setting shows members every answer (`session_member_full`), that
+  includes each answer with its writer's address, so anyone holding a
+  forwarded invite link reads every answer and who wrote it, until the group's
+  password changes. Where members see only their own answers, an invite reads
+  none. Results admins outside the named groups are refused like anyone else.
+- **Groups to use.** Use groups joined by group password for invite links.
+  Membership of an open group the rule names would admit anyone who joins it,
+  and a listed group's name shows to anyone signed in.
+
+Every part of a session follows its one rule for now. Each part's check reads
+its rule in one place (`resolvePrivateSessionPartRule` in
+`privateSessionAccess.js`), so a part with its own rule later changes that
+function and nothing else.
 
 ## Required bindings
 
