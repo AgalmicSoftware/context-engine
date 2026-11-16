@@ -102,6 +102,12 @@ test('resolveTopLevelRouteSelection classifies realtime SDP exchange as anonymou
     }),
     { kind: 'anonymous', anonymousRoute: 'realtime' },
   );
+  // Signed in too: the call has no other route, and a private session reads the sign-in there.
+  for (const [path, kind] of [['/realtime/call', 'anonymous'], ['/ai', 'authenticated'], ['/transcribe', 'authenticated']]) {
+    assert.equal(resolveTopLevelRouteSelection({
+      path, method: 'POST', request: createRequest({ Authorization: 'Bearer token' }), deps: { toStr: String },
+    }).kind, kind, path);
+  }
 });
 
 test('resolveTopLevelRouteSelection preserves raw authorization-header truthiness for arweave upload handoff', () => {

@@ -349,6 +349,45 @@ test('the signed-out session agent, interview and presence routes follow the rul
   }
 });
 
+test('a member signed in passes the routes open signed out without an invite; no one else does', async () => {
+  const { f } = await setup();
+  const asked = [];
+  const as = (address) => ({ resolveOptionalRequester: async () => { asked.push(address); return { address, scopes: { storage: true } }; } });
+  const routes = {
+    'interview starter': (config, deps) => dispatchInterviewStarterRequest({
+      request: new Request('https://worker.test/interview/starter?slug=fixture'), env: f.env, baseHeaders: {}, constants: {},
+      deps: { ...sessionReads, readCurrentSessionConfig: async () => ({ config }),
+        evaluateAnonymousRouteAccess: async () => ({ ok: false, status: 418, error: 'marker' }), ...deps },
+    }),
+    'resource presence': (config, deps) => dispatchResourcePresenceRequest({
+      request: new Request('https://worker.test/resource-presence'), env: f.env, baseHeaders: {}, constants: {},
+      deps: { ...sessionReads, getSessionConfig: async () => config, getSessionSecrets: async () => ({}), ...deps },
+    }),
+    'agent instructions': (config, deps) => dispatchSessionAgentInstructionsRequest({
+      request: new Request('https://worker.test/llms.txt'), env: f.env, baseHeaders: {},
+      deps: { ...sessionReads, getSessionConfig: async () => config, ...deps },
+      constants: { missingSlugError: 'Missing.', sessionConfigNotFoundError: 'Not found.' },
+    }),
+    'voice call': (config, deps) => signedOut(f, '/realtime/call', { config, deps: {
+      readRealtimeCallRequestPayload: async () => ({ ok: false, status: 400, error: 'marker' }), ...deps } }),
+  };
+  const through = async (run) => {
+    const result = await run();
+    return result instanceof Response ? result.status === 200 : passed(() => result);
+  };
+  const config = { ...privateConfig(), interviewMode: { enabled: true } };
+  for (const [name, route] of Object.entries(routes)) {
+    assert.equal(await through(() => route(config, as(principal(1).address))), true, name);
+    assert.equal(await through(() => route(config, as(ADMIN))), true, name);
+    assert.equal((await route(config, as(principal(2).address))).body.reason, PRIVATE_SESSION_INVITE_REQUIRED, name);
+  }
+  // A session that isn't private never looks at a sign-in here.
+  asked.length = 0;
+  const open = { ...privateConfig({ match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] }), interviewMode: { enabled: true } };
+  for (const [name, route] of Object.entries(routes)) assert.equal(await through(() => route(open, as(principal(2).address))), true, name);
+  assert.deepEqual(asked, []);
+});
+
 test('a catalog ticket opens a private session to its person only if the rule admits them', async () => {
   const { f } = await setup();
   const env = { ...f.env, TOKEN_HMAC_SECRET: 'synthetic-ticket-hmac' };
@@ -450,7 +489,9 @@ test('signed in, a private session admits its members and invite holders, and le
   }
   // Storage checks each request itself, and joining a group by its id needs no membership.
   for (const [path, method] of [['/storage/read', 'GET'], ['/storage/list', 'POST'], ['/storage/read-batch', 'POST'], ['/storage/upload', 'POST'],
-    ['/groups/join', 'POST'], ['/groups/my-memberships', 'GET'], ['/groups/leave', 'POST']]) {
+    ['/groups/join', 'POST'], ['/groups/my-memberships', 'GET'], ['/groups/leave', 'POST'],
+    // Their own switches and drafts stay theirs after they lose access.
+    ['/session-agent/opt-out', 'POST'], ['/session-agent/attribution', 'POST'], ['/storage/draft-text/delete', 'POST']]) {
     assert.equal((await send(path, method, outsider)).body.marker, true, path);
   }
 });
@@ -470,7 +511,7 @@ const ROUTE_KINDS = {
   'debate-atlas': RULE,
   'risk-matrix': RULE,
   anonymous: RULE, // AI and the group list here; storage checks each read itself
-  authenticated: RULE, // at the entry, but for storage reads and uploads, and joining a group by its id
+  authenticated: RULE, // at the entry, but for storage, joining a group by its id, and one's own switches and drafts
   'interview-catalog-ticket': 'held to the rule where the ticket is used, the catalog',
   'arweave-upload': 'an admin-signed bootstrap upload; otherwise the signed-in entry',
   options: 'open: a CORS preflight',

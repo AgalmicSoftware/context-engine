@@ -98,10 +98,10 @@ export const resolveTopLevelRouteSelection = ({
     };
   }
 
+  // A voice call has only this route, signed in or not.
   if (
-    !hasTrimmedAuthorization &&
     method === 'POST' &&
-    (path === '/ai' || path === '/transcribe' || path === '/realtime/call')
+    (path === '/realtime/call' || (!hasTrimmedAuthorization && (path === '/ai' || path === '/transcribe')))
   ) {
     return {
       kind: 'anonymous',

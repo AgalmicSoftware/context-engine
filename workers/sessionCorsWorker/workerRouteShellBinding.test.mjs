@@ -171,7 +171,9 @@ test('createWorkerRouteShellWithWorkerDeps preserves resource-presence branch wi
         assert.equal(value.env, env);
         assert.equal(value.slugHint, 'demo-1');
         assert.equal(value.baseHeaders, baseHeaders);
-        assert.deepEqual(value.deps, {
+        const { resolveOptionalRequester, ...deps } = value.deps;
+        assert.equal(typeof resolveOptionalRequester, 'function');
+        assert.deepEqual(deps, {
           resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
           getSessionConfig: 'getSessionConfig',
           getCorsContext: 'getCorsContext',

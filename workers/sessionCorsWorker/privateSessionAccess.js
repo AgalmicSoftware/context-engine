@@ -40,7 +40,8 @@ export { PRIVATE_SESSION_INVITE_INVALID, PRIVATE_SESSION_INVITE_REQUIRED, PRIVAT
 /**
  * Whether a request may see one part of a session: `{ ok: true }` for a session that isn't private or a request its
  * rule admits; otherwise `{ ok: false, status, reason }`. A request with an invite that doesn't hold is told apart from
- * one without; an invite is never needed by someone the rule admits without it.
+ * one without; an invite is never needed by someone the rule admits without it. A route open signed out passes
+ * `resolveRequester` instead of an address, so a member's sign-in counts there too and costs nothing elsewhere.
  */
 export const evaluatePrivateSessionAccess = async ({
   env,
@@ -50,17 +51,19 @@ export const evaluatePrivateSessionAccess = async ({
   requesterAddress = '',
   authScopes,
   part = 'questions',
+  resolveRequester,
   deps,
 } = {}) => {
   const rule = resolvePrivateSessionPartRule(config, part);
   if (!namesWorkerGroup(rule)) return { ok: true, private: false };
   const header = readGroupReadInviteHeader(request);
+  const requester = resolveRequester ? (await resolveRequester()) || {} : { address: requesterAddress, scopes: authScopes };
   const checks = createRequesterAccessChecks({
     env,
     config,
     slug,
-    requesterAddress,
-    authScopes,
+    requesterAddress: requester.address || '',
+    authScopes: requester.scopes,
     deps: { ...(deps || {}), [STORAGE_GROUP_READ_INVITE]: header },
   });
   // A check that throws refuses: the route's own error handling answers it.

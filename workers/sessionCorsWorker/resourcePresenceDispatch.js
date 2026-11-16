@@ -44,7 +44,10 @@ export const dispatchResourcePresenceRequest = async ({
 
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return corsContext?.response;
-  const access = await evaluatePrivateSessionAccess({ env, slug, config, request });
+  const access = await evaluatePrivateSessionAccess({
+    env, slug, config, request,
+    resolveRequester: () => deps?.resolveOptionalRequester?.({ request, env, slug, config, headers: corsContext.headers }),
+  });
   if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers: corsContext.headers });
 
   const secrets = (await deps?.getSessionSecrets?.(env, slug)) || {};

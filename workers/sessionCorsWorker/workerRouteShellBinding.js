@@ -295,6 +295,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
               isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
               log: deps?.log,
               evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+              resolveOptionalRequester,
             } : {}),
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
             checkRateLimit: deps?.checkRateLimit,
@@ -344,6 +345,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             getCorsContext: deps?.getCorsContext,
             getSessionSecrets: deps?.getSessionSecrets,
             evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+            resolveOptionalRequester,
             json: deps?.json,
           },
           constants: {
@@ -765,6 +767,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
                 storageRoute: deps?.storageRoute,
                 readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
                 evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+                resolveOptionalRequester,
                 getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
                 transcribe: deps?.transcribe,
                 readAiRequestPayload: deps?.readAiRequestPayload,

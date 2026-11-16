@@ -67,7 +67,11 @@ export const dispatchAnonymousRoute = async ({
   const privateSession = isPrivateSession(config);
   const refusePrivate = async () => {
     if (!privateSession) return null;
-    const access = await evaluatePrivateSessionAccess({ env, slug, config, request, part: 'questions' });
+    const access = await evaluatePrivateSessionAccess({
+      env, slug, config, request, part: 'questions',
+      // Voice calls arrive here signed in too: the signed-in Worker has no route for them.
+      resolveRequester: () => deps?.resolveOptionalRequester?.({ request, env, slug, config, headers }),
+    });
     return access.ok ? null : privateSessionRefusal({ access, json: deps?.json, headers });
   };
 

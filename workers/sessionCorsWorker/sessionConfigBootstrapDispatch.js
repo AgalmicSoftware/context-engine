@@ -161,7 +161,10 @@ export const dispatchSessionAgentInstructionsRequest = async ({
   });
   if ('response' in read) return read.response;
   if (isPrivateSession(read.config)) {
-    const access = await evaluatePrivateSessionAccess({ env, slug: read.slug, config: read.config, request, part: 'questions' });
+    const access = await evaluatePrivateSessionAccess({
+      env, slug: read.slug, config: read.config, request, part: 'questions',
+      resolveRequester: () => deps?.resolveOptionalRequester?.({ request, env, slug: read.slug, config: read.config, headers: read.headers }),
+    });
     if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers: read.headers });
   }
   const { agentInstructions } = projectPublicWorkerSessionConfig(read.config);
