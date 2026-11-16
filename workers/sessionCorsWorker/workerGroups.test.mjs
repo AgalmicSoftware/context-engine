@@ -365,20 +365,36 @@ test('a join link to a listed group shows a private session its listed groups; o
 test('an AI suggests only open groups still taking members, and any listed group\'s link counts', async () => {
 	const nowMs = Date.parse('2026-02-03T04:05:06.000Z');
 	const listed = [
-		{ groupId: 'salon', label: 'Salon', joinMode: 'open', memberVisibility: 'session' },
-		{ groupId: 'staff', label: 'Staff', joinMode: 'admin_add', memberVisibility: 'session' },
-		{ groupId: 'circle', label: 'Circle', joinMode: 'open', memberVisibility: 'members' },
-		{ groupId: 'closed', label: 'Closed', joinMode: 'open', memberVisibility: 'session', joinEndsAt: '2026-02-01T00:00:00.000Z' },
-		{ groupId: 'open-later', label: 'Open later', joinMode: 'open', memberVisibility: 'session', joinEndsAt: '2026-03-01T00:00:00.000Z' },
+		{ groupId: 'salon', label: 'Salon', joinMode: 'open', memberVisibility: 'session', memberCount: 1 },
+		{ groupId: 'staff', label: 'Staff', joinMode: 'admin_add', memberVisibility: 'session', memberCount: 1 },
+		{ groupId: 'circle', label: 'Circle', joinMode: 'open', memberVisibility: 'members', memberCount: 2, memberLimit: 3 },
+		{ groupId: 'full', label: 'Full', joinMode: 'open', memberVisibility: 'session', memberCount: 2, memberLimit: 2 },
+		{ groupId: 'closed', label: 'Closed', joinMode: 'open', memberVisibility: 'session', joinEndsAt: '2026-02-01T00:00:00.000Z', memberCount: 1 },
+		{ groupId: 'open-later', label: 'Open later', joinMode: 'open', memberVisibility: 'session', joinEndsAt: '2026-03-01T00:00:00.000Z', memberCount: 1 },
 	];
+	const listings = [];
 	// Even a list that held more than members see could not widen what counts.
 	const deps = {
 		now: () => nowMs,
 		checkCoordinatedWorkerGroupReady: async () => ({ ok: true, meta: { groupCount: listed.length } }),
-		listWorkerGroups: async () => ({ ok: true, store: 'kv', groups: listed }),
+		listWorkerGroups: async (args) => {
+			listings.push(args);
+			return { ok: true, store: 'kv', groups: listed };
+		},
 	};
 	const joinable = await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: publicWorkerGroupConfig(), slug: 'session-a', deps });
+	// A full group is never suggested, and the counts that tell it apart are not passed on.
 	assert.deepEqual(joinable.map((group) => group.groupId), ['salon', 'circle', 'open-later']);
+	assert.equal(listings[0].includeMemberCount, true);
+	assert.equal(joinable.some((group) => 'memberCount' in group), false);
+	// A group at the session's ceiling is full whatever its own limit.
+	const atCeiling = await listSelfJoinableWorkerGroupsForVisitor({
+		env: {},
+		config: { ...publicWorkerGroupConfig(), groupMemberCeiling: 2 },
+		slug: 'session-a',
+		deps,
+	});
+	assert.deepEqual(atCeiling.map((group) => group.groupId), ['salon', 'open-later']);
 	assert.deepEqual(
 		await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', inviteGroupId: 'missing', deps }),
 		[],
