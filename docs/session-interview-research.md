@@ -36,9 +36,9 @@ settings** on the setup page or the session's settings page. The boolean
 `interviewMode.shareDraftChangesByDefault` defaults to `true` and sets the
 initial **Share for research** checkbox for new responses, including imported
 and voice-generated drafts. The checkbox sits beside **AI submission info**, so
-the choice is visible before submitting without opening it, and its **?** says
-what sharing keeps. A **What’s kept** link beside it, and a **How it works** link
-on the hidden-drafts line, open [research data in interviews](research-data.md)
+the choice is visible before submitting without opening it. **What’s this?**
+beside it says, on a tap, hover or focus, what sharing keeps; its tooltip's link,
+and a **How it works** link on the hidden-drafts line, open [research data in interviews](research-data.md)
 on GitHub, a plain-language summary with a diagram. Participants can untick it before submitting. Saved per-question choices
 take precedence over this default; a session-config refresh does not overwrite
 an explicit choice made during review, including while logging in to submit.

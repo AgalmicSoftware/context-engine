@@ -28,7 +28,7 @@ Your chats with your AI and interview transcripts. Usually, the AI's notes and
 drafted text too.
 
 - A session set to full detail also keeps the AI's notes and drafted comments;
-  the **?** beside **Share for research** says which applies.
+  **What’s this?** beside **Share for research** says which applies.
 - If a session keeps the AI's drafted text for its admins only, it has its own
   switch, which you can turn off.
 

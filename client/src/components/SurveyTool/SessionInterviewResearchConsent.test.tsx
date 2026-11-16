@@ -2,7 +2,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds';
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import SessionInterviewResearchConsent, { SessionInterviewResearchShare } from './SessionInterviewResearchConsent';
 import type { InterviewPrefillPacket } from './sessionInterview';
 
@@ -174,20 +174,35 @@ describe('SessionInterviewResearchShare', () => {
     expect(diagram && fs.existsSync(path.join(docs, diagram))).toBe(true);
   });
 
-  it('shows a link to what is kept beside the checkbox, opening that section of the research data doc in a new tab', () => {
-    render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
-    const link = screen.getByRole('link', { name: 'What’s kept' });
+  it('says what it is with one “What’s this?”, whose tooltip links to the research data doc in a new tab', async () => {
+    render(
+      <SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} dataNote="Funded by Example." />,
+    );
+    const what = screen.getByRole('button', { name: 'What’s this? About sharing for research' });
+    expect(what).toHaveTextContent(/^What’s this\?$/);
+    // No separate ? or “What’s kept” saying the same thing again.
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.queryByText('What’s kept')).not.toBeInTheDocument();
+    // A tap shows the tooltip with the session's note and the doc's link, whether the browser reports it as
+    // focus or, as iOS Safari does, as a hover.
+    fireEvent.mouseOver(what);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Funded by Example.');
+    const link = within(tooltip).getByRole('link', { name: 'How research data is handled' });
     expect(link).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/research-data.md#what-is-kept',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/research-data.md',
     );
     expect(link).toHaveAttribute('target', '_blank');
+    fireEvent.mouseOut(what);
+    fireEvent.focus(what);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Funded by Example.');
   });
 
-  it('names itself shortly, with what it shares behind its ?', () => {
+  it('names itself shortly, with what it shares behind “What’s this?”', () => {
     render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
     expect(screen.getByLabelText('Share for research')).toBeChecked();
-    expect(screen.getByRole('button', { name: 'About sharing for research' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('button', { name: 'What’s this? About sharing for research' })).toHaveAccessibleDescription(
       /predicted answers, ratings and confidence/,
     );
   });

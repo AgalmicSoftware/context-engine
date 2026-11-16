@@ -183,7 +183,7 @@ it('says how many drafts are hidden and why, with the session note on where the 
     'https://example.test/study',
   );
   const sharing = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
-  expect(screen.getByRole('button', { name: 'About sharing for research' })).toHaveAccessibleDescription(
+  expect(screen.getByRole('button', { name: 'What’s this? About sharing for research' })).toHaveAccessibleDescription(
     /Part of a study funded by Example/,
   );
   fireEvent.click(sharing);

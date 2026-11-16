@@ -162,13 +162,7 @@
   white-space: nowrap;
 }
 
-// The tooltip's default link color is too dim on its dark background; take the text color, underlined.
-.tooltipLink {
-  color: inherit;
-  text-decoration: underline;
-}
-
-// The visible link beside "Share for research": the label's colour, underlined and bold, so it reads as a link.
+// The visible links, "What’s this?" beside "Share for research" and "How it works": the label's colour, underlined and bold, so it reads as a link.
 .researchLink {
   flex: 0 0 auto;
   color: inherit;
@@ -187,4 +181,24 @@
     outline: 2px solid currentColor;
     outline-offset: 2px;
   }
+}
+
+// “What’s this?” is a button, so a tap shows its tooltip: drawn as the link beside it would be.
+.researchWhat {
+  // A taller target for a tap, without moving the text, so a tap aimed at it doesn't land on the checkbox.
+  margin: -6px -4px;
+  padding: 6px 4px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  // The themes give buttons their own face, at a higher specificity; this one reads as the text beside it.
+  font-family: inherit !important;
+  font-weight: 700;
+  cursor: help;
+}
+
+// The tooltip's default link color is too dim on its dark background; take the text color, underlined.
+.tooltipLink {
+  color: inherit;
+  text-decoration: underline;
 }

@@ -1,7 +1,5 @@
 import type React from 'react';
 import { Input, Label, UncontrolledTooltip } from 'reactstrap';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { INTERVIEW_PROMPT_VERSION, type InterviewPrefillPacket } from './sessionInterview';
 import { describeInterviewPlatform } from './sessionInterviewModalState';
@@ -12,7 +10,6 @@ import styles from './SessionInterviewResearchConsent.module.scss';
 // The plain-language research data doc on GitHub, led by its diagram: what is kept, how it's measured,
 // who sees it, how to stop. Links open it in a new tab, so the review in progress stays put.
 export const RESEARCH_DOC_URL = buildPublicRepoBlobUrl('docs/research-data.md');
-const RESEARCH_DOC_KEPT_URL = `${RESEARCH_DOC_URL}#what-is-kept`;
 
 type Props = {
   packet: InterviewPrefillPacket;
@@ -264,15 +261,16 @@ export function SessionInterviewResearchShare({
         />{' '}
         <span>Share for research{mixed ? ' (mixed)' : ''}</span>
       </Label>
+      {/* Says what this is in a tooltip on a tap, hover or focus, which a phone can't do with a link. */}
       <button
         type="button"
         id="ce-interview-research-help"
-        className={styles.researchHelp}
+        className={`${styles.researchLink} ${styles.researchWhat}`}
         data-ce-control-appearance="frameless"
-        aria-label="About sharing for research"
+        aria-label="What’s this? About sharing for research"
         aria-describedby="ce-interview-research-description"
       >
-        <FontAwesomeIcon icon={faQuestionCircle} />
+        What’s this?
       </button>
       <span id="ce-interview-research-description" className={styles.srOnly}>
         {minimal
@@ -296,9 +294,6 @@ export function SessionInterviewResearchShare({
           How research data is handled
         </a>
       </UncontrolledTooltip>
-      <a className={styles.researchLink} href={RESEARCH_DOC_KEPT_URL} target="_blank" rel="noreferrer">
-        What’s kept
-      </a>
     </span>
   );
 }

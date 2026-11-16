@@ -4699,16 +4699,17 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   grid-area: 1 / 1;
   justify-self: end;
   align-self: start;
-  margin: 6px 12px 0 0;
+  // Level with the summary's text: its 1px border and 10px padding, plus half the difference in line height.
+  margin: 12px 12px 0 0;
 }
 
-// The share control, with its “What’s kept” link, is about 306px wide; on the bar it must leave the
+// The share control, with its “What’s this?” link, is about 280px wide; on the bar it must leave the
 // middle free, so a tap there opens the summary instead of ticking the box.
 @container (max-width: 640px) {
   .sessionInterviewConsentGroup > .sessionInterviewResearchShare {
     grid-area: 2 / 1;
     justify-self: stretch;
-    // “What’s kept” takes the next line before the label would wrap away from its ?.
+    // On a very narrow screen “What’s this?” takes the next line rather than splitting the label.
     flex-wrap: wrap;
     row-gap: 2px;
     margin: 0;

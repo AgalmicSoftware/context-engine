@@ -547,7 +547,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeChecked();
     fireEvent.click(choices.querySelector('summary')!);
     expect(choices).toHaveAttribute('open');
-    expect(screen.getByRole('button', { name: 'About sharing for research' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('button', { name: 'What’s this? About sharing for research' })).toHaveAccessibleDescription(
       /drafts you did not select/,
     );
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
