@@ -226,7 +226,8 @@ test('independent isolates share submission bytes and a late failed outcome cann
   assert.deepEqual(payloads[0], payloads[1]);
   assert.ok(results.every(result => result.ok && result.status === 'direct_submitted'), JSON.stringify(results));
   const stored = [...f.records.values()].map(value => JSON.parse(value)).filter(record => record.onChain);
-  assert.equal(stored.length, 5);
+  // The receipt and its session and user indexes, and the permanent answer with its session and user indexes.
+  assert.equal(stored.length, 6);
   assert.ok(stored.every(record => record.status === 'direct_submitted'));
   const record = requestRecords(f)[0];
   assert.equal(record.draftProvenance.submittedAt, record.createdAt);
@@ -577,6 +578,20 @@ test('an answer sent again after its 30-day receipt lapsed replays how it ended 
   assert.equal(state.messages.length, 1, 'nothing is queued again');
   const current = selectCurrentSubmittedAnswers(await loadSubmittedResultRecords(f.agentEnv, 'fixture'));
   assert.deepEqual(current.map(answer => answer.label), ['Agree']);
+});
+
+test('an answered question stays answered on the agent route after its 30-day receipts lapse', async () => {
+  const { f, submit, listQuestions } = await submissionFixture();
+  assert.equal((await submit()).status, 200);
+  const before = await (await listQuestions()).json();
+  assert.equal(before.answerState.answeredCount, 1);
+  const lapsed = [...f.records.keys()].filter(key => key.includes(':telegram:submit-request'));
+  assert.ok(lapsed.length > 0);
+  for (const key of lapsed) f.records.delete(key);
+  const after = await (await listQuestions()).json();
+  assert.deepEqual([after.answerState.answeredCount, after.answerState.unansweredCount], [1, 0]);
+  assert.equal(after.questions[0].answeredByUser, true);
+  assert.deepEqual(after.questions[0].myAnswer, before.questions[0].myAnswer);
 });
 
 test('concurrent answer claims serialize different content and retain retries at the current head', async () => {

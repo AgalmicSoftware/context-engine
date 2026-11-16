@@ -13,6 +13,7 @@ export const SUBMIT_REQUEST_SESSION_KV_PREFIX = 'telegram:submit-request-by-sess
 export const SUBMIT_REQUEST_USER_KV_PREFIX = 'telegram:submit-request-by-user:v1:';
 export const CANONICAL_ANSWER_KV_PREFIX = 'telegram:canonical-answer:v1:';
 export const CANONICAL_ANSWER_SESSION_KV_PREFIX = 'telegram:canonical-answer-by-session:v1:';
+export const CANONICAL_ANSWER_USER_KV_PREFIX = 'telegram:canonical-answer-by-user:v1:';
 export const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const AGENT_SUBMIT_QUEUE_MESSAGE_TYPE = 'telegram_submit_direct_v1';
 export const SUBMIT_QUEUE_MAX_ATTEMPTS = 4;
@@ -65,6 +66,13 @@ export function canonicalAnswerKvKey(record = {}) {
 export function canonicalAnswerSessionKvPrefix(sessionSlug = '') {
   const slug = sanitizeSessionSlug(sessionSlug);
   return slug ? `${CANONICAL_ANSWER_SESSION_KV_PREFIX}${slug}:` : '';
+}
+
+// One person's permanent answers in a session, which outlast the 30-day
+// submission index, so their answered questions stay answered.
+export function canonicalAnswerUserKvPrefix({ sessionSlug = '', telegramUserId = '' } = {}) {
+  const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
+  return prefix ? `${CANONICAL_ANSWER_USER_KV_PREFIX}${prefix.slice(SUBMIT_REQUEST_USER_KV_PREFIX.length)}` : '';
 }
 
 export function canonicalAnswerSessionKvKey(record = {}) {
@@ -194,9 +202,11 @@ async function persistCanonicalAnswerRecord({
   if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
   const canonical = buildCanonicalAnswerRecord(record, { sourceKey });
   if (!canonical) return { ok: false, reason: 'canonical_answer_incomplete' };
+  const userPrefix = canonicalAnswerUserKvPrefix(canonical);
   const keys = [
     canonicalAnswerKvKey(canonical),
     canonicalAnswerSessionKvKey(canonical),
+    userPrefix ? `${userPrefix}${canonical.requestId}` : '',
   ].filter(Boolean);
   if (!keys.length) return { ok: false, reason: 'canonical_answer_key_missing' };
 
