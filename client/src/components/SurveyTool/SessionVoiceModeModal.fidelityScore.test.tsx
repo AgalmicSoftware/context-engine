@@ -165,6 +165,44 @@ it('shows nothing without the person’s own AI drafts', async () => {
   expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_FIDELITY_SCORE)).not.toBeInTheDocument();
 });
 
+it('says what is kept in AI submission info after a voice interview with nothing shared, never an empty box', async () => {
+  const transcript = 'Responder: I agree with the first statement.';
+  jest.mocked(startSessionRealtimeInterview).mockImplementation(async (options) => {
+    options.onRecordingState?.('recording');
+    options.onTranscript?.(transcript, []);
+    return {
+      mediaStream: {} as MediaStream,
+      stop: jest.fn(async () => ({ transcript, turns: [] })),
+      pause: jest.fn(),
+      resume: jest.fn(),
+      getTranscript: () => transcript,
+    };
+  });
+  jest
+    .mocked(mapInterviewEvidenceToResponses)
+    .mockResolvedValue([{ questionId: 'b1', answer: 'Agree', confidence: 0.9 }]);
+  renderModal({ packet: null, interviewMode: { shareDraftChangesByDefault: false } });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+  await screen.findByLabelText('Pause interview');
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const submissionInfo = screen.getByText('AI submission info').closest('details')!;
+  fireEvent.click(submissionInfo.querySelector('summary')!);
+  // No prefill, no name and sharing off: the session's own AI drafted these, and only the answers are kept.
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeChecked();
+  const body = submissionInfo.querySelector(':scope > div')!;
+  expect(body.textContent?.trim()).not.toBe('');
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).toHaveTextContent(
+    /^Drafted by the session’s AI \(.+\)\. Only the answers you submit are saved/,
+  );
+  // Sharing for research shows what it would keep instead.
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
+  expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).not.toBeInTheDocument();
+  expect(screen.getByRole('group', { name: 'AI research metadata' }).querySelector('summary')).toHaveTextContent(
+    'AI research metadata',
+  );
+});
+
 it('counts every hidden draft, scored on the answer given before the reveal', async () => {
   const hidden = pickHiddenInterviewDrafts(['b1', 'b2', 'r1'], 0.5, `demo|${account}`);
   const statement = hidden.find((id) => id !== 'r1')!;

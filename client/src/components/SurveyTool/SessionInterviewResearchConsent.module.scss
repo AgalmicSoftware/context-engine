@@ -128,6 +128,15 @@
   margin: 0;
 }
 
+.nothingShared {
+  margin: 0;
+  padding: 8px;
+  color: var(--ce-panel-text);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .metadata ul {
   margin: 0;
   padding-left: 18px;

@@ -60,6 +60,18 @@ export default function SessionInterviewResearchConsent({
   const keepsText = minimal && !!draftText && (draftText.checked || draftText.mixed);
   const model = packet.source.modelId || 'Unknown model';
   const platform = describeInterviewPlatform(packet.source.platform);
+  const sharesMetadata = preserveSavedProvenance || (showProvenance && includeProvenance) || includeComparison;
+  // Drafts from the session's own AI offer no provenance choice, so with nothing shared there'd be nothing to show.
+  if (!showProvenance && !children && !sharesMetadata) {
+    // A packet from the person's own typed context names no model.
+    const drafter = packet.source.modelId === 'direct-user-context' ? '' : packet.source.modelId;
+    return (
+      <p className={styles.nothingShared} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED}>
+        Drafted by the session’s AI{drafter ? ` (${drafter})` : ''}. Only the answers you submit are saved; Share for
+        research also keeps the AI’s predictions and what you changed.
+      </p>
+    );
+  }
   return (
     <>
       {showProvenance || children ? (
@@ -83,12 +95,12 @@ export default function SessionInterviewResearchConsent({
         </div>
       ) : null}
       {/* An unticked box already says what is left out; with nothing shared there is nothing to describe. */}
-      {preserveSavedProvenance || (showProvenance && includeProvenance) || includeComparison ? (
+      {sharesMetadata ? (
         <details
           className={styles.metadata}
           aria-label={showProvenance ? 'AI prefill metadata' : 'AI research metadata'}
         >
-          <summary>AI prefill metadata</summary>
+          <summary>{showProvenance ? 'AI prefill metadata' : 'AI research metadata'}</summary>
           <div className={styles.metadataBody}>
             {preserveSavedProvenance ? (
               <p>

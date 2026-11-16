@@ -38,6 +38,56 @@ const renderConsent = (props = {}) =>
   );
 
 describe('SessionInterviewResearchConsent', () => {
+  it('says in one line what is kept when it offers no choice and nothing is shared', () => {
+    const { container, rerender } = renderConsent({ showProvenance: false });
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).toHaveTextContent(
+      'Drafted by the session’s AI (gpt-example). Only the answers you submit are saved; Share for research also keeps the AI’s predictions and what you changed.',
+    );
+    expect(container.querySelectorAll('input, details')).toHaveLength(0);
+    // Without a model ID it names no model.
+    rerender(
+      <SessionInterviewResearchConsent
+        packet={{ ...packet, source: { ...packet.source, modelId: '' } }}
+        showProvenance={false}
+        includeProvenance
+        includeComparison={false}
+        onProvenanceChange={jest.fn()}
+        coverageDetails={[]}
+        selectedCount={1}
+        unselectedCount={0}
+        disabled={false}
+      />,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).toHaveTextContent(
+      /^Drafted by the session’s AI\. Only/,
+    );
+    // Nor for the person's own typed context, which isn't a model.
+    rerender(
+      <SessionInterviewResearchConsent
+        packet={{ ...packet, source: { ...packet.source, modelId: 'direct-user-context' } }}
+        showProvenance={false}
+        includeProvenance
+        includeComparison={false}
+        onProvenanceChange={jest.fn()}
+        coverageDetails={[]}
+        selectedCount={1}
+        unselectedCount={0}
+        disabled={false}
+      />,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).toHaveTextContent(
+      /^Drafted by the session’s AI\. Only/,
+    );
+  });
+
+  it('leaves the line out when it has a choice or something to show', () => {
+    renderConsent({ showProvenance: false, children: <label>Name choice</label> });
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).not.toBeInTheDocument();
+    renderConsent({ showProvenance: false, includeComparison: true });
+    renderConsent({ includeProvenance: false });
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).not.toBeInTheDocument();
+  });
+
   it('describes opt-in research metadata without claiming edits are agreement', () => {
     renderConsent({ researchDetail: 'full' });
     render(
