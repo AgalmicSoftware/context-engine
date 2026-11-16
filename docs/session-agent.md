@@ -162,7 +162,9 @@ older backup has none: after restoring one, tell people to set the switch again.
 
 A second switch there, **Include my address with my answers**, is also on
 until the person turns it off. Off, their answers and files stay in, and the
-[export](#export) leaves their account address off them. The Worker stores
+[export](#export) leaves their account address off them. It changes the
+export only: the address still shows wherever the session shows their
+answers. The Worker stores
 who turned it off, and backs that up, the same way, from 0.9.11. Only someone
 signed in with an address has it. The interview dialog carries the first
 switch only.
@@ -172,7 +174,10 @@ when the Session Agent answers no one: an export can still be made then, and
 each person's choices apply to it.
 
 A "?" by the switch, and a robot by the session's title while the Session Agent
-is on, say what it may read and link here through the README.
+is on, say what it may read and link here through the README. The robot's notice
+and the second switch's "?" also say who is shown a person's answers with
+their address, by the session's results setting: anyone with its link, its
+organisers and signed-in members, or its organisers alone.
 
 While it is on, the interview dialog, where AI-drafted answers are reviewed and
 submitted, carries the same switch at its foot, **Session Agent may use my

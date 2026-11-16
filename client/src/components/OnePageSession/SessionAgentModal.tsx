@@ -7,6 +7,7 @@ import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
 import CETooltip from '../Shared/CETooltip';
 import SessionAgentNotice from './SessionAgentNotice';
+import { sessionAgentAddressNotice } from './sessionAgentWording';
 import {
   askSessionAgent,
   readSessionAgentStatus,
@@ -28,11 +29,6 @@ const STYLE_HELP = {
     'Detailed answers draw on everything you may see in this session, and on members’ answers from people who ' +
     'haven’t turned that off. No answer names anyone.',
 };
-
-const ADDRESS_HELP =
-  'What you wrote and the files you added will be available to this session’s organisers with your account ' +
-  'address, and may be exported with it. Turn this off and exports leave your address off them; your answers ' +
-  'and files stay in. Copies already made keep it.';
 
 // It answers no one, but each person's switches still count for what an admin exports.
 const CLOSED = {
@@ -184,10 +180,10 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
           </button>
           <span id={`${baseId}-address-text`} className={styles.hidden}>
-            {ADDRESS_HELP}
+            {sessionAgentAddressNotice(sessionConfig)}
           </span>
           <CETooltip target={`${baseId}-address-help`} placement="bottom" trigger="hover focus" autohide={false}>
-            {ADDRESS_HELP}
+            {sessionAgentAddressNotice(sessionConfig)}
           </CETooltip>
         </div>
       )}

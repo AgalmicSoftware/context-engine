@@ -1747,23 +1747,59 @@ describe('OnePageSession results routing', () => {
         'href',
         expect.stringMatching(/README\.md#session-agent$/),
       );
-      // Behind the icon, not on the page: who gets what they give, and that two switches turn it off.
+      // Behind the icon, not on the page: who is shown what a person gives.
       const notice = screen.getByTestId('ce-session-agent-notice-page');
-      expect(notice).toHaveAccessibleDescription(
-        expect.stringContaining(
-          'will be available to this session’s organisers with your account address, and may be exported',
-        ),
-      );
-      // The whole of it, as the owner settled it.
+      // What it says follows the session's own results setting. This session names none, so only
+      // its organisers are claimed.
       expect(notice).toHaveAccessibleDescription(
         'The Session Agent may draw on your answers and the files you add when it answers others, never naming you. ' +
-          'They will be available to this session’s organisers with your account address, and may be exported; ' +
+          'They are available with your account address to this session’s organisers, and may be exported; ' +
           'a summary without names or addresses may be published.',
       );
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       expect(screen.getByTestId('ce-session-context-sources')).toBeInTheDocument();
       expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
       expect(mockSessionAgentStatus).not.toHaveBeenCalled();
+    });
+
+    it('says by the title who is shown a person’s answers, by the session’s results setting', async () => {
+      const base = buildProps().sessionConfig;
+      const withVisibility = (visibility) => ({
+        sessionConfig: {
+          ...base,
+          sessionAgent,
+          sessionModeProfile: {
+            ...base.sessionModeProfile,
+            results: { ...base.sessionModeProfile?.results, visibility },
+          },
+        },
+      });
+      // A members-only session: its signed-in members read every answer.
+      await renderSession([file, link], false, withVisibility('session_member_full'));
+      expect(screen.getByTestId('ce-session-agent-notice-page')).toHaveAccessibleDescription(
+        expect.stringContaining(
+          'They are available with your account address to this session’s organisers and its signed-in members, and may be exported;',
+        ),
+      );
+    });
+
+    it('says by the title that anyone with the link is shown answers, where the session shows them to everyone', async () => {
+      const base = buildProps().sessionConfig;
+      await renderSession([file, link], false, {
+        sessionConfig: {
+          ...base,
+          sessionAgent,
+          sessionModeProfile: {
+            ...base.sessionModeProfile,
+            results: { ...base.sessionModeProfile?.results, visibility: 'public_full_if_storage_public' },
+          },
+        },
+      });
+      expect(screen.getByTestId('ce-session-agent-notice-page')).toHaveAccessibleDescription(
+        expect.stringContaining(
+          'They are available with your account address to anyone with this session’s link, and may be exported;',
+        ),
+      );
     });
 
     it('shows no Session Agent while it is off, even to admins', async () => {

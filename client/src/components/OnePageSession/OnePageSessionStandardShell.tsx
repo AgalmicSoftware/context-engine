@@ -565,6 +565,7 @@ export default function OnePageSessionStandardShell({
               id={`${sessionInfoTooltipId}-agent`}
               where="page"
               className={styles.sessionInfoButton}
+              sessionConfig={resolvedSessionConfig}
             />
           ) : null}
         </div>

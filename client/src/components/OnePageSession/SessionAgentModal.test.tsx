@@ -159,10 +159,12 @@ describe('SessionAgentModal', () => {
     // On to start, like the switch above it: both are turned off to opt out.
     expect(include).toBeChecked();
     const help = dialog.getByRole('button', { name: 'About your address on your answers' });
+    // This session's config names no results setting, so only its organisers are claimed; the switch
+    // changes exports and nothing else, and says so.
     expect(help).toHaveAccessibleDescription(
-      'What you wrote and the files you added will be available to this session’s organisers with your account ' +
-        'address, and may be exported with it. Turn this off and exports leave your address off them; your ' +
-        'answers and files stay in. Copies already made keep it.',
+      'What you wrote and the files you added are available with your account address to this session’s ' +
+        'organisers, and may be exported with it. Turning this off leaves your address off exports only; it ' +
+        'still shows wherever this session shows your answers. Copies already made keep it.',
     );
 
     setUnattributed.mockResolvedValueOnce(true);
@@ -178,6 +180,29 @@ describe('SessionAgentModal', () => {
     expect(await dialog.findByRole('alert')).toHaveTextContent('couldn’t be saved just now');
     expect(setUnattributed).toHaveBeenLastCalledWith(false, OPTIONS);
     expect(include).not.toBeChecked();
+  });
+
+  it('says behind the address switch who is shown a person’s answers, by the session’s results setting', async () => {
+    readStatus.mockResolvedValue(member);
+    const members = { slug: 'salon', sessionModeProfile: { results: { visibility: 'session_member_full' } } };
+    render(<SessionAgentModal {...OPTIONS} sessionConfig={members} onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    expect(
+      await dialog.findByRole('button', { name: 'About your address on your answers' }),
+    ).toHaveAccessibleDescription(
+      expect.stringContaining(
+        'are available with your account address to this session’s organisers and its signed-in members, and may be exported with it.',
+      ),
+    );
+    cleanup();
+    const open = { slug: 'salon', sessionModeProfile: { results: { visibility: 'public_full_if_storage_public' } } };
+    render(<SessionAgentModal {...OPTIONS} sessionConfig={open} onClose={() => {}} />);
+    const second = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    expect(
+      await second.findByRole('button', { name: 'About your address on your answers' }),
+    ).toHaveAccessibleDescription(
+      expect.stringContaining('are available with your account address to anyone with this session’s link, and may be'),
+    );
   });
 
   it('shows the address switch as off for someone who turned it off, and not at all for someone who has none', async () => {
