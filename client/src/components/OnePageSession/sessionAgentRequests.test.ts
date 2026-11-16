@@ -6,6 +6,7 @@ import {
 } from './sessionAgentRequests';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy';
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
+import { forgetGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
 
 jest.mock('../../utilities/worker/corsProxy', () => ({ getCorsProxyUrlOrThrow: jest.fn() }));
 jest.mock('../../utilities/worker/workerAuth', () => ({ fetchWorkerWithAuth: jest.fn() }));
@@ -160,6 +161,29 @@ describe('sessionAgentRequests', () => {
       expect(fetchWorker).not.toHaveBeenCalled();
     } finally {
       global.fetch = realFetch;
+    }
+  });
+
+  it('sends a private session’s invite proof with a signed-out question', async () => {
+    const header = `rxc:0x${'ab'.repeat(65)}`;
+    saveGroupReadHeader({
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'salon',
+      sessionId: `0x${'2a'.repeat(16)}`,
+      header,
+    });
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ on: true }) });
+    const realFetch = global.fetch;
+    global.fetch = fetchMock as unknown as typeof fetch;
+    try {
+      await readSessionAgentStatus({ ...OPTIONS, account: '' });
+      expect(fetchMock.mock.calls[0][1].headers).toEqual({
+        'Content-Type': 'application/json',
+        'X-CE-Group-Invite': header,
+      });
+    } finally {
+      global.fetch = realFetch;
+      forgetGroupReadHeader('https://worker.example', 'salon');
     }
   });
 

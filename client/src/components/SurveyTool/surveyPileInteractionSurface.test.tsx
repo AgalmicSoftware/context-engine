@@ -22,6 +22,7 @@ import {
 } from './surveyPileInteractionSurface';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { forgetGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
 
 type TestTreeNode = React.ReactNode;
 type TestElementNode = React.ReactElement<{
@@ -541,6 +542,21 @@ it('explains protected question storage when signed out without replacing genuin
   expect(requiresQuestionStorageLogin(config, false)).toBe(true);
   expect(requiresQuestionStorageLogin(config, true)).toBe(false);
   expect(requiresQuestionStorageLogin({}, false)).toBe(false);
+  // An invite holder reads a private session's questions signed out.
+  const worker = 'https://salon.example.workers.dev';
+  const privateConfig = { ...config, corsWorkerUrl: `${worker}/`, slug: 'salon' };
+  saveGroupReadHeader({
+    workerUrl: worker,
+    sessionSlug: 'salon',
+    sessionId: `0x${'2a'.repeat(16)}`,
+    header: `rxc:0x${'ab'.repeat(65)}`,
+  });
+  try {
+    expect(requiresQuestionStorageLogin(privateConfig, false)).toBe(false);
+    expect(requiresQuestionStorageLogin({ ...privateConfig, slug: 'other' }, false)).toBe(true);
+  } finally {
+    forgetGroupReadHeader(worker, 'salon');
+  }
   expect(
     requiresQuestionStorageLogin(
       { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none' } } },

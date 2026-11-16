@@ -3,6 +3,7 @@ import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy';
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 import { defaultStrictAllowDemoFallback } from '../../utilities/worker/workerSessionResolution.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { groupReadHeaders } from '../../utilities/worker/workerGroupReadProof';
 
 export type SessionAgentStyle = 'general' | 'detailed';
 
@@ -64,6 +65,7 @@ const post = async (path: string, body: Record<string, unknown>, options: Sessio
     ? await fetchWorkerWithAuth(`${base}${path}`, init, { ...session, workerUrl: base })
     : await fetch(`${base}${path}?slug=${encodeURIComponent(options.sessionSlug)}`, {
         ...init,
+        headers: { ...init.headers, ...groupReadHeaders(base, options.sessionSlug) },
         credentials: 'omit',
         referrerPolicy: 'no-referrer',
       });
