@@ -231,6 +231,7 @@ const SessionSettingsPage = ({
   const [workerCountsAiLimit, setWorkerCountsAiLimit] = useState(false);
   const [workerRunsWorkersAi, setWorkerRunsWorkersAi] = useState(false);
   // Whether it accepts the note on where research data goes; an older one would refuse the whole save.
+  // On-chain sessions save to the registry, which takes it.
   const [workerTakesDataNote, setWorkerTakesDataNote] = useState(false);
   useEffect(() => {
     let stale = false;
@@ -604,7 +605,7 @@ const SessionSettingsPage = ({
           workerHosted={!onChain}
           groupCeilingSupported={workerOffersGroupJoinChoices(saved)}
           draftTextSupported={workerKeepsDraftText !== false}
-          dataNoteSupported={workerTakesDataNote}
+          dataNoteSupported={onChain || workerTakesDataNote}
         />
         <SetupResultsSection
           {...section('results')}

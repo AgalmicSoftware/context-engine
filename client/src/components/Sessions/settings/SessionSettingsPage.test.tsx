@@ -780,6 +780,12 @@ describe('SessionSettingsPage', () => {
       mockReadWallet.mockResolvedValue({ address: ADMIN, chainId: 11155420 });
     });
 
+    it('offers the note on where the data goes, which the registry keeps without asking a Worker', async () => {
+      renderPage({ sessionConfig: registryConfig(), workerOrigin: '' });
+      fireEvent.click(await screen.findByTestId('ce-setup-more-participation'));
+      expect(screen.getByLabelText('Where the data goes')).toBeInTheDocument();
+    });
+
     it('has no AI daily limit, which only a Session Worker counts', async () => {
       renderPage({ sessionConfig: registryConfig(), workerOrigin: '' });
       fireEvent.click(await screen.findByTestId('ce-setup-more-ai'));
