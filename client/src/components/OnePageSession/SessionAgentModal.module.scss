@@ -197,6 +197,47 @@
   }
 }
 
+// What to keep of this chat, set off from the question above it.
+.keep {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  legend {
+    float: left;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+  }
+}
+
+// The setup page's field colours, as for the question.
+.name {
+  flex: 1 1 160px;
+  min-width: 0;
+  background: var(--ce-input-bg) !important;
+  border-color: var(--ce-input-border-strong) !important;
+  color: var(--ce-panel-text) !important;
+}
+
 // Read by screen readers as the "?"'s description; the tooltip shows it to everyone else.
 .hidden {
   position: absolute;

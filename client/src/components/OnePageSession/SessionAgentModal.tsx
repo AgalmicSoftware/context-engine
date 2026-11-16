@@ -30,6 +30,14 @@ const STYLE_HELP = {
     'haven’t turned that off. No answer names anyone.',
 };
 
+const STORE_HELP =
+  'This question and its answer will be kept in this session’s records, available to its organisers, and may ' +
+  'be exported. Untick it to keep this one out.';
+const NAME_HELP = 'Kept as you type it, for example Sam or Sam’s agent. It isn’t checked.';
+// The box starts ticked, and a chat is stored without the asker's address unless they choose it.
+const STORE_TO_START = true;
+const ADDRESS_TO_START = false;
+
 // It answers no one, but each person's switches still count for what an admin exports.
 const CLOSED = {
   session_ended: 'This session has ended, so the Session Agent no longer answers.',
@@ -52,7 +60,33 @@ const drewOn = ({ context, results, answers }: SessionAgentReply['read']) => {
   return `Drew on ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]}.`;
 };
 
-// The session keeps no questions or answers, so the dialog shows only the latest.
+type HelpProps = { id: string; label: string; text: string };
+
+// A "?" whose text a screen reader hears as its description and everyone else sees on hover or focus.
+const Help = ({ id, label, text }: HelpProps) => (
+  <>
+    <button
+      type="button"
+      id={id}
+      className={styles.helpLink}
+      data-ce-control-appearance="frameless"
+      aria-label={label}
+      aria-describedby={`${id}-text`}
+      onClick={(event) => event.currentTarget.focus()}
+    >
+      <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+    </button>
+    <span id={`${id}-text`} className={styles.hidden}>
+      {text}
+    </span>
+    <CETooltip target={id} placement="bottom" trigger="hover focus" autohide={false}>
+      {text}
+    </CETooltip>
+  </>
+);
+
+// The dialog shows only the latest answer. A chat is kept only where the
+// session stores chats and the asker leaves "Store this chat" ticked.
 export default function SessionAgentModal({ sessionSlug, sessionConfig, account, onClose }: Props) {
   const baseId = `ce-session-agent-${useId().replace(/:/g, '')}`;
   const options = { sessionSlug, sessionConfig, account };
@@ -63,6 +97,9 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   const [asking, setAsking] = useState(false);
   const [reply, setReply] = useState<SessionAgentReply | null>(null);
   const [askError, setAskError] = useState('');
+  const [store, setStore] = useState(STORE_TO_START);
+  const [withAddress, setWithAddress] = useState(ADDRESS_TO_START);
+  const [name, setName] = useState('');
   const [savingSwitch, setSavingSwitch] = useState(false);
   const [switchError, setSwitchError] = useState('');
   const switchSaves = useRef(0);
@@ -98,13 +135,22 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     };
   }, [sessionSlug, sessionConfig, account, attempt, person]);
 
+  const hasAddress = status?.unattributed != null;
   const ask = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!question.trim() || asking) return;
     setAsking(true);
     setAskError('');
     try {
-      setReply(await askSessionAgent(question.trim(), options));
+      // Only someone signed in with an address has one to store.
+      const keep = store
+        ? { attribution: withAddress && hasAddress ? ('address' as const) : ('anonymous' as const), name: name.trim() }
+        : null;
+      setReply(
+        status?.recording
+          ? await askSessionAgent(question.trim(), options, keep)
+          : await askSessionAgent(question.trim(), options),
+      );
     } catch (error) {
       setReply(null);
       setAskError(errorText(error));
@@ -168,23 +214,11 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             />
             Include my address with my answers
           </label>
-          <button
-            type="button"
+          <Help
             id={`${baseId}-address-help`}
-            className={styles.helpLink}
-            data-ce-control-appearance="frameless"
-            aria-label="About your address on your answers"
-            aria-describedby={`${baseId}-address-text`}
-            onClick={(event) => event.currentTarget.focus()}
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
-          </button>
-          <span id={`${baseId}-address-text`} className={styles.hidden}>
-            {sessionAgentAddressNotice(sessionConfig)}
-          </span>
-          <CETooltip target={`${baseId}-address-help`} placement="bottom" trigger="hover focus" autohide={false}>
-            {sessionAgentAddressNotice(sessionConfig)}
-          </CETooltip>
+            label="About your address on your answers"
+            text={sessionAgentAddressNotice(sessionConfig)}
+          />
         </div>
       )}
       {switchError ? (
@@ -263,9 +297,68 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             data-testid="ce-session-agent-question"
             onChange={(event) => setQuestion(event.target.value)}
           />
+          {status.recording ? (
+            <div className={styles.keep} data-testid="ce-session-agent-keep">
+              <div className={styles.switchRow}>
+                <label htmlFor={`${baseId}-store`}>
+                  <input
+                    id={`${baseId}-store`}
+                    type="checkbox"
+                    checked={store}
+                    data-testid="ce-session-agent-store"
+                    onChange={(event) => setStore(event.target.checked)}
+                  />
+                  Store this chat
+                </label>
+                <Help id={`${baseId}-store-help`} label="About storing this chat" text={STORE_HELP} />
+              </div>
+              {store ? (
+                <>
+                  {hasAddress ? (
+                    <fieldset className={styles.choice}>
+                      <legend>Store it with</legend>
+                      <label>
+                        <input
+                          type="radio"
+                          name={`${baseId}-identity`}
+                          checked={!withAddress}
+                          onChange={() => setWithAddress(false)}
+                        />
+                        No address
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name={`${baseId}-identity`}
+                          checked={withAddress}
+                          onChange={() => setWithAddress(true)}
+                        />
+                        My address
+                      </label>
+                    </fieldset>
+                  ) : null}
+                  <div className={styles.switchRow}>
+                    <label htmlFor={`${baseId}-name`}>Name (optional)</label>
+                    <Help id={`${baseId}-name-help`} label="About the name" text={NAME_HELP} />
+                    <input
+                      id={`${baseId}-name`}
+                      type="text"
+                      className={`form-control ${styles.name}`}
+                      value={name}
+                      maxLength={SESSION_AGENT_LIMITS.nameChars}
+                      autoComplete="off"
+                      data-testid="ce-session-agent-name"
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
           <div className={styles.row}>
             <p id={`${baseId}-limits`} className={styles.hint}>
-              Answers are at most {SESSION_AGENT_LIMITS.answerWords} words. Questions and answers aren’t kept.
+              Answers are at most {SESSION_AGENT_LIMITS.answerWords} words.{' '}
+              {!status.recording ? 'Questions and answers aren’t kept.' : store ? '' : 'This chat won’t be kept.'}
             </p>
             <button
               type="submit"
@@ -287,6 +380,7 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             <div className={styles.answer} data-testid="ce-session-agent-answer">
               <p className={styles.answerText}>{reply.answer}</p>
               <p className={styles.hint}>{drewOn(reply.read)}</p>
+              {reply.stored ? <p className={styles.hint}>This chat was stored.</p> : null}
               {reply.note ? <p className={styles.hint}>{reply.note}</p> : null}
             </div>
           ) : null}

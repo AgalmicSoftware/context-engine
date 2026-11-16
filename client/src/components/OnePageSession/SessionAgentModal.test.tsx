@@ -31,12 +31,14 @@ const member: SessionAgentStatus = {
   optedOut: false,
   unattributed: false,
   closed: null,
+  recording: false,
 };
 const reply = (answer: string, read = { context: 0, results: false, answers: 0 }, note = ''): SessionAgentReply => ({
   answer,
   answers: 'general',
   read,
   note,
+  stored: null,
 });
 
 const renderModal = async (status: SessionAgentStatus) => {
@@ -271,6 +273,75 @@ describe('SessionAgentModal', () => {
     await act(async () => saved(true));
     expect(theirs).toBeChecked();
     await waitFor(() => expect(theirs).toBeEnabled());
+  });
+
+  it('offers no way to store a chat in a session that stores none, and sends nothing about storing', async () => {
+    const { dialog } = await renderModal(member);
+    expect(dialog.queryByRole('checkbox', { name: 'Store this chat' })).not.toBeInTheDocument();
+    expect(dialog.queryByLabelText('Name (optional)')).not.toBeInTheDocument();
+    ask.mockResolvedValueOnce(reply('An answer.'));
+    askQuestion(dialog, 'Why?');
+    await dialog.findByText('An answer.');
+    expect(ask.mock.calls[0]).toEqual(['Why?', OPTIONS]);
+    expect(dialog.queryByText('This chat was stored.')).not.toBeInTheDocument();
+  });
+
+  it('stores a chat unless its asker unticks the box, without their address unless they choose it', async () => {
+    const { dialog } = await renderModal({ ...member, recording: true });
+    const store = dialog.getByRole('checkbox', { name: 'Store this chat' });
+    // Ticked to start, and said before anything is asked.
+    expect(store).toBeChecked();
+    expect(dialog.getByRole('button', { name: 'About storing this chat' })).toHaveAccessibleDescription(
+      /will be kept in this session’s records, available to its organisers, and may be exported\. Untick it to keep this one out\./,
+    );
+    expect(dialog.queryByText(/Questions and answers aren’t kept/)).not.toBeInTheDocument();
+    expect(dialog.getByRole('radio', { name: 'No address' })).toBeChecked();
+    expect(dialog.getByRole('radio', { name: 'My address' })).not.toBeChecked();
+    expect(dialog.getByLabelText('Name (optional)')).toHaveAttribute('maxLength', '60');
+
+    ask.mockResolvedValueOnce({ ...reply('First answer.'), stored: true });
+    askQuestion(dialog, 'Why?');
+    expect(await dialog.findByText('This chat was stored.')).toBeInTheDocument();
+    expect(ask).toHaveBeenLastCalledWith('Why?', OPTIONS, { attribution: 'anonymous', name: '' });
+
+    fireEvent.click(dialog.getByRole('radio', { name: 'My address' }));
+    fireEvent.change(dialog.getByLabelText('Name (optional)'), { target: { value: '  Sam’s agent ' } });
+    ask.mockResolvedValueOnce({ ...reply('Second answer.'), stored: true });
+    fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
+    await dialog.findByText('Second answer.');
+    expect(ask).toHaveBeenLastCalledWith('Why?', OPTIONS, { attribution: 'address', name: 'Sam’s agent' });
+
+    // Unticked, nothing about who asked is offered or sent, and the dialog says this one isn't kept.
+    fireEvent.click(store);
+    expect(dialog.queryByRole('radio')).not.toBeInTheDocument();
+    expect(dialog.queryByLabelText('Name (optional)')).not.toBeInTheDocument();
+    expect(dialog.getByText(/This chat won’t be kept\./)).toBeInTheDocument();
+    ask.mockResolvedValueOnce({ ...reply('Third answer.'), stored: false });
+    fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
+    await dialog.findByText('Third answer.');
+    expect(ask).toHaveBeenLastCalledWith('Why?', OPTIONS, null);
+    expect(dialog.queryByText('This chat was stored.')).not.toBeInTheDocument();
+  });
+
+  it('shows what the Worker says when a chat that was to be stored wasn’t', async () => {
+    const { dialog } = await renderModal({ ...member, recording: true });
+    ask.mockResolvedValueOnce({
+      ...reply('An answer.', undefined, 'This chat couldn’t be stored just now.'),
+      stored: false,
+    });
+    askQuestion(dialog, 'Why?');
+    expect(await dialog.findByText('This chat couldn’t be stored just now.')).toBeInTheDocument();
+    expect(dialog.queryByText('This chat was stored.')).not.toBeInTheDocument();
+  });
+
+  it('gives someone signed in without an address no address to store', async () => {
+    const { dialog } = await renderModal({ ...member, recording: true, unattributed: null });
+    expect(dialog.getByRole('checkbox', { name: 'Store this chat' })).toBeChecked();
+    expect(dialog.queryByRole('radio')).not.toBeInTheDocument();
+    ask.mockResolvedValueOnce({ ...reply('An answer.'), stored: true });
+    askQuestion(dialog, 'Why?');
+    await dialog.findByText('An answer.');
+    expect(ask).toHaveBeenLastCalledWith('Why?', OPTIONS, { attribution: 'anonymous', name: '' });
   });
 
   it('shows the switch as off for someone who opted out', async () => {

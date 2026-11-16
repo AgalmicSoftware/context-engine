@@ -50,6 +50,7 @@ const status = (optedOut = false, on = true) => ({
   optedOut,
   unattributed: false,
   closed: null,
+  recording: false,
 });
 
 const renderReview = (sessionConfig: Record<string, unknown>) => {

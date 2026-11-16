@@ -37,6 +37,10 @@ const minAnswersHelp = (min: number) =>
   `On: a Detailed answer to someone who isn’t an admin leaves out any question fewer than ${min} members ` +
   'answered. Off: a question only one member answered is used too, so that one person’s answer can come back as ' +
   '“the members’” view. Admins always get every question.';
+const RECORD_HELP =
+  'Adds a Store this chat box to the Session Agent. A chat is kept when the person asking leaves it ticked, from ' +
+  'now on, for this session’s organisers and in exports. Turning this off stops new ones; chats already stored ' +
+  'stay until an admin clears them in Admin.';
 const MATCH_HELP = 'Any: people who meet at least one rule. All: only people who meet every rule.';
 const instructionsHelp = (style: string) =>
   `How ${STYLE_LABELS[style]} answers are written. Leave it blank for the default. Always added: answer only ` +
@@ -77,6 +81,7 @@ const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): 
   const audiences = readAudiences(value);
   const instructions = asRecord(asRecord(value).instructions);
   const { minAnswers } = asRecord(value);
+  const recordsChats = asRecord(value).history === true;
   // The number the rule holds while on: a stored one below the default, or the default.
   const skipUnder = typeof minAnswers === 'number' && minAnswers > 1 ? minAnswers : L.minAnswers;
   const problem = on ? describeSessionAgentProblem(value) : '';
@@ -84,12 +89,15 @@ const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): 
     next: Audience[],
     nextInstructions: Record<string, unknown> = instructions,
     nextMinAnswers: unknown = minAnswers,
+    nextRecordsChats: boolean = recordsChats,
   ) =>
     onChange({
       audiences: next,
       ...(Object.keys(nextInstructions).length ? { instructions: nextInstructions } : {}),
       // The default is stored as nothing.
       ...(nextMinAnswers === undefined || nextMinAnswers === L.minAnswers ? {} : { minAnswers: nextMinAnswers }),
+      // Off is stored as nothing too.
+      ...(nextRecordsChats ? { history: true } : {}),
     });
   const update = (index: number, change: (audience: Audience) => Audience) =>
     save(audiences.map((audience, at) => (at === index ? change(audience) : audience)));
@@ -322,6 +330,14 @@ const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): 
             help={minAnswersHelp(skipUnder)}
             testId="ce-setup-session-agent-min-answers"
             onChange={(checked) => save(audiences, instructions, checked ? L.minAnswers : 1)}
+          />
+          <SetupCheck
+            id="ce-setup-session-agent-record-chats"
+            label="Record chats"
+            checked={recordsChats}
+            help={RECORD_HELP}
+            testId="ce-setup-session-agent-record-chats"
+            onChange={(checked) => save(audiences, instructions, minAnswers, checked)}
           />
           {SESSION_AGENT_STYLES.map((style) => {
             const fieldId = `ce-setup-session-agent-${style}`;

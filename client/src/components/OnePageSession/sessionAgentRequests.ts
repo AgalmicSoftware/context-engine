@@ -18,7 +18,12 @@ export type SessionAgentStatus = {
   unattributed: boolean | null;
   /** Why it answers no one, when the session has ended or its AI is off. */
   closed: 'session_ended' | 'ai_disabled' | null;
+  /** The session lets an asker have a chat stored. */
+  recording: boolean;
 };
+
+/** What to keep of one chat: with the asker's address or without, and a name if they gave one; null keeps nothing. */
+export type SessionAgentKeep = { attribution: 'address' | 'anonymous'; name: string } | null;
 
 export type SessionAgentReply = {
   answer: string;
@@ -26,6 +31,8 @@ export type SessionAgentReply = {
   /** How much the answer drew on: items of context, the results, members' answers. */
   read: { context: number; results: boolean; answers: number };
   note: string;
+  /** Whether this chat was stored; null when the session stores none. */
+  stored: boolean | null;
 };
 
 export type SessionAgentRequestOptions = { sessionSlug: string; sessionConfig: unknown; account: string };
@@ -69,20 +76,30 @@ export const readSessionAgentStatus = async (options: SessionAgentRequestOptions
     // Absent from a Session Worker without the switch, and for someone signed in without an address.
     unattributed: typeof result.unattributed === 'boolean' ? result.unattributed : null,
     closed: result.closed === 'session_ended' || result.closed === 'ai_disabled' ? result.closed : null,
+    recording: result.recording === true,
   };
 };
 
+// `keep` is sent only where the session stores chats: without it the Worker keeps nothing.
 export const askSessionAgent = async (
   question: string,
   options: SessionAgentRequestOptions,
+  keep?: SessionAgentKeep,
 ): Promise<SessionAgentReply> => {
-  const result = await post('/session-agent/ask', { question }, options);
+  const stored =
+    keep === undefined
+      ? {}
+      : keep
+        ? { store: true, attribution: keep.attribution, ...(keep.name ? { name: keep.name } : {}) }
+        : { store: false };
+  const result = await post('/session-agent/ask', { question, ...stored }, options);
   const read = asRecord(result.read);
   return {
     answer: toStr(result.answer),
     answers: styleOf(result.answers) || 'general',
     read: { context: Number(read.context) || 0, results: read.results === true, answers: Number(read.answers) || 0 },
     note: toStr(result.note),
+    stored: typeof result.stored === 'boolean' ? result.stored : null,
   };
 };
 

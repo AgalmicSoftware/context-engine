@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { SESSION_AGENT_DEFAULT_INSTRUCTIONS } from '@ce-shared/sessionAgent.mjs';
-import SetupSessionAgent from './SetupSessionAgent';
+import SetupSessionAgent, { describeSessionAgentProblem } from './SetupSessionAgent';
 
 const GROUPS = [
   { groupId: 'salon', label: 'Salon' },
@@ -127,6 +127,32 @@ describe('SetupSessionAgent', () => {
     expect(last()).toEqual({ audiences: [everyone], instructions: { general: 'Be brief.' }, minAnswers: 1 });
     fireEvent.click(skip);
     expect(last()).toEqual({ audiences: [everyone], instructions: { general: 'Be brief.' } });
+  });
+
+  it('records chats only once an admin turns that on, and keeps the choice through other edits', () => {
+    const last = renderAgent({ value: { audiences: [everyone] } });
+    const record = screen.getByRole('checkbox', { name: 'Record chats' });
+    // Off to start: nothing asked or answered is kept.
+    expect(record).not.toBeChecked();
+    expect(record).toHaveAccessibleDescription(
+      expect.stringContaining('A chat is kept when the person asking leaves it ticked'),
+    );
+    expect(record).toHaveAccessibleDescription(expect.stringContaining('stay until an admin clears them in Admin'));
+    fireEvent.click(record);
+    expect(last()).toEqual({ audiences: [everyone], history: true });
+    expect(record).toBeChecked();
+    fireEvent.change(screen.getByTestId('ce-setup-session-agent-general'), { target: { value: 'Be brief.' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Skip questions with under 3 answers' }));
+    expect(last()).toEqual({
+      audiences: [everyone],
+      instructions: { general: 'Be brief.' },
+      minAnswers: 1,
+      history: true,
+    });
+    // Off is stored as nothing, and the setting still saves.
+    fireEvent.click(record);
+    expect(last()).toEqual({ audiences: [everyone], instructions: { general: 'Be brief.' }, minAnswers: 1 });
+    expect(describeSessionAgentProblem({ audiences: [everyone], history: true })).toBe('');
   });
 
   it('names the number a stored rule holds, and returns to 3 when turned off and on again', () => {

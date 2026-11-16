@@ -33,6 +33,7 @@ describe('sessionAgentRequests', () => {
       answers: 'detailed',
       read: { context: 3, results: true, answers: 4 },
       note: '',
+      stored: null,
     });
     const [url, init, auth] = fetchWorker.mock.calls[0];
     expect(url).toBe('https://worker.example/session-agent/ask');
@@ -68,6 +69,7 @@ describe('sessionAgentRequests', () => {
       optedOut: true,
       unattributed: true,
       closed: null,
+      recording: false,
     });
     expect(fetchWorker.mock.calls[0][0]).toBe('https://worker.example/session-agent/status');
     reply(200, { on: true, answers: 'everything', audience: 'owner' });
@@ -79,6 +81,7 @@ describe('sessionAgentRequests', () => {
       // A Session Worker that doesn't say has no such switch for this person.
       unattributed: null,
       closed: null,
+      recording: false,
     });
     reply(200, {
       on: true,
@@ -91,6 +94,27 @@ describe('sessionAgentRequests', () => {
     await expect(readSessionAgentStatus(OPTIONS)).resolves.toEqual(
       expect.objectContaining({ closed: 'session_ended' }),
     );
+  });
+
+  it('says what to keep of a chat only where the session stores chats', async () => {
+    reply(200, { on: true, answers: 'general', audience: 0, optedOut: false, unattributed: false, recording: true });
+    await expect(readSessionAgentStatus(OPTIONS)).resolves.toEqual(expect.objectContaining({ recording: true }));
+    const sent = () => JSON.parse(String(fetchWorker.mock.calls.at(-1)?.[1]?.body));
+    reply(200, { answer: 'A.', answers: 'general', read: {}, stored: true });
+    await expect(askSessionAgent('Why?', OPTIONS, { attribution: 'address', name: 'Sam' })).resolves.toEqual(
+      expect.objectContaining({ stored: true }),
+    );
+    expect(sent()).toEqual({ question: 'Why?', store: true, attribution: 'address', name: 'Sam' });
+    reply(200, { answer: 'A.', answers: 'general', read: {}, stored: true });
+    await askSessionAgent('Why?', OPTIONS, { attribution: 'anonymous', name: '' });
+    expect(sent()).toEqual({ question: 'Why?', store: true, attribution: 'anonymous' });
+    reply(200, { answer: 'A.', answers: 'general', read: {}, stored: false });
+    await expect(askSessionAgent('Why?', OPTIONS, null)).resolves.toEqual(expect.objectContaining({ stored: false }));
+    expect(sent()).toEqual({ question: 'Why?', store: false });
+    // Without it, as in a session that stores none, the question goes alone.
+    reply(200, { answer: 'A.', answers: 'general', read: {} });
+    await askSessionAgent('Why?', OPTIONS);
+    expect(sent()).toEqual({ question: 'Why?' });
   });
 
   it('throws the Worker’s own sentence, or says which status failed', async () => {
