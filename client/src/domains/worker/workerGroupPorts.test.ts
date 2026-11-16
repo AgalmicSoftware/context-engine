@@ -23,6 +23,7 @@ import {
   setWorkerGroupPassword,
   workerGroupNeedsSecret,
 } from './workerGroupPorts';
+import { forgetGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
 import * as workerAuth from '../../utilities/worker/workerAuth.js';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../utilities/worker/coordinatorRetry';
 
@@ -1442,4 +1443,30 @@ describe('worker group ports', () => {
       });
     });
   });
+});
+
+it('sends a private session’s invite proof when listing its groups', async () => {
+  const header = `rxc:0x${'ab'.repeat(65)}`;
+  saveGroupReadHeader({ workerUrl: WORKER_URL, sessionSlug: SESSION_SLUG, sessionId: SESSION_ID, header });
+  try {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: SESSION_SLUG, groups: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
+    await loadPublicWorkerGroups({
+      workerUrl: WORKER_URL,
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      fetchImpl,
+    });
+    expect((fetchImpl as jest.Mock).mock.calls[0][1].headers).toEqual({
+      'X-Session-Slug': SESSION_SLUG,
+      'X-CE-Group-Invite': header,
+    });
+  } finally {
+    forgetGroupReadHeader(WORKER_URL, SESSION_SLUG);
+  }
 });

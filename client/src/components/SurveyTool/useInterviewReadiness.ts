@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { groupReadHeaders } from '../../utilities/worker/workerGroupReadProof';
 
 type Readiness = { state: 'checking' | 'ready' | 'unavailable' | 'unknown'; detail: string };
 const checking: Readiness = { state: 'checking', detail: 'Checking voice interview setup…' };
@@ -30,7 +31,7 @@ export function useInterviewReadiness(workerUrl: string, sessionSlug: string) {
         /* Some browsers do not expose microphone permission state until Start is clicked. */
       }
       const response = await fetch(`${workerUrl.replace(/\/+$/, '')}/resource-presence?interview=1`, {
-        headers: { 'X-Session-Slug': sessionSlug || 'general' },
+        headers: { 'X-Session-Slug': sessionSlug || 'general', ...groupReadHeaders(workerUrl, sessionSlug) },
         cache: 'no-store',
         signal: controller.signal,
       });

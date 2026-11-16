@@ -2,6 +2,7 @@ import { normalizeSessionIdHex } from '@ce-shared/auth/siweMessage.mjs';
 type UnknownRecord = Record<string, unknown>;
 
 import { classifySessionModeProfileSupport, type SessionModeProfile } from './sessionModeProfile';
+import { groupReadHeaders } from '../worker/workerGroupReadProof';
 
 export type DiscoveryEnvironment = 'development' | 'production' | 'test' | string;
 
@@ -526,6 +527,7 @@ export const fetchWorkerCanonicalSessionBootstrap = async ({
       headers: {
         Accept: 'application/json',
         'X-Session-Slug': canonicalSlug,
+        ...groupReadHeaders(workerOrigin, canonicalSlug),
       },
       credentials: 'omit',
       redirect: 'error',

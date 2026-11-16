@@ -1,4 +1,5 @@
 import { withCoordinatorRetry } from '../worker/coordinatorRetry';
+import { groupReadHeaders } from '../worker/workerGroupReadProof';
 
 export type RealtimeInterviewTurn = {
   itemId: string;
@@ -368,7 +369,11 @@ export const startSessionRealtimeInterview = async ({
     const response = await run(
       withCoordinatorRetry(fetchImpl)(`${baseUrl}/realtime/call?slug=${encodeURIComponent(sessionSlug)}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-session-slug': sessionSlug },
+        headers: {
+          'content-type': 'application/json',
+          'x-session-slug': sessionSlug,
+          ...groupReadHeaders(baseUrl, sessionSlug),
+        },
         body: JSON.stringify({ sdp: peer.localDescription?.sdp || offer.sdp || '', instructions }),
         signal: controller.signal,
       }),

@@ -13,6 +13,7 @@ export {
   isWorkerSignInNeededError,
   subscribeWorkerSessionToken,
 } from '../../utilities/worker/workerAuth.js';
+import { groupReadHeaders } from '../../utilities/worker/workerGroupReadProof';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -542,6 +543,7 @@ export const loadPublicWorkerGroups = async ({
     cache: 'no-store',
     headers: {
       'X-Session-Slug': expectedSessionSlug,
+      ...groupReadHeaders(base, expectedSessionSlug),
     },
   });
   const payload = toRecord(await response.json().catch(() => ({})));

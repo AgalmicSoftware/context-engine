@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useInterviewReadiness } from './useInterviewReadiness';
+import { forgetGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
 
 const originalFetch = global.fetch;
 const mediaDescriptor = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices');
@@ -82,4 +83,17 @@ it('aborts old checks and ignores their late completion when switching Workers',
   expect(result.current.state).toBe('unavailable');
   unmount();
   expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(true);
+});
+
+it('sends a private session’s invite proof when checking voice', async () => {
+  const header = `rxc:0x${'ab'.repeat(65)}`;
+  saveGroupReadHeader({ workerUrl: 'https://worker.example', sessionSlug: 'demo', sessionId: '0xabc', header });
+  try {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ interview: { ready: true } }) });
+    const { result } = renderHook(() => useInterviewReadiness('https://worker.example/', 'demo'));
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({ 'X-Session-Slug': 'demo', 'X-CE-Group-Invite': header });
+  } finally {
+    forgetGroupReadHeader('https://worker.example', 'demo');
+  }
 });

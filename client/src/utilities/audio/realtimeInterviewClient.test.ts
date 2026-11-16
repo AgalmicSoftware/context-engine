@@ -4,6 +4,7 @@ import {
   REALTIME_INTERVIEW_OPENING_INSTRUCTION,
   startSessionRealtimeInterview,
 } from './realtimeInterviewClient';
+import { forgetGroupReadHeader, saveGroupReadHeader } from '../worker/workerGroupReadProof';
 
 describe('realtime interview transcript collection', () => {
   it('collects only completed responder transcription events', () => {
@@ -171,6 +172,21 @@ describe('interview connection lifecycle', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     await session.stop();
+  });
+
+  it('sends a private session’s invite proof with the call', async () => {
+    const header = `rxc:0x${'ab'.repeat(65)}`;
+    saveGroupReadHeader({ workerUrl: 'https://worker.example', sessionSlug: 'demo', sessionId: '0xabc', header });
+    try {
+      const h = harness();
+      const session = await h.start();
+      expect((h.options.fetchImpl as jest.Mock).mock.calls[0][1].headers).toEqual(
+        expect.objectContaining({ 'x-session-slug': 'demo', 'X-CE-Group-Invite': header }),
+      );
+      await session.stop();
+    } finally {
+      forgetGroupReadHeader('https://worker.example', 'demo');
+    }
   });
 
   it('appends exact Live transcript fragments, deduplicates by event ID, and orders late fragments by time', async () => {

@@ -2,6 +2,7 @@ import { ethers } from 'ethers';
 import {
   createWorkerGroupPasswordKeys,
   formatGroupInviteToken,
+  formatWorkerGroupReadInvite,
   generateOneUseSecret,
   hashOneUseSecret,
   parseGroupInviteToken,
@@ -91,6 +92,26 @@ export const buildWorkerGroupJoinCredentials = async ({
     };
   }
   return null;
+};
+
+/**
+ * A private session's read header for a held group password: the password's key signs a statement naming the session
+ * and group, not a person. Null for a token that can't make one (a claim code is spent by joining, not reading).
+ */
+export const buildWorkerGroupReadHeader = async ({
+  token,
+  sessionId,
+  groupId,
+}: {
+  token: string;
+  sessionId: string;
+  groupId: string;
+}): Promise<string | null> => {
+  const parsed = parseGroupInviteToken(token);
+  if (parsed?.kind !== 'password') return null;
+  const group = groupKey(groupId);
+  const proof = await keys.signRead({ password: parsed.password, sessionId: canonical(sessionId), groupId: group });
+  return formatWorkerGroupReadInvite({ groupId: group, proof });
 };
 
 /** Sets or replaces a Group Password group's password: only its signer address reaches the Worker. */

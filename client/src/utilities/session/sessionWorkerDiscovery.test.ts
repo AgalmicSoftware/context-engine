@@ -10,6 +10,7 @@ import {
   validateWorkerCanonicalSessionBootstrap,
   WorkerSessionBootstrapRequestError,
 } from './sessionWorkerDiscovery';
+import { forgetGroupReadHeader, saveGroupReadHeader } from '../worker/workerGroupReadProof';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from './sessionModeProfile';
 
 const SESSION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -352,6 +353,30 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
       }),
     );
     expect(result.sessionId).toBe(SESSION_ID);
+  });
+
+  it('sends a private session’s invite proof held for that Worker and session, and nothing for another', async () => {
+    const header = `rxc:0x${'ab'.repeat(65)}`;
+    const worker = 'https://session-a.example.workers.dev';
+    saveGroupReadHeader({ workerUrl: worker, sessionSlug: 'session-a', sessionId: SESSION_ID, header });
+    const respond = async () =>
+      new Response(JSON.stringify(buildPayload()), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    try {
+      const fetchImpl = jest.fn(respond);
+      await fetchWorkerCanonicalSessionBootstrap({
+        fetchImpl,
+        sessionSlug: 'session-a',
+        workerQueryValue: `${worker}/`,
+        environment: 'production',
+      });
+      expect((fetchImpl as jest.Mock).mock.calls[0][1].headers).toEqual({
+        Accept: 'application/json',
+        'X-Session-Slug': 'session-a',
+        'X-CE-Group-Invite': header,
+      });
+    } finally {
+      forgetGroupReadHeader(worker, 'session-a');
+    }
   });
 
   it('fails before fetch for unsafe origins and rejects HTTP or JSON failures', async () => {
