@@ -47,6 +47,20 @@ export const readWorkerTakesDataNote = async (
   return found.features.includes('interview_data_note_v1');
 };
 
+/** Which Session Agent options the Session Worker accepts (0.9.11 on); neither when it can't be read. */
+export const readWorkerSessionAgentOptions = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<{ recordChats: boolean; anyoneCanAsk: boolean }> => {
+  if (!workerOrigin) return { recordChats: false, anyoneCanAsk: false };
+  const { features } = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return {
+    recordChats: features.includes('session_agent_chats'),
+    anyoneCanAsk: features.includes('session_agent_signed_out'),
+  };
+};
+
 export const WORKERS_AI_FEATURE = 'workers_ai_v1';
 
 /** Whether the Session Worker can answer the Session Agent on Cloudflare's models: it has the AI binding. */

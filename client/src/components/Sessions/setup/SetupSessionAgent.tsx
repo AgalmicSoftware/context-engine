@@ -75,12 +75,22 @@ type Props = {
   groups: Array<{ groupId: string; label: string }>;
   /** The chain the session checks SBTs on, or 0 when it checks none. */
   sbtChainId?: number;
+  /** Whether the session's Worker accepts each option; an older one refuses the whole save. */
+  recordChatsSupported?: boolean;
+  anyoneCanAskSupported?: boolean;
 };
 
 // Off is no setting. Turning it on lets everyone signed in ask, with General
 // answers; an admin adds audiences, in order, and may rewrite each style's
 // instructions. The Worker checks who may ask and gathers what each style reads.
-const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): React.ReactElement => {
+const SetupSessionAgent = ({
+  value,
+  onChange,
+  groups,
+  sbtChainId = 0,
+  recordChatsSupported = true,
+  anyoneCanAskSupported = true,
+}: Props): React.ReactElement => {
   const on = !!value && typeof value === 'object';
   const audiences = readAudiences(value);
   const instructions = asRecord(asRecord(value).instructions);
@@ -339,22 +349,26 @@ const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): 
             testId="ce-setup-session-agent-min-answers"
             onChange={(checked) => save(audiences, instructions, checked ? L.minAnswers : 1)}
           />
-          <SetupCheck
-            id="ce-setup-session-agent-anyone"
-            label="Anyone can ask"
-            checked={signedOutMayAsk}
-            help={ANYONE_HELP}
-            testId="ce-setup-session-agent-anyone"
-            onChange={(checked) => save(audiences, instructions, minAnswers, recordsChats, checked)}
-          />
-          <SetupCheck
-            id="ce-setup-session-agent-record-chats"
-            label="Record chats"
-            checked={recordsChats}
-            help={RECORD_HELP}
-            testId="ce-setup-session-agent-record-chats"
-            onChange={(checked) => save(audiences, instructions, minAnswers, checked)}
-          />
+          {anyoneCanAskSupported ? (
+            <SetupCheck
+              id="ce-setup-session-agent-anyone"
+              label="Anyone can ask"
+              checked={signedOutMayAsk}
+              help={ANYONE_HELP}
+              testId="ce-setup-session-agent-anyone"
+              onChange={(checked) => save(audiences, instructions, minAnswers, recordsChats, checked)}
+            />
+          ) : null}
+          {recordChatsSupported ? (
+            <SetupCheck
+              id="ce-setup-session-agent-record-chats"
+              label="Record chats"
+              checked={recordsChats}
+              help={RECORD_HELP}
+              testId="ce-setup-session-agent-record-chats"
+              onChange={(checked) => save(audiences, instructions, minAnswers, checked)}
+            />
+          ) : null}
           {SESSION_AGENT_STYLES.map((style) => {
             const fieldId = `ce-setup-session-agent-${style}`;
             const written = instructions[style];

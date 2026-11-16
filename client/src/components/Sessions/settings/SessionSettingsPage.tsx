@@ -43,6 +43,7 @@ import { describeWorkerModeError, listSessionModeConflicts } from '../../../util
 import {
   readWorkerCountsAiLimit,
   readWorkerRunsWorkersAi,
+  readWorkerSessionAgentOptions,
   readWorkerKeepsDraftText,
   readWorkerTakesDataNote,
   readWorkerReleaseLabel,
@@ -233,6 +234,8 @@ const SessionSettingsPage = ({
   // Whether it accepts the note on where research data goes; an older one would refuse the whole save.
   // On-chain sessions save to the registry, which takes it.
   const [workerTakesDataNote, setWorkerTakesDataNote] = useState(false);
+  // Which Session Agent options it accepts; an older one would refuse the whole save, so they aren't offered there.
+  const [workerAgentOptions, setWorkerAgentOptions] = useState({ recordChats: false, anyoneCanAsk: false });
   useEffect(() => {
     let stale = false;
     setWorkerRelease('');
@@ -241,6 +244,7 @@ const SessionSettingsPage = ({
     setWorkerCountsAiLimit(false);
     setWorkerRunsWorkersAi(false);
     setWorkerTakesDataNote(false);
+    setWorkerAgentOptions({ recordChats: false, anyoneCanAsk: false });
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
       if (!stale) setWorkerRelease(release);
     });
@@ -258,6 +262,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerTakesDataNote(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesDataNote(takes);
+    });
+    void readWorkerSessionAgentOptions(workerOrigin, sessionSlug, fetchImpl).then((options) => {
+      if (!stale) setWorkerAgentOptions(options);
     });
     return () => {
       stale = true;
@@ -677,6 +684,8 @@ const SessionSettingsPage = ({
                 onChange={(next) => updateDraft(['sessionAgent'], next)}
                 groups={groups}
                 sbtChainId={usesSbtDefaults(draft) ? Number(saved?.networkChainId) || 0 : 0}
+                recordChatsSupported={workerAgentOptions.recordChats}
+                anyoneCanAskSupported={workerAgentOptions.anyoneCanAsk}
               />
             ) : (
               <p className={styles.hint} data-testid="ce-settings-session-agent-locked">
