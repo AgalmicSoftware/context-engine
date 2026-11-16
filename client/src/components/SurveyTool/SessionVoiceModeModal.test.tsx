@@ -350,7 +350,7 @@ describe('SessionVoiceModeModal', () => {
   });
 
   it.each([
-    ['checking', 'Checking setup', 'pending'],
+    ['checking', 'Checking setup', 'busy'],
     ['unavailable', 'Setup needed', 'error'],
     ['unknown', 'Not checked', 'pending'],
   ] as const)('shows %s readiness without a misleading green pill', (state, label, tone) => {
@@ -3697,7 +3697,12 @@ describe('Interview cancellation and recovery', () => {
       h.options().onTranscript?.('Stale evidence', []);
     });
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Preparing responses…');
+    // The app's spinner shows while it works, beside the words that are read out.
+    const pill = screen.getByRole('button', { name: 'Interview status: Preparing responses…' });
+    expect(pill).toHaveAttribute('data-tone', 'busy');
+    expect(pill.querySelector('svg.fa-spinner.fa-spin')).toHaveAttribute('aria-hidden', 'true');
     await act(async () => finish([{ questionId: 'q1', answer: 'New evidence' }]));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS).querySelector('svg.fa-spinner')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Review proposed responses' }).closest('summary')).toHaveFocus();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts');
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();

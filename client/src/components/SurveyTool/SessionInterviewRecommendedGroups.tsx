@@ -14,6 +14,7 @@ import { AUTO_JOIN_CLAIM_ATTRIBUTE } from '../../utilities/ui/voiceDialogNoticeS
 import { clearWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
 import type { WorkerGroupAutoJoinIntent } from '../../domains/worker/workerGroupAutoJoinIntent';
 import WorkerGroupImage from '../Shared/WorkerGroupImage';
+import { InterviewBusyLabel } from './SessionInterviewModalHeader';
 import {
   getWorkerSessionToken,
   isSafeHttpsUrl,
@@ -472,9 +473,17 @@ export function SessionInterviewRecommendedGroups({
             </span>
           </label>
         ))}
-        {loading ? <p role="status">Finding groups that fit your answers…</p> : null}
+        {loading ? (
+          <p role="status">
+            <InterviewBusyLabel label="Finding groups that fit your answers…" />
+          </p>
+        ) : null}
         {loadFailed && !choices.length ? <p role="status">Groups are unavailable right now.</p> : null}
-        {outcome.status === 'joining' ? <p role="status">Joining groups…</p> : null}
+        {outcome.status === 'joining' ? (
+          <p role="status">
+            <InterviewBusyLabel label="Joining groups…" />
+          </p>
+        ) : null}
         {outcome.joined.length ? <p role="status">Joined {listNames(outcome.joined)}.</p> : null}
         {outcome.failed.map((message, index) => (
           <p key={`${index}:${message}`} role="alert">

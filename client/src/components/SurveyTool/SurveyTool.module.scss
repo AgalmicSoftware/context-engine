@@ -3908,7 +3908,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   font-weight: 700;
   line-height: 1.3;
 
-  &[data-tone='pending'] {
+  &[data-tone='pending'],
+  &[data-tone='busy'] {
     background: var(--ce-color-yellow) !important;
   }
   &[data-tone='error'] {
@@ -7012,7 +7013,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     color: var(--ce-response-agree-text) !important;
     background: var(--ce-response-agree-bg) !important;
 
-    &[data-tone='pending'] {
+    &[data-tone='pending'],
+    &[data-tone='busy'] {
       color: var(--ce-response-unsure-text) !important;
       background: var(--ce-response-unsure-bg) !important;
     }

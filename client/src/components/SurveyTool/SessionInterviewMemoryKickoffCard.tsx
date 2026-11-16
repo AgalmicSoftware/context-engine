@@ -5,6 +5,7 @@ import { faCaretDown, faCheck, faCopy, faQuestionCircle } from '@fortawesome/fre
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SessionInterviewPrompt from './SessionInterviewPrompt';
+import { InterviewBusyLabel } from './SessionInterviewModalHeader';
 import { shouldIgnorePromptCopyEvent } from './sessionInterviewModalState';
 
 /** The prompt a check approved, when it differs from `kickoff`, and when to check again before its link runs out. */
@@ -159,7 +160,11 @@ export default function SessionInterviewMemoryKickoffCard({
           </button>
         </div>
       </div>
-      {checking ? <div role="status">Checking session compatibility…</div> : null}
+      {checking ? (
+        <div role="status">
+          <InterviewBusyLabel label="Checking session compatibility…" />
+        </div>
+      ) : null}
       {validationError ? (
         <div role="alert">
           {validationError}{' '}
