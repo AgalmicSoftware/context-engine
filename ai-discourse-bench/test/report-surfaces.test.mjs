@@ -1582,7 +1582,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.sectionHeaderViewModeButton\[aria-pressed="true"\]/);
   assert.match(html, /rgba\(77, 255, 164, 0\.7\)/);
   assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">🧾<\/span><span class="sectionHeaderViewModeLabel">Report<\/span>/);
-  assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">🗺️<\/span><span class="sectionHeaderViewModeLabel">Debate Atlas<\/span>/);
+  assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">🗺️<\/span><span class="sectionHeaderViewModeLabel">Atlas<\/span>/);
+  assert.match(html, /data-ce-report-view-mode="debate-atlas" aria-pressed="false" title="Atlas">/);
   assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">📊<\/span><span class="sectionHeaderViewModeLabel">Breakdown<\/span>/);
   assert.match(html, /<span class="sectionHeaderViewModeIcon" aria-hidden="true">⚠️<\/span><span class="sectionHeaderViewModeLabel">Risk Matrix<\/span>/);
   assert.match(html, /class="sectionHeaderViewModeButton" data-ce-open-raw-results>/);
