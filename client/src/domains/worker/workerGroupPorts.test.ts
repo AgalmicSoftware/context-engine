@@ -1462,7 +1462,7 @@ it('sends a private session’s invite proof when listing its groups', async () 
       sessionSlug: SESSION_SLUG,
       fetchImpl,
     });
-    expect((fetchImpl as jest.Mock).mock.calls[0][1].headers).toEqual({
+    expect(jest.mocked(fetchImpl as typeof fetch).mock.calls[0][1]?.headers).toEqual({
       'X-Session-Slug': SESSION_SLUG,
       'X-CE-Group-Invite': header,
     });

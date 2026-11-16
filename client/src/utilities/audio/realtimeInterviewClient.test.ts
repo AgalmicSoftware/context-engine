@@ -180,7 +180,7 @@ describe('interview connection lifecycle', () => {
     try {
       const h = harness();
       const session = await h.start();
-      expect((h.options.fetchImpl as jest.Mock).mock.calls[0][1].headers).toEqual(
+      expect(jest.mocked(h.options.fetchImpl as typeof fetch).mock.calls[0][1]?.headers).toEqual(
         expect.objectContaining({ 'x-session-slug': 'demo', 'X-CE-Group-Invite': header }),
       );
       await session.stop();

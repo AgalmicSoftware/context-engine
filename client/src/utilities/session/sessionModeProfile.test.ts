@@ -97,9 +97,12 @@ describe('sessionModeProfile', () => {
     expect(validateSessionModeProfile(profile)).toEqual({ valid: true, issues: [] });
     expect(classifySessionModeProfileSupport(profile).status).toBe('reachable');
     const compiled = compileSessionModeProfile(profile);
-    expect(compiled.storageProfile.payloadAccessControl?.accessConditions?.conditions).toContainEqual({
-      kind: 'worker_group',
-      groupIds: ['rxc', 'cosmos.2026'],
+    expect(compiled.storageProfile).toMatchObject({
+      payloadAccessControl: {
+        accessConditions: {
+          conditions: expect.arrayContaining([{ kind: 'worker_group', groupIds: ['rxc', 'cosmos.2026'] }]),
+        },
+      },
     });
     expect(mergeSessionModeProfileStorageAccess(profile, compiled.storageProfile)).toEqual(profile);
 

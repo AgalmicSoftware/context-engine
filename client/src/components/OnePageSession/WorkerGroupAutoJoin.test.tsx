@@ -116,7 +116,7 @@ describe('WorkerGroupAutoJoin', () => {
     // As on a fresh tab whose first render was hidden: the host's layout effect saves the link's invite after this
     // component read the tab and before its own effect reads the link, whose fragment is already gone.
     const SaveLate = () => {
-      React.useLayoutEffect(() => savePendingAutoJoin({ ...readPendingAutoJoinFixture(), token }), []);
+      React.useLayoutEffect(() => savePendingAutoJoin({ ...readPendingAutoJoinFixture(), version: 1, token }), []);
       return null;
     };
     render(

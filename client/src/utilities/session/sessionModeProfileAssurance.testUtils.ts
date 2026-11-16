@@ -104,6 +104,7 @@ export const SESSION_MODE_DECLARED_SUPPORT = {
     worker_role: 'reachable',
     sbt_onchain: 'reachable',
     agent_grant_scope: 'reachable',
+    worker_group: 'reachable',
   } satisfies Record<AccessConditionKind, SessionModeProfileSupportStatus>,
 } as const;
 
@@ -136,6 +137,22 @@ const roleGatedPlaintextCloudflareProfile = (): SessionModeProfile => {
 const membersResultsCloudflareProfile = (): SessionModeProfile => {
   const profile = roleGatedPlaintextCloudflareProfile();
   profile.results.visibility = 'session_member_full';
+  return profile;
+};
+
+// A private session: admins and the members, or invite holders, of its groups.
+const privateGroupsCloudflareProfile = (): SessionModeProfile => {
+  const profile = membersResultsCloudflareProfile();
+  profile.storage.payloadAccessControl = {
+    ...profile.storage.payloadAccessControl!,
+    accessConditions: {
+      match: 'any',
+      conditions: [
+        { kind: 'worker_role', role: 'admin' },
+        { kind: 'worker_group', groupIds: ['rxc', 'cosmos.2026'] },
+      ],
+    },
+  };
   return profile;
 };
 
@@ -211,6 +228,7 @@ export const createReachableSessionModeFixtures = (): SessionModeAssuranceFixtur
   { id: 'cloudflare-public', profile: publicCloudflareProfile() },
   { id: 'cloudflare-role-gated-plaintext', profile: roleGatedPlaintextCloudflareProfile() },
   { id: 'cloudflare-members-results', profile: membersResultsCloudflareProfile() },
+  { id: 'cloudflare-private-groups', profile: privateGroupsCloudflareProfile() },
   { id: 'cloudflare-lit', profile: litCloudflareProfile() },
   { id: 'cloudflare-worker-envelope-sbt', profile: sbtEnvelopeProfile() },
   { id: 'arweave-lit', profile: litArweaveProfile() },

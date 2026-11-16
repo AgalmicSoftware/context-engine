@@ -30,7 +30,7 @@ it('sends a private session’s invite proof for its opening, never a credential
   try {
     const { result } = renderHook(() => useInterviewOpening(options));
     await waitFor(() => expect(result.current.opening).toBe('Why?'));
-    expect((global.fetch as jest.Mock).mock.calls[0][1].headers).toEqual({ 'X-CE-Group-Invite': header });
+    expect(jest.mocked(global.fetch).mock.calls[0][1]?.headers).toEqual({ 'X-CE-Group-Invite': header });
   } finally {
     forgetGroupReadHeader(options.workerUrl, 'demo');
   }

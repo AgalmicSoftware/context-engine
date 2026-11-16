@@ -369,7 +369,7 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
         workerQueryValue: `${worker}/`,
         environment: 'production',
       });
-      expect((fetchImpl as jest.Mock).mock.calls[0][1].headers).toEqual({
+      expect(jest.mocked(fetchImpl as unknown as typeof fetch).mock.calls[0][1]?.headers).toEqual({
         Accept: 'application/json',
         'X-Session-Slug': 'session-a',
         'X-CE-Group-Invite': header,
@@ -384,9 +384,9 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
     const shell = { ...buildPayload(), privateSession: 'invite_required' };
     const reply = (payload: unknown) =>
       new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    const load = (fetchImpl: jest.Mock, memberToken?: () => string) =>
+    const load = (fetchImpl: jest.Mock, memberToken?: (origin: string, slug: string) => string) =>
       fetchWorkerCanonicalSessionBootstrap({
-        fetchImpl,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
         sessionSlug: 'session-a',
         workerQueryValue: worker,
         environment: 'production',
@@ -395,12 +395,14 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
 
     // A member: the shell, then the full config for the sign-in.
     const member = jest.fn().mockResolvedValueOnce(reply(shell)).mockResolvedValueOnce(reply(buildPayload()));
-    const memberToken = jest.fn(() => 'member-token');
+    const memberToken = jest.fn((_origin: string, _slug: string) => 'member-token');
+    const authorizationOf = (call: number) =>
+      (member.mock.calls[call] as [string, RequestInit])[1].headers as Record<string, string | undefined>;
     const admitted = await load(member, memberToken);
     expect(admitted.config.privateSession).toBeUndefined();
     expect(memberToken).toHaveBeenCalledWith(worker, 'session-a');
-    expect(member.mock.calls[0][1].headers.Authorization).toBeUndefined();
-    expect(member.mock.calls[1][1].headers.Authorization).toBe('Bearer member-token');
+    expect(authorizationOf(0).Authorization).toBeUndefined();
+    expect(authorizationOf(1).Authorization).toBe('Bearer member-token');
 
     // Signed out: the shell, marked, from one request.
     const signedOut = jest.fn().mockResolvedValue(reply(shell));
@@ -415,7 +417,7 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
 
     // Any other session never sends the sign-in to its config.
     const open = jest.fn().mockResolvedValue(reply(buildPayload()));
-    const unused = jest.fn(() => 'member-token');
+    const unused = jest.fn((_origin: string, _slug: string) => 'member-token');
     expect((await load(open, unused)).config.privateSession).toBeUndefined();
     expect(open).toHaveBeenCalledTimes(1);
     expect(unused).not.toHaveBeenCalled();
