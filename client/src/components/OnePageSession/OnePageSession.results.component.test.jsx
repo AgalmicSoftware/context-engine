@@ -1418,11 +1418,13 @@ describe('OnePageSession results routing', () => {
       mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, loaded: false });
       renderSession('edge');
       fireEvent.click(screen.getByRole('button', { name: 'Atlas' }));
+      expect(screen.getByRole('button', { name: 'Atlas' })).toHaveAttribute('aria-pressed', 'true');
       expect(screen.queryByTestId('ce-session-debate-atlas-empty')).not.toBeInTheDocument();
       cleanup();
       mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, error: 'Atlases are unavailable.' });
       renderSession('edge');
       fireEvent.click(screen.getByRole('button', { name: 'Atlas' }));
+      expect(screen.getByRole('button', { name: 'Atlas' })).toHaveAttribute('aria-pressed', 'true');
       expect(screen.queryByTestId('ce-session-debate-atlas-empty')).not.toBeInTheDocument();
     });
 
@@ -1430,6 +1432,7 @@ describe('OnePageSession results routing', () => {
       mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true });
       renderSession('demo');
       fireEvent.click(await screen.findByRole('button', { name: /^Atlas$/i }));
+      expect(screen.getByRole('button', { name: /^Atlas$/i })).toHaveAttribute('aria-pressed', 'true');
       expect(screen.queryByTestId('ce-session-debate-atlas-empty')).not.toBeInTheDocument();
     });
 
