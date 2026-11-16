@@ -7,6 +7,7 @@ import { Wallet } from 'ethers';
 import { formatWorkerGroupReadInvite, workerGroupJoinStatement, workerGroupReadStatement } from '../../shared/workerGroupJoin.mjs';
 import { ADMIN, SESSION_ID, createFixture, principal } from './workerGroupTestFixture.mjs';
 import { dispatchSessionAgentInstructionsRequest, dispatchSessionConfigBootstrapRequest } from './sessionConfigBootstrapDispatch.js';
+import { dispatchAnonymousRoute } from './anonymousRouteDispatch.js';
 import {
   PRIVATE_SESSION_INVITE_INVALID,
   PRIVATE_SESSION_INVITE_REQUIRED,
@@ -240,4 +241,45 @@ test('agent instructions follow the same rule', async () => {
   assert.equal((await read()).body.reason, PRIVATE_SESSION_INVITE_REQUIRED);
   assert.equal((await read(await readInvite(passwordKey('22')))).body.reason, PRIVATE_SESSION_INVITE_INVALID);
   assert.equal(await (await read(await readInvite(key))).text(), 'Be kind.');
+});
+
+const signedOut = (f, path, { invite, config = privateConfig(), query = '', deps = {} } = {}) => dispatchAnonymousRoute({
+  path,
+  request: new Request(`https://worker.test${path}${query}`, { method: path === '/groups/list' ? 'GET' : 'POST',
+    headers: invite ? { 'X-CE-Group-Invite': invite } : {} }),
+  anonymousContext: { slug: 'fixture', config, headers: {}, env: f.env },
+  deps: { json: (body, status) => ({ body, status }), ...deps },
+});
+
+test('a private session lists to a signed-out visitor only the group their invite opens', async () => {
+  const { f, key } = await setup();
+  await f.mutate({ operation: 'create', principal: undefined, groupId: 'other',
+    input: { groupId: 'other', label: 'Other', joinMode: 'open', listed: true } });
+  const list = (invite, joinGroup = 'salon') =>
+    signedOut(f, '/groups/list', { invite, query: `?sessionId=${SESSION_ID}&joinGroup=${joinGroup}` });
+  const opened = await list(await readInvite(key));
+  assert.equal(opened.status, 200, JSON.stringify(opened.body));
+  assert.deepEqual(opened.body.groups.map((group) => group.groupId), ['salon']);
+  assert.equal(JSON.stringify(opened.body).includes(ADMIN.slice(2)), false);
+  assert.equal((await list()).body.reason, PRIVATE_SESSION_INVITE_REQUIRED);
+  assert.equal((await list(await readInvite(passwordKey('22')))).body.reason, PRIVATE_SESSION_INVITE_INVALID);
+  // An invite opens its own group's entry, not another's.
+  const elsewhere = await list(await readInvite(key), 'other');
+  assert.deepEqual([elsewhere.status, elsewhere.body.reason], [403, PRIVATE_SESSION_INVITE_INVALID]);
+});
+
+test('the AI routes of a private session answer only those its rule admits', async () => {
+  const { f, key } = await setup();
+  const reached = [];
+  const parsed = async () => { reached.push(true); return { ok: false, status: 400, error: 'parsed' }; };
+  const deps = { readAiRequestPayload: parsed, readTranscribeRequestPayload: parsed, readRealtimeCallRequestPayload: parsed };
+  const config = { ...privateConfig(), interviewMode: { enabled: true } };
+  for (const path of ['/ai', '/transcribe', '/realtime/call']) {
+    reached.length = 0;
+    assert.equal((await signedOut(f, path, { config, deps })).body.reason, PRIVATE_SESSION_INVITE_REQUIRED, path);
+    assert.equal((await signedOut(f, path, { config, deps, invite: await readInvite(passwordKey('22')) })).body.reason,
+      PRIVATE_SESSION_INVITE_INVALID, path);
+    assert.equal(reached.length, 0, path);
+    assert.equal((await signedOut(f, path, { config, deps, invite: await readInvite(key) })).body.error, 'parsed', path);
+  }
 });

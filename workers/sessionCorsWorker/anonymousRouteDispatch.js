@@ -4,8 +4,16 @@ import { dispatchWorkerCapabilities } from './workerCapabilities.js';
 import { isModelAllowed } from './aiRequestNormalization.js';
 import {
   dispatchPublicWorkerGroupListRequest as dispatchPublicWorkerGroupListRequestBoundary,
+  normalizeWorkerGroupId,
 } from './workerGroups.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
+import { PRIVATE_SESSION_INVITE_INVALID, parseWorkerGroupReadInvite } from '../../shared/workerGroupJoin.mjs';
+import {
+  evaluatePrivateSessionAccess,
+  isPrivateSession,
+  privateSessionRefusal,
+  readGroupReadInviteHeader,
+} from './privateSessionAccess.js';
 import {
   isInterviewModeEnabled,
   proxyOpenAiRealtimeCall as proxyOpenAiRealtimeCallBoundary,
@@ -27,6 +35,18 @@ const resolveModelForProvider = ({ payload, provider } = {}) => {
   return model || resolveDefaultModelForProvider(provider);
 };
 
+// Whether the read invite is for the one group the list request names.
+const sameGroup = (header, request) => {
+  let joinGroups = [];
+  try {
+    joinGroups = new URL(request?.url || '').searchParams.getAll('joinGroup');
+  } catch {
+    return false;
+  }
+  const invite = parseWorkerGroupReadInvite(header);
+  return joinGroups.length === 1 && !!invite && invite.groupId === normalizeWorkerGroupId(joinGroups[0]);
+};
+
 export const dispatchAnonymousRoute = async ({
   path,
   request,
@@ -42,7 +62,26 @@ export const dispatchAnonymousRoute = async ({
 
   if (path === '/capabilities') return dispatchWorkerCapabilities({ request, env, headers });
 
+  // A private session shows a signed-out visitor nothing its rule doesn't
+  // admit them to; storage reads check the rule themselves, part by part.
+  const privateSession = isPrivateSession(config);
+  const refusePrivate = async () => {
+    if (!privateSession) return null;
+    const access = await evaluatePrivateSessionAccess({ env, slug, config, request, part: 'questions' });
+    return access.ok ? null : privateSessionRefusal({ access, json: deps?.json, headers });
+  };
+
   if (path === '/groups/list') {
+    const refused = await refusePrivate();
+    if (refused) return refused;
+    // In a private session the list shows only the group the invite opens.
+    if (privateSession && !sameGroup(readGroupReadInviteHeader(request), request)) {
+      return privateSessionRefusal({
+        access: { status: 403, reason: PRIVATE_SESSION_INVITE_INVALID },
+        json: deps?.json,
+        headers,
+      });
+    }
     const dispatchPublicWorkerGroupListRequest =
       deps?.dispatchPublicWorkerGroupListRequest || dispatchPublicWorkerGroupListRequestBoundary;
     return dispatchPublicWorkerGroupListRequest({
@@ -51,6 +90,7 @@ export const dispatchAnonymousRoute = async ({
       env,
       slug,
       baseHeaders: headers,
+      invitedOnly: privateSession,
       deps: {
         json: deps?.json,
       },
@@ -72,6 +112,8 @@ export const dispatchAnonymousRoute = async ({
       baseHeaders: headers,
     });
   }
+  const refused = await refusePrivate();
+  if (refused) return refused;
   const endedResponse = buildSessionEndedResponse({
     config,
     headers,
