@@ -191,6 +191,7 @@ import type {
   SbtPageDecodedInviteInput,
   SbtPageUrlAutoMintIntent,
 } from './sbtPageHelpers';
+import { withCurrentWorkerHint } from '../../utilities/ui/currentWorkerHint';
 
 const sbtLog = createLogger('sbt');
 const inviteLog = createLogger('inviteDebug');
@@ -1832,7 +1833,9 @@ class SBTPage extends Component<any, any> {
     return (
       <>
         <a
-          href={buildPublicRoute(`/u/${normalized}${slug ? `?session=${encodeURIComponent(slug)}` : ''}`)}
+          href={withCurrentWorkerHint(
+            buildPublicRoute(`/u/${normalized}${slug ? `?session=${encodeURIComponent(slug)}` : ''}`),
+          )}
           target="_blank"
           rel="noopener noreferrer"
         >

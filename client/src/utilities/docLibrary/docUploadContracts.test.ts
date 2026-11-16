@@ -28,6 +28,17 @@ describe('docUploadContracts', () => {
         txId: 'tx-1',
       }),
     ).toBe('/session/edge/docs?__ceDocTx=tx-1&__ceDocStorage=lit-arweave&__ceDocKind=file');
+    // An unlisted session's page needs its Worker to find the session.
+    expect(
+      buildSessionDocLibraryViewerUrl({
+        sessionToken: 'edge',
+        storageRef: 'id-1',
+        storage: 'cloudflare',
+        workerOrigin: 'https://edge.example.workers.dev',
+      }),
+    ).toBe(
+      '/session/edge/docs?__ceDocTx=id-1&__ceDocStorage=cloudflare&__ceDocKind=file&worker=https%3A%2F%2Fedge.example.workers.dev',
+    );
     expect(buildSessionDocLibraryViewerUrl({ sessionToken: '', txId: 'tx-1' })).toBe('');
     expect(buildSessionDocLibraryViewerUrl({ sessionToken: 'edge', txId: '' })).toBe('');
   });

@@ -62,6 +62,7 @@ export const buildSessionDocLibraryViewerUrl = ({
   storage = STORAGE_BACKENDS.LIT_ARWEAVE,
   kind = 'file',
   name = '',
+  workerOrigin = '',
 }: {
   sessionToken?: unknown;
   txId?: unknown;
@@ -70,6 +71,8 @@ export const buildSessionDocLibraryViewerUrl = ({
   storage?: unknown;
   kind?: unknown;
   name?: unknown;
+  /** The Worker an unlisted session is opened from; without it the page cannot find the session. */
+  workerOrigin?: unknown;
 } = {}) => {
   const token = toStr(sessionToken).trim();
   const id = toStr(storageRef || storageId || txId).trim();
@@ -80,6 +83,7 @@ export const buildSessionDocLibraryViewerUrl = ({
   query.set('__ceDocStorage', toStr(storage).trim() || STORAGE_BACKENDS.LIT_ARWEAVE);
   query.set('__ceDocKind', toStr(kind).trim() || 'file');
   if (toStr(name).trim()) query.set('__ceDocName', toStr(name).trim());
+  if (toStr(workerOrigin).trim()) query.set('worker', toStr(workerOrigin).trim());
   return `${pathname}?${query.toString()}`;
 };
 

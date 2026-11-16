@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
+import { withCurrentWorkerHint } from '../../utilities/ui/currentWorkerHint';
 
 export type SurveyResultsResponseListEntry = {
   responder: string;
@@ -37,7 +38,9 @@ const SurveyResultsIndividualResponseCard = ({
     <CardHeader onClick={() => onToggleResponse(responseId)} className={styleMap.responseHeader}>
       <span className={styleMap.responderAddress}>
         <a
-          href={`/u/${encodeURIComponent(response.responder)}${effectiveSlug ? `?session=${encodeURIComponent(effectiveSlug)}` : ''}`}
+          href={withCurrentWorkerHint(
+            `/u/${encodeURIComponent(response.responder)}${effectiveSlug ? `?session=${encodeURIComponent(effectiveSlug)}` : ''}`,
+          )}
           className={styleMap.responderLink}
           onClick={(e: React.MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}
         >

@@ -457,7 +457,11 @@ describe('WorkerGroupMembershipPanel', () => {
       name: 'View admin profile 0x00000000000000000000000000000000000000aa',
     });
     expect(adminLink).toHaveTextContent('0x000...00aa');
-    expect(adminLink).toHaveAttribute('href', '/u/0x00000000000000000000000000000000000000aa?session=alpha');
+    // The page was opened with its Worker, which the profile needs too.
+    expect(adminLink).toHaveAttribute(
+      'href',
+      '/u/0x00000000000000000000000000000000000000aa?session=alpha&worker=https%3A%2F%2Fworker.example',
+    );
     expect(adminLink).toHaveAttribute('title', '0x00000000000000000000000000000000000000aa');
     expect(adminLink).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.queryByText('Relevant documents and tags for this group.')).not.toBeInTheDocument();
@@ -698,7 +702,7 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(await screen.findByText('Reviewers members')).toBeInTheDocument();
     expect(await screen.findByTitle('0x00000000000000000000000000000000000000aa')).toHaveAttribute(
       'href',
-      '/u/0x00000000000000000000000000000000000000aa?session=alpha',
+      '/u/0x00000000000000000000000000000000000000aa?session=alpha&worker=https%3A%2F%2Fworker.example',
     );
     expect(screen.getByText('Agent · telegram:12345')).toBeInTheDocument();
     expect(screen.getByTitle('0x00000000000000000000000000000000000000bb')).toHaveTextContent(/^Passkey · /);

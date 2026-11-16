@@ -109,6 +109,34 @@ describe('SurveyQuestionsResponseView', () => {
     }
   });
 
+  it('keeps an unlisted session’s Worker on the profile link, and nothing else from the page', () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/survey/s1/0xabc1234?session=salon&worker=https%3A%2F%2Fsalon.example.workers.dev&inv=secret',
+    );
+    try {
+      render(
+        <SurveyQuestionsResponseView
+          renderQuestionAnswer={renderQuestionAnswer}
+          renderSurveyAnswers={renderSurveyAnswers}
+          routeViewDisplayState={{
+            isOwnResponse: undefined,
+            shortenedViewAddress: '0xabc...1234',
+            viewedAddressLower: '0xabc1234',
+            viewedAddressRaw: '0xABC1234',
+          }}
+        />,
+      );
+      expect(screen.getByRole('link', { name: '0xabc...1234' })).toHaveAttribute(
+        'href',
+        '/u/0xabc1234?session=salon&worker=https%3A%2F%2Fsalon.example.workers.dev',
+      );
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
+  });
+
   it('renders full-survey answers from own responses with the existing callback contract', () => {
     const responses = [{ questionID: 'q1', answer: 'yes' }];
 

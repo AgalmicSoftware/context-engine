@@ -7,6 +7,7 @@ import type {
   SurveyQuestionsLayoutDisplayState,
   SurveyQuestionsRouteViewDisplayState,
 } from './surveyQuestionsTypes.js';
+import { withCurrentWorkerHint } from '../../utilities/ui/currentWorkerHint';
 
 type SurveyQuestionsResponseViewProps = {
   isLoadingResponse?: boolean;
@@ -77,7 +78,9 @@ const SurveyQuestionsResponseView = ({
 
   // The profile opens in the session this page was opened in.
   const session = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('session') : null;
-  const profileHref = `/u/${viewedAddressLower}${session ? `?session=${encodeURIComponent(session)}` : ''}`;
+  const profileHref = withCurrentWorkerHint(
+    `/u/${viewedAddressLower}${session ? `?session=${encodeURIComponent(session)}` : ''}`,
+  );
 
   return (
     <div className={layoutDisplayState?.responseViewClassName}>

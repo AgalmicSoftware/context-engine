@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { isQuestionPromptMasked, shouldShowPileFullLoadingState } from './surveyToolViewState.js';
+import { withCurrentWorkerHint } from '../../utilities/ui/currentWorkerHint';
 
 export const NO_PENDING_PILE_SUBMIT_TEXT = 'No new or changed responses';
 
@@ -301,7 +302,7 @@ export const buildPileSubmitViewState = ({
     shouldHidePileSubmitButton,
     finalSubmitText,
     pileSubmitResponderHref: pileSubmitResponderAddressLower
-      ? `/u/${pileSubmitResponderAddressLower}${sessionQuery}`
+      ? withCurrentWorkerHint(`/u/${pileSubmitResponderAddressLower}${sessionQuery}`)
       : '',
   };
 };

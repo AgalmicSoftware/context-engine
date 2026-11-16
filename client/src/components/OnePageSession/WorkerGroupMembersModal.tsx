@@ -5,6 +5,7 @@ import type { WorkerGroup, WorkerGroupMember } from '../../domains/worker/worker
 import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { withCurrentWorkerHint } from '../../utilities/ui/currentWorkerHint';
 import sbtPageStyles from '../SBTs/SBTPage.module.scss';
 
 export const workerGroupPrincipalIdentity = (member: WorkerGroupMember): string => {
@@ -108,7 +109,9 @@ const WorkerGroupMembersModal = ({
                   {blockieUrl ? <img src={blockieUrl} alt="" className={sbtPageStyles.userBlockie} /> : null}
                   {isAddress ? (
                     <a
-                      href={buildPublicRoute(`/u/${identity}?session=${encodeURIComponent(sessionSlug)}`)}
+                      href={withCurrentWorkerHint(
+                        buildPublicRoute(`/u/${identity}?session=${encodeURIComponent(sessionSlug)}`),
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={sbtPageStyles.userAddressLink}
