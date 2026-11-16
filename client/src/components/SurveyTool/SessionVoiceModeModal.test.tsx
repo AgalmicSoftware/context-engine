@@ -198,6 +198,8 @@ const threeQuestions = [
 
 describe('SessionVoiceModeModal', () => {
   beforeEach(() => {
+    // A review one test leaves unsubmitted is kept in this browser and would open in the next.
+    window.localStorage.clear();
     jest.restoreAllMocks();
     jest.clearAllMocks();
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(

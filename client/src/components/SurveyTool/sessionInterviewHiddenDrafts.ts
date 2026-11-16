@@ -130,15 +130,25 @@ const showUnrevealed = (current: HiddenDrafts, questionIds: string[]) => {
 
 type Options = ReviewValues & {
   questions: InterviewQuestion[];
+  /** A review kept in the browser: which drafts it hid, and what it revealed. */
+  initial?: HiddenDrafts;
   researchOn: boolean;
   // Told which still-hidden drafts' questions now have an answer, so review can drop them.
   onAnswered: (questionIds: string[]) => void;
 };
 
 /** Hidden-draft state for one review: which drafts are hidden, and each one's blind answer once revealed. */
-export function useInterviewHiddenDrafts({ questions, editedDrafts, savedResponses, researchOn, onAnswered }: Options) {
-  const [hidden, setHidden] = useState<HiddenDrafts>({});
-  const assignedRef = useRef(false);
+export function useInterviewHiddenDrafts({
+  questions,
+  editedDrafts,
+  savedResponses,
+  researchOn,
+  onAnswered,
+  initial,
+}: Options) {
+  const [hidden, setHidden] = useState<HiddenDrafts>(() => initial || {});
+  // A kept review already chose what to hide, so nothing it showed is hidden again.
+  const assignedRef = useRef(Boolean(initial));
   // Read by the stable callbacks below, which the modal's memoized callbacks depend on.
   const latest = useRef<ReviewValues & { hidden: HiddenDrafts }>({ editedDrafts, savedResponses, hidden });
   latest.current = { editedDrafts, savedResponses, hidden };
@@ -268,5 +278,5 @@ export function useInterviewHiddenDrafts({ questions, editedDrafts, savedRespons
 
   // How many drafts are still hidden: answering one shows its guess, and unticking research sharing shows them all.
   const count = Object.values(hidden).filter((state) => state.revealedAt === undefined).length;
-  return { assign, isConcealed, reviewedValues, view, noteEdit, submittable, prepareSubmit, count };
+  return { assign, isConcealed, reviewedValues, view, noteEdit, submittable, prepareSubmit, count, hidden };
 }

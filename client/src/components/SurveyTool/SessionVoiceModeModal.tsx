@@ -20,6 +20,12 @@ import { useKeptRecording } from '../../utilities/audio/useRecordingChunkQueue';
 import { sortInterviewQuestionPoolNewestFirst } from './sessionInterviewQuestionOrder';
 import { normalizeInterviewQuestions, type InterviewPrefillPacket, type SessionVoiceMode } from './sessionInterview';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
+import {
+  clearKeptReview,
+  keptReviewOwner,
+  readKeptReview,
+  type KeptInterviewReview,
+} from './sessionInterviewKeptReview';
 import type { SessionVoiceModeModalProps } from './sessionVoiceModeTypes';
 import styles from './SurveyTool.module.scss';
 
@@ -78,9 +84,33 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const [discardedClaim, setDiscardedClaim] = useState<TranscriptClaim | null>(null);
   const claim = props.claim === discardedClaim ? null : props.claim;
   const [scanRequested, setScanRequested] = useState(false);
+  // A review this browser kept through a reload, for whoever is signed in now. It is read only while nothing is
+  // under review here, and a link carrying different evidence starts afresh.
+  const sessionSlug = props.sessionSlug || '';
+  const owner = keptReviewOwner(props.account, Boolean(props.loginComplete));
+  const readKept = () => {
+    if (claim || !sessionSlug) return null;
+    const review = readKeptReview(sessionSlug, owner);
+    const sameLink = !prefillPacket || JSON.stringify(review?.packet) === JSON.stringify(prefillPacket);
+    return review && sameLink ? { owner, review } : null;
+  };
+  const [keptReview, setKeptReview] = useState<{ owner: string; review: KeptInterviewReview } | null>(readKept);
+  useEffect(() => {
+    // One kept for another account is never left on screen; it stays kept for them. Signing in keeps your own.
+    if (keptReview && keptReview.owner !== owner && keptReview.owner !== 'browser') {
+      setKeptReview(null);
+      setInterviewVersion((version) => version + 1);
+    } else if (!keptReview && !hasUnsavedReview) {
+      const found = readKept();
+      if (found) setKeptReview(found);
+    }
+    // Only a change of who is signed in, or of session, looks again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, sessionSlug]);
+  const reviewPacket = prefillPacket || keptReview?.review.packet || null;
   // Closing retains this review, but importing different evidence starts a new
   // review. Equivalent packet objects must not erase the participant's edits.
-  const prefillIdentity = useMemo(() => JSON.stringify(prefillPacket || null), [prefillPacket]);
+  const prefillIdentity = useMemo(() => JSON.stringify(reviewPacket), [reviewPacket]);
   const onInterviewProgressChange = props.onInterviewProgressChange;
   useEffect(() => {
     onInterviewProgressChange?.(interviewUnfinished);
@@ -103,6 +133,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   };
   // Leaving the interview drops what fed it, so choosing Interview again starts afresh.
   const leaveInterview = () => {
+    clearKeptReview(sessionSlug, owner);
+    setKeptReview(null);
     setHasUnsavedReview(false);
     setGroupsUnjoined(false);
     setDiscardedPrefill(props.prefillPacket || null);
@@ -188,9 +220,10 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
           <VoiceModeBackContext.Provider value={goBack}>
             <VoiceModeUnjoinedGroupsContext.Provider value={setGroupsUnjoined}>
               <SessionInterviewPanel
-                key={`${interviewVersion}:${prefillIdentity}`}
+                key={`${interviewVersion}:${prefillIdentity}:${keptReview ? 'kept' : ''}`}
                 {...props}
-                prefillPacket={prefillPacket}
+                prefillPacket={reviewPacket}
+                keptReview={keptReview}
                 claim={claim}
                 onClose={requestClose}
                 questions={questions}
@@ -201,7 +234,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
             </VoiceModeUnjoinedGroupsContext.Provider>
             <SessionInterviewAgentUse use={agentUse} className={styles.sessionInterviewAgentUse} />
             {/* Until the interview has something to review. */}
-            {!hasUnsavedReview && !prefillPacket && !claim ? (
+            {!hasUnsavedReview && !reviewPacket && !claim ? (
               <ModalBody className={styles.sessionInterviewPrefill}>{prefillCard}</ModalBody>
             ) : null}
           </VoiceModeBackContext.Provider>
