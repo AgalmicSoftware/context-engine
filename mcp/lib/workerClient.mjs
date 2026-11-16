@@ -240,6 +240,8 @@ export const createWorkerClient = ({
     }
     if (response.status === 401 && auth && !retried && (!error || TOKEN_ERROR_RE.test(error))) {
       token = '';
+      // A sign-in ended by an admin's change: the config the agent holds may be out of date too.
+      configLoadedAt = 0;
       return request(path, { method, headers, body, form, auth, retried: true, busyRetries, maxBytes, signal });
     }
     if (response.status === 401 && error && !TOKEN_ERROR_RE.test(error)) {

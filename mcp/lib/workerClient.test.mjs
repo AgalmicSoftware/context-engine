@@ -74,6 +74,26 @@ test('too many sign-ins reads as sign-ins, not a blockchain nonce; other limits 
   assert.equal(other, 'Rate limited by the Worker (Too many uploads.). Wait a minute and retry.');
 });
 
+test('a sign-in the Worker has ended makes the next config read fresh', async () => {
+  let configs = 0;
+  let stale = false;
+  const fetchImpl = async (url, init = {}) => {
+    const path = new URL(url).pathname;
+    if (path === '/session-config') { configs += 1; return json({ sessionSlug: 's', config: { sessionId: SESSION_ID, round: configs } }); }
+    if (path === '/auth/nonce') return json({ nonce: 'n1abcdefgh' });
+    if (path === '/auth/login') return json({ token: 'e30.sig', exp: 9999999999 });
+    if (stale) { stale = false; return json({ error: 'Token is stale.' }, 401); }
+    return json({ items: [], listComplete: true });
+  };
+  const client = createWorkerClient({ workerOrigin: 'https://w.example.dev', slug: 's', trustedOrigins: TRUSTED, wallet: ethers.Wallet.createRandom(), fetchImpl });
+  await client.login();
+  await client.refreshConfig();
+  assert.equal(configs, 1);
+  stale = true;
+  await client.listAll('questions');
+  assert.equal((await client.refreshConfig()).round, 2);
+});
+
 test('refuses redirects and oversized responses', async () => {
   const wallet = ethers.Wallet.createRandom();
   const redirecting = createWorkerClient({
