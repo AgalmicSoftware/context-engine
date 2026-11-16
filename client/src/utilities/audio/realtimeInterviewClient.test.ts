@@ -192,6 +192,66 @@ describe('interview connection lifecycle', () => {
     }
   });
 
+  // A 0.9.10 Session Worker routes this call only when it carries no sign-in. To one that does it answers 404, or
+  // 401 when a settings save has since ended that sign-in.
+  const olderWorker = (h: ReturnType<typeof harness>, status = 404) =>
+    h.options.fetchImpl.mockImplementation((async (_url: unknown, init?: RequestInit) =>
+      (init?.headers as Record<string, string>).Authorization
+        ? { ok: false, status, headers: new Headers(), text: async () => JSON.stringify({ error: 'Refused.' }) }
+        : {
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'x-interview-protocol': 'live' }),
+            text: async () => 'v=0\r\no=answer\r\n',
+          }) as unknown as typeof fetch);
+
+  it('calls again without the sign-in when an older Worker answers 404 to it', async () => {
+    const release = holdSignInAndProof('https://worker.example', 'demo');
+    try {
+      const h = harness();
+      olderWorker(h);
+      const session = await h.start();
+      const calls = jest.mocked(h.options.fetchImpl as typeof fetch).mock.calls;
+      expect(calls).toHaveLength(2);
+      expect(calls[0][1]?.headers).toEqual(expect.objectContaining({ Authorization: 'Bearer member-token' }));
+      expect(calls[1][1]?.headers).toEqual(
+        expect.objectContaining({ 'x-session-slug': 'demo', 'X-CE-Group-Invite': TEST_READ_PROOF }),
+      );
+      expect(calls[1][1]?.headers).not.toHaveProperty('Authorization');
+      expect(calls[1][1]?.body).toBe(calls[0][1]?.body);
+      await session.stop();
+    } finally {
+      release();
+    }
+  });
+
+  it('calls again without the sign-in when an older Worker answers 401 to one that has ended', async () => {
+    const release = holdSignInAndProof('https://worker.example', 'demo');
+    try {
+      const h = harness();
+      olderWorker(h, 401);
+      const session = await h.start();
+      const calls = jest.mocked(h.options.fetchImpl as typeof fetch).mock.calls;
+      expect(calls).toHaveLength(2);
+      expect(calls[1][1]?.headers).not.toHaveProperty('Authorization');
+      await session.stop();
+    } finally {
+      release();
+    }
+  });
+
+  it('does not call again when a 404 came to a call without a sign-in', async () => {
+    const h = harness();
+    h.options.fetchImpl.mockImplementation((async () => ({
+      ok: false,
+      status: 404,
+      headers: new Headers(),
+      text: async () => JSON.stringify({ error: 'Not found.' }),
+    })) as unknown as typeof fetch);
+    await expect(h.start()).rejects.toThrow('Not found.');
+    expect(h.options.fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('appends exact Live transcript fragments, deduplicates by event ID, and orders late fragments by time', async () => {
     const h = harness();
     const session = await h.start();
