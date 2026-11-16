@@ -6,6 +6,7 @@ import { Wallet } from 'ethers';
 
 import { formatWorkerGroupReadInvite, workerGroupJoinStatement, workerGroupReadStatement } from '../../shared/workerGroupJoin.mjs';
 import { ADMIN, SESSION_ID, createFixture, principal } from './workerGroupTestFixture.mjs';
+import { dispatchSessionAgentInstructionsRequest, dispatchSessionConfigBootstrapRequest } from './sessionConfigBootstrapDispatch.js';
 import {
   PRIVATE_SESSION_INVITE_INVALID,
   PRIVATE_SESSION_INVITE_REQUIRED,
@@ -145,4 +146,98 @@ test('a refusal never echoes the invite, and the shell keeps only what signing i
     slug: 's', sessionId: SESSION_ID, configRevision: 'r1', authzEpoch: 3, corsWorkerUrl: 'https://w.test', appearance: { theme: 'civic' },
     sessionModeProfile: { authority: { mode: 'worker_canonical' } }, workerAuthority: { version: 1 }, groupJoinChoices: true,
   });
+});
+
+// A whole private session config, as the Worker stores one.
+const privateConfig = (rule = { match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupIds: ['salon'] }] }) => ({
+  slug: 'fixture',
+  sessionId: SESSION_ID,
+  configRevision: 'revision-a',
+  authzEpoch: 2,
+  sessionName: 'Secret salon',
+  sessionInfo: 'Who is coming',
+  sessionContext: 'The context text',
+  agentInstructions: 'Be kind.',
+  adminAddress: ADMIN,
+  corsWorkerUrl: 'https://fixture.example.workers.dev',
+  sessionModeProfile: {
+    profileVersion: 1,
+    preset: 'custom',
+    authority: { mode: 'worker_canonical' },
+    evm: { registryChainId: null },
+    storage: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate', encryption: 'worker_envelope', accessConditions: rule } },
+    identity: { default: 'passkey', enabled: ['passkey'] },
+    authorization: { mechanisms: ['worker_roles'] },
+    encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+    surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
+    results: { visibility: 'participant_aggregate', exposure: { aggregateResultsEnabled: true, anonymizedGroupsEnabled: false, minGroupSize: 2 } },
+    export: { scope: 'admin_raw' },
+  },
+  workerAuthority: { version: 1, participantScopes: ['ai', 'storage'], anonymousScopes: ['ai'] },
+  storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate', encryption: 'worker_envelope', accessConditions: rule } },
+});
+
+const readConfig = async (env, config, { invite, requester } = {}) => dispatchSessionConfigBootstrapRequest({
+  request: new Request('https://worker.test/session-config', { headers: invite ? { 'X-CE-Group-Invite': invite } : {} }),
+  env,
+  baseHeaders: {},
+  deps: {
+    resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 'fixture', explicitSlugProvided: true }),
+    getSessionConfig: async () => config,
+    getCorsContext: async () => ({ ok: true, headers: {} }),
+    json: (body, status) => ({ body, status }),
+    resolveOptionalRequester: async () => requester || { address: '', scopes: {} },
+  },
+  constants: { missingSlugError: 'Missing.', sessionConfigNotFoundError: 'Not found.' },
+});
+
+test('session-config gives a visitor the rule does not admit only the shell, and says why', async () => {
+  const { f, key } = await setup();
+  const config = privateConfig();
+  const shellKeys = ['allowOrigins', 'appearance', 'authzEpoch', 'configRevision', 'corsWorkerUrl', 'sessionId', 'sessionIdHex', 'sessionModeProfile',
+    'slug', 'storageProfile', 'workerAuthority'];
+  for (const [options, reason] of [[{}, 'invite_required'], [{ invite: await readInvite(passwordKey('22')) }, 'invite_invalid'],
+    [{ requester: { address: principal(2).address } }, 'invite_required']]) {
+    const { status, body } = await readConfig(f.env, config, options);
+    assert.equal(status, 200);
+    assert.equal(body.privateSession, reason);
+    assert.equal(body.config.sessionModeProfile.authority.mode, 'worker_canonical');
+    for (const hidden of ['sessionName', 'sessionInfo', 'sessionContext', 'agentInstructions', 'adminAddress']) {
+      assert.equal(hidden in body.config, false, hidden);
+    }
+    assert.deepEqual(Object.keys(body.config).filter((field) => !shellKeys.includes(field) && !/Ready|Choices|Results|Atlas|Matrix|Merges/.test(field)), []);
+  }
+  for (const options of [{ invite: await readInvite(key) }, { requester: { address: principal(1).address } }, { requester: { address: ADMIN } }]) {
+    const { status, body } = await readConfig(f.env, config, options);
+    assert.equal(status, 200);
+    assert.equal('privateSession' in body, false);
+    assert.equal(body.config.sessionName, 'Secret salon');
+    assert.equal(body.config.sessionContext, 'The context text');
+  }
+  // A group check that can't be answered refuses, retryably, rather than showing either.
+  const down = { ...f.env, CE_WORKER_GROUP_COORDINATOR: { idFromName: (name) => name, get: () => ({ fetch: async () => { throw new Error('down'); } }) } };
+  const outage = await readConfig(down, config, { invite: await readInvite(key) });
+  assert.deepEqual([outage.status, outage.body.reason, outage.body.retryable], [503, 'private_session_unavailable', true]);
+  // A session that isn't private is unchanged.
+  const open = privateConfig({ match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'agent_grant_scope', scope: 'storage' }] });
+  assert.equal((await readConfig(f.env, open)).body.config.sessionName, 'Secret salon');
+});
+
+test('agent instructions follow the same rule', async () => {
+  const { f, key } = await setup();
+  const read = async (invite) => dispatchSessionAgentInstructionsRequest({
+    request: new Request('https://worker.test/llms.txt', { headers: invite ? { 'X-CE-Group-Invite': invite } : {} }),
+    env: f.env,
+    baseHeaders: {},
+    deps: {
+      resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 'fixture', explicitSlugProvided: true }),
+      getSessionConfig: async () => privateConfig(),
+      getCorsContext: async () => ({ ok: true, headers: {} }),
+      json: (body, status) => ({ body, status }),
+    },
+    constants: { missingSlugError: 'Missing.', sessionConfigNotFoundError: 'Not found.' },
+  });
+  assert.equal((await read()).body.reason, PRIVATE_SESSION_INVITE_REQUIRED);
+  assert.equal((await read(await readInvite(passwordKey('22')))).body.reason, PRIVATE_SESSION_INVITE_INVALID);
+  assert.equal(await (await read(await readInvite(key))).text(), 'Be kind.');
 });

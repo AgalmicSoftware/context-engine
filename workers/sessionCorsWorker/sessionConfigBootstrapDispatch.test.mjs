@@ -549,7 +549,7 @@ test('dispatchSessionConfigBootstrapRequest returns only CORS-scoped worker-cano
   assert.deepEqual(Object.fromEntries(response.headers.entries()), {
     'access-control-allow-origin': 'https://app.example.test',
     'cache-control': 'no-store',
-    vary: 'Origin, X-Session-Slug',
+    vary: 'Origin, X-Session-Slug, Authorization, X-CE-Group-Invite',
   });
 });
 
@@ -661,7 +661,7 @@ test('dispatchSessionConfigBootstrapRequest rejects missing config, wrong author
   });
   assert.equal(missingResponse.status, 404);
   assert.equal(missingResponse.headers.get('Cache-Control'), 'no-store');
-  assert.equal(missingResponse.headers.get('Vary'), 'Origin, X-Session-Slug');
+  assert.equal(missingResponse.headers.get('Vary'), 'Origin, X-Session-Slug, Authorization, X-CE-Group-Invite');
   assert.equal((await dispatchSessionConfigBootstrapRequest({
     ...base,
     deps: {
@@ -689,7 +689,7 @@ test('dispatchSessionConfigBootstrapRequest rejects missing config, wrong author
   });
   assert.equal(blockedCorsResponse.status, 403);
   assert.equal(blockedCorsResponse.headers.get('Cache-Control'), 'no-store');
-  assert.equal(blockedCorsResponse.headers.get('Vary'), 'Origin, X-Session-Slug');
+  assert.equal(blockedCorsResponse.headers.get('Vary'), 'Origin, X-Session-Slug, Authorization, X-CE-Group-Invite');
 });
 
 test('GET /llms.txt serves the session\'s instructions for AI agents as text that never runs as a page', async () => {
@@ -718,7 +718,7 @@ test('GET /llms.txt serves the session\'s instructions for AI agents as text tha
     'cache-control': 'no-store',
     'content-security-policy': "sandbox; default-src 'none'",
     'content-type': 'text/markdown; charset=utf-8',
-    vary: 'Origin, X-Session-Slug',
+    vary: 'Origin, X-Session-Slug, Authorization, X-CE-Group-Invite',
     'x-content-type-options': 'nosniff',
   });
 

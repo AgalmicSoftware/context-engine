@@ -209,7 +209,10 @@ test('createWorkerRouteShellWithWorkerDeps preserves session-config bootstrap br
         assert.equal(value.env, env);
         assert.equal(value.slugHint, 'demo-1');
         assert.equal(value.baseHeaders, baseHeaders);
-        assert.deepEqual(value.deps, {
+        const { resolveOptionalRequester, ...deps } = value.deps;
+        // Who is asking, when someone signed in is: a private session shows them what its rule admits.
+        assert.equal(typeof resolveOptionalRequester, 'function');
+        assert.deepEqual(deps, {
           resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
           getSessionConfig: 'getSessionConfig',
           getCorsContext: 'getCorsContext',
@@ -226,6 +229,47 @@ test('createWorkerRouteShellWithWorkerDeps preserves session-config bootstrap br
   });
 
   assert.equal(await routeShell.fetch(request, env), response);
+});
+
+test('the session config reads an optional sign-in only for this session, and any doubt as signed out', async () => {
+  const config = { sessionId: '0x' + '1'.repeat(64), authzEpoch: 3 };
+  const token = (sub, extra = {}) => ({ ok: true, slug: 'demo-1', payload: { sub, sessionId: config.sessionId, authzEpoch: 3, scopes: { questions: ['read'] }, ...extra } });
+  const auths = {
+    'Bearer member': token('0xABC'),
+    'Bearer elsewhere': { ...token('0xABC'), slug: 'demo-2' },
+    'Bearer stale': token('0xABC', { authzEpoch: 2 }),
+    'Bearer refused': { ok: false, slug: 'demo-1' },
+  };
+  const seen = [];
+  const asked = [];
+  const routeShell = createWorkerRouteShellWithWorkerDeps({
+    deps: {
+      ...createBaseDeps(),
+      toStr: String,
+      resolveTopLevelRouteSelection: () => ({ kind: 'session-config' }),
+      getRouteBaseHeaders: () => ({}),
+      getDefaultWorkerSessionSlug: () => 'demo-1',
+      getCorsContext: async () => ({ ok: true, headers: {} }),
+      json: (body, status = 200) => Response.json(body, { status }),
+      requireAuth: async ({ request }) => {
+        asked.push(request.headers.get('authorization'));
+        return auths[request.headers.get('authorization')];
+      },
+      dispatchSessionConfigBootstrapRequest: async ({ request, env, deps }) => {
+        seen.push(await deps.resolveOptionalRequester({ request, env, slug: 'demo-1', config, headers: {} }));
+        return new Response('ok');
+      },
+    },
+    constants: createBaseConstants(),
+  });
+  for (const authorization of [undefined, 'Bearer member', 'Bearer elsewhere', 'Bearer stale', 'Bearer refused']) {
+    const headers = { 'X-Session-Slug': 'demo-1', ...(authorization ? { Authorization: authorization } : {}) };
+    await routeShell.fetch(createRequest('/session-config', 'GET', headers), {});
+  }
+  const signedOut = { address: '', scopes: {} };
+  assert.deepEqual(seen, [signedOut, { address: '0xabc', scopes: { questions: ['read'] } }, signedOut, signedOut, signedOut]);
+  // No bearer is no sign-in to check, and no failed sign-in to count.
+  assert.equal(asked.length, 4);
 });
 
 test('createWorkerRouteShellWithWorkerDeps sends GET /llms.txt to the agent instructions read for this Worker\'s session', async () => {
@@ -247,7 +291,10 @@ test('createWorkerRouteShellWithWorkerDeps sends GET /llms.txt to the agent inst
         assert.equal(value.env, env);
         assert.equal(value.slugHint, 'demo-1');
         assert.equal(value.baseHeaders, baseHeaders);
-        assert.deepEqual(value.deps, {
+        const { resolveOptionalRequester, ...deps } = value.deps;
+        // Who is asking, when someone signed in is: a private session shows them what its rule admits.
+        assert.equal(typeof resolveOptionalRequester, 'function');
+        assert.deepEqual(deps, {
           resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
           getSessionConfig: 'getSessionConfig',
           getCorsContext: 'getCorsContext',

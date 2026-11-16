@@ -136,6 +136,26 @@ export const createWorkerRouteShellWithWorkerDeps = ({
   const log = deps?.log || (() => {});
   const ResponseCtor = deps?.Response || Response;
 
+  // Who a signed-out route's optional bearer names: a route that serves both
+  // the signed out and the signed in reads a missing, failing or other
+  // session's token as signed out.
+  const resolveOptionalRequester = async ({ request, env, slug, config, headers }) => {
+    const signedOut = { address: '', scopes: {} };
+    if (!deps?.toStr?.(request.headers.get('authorization') || '').trim()) return signedOut;
+    const auth = await deps?.requireAuth?.({ request, env, baseHeaders: headers, slugHint: slug });
+    if (!auth?.ok || auth.slug !== slug) return signedOut;
+    const context = await resolveAuthenticatedRouteContext({
+      request, env, auth, baseHeaders: headers,
+      deps: {
+        readCurrentSessionConfig: async () => ({ config }),
+        getCorsContext: deps?.getCorsContext,
+        json: deps?.json, toStr: deps?.toStr,
+        SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
+      },
+    });
+    return context?.ok ? { address: context.address, scopes: context.scopes } : signedOut;
+  };
+
   const handleRequest = async (request, env) => {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -190,6 +210,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             getSessionConfig: deps?.getSessionConfig,
             getCorsContext: deps?.getCorsContext,
             json: deps?.json,
+            resolveOptionalRequester,
           },
           constants: {
             missingSlugError: constants?.missingSlugError,
