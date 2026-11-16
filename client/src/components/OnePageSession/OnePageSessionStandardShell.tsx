@@ -475,7 +475,10 @@ export default function OnePageSessionStandardShell({
     sessionConfig: resolvedSessionConfig,
     account: typeof account === 'string' ? account : '',
   });
-  const canEditContext = (contextSources.isAdmin && contextSources.supported) || contextSources.participantsCanAdd;
+  // Someone signed out where they could add once logged in sees Add too, which opens the login.
+  const signInToAddContext = contextSources.signInToAdd && typeof toggleLoginModal === 'function';
+  const canEditContext =
+    (contextSources.isAdmin && contextSources.supported) || contextSources.participantsCanAdd || signInToAddContext;
   // Everyone signed in sees the Session Agent once an admin turns it on: the
   // dialog says whether it answers them, and lets them keep their answers and
   // files out of it. The robot by the title tells everyone else it is on.
@@ -818,6 +821,9 @@ export default function OnePageSessionStandardShell({
                     list={contextSources}
                     pageLinks={sessionContext?.links || []}
                     headerActionsSlot={contextActions}
+                    onRequestLogin={
+                      signInToAddContext ? () => (toggleLoginModal as (open: boolean) => void)(true) : undefined
+                    }
                   />
                 ) : null}
                 {isDemoSlug && (

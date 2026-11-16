@@ -1,0 +1,174 @@
+// The Context section's files and links. Text keeps the session chrome's
+// contrast colour, which reads on the chrome in every theme.
+
+.items {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+  color: var(--ce-session-chrome-contrast);
+}
+
+.itemHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+
+  // The kind icon sits on the title's first line.
+  > svg {
+    flex: none;
+    margin-top: 0.2rem;
+  }
+}
+
+.caret,
+.caretSpace {
+  flex: none;
+  width: 1.6rem;
+  min-height: 1.6rem;
+}
+
+.caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
+  }
+}
+
+.title {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: left;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+// Kind and size, who added it, and its marks, under the name.
+.itemMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.6rem;
+  margin: 0.1rem 0 0 calc(1.6rem + 0.35rem);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.preview {
+  margin: 0.5rem 0 0 calc(1.6rem + 0.35rem);
+}
+
+.previewText {
+  max-height: 16rem;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--ce-session-chrome-contrast) 30%, transparent);
+  border-radius: var(--ce-radius-6);
+  background: transparent;
+  color: inherit;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.previewStatus {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.previewMore {
+  margin-top: 0.4rem;
+  padding: 0 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: var(--ce-radius-6);
+  background: transparent;
+  color: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+// A PDF's first page, small; the button over it takes the click.
+.pdfThumb {
+  position: relative;
+  width: min(100%, 15rem);
+  height: 12rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ce-session-chrome-contrast) 30%, transparent);
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-document-canvas, #fff);
+
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    pointer-events: none;
+  }
+}
+
+.pdfThumbOpen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0.5rem;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+
+  span {
+    padding: 0.1rem 0.6rem;
+    border-radius: var(--ce-radius-6);
+    background: var(--ce-session-chrome);
+    color: var(--ce-session-chrome-contrast);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--ce-session-chrome);
+    outline-offset: -3px;
+  }
+}
+
+// The dialog's text, underlined: the theme's link colour is made for its page, not this surface.
+.viewerPageLink {
+  display: inline-block;
+  margin-top: 0.75rem;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}

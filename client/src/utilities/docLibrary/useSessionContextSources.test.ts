@@ -124,6 +124,31 @@ describe('useSessionContextSources', () => {
     expect(older.result.current.participantsCanAddLinks).toBe(false);
   });
 
+  it('asks someone signed out to log in only where they could add once logged in', async () => {
+    const signedOut = mount('');
+    await resolveLatest([]);
+    await waitFor(() => expect(signedOut.result.current.signInToAdd).toBe(true));
+    expect(signedOut.result.current.participantsCanAdd).toBe(false);
+
+    const signedIn = mount(READER);
+    await resolveLatest([]);
+    await waitFor(() => expect(signedIn.result.current.participantsCanAdd).toBe(true));
+    expect(signedIn.result.current.signInToAdd).toBe(false);
+
+    signedOut.rerender({
+      sessionSlug: 'salon',
+      sessionConfig: { ...config(), contextAdditionPolicy: 'admin_only' } as ReturnType<typeof config>,
+      account: '',
+    });
+    expect(signedOut.result.current.signInToAdd).toBe(false);
+
+    jest.mocked(workerAcceptsParticipantContext).mockResolvedValueOnce(false);
+    const olderWorker = mount('');
+    await resolveLatest([]);
+    await act(async () => undefined);
+    expect(olderWorker.result.current.signInToAdd).toBe(false);
+  });
+
   it('skips the Worker check where adding isn’t on offer, as for the AI’s context', async () => {
     jest.mocked(workerAcceptsParticipantContext).mockClear();
     renderHook(() =>

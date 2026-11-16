@@ -1665,11 +1665,9 @@ describe('OnePageSession results routing', () => {
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       const list = screen.getByTestId('ce-session-context-sources');
       expect(within(list).getByRole('link', { name: /Essay/ })).toHaveAttribute('href', 'https://example.org/essay');
-      expect(
-        within(list)
-          .getByRole('link', { name: /deck\.pdf/ })
-          .getAttribute('href'),
-      ).toContain('__ceDocTx=file-1');
+      // A file's name opens it in the viewer, which links to its own page.
+      expect(within(list).getByRole('button', { name: 'deck' })).toBeInTheDocument();
+      expect(within(list).getByRole('button', { name: 'Preview deck' })).toHaveAttribute('aria-expanded', 'false');
       expect(within(list).queryByText('Admins only')).not.toBeInTheDocument();
       expect(screen.queryByTestId('ce-session-context-manage')).not.toBeInTheDocument();
     });

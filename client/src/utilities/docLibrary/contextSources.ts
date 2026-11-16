@@ -177,15 +177,25 @@ export const listContextSources = async (options: ContextSourceOptions): Promise
     .sort((left, right) => (Date.parse(left.createdAt) || 0) - (Date.parse(right.createdAt) || 0));
 };
 
-const readText = async (id: string, options: ContextSourceOptions): Promise<string> => {
-  const response = await readSessionStorageBlob({
+const readStored = async (id: string, options: ContextSourceOptions): Promise<Response> =>
+  readSessionStorageBlob({
     ...workerOptions(options),
     storageRef: { backend: 'cloudflare', id },
     preferAnonymous: !(options.asAdmin || (await hasCachedWorkerSessionToken(workerOptions(options)))),
-    // Texts load for an AI by themselves; the list that showed them was the place to sign in.
+    // Texts and previews load by themselves; the list that showed them was the place to sign in.
     prompt: false,
   });
-  return response.text();
+
+const readText = async (id: string, options: ContextSourceOptions): Promise<string> =>
+  (await readStored(id, options)).text();
+
+/** A file source's bytes for a viewer, typed as its list says. */
+export const readContextSourceBlob = async (
+  source: Pick<ContextSource, 'id' | 'mime'>,
+  options: ContextSourceOptions,
+): Promise<Blob> => {
+  const blob = await (await readStored(source.id, options)).blob();
+  return !source.mime || blob.type === source.mime ? blob : new Blob([blob], { type: source.mime });
 };
 
 /** A source's text for an AI: a link's page snapshot, a text file, or a PDF's AI reading ('' when unread). */
@@ -228,8 +238,10 @@ export const loadContextSourcesForAi = async (
 };
 
 /**
- * Who added a source, for its list: "you", an agent's name with "(agent)", "an
- * admin" or a short address. '' when unrecorded.
+ * Who added a source, for its list: "you", an agent's name as it gives it (or its
+ * short address), "an admin" or a short address. '' when unrecorded. An agent picks
+ * its own name, so lists mark its items with a separate "Agent" label, which no
+ * name can supply or remove.
  */
 export const contextAdderLabel = (
   {
@@ -243,7 +255,7 @@ export const contextAdderLabel = (
   if (!addedBy) return '';
   if (addedBy === toStr(account).trim().toLowerCase()) return 'you';
   const short = `${addedBy.slice(0, 6)}…${addedBy.slice(-4)}`;
-  if (addedByAgent) return `${adderName || short} (agent)`;
+  if (addedByAgent) return adderName || short;
   return isConfiguredAdmin(sessionConfig, { account: addedBy }) ? 'an admin' : short;
 };
 
@@ -340,4 +352,79 @@ export const uploadContextFile = async (
         : {}),
   });
   return toStr(result.id);
+};
+
+const KIND_LABELS: Record<string, string> = {
+  [CONTEXT_FILE_TYPES.pdf]: 'PDF',
+  [CONTEXT_FILE_TYPES.md]: 'Markdown',
+  [CONTEXT_FILE_TYPES.txt]: 'Text',
+  [CONTEXT_FILE_TYPES.csv]: 'CSV',
+  [CONTEXT_FILE_TYPES.json]: 'JSON',
+};
+const FILE_EXTENSION = /\.(?:pdf|md|markdown|txt|csv|json)$/i;
+
+/** What kind of source it is, in a word: Link, PDF, Markdown, Text, CSV, JSON or File. */
+export const contextSourceKindLabel = (source: Pick<ContextSource, 'kind' | 'mime' | 'title'>): string =>
+  source.kind === 'link'
+    ? 'Link'
+    : KIND_LABELS[source.mime] || KIND_LABELS[resolveContextFileType({ name: source.title }) || ''] || 'File';
+
+/** A source's name for its list: a file's without the extension its kind label already gives. */
+export const contextSourceDisplayTitle = (source: Pick<ContextSource, 'kind' | 'title' | 'url'>): string => {
+  if (source.kind === 'link') return source.title || source.url;
+  return source.title.replace(FILE_EXTENSION, '').trim() || source.title;
+};
+
+/** A file's size in bytes, KB or MB (of 1,024), as the limits give them; '' when unknown. */
+export const formatContextSize = (bytes: number): string => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} bytes`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+/**
+ * The sources that repeat an earlier one: a link to the same address, or a file
+ * of the same name, kind and size. Contents are not compared, so this is a strong hint.
+ */
+export const contextDuplicateIds = (sources: ContextSource[]): Set<string> => {
+  const seen = new Set<string>();
+  const repeats = new Set<string>();
+  sources.forEach((source) => {
+    const key =
+      source.kind === 'link'
+        ? `link ${source.url}`
+        : `file ${source.mime} ${source.size} ${contextSourceDisplayTitle(source).toLowerCase()}`;
+    if (seen.has(key)) repeats.add(source.id);
+    seen.add(key);
+  });
+  return repeats;
+};
+
+const plainLine = (value: string): string =>
+  value
+    .replace(/\p{Cc}/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * Typed text as the Markdown file it is stored as, named by its title or else its
+ * first line, as an agent's note is. The type and size rules are a file's.
+ */
+export const buildContextNote = ({ text, title = '' }: { text: string; title?: string }): File => {
+  const content = text.trim();
+  if (!content) throw new Error('Write the text to add.');
+  const named = plainLine(title);
+  if (named.length > CONTEXT_SOURCE_LIMITS.titleChars) {
+    throw new Error(`The title must be ${CONTEXT_SOURCE_LIMITS.titleChars} characters or fewer.`);
+  }
+  const firstLine = plainLine(content.split('\n')[0].replace(/^#+\s*/, '')).slice(0, CONTEXT_SOURCE_LIMITS.titleChars);
+  const base = (named || firstLine || 'Note').replace(/\.(?:md|markdown)$/i, '') || 'Note';
+  const note = new File([content], `${base}.md`, { type: CONTEXT_FILE_TYPES.md });
+  if (note.size > CONTEXT_SOURCE_LIMITS.textFileBytes) {
+    throw new Error(
+      `The text is larger than ${CONTEXT_SOURCE_LIMITS.textFileBytes / (1024 * 1024)} MB, the most for a note.`,
+    );
+  }
+  return note;
 };

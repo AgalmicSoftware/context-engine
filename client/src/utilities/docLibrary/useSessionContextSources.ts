@@ -130,12 +130,12 @@ export function useSessionContextSources({
       current = false;
     };
   }, [active, isAdmin, account, sessionSlug, revision]);
-  // Only someone signed in can add, so only they make this check, and only where adding is on offer.
+  // Checked only where adding is on offer. Only someone signed in can add; anyone else is asked to log in.
   const [workerAccepts, setWorkerAccepts] = useState({ files: false, links: false });
-  const mayAdd =
-    active && offersAdding && !!account && participantsMayAddContext(sessionConfig) && !sessionHasEnded(sessionConfig);
+  const offered = active && offersAdding && participantsMayAddContext(sessionConfig) && !sessionHasEnded(sessionConfig);
+  const mayAdd = offered && !!account;
   useEffect(() => {
-    if (!mayAdd) return undefined;
+    if (!offered) return undefined;
     let current = true;
     const options = { sessionSlug, sessionConfig: configRef.current, context: { account } };
     void Promise.all([workerAcceptsParticipantContext(options), workerAcceptsParticipantLinks(options)]).then(
@@ -144,7 +144,7 @@ export function useSessionContextSources({
     return () => {
       current = false;
     };
-  }, [mayAdd, sessionSlug, account]);
+  }, [offered, sessionSlug, account]);
   // The render that changes identity runs before the effect clears the old list.
   const { identity: loadedFor, ...loaded } = state;
   const fresh = loadedFor === identity;
@@ -156,6 +156,8 @@ export function useSessionContextSources({
     supported,
     isAdmin,
     participantsCanAdd: mayAdd && workerAccepts.files,
+    // Someone signed out, where they could add once logged in.
+    signInToAdd: offered && !account && workerAccepts.files,
     // Links need a Worker that takes them from participants too.
     participantsCanAddLinks: mayAdd && workerAccepts.files && workerAccepts.links,
     // Not offered while the list, and any sign-in it asked for, is still under way.
