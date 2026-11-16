@@ -4,6 +4,7 @@ import { Wallet } from 'ethers';
 
 import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, harness, idOf, json } from './contextSourceTestFixture.mjs';
+import { SESSION_AGENT_RULES } from '../../shared/sessionAgent.mjs';
 import { buildSessionAgentExport } from '../../shared/sessionAgentExport.mjs';
 import { SESSION_AGENT_EXPORT_ACTION, exportSessionAgent, sessionAgentExportGate } from './sessionAgentExport.js';
 import { SLUG, createSessionEnv, signedAdminRequest } from './sessionWorkerRuntimeFixture.mjs';
@@ -106,7 +107,8 @@ test('the file holds what the agent may give a member, each item with the lowest
   assert.deepEqual(file.session.gate.read, { match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'agent_grant_scope', scope: 'storage' }] });
   assert.deepEqual(file.agent.audiences, SETTING.audiences);
   assert.equal(file.agent.minAnswers, 2);
-  assert.equal(file.agent.rules.length, 4);
+  // The rules as every question is sent them.
+  assert.deepEqual(file.agent.rules, [...SESSION_AGENT_RULES]);
   assert.match(file.agent.instructions.general, /shared material/);
   assert.match(file.agent.instructions.detailed, /members’ answers included/);
 
