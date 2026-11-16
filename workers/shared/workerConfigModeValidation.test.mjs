@@ -717,4 +717,16 @@ test('a Worker group condition names one to twenty stored group ids, nothing els
   assert.deepEqual(validateWorkerConfigModeValues(withRule({ kind: 'worker_group', groupId: 'rxc' })), { ok: false, path: `${path}.groupId` });
   assert.deepEqual(validateWorkerConfigModeValues(withRule({ kind: 'worker_group', groupIds: ['rxc'], role: 'admin' })), { ok: false, path: `${path}.role` });
   assert.deepEqual(validateWorkerConfigModeValues(withRule({ kind: 'worker_groups', groupIds: ['rxc'] })), { ok: false, path: `${path}.kind` });
+  // A rule naming groups lets admins in too: any-of, with the admin condition.
+  const rulePath = 'sessionModeProfile.storage.payloadAccessControl.accessConditions';
+  const group = { kind: 'worker_group', groupIds: ['rxc'] };
+  for (const accessConditions of [
+    { match: 'any', conditions: [group] },
+    { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }, group] },
+    { match: 'any', conditions: [{ kind: 'worker_role', role: 'host' }, group] },
+  ]) {
+    const config = withRule(group);
+    config.sessionModeProfile.storage.payloadAccessControl.accessConditions = accessConditions;
+    assert.deepEqual(validateWorkerConfigModeValues(config), { ok: false, path: rulePath }, JSON.stringify(accessConditions));
+  }
 });

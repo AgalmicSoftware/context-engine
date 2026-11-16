@@ -240,6 +240,13 @@ const validateAccessConditions = (value, path) => {
     if (!result.ok) return result;
     sbtChainIds.push(condition.chainId);
   }
+  // A rule naming groups makes the session private; its admins must still get in.
+  if (
+    value.conditions.some((condition) => condition.kind === 'worker_group') &&
+    (value.match !== 'any' || !value.conditions.some((condition) => condition.kind === 'worker_role' && condition.role === 'admin'))
+  ) {
+    return invalid(path);
+  }
   return { ok: true, sbtChainIds };
 };
 
