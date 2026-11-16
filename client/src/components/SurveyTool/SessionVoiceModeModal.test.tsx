@@ -249,9 +249,14 @@ describe('SessionVoiceModeModal', () => {
     view.rerender(<SessionVoiceModeModal {...props} />);
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1);
-    // Discard sits beside the microphone and explains itself on hover, and to screen readers.
+    // Discard sits right of the microphone and explains itself on hover, and to screen readers.
     const discard = screen.getByRole('button', { name: 'Discard interview' });
-    expect(discard.parentElement).toContainElement(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    const microphone = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
+    // With no transcript, Discard is alone in the column right of the microphone.
+    expect(discard.parentElement).toHaveClass('sessionInterviewSideActions');
+    expect(discard.parentElement?.children).toHaveLength(1);
+    expect(discard.parentElement?.parentElement).toContainElement(microphone);
+    expect(microphone.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.querySelector('.modal-footer')).toBeNull();
     expect(discard).toHaveAccessibleDescription(/Responses you’ve submitted are kept\.$/);
     fireEvent.mouseOver(discard);
@@ -2661,6 +2666,7 @@ describe('SessionVoiceModeModal', () => {
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
     const startControl = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
     expect(startControl.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(toggle.closest('.sessionInterviewSideActions')).not.toBeNull();
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
     // Sharing for research starts on, so its metadata is there to read.

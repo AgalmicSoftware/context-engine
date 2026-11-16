@@ -143,8 +143,9 @@ research** one, as text with only `https://` addresses as links.
   `round(count × share)` are hidden, at least one of three or more.
   Participant is the signed-in account, or this browser's local id before
   login, so a reload hides the same drafts.
-- **Hidden.** A grey answer area says "AI guess hidden", with a keyboard-accessible
-  question-mark tooltip explaining why. Your answer controls remain available
+- **Hidden.** One line says "Your AI's predicted response is hidden until you
+  answer.", with a keyboard-accessible question-mark tooltip explaining why, above
+  a grey answer area. Your answer controls remain available
   below it. The AI answer, comment, ratings and notes are absent from the
   rendered markup and accessible text; the grey area contains only placeholders.
 - **Reveal.** Agree/disagree and single-choice questions show "Your AI guessed:

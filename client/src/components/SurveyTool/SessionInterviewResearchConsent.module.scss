@@ -143,10 +143,6 @@
 }
 
 @media (max-width: 520px) {
-  .researchConsent {
-    align-items: flex-start;
-  }
-
   .metadata dl {
     grid-template-columns: minmax(0, 1fr);
   }

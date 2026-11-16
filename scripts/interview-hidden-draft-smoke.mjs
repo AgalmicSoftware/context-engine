@@ -31,7 +31,7 @@ try {
       return route.continue();
     });
     await page.goto(`${base}/hidden-draft-probe`);
-    const hidden = page.getByRole('group', { name: 'Hidden AI guess' });
+    const hidden = page.getByRole('group', { name: 'Hidden AI prediction' });
     await hidden.first().waitFor().catch(async error => { console.error(await page.locator('body').innerText(), failures); throw error; });
     assert.equal(await hidden.count(), 2);
     const card = page.getByTestId('ce-session-interview-draft').filter({ has: hidden }).first();
@@ -39,7 +39,7 @@ try {
     const id = await card.getAttribute('data-ce-question-id');
     assert(!(await card.innerHTML()).includes('PRIVATE-GUESS'));
     assert.equal(await card.getByRole('radio', { name: 'Agree', exact: true }).isChecked(), false);
-    const help = card.getByRole('button', { name: 'Why is the AI guess hidden?' });
+    const help = card.getByRole('button', { name: 'Why is the prediction hidden?' });
     await help.focus();
     await page.getByRole('tooltip').waitFor();
     assert((await page.getByRole('tooltip').innerText()).includes('Give your own answer first'));
@@ -56,7 +56,7 @@ try {
     await card.getByRole('radio', { name: 'Disagree', exact: true }).locator('..').click();
     const revealed = page.locator(`[data-testid="ce-session-interview-draft"][data-ce-question-id="${id}"]`);
     await revealed.getByText('Your AI guessed: Agree · 80% sure').waitFor();
-    assert.equal(await revealed.getByRole('group', { name: 'Hidden AI guess' }).count(), 0);
+    assert.equal(await revealed.getByRole('group', { name: 'Hidden AI prediction' }).count(), 0);
     assert.equal(await revealed.getByRole('radio', { name: 'Disagree', exact: true }).isChecked(), true);
     await revealed.screenshot({ animations: 'disabled', path: path.join(output, `revealed-${theme}-${width}.png`) });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);

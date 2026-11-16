@@ -17,7 +17,7 @@ import type { InterviewDraftResponse, InterviewPrefillPacket, InterviewQuestion 
 // of a person's AI prefill drafts starts blank, and the AI's guess appears only after
 // they answer. That first answer, given without seeing the guess, is the one scored.
 
-export const HIDDEN_DRAFT_NOTE = "Your AI's answer is hidden until you answer.";
+export const HIDDEN_DRAFT_NOTE = "Your AI's predicted response is hidden until you answer.";
 
 /** A hidden draft's first answer, kept from the moment the AI's guess is revealed. */
 export type HiddenInterviewDraft = { blindAnswer?: unknown; revealedAt?: number };

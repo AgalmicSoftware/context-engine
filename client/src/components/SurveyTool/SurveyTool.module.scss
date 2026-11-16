@@ -3832,14 +3832,32 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   gap: 10px;
 }
 
+// The microphone in the middle column, so it stays centered whatever sits to its right, unless that
+// needs more room than half of what is left: then the column grows and the microphone moves left.
 .sessionInterviewPrimaryAction {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: nowrap;
-  min-width: 0;
+  display: grid;
+  // As wide as its columns need, centered in the row, so Generate response drafts can still sit beside it.
+  flex: 0 1 auto;
   margin-inline: auto;
-  gap: 10px 12px;
+  grid-template-columns: 1fr minmax(112px, 132px) 1fr;
+  align-items: center;
+  min-width: 0;
+  column-gap: 12px;
+
+  > :first-child {
+    grid-column: 2;
+  }
+}
+
+// The transcript level with the microphone's circle, Discard level with its label.
+.sessionInterviewSideActions {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-self: stretch;
+  align-items: center;
+  justify-items: start;
+  // The transcript clips its own overflow, so it would let this column narrow past it.
+  min-width: max-content;
 }
 
 // The prompt card under an interview that hasn't started, flush with the interview above it.
@@ -3921,6 +3939,32 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// On a phone the header's items share one row with the close button: Back, the title, its ?, the status.
+@media (max-width: 480px) {
+  .sessionVoiceModeModal :global(.modal-header) {
+    padding-inline: 10px;
+  }
+
+  .sessionVoiceModeModal :global(.modal-title) {
+    font-size: 1.15rem;
+  }
+
+  .sessionInterviewHeader {
+    gap: 2px;
+  }
+
+  .sessionInterviewHeader .sessionInterviewHeaderButton {
+    min-width: 36px;
+    padding: 8px 6px;
+  }
+
+  .sessionInterviewStatusPill {
+    margin-inline-start: 4px;
+    padding-inline: 9px;
+    font-size: 0.8rem;
+  }
+}
+
 .sessionInterviewPanel .sessionInterviewMicrophone {
   display: inline-flex;
   flex: 0 1 132px;
@@ -3976,27 +4020,21 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   border-radius: 50%;
 }
 
-// Discard sits left of the microphone, level with its circle, and is quieter than
-// it; it takes the danger tone on hover or focus.
-.sessionInterviewPanel .sessionInterviewDiscard,
-.sessionInterviewDiscardBalance {
-  flex: 0 0 44px;
-  align-self: flex-start;
-  // The microphone's 10px top padding and half its 104px circle, less half of this 44px one.
-  margin-top: 40px;
-}
-
+// Discard sits right of the microphone, level with its label and set apart from it, in the danger tone.
 .sessionInterviewPanel .sessionInterviewDiscard {
   display: inline-flex;
+  grid-row: 2;
+  // Level with the label, which ends above the microphone's 10px bottom padding.
+  margin: 0 0 8px 16px;
   padding: 0;
   border-radius: 50%;
   background: transparent !important;
-  color: var(--ce-panel-text-muted) !important;
+  color: var(--ce-status-danger-text) !important;
   cursor: pointer;
 
-  &:hover:not(:disabled),
-  &:focus-visible {
-    color: var(--ce-status-danger-text) !important;
+  &:hover:not(:disabled) .sessionInterviewDiscardCircle,
+  &:focus-visible .sessionInterviewDiscardCircle {
+    background: color-mix(in srgb, var(--ce-status-danger-text) 12%, transparent);
   }
 
   &:focus-visible {
@@ -4634,7 +4672,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   display: grid;
   // No wider than the summary, so sharing for research stays on its bar when the open group widens.
   grid-template-columns: minmax(0, 620px);
-  gap: 4px;
   container-type: inline-size;
 
   > details {
@@ -4648,10 +4685,16 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   max-width: none;
   // Wide enough that sharing for research, on the bar, leaves its middle free (see below).
   grid-template-columns: minmax(0, 700px);
+
+  // The box takes that width too, so the share control on its bar stays inside it.
+  > .sessionInterviewConsentOptions {
+    max-width: none;
+  }
 }
 
-// Sharing for research sits at the end of the summary's row, open or closed, and drops
-// under it where the row has no room for both. The group's selector outranks the label's own margin.
+// Sharing for research sits in the green box, as what it shares is the submission info: at the end of the
+// summary's row, open or closed, or along the box's foot where the row has no room for both.
+// The group's selector outranks the label's own margin.
 .sessionInterviewConsentGroup > .sessionInterviewResearchShare {
   grid-area: 1 / 1;
   justify-self: end;
@@ -4664,8 +4707,28 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 @container (max-width: 640px) {
   .sessionInterviewConsentGroup > .sessionInterviewResearchShare {
     grid-area: 2 / 1;
-    justify-self: start;
-    margin: 0 0 0 4px;
+    justify-self: stretch;
+    // “What’s kept” takes the next line before the label would wrap away from its ?.
+    flex-wrap: wrap;
+    row-gap: 2px;
+    margin: 0;
+    padding: 0 12px 8px;
+    border: 1px solid color-mix(in srgb, var(--ce-action-accent) 55%, var(--ce-surface-sunken));
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
+    background: color-mix(in srgb, var(--ce-surface-sunken) 78%, var(--ce-action-accent));
+  }
+
+  // The box continues into that foot: closed, the summary has no bottom edge; open, the choices have no round one.
+  .sessionInterviewConsentGroup:has(> .sessionInterviewResearchShare) > .sessionInterviewConsentOptions {
+    &:not([open]) > summary {
+      border-bottom: 0;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .sessionInterviewChoicesPanel {
+      border-radius: 0;
+    }
   }
 }
 

@@ -104,36 +104,6 @@ export function SessionInterviewVoiceControls({
       ) : null}
       {!isRecorderSessionActive ? (
         <div className={styles.sessionInterviewPrimaryAction}>
-          {onDiscard ? (
-            <>
-              <button
-                type="button"
-                id="ce-interview-discard-button"
-                className={styles.sessionInterviewDiscard}
-                data-ce-control-appearance="frameless"
-                onClick={onDiscard}
-                disabled={discardDisabled}
-                aria-label="Discard interview"
-                aria-describedby="ce-interview-discard-explanation"
-              >
-                <span className={styles.sessionInterviewDiscardCircle} aria-hidden="true">
-                  <FontAwesomeIcon icon={faTrash} />
-                </span>
-                <span id="ce-interview-discard-explanation" className={styles.sessionListeningSrOnly}>
-                  {DISCARD_EXPLANATION}
-                </span>
-              </button>
-              {/* Hover only: focus returns here after the confirmation, which would reopen it. */}
-              <UncontrolledTooltip
-                target="ce-interview-discard-button"
-                placement="top"
-                trigger="hover"
-                autohide={false}
-              >
-                Discard interview: {DISCARD_EXPLANATION}
-              </UncontrolledTooltip>
-            </>
-          ) : null}
           <Button
             color="link"
             className={styles.sessionInterviewMicrophone}
@@ -147,16 +117,49 @@ export function SessionInterviewVoiceControls({
             </span>
             <span>{startLabel}</span>
           </Button>
-          {hasTranscript ? (
-            <SessionInterviewTranscriptDisclosure
-              variant="compact"
-              showTranscript={showTranscript}
-              transcript={transcript}
-              onToggleTranscript={onToggleTranscript}
-            />
-          ) : onDiscard ? (
-            // Balances the discard button so the microphone stays centered.
-            <span className={styles.sessionInterviewDiscardBalance} aria-hidden="true" />
+          {hasTranscript || onDiscard ? (
+            // Right of the microphone, which stays centered: the transcript level with its circle, and
+            // Discard level with its label and set apart, so it isn't pressed by accident.
+            <span className={styles.sessionInterviewSideActions}>
+              {hasTranscript ? (
+                <SessionInterviewTranscriptDisclosure
+                  variant="compact"
+                  showTranscript={showTranscript}
+                  transcript={transcript}
+                  onToggleTranscript={onToggleTranscript}
+                />
+              ) : null}
+              {onDiscard ? (
+                <>
+                  <button
+                    type="button"
+                    id="ce-interview-discard-button"
+                    className={styles.sessionInterviewDiscard}
+                    data-ce-control-appearance="frameless"
+                    onClick={onDiscard}
+                    disabled={discardDisabled}
+                    aria-label="Discard interview"
+                    aria-describedby="ce-interview-discard-explanation"
+                  >
+                    <span className={styles.sessionInterviewDiscardCircle} aria-hidden="true">
+                      <FontAwesomeIcon icon={faTrash} />
+                    </span>
+                    <span id="ce-interview-discard-explanation" className={styles.sessionListeningSrOnly}>
+                      {DISCARD_EXPLANATION}
+                    </span>
+                  </button>
+                  {/* Hover only: focus returns here after the confirmation, which would reopen it. */}
+                  <UncontrolledTooltip
+                    target="ce-interview-discard-button"
+                    placement="top"
+                    trigger="hover"
+                    autohide={false}
+                  >
+                    Discard interview: {DISCARD_EXPLANATION}
+                  </UncontrolledTooltip>
+                </>
+              ) : null}
+            </span>
           ) : null}
         </div>
       ) : (
