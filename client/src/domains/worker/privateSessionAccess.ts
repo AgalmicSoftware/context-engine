@@ -51,18 +51,40 @@ export const forgetRefusedPrivateInvite = ({ sessionSlug, workerUrl }: Omit<Sess
   return true;
 };
 
-/** Makes and keeps the session's read proof from a held group password. About a second on a phone. */
+const buildProof = async ({ sessionId, groupId, token }: { sessionId: string } & PrivateInvite) => {
+  const { buildWorkerGroupReadHeader } = await import('./workerGroupSecrets');
+  return buildWorkerGroupReadHeader({ token, sessionId, groupId });
+};
+
+/** Makes and keeps the session's read proof from a held group password, and returns it. About a second on a phone. */
 export const keepPrivateSessionProof = async ({
   sessionSlug,
   sessionId,
   workerUrl,
   groupId,
   token,
-}: Session & PrivateInvite) => {
-  const { buildWorkerGroupReadHeader } = await import('./workerGroupSecrets');
-  const header = await buildWorkerGroupReadHeader({ token, sessionId, groupId });
+}: Session & PrivateInvite): Promise<string> => {
+  const header = await buildProof({ sessionId, groupId, token });
   if (!header) throw new Error('That invite can’t open this session. Ask the host for an invite link.');
   saveGroupReadHeader({ workerUrl, sessionSlug, sessionId, header });
+  return header;
+};
+
+/**
+ * The Worker refused the proof this browser sent. A newer link the tab holds (a changed password, another group) may
+ * still open the session, so its proof replaces the refused one; the same proof again means the held invite is the
+ * refused one, and both are forgotten. Returns the new proof, or '' once the invite is forgotten.
+ */
+export const replaceRefusedPrivateProof = async (session: Session): Promise<string> => {
+  const refused = readGroupReadHeader(session.workerUrl, session.sessionSlug);
+  const held = readHeldPrivateInvite(session);
+  const header = refused && held ? await buildProof({ sessionId: session.sessionId, ...held }).catch(() => null) : null;
+  if (header && header !== refused) {
+    saveGroupReadHeader({ ...session, header });
+    return header;
+  }
+  forgetRefusedPrivateInvite(session);
+  return '';
 };
 
 export type PastedInvite = { path: string; groupId: string; token: string };

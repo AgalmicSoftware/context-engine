@@ -16,7 +16,11 @@ import {
 import { readGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
 
 jest.mock('../../domains/worker/workerGroupSecrets', () => ({
-  buildWorkerGroupReadHeader: jest.fn(async ({ groupId }: { groupId: string }) => `${groupId}:0x${'ab'.repeat(65)}`),
+  // A newer link's password makes another proof.
+  buildWorkerGroupReadHeader: jest.fn(
+    async ({ groupId, token }: { groupId: string; token: string }) =>
+      `${groupId}:0x${(token.includes('newer') ? 'cd' : 'ab').repeat(65)}`,
+  ),
 }));
 const mockGetWorkerSessionToken = jest.fn();
 jest.mock('../../utilities/worker/workerAuth', () => ({
@@ -130,16 +134,41 @@ it('turns the invite this tab holds into a kept read proof, then reads the sessi
   expect(readPendingAutoJoin()?.token).toBe('gp:river-stone-lamp');
 });
 
-it('when the Worker refuses the proof sent, forgets the proof and the invite and says so plainly', () => {
+it('when the Worker refuses the proof sent, forgets the proof and the invite and says so plainly', async () => {
   holdInvite();
   saveGroupReadHeader({ workerUrl: worker, sessionSlug: 'salon', sessionId, header: proof });
   const reread = jest.fn();
   render(<PrivateSessionGate {...props} shell="invite_invalid" account="0xabc" reread={reread} />);
-  expect(screen.getByRole('alert')).toHaveTextContent('This invite no longer works. Ask the host for a new link.');
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'This invite no longer works. Ask the host for a new link.',
+  );
   expect(readGroupReadHeader(worker, 'salon')).toBe('');
   expect(readPendingAutoJoin()?.token).toBeUndefined();
   expect(reread).not.toHaveBeenCalled();
   expect(mockGetWorkerSessionToken).not.toHaveBeenCalled();
+});
+
+it('when the Worker refuses an older proof, opens with the newer link this tab holds', async () => {
+  holdInvite('gp:newer-river-stone');
+  saveGroupReadHeader({ workerUrl: worker, sessionSlug: 'salon', sessionId, header: proof });
+  const reread = jest.fn();
+  render(<PrivateSessionGate {...props} shell="invite_invalid" reread={reread} />);
+  await waitFor(() => expect(reread).toHaveBeenCalledTimes(1));
+  expect(readGroupReadHeader(worker, 'salon')).toBe(`rxc:0x${'cd'.repeat(65)}`);
+  expect(readPendingAutoJoin()?.token).toBe('gp:newer-river-stone');
+});
+
+it('reads again once for a proof, so one this browser can’t keep doesn’t reload forever', async () => {
+  holdInvite();
+  const reread = jest.fn();
+  const first = render(<PrivateSessionGate {...props} reread={reread} />);
+  await waitFor(() => expect(reread).toHaveBeenCalledTimes(1));
+  first.unmount();
+  // The reload: the proof wasn't kept, so the page is the gate again, with the same invite.
+  localStorage.clear();
+  render(<PrivateSessionGate {...props} reread={reread} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('The invite didn’t open the session.');
+  expect(reread).toHaveBeenCalledTimes(1);
 });
 
 it('opens from a pasted link, keeping its secret out of the address', async () => {

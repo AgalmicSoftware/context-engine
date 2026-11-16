@@ -3,10 +3,10 @@ import { Input } from 'reactstrap';
 
 import {
   followPastedPrivateInvite,
-  forgetRefusedPrivateInvite,
   keepPrivateSessionProof,
   readHeldPrivateInvite,
   readPastedPrivateInvite,
+  replaceRefusedPrivateProof,
   type PrivateInvite,
 } from '../../domains/worker/privateSessionAccess';
 import type { PrivateSessionShell } from '../../utilities/session/sessionWorkerDiscovery';
@@ -30,23 +30,38 @@ export type PrivateSessionGateProps = {
   reread?: () => void;
 };
 
-type Phase = 'opening' | 'checking' | 'locked' | 'invalid' | 'joinedLocked' | 'unsupported';
+type Phase = 'opening' | 'checking' | 'locked' | 'invalid' | 'joinedLocked' | 'unsupported' | 'unkept';
 
 const ABOUT_LINK = 'The link from your host or its QR code. It stays in this browser and is never sent in an address.';
-// A sign-in or join that comes back to the private page twice in a minute isn't going to open it by reloading again.
+// A sign-in, a join or a proof that comes back to the private page twice in a minute isn't going to open it by
+// reloading again: a proof this browser couldn't keep would otherwise reload forever.
 const REREAD_KEY = 'ce:private-session-reread:v1';
 const REREAD_WINDOW_MS = 60_000;
+const SIGN_IN = 'sign-in';
+type Reread = { sessionSlug: string; reason: string; at: number };
+let lastReread: Reread | null = null;
 
-const rereadAllowed = (sessionSlug: string): boolean => {
+const rereadAllowed = (sessionSlug: string, reason: string): boolean => {
+  let last: Reread | null;
   try {
-    const last = JSON.parse(sessionStorage.getItem(REREAD_KEY) || 'null');
-    if (last?.sessionSlug === sessionSlug && Date.now() - Number(last.at) < REREAD_WINDOW_MS) return false;
-    sessionStorage.setItem(REREAD_KEY, JSON.stringify({ sessionSlug, at: Date.now() }));
+    last = JSON.parse(sessionStorage.getItem(REREAD_KEY) || 'null');
   } catch {
-    /* Without storage the guard lasts as long as the page. */
+    // Without storage the guard lasts as long as the page.
+    last = lastReread;
+  }
+  if (last?.sessionSlug === sessionSlug && last.reason === reason && Date.now() - Number(last.at) < REREAD_WINDOW_MS)
+    return false;
+  lastReread = { sessionSlug, reason, at: Date.now() };
+  try {
+    sessionStorage.setItem(REREAD_KEY, JSON.stringify(lastReread));
+  } catch {
+    /* Kept in memory alone. */
   }
   return true;
 };
+
+// A proof's tail names it in the guard; the proof itself stays where it is kept.
+const proofReason = (header: string) => `proof:${header.slice(-16)}`;
 
 const MESSAGES: Record<Phase, string> = {
   opening: 'Opening your invite…',
@@ -55,6 +70,8 @@ const MESSAGES: Record<Phase, string> = {
   invalid: 'This invite no longer works. Ask the host for a new link.',
   joinedLocked: 'You joined the group, but the session didn’t open. Reload in a moment, or ask the host.',
   unsupported: 'This browser can’t open the invite. Try another browser.',
+  // The same proof came back within a minute: a browser that won't keep site data, or a link that just stopped working.
+  unkept: 'The invite didn’t open the session. If this browser blocks site data, allow it; otherwise ask the host.',
 };
 
 /**
@@ -82,11 +99,15 @@ export default function PrivateSessionGate({
   // The page was read with this tab's sign-in, if it held one: reading again with the same one changes nothing.
   const [readSignedIn] = useState(() => !!heldSessionToken(workerUrl, sessionSlug));
 
+  const readWith = (header: string) => {
+    if (rereadAllowed(sessionSlug, proofReason(header))) rereadRef.current();
+    else setPhase('unkept');
+  };
+
   const open = async (invite: PrivateInvite) => {
     setPhase('opening');
     try {
-      await keepPrivateSessionProof({ ...session, ...invite });
-      rereadRef.current();
+      readWith(await keepPrivateSessionProof({ ...session, ...invite }));
     } catch (failure) {
       const message = failure instanceof Error ? failure.message : '';
       setPhase(/WebCrypto|crypto\.subtle/i.test(message) ? 'unsupported' : 'invalid');
@@ -94,14 +115,25 @@ export default function PrivateSessionGate({
   };
 
   useEffect(() => {
-    // The proof this browser sent no longer works (a changed password, a group taken off the session).
+    let active = true;
+    // The proof this browser sent no longer works (a changed password, a group taken off the session), unless the tab
+    // holds a newer link than the one that made it.
     if (shell === 'invite_invalid') {
-      forgetRefusedPrivateInvite(session);
-      setPhase('invalid');
-      return;
+      setPhase('opening');
+      void replaceRefusedPrivateProof(session).then((header) => {
+        if (!active) return;
+        if (header) readWith(header);
+        else setPhase('invalid');
+      });
+      return () => {
+        active = false;
+      };
     }
     const held = readHeldPrivateInvite(session);
     if (held) void open(held);
+    return () => {
+      active = false;
+    };
     // Runs once per session shown; the invite is read from the tab, not from props.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionSlug, sessionId, workerUrl, shell]);
@@ -121,7 +153,7 @@ export default function PrivateSessionGate({
           context: { account, providerLike: provider },
         });
         if (!active) return;
-        if (rereadAllowed(sessionSlug)) rereadRef.current();
+        if (rereadAllowed(sessionSlug, SIGN_IN)) rereadRef.current();
         else setPhase('locked');
       } catch {
         if (active) setPhase('locked');
@@ -139,7 +171,7 @@ export default function PrivateSessionGate({
     () =>
       subscribeWorkerGroupsChanged((detail) => {
         if (detail.sessionSlug !== sessionSlug) return;
-        if (rereadAllowed(sessionSlug)) rereadRef.current();
+        if (rereadAllowed(sessionSlug, SIGN_IN)) rereadRef.current();
         else setPhase('joinedLocked');
       }),
     [sessionSlug],
@@ -168,7 +200,9 @@ export default function PrivateSessionGate({
       <h2 id="ce-private-session-title" className={setupStyles.bannerTitle}>
         Private session
       </h2>
-      <p role={phase === 'invalid' || phase === 'unsupported' ? 'alert' : 'status'}>{MESSAGES[phase]}</p>
+      <p role={phase === 'invalid' || phase === 'unsupported' || phase === 'unkept' ? 'alert' : 'status'}>
+        {MESSAGES[phase]}
+      </p>
       {signedIn && phase === 'locked' ? <p>Your account isn’t in a group that can see it yet.</p> : null}
       {phase !== 'opening' && phase !== 'checking' ? (
         <form
