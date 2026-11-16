@@ -1423,7 +1423,7 @@ also serves the file at `/known-sessions.json`, so agents can find a session's
 Worker from its slug.
 
 The file lists EDDY 2026 (`eddy26`), the demo session (`demo-sh`), the Reverse
-Alignment salon (`rxc-ra-26`) and `rxc-ra-test-5`. The About page's **Demo**
+Alignment salon (`rxc-ra-2`), its public demo (`rxc-ra-26`) and `rxc-ra-test-5`. The About page's **Demo**
 button opens `rxc-ra-test-5`, and the films, stills, promo slides and writeup
 carry its link. Delete its entry only once those links switch to `rxc-ra-26`'s
 and the button opens another listed session. A listed session that also has

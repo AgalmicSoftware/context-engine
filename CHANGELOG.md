@@ -2,7 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.9.11] - 2026-11-15
+## [0.9.11] - 2026-11-16
+
+### Client — available when the site deploys
+
+- The site lists the Reverse Alignment salon's session, `rxc-ra-2`, so its normal link opens it and agents can find its Worker in `/known-sessions.json`.
 
 ## [0.9.10] - 2026-11-15
 
