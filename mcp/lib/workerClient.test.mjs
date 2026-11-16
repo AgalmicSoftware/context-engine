@@ -94,6 +94,46 @@ test('a sign-in the Worker has ended makes the next config read fresh', async ()
   assert.equal((await client.refreshConfig()).round, 2);
 });
 
+test('a private session that did not count an ended sign-in is read again after signing in afresh', async () => {
+  let tokens = 0;
+  const live = new Set();
+  const fetchImpl = async (url, init = {}) => {
+    const path = new URL(url).pathname;
+    const bearer = new Headers(init.headers).get('authorization') || '';
+    if (path === '/auth/nonce') return json({ nonce: 'n1abcdefgh' });
+    if (path === '/auth/login') { tokens += 1; live.add(`Bearer e30.sig${tokens}`); return json({ token: `e30.sig${tokens}`, exp: 9999999999 }); }
+    return live.has(bearer)
+      ? json({ sessionSlug: 's', config: { sessionId: SESSION_ID, sessionName: 'Whole' } })
+      : json({ sessionSlug: 's', privateSession: 'invite_required', signedIn: !bearer ? undefined : false, config: { sessionId: SESSION_ID } });
+  };
+  const client = createWorkerClient({ workerOrigin: 'https://w.example.dev', slug: 's', trustedOrigins: TRUSTED, wallet: ethers.Wallet.createRandom(), fetchImpl });
+  await client.login();
+  assert.equal((await client.loadConfig()).sessionName, 'Whole');
+  live.clear(); // An admin's change ends every sign-in.
+  assert.equal((await client.loadConfig()).sessionName, 'Whole');
+  assert.equal(client.privateSession, '');
+  assert.equal(tokens, 2);
+  // A sign-in the session counts but doesn't admit is not renewed.
+  const before = tokens;
+  const outsider = async (url, init) => (new URL(url).pathname === '/session-config'
+    ? json({ sessionSlug: 's', privateSession: 'invite_required', signedIn: true, config: { sessionId: SESSION_ID } })
+    : fetchImpl(url, init));
+  const other = createWorkerClient({ workerOrigin: 'https://w.example.dev', slug: 's', trustedOrigins: TRUSTED, wallet: ethers.Wallet.createRandom(), fetchImpl: outsider });
+  await other.login();
+  await other.loadConfig();
+  assert.equal(other.privateSession, 'invite_required');
+  assert.equal(tokens, before + 1);
+  // A Worker that never counts the sign-in gets one more try, not a loop.
+  const refusing = async (url, init) => (new URL(url).pathname === '/session-config'
+    ? json({ sessionSlug: 's', privateSession: 'invite_required', signedIn: false, config: { sessionId: SESSION_ID } })
+    : fetchImpl(url, init));
+  const stuck = createWorkerClient({ workerOrigin: 'https://w.example.dev', slug: 's', trustedOrigins: TRUSTED, wallet: ethers.Wallet.createRandom(), fetchImpl: refusing });
+  await stuck.login();
+  const signIns = tokens;
+  await stuck.loadConfig();
+  assert.equal(tokens, signIns + 1);
+});
+
 test('refuses redirects and oversized responses', async () => {
   const wallet = ethers.Wallet.createRandom();
   const redirecting = createWorkerClient({

@@ -97,7 +97,7 @@ const readPrivateSessionAccess = async ({ request, env, slug, config, headers, d
   });
   if (!questions.ok) {
     return questions.status === 403
-      ? { shell: questions.reason }
+      ? { shell: questions.reason, signedIn: !!requester.address }
       : { refusal: privateSessionRefusal({ access: questions, json: deps?.json, headers }) };
   }
   // Every part follows one rule for now. When the context gets its own, the
@@ -126,6 +126,8 @@ export const dispatchSessionConfigBootstrapRequest = async ({
       ok: true,
       sessionSlug: slug,
       privateSession: access.shell === PRIVATE_SESSION_INVITE_INVALID ? 'invite_invalid' : 'invite_required',
+      // Whether a sign-in counted, so a client whose bearer didn't can sign in again.
+      signedIn: access.signedIn,
       config: projectPrivateSessionShell(projectPublicWorkerSessionConfig(config)),
     }, 200, read.headers);
   }

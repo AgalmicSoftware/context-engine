@@ -257,15 +257,22 @@ export const createWorkerClient = ({
     return data;
   };
 
-  const loadConfig = async () => {
+  const loadConfig = async ({ renewed = false } = {}) => {
     // Signed in, the config is read as the agent: a private session shows its
     // members what it shows no one else.
     if (!registryConfigLoader && token) await ensureToken();
+    const sentToken = !registryConfigLoader && !!token;
     const data = registryConfigLoader
       ? { config: await registryConfigLoader(), sessionSlug: slug }
       : await request(`/session-config?slug=${encodeURIComponent(slug)}`, {
           headers: { 'X-Session-Slug': slug, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         });
+    // A private session that didn't count the sign-in, after an admin's change ended it: sign in again, once.
+    if (sentToken && !renewed && text(data?.privateSession) && data?.signedIn === false) {
+      token = '';
+      await login();
+      return loadConfig({ renewed: true });
+    }
     const loaded = isRecord(data?.config) ? data.config : null;
     const id = resolveSessionIdHex(loaded);
     if (!loaded || (!registryConfigLoader && !id)) throw new WorkerRequestError('The Worker did not return a hosted session config.');

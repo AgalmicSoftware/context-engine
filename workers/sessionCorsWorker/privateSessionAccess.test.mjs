@@ -212,6 +212,8 @@ test('session-config gives a visitor the rule does not admit only the shell, and
     const { status, body } = await readConfig(f.env, config, options);
     assert.equal(status, 200);
     assert.equal(body.privateSession, reason);
+    // Whether a sign-in counted, so an agent whose sign-in an admin ended can sign in again.
+    assert.equal(body.signedIn, !!options.requester);
     assert.equal(body.config.sessionModeProfile.authority.mode, 'worker_canonical');
     for (const hidden of ['sessionName', 'sessionInfo', 'sessionContext', 'agentInstructions', 'adminAddress']) {
       assert.equal(hidden in body.config, false, hidden);
