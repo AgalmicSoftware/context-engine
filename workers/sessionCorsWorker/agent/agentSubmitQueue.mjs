@@ -3,6 +3,7 @@ import { safeString, safeJsonParse, nowIso, sanitizeSessionSlug } from './runtim
 import { AGENT_EVENT_TYPES, AGENT_ACTIONS } from './constants.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { submitAgentResponseOnChain } from './onChainResponses.mjs';
+import { answerRevisionIdentity } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 import { normalizeAgentRatingScale } from './ratingScale.mjs';
@@ -320,6 +321,28 @@ function staleQueueGeneration(existing, incoming) {
   return existing?.queueGeneration && incoming?.queueGeneration && existing.queueGeneration !== incoming.queueGeneration;
 }
 
+// Whether this person has stored a newer revision of this answer, newest first.
+// A head claimed for an edit that was never stored does not count, so a first
+// answer that was merely retried still lands.
+const NEWER_REVISIONS_CHECKED = 20;
+async function newerRevisionStored({ env, kv, source }) {
+  const revision = Number(source.answerRevision);
+  if (!Number.isSafeInteger(revision) || revision < 1 || typeof env.AGENT_SERVICES?.readAnswerHead !== 'function') return false;
+  try {
+    const read = await env.AGENT_SERVICES.readAnswerHead({ sessionId: source.sessionId, sessionSlug: source.sessionSlug,
+      workerOrigin: source.workerOrigin, principalId: source.principalId, questionId: source.questionId });
+    const head = Number(read?.head?.revision);
+    if (read?.ok !== true || !Number.isSafeInteger(head)) return false;
+    for (let next = head; next > revision && next > head - NEWER_REVISIONS_CHECKED; next -= 1) {
+      const { requestId } = await answerRevisionIdentity({ transport: 'telegram_bot_submit', principalId: source.principalId,
+        sessionId: source.sessionId, questionId: source.questionId, revision: next });
+      const stored = objectOrNull(safeJsonParse(await kv.get(canonicalAnswerKvKey({ requestId })), null));
+      if (stored?.status === 'direct_submitted') return true;
+    }
+  } catch { /* Unknown: deliver as before. */ }
+  return false;
+}
+
 function recoveryDiagnostics(record, reason) {
   return {
     event: 'agent_submit_recovery_required', reason, requestId: safeString(record.requestId),
@@ -498,6 +521,12 @@ export async function processQueuedAgentSubmitRecord({
   catch (error) {
     return persistQueueOutcome({ env, source, now: executionTime,
       outcome: { ok: false, safeToRetry: true, retryable: false, reason: error.reason || 'queued_agent_authority_denied' } });
+  }
+  // A late delivery of an older revision never replaces a newer stored answer;
+  // it ends here and stays in history.
+  if (await newerRevisionStored({ env, kv, source })) {
+    return persistQueueOutcome({ env, source, now: executionTime,
+      outcome: { ok: false, retryable: false, safeToRetry: false, reason: 'superseded_by_newer_answer' } });
   }
   const answerCreatedAt = source.createdAt || createdAt || null;
   const answer = source.onChainAnswer || source.answer;

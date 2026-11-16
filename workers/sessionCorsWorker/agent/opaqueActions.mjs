@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 
-import { stableJson } from './runtimePrimitives.mjs';
+import { sha256Hex, stableJson } from './runtimePrimitives.mjs';
 
 import { assertNoSecretShape } from './redaction.mjs';
 
@@ -30,4 +30,10 @@ function buildOpaqueActionId(seed = '') {
   return buildId('ceab_', ACTION_ID_RE, seed);
 }
 
-export { buildSubmitIdempotencyKey, buildOpaqueActionId };
+/** The request identity of one revision of a person's answer to a question. */
+async function answerRevisionIdentity({ transport, principalId, sessionId, questionId, revision }) {
+  const idempotencyKey = buildOpaqueActionId(await sha256Hex(stableJson([transport, principalId, sessionId, questionId, revision])));
+  return { idempotencyKey, requestId: buildOpaqueActionId(idempotencyKey) };
+}
+
+export { answerRevisionIdentity, buildSubmitIdempotencyKey, buildOpaqueActionId };

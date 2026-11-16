@@ -1,4 +1,4 @@
-import { buildOpaqueActionId } from './opaqueActions.mjs';
+import { answerRevisionIdentity } from './opaqueActions.mjs';
 import { resolveCanonicalWorkerSessionIdHex } from '../sessionConfigMutation.js';
 import { assertExpectedSessionAuthority } from '../sessionConfigAuthority.js';
 import { createAgentStorage } from './storage.mjs';
@@ -6,6 +6,8 @@ import { persistAgentSubmitRecord } from './agentSubmitQueue.mjs';
 import { sha256Hex, stableJson } from './runtimePrimitives.mjs';
 
 const PROJECTION_PREFIX = 'ce-agent-submit-projection:';
+const answerHeadKey = async record => `ce-agent-answer-head:${record.sessionId}:${await sha256Hex(stableJson([record.principalId, record.questionId]))}`;
+
 const reply = (body, status = 200) => Response.json(body, { status });
 const sameRequest = (a, b) => ['sessionId', 'sessionSlug', 'workerOrigin', 'accountAddress', 'principalId', 'questionId', 'idempotencyKey', 'requestId']
   .every(key => a[key] === b[key]);
@@ -90,6 +92,16 @@ export async function repairAgentSubmitProjections(coordinator) {
 // outcome once; replays read this journal even if that projection is delayed.
 export const dispatchAgentSubmissionJournal = (coordinator, operation, payload) => coordinator.serializeSessionConfigOperation(async () => {
   const record = payload?.record;
+  // The latest revision claimed for this person's answer, so a late delivery
+  // of an older one can see it has been replaced.
+  if (operation === 'head') {
+    if (!record || record.sessionSlug !== payload.slug || ['principalId', 'questionId'].some(key => typeof record[key] !== 'string' || !record[key])) {
+      return reply({ ok: false, reason: 'submit_journal_record_invalid' }, 400);
+    }
+    const authority = await coordinator.readSessionConfigAuthority(payload.slug);
+    if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record.sessionId) return reply({ ok: false, reason: 'submit_journal_session_mismatch' }, 409);
+    return reply({ ok: true, head: await coordinator.state.storage.get(await answerHeadKey(record)) || null });
+  }
   if (operation === 'claim') {
     if (!record || record.sessionSlug !== payload.slug ||
         ['principalId', 'questionId', 'transport', 'contentDigest'].some(key => typeof record[key] !== 'string' || !record[key])) {
@@ -97,7 +109,7 @@ export const dispatchAgentSubmissionJournal = (coordinator, operation, payload) 
     }
     const authority = await coordinator.readSessionConfigAuthority(payload.slug);
     if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record.sessionId) return reply({ ok: false, reason: 'submit_journal_session_mismatch' }, 409);
-    const key = `ce-agent-answer-head:${record.sessionId}:${await sha256Hex(stableJson([record.principalId, record.questionId]))}`;
+    const key = await answerHeadKey(record);
     const head = await coordinator.state.storage.get(key);
     // A retry retains its identity even after authority changes. Different
     // content claims a new revision before either direct or queued effects.
@@ -105,8 +117,7 @@ export const dispatchAgentSubmissionJournal = (coordinator, operation, payload) 
     assertExpectedSessionAuthority(authority, payload.expectedAuthority, payload.slug);
     const revision = (head?.revision || 0) + 1;
     if (!Number.isSafeInteger(revision)) return reply({ ok: false, reason: 'submit_revision_exhausted' }, 409);
-    const idempotencyKey = buildOpaqueActionId(await sha256Hex(stableJson([record.transport, record.principalId, record.sessionId, record.questionId, revision])));
-    const next = { revision, contentDigest: record.contentDigest, requestId: buildOpaqueActionId(idempotencyKey), idempotencyKey };
+    const next = { revision, contentDigest: record.contentDigest, ...await answerRevisionIdentity({ ...record, revision }) };
     await coordinator.state.storage.put(key, next);
     return reply({ ok: true, head: next });
   }

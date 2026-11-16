@@ -531,6 +531,54 @@ test('A, B, then A again while the first A is still being stored ends on A', asy
   assert.deepEqual([current.length, current[0].label, current[0].answerRevision], [1, 'Agree', 3]);
 });
 
+test('a late retry of an older answer never replaces a newer one stored meanwhile', async () => {
+  const { f, state, submit, qid } = await submissionFixture({ registry: true, queued: true });
+  const send = value => submit({ preferences: [{ questionId: qid, value }] });
+  const deliver = (body, attempts) => f.queue({ messages: [{ body, attempts, ack() {}, retry() {} }] });
+  state.rpcDown = true;
+  assert.equal((await send('agree')).status, 200);
+  const first = state.messages[0];
+  assert.equal((await deliver(first, 1)).results[0].retryable, true);
+  state.rpcDown = false;
+  assert.equal((await send('disagree')).status, 200);
+  assert.equal((await deliver(state.messages[1], 1)).ok, true);
+  assert.equal(state.broadcasts, 1);
+  const late = await deliver(first, 2);
+  assert.equal(state.broadcasts, 1, 'the older answer is not written over the newer one: ' + JSON.stringify(late));
+  const current = selectCurrentSubmittedAnswers(await loadSubmittedResultRecords(f.agentEnv, 'fixture'));
+  assert.deepEqual(current.map(answer => [answer.label, answer.answerRevision]), [['Disagree', 2]]);
+});
+
+test('a retried first answer still lands when the newer edit was never stored', async () => {
+  const { f, state, submit, qid } = await submissionFixture({ registry: true, queued: true });
+  const send = value => submit({ preferences: [{ questionId: qid, value }] });
+  const deliver = (body, attempts) => f.queue({ messages: [{ body, attempts, ack() {}, retry() {} }] });
+  state.rpcDown = true;
+  assert.equal((await send('agree')).status, 200);
+  assert.equal((await deliver(state.messages[0], 1)).results[0].retryable, true);
+  // A newer edit is claimed and queued, but its delivery has not run.
+  assert.equal((await send('disagree')).status, 200);
+  state.rpcDown = false;
+  assert.equal((await deliver(state.messages[0], 2)).ok, true);
+  assert.equal(state.broadcasts, 1);
+});
+
+test('an answer sent again after its 30-day receipt lapsed replays how it ended and stays counted', async () => {
+  const { f, state, submit } = await submissionFixture({ registry: true, queued: true });
+  assert.equal((await submit()).status, 200);
+  assert.equal((await f.queue({ messages: [{ body: state.messages[0], attempts: 1, ack() {}, retry() {} }] })).ok, true);
+  // The rolling receipts lapse; the permanent answer record stays.
+  const lapsed = [...f.records.keys()].filter(key => key.includes(':telegram:submit-request'));
+  assert.ok(lapsed.length > 0);
+  for (const key of lapsed) f.records.delete(key);
+  const again = await submit();
+  assert.equal(again.status, 200, await again.clone().text());
+  assert.equal((await again.json()).submitted[0].replayed, true);
+  assert.equal(state.messages.length, 1, 'nothing is queued again');
+  const current = selectCurrentSubmittedAnswers(await loadSubmittedResultRecords(f.agentEnv, 'fixture'));
+  assert.deepEqual(current.map(answer => answer.label), ['Agree']);
+});
+
 test('concurrent answer claims serialize different content and retain retries at the current head', async () => {
   const { coordinated, qid } = await submissionFixture();
   const claim = contentDigest => coordinated.coordinator.fetch(new Request('https://session-coordinator.internal/session-config/agent-submit/claim', {

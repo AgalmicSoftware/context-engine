@@ -6,7 +6,7 @@ import { normalizeAgentRatingScale } from './ratingScale.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { resolveSessionInvocation } from './sessionPolicy.mjs';
 import { loadSessionPolicy } from './sessionPolicyLoader.mjs';
-import { buildQueuedSubmitRecord, enqueueAgentSubmitRecord, queueAgentSubmitRecord, submitRequestKvKey, agentSubmitQueueEnabled } from './agentSubmitQueue.mjs';
+import { buildQueuedSubmitRecord, canonicalAnswerKvKey, enqueueAgentSubmitRecord, queueAgentSubmitRecord, submitRequestKvKey, agentSubmitQueueEnabled } from './agentSubmitQueue.mjs';
 import { questionId, shortQuestionId } from './runtimeCore.mjs';
 import { onChainAnswerFromDraft } from './draftAnswerEncoding.mjs';
 import { answerDraftFingerprint, writeDraftLifecycleEvent, buildDraftProvenance, readAnswerDraftFirstViewedAt } from './answerDrafts.mjs';
@@ -69,6 +69,12 @@ async function executeAgentSubmitRequest({
     existing = raw == null ? null : safeJsonParse(raw, null);
     if (raw != null && (!existing || typeof existing !== 'object' || Array.isArray(existing))) {
       return { ok: false, reason: 'submit_request_record_invalid', requestId };
+    }
+    // The receipt above lapses after 30 days; the permanent answer record still
+    // says how this request ended, so sending it again replays that ending.
+    if (raw == null) {
+      const kept = safeJsonParse(await env.AGENT_ACTION_KV.get(canonicalAnswerKvKey({ requestId })), null);
+      if (kept?.requestId === requestId && ['direct_submitted', 'direct_submit_failed', 'direct_submit_reconciliation_required'].includes(kept.status)) existing = kept;
     }
   } catch (error) {
     return { ok: false, reason: 'submit_request_read_failed', requestId, retryable: true, error: safeString(error?.message || error) };
