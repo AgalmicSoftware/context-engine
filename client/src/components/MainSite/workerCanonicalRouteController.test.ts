@@ -206,7 +206,7 @@ describe('workerCanonicalRouteController', () => {
     expect(controller.getActiveVerifiedConfig('worker-session')).toBeNull();
   });
 
-  it.each(['/compare', '/compare/', '/u/0x1111111111111111111111111111111111111111'])(
+  it.each(['/compare', '/compare/', '/u/0x1111111111111111111111111111111111111111', `/question/0x${'2'.repeat(64)}`])(
     'scopes verified query configuration to its exact session and origin on %s',
     (path) => {
       const { host } = buildHost();

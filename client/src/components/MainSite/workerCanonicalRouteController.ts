@@ -48,13 +48,13 @@ export const createWorkerCanonicalRouteController = (
     const normalizedSlug = normalizeSessionSlug(slug);
     const search = typeof window !== 'undefined' ? window.location.search || '' : '';
     const path = host.getCurrentPathname();
-    // Profile and comparison deep links carry their session in the query. Only
+    // Profile, comparison and question deep links carry their session in the query. Only
     // that exact route may use its live-verified config for cache hydration.
     const querySlugs = new URLSearchParams(search).getAll('session');
     const routeSlug = normalizeSessionSlug(
       path === '/'
         ? host.getSessionSlugFromState?.() || ''
-        : /^\/(?:compare(?:\/|$)|u\/)/.test(path)
+        : /^\/(?:compare(?:\/|$)|u\/|question\/)/.test(path)
           ? querySlugs.length === 1
             ? querySlugs[0]
             : ''

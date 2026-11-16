@@ -970,6 +970,23 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         </div>
       );
     }
+    // A link from an unlisted session carries its Worker, as the session page's own link does: the session comes
+    // from that Worker, and the address keeps it.
+    const workerRoute =
+      queryQuestionSlug && urlParams.has('worker')
+        ? resolveMainSiteGroupWorkerRoute({
+            workerSessionSlug: queryQuestionSlug,
+            sessionConfig: null,
+            searchStr,
+            controller: getWorkerCanonicalRouteController(host),
+          })
+        : null;
+    if (workerRoute) {
+      const interruption =
+        renderWorkerCanonicalRouteError(workerRoute) ||
+        renderWorkerCanonicalRouteBootstrap(workerRoute, getWorkerCanonicalRouteController(host));
+      if (interruption) return interruption;
+    }
     const cachedQuestionSlug = questionSlugPinned
       ? null
       : host.findGroupSlugForQuestion(questionID, { requireCacheHit: true });
@@ -981,11 +998,14 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       effectiveQuestionSlug != null &&
       typeof window !== 'undefined'
     ) {
-      const canonicalQuestionPath = buildQuestionRoutePath(questionID, {
+      const routePath = buildQuestionRoutePath(questionID, {
         responderAddress,
         sessionSlug: effectiveQuestionSlug,
         sessionId: queryQuestionSessionId || undefined,
       });
+      const canonicalQuestionPath = workerRoute
+        ? `${routePath}&worker=${encodeURIComponent(workerRoute.workerOrigin)}`
+        : routePath;
       const currentPath = `${window.location.pathname || ''}${window.location.search || ''}`;
       const canonicalQuestionPublicPath = buildPublicRoute(canonicalQuestionPath);
       if (canonicalQuestionPublicPath !== currentPath) {
