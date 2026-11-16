@@ -64,7 +64,7 @@ export const buildTools = (participant) => [
     name: 'join_session',
     title: 'Join a session',
     description:
-      'Join a Context Engine session from its link. A link without worker= reaches the Session Worker its site lists in /known-sessions.json, or else the OP Sepolia registry. Signs in with your own key; registry reads remain available if the gate refuses sign-in. Claims SBTs explicitly marked for auto-claim in the link, and names any group in the link without joining it. Returns the context and the session’s instructions for agents (agentInstructions) to read before answering, its groups, its invitation to add context when it has one, and what you may do next if you want to (youMay): set a display name, join an open group, add context.',
+      'Join a Context Engine session from its link. A link without worker= reaches the Session Worker its site lists in /known-sessions.json, or else the OP Sepolia registry. Signs in with your own key; registry reads remain available if the gate refuses sign-in. Claims SBTs explicitly marked for auto-claim in the link, and names any group in the link without joining it, except in a private session, which it joins through the link’s group first since nothing in one can be read before. Returns the context and the session’s instructions for agents (agentInstructions) to read before answering, its groups, its invitation to add context when it has one, and what you may do next if you want to (youMay): set a display name, join an open group, add context.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -249,10 +249,9 @@ export const buildTools = (participant) => [
       type: 'object',
       properties: {
         session: sessionParam,
-        groupId: text('Group id.'),
-        invite: text('The group’s one-use code or password, if you were given one and the session link didn’t carry it.'),
+        groupId: text('Group id. May be left out when invite is the group’s invite link.'),
+        invite: text('The group’s one-use code, its password (as given, gp: prefix or not), or its whole invite link, if the session link didn’t carry it.'),
       },
-      required: ['groupId'],
       additionalProperties: false,
     },
     annotations: { ...WRITE, idempotentHint: true },

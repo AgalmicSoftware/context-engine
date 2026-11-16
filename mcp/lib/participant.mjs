@@ -18,7 +18,7 @@ import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
-import { createWorkerGroupPasswordKeys, parseGroupInviteToken } from '../../shared/workerGroupJoin.mjs';
+import { createWorkerGroupPasswordKeys, formatWorkerGroupReadInvite, parseGroupInviteToken } from '../../shared/workerGroupJoin.mjs';
 import { ethers } from 'ethers';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
@@ -310,6 +310,18 @@ const groupJoinCredential = async ({ token, sessionId, groupId, address }) => {
   if (invite.kind === 'invite') throw new Error('Invite codes aren’t supported yet; ask for a group password or a one-use link instead.');
   if (invite.kind === 'one_use') return { secret: invite.secret };
   return { proof: await groupPasswordKeys.signJoin({ password: invite.password, sessionId, groupId, address }) };
+};
+
+// What lets a private session's agent read before it joins: a group password
+// signs a read proof for its session and group. A code makes none.
+const groupReadInvite = async ({ token, sessionId, groupId }) => {
+  const invite = parseGroupInviteToken(token);
+  const id = trim(groupId).toLowerCase();
+  if (invite?.kind !== 'password' || !id) return '';
+  return formatWorkerGroupReadInvite({
+    groupId: id,
+    proof: await groupPasswordKeys.signRead({ password: invite.password, sessionId, groupId: id }),
+  });
 };
 
 // `sentInvite` is false when join_group had no invite to send: the link's is
@@ -974,7 +986,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       // Joining always starts a fresh client, so a session that changed identity can be joined again.
       sessions.delete(sessionKey(parsed));
       const ctx = await openSession(parsed);
-      const sessionConfig = await ctx.client.loadConfig();
+      let sessionConfig = await ctx.client.loadConfig();
       // A listed Worker must serve the session the list names, as the browser checks, before any sign-in.
       if (parsed.listedSessionId && ctx.client.sessionId !== parsed.listedSessionId) {
         sessions.delete(sessionKey(parsed));
@@ -986,6 +998,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       ctx.info.appOrigin = ctx.client.loginOrigin;
       // Kept in memory for join_group only; never shown or saved.
       if (groupInvite) ctx.groupInvites = new Map([[parsed.joinGroupId.toLowerCase(), groupInvite]]);
+      // A private session shows only its shell until the link's invite, or a
+      // membership, admits the agent; the invite is held in memory like the link's.
+      const privateSession = !ctx.registry && !!ctx.client.privateSession;
+      if (privateSession) {
+        const readInvite = await groupReadInvite({ token: groupInvite, sessionId: ctx.client.sessionId, groupId: parsed.joinGroupId });
+        if (readInvite) {
+          ctx.client.setGroupReadInvite(readInvite);
+          sessionConfig = await ctx.client.loadConfig();
+        }
+      }
       const outcome = { ...sessionSummary(ctx, sessionConfig), address: wallet.address };
 
       // Like the web app, only SBTs the link marks for automatic claiming are claimed on join.
@@ -1012,6 +1034,27 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         loginError = error;
         return {};
       });
+      // A private session is joined through its link's group before anything
+      // else is read, so what follows is read as a member.
+      if (privateSession && parsed.joinGroupId) {
+        checkpoint();
+        const id = parsed.joinGroupId.toLowerCase();
+        try {
+          const credential = groupInvite
+            ? await groupJoinCredential({ token: groupInvite, sessionId: ctx.client.sessionId, groupId: id, address: wallet.address })
+            : {};
+          await ctx.client.joinGroup(id, { signal, ...credential });
+          outcome.joinedGroup = id;
+        } catch (error) {
+          outcome.groupJoinError = describeError(groupRefusal(error, id, 'join_group', { sentInvite: !!groupInvite }));
+        }
+        sessionConfig = await ctx.client.loadConfig();
+        Object.assign(outcome, sessionSummary(ctx, sessionConfig));
+      }
+      if (ctx.client.privateSession) {
+        outcome.privateSession = ctx.client.privateSession;
+        outcome.note = 'This session is private, and nothing in it can be read yet. Join it from its group invite link: call join_session with the full link, or join_group with the link as invite.';
+      }
       await remember(ctx, outcome.title, parsed.recruitmentSource);
       if (claims.length) {
         outcome.sbtClaims = [];
@@ -1051,7 +1094,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (sessionAgent) outcome.sessionAgent = sessionAgent;
       const sessionSbts = listSessionSbts(sessionConfig);
       if (sessionSbts.length) outcome.sessionSbts = sessionSbts;
-      // The link's group is named, not joined, so the agent can read the session's instructions first.
+      // The link's group is named, not joined, so the agent can read the session's instructions first;
+      // a private session's was joined above, since nothing can be read before.
       const linkGroup = ctx.registry ? '' : parsed.joinGroupId;
       if (!ctx.registry) {
         checkpoint();
@@ -1384,10 +1428,22 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const ctx = await resolveSession(session);
       if (ctx.registry) throw new Error('Worker groups are not available in on-chain sessions.');
       await ensureReady(ctx);
-      const id = trim(groupId);
-      if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
+      let id = trim(groupId);
+      let pasted = trim(invite);
+      // A pasted invite link names its group and carries its invite after #.
+      if (/^https?:\/\//i.test(pasted)) {
+        const link = parseSessionLink(pasted, { allowLocalWorkers: config.allowLocalWorkers });
+        if (link.slug !== ctx.info.slug) throw new Error('That invite link is for another session; call join_session with it.');
+        if (!link.joinGroupId || !link.groupInvite) throw new Error('That link carries no group invite.');
+        if (id && id.toLowerCase() !== link.joinGroupId.toLowerCase()) {
+          throw new Error(`That invite link is for group "${link.joinGroupId}", not "${id}".`);
+        }
+        id = link.joinGroupId;
+        pasted = link.groupInvite;
+      }
+      if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id, or the group’s invite link as invite.');
       // An invite passed here wins over the one the session link carried.
-      const token = trim(invite) || ctx.groupInvites?.get(id.toLowerCase()) || '';
+      const token = pasted || ctx.groupInvites?.get(id.toLowerCase()) || '';
       const credential = token
         ? await groupJoinCredential({ token, sessionId: ctx.client.sessionId, groupId: id.toLowerCase(), address: wallet.address })
         : {};
@@ -1395,6 +1451,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       await ctx.client.joinGroup(id, { signal, ...credential }).catch((error) => {
         throw groupRefusal(error, id, 'join_group', { sentInvite: !!token });
       });
+      // A private session's config is whole once the agent is a member.
+      if (ctx.client.privateSession) await ctx.client.loadConfig();
       return { session: ctx.info.slug, joinedGroup: id };
     },
 

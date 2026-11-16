@@ -180,6 +180,11 @@ export const createWorkerClient = ({
   let presenceLoadedAt = -Infinity;
   let features = null;
   let featuresLoadedAt = -Infinity;
+  // A private session's read invite, sent with every request until the agent
+  // is a member, and whether the last config was the shell given to someone
+  // its rule doesn't admit.
+  let groupReadInvite = '';
+  let privateSession = '';
 
   // A busy answer the Worker marks safe to send again may follow work already
   // done, so only requests whose repeat does no harm wait and try again, as
@@ -208,6 +213,7 @@ export const createWorkerClient = ({
         headers: {
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
           ...(auth ? { Authorization: `Bearer ${token}`, 'X-Group-Slug': slug } : {}),
+          ...(groupReadInvite ? { 'X-CE-Group-Invite': groupReadInvite } : {}),
           ...headers,
         },
         ...(form ? { body: form } : body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -250,9 +256,14 @@ export const createWorkerClient = ({
   };
 
   const loadConfig = async () => {
+    // Signed in, the config is read as the agent: a private session shows its
+    // members what it shows no one else.
+    if (!registryConfigLoader && token) await ensureToken();
     const data = registryConfigLoader
       ? { config: await registryConfigLoader(), sessionSlug: slug }
-      : await request(`/session-config?slug=${encodeURIComponent(slug)}`, { headers: { 'X-Session-Slug': slug } });
+      : await request(`/session-config?slug=${encodeURIComponent(slug)}`, {
+          headers: { 'X-Session-Slug': slug, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        });
     const loaded = isRecord(data?.config) ? data.config : null;
     const id = resolveSessionIdHex(loaded);
     if (!loaded || (!registryConfigLoader && !id)) throw new WorkerRequestError('The Worker did not return a hosted session config.');
@@ -267,6 +278,7 @@ export const createWorkerClient = ({
     config = loaded;
     configLoadedAt = now();
     sessionId = id;
+    privateSession = text(data.privateSession);
     return config;
   };
 
@@ -466,8 +478,15 @@ export const createWorkerClient = ({
     listMyMemberships,
     readFeatures,
     request,
+    setGroupReadInvite: (value) => {
+      groupReadInvite = text(value);
+    },
     get config() {
       return config;
+    },
+    /** 'invite_required' or 'invite_invalid' while the config is a private session's shell; '' otherwise. */
+    get privateSession() {
+      return privateSession;
     },
     get sessionId() {
       return sessionId;
