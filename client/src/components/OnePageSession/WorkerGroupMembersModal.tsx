@@ -91,7 +91,7 @@ const WorkerGroupMembersModal = ({
                 : `Members could not be loaded (${error}).`}
             </div>
           ) : null}
-          {status === 'ready' && members.length === 0 ? (
+          {status === 'ready' && members.length === 0 && !nextCursor ? (
             <div className={sbtPageStyles.emptyState}>No members found.</div>
           ) : null}
           {members.map((member) => {

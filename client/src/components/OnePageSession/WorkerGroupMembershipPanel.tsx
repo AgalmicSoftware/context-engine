@@ -116,6 +116,9 @@ const emptyMemberListState = (targetKey: string, groupId = ''): WorkerGroupMembe
   nextCursor: '',
 });
 
+// Pages of only departed members read in one go before "Load more" takes over.
+const MEMBER_PAGES_SKIPPED_MAX = 20;
+
 const groupJoinHasEnded = (group: WorkerGroup): boolean =>
   Boolean(group.joinEndsAt && Date.parse(group.joinEndsAt) <= Date.now());
 // A person can still join it: by link, or with a password or claim code.
@@ -621,19 +624,26 @@ const WorkerGroupMembershipPanel = ({
         };
       });
       try {
-        const page = await loadWorkerGroupMembers({
-          workerUrl,
-          credentialToken: workerToken,
-          sessionId,
-          sessionSlug,
-          groupId: requestGroupId,
-          cursor,
-          limit: 100,
-          fetchImpl,
-        });
-        if (targetKeyRef.current !== requestTargetKey || memberListRequestIdRef.current !== requestId) {
-          return;
+        const isStale = () => targetKeyRef.current !== requestTargetKey || memberListRequestIdRef.current !== requestId;
+        const readPage = (pageCursor?: string) =>
+          loadWorkerGroupMembers({
+            workerUrl,
+            credentialToken: workerToken,
+            sessionId,
+            sessionSlug,
+            groupId: requestGroupId,
+            cursor: pageCursor,
+            limit: 100,
+            fetchImpl,
+          });
+        let page = await readPage(cursor);
+        // A page can hold only people who have left; read on, so "No members found" waits for the list's end.
+        for (let skipped = 0; !page.members.length && page.nextCursor && skipped < MEMBER_PAGES_SKIPPED_MAX;) {
+          if (isStale()) return;
+          skipped += 1;
+          page = await readPage(page.nextCursor);
         }
+        if (isStale()) return;
         setMemberListState((current) => {
           if (current.targetKey !== requestTargetKey || current.groupId !== requestGroupId) return current;
           const combined = append ? [...current.members, ...page.members] : page.members;
