@@ -28,7 +28,8 @@ session's Settings:
   ],
   "instructions": { "general": "…", "detailed": "…" },
   "minAnswers": 1,
-  "history": true
+  "history": true,
+  "anyoneCanAsk": false
 }
 ```
 
@@ -39,6 +40,8 @@ session's Settings:
   reached, the question is refused rather than passed to a later audience.
 - **`history`** lets an asker have a chat stored: see
   [Recorded chats](#recorded-chats). It is off unless set to `true`.
+- **`anyoneCanAsk`** is on unless set to `false`: see
+  [Asking without signing in](#asking-without-signing-in).
 - **Admins** always get Detailed answers, whatever the audiences say.
 - **AI access.** Everyone who asks, admins included, also needs the session's
   AI access (the `ai` scope), as on the `/ai` route.
@@ -343,6 +346,36 @@ members in a single request. A session with several hundred members in the
 groups its rules name may be more than one request can read, and then answers
 `503` each time.
 
+## Asking without signing in
+
+Unless an admin turns off **Anyone can ask** (`anyoneCanAsk: false`), someone
+who hasn't signed in can ask too. The Worker admits them exactly as it would a
+first sign-in with no memberships, so the session's own rules still hold:
+
+- If the session lets only some people sign in (a group or a role), a visitor
+  is asked to sign in.
+- If no audience takes everyone signed in, or the session gives a sign-in no AI
+  access, a visitor is asked to sign in. A group, an SBT or an admin role can
+  only be shown by signing in.
+- A visitor gets **General** answers only, even where everyone signed in gets
+  Detailed ones, and reads only what a first sign-in could.
+
+Each question spends the session's AI, so signed-out asking is bounded: at
+most 10 questions a day from one network address (fewer if the session's own
+daily AI limit is lower; the count is shared with the session's other
+signed-out AI use), and at most 300 a day for the session whatever addresses
+they come from. Past either, the Worker answers `429`
+(`session_agent_signed_out_limit`) until the next day. Nothing else about a
+visitor is kept: where the session records chats they may store one, with a
+name if they like and never an address.
+
+Signed out, the page sends `POST /session-agent/status` and
+`POST /session-agent/ask` with no sign-in and `?slug=<slug>`; a body is 4 KB
+at most. Where a sign-in is needed the Worker answers `401`
+(`session_agent_sign_in_required`). Status then carries `signedOut: true`. The
+two switches need a sign-in. A Worker that takes signed-out questions lists
+`session_agent_signed_out` among its features.
+
 ## Recorded chats
 
 Nothing asked or answered is kept unless an admin turns on **Record chats** in
@@ -457,7 +490,7 @@ never as a `401`, which the page would take for its own sign-in failing.
 ## On the session page
 
 While the setting is on, the session's Context has a **Session Agent** button for
-anyone signed in. The dialog says it's a preview and how the person will be
+anyone signed in, and for anyone else unless **Anyone can ask** is off. The dialog says it's a preview and how the person will be
 answered, asks one question at a time, and shows only the latest answer, with
 what it drew on. Errors say what went wrong. A chat is kept only as
 [Recorded chats](#recorded-chats) says.

@@ -1497,6 +1497,8 @@ test('the MCP says a session’s agent stores nothing where recording is off, an
   const alice = await createAgent(env, 'alice.delve.town', []);
   const joined = await alice.participant.joinSession({ link: LINK });
   assert.equal(joined.sessionAgent.recording, false);
+  // And whether someone not signed in may ask it too.
+  assert.equal(joined.sessionAgent.anyoneCanAsk, true);
   assert.match(joined.sessionAgent.note, /It is off here: nothing you ask is kept\./);
   t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Most agree.' }] }), {
     headers: { 'Content-Type': 'application/json' },
@@ -1511,6 +1513,70 @@ test('the MCP says a session’s agent stores nothing where recording is off, an
   const bob = await createAgent(plain, 'bob.delve.town', []);
   assert.equal('sessionAgent' in await bob.participant.joinSession({ link: LINK }), false);
   await assert.rejects(bob.participant.askSessionAgent({ question: 'Anyone there?' }), /This session has no Session Agent\./);
+});
+
+test('someone not signed in asks the Session Agent through the real Worker, where the session would let them sign in', async (t) => {
+  const agentConfig = (extra = {}) => {
+    const config = sessionConfig();
+    config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
+    config.sessionAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'detailed' }] };
+    return Object.assign(config, extra);
+  };
+  const open = async (config) => {
+    const env = createEnv([config]);
+    await env.GROUP_KV.put(`session:${SLUG}:secrets`, JSON.stringify({ anthropicKey: ['synthetic', 'anthropic', 'key'].join('-') }));
+    // No Authorization header, and the session named in the query, as the page sends it signed out.
+    const post = async (path, body, { origin = 'https://contextengine.sh', slug = `?slug=${SLUG}` } = {}) => {
+      const response = await workerFetch(env)(`${WORKER_ORIGIN}${path}${slug}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify(body),
+      });
+      return { status: response.status, body: await response.json() };
+    };
+    return { env, post };
+  };
+  const sent = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    sent.push(init.body);
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: 'Most agree.' }] }), { headers: { 'Content-Type': 'application/json' } });
+  });
+
+  const { env, post } = await open(agentConfig());
+  // A member's answer exists, and everyone signed in gets Detailed answers here.
+  const alice = await createAgent(env, 'alice.delve.town', []);
+  await alice.participant.joinSession({ link: LINK });
+  const { questionId } = await alice.participant.addStatement({ prompt: STATEMENT });
+  await alice.participant.answer({ answers: [{ questionId, value: 'Agree', comment: 'MEMBER-ONLY comment.' }] });
+
+  assert.deepEqual((await post('/session-agent/status', {})).body, {
+    on: true, answers: 'general', audience: 0, optedOut: false, recording: false, signedOut: true,
+  });
+  const reply = await post('/session-agent/ask', { question: 'Do people want labels?' });
+  assert.deepEqual([reply.status, reply.body.answer, reply.body.answers, reply.body.read.answers], [200, 'Most agree.', 'general', 0]);
+  // General material only reached the AI: the session's context, never what a member wrote.
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /Answer as yourself/);
+  assert.doesNotMatch(sent[0], /MEMBER-ONLY/);
+
+  // The session must be named, the body small JSON, and neither switch is a visitor's.
+  assert.equal((await post('/session-agent/ask', { question: 'Why?' }, { slug: '' })).status, 400);
+  assert.equal((await post('/session-agent/ask', { question: 'x'.repeat(5000) })).status, 400);
+  assert.equal((await post('/session-agent/opt-out', { optedOut: true })).status, 401);
+  // Ten a day from one network address, the eleventh refused before the AI is asked.
+  for (let asked = 1; asked < 10; asked += 1) assert.equal((await post('/session-agent/ask', { question: `Again ${asked}?` })).status, 200);
+  const eleventh = await post('/session-agent/ask', { question: 'One more?' });
+  assert.deepEqual([eleventh.status, eleventh.body.reason, sent.length], [429, 'session_agent_signed_out_limit', 10]);
+
+  // Turned off by an admin, or on a session that lets only some people sign in, a visitor is asked to sign in.
+  for (const config of [
+    agentConfig({ sessionAgent: { ...agentConfig().sessionAgent, anyoneCanAsk: false } }),
+    agentConfig({ workerAuthority: { ...agentConfig().workerAuthority, loginGate: { match: 'any', conditions: [{ kind: 'worker_group', groupId: 'invited' }] } } }),
+  ]) {
+    const closed = await open(config);
+    const refused = await closed.post('/session-agent/ask', { question: 'May I?' });
+    assert.deepEqual([refused.status, refused.body.reason], [401, 'session_agent_sign_in_required']);
+    assert.equal((await closed.post('/session-agent/status', {})).body.answers, null);
+  }
+  assert.equal(sent.length, 10);
 });
 
 test('the Session Agent answers a member from stored answers through the real Worker, naming no one', async (t) => {

@@ -3077,7 +3077,9 @@ Signed login/bootstrap requests:
   `POST /session-agent/opt-out` stores their choice to keep their answers and
   files out of it, and `POST /session-agent/attribution` their choice to leave
   their address off exported items. While the session records chats, `ask` can
-  store one, and admins read them with `GET /admin/session-agent/chats`. See
+  store one, and admins read them with `GET /admin/session-agent/chats`. Without
+  a sign-in, `status` and `ask` answer where the session's setting and its own
+  rules allow, named with `?slug=` and bounded by two daily limits. See
   [session-agent.md](session-agent.md).
   - A session may have the Session Agent answer on Cloudflare Workers AI by
     setting `ai.models["session-agent"]` to `{ provider: "workers-ai", model }`

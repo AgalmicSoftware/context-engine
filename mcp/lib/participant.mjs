@@ -195,6 +195,8 @@ const sessionAgentOf = (config) => {
   const recording = config.sessionAgent.history === true;
   return {
     recording,
+    // Whether someone not signed in may ask too, where the session would let them sign in.
+    anyoneCanAsk: config.sessionAgent.anyoneCanAsk !== false,
     note: recording
       ? `${RECORDING_NOTICE} It is on here: ask_session_agent stores your question and its answer for the session’s organisers, who may export them, unless you pass store false. Your address is stored only if you pass attribution "address".`
       : `${RECORDING_NOTICE} It is off here: nothing you ask is kept.`,

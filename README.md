@@ -77,7 +77,7 @@ For testing, run modes, and deeper setup:
 
 ### Session Agent
 
-A session on a Session Worker can have a Session Agent: an AI that answers questions about the session from its own material. It is off until an admin turns it on under AI, on `/new` or in the session's Settings. While it is on, a robot by the session's title says so, and anyone signed in can open it from the session's Context.
+A session on a Session Worker can have a Session Agent: an AI that answers questions about the session from its own material. It is off until an admin turns it on under AI, on `/new` or in the session's Settings. While it is on, a robot by the session's title says so, and anyone signed in can open it from the session's Context. Unless the admins turn that off, people who haven't signed in can ask too, for General answers, a few times a day.
 
 - **Who may ask.** An admin lists audiences in order (everyone signed in, members of chosen groups, or SBT holders) and gives each General or Detailed answers. The first audience a person matches sets how they are answered. Admins always get Detailed answers. Anyone asking also needs the session's AI access.
 - **General answers** draw on the session's context, the files everyone may see, and the results the asker may see. They never use members' answers or files locked to a group.

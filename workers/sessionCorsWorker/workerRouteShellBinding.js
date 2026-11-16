@@ -6,6 +6,7 @@ import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { evaluateAuthenticatedRoutePreflight as evaluateAuthenticatedRoutePreflightBoundary } from './authenticatedRoutePreflight.js';
 import { dispatchInterviewStarterRequest } from './interviewStarter.js';
 import { dispatchAnonymousFeedbackRequest } from './sessionFeedbackRoute.js';
+import { dispatchSignedOutSessionAgentRequest } from './sessionAgentSignedOut.js';
 import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import {
@@ -210,6 +211,43 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
             checkRateLimit: deps?.checkRateLimit,
             json: deps?.json,
+          },
+          constants: {
+            missingSlugError: constants?.missingSlugError,
+            sessionConfigNotFoundError: constants?.sessionConfigNotFoundError,
+          },
+        });
+      }
+
+      if (routeSelection.kind === 'session-agent-signed-out') {
+        return await dispatchSignedOutSessionAgentRequest({
+          request,
+          env,
+          path: routeSelection.path,
+          slugHint: envSlug,
+          baseHeaders: routeBaseHeaders,
+          deps: {
+            resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
+            getCorsContext: deps?.getCorsContext,
+            resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
+            checkRateLimit: deps?.checkRateLimit,
+            // As the signed-in route has them: the session's AI, and its gates for who may ask and what they may read.
+            resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+            normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
+            proxyAnthropic: deps?.proxyAnthropic,
+            proxyOpenAI: deps?.proxyOpenAI,
+            proxyOpenRouter: deps?.proxyOpenRouter,
+            proxyCustomRPC: deps?.proxyCustomRPC,
+            getSessionSecrets: deps?.getSessionSecrets,
+            readResourceGateOnChain: deps?.readResourceGateOnChain,
+            resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+            toRegistrySessionSlug: deps?.toRegistrySessionSlug,
+            resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+            checkSbtGate: deps?.checkSbtGate,
+            json: deps?.json,
+            toStr: deps?.toStr,
+            now: deps?.now,
           },
           constants: {
             missingSlugError: constants?.missingSlugError,

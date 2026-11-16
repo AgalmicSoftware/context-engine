@@ -7,6 +7,7 @@ import {
   buildSessionAgentMessages,
   sessionAgentInstructions,
   sessionAgentMinAnswers,
+  sessionAgentOpenToAnyone,
   sessionAgentSettingOf,
   sessionAgentStoresChats,
   validateSessionAgent,
@@ -66,6 +67,18 @@ test('chats are stored only when the setting says so, and off is stored as nothi
   assert.deepEqual(
     [{ audiences: [], history: true }, { audiences: [] }, null, { audiences: [], history: 'yes' }].map((value) =>
       sessionAgentStoresChats(sessionAgentSettingOf(value))),
+    [true, false, false, false],
+  );
+});
+
+test('people who aren’t signed in may ask unless the setting says no, and on is stored as nothing', () => {
+  assert.deepEqual(validateSessionAgent({ audiences: [], anyoneCanAsk: true }).value, { audiences: [] });
+  assert.deepEqual(validateSessionAgent({ audiences: [], anyoneCanAsk: false }).value, { audiences: [], anyoneCanAsk: false });
+  assert.equal(messageOf({ audiences: [], anyoneCanAsk: 'no' }), 'Whether people may ask without signing in must be on or off.');
+  assert.deepEqual(
+    [{ audiences: [] }, { audiences: [], anyoneCanAsk: false }, null, { audiences: [], anyoneCanAsk: 'no' }].map((value) =>
+      sessionAgentOpenToAnyone(sessionAgentSettingOf(value))),
+    // Off, or no valid setting, opens nothing.
     [true, false, false, false],
   );
 });

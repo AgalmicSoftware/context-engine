@@ -9,7 +9,9 @@ import { buildSessionContextPrompt } from './sessionContextText.mjs';
 // is how many members must have answered a question before someone who is not
 // an admin hears anything from it. Off is no setting. The answer style decides what the Worker reads; instructions only
 // change how the agent writes. `history: true` lets an asker have an exchange
-// stored; without it nothing asked or answered is kept.
+// stored; without it nothing asked or answered is kept. Someone not signed in
+// may ask too, for General answers, where the session would let them sign in
+// and an audience would then admit them; `anyoneCanAsk: false` turns that off.
 
 export const SESSION_AGENT_STYLES = Object.freeze(['general', 'detailed']);
 
@@ -177,7 +179,10 @@ export const validateSessionAgent = (value) => {
     fail(errors, 'sessionAgent', 'The Session Agent setting must list who may ask.');
     return { ok: false, errors };
   }
-  refuseUnknown(value, ['audiences', 'instructions', 'minAnswers', 'history'], errors, 'sessionAgent', 'The Session Agent setting');
+  refuseUnknown(value, ['audiences', 'instructions', 'minAnswers', 'history', 'anyoneCanAsk'], errors, 'sessionAgent', 'The Session Agent setting');
+  if (value.anyoneCanAsk !== undefined && typeof value.anyoneCanAsk !== 'boolean') {
+    fail(errors, 'sessionAgent.anyoneCanAsk', 'Whether people may ask without signing in must be on or off.');
+  }
   if (value.history !== undefined && typeof value.history !== 'boolean') {
     fail(errors, 'sessionAgent.history', 'Whether chats may be stored must be on or off.');
   }
@@ -195,7 +200,13 @@ export const validateSessionAgent = (value) => {
   if (errors.length) return { ok: false, errors };
   // Off is stored as nothing, as the other defaults are.
   const history = value.history === true ? { history: true } : {};
-  return { ok: true, value: { audiences, ...(instructions ? { instructions } : {}), ...(minAnswers ? { minAnswers } : {}), ...history }, errors };
+  // On is the default, so only off is stored.
+  const signedOut = value.anyoneCanAsk === false ? { anyoneCanAsk: false } : {};
+  return {
+    ok: true,
+    value: { audiences, ...(instructions ? { instructions } : {}), ...(minAnswers ? { minAnswers } : {}), ...history, ...signedOut },
+    errors,
+  };
 };
 
 /** For readers: the stored setting, or null when it is off or not valid. */
@@ -206,6 +217,9 @@ export const sessionAgentSettingOf = (value) => {
 
 /** How many members must have answered a question before someone who is not an admin hears from it. */
 export const sessionAgentMinAnswers = (setting) => setting?.minAnswers || L.minAnswers;
+
+/** Whether someone not signed in may ask, where the session's own rules would let them in. */
+export const sessionAgentOpenToAnyone = (setting) => !!setting && setting.anyoneCanAsk !== false;
 
 /** Whether an asker may have an exchange stored in this session. */
 export const sessionAgentStoresChats = (setting) => setting?.history === true;

@@ -1,5 +1,6 @@
 import {
-  SESSION_AGENT_LIMITS, buildSessionAgentMessages, sessionAgentMinAnswers, sessionAgentSettingOf, sessionAgentStoresChats,
+  SESSION_AGENT_LIMITS, buildSessionAgentMessages, sessionAgentMinAnswers, sessionAgentOpenToAnyone, sessionAgentSettingOf,
+  sessionAgentStoresChats,
 } from '../../shared/sessionAgent.mjs';
 import { namesSomeone } from '../../shared/sessionAgentExport.mjs';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
@@ -51,6 +52,32 @@ const NOT_ADMITTED = {
 };
 
 const UNCHECKED = { ok: false, status: 503, error: 'Who may ask could not be checked just now. Try again shortly.' };
+
+// Asking without signing in spends the session's AI for people it can't
+// name, so it is bounded twice a day: by network address, and for the session
+// as a whole whatever addresses the questions come from.
+export const SESSION_AGENT_SIGNED_OUT = Object.freeze({ perNetworkPerDay: 10, perSessionPerDay: 300, bodyBytes: 4096 });
+const SIGN_IN_TO_ASK = { error: 'Sign in to ask the Session Agent.', reason: 'session_agent_sign_in_required' };
+const SIGNED_OUT_LIMIT = {
+  error: 'The Session Agent has answered all it can today for people who aren’t signed in. Sign in to ask, or try again tomorrow.',
+  reason: 'session_agent_signed_out_limit',
+};
+
+// Counts one signed-out question against both limits; a response when either
+// is used up or can't be counted, otherwise nothing. The network's count is
+// the session's own daily AI count, shared with its other signed-out AI use.
+const countSignedOutQuestion = async ({ env, slug, config, identity, deps, json }) => {
+  const daily = resolveAiDailyLimit(config);
+  for (const [address, limit, route] of [
+    [identity, daily > 0 ? Math.min(daily, SESSION_AGENT_SIGNED_OUT.perNetworkPerDay) : SESSION_AGENT_SIGNED_OUT.perNetworkPerDay, 'ai'],
+    ['anon:session-agent', SESSION_AGENT_SIGNED_OUT.perSessionPerDay, 'session-agent-signed-out'],
+  ]) {
+    const allowed = await deps.checkRateLimit({ env, slug, address, limit, route });
+    if (allowed === null) return json({ error: UNCHECKED.error }, 503);
+    if (!allowed) return json(SIGNED_OUT_LIMIT, 429);
+  }
+  return null;
+};
 
 // Everyone who asks needs the session's AI access, as on the /ai route.
 // Admins, as the config names them now, then get Detailed answers. Anyone
@@ -280,10 +307,18 @@ const storeExchange = async ({ env, slug, request, question, reply, style, admin
 const accessFor = ({ env, config, slug, address, scopes, deps }) =>
   createRequesterAccessChecks({ env, config, slug, requesterAddress: address, authScopes: scopes, deps });
 
-export const dispatchSessionAgentRoute = async ({ path, body, config, slug, address, env, headers, scopes, deps } = {}) => {
+// `signedOut` is `{ identity }` for someone not signed in: `address` is then
+// empty and `scopes` are those a first sign-in would be given. They are
+// admitted as that sign-in would be, get General answers whatever the audience
+// says, and have no switches.
+export const dispatchSessionAgentRoute = async ({ path, body, config, slug, address, env, headers, scopes, deps, signedOut = null } = {}) => {
   const json = (payload, status = 200) => deps.json(payload, status, headers);
   const setting = sessionAgentSettingOf(config?.sessionAgent);
   const store = deps.callSessionAgentOptOutStore || callOptOutStore;
+  if (signedOut && (path === '/session-agent/opt-out' || path === '/session-agent/attribution')) {
+    return json({ error: 'Sign in to change this.', reason: 'session_agent_sign_in_required' }, 401);
+  }
+  const openToThem = !signedOut || sessionAgentOpenToAnyone(setting);
   if (path === '/session-agent/opt-out') {
     const saved = await store(env, slug, 'set', { address, optedOut: body?.optedOut });
     if (!saved.ok) return json({ error: saved.status === 400 ? saved.body?.error : OPT_OUTS_UNAVAILABLE }, saved.status === 400 ? 400 : 503);
@@ -310,7 +345,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   if (path === '/session-agent/status') {
     const closed = ended ? 'session_ended' : aiOff ? 'ai_disabled' : '';
     const [asker, own] = await Promise.all([
-      closed ? { ok: false } : resolveAsker({
+      closed || !openToThem ? { ok: false } : resolveAsker({
         setting, config, address, aiScope: scopes?.ai === true, access: accessFor({ env, config, slug, address, scopes, deps }),
       }),
       canOptOut(address) ? store(env, slug, 'read', { address }) : { ok: true, body: {} },
@@ -318,11 +353,15 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
     if (!asker.ok && asker.status === 503) return json({ error: asker.error }, 503);
     if (!own.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
     return json({
-      on: true, answers: asker.ok ? asker.answers : null, audience: asker.ok ? asker.audience : null, optedOut: own.body.optedOut === true,
+      on: true,
+      answers: asker.ok ? (signedOut ? 'general' : asker.answers) : null,
+      audience: asker.ok ? asker.audience : null,
+      optedOut: own.body.optedOut === true,
       // Only someone signed in with an address has an address to leave off.
       ...(canOptOut(address) ? { unattributed: own.body.unattributed === true } : {}),
       recording: sessionAgentStoresChats(setting),
       ...(closed ? { closed } : {}),
+      ...(signedOut ? { signedOut: true } : {}),
     });
   }
   if (ended) return ended;
@@ -335,18 +374,36 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   }
   const storeRequest = storeRequestOf({ body, setting, address });
   if (storeRequest.error) return json({ error: storeRequest.error }, 400);
-  // The /ai route's checks: the current AI scope, which every asker needs,
-  // then its rate limit, counted once nothing below can refuse the question.
-  const preflight = await deps.evaluateAuthenticatedRoutePreflight({
-    scopes, scope: 'ai', route: 'ai', allowWithoutScope: true, config, env, slug, address, limit: resolveAiDailyLimit(config), headers,
-    deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: deps.json },
-    countLater: true,
-  });
-  if (!preflight?.ok) return preflight?.response || json({ error: 'Current authorization check failed.' }, 403);
-  const currentScopes = { ...scopes, ai: preflight.tokenHasScope === true };
+  let currentScopes = scopes;
+  let asker = null;
+  let countQuestion = null;
+  if (signedOut) {
+    // Admitted as a first sign-in would be, and only for General answers.
+    if (!openToThem) return json(SIGN_IN_TO_ASK, 401);
+    asker = await resolveAsker({
+      setting, config, address, aiScope: scopes?.ai === true, access: accessFor({ env, config, slug, address, scopes, deps }),
+    });
+    // Signing in may admit them, through a group or an SBT, where this could not.
+    if (!asker.ok) return asker.status === 503 ? json({ error: asker.error }, 503) : json(SIGN_IN_TO_ASK, 401);
+    asker = { ...asker, answers: 'general' };
+    countQuestion = () => countSignedOutQuestion({ env, slug, config, identity: signedOut.identity, deps, json });
+  } else {
+    // The /ai route's checks: the current AI scope, which every asker needs,
+    // then its rate limit, counted once nothing below can refuse the question.
+    const preflight = await deps.evaluateAuthenticatedRoutePreflight({
+      scopes, scope: 'ai', route: 'ai', allowWithoutScope: true, config, env, slug, address, limit: resolveAiDailyLimit(config), headers,
+      deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: deps.json },
+      countLater: true,
+    });
+    if (!preflight?.ok) return preflight?.response || json({ error: 'Current authorization check failed.' }, 403);
+    currentScopes = { ...scopes, ai: preflight.tokenHasScope === true };
+    asker = await resolveAsker({
+      setting, config, address, aiScope: preflight.tokenHasScope === true, access: accessFor({ env, config, slug, address, scopes: currentScopes, deps }),
+    });
+    if (!asker.ok) return json({ error: asker.error, ...(asker.reason ? { reason: asker.reason } : {}) }, asker.status);
+    countQuestion = () => preflight.count?.();
+  }
   const access = accessFor({ env, config, slug, address, scopes: currentScopes, deps });
-  const asker = await resolveAsker({ setting, config, address, aiScope: preflight.tokenHasScope === true, access });
-  if (!asker.ok) return json({ error: asker.error, ...(asker.reason ? { reason: asker.reason } : {}) }, asker.status);
   const secretContext = await deps.resolveAuthenticatedRouteSecrets({
     env, slug, headers, deps: { getSessionSecrets: deps.getSessionSecrets, json: deps.json },
   });
@@ -358,7 +415,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   // Who opted out is read on every question, so no answer goes ahead without it.
   const optOuts = await store(env, slug, 'list');
   if (!optOuts.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
-  const refused = await preflight.count?.();
+  const refused = await countQuestion();
   if (refused) return refused;
   const optedOut = new Set(optOuts.body.addresses);
   const { material, answersUnavailable, contextLeftOut, lockedTo } = await gatherMaterial({

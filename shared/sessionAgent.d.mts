@@ -24,6 +24,8 @@ export type SessionAgentSetting = {
   minAnswers?: number;
   /** True lets an asker have a chat stored; absent, nothing asked or answered is kept. */
   history?: true;
+  /** False stops people who aren't signed in from asking; absent, they may. */
+  anyoneCanAsk?: false;
 };
 
 export type SessionAgentError = { path: string; message: string };
@@ -73,6 +75,9 @@ export function sessionAgentSettingOf(value: unknown): SessionAgentSetting | nul
 
 /** How many members must have answered a question before someone who is not an admin hears from it. */
 export function sessionAgentMinAnswers(setting: SessionAgentSetting | null | undefined): number;
+
+/** Whether someone not signed in may ask, where the session's own rules would let them in. */
+export function sessionAgentOpenToAnyone(setting: SessionAgentSetting | null | undefined): boolean;
 
 /** Whether an asker may have an exchange stored in this session. */
 export function sessionAgentStoresChats(setting: SessionAgentSetting | null | undefined): boolean;

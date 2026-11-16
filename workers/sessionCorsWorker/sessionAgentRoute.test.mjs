@@ -7,6 +7,7 @@ import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretAct
 import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, harness, idOf, json } from './contextSourceTestFixture.mjs';
 import { dispatchSessionAgentHistoryStore, listSessionAgentHistory } from './sessionAgentHistory.js';
+import { SESSION_AGENT_SIGNED_OUT, dispatchSessionAgentRoute } from './sessionAgentRoute.js';
 import { createDurableStorage } from './workerGroupTestFixture.mjs';
 
 const MEMBER = `0x${'3'.repeat(40)}`;
@@ -546,6 +547,138 @@ test('what to store is checked before the AI is asked', async () => {
   const longest = await ask(await seeded(recording), { body: { question: 'What do people want?', store: true, name: 'x'.repeat(60) }, deps });
   assert.equal(longest.body.stored, true);
   assert.equal((await kept()).length, 1);
+});
+
+// Someone who isn't signed in: no address, the scopes a first sign-in would be given, and a network address to count.
+const NETWORK = 'anon:203.0.113.9';
+const askSignedOut = async (h, {
+  path = '/session-agent/ask',
+  body = { question: 'What do people want?' },
+  scopes = { ai: true, storage: true },
+  limits = () => true,
+  deps = {},
+} = {}) => {
+  const calls = { ai: [], rate: [] };
+  const response = await dispatchSessionAgentRoute({
+    path, body, config: h.state.config, slug: 'salon', address: '', env: h.env, headers: {}, scopes, signedOut: { identity: NETWORK },
+    deps: {
+      ...h.deps,
+      resolveAuthenticatedRouteSecrets,
+      evaluateAuthenticatedRoutePreflight: async () => { throw new Error('a signed-out question has no sign-in to check'); },
+      checkRateLimit: async ({ address, limit, route }) => { calls.rate.push([address, limit, route]); return limits({ address, route }); },
+      isWorkerGroupMember: async () => ({ ok: false, status: 403, reason: 'worker_group_membership_denied' }),
+      evaluateResultsAnalysisViewerEligibility: () => ({ ok: true }),
+      readPublishedResultsAnalysisArtifact: async () => ({
+        ok: true, artifact: { sections: { overview: { available: true, overview: 'RESULTS: shorter meetings.' } } },
+      }),
+      loadWorkerCanonicalResultsAnalysisSource: async () => ({
+        ok: true,
+        snapshot: {
+          questions: [{ id: 'q1', prompt: 'What should change?', type: 'text' }],
+          responses: [{ questionId: 'q1', answer: 'ANSWER meet less', participantId: 'participant_001' }],
+        },
+        participantAddresses: new Map([['participant_001', MEMBER]]),
+      }),
+      proxyAnthropic: async ({ payload }) => { calls.ai.push(payload); return json({ completion: 'They want shorter meetings.' }); },
+      ...deps,
+    },
+  });
+  const prompt = calls.ai[0]?.messages.map((message) => message.content).join('\n') || '';
+  return { status: response.status, body: await response.json(), calls, prompt };
+};
+
+test('someone not signed in is answered as a first sign-in would be, with General answers only', async () => {
+  const h = await seeded();
+  const status = await askSignedOut(h, { path: '/session-agent/status', body: {} });
+  assert.deepEqual(status.body, { on: true, answers: 'general', audience: 1, optedOut: false, recording: false, signedOut: true });
+  const reply = await askSignedOut(h);
+  assert.deepEqual([reply.status, reply.body.answer, reply.body.answers], [200, 'They want shorter meetings.', 'general']);
+  // The shared material only: no member's answer, nothing locked to a group, nothing for admins.
+  for (const piece of ['CONTEXT for everyone', 'OPEN agenda', 'RESULTS: shorter meetings']) assert.match(reply.prompt, new RegExp(piece));
+  assert.doesNotMatch(reply.prompt, /ANSWER|GROUP notes|ADMINS plan/);
+
+  // Even where everyone signed in gets Detailed answers, someone not signed in gets General.
+  const detailed = await seeded({ audiences: [{ who: everyone, answers: 'detailed' }] });
+  assert.equal((await ask(detailed)).body.answers, 'detailed');
+  const general = await askSignedOut(detailed);
+  assert.deepEqual([general.status, general.body.answers], [200, 'general']);
+  assert.doesNotMatch(general.prompt, /ANSWER|GROUP notes/);
+  assert.equal((await askSignedOut(detailed, { path: '/session-agent/status', body: {} })).body.answers, 'general');
+});
+
+test('a sign-in is asked for where the setting is off, the session keeps people out, or only groups may ask', async () => {
+  const signIn = { error: 'Sign in to ask the Session Agent.', reason: 'session_agent_sign_in_required' };
+  for (const [label, h, options] of [
+    ['turned off by an admin', await seeded({ ...twoAudiences, anyoneCanAsk: false }), {}],
+    ['only a group may ask', await seeded({ audiences: [{ who: salonMembers, answers: 'detailed' }] }), {}],
+    // The session's sign-in rule would not let them in, so a first sign-in is given nothing.
+    ['the session admits only some', await seeded(), { scopes: {} }],
+    ['the session gives a sign-in no AI', await seeded(), { scopes: { storage: true } }],
+  ]) {
+    const refused = await askSignedOut(h, options);
+    assert.deepEqual([refused.status, refused.body, refused.calls.ai.length, refused.calls.rate.length], [401, signIn, 0, 0], label);
+    const status = await askSignedOut(h, { ...options, path: '/session-agent/status', body: {} });
+    assert.deepEqual([status.status, status.body.answers, status.body.signedOut], [200, null, true], label);
+  }
+  // A check that can't be made is an outage, not a refusal to sign in over.
+  const down = await askSignedOut(await seeded({ audiences: [{ who: salonMembers, answers: 'detailed' }, { who: everyone, answers: 'general' }] }), {
+    deps: { isWorkerGroupMember: async () => ({ ok: false, status: 503, reason: 'worker_group_store_unavailable' }) },
+  });
+  assert.deepEqual([down.status, down.calls.ai.length], [503, 0]);
+  // Neither switch is theirs to set.
+  for (const [path, body] of [['/session-agent/opt-out', { optedOut: true }], ['/session-agent/attribution', { unattributed: true }]]) {
+    assert.equal((await askSignedOut(await seeded(), { path, body })).status, 401, path);
+  }
+});
+
+test('signed-out questions are counted by network and for the whole session, after everything else has passed', async () => {
+  const h = await seeded();
+  const reply = await askSignedOut(h);
+  assert.equal(reply.status, 200);
+  // The network's count is the session's own daily AI count; the session's is the Session Agent's own.
+  assert.deepEqual(reply.calls.rate, [
+    [NETWORK, SESSION_AGENT_SIGNED_OUT.perNetworkPerDay, 'ai'],
+    ['anon:session-agent', SESSION_AGENT_SIGNED_OUT.perSessionPerDay, 'session-agent-signed-out'],
+  ]);
+  assert.deepEqual([SESSION_AGENT_SIGNED_OUT.perNetworkPerDay, SESSION_AGENT_SIGNED_OUT.perSessionPerDay], [10, 300]);
+  // A session whose own daily AI limit is lower keeps it.
+  h.state.config.limits = { aiPerWalletPerDay: 3 };
+  assert.deepEqual((await askSignedOut(h)).calls.rate[0], [NETWORK, 3, 'ai']);
+  h.state.config.limits = { aiPerWalletPerDay: 50 };
+  assert.deepEqual((await askSignedOut(h)).calls.rate[0], [NETWORK, 10, 'ai']);
+
+  const over = { error: 'The Session Agent has answered all it can today for people who aren’t signed in. Sign in to ask, or try again tomorrow.', reason: 'session_agent_signed_out_limit' };
+  for (const used of ['ai', 'session-agent-signed-out']) {
+    const refused = await askSignedOut(h, { limits: ({ route }) => route !== used });
+    assert.deepEqual([refused.status, refused.body, refused.calls.ai.length], [429, over, 0], used);
+  }
+  const uncounted = await askSignedOut(h, { limits: () => null });
+  assert.deepEqual([uncounted.status, uncounted.calls.ai.length], [503, 0]);
+  // Nothing is counted for a question that is refused anyway.
+  for (const body of [{ question: ' ' }, { question: 'x'.repeat(501) }, { question: 'Why?', store: 'yes' }]) {
+    const refused = await askSignedOut(h, { body });
+    assert.deepEqual([refused.status, refused.calls.rate.length, refused.calls.ai.length], [400, 0, 0], JSON.stringify(body).slice(0, 40));
+  }
+  h.state.config.sessionEndsAt = '2020-01-01T00:00:00.000Z';
+  const ended = await askSignedOut(h);
+  assert.deepEqual([ended.status, ended.calls.rate.length], [410, 0]);
+  assert.equal((await askSignedOut(h, { path: '/session-agent/status', body: {} })).body.closed, 'session_ended');
+});
+
+test('a signed-out chat is stored only if asked, and never with an address', async () => {
+  const { deps, kept } = chatStore();
+  const h = await seeded(recording);
+  assert.equal((await askSignedOut(h, { path: '/session-agent/status', body: {} })).body.recording, true);
+  const stored = await askSignedOut(h, { body: { question: 'What do people want?', store: true, attribution: 'address', name: 'A visitor' }, deps });
+  assert.deepEqual([stored.status, stored.body.stored], [200, true]);
+  const unasked = await askSignedOut(h, { deps });
+  assert.equal(unasked.body.stored, false);
+  const entries = await kept();
+  assert.deepEqual(entries.map(({ question, name, by, answers }) => ({ question, name, by, answers })), [
+    { question: 'What do people want?', name: 'A visitor', by: undefined, answers: 'general' },
+  ]);
+  // The network address the limit counts is never written with the chat.
+  assert.ok(!JSON.stringify(entries).includes('203.0.113.9'));
 });
 
 test('answers without an address stay out, and no question goes ahead when opt-outs can’t be read', async () => {

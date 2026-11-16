@@ -40,6 +40,12 @@ export const resolveTopLevelRouteSelection = ({
   // Signed in, feedback is an ordinary signed-in route; signed out, it names its session with ?slug=.
   if (path === '/feedback' && method === 'POST' && !hasTrimmedAuthorization) return { kind: 'feedback' };
 
+  // Signed in, the Session Agent is an ordinary signed-in route; signed out, its status and one question are open
+  // where the session's setting allows, and name their session with ?slug=.
+  if ((path === '/session-agent/status' || path === '/session-agent/ask') && method === 'POST' && !hasTrimmedAuthorization) {
+    return { kind: 'session-agent-signed-out', path };
+  }
+
   if (path === '/session-config' && method === 'GET') {
     return { kind: 'session-config' };
   }
