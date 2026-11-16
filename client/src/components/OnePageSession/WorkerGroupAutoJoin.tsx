@@ -187,8 +187,9 @@ function AutoJoinIntent({
           return;
         }
         if (group?.joinMode === 'admin_add') throw new Error('This group is not open for joining.');
-        // Without join choices every group is listed, so a missing one is gone.
-        if (!group && overview && !workerOffersGroupJoinChoices(configRef.current))
+        // Without join choices every group is listed, so a missing one is gone, unless the link carries its
+        // credential: a private session shows an unlisted group to no one before they join, so that joins by id.
+        if (!group && !token && overview && !workerOffersGroupJoinChoices(configRef.current))
           throw new Error('worker_group_not_found');
         if (!token) {
           setProgress({ phase: 'code', message: NEEDS_CODE_MESSAGE });

@@ -505,6 +505,16 @@ describe('WorkerGroupAutoJoin', () => {
       expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
     });
 
+    it('joins an unlisted group by the link’s id when its credential is in the link, even without join choices', async () => {
+      listing([]);
+      window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026#groupInvite=gp%3Ariver-stone');
+      const proof = `0x${'ab'.repeat(65)}`;
+      credentials.mockResolvedValueOnce({ proof });
+      render(<WorkerGroupAutoJoin {...props} sessionConfig={{ ...config, groupJoinChoices: undefined }} />);
+      await settle();
+      expect(JSON.parse(String(joins()[0][1]?.body))).toEqual({ groupId: group.groupId, proof, sessionId });
+    });
+
     it('asks for a code without one, and sends a typed claim code as the secret', async () => {
       listing([secretGroup]);
       render(<WorkerGroupAutoJoin {...props} />);
