@@ -80,6 +80,38 @@ describe('sessionModeProfile', () => {
     expect(() => compileSessionModeProfile(restored)).not.toThrow();
   });
 
+  it('keeps a private session’s group rule as the Worker checks it, through compile and back', () => {
+    const privateProfile = (groupIds: unknown) => {
+      const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+      profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+      profile.storage.payloadAccessControl!.accessConditions = {
+        match: 'any',
+        conditions: [
+          { kind: 'worker_role', role: 'admin' },
+          { kind: 'worker_group', groupIds: groupIds as string[] },
+        ],
+      };
+      return profile;
+    };
+    const profile = privateProfile(['rxc', 'cosmos.2026']);
+    expect(validateSessionModeProfile(profile)).toEqual({ valid: true, issues: [] });
+    expect(classifySessionModeProfileSupport(profile).status).toBe('reachable');
+    const compiled = compileSessionModeProfile(profile);
+    expect(compiled.storageProfile.payloadAccessControl?.accessConditions?.conditions).toContainEqual({
+      kind: 'worker_group',
+      groupIds: ['rxc', 'cosmos.2026'],
+    });
+    expect(mergeSessionModeProfileStorageAccess(profile, compiled.storageProfile)).toEqual(profile);
+
+    const tooMany = Array.from({ length: 21 }, (_, index) => `g${index}`);
+    for (const groupIds of [[], ['rxc', 'rxc'], ['RxC'], ['rxc:1'], tooMany, 'rxc']) {
+      expect(classifySessionModeProfileSupport(privateProfile(groupIds))).toMatchObject({
+        status: 'invalid',
+        validation: { issues: [expect.objectContaining({ code: 'worker_group_ids_required' })] },
+      });
+    }
+  });
+
   it('compiles the public decentralized preset with a derived legacy access string', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     const compiled = compileSessionModeProfile(profile);

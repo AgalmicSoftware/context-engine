@@ -30,6 +30,13 @@ export const normalizeSessionModeAccessConditions = (value: unknown): SessionMod
         };
       }
       if (kind === 'agent_grant_scope') return { kind, scope: trim(condition.scope || condition.value) };
+      // A private session's groups: dropping them would open the session to everyone signed in.
+      if (kind === 'worker_group') {
+        return {
+          kind,
+          groupIds: Array.isArray(condition.groupIds) ? condition.groupIds.map(trim).filter(Boolean) : [],
+        };
+      }
       return null;
     })
     .filter((condition): condition is SessionModeAccessConditionDocument['conditions'][number] => !!condition);

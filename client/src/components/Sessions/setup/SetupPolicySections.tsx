@@ -270,6 +270,7 @@ const RULE_LABELS: Record<SessionModeAccessConditionDocument['conditions'][numbe
   worker_role: 'Session role',
   sbt_onchain: 'SBT holders',
   agent_grant_scope: 'Authorized accounts',
+  worker_group: 'Group members',
 };
 
 const RULES_HELP =
