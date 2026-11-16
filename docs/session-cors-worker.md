@@ -2038,7 +2038,9 @@ group, a member or a password refuses on the next request.
   current signer. A read spends nothing and cannot be used to join. A one-use
   code makes no read invite: its holder joins first.
 - **Who is refused, and how.** The shell, for `GET /session-config`: `ok`,
-  `sessionSlug`, `privateSession` (`invite_required` or `invite_invalid`) and a
+  `sessionSlug`, `privateSession` (`invite_required` or `invite_invalid`),
+  `signedIn` (whether a bearer sent with the request counted, so a client whose
+  sign-in an admin's change ended knows to sign in again) and a
   `config` cut to what signing in and joining need (`slug`, `sessionId`,
   `sessionIdHex`, `configRevision`, `authzEpoch`, `corsWorkerUrl`,
   `allowOrigins`, `appearance`, `sessionModeProfile`, `storageProfile`,
