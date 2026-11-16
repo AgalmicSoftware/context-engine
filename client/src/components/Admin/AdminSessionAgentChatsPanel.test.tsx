@@ -79,9 +79,13 @@ describe('AdminSessionAgentChatsPanel', () => {
     expect(third).toHaveTextContent('Answered: Answer to Third?');
     expect(second).toHaveTextContent(`2026-11-24 · Detailed answer · Sam, ${ASKER} · For salon, hosts`);
 
-    answer(200, { entries: [chat('000000000001', 'First?')], stored: 3 });
+    answer(200, { entries: [chat('000000000001', 'First?', { signedOut: true, name: 'A visitor' })], stored: 3 });
     fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
     await waitFor(() => expect(screen.getAllByTestId('ce-admin-session-agent-chat')).toHaveLength(3));
+    // A visitor's chat says it was asked without signing in, so it isn't taken for a member's.
+    expect(screen.getAllByTestId('ce-admin-session-agent-chat')[2]).toHaveTextContent(
+      '2026-11-24 · General answer · A visitor, not signed in',
+    );
     expect(screen.getAllByTestId('ce-admin-session-agent-chat')[2]).not.toHaveTextContent(/exported|For /);
     expect(fetchWorker.mock.calls[1][0]).toBe(
       'https://worker.example/admin/session-agent/chats?slug=salon&cursor=000000000002',

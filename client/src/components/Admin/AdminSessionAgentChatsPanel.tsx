@@ -17,6 +17,8 @@ type Chat = {
   // Whom the answer was fit for: an admin, or members of these groups; otherwise anyone its style reaches.
   forAdmins: boolean;
   groups: string[];
+  // Asked without signing in.
+  signedOut: boolean;
 };
 
 type Props = {
@@ -48,10 +50,12 @@ const chatOf = (value: unknown): Chat => {
     name: text(row.name),
     forAdmins: row.scope === 'admin',
     groups: (Array.isArray(row.groups) ? row.groups : []).map(text).filter(Boolean),
+    signedOut: row.signedOut === true,
   };
 };
 // Who asked, only as far as they chose to say.
-const asker = ({ by, name }: Chat) => [name, by].filter(Boolean).join(', ') || 'No address or name';
+const asker = ({ by, name, signedOut }: Chat) =>
+  [name, by, signedOut ? 'not signed in' : ''].filter(Boolean).join(', ') || 'No address or name';
 // An admin's answer may hold what no member is given, so the export leaves it out.
 const reach = ({ forAdmins, groups }: Chat) =>
   forAdmins ? ' · Answered to an admin; not exported' : groups.length ? ` · For ${groups.join(', ')}` : '';
