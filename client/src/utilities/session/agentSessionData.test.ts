@@ -1,4 +1,4 @@
-import { fetchAgentQuestions, normalizeAgentQuestion } from './agentSessionData';
+import { buildAgentPolisDataset, fetchAgentQuestions, normalizeAgentQuestion } from './agentSessionData';
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
 const envelope = {
   v: 3,
@@ -81,5 +81,39 @@ describe('normalizeAgentQuestion', () => {
     expect(normalizeAgentQuestion({ ...base, questionType: 'multichoice', options })).not.toHaveProperty(
       'singleSelect',
     );
+  });
+});
+
+describe('buildAgentPolisDataset', () => {
+  // A rating and a yes/no question with the same wording, and the raw Polis read unavailable.
+  const views = (statement: Record<string, unknown>) => ({
+    polis: { status: 'error' },
+    consensus: {
+      status: 'ready',
+      data: {
+        questions: [
+          { questionId: 'rating', prompt: 'Is it fair?', counts: [{ label: '7', count: 2 }], participants: 2 },
+          { questionId: 'yes-no', prompt: 'Is it  fair?', counts: [{ label: 'Agree', count: 2 }], participants: 2 },
+        ],
+      },
+    },
+    groups: {
+      status: 'ready',
+      data: {
+        groups: [
+          { size: 2, topStatements: [{ prompt: 'Is it fair?', cluster: { agree: 2, responded: 2 }, ...statement }] },
+        ],
+      },
+    },
+  });
+
+  it('never gives a rating the votes of a yes/no question that shares its wording', () => {
+    expect(Object.keys(buildAgentPolisDataset(views({})).aggregator)).toEqual(['yes-no']);
+  });
+
+  it('places a group statement on the question its id names', () => {
+    const dataset = buildAgentPolisDataset(views({ questionId: 'yes-no' }));
+    expect(Object.keys(dataset.aggregator)).toEqual(['yes-no']);
+    expect(dataset.aggregator['yes-no'].map((vote) => vote.responder)).toEqual(['G1-P1', 'G1-P2']);
   });
 });
