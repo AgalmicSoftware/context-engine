@@ -71,12 +71,14 @@ const normalizeAiTranscriptionEntry = (entry: AnyRecord | null | undefined): Any
   };
 };
 
+const asFields = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+
 // The Session Agent's own model, when it answers on Cloudflare: a listed
 // Workers AI model, or nothing. Every other task uses the fast and thinking models.
 const readSessionAgentModel = (models: unknown): { provider: string; model: string } | null => {
-  const entry = models && typeof models === 'object' ? (models as AnyRecord)[WORKERS_AI_TASK] : null;
-  if (!entry || typeof entry !== 'object' || normalizeAiProvider(entry.provider, '') !== WORKERS_AI_PROVIDER)
-    return null;
+  const entry = asFields(asFields(models)?.[WORKERS_AI_TASK]);
+  if (!entry || normalizeAiProvider(entry.provider, '') !== WORKERS_AI_PROVIDER) return null;
   const model = toStr(entry.model).trim();
   return {
     provider: WORKERS_AI_PROVIDER,
@@ -84,12 +86,11 @@ const readSessionAgentModel = (models: unknown): { provider: string; model: stri
   };
 };
 
-export const sessionAgentOnCloudflare = (ai: unknown): boolean =>
-  !!readSessionAgentModel(ai && typeof ai === 'object' ? (ai as AnyRecord).models : null);
+export const sessionAgentOnCloudflare = (ai: unknown): boolean => !!readSessionAgentModel(asFields(ai)?.models);
 
 /** The models with the Session Agent answering on Cloudflare's open model, or on the session's own. */
-export const withSessionAgentOnCloudflare = (models: unknown, on: boolean): AnyRecord => {
-  const { [WORKERS_AI_TASK]: _previous, ...rest } = models && typeof models === 'object' ? (models as AnyRecord) : {};
+export const withSessionAgentOnCloudflare = (models: unknown, on: boolean): Record<string, unknown> => {
+  const { [WORKERS_AI_TASK]: _previous, ...rest } = asFields(models) ?? {};
   return on ? { ...rest, [WORKERS_AI_TASK]: { provider: WORKERS_AI_PROVIDER, model: DEFAULT_WORKERS_AI_MODEL } } : rest;
 };
 
