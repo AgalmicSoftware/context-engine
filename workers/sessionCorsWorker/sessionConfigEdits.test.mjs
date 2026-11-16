@@ -252,9 +252,11 @@ test('the path lists agree with the Worker verdict for any pair of configs', () 
     mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
     return ((mixed ^ (mixed >>> 14)) >>> 0) % count;
   };
-  const keys = ['sessionName', 'sessionContext', 'defaultTags', 'interviewMode', 'agentHttp', 'futureSetting'];
+  const keys = ['sessionName', 'sessionContext', 'defaultTags', 'interviewMode', 'agentHttp', 'futureSetting', 'workerAuthority'];
+  const gate = (...groupIds) => ({ version: 1, loginGate: { match: 'any', conditions: groupIds.map(groupId => ({ kind: 'worker_group', groupId })) } });
   const values = [undefined, null, 'a', 'b', ['x'], {}, { openingPrompt: 'a' }, { openingPrompt: 'b', enabled: true },
-    { enabled: true }, { invites: [invite] }, { invites: [invite, second] }, { invites: [second], enabled: false }];
+    { enabled: true }, { invites: [invite] }, { invites: [invite, second] }, { invites: [second], enabled: false },
+    gate('g1'), gate('g1', 'g2'), gate('g2'), gate()];
   const config = () => Object.fromEntries(keys.filter(() => pick(2)).map(key => [key, values[pick(values.length)]]));
   for (let run = 0; run < 3000; run += 1) {
     const before = config();
@@ -312,4 +314,82 @@ test('the preview matches the authorization epoch the Worker assigns on save', (
     assert.equal(saved.config.authzEpoch !== stored.authzEpoch, signsOut, label);
     assert.equal(classify(stored, { ...stored, ...patch }).signsParticipantsOut, signsOut, label);
   }
+});
+
+// Who may sign in and read, as any-of rules: a sign-in gate of groups, a group
+// read gate, and an access rule with a group condition.
+const groupRules = ({ login = ['g1'], match = 'any', readGroups = ['g1'], ruleGroups = ['g1'], ruleMatch = 'all', extraRule } = {}) => ({
+  workerAuthority: { version: 1, participantScopes: ['storage'], loginGate: { match, conditions: login.map(groupId => ({ kind: 'worker_group', groupId })) } },
+  storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'group_gate', encryption: 'worker_envelope', groupIds: readGroups } },
+  sessionModeProfile: { encryption: { mode: 'worker_envelope', accessConditions: {
+    match: ruleMatch, conditions: [{ kind: 'worker_group', groupIds: ruleGroups }, ...(extraRule ? [extraRule] : [])],
+  } } },
+});
+
+test('adding a group to an any-of access rule keeps sign-ins; every narrowing still ends them', () => {
+  const before = groupRules({ login: ['g1', 'g2'], readGroups: ['g1', 'g2'], ruleGroups: ['g1', 'g2'] });
+  const widened = [
+    groupRules({ login: ['g1', 'g2', 'g3'], readGroups: ['g1', 'g2'], ruleGroups: ['g1', 'g2'] }),
+    groupRules({ login: ['g1', 'g2'], readGroups: ['g1', 'g2', 'g3'], ruleGroups: ['g1', 'g2'] }),
+    groupRules({ login: ['g1', 'g2'], readGroups: ['g1', 'g2'], ruleGroups: ['g1', 'g2', 'g3'] }),
+    groupRules({ login: ['g1', 'g2', 'g3', 'g4'], readGroups: ['g3', 'g1', 'g2'], ruleGroups: ['g1', 'g2', 'g3'] }),
+  ];
+  for (const after of widened) {
+    const label = JSON.stringify(after);
+    assert.equal(revokes(before, after), false, label);
+    assert.deepEqual(classify(before, after).authority, [], label);
+    assert.equal(classify(before, after).content.length > 0, true, label);
+  }
+  const narrowed = [
+    // A group removed, or swapped for another.
+    groupRules({ login: ['g1'], readGroups: ['g1', 'g2'], ruleGroups: ['g1', 'g2'] }),
+    groupRules({ login: ['g1', 'g3'], readGroups: ['g1', 'g2'], ruleGroups: ['g1', 'g2'] }),
+    groupRules({ login: ['g1', 'g2'], readGroups: ['g2'], ruleGroups: ['g1', 'g2'] }),
+    groupRules({ login: ['g1', 'g2'], readGroups: ['g1', 'g2'], ruleGroups: ['g1'] }),
+    // Any becomes all; a condition added to an all rule; conditions reordered.
+    groupRules({ login: ['g1', 'g2'], match: 'all', readGroups: ['g1', 'g2'], ruleGroups: ['g1', 'g2'] }),
+    groupRules({ login: ['g1', 'g2'], readGroups: ['g1', 'g2'], ruleGroups: ['g1', 'g2'], extraRule: { kind: 'worker_role', role: 'admin' } }),
+    groupRules({ login: ['g2', 'g1', 'g3'], readGroups: ['g1', 'g2'], ruleGroups: ['g1', 'g2'] }),
+    // A widening alongside any other authority edit.
+    { ...groupRules({ login: ['g1', 'g2', 'g3'], readGroups: ['g1', 'g2'], ruleGroups: ['g1', 'g2'] }), adminAddress: `0x${'ab'.repeat(20)}` },
+    { ...before, workerAuthority: { ...before.workerAuthority, participantScopes: ['storage', 'ai'], loginGate: groupRules({ login: ['g1', 'g2', 'g3'] }).workerAuthority.loginGate } },
+    { ...before, storageProfile: { ...before.storageProfile, payloadAccessControl: { ...before.storageProfile.payloadAccessControl, gate: 'sbt_gate', groupIds: ['g1', 'g2', 'g3'] } } },
+    { ...before, sessionModeProfile: { encryption: { ...before.sessionModeProfile.encryption, mode: 'lit' } } },
+  ];
+  for (const after of narrowed) {
+    const label = JSON.stringify(after);
+    assert.equal(revokes(before, after), true, label);
+    assert.equal(classify(before, after).signsParticipantsOut, true, label);
+  }
+  // A first rule closes an open session; a first group is not a widening either.
+  assert.equal(revokes(groupRules({ login: [] }), groupRules({ login: ['g1'] })), true);
+  assert.equal(revokes(groupRules({ readGroups: [] }), groupRules({ readGroups: ['g1'] })), true);
+  assert.equal(revokes(groupRules({ ruleGroups: [] }), groupRules({ ruleGroups: ['g1'] })), true);
+  // A group read list counts only under a group gate.
+  const sbt = (groupIds) => ({ storageProfile: { payloadAccessControl: { gate: 'sbt_gate', groupIds } } });
+  assert.equal(revokes(sbt(['g1']), sbt(['g1', 'g2'])), true);
+  // A group condition grows only in its group list.
+  const condition = (extra) => ({ sessionModeProfile: { encryption: { accessConditions: {
+    match: 'any', conditions: [{ kind: 'worker_group', groupIds: ['g1'], ...extra }] } } } });
+  assert.equal(revokes(condition({}), condition({ groupIds: ['g1', 'g2'] })), false);
+  assert.equal(revokes(condition({}), condition({ groupIds: ['g1', 'g2'], minMembers: 2 })), true);
+});
+
+test('adding a group keeps the authorization epoch on save; removing one raises it', () => {
+  const stored = { ...workerCanonicalConfig(), authzEpoch: 4, workerAuthority: {
+    version: 1, participantScopes: ['storage'], loginGate: { match: 'any', conditions: [{ kind: 'worker_group', groupId: 'g1' }] },
+  } };
+  const save = workerAuthority => applySessionConfigMutation({
+    existingConfig: stored, mutation: { kind: 'set-config', incomingConfig: { workerAuthority } }, slug: 'session-a',
+  });
+  const login = (...groupIds) => ({ ...stored.workerAuthority, loginGate: { match: 'any', conditions: groupIds.map(groupId => ({ kind: 'worker_group', groupId })) } });
+  const widened = save(login('g1', 'g2'));
+  assert.equal(widened.ok, true, widened.error);
+  assert.deepEqual(widened.config.workerAuthority.loginGate.conditions.map(condition => condition.groupId), ['g1', 'g2']);
+  assert.equal(widened.config.authzEpoch, 4);
+  const narrowed = applySessionConfigMutation({
+    existingConfig: widened.config, mutation: { kind: 'set-config', incomingConfig: { workerAuthority: login('g2') } }, slug: 'session-a',
+  });
+  assert.equal(narrowed.ok, true, narrowed.error);
+  assert.equal(narrowed.config.authzEpoch, 5);
 });

@@ -2718,7 +2718,16 @@ Never return secrets in responses.
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
   invite records remain unchanged. Removing, disabling, re-enabling or editing
-  an existing invite revokes authorization. Other fields, including permissions,
+  an existing invite revokes authorization. Adding an alternative to an access
+  rule that admits anyone meeting any one of them also preserves authorization,
+  since every gate is checked afresh on each request: another group in
+  `workerAuthority.loginGate` or an access-condition document whose `match` is
+  not `all`, more `groupIds` in a `worker_group` condition, or more `groupIds`
+  under a group read gate (`payloadAccessControl.gate: group_gate`). Every
+  earlier entry must stay unchanged and in place, the rule must already have
+  one, and nothing else may change. Removing or swapping a group, a first rule
+  on an open session, `any` becoming `all`, a condition added to an `all` rule,
+  or a reorder still raise `authzEpoch`. Other fields, including permissions,
   gates, groups, surfaces, visibility, encryption, origins and unknown settings,
   remain authority-sensitive. A mixed content/authority edit raises `authzEpoch`.
   Classification compares the normalized configuration that will be stored.
