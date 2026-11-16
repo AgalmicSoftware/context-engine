@@ -37,6 +37,12 @@ All notable changes to this project will be documented in this file.
 - An Interview's draft review now survives a reload, Back, or reopening the tab. Its transcript, drafts, edits, sharing choices and any AI prefill are kept in this browser until you submit or discard, for at most 24 hours from when it was first kept, and nothing more is sent anywhere. Each is kept for the signed-in account and never shown to another account. One kept signed out lasts an hour, and the next visit asks whether to continue it or discard it before showing anything, since a phone may be shared; a new interview from a link or a code clears it. Another browser starts empty, including Safari after a chat app's own browser.
 - A private session shows a way in where its content would be. Without an invite, a visitor is told the session is private and can paste an invite link. A valid group invite link opens the session, signed in or not, and keeps working in that browser until the invite stops holding.
 - A link's group invite is no longer lost when the page saves it late in start-up, on ordinary sessions too.
+- Results no longer shows the AI Views tabs (Circles, Breakdown, Risk Matrix). The AI Views build stays, for the Session Agent.
+- **Atlas** and **Risk Matrix** appear in Results once an admin builds them. Until then, only people who may build one see its tab, with a note saying how.
+- The **Debate Atlas** tab is now **Atlas**, and its levels are named Topic and Subtopic.
+- A built view is headed by one small row: its version, with its model and counts beneath.
+- A built atlas shows a multiple-choice question's choices, on a Worker from this release.
+- A question's **Answer** link from the atlas opens for a session reached by a `worker=` link.
 
 ### Workers — requires redeployment
 
@@ -53,6 +59,7 @@ All notable changes to this project will be documented in this file.
 - Everyone else gets a shell from `GET /session-config`, with only what signing in and joining need and never the session's name, description, context or instructions, and `403` (`private_session_invite_required` or `private_session_invite_invalid`) on other routes.
 - The rule is a `worker_group` condition in the session's access conditions, any-of with the admin role so admins are never locked out, saved with `set-config`. This release has no control for it on `/new` or in Settings.
 - Adding a group to an access rule, or another condition to an any-of rule, signs no one out. Every narrowing still does.
+- An atlas build keeps each multiple-choice question's choices. An atlas built before the Worker is updated shows "Options unavailable" for those questions until it is built once more.
 
 ### Agents and MCP
 
