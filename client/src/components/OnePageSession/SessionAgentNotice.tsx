@@ -10,12 +10,15 @@ import styles from './SessionAgentNotice.module.scss';
 const SESSION_AGENT_README_URL = `${buildPublicRepoBlobUrl('README.md')}#session-agent`;
 
 // `sessionConfig` sets the words by the title: who else is shown a person's answers follows its results setting.
-type Props = { id: string; where: 'page' | 'switch'; className?: string; sessionConfig?: unknown };
+// `note` is the session's own words on where its data goes, read after the notice as plain text: a link in it
+// is shown where it can be selected, not here.
+type Props = { id: string; where: 'page' | 'switch'; className?: string; sessionConfig?: unknown; note?: string };
 
 // A link, so selecting it opens the README's Session Agent section; hovering or focusing it shows the notice.
 // By the session's title it shows the launcher's robot, as the session's own "?" sits beside it.
-const SessionAgentNotice = ({ id, where, className, sessionConfig }: Props) => {
-  const text = where === 'page' ? sessionAgentPageNotice(sessionConfig) : SESSION_AGENT_USE_NOTICE;
+const SessionAgentNotice = ({ id, where, className, sessionConfig, note = '' }: Props) => {
+  const notice = where === 'page' ? sessionAgentPageNotice(sessionConfig) : SESSION_AGENT_USE_NOTICE;
+  const text = note ? `${notice} ${note}` : notice;
   return (
     <>
       <a

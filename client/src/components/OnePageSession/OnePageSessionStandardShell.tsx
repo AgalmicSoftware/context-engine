@@ -36,6 +36,7 @@ import styles from './OnePageSession.module.scss';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
 import SessionContextSources from './SessionContextSources';
 import SessionAgentNotice from './SessionAgentNotice';
+import { normalizeInterviewSettings } from '@ce-shared/interviewSettings.mjs';
 import { useSessionContextSources } from '../../utilities/docLibrary/useSessionContextSources';
 import { sessionAgentOpenToAnyone, sessionAgentSettingOf } from '@ce-shared/sessionAgent.mjs';
 
@@ -570,6 +571,7 @@ export default function OnePageSessionStandardShell({
               where="page"
               className={styles.sessionInfoButton}
               sessionConfig={resolvedSessionConfig}
+              note={normalizeInterviewSettings((resolvedSessionConfig as UnknownRecord | null)?.interviewMode).dataNote}
             />
           ) : null}
         </div>

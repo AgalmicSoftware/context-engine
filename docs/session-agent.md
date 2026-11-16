@@ -183,7 +183,9 @@ A "?" by the switch, and a robot by the session's title while the Session Agent
 is on, say what it may read and link here through the README. The robot's notice
 and the second switch's "?" also say who is shown a person's answers with
 their address, by the session's results setting: anyone with its link, its
-organisers and signed-in members, or its organisers alone.
+organisers and signed-in members, or its organisers alone. The robot's notice
+ends with the session's own note on where its data goes, when its admins wrote
+one (`interviewMode.dataNote`), as plain text.
 
 While it is on, the interview dialog, where AI-drafted answers are reviewed and
 submitted, carries the same switch at its foot, **Session Agent may use my

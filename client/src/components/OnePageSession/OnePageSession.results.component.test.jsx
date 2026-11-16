@@ -1830,6 +1830,21 @@ describe('OnePageSession results routing', () => {
       expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
     });
 
+    it('reads the session’s own note on where its data goes after the notice, as plain text', async () => {
+      const dataNote = 'Part of a study funded by two institutes. https://example.org/study';
+      await renderSession([file, link], false, {
+        sessionConfig: { ...buildProps().sessionConfig, sessionAgent, interviewMode: { dataNote } },
+      });
+      const notice = screen.getByTestId('ce-session-agent-notice-page');
+      expect(notice).toHaveAccessibleDescription(
+        'The Session Agent may draw on your answers and the files you add when it answers others, never naming you. ' +
+          'They are available with your account address to this session’s organisers, and may be exported; ' +
+          `a summary without names or addresses may be published. ${dataNote}`,
+      );
+      // Its link is offered where it can be selected, not inside a description no one can reach.
+      expect(document.querySelector('a[href="https://example.org/study"]')).toBeNull();
+    });
+
     it('shows no Session Agent while it is off, even to admins', async () => {
       await renderSession([], true, { account: '0xabc', loginComplete: true });
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
