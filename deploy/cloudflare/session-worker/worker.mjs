@@ -71171,7 +71171,7 @@ var init_workersAiModels = __esm({
     WORKERS_AI_PROVIDER = "workers-ai";
     WORKERS_AI_TASK = "session-agent";
     WORKERS_AI_MODELS = Object.freeze([
-      Object.freeze({ id: "@cf/zai-org/glm-5.3", tokenField: "max_completion_tokens" })
+      Object.freeze({ id: "@cf/zai-org/glm-5.3", tokenField: "max_completion_tokens", reasoningEffort: "low" })
     ]);
     DEFAULT_WORKERS_AI_MODEL = WORKERS_AI_MODELS[0].id;
     WORKERS_AI_MODEL_IDS = Object.freeze(WORKERS_AI_MODELS.map((entry2) => entry2.id));
@@ -71529,7 +71529,8 @@ var init_aiProviderExecution = __esm({
       if (!listed) return json10({ error: AI_MODEL_NOT_ALLOWED.error, reason: AI_MODEL_NOT_ALLOWED.reason }, 403, baseHeaders);
       const inputs = {
         messages: Array.isArray(messages) ? messages : [{ role: "user", content: String(prompt || "") }],
-        [listed.tokenField]: maxTokens
+        [listed.tokenField]: maxTokens,
+        ...listed.reasoningEffort ? { reasoning_effort: listed.reasoningEffort } : {}
       };
       let data;
       try {
