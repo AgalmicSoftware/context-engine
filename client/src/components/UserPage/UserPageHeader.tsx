@@ -159,7 +159,7 @@ const UserPageHeader = ({
           {addressDisplay}
           {addressIsPrivateLabel && (
             <span className={styles.privateLabelTag} title={PRIVATE_LABEL_NOTE}>
-              your label
+              <span className={styles.visuallyHidden}>, </span>your label
             </span>
           )}
           {showPen && (

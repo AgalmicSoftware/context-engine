@@ -710,6 +710,7 @@ const CompareAddress = ({
             />
             <span>
               {nickname || shortened} {nickname && <span className={styles.pillAddress}>({shortened})</span>}
+              {nickname && <span className={styles.visuallyHidden}>, your private label</span>}
             </span>
           </span>
           <button
