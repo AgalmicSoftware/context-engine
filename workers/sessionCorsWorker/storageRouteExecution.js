@@ -80,6 +80,7 @@ import { checkContextSourceUpload, contextSourceListFields } from './contextSour
 import { contextSourceRoute } from './contextSourceRoute.js';
 import { toStr } from './stringCoercion.js';
 import { answerVersionStamp } from './answerVersionStamp.js';
+import { answerPayloadForReader, readsResearchFields } from './researchFieldAccess.js';
 import {
   isStorageReadLimitError, jsonByteLength, parseStorageExportCursor, readStorageBytesBounded,
   STORAGE_EXPORT_PAGE_LIMITS, StorageReadLimitError, storageExportCursor,
@@ -2142,6 +2143,19 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
       return responseJson(deps, { error: error?.message || 'Cloudflare worker envelope decrypt failed.' }, 403, baseHeaders);
     }
   }
+  // An answer's research material reaches only its author and the session's admins (researchFieldAccess.js).
+  let researchPrivate = false;
+  if (resource === 'responses') {
+    const bytes = new Uint8Array(await new Response(responseBody).arrayBuffer());
+    const forReader = answerPayloadForReader(decoder.decode(bytes), {
+      reads: readsResearchFields({
+        metadata, requesterAddress: uploaderAddress, authScopes, adminAddresses: resolveSessionAdminAddresses(config),
+      }),
+    });
+    responseBody = forReader?.withheld ? forReader.text : bytes;
+    // The body now depends on who reads it, so no shared cache may keep it.
+    researchPrivate = !!forReader?.carries;
+  }
   const { contentType, inline } = resolveStorageReadContentType(metadata?.contentType);
   const responseHeaders = new Headers(baseHeaders || {});
   responseHeaders.set('Content-Type', contentType);
@@ -2154,7 +2168,7 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   responseHeaders.set('X-CE-Storage-Backend', STORAGE_BACKENDS.CLOUDFLARE);
   responseHeaders.set('X-CE-Storage-Ref', id);
   responseHeaders.set('X-CE-Payload-Access-Mode', deriveLegacyPayloadAccessMode(resolvedAccess));
-  if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE || hasPrivateResponsePolicy({ config, resource })) {
+  if (researchPrivate || resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE || hasPrivateResponsePolicy({ config, resource })) {
     responseHeaders.set('Cache-Control', 'private, no-store');
   }
   return new Response(responseBody, {
