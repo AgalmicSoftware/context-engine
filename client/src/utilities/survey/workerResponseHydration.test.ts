@@ -671,6 +671,23 @@ describe('answers with research material, which the Worker sends only to their a
     );
   });
 
+  it('never asks anyone to sign on Results: without a token, it reads signed out and the answers still load', async () => {
+    const readBlob = jest.fn(async (options: Record<string, any>) => {
+      // No token held: a signed-in read that may not ask fails, as fetchWorkerWithAuth does.
+      if (options.preferAnonymous === false) throw new Error('Sign in to continue.');
+      return workerRead(ADMIN)(options);
+    });
+    const rows = await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account: ADMIN },
+      { listSessionStorageRefsPage: listPage, readSessionStorageBlob: readBlob },
+    );
+    expect(whole(rows)).toEqual({ [AUTHOR]: false, [OTHER]: false });
+    expect(rows.every((row) => row.response.interviewProvenanceWithheld === true)).toBe(true);
+    const signedIn = readBlob.mock.calls.filter(([options]) => options.preferAnonymous === false);
+    expect(signedIn).toHaveLength(2);
+    expect(signedIn.every(([options]) => options.prompt === false)).toBe(true);
+  });
+
   it('reads own answers signed in, so ticks restore on a fresh browser', async () => {
     const rows = await loadWorkerResponses(
       { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account: AUTHOR, ownResponses: true },

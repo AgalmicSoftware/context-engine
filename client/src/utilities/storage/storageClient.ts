@@ -427,7 +427,8 @@ export const readSessionStorageBatch = async ({
   workerUrl = '',
   signal,
   preferAnonymous = true,
-}: Omit<ReadSessionStorageBlobOptions, 'storageRef' | 'prompt'> & { ids: string[] }): Promise<unknown[]> => {
+  prompt,
+}: Omit<ReadSessionStorageBlobOptions, 'storageRef'> & { ids: string[] }): Promise<unknown[]> => {
   if (!ids.length || ids.length > STORAGE_READ_BATCH_MAX_IDS) throw new Error('A batch read takes 1 to 100 ids.');
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   const response = await fetchWorkerWithAuth(
@@ -445,6 +446,7 @@ export const readSessionStorageBatch = async ({
       workerUrl: baseUrl,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
       preferAnonymous,
+      prompt,
       anonymousRefused: batchNeedsSignIn,
     },
   );
@@ -475,6 +477,7 @@ export const readSessionStorageBatch = async ({
           workerUrl: baseUrl,
           signal,
           preferAnonymous,
+          prompt,
         });
         return parse(await single.text());
       }

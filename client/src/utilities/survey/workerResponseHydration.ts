@@ -211,6 +211,17 @@ export const loadWorkerResponses = async (
   const readsAllWhole = ownResponses || readsResearchMaterial(target.sessionConfig, account);
   const signedIn = ({ metadata }: WantedRead) =>
     readsAllWhole || (!!reader && readString(metadata.responder).toLowerCase() === reader);
+  // Own answers are read signed in as before. Results never ask anyone to sign: without a token held, these reads
+  // go signed out, and the copies come back marked so a later load reads them again.
+  const readWhole = async <T>(read: (auth: { preferAnonymous?: false; prompt?: false }) => Promise<T>) => {
+    if (ownResponses) return read({ preferAnonymous: false });
+    try {
+      return await read({ preferAnonymous: false, prompt: false });
+    } catch {
+      signal?.throwIfAborted();
+      return read({});
+    }
+  };
   const batched =
     !!wanted.length &&
     (
@@ -228,11 +239,10 @@ export const loadWorkerResponses = async (
       for (const whole of [true, false]) {
         const part = chunk.map((read, index) => ({ read, index })).filter(({ read }) => signedIn(read) === whole);
         if (!part.length) continue;
-        const read = await readBatch({
-          ...readTarget,
-          ...(whole ? { preferAnonymous: false } : {}),
-          ids: part.map(({ read: entry }) => entry.storageRefId),
-        });
+        const ids = part.map(({ read: entry }) => entry.storageRefId);
+        const read = whole
+          ? await readWhole((auth) => readBatch({ ...readTarget, ...auth, ids }))
+          : await readBatch({ ...readTarget, ids });
         part.forEach(({ index }, at) => {
           payloads[index] = read[at];
         });
@@ -241,12 +251,9 @@ export const loadWorkerResponses = async (
       payloads.push(
         ...(await Promise.all(
           chunk.map(async (read) =>
-            (
-              await readBlob({
-                ...readTarget,
-                ...(signedIn(read) ? { preferAnonymous: false } : {}),
-                storageRef: read.storageRef,
-              })
+            (signedIn(read)
+              ? await readWhole((auth) => readBlob({ ...readTarget, ...auth, storageRef: read.storageRef }))
+              : await readBlob({ ...readTarget, storageRef: read.storageRef })
             )
               .json()
               .catch(() => null),
