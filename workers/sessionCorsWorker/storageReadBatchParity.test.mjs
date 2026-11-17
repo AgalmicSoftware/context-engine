@@ -1,6 +1,6 @@
 // A batch read gives each reader exactly what single reads give them, item by
-// item (access checks, the session's rule as it is now, an item's own rule,
-// research material), while reading every payload in one bulk KV get and asking the
+// item (access checks, the rule each item was stored under, an item's own
+// rule, research material), while reading every payload in one bulk KV get and asking the
 // session's gate once.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -138,12 +138,12 @@ for (const refuseBulk of [false, true]) {
     assert.deepEqual(statuses, {
       signedOut: [403, 403, 403, 403, 403, 404],
       first: [200, 200, 200, 200, 403, 404],
-      second: [200, 403, 200, 200, 200, 404],
+      // Items stored while the session was the first group's keep that rule.
+      second: [403, 403, 403, 200, 200, 404],
       admin: [200, 200, 200, 200, 200, 404],
     });
     // Research material reaches an answer's author and the admins, and no other reader.
     const research = async (who, id) => JSON.parse((await batch(env, WIDENED, who, [id]))[0].text);
-    assert.equal((await research(SECOND, ids[2])).interviewProvenanceWithheld, true);
     assert.equal('interviewProvenance' in await research(ADMIN, ids[3]), true);
     assert.equal('interviewProvenance' in await research(SECOND, ids[3]), true);
     assert.equal((await research(FIRST, ids[3])).interviewProvenanceWithheld, true);
