@@ -264,6 +264,9 @@ export default function PolisReportFidelitySection({
   if (!overview) return null;
 
   const minimum = overview.options.minParticipants;
+  // The Worker sends what people's AIs predicted only to the session's admins (and each person their own), so a
+  // reader shown none gets no section rather than a promise it will appear.
+  if (!overview.coverage.participants) return null;
   if (overview.coverage.participants < minimum) {
     // With voice interviews off, no more AI-prefill drafts can arrive.
     if (!isInterviewFeatureEnabled(config)) return null;

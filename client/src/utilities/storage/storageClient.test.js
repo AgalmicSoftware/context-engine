@@ -196,6 +196,20 @@ describe('storageClient', () => {
     expect(result.storageRef).toEqual({ backend: 'arweave', id: TX_ID, uri: `ar://${TX_ID}`, resource: 'docsContext' });
   });
 
+  test('puts an answer on Arweave without its research material, which only admins may read', async () => {
+    const answer = { questionID: 'q-1', answer: { value: 'Agree' }, interviewProvenance: { originalPrediction: {} } };
+    await uploadDataToSessionStorage(JSON.stringify({ surveyID: 's', responses: [answer] }), 'json', {
+      sessionSlug: 'alpha',
+      sessionConfig: {},
+      resource: 'responses',
+    });
+    const sent = JSON.parse(arweaveClient.uploadDataToArweave.mock.calls[0][0]);
+    expect(sent.responses).toEqual([{ questionID: 'q-1', answer: { value: 'Agree' } }]);
+    // Other resources go up as given.
+    await uploadDataToSessionStorage(answer, 'json', { sessionSlug: 'alpha', sessionConfig: {} });
+    expect(arweaveClient.uploadDataToArweave.mock.calls[1][0]).toBe(answer);
+  });
+
   test('keeps lit-arweave available for encrypted payload storage refs', async () => {
     const result = await uploadDataToSessionStorage({ envelope: true }, 'json', {
       sessionSlug: 'alpha',

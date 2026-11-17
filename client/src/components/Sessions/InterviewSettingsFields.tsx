@@ -98,7 +98,7 @@ const SWITCHES = {
 } as const;
 const FIDELITY_RESULTS_LABEL = 'Show “How well AIs predicted people” in Results';
 const FIDELITY_RESULTS_HELP =
-  'Adds How well AIs predicted people to Results, once AI prefill drafts come from at least the smallest group set below.';
+  'Adds How well AIs predicted people to the Results the session’s admins see, once AI prefill drafts come from at least the smallest group set below. Only admins see what people’s AIs predicted.';
 
 const ROW = { display: 'flex', alignItems: 'center', gap: 8 } as const;
 

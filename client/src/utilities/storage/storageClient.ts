@@ -13,6 +13,7 @@ import {
   normalizeSessionStorageConfig,
   resolveSessionStorageBackend,
 } from './sessionStorageConfig.js';
+import { withoutResearchMaterial } from './withoutResearchMaterial';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -246,7 +247,9 @@ export const uploadDataToSessionStorage = async (
   const storageConfig = normalizeSessionStorageConfig(sessionConfig);
 
   if (backend === STORAGE_BACKENDS.ARWEAVE || backend === STORAGE_BACKENDS.LIT_ARWEAVE) {
-    const txId = await arweaveClient.uploadDataToArweave(data, format, {
+    // Arweave is public for good, so an answer goes there without its research material.
+    const publicData = resource === 'responses' ? withoutResearchMaterial(data) : data;
+    const txId = await arweaveClient.uploadDataToArweave(publicData, format, {
       sessionSlug,
       sessionConfig,
       context,
