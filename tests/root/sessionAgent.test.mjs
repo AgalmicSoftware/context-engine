@@ -491,3 +491,14 @@ test('without members’ answers the agent is told the counts are on the Results
   // The sentence stays outside the tags: the results themselves are unchanged.
   assert.match(promptOf('general'), /<session_results>\n"Two themes\."\n<\/session_results>/);
 });
+
+test('the agent is told whether the session records its chats, so it can say when asked', () => {
+  const systemOf = (setting) => buildSessionAgentMessages({ setting, style: 'general', question: 'Is this recorded?' }).messages[0].content;
+  const off = systemOf({ audiences: [audience(everyone)] });
+  assert.match(off, /About this chat: this session does not record chats with you, so this question and your answer are not stored in its records\. Say so if asked\.$/);
+  const on = systemOf({ audiences: [audience(everyone)], history: true });
+  assert.match(on, /About this chat: this session stores a chat with you in its records, for its organisers, when the asker chooses\. Whether this one is stored is shown to the asker beside your answer; say so if asked\.$/);
+  // It comes after the rules, which no setting moves or removes.
+  for (const system of [off, on]) assert.ok(system.indexOf('These rules always apply') < system.indexOf('About this chat:'));
+  assert.match(systemOf(undefined), /does not record chats/);
+});

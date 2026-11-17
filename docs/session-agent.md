@@ -476,6 +476,14 @@ Nothing asked or answered is kept unless an admin turns on **Record chats** in
 the Session Agent's settings (`history: true`). It is off by default, and
 turning it on or off signs no one out.
 
+The agent itself is told which it is on every question, after its rules:
+that the session does not record chats, or that it stores one when the asker
+chooses and that the asker is shown whether this one was. Asked whether the
+chat is recorded, it then answers from the session's setting. The answer's
+own text never carries a line about recording: the dialog and the reply's
+`stored` field say that, and a stored chat keeps the answer as the agent
+wrote it.
+
 While it is on, the dialog shows **Store this chat**, ticked to start, with a
 "?" saying what that means. A chat is stored only when its asker leaves the
 box ticked. Signed in with an address, they choose **No address**, which is

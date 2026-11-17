@@ -588,6 +588,13 @@ const chatStore = () => {
   };
 };
 
+test('each question tells the agent whether this session records chats', async () => {
+  assert.match((await ask(await seeded())).prompt, /About this chat: this session does not record chats with you/);
+  const kept = await ask(await seeded(recording), { deps: chatStore().deps });
+  assert.match(kept.prompt, /About this chat: this session stores a chat with you in its records, for its organisers, when the asker chooses/);
+  assert.match((await askSignedOut(await seeded())).prompt, /About this chat: this session does not record chats with you/);
+});
+
 test('nothing asked is kept unless the session stores chats and the asker asked for it', async () => {
   const off = chatStore();
   const h = await seeded();

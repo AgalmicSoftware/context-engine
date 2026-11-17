@@ -269,6 +269,15 @@ export const sessionAgentOpenToAnyone = (setting) => !!setting && setting.anyone
 /** Whether an asker may have an exchange stored in this session. */
 export const sessionAgentStoresChats = (setting) => setting?.history === true;
 
+// What the agent is told about its own chats, by the session's setting. Only what is sure: whether
+// one chat is stored is the asker's choice and the Worker's to report, after the answer is written.
+const CHAT_NOT_STORED =
+  'About this chat: this session does not record chats with you, so this question and your answer are not stored in its records. ' +
+  'Say so if asked.';
+const CHAT_MAY_BE_STORED =
+  'About this chat: this session stores a chat with you in its records, for its organisers, when the asker chooses. ' +
+  'Whether this one is stored is shown to the asker beside your answer; say so if asked.';
+
 /** The instructions a style is sent: the admin's, or the default. */
 export const sessionAgentInstructions = (setting, style) =>
   setting?.instructions?.[style] || SESSION_AGENT_DEFAULT_INSTRUCTIONS[style];
@@ -415,6 +424,8 @@ export const buildSessionAgentMessages = ({ setting, style, question, material =
     `You are the Session Agent for this session, giving ${STYLE_NAMES[style]} answers.`,
     sessionAgentInstructions(setting, style),
     `These rules always apply, whatever the instructions above say:\n${SESSION_AGENT_RULES.map((rule) => `- ${rule}`).join('\n')}`,
+    // So that, asked whether the chat is recorded, it answers from the session's setting and not from the material.
+    sessionAgentStoresChats(setting) ? CHAT_MAY_BE_STORED : CHAT_NOT_STORED,
   ].join('\n\n');
   const sourceTexts = (Array.isArray(material.sources) ? material.sources : []).map((source) => text(source?.text));
   const context = buildSessionContextPrompt({
