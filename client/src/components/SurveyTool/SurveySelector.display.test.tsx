@@ -380,6 +380,8 @@ describe('SurveySelector display guards', () => {
       const shown = view.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
       expect(shown).toHaveTextContent(/^Submitted$/);
       expect(shown.classList.contains(styles.headerSubmitDone)).toBe(true);
+      const announced = findElement(subject.render(), (element) => element?.props?.role === 'status');
+      expect(announced?.props?.children).toBe('Your answers are submitted.');
       act(() => {
         jest.advanceTimersByTime(10_000);
       });
@@ -388,6 +390,7 @@ describe('SurveySelector display guards', () => {
       stats(1, false); // an edit, then Clear changes
       stats(0, true);
       expect(check()).toBeFalsy();
+      expect(findElement(subject.render(), (element) => element?.props?.role === 'status')?.props?.children).toBe('');
     } finally {
       jest.useRealTimers();
     }

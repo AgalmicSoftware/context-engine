@@ -1220,7 +1220,8 @@ export class SurveySelector extends Component<any, any> {
       !this.props.displayAnswerMode &&
       !!this.state.submittedAt &&
       !!pendingSubmitStats.submittedSinceLastEdit &&
-      !pendingSubmitStats.isSubmitting;
+      !pendingSubmitStats.isSubmitting &&
+      (viewMode === 'questions' || !!selectedSurvey);
     const isEmbeddedSessionToolbar = Boolean(this.props.embeddedSessionToolbar);
     // Keep the live filtered count in the session heading only after surveys are known to be empty.
     const showQuestionCountInHeading = Boolean(
@@ -1235,7 +1236,7 @@ export class SurveySelector extends Component<any, any> {
     const toolbarClassName = [
       isEmbeddedSessionToolbar ? styles.embeddedSessionToolbar : '',
       this.props.toolbarTarget ? styles.explorerToolbar : '',
-      isEmbeddedSessionToolbar && !showHeaderSubmitButton ? styles.toolbarWithoutSubmit : '',
+      isEmbeddedSessionToolbar && !showHeaderSubmitButton && !showHeaderSubmitted ? styles.toolbarWithoutSubmit : '',
       showQuestionCountInHeading ? styles.toolbarWithoutSelector : '',
     ]
       .filter(Boolean)
@@ -1362,6 +1363,10 @@ export class SurveySelector extends Component<any, any> {
           <FontAwesomeIcon icon={createSurveyIcon} />
         </button>
 
+        {/* Always present, so screen readers hear the text that arrives in it. */}
+        <span className={styles.pileSubmitStatusText} role="status">
+          {showHeaderSubmitted ? 'Your answers are submitted.' : ''}
+        </span>
         {showHeaderSubmitButton ? (
           <div className={styles.headerSubmitActions}>
             <button

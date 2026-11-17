@@ -21,7 +21,6 @@ export const HeaderSubmittedCheck = (): React.ReactElement | null => {
       <div
         className={`${styles.headerSubmitButton} ${styles.headerSubmitDone}`}
         data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-        role="status"
       >
         Submitted
       </div>

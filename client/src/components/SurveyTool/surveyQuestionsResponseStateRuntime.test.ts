@@ -105,6 +105,10 @@ describe('surveyQuestionsResponseStateRuntime', () => {
       expect(runtime.isQuestionSaved(stored, changed, 'q1')).toBe(false);
       expect(runtime.computeModifiedQuestionsCount(stored, changed)).toBe(1);
     }
+    // Stored under a differently cased key, it is the same question; a changed slider is pending.
+    const storedUpper = { ...stored, answers: { Q1: { value: 'Agree', encrypted: false } } };
+    expect(runtime.isQuestionSaved(storedUpper, slice('Agree'), 'q1')).toBe(true);
+    expect(runtime.isQuestionSaved(stored, { ...slice('Agree'), importance: { q1: 3 } }, 'q1')).toBe(false);
     // Nothing stored: an answer on the page is not saved yet, nor is an empty one.
     expect(runtime.isQuestionSaved(slice(''), slice('Agree'), 'q1')).toBe(false);
     expect(runtime.isQuestionSaved(slice(''), slice(''), 'q1')).toBe(false);
