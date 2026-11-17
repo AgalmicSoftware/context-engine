@@ -41,6 +41,7 @@ No change to the Session Worker or the MCP: no Worker needs redeploying, and not
 - The all-questions view shows a green "Submitted" after Submit, as on the phone card, and marks each saved answer "Saved".
 - After a reload, "Loading your saved answers..." counts the session's answers as they are read; Results counts them during a reload too.
 - On phones, a long multiple-choice list no longer hides its first option behind the question.
+- `rxc-ra-26` is no longer in `known-sessions.json`, so a plain `/session/rxc-ra-26` link no longer opens; its `worker=` links still work, and the session and its Worker are untouched.
 
 ### Local tooling
 
