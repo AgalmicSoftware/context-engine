@@ -7,7 +7,7 @@ import {
   isTextInterviewQuestion,
   type InterviewResearchTier,
 } from './sessionInterviewResearch';
-import { resolveConsentFlags } from './sessionInterviewConsent';
+import { isWithheldConsent, resolveConsentFlags } from './sessionInterviewConsent';
 import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 
@@ -288,6 +288,10 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       ? surveyResponseState.interviewProvenance?.[q.id]
       : opts.savedInterviewProvenance?.[q.id];
     const interviewProvenanceRecord = asRecord(rawInterviewProvenance);
+    // Built from a copy the Worker stripped of research material, this answer would leave the evaluation without
+    // the person choosing to, so it isn't sent.
+    if (isWithheldConsent(interviewProvenanceRecord))
+      throw new Error('Your saved research choices didn’t load. Reload the page signed in, then submit again.');
     const interviewSource = asRecord(interviewProvenanceRecord.source);
     const researchCoverage = buildSubmittedResearchCoverage(interviewSource.researchCoverage);
     // A saved name or timestamp alone is not consent to AI attribution.

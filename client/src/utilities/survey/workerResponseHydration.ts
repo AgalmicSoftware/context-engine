@@ -202,11 +202,15 @@ export const loadWorkerResponses = async (
     sessionConfig: target.sessionConfig,
     context,
     workerUrl: target.workerUrl,
-    // The Worker sends an answer's research material only to its author and the session's admins, so their
-    // reads go signed in: a signed-out copy would drop it from Results, the export, and a resubmitted answer.
-    ...(ownResponses || readsResearchMaterial(target.sessionConfig, account) ? { preferAnonymous: false } : {}),
     ...(signal ? { signal } : {}),
   };
+  // The Worker sends an answer's research material only to its author and the session's admins, so those reads
+  // go signed in: a signed-out copy would drop it from Results, the export, and a resubmitted answer. Everyone
+  // else's answers are read signed out first, as before.
+  const reader = readString(account).toLowerCase();
+  const readsAllWhole = ownResponses || readsResearchMaterial(target.sessionConfig, account);
+  const signedIn = ({ metadata }: WantedRead) =>
+    readsAllWhole || (!!reader && readString(metadata.responder).toLowerCase() === reader);
   const batched =
     !!wanted.length &&
     (
@@ -218,11 +222,38 @@ export const loadWorkerResponses = async (
   for (let offset = 0; offset < wanted.length; offset += step) {
     signal?.throwIfAborted();
     const chunk = wanted.slice(offset, offset + step);
-    const payloads = batched
-      ? await readBatch({ ...readTarget, ids: chunk.map((read) => read.storageRefId) })
-      : await Promise.all(
-          chunk.map(async ({ storageRef }) => (await readBlob({ ...readTarget, storageRef })).json().catch(() => null)),
-        );
+    const payloads: unknown[] = [];
+    if (batched) {
+      // At most two requests a chunk: the reader's own answers (or all, for an admin) signed in, the rest as before.
+      for (const whole of [true, false]) {
+        const part = chunk.map((read, index) => ({ read, index })).filter(({ read }) => signedIn(read) === whole);
+        if (!part.length) continue;
+        const read = await readBatch({
+          ...readTarget,
+          ...(whole ? { preferAnonymous: false } : {}),
+          ids: part.map(({ read: entry }) => entry.storageRefId),
+        });
+        part.forEach(({ index }, at) => {
+          payloads[index] = read[at];
+        });
+      }
+    } else {
+      payloads.push(
+        ...(await Promise.all(
+          chunk.map(async (read) =>
+            (
+              await readBlob({
+                ...readTarget,
+                ...(signedIn(read) ? { preferAnonymous: false } : {}),
+                storageRef: read.storageRef,
+              })
+            )
+              .json()
+              .catch(() => null),
+          ),
+        )),
+      );
+    }
     chunk.forEach((read, index) => {
       const row = toRow(read, payloads[index]);
       if (row) rows.push(row);

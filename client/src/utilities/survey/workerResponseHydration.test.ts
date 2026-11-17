@@ -623,46 +623,104 @@ describe('hidden Worker questions', () => {
 
 describe('answers with research material, which the Worker sends only to their author and the admins', () => {
   const ADMIN = `0x${'a'.repeat(40)}`;
+  const AUTHOR = `0x${'b'.repeat(40)}`;
+  const OTHER = `0x${'c'.repeat(40)}`;
   const adminConfig = { ...workerConfig, adminAddress: ADMIN };
   const listPage = async () => ({
-    items: [{ storageRef: { id: 'r1' }, metadata: { responder: '0xabc', createdAt: '2026-01-01T00:00:00Z' } }],
+    items: [AUTHOR, OTHER].map((responder) => ({
+      storageRef: { id: `ref-${responder}` },
+      metadata: { responder, createdAt: '2026-01-01T00:00:00Z' },
+    })),
     cursor: null,
     listComplete: true,
   });
-  const payload = (withMaterial: boolean) => ({
-    sessionSlug: 'demo-sh',
-    sessionId: SESSION_ID,
-    questionID: 'q1',
-    answer: { value: 'Agree' },
-    ...(withMaterial ? { interviewProvenance: { originalPrediction: { answer: 'Agree' } } } : {}),
-  });
+  // What the Worker sends: whole when read signed in by the author or an admin, else stripped and marked.
+  const workerRead = (reader: string) =>
+    jest.fn(async ({ storageRef, preferAnonymous }: Record<string, any>) => {
+      const responder = String(storageRef.id).slice(4);
+      const whole = preferAnonymous === false && (reader === ADMIN || reader === responder);
+      return new Response(
+        JSON.stringify({
+          sessionSlug: 'demo-sh',
+          sessionId: SESSION_ID,
+          questionID: 'q1',
+          answer: { value: 'Agree' },
+          ...(whole
+            ? { interviewProvenance: { originalPrediction: { answer: 'Agree' } } }
+            : { interviewProvenanceWithheld: true }),
+        }),
+      );
+    });
+  const whole = (rows: any[]) =>
+    Object.fromEntries(rows.map((row) => [row.responder, !!row.response.interviewProvenance]));
 
   it.each([
-    ['a session admin', { account: ADMIN }, false],
-    ['the author reading their own answers', { account: '0xabc', ownResponses: true }, false],
-    ['anyone else', { account: '0xdef' }, true],
-  ])('%s reads signed in only when the Worker would send them the material', async (_who, options, anonymous) => {
-    const readBlob = jest.fn(async (_options: Record<string, unknown>) => new Response(JSON.stringify(payload(false))));
-    await loadWorkerResponses(
-      { sessionSlug: 'demo-sh', sessionConfig: adminConfig, ...options },
+    ['a signed-out visitor', '', {}, { [AUTHOR]: false, [OTHER]: false }],
+    ['a participant on Results, for their own answer only', AUTHOR, {}, { [AUTHOR]: true, [OTHER]: false }],
+    ['a session admin on Results', ADMIN, {}, { [AUTHOR]: true, [OTHER]: true }],
+  ])('%s gets the material where the Worker would send it', async (_who, account, extra, expected) => {
+    const readBlob = workerRead(account);
+    const rows = await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account, ...extra },
       { listSessionStorageRefsPage: listPage, readSessionStorageBlob: readBlob },
     );
-    expect(readBlob).toHaveBeenCalledTimes(1);
-    expect(readBlob.mock.calls[0][0].preferAnonymous === false).toBe(!anonymous);
+    expect(whole(rows)).toEqual(expected);
+    // Only reads that come back whole go signed in.
+    expect(readBlob.mock.calls.filter(([options]) => options.preferAnonymous === false)).toHaveLength(
+      Object.values(expected).filter(Boolean).length,
+    );
   });
 
-  it("rereads an admin's cached answers once, since copies read signed out lack the material", async () => {
-    let withMaterial = false;
-    const readBlob = jest.fn(async () => new Response(JSON.stringify(payload(withMaterial))));
+  it('reads own answers signed in, so ticks restore on a fresh browser', async () => {
+    const rows = await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account: AUTHOR, ownResponses: true },
+      {
+        listSessionStorageRefsPage: async () => ({ ...(await listPage()), items: [(await listPage()).items[0]] }),
+        readSessionStorageBlob: workerRead(AUTHOR),
+      },
+    );
+    expect(whole(rows)).toEqual({ [AUTHOR]: true });
+  });
+
+  it("splits a batch: the reader's own answers signed in, the rest as before", async () => {
+    const readBatch = jest.fn(async ({ ids, preferAnonymous }: Record<string, any>) =>
+      ids.map((id: string) => ({
+        sessionSlug: 'demo-sh',
+        sessionId: SESSION_ID,
+        questionID: 'q1',
+        answer: { value: 'Agree' },
+        ...(preferAnonymous === false && id === `ref-${AUTHOR}`
+          ? { interviewProvenance: { originalPrediction: {} } }
+          : { interviewProvenanceWithheld: true }),
+      })),
+    );
+    const rows = await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account: AUTHOR },
+      {
+        listSessionStorageRefsPage: listPage,
+        readSessionStorageBatch: readBatch,
+        readWorkerCapabilities: async () => ({ features: ['storage_read_batch_v1'] }) as any,
+      },
+    );
+    expect(whole(rows)).toEqual({ [AUTHOR]: true, [OTHER]: false });
+    expect(readBatch.mock.calls.map(([options]) => [options.ids, options.preferAnonymous])).toEqual([
+      [[`ref-${AUTHOR}`], false],
+      [[`ref-${OTHER}`], undefined],
+    ]);
+  });
+
+  it('rereads a stripped copy the reader now gets whole, such as one read before they signed in', async () => {
+    let reader = '';
+    const readBlob = jest.fn(async (options: Record<string, any>) => workerRead(reader)(options));
     let questions: any = {};
     const refresh = () =>
       hydrateWorkerCanonicalResponses({
         sessionSlug: 'demo-sh',
         sessionConfig: adminConfig,
-        run: resolveWorkerResponseHydrationRun({ sessionConfig: adminConfig, sessionSlug: 'demo-sh', reader: ADMIN })!,
+        run: resolveWorkerResponseHydrationRun({ sessionConfig: adminConfig, sessionSlug: 'demo-sh', reader: AUTHOR })!,
         loadWorkerResponses: (options) =>
           loadWorkerResponses(options, { listSessionStorageRefsPage: listPage, readSessionStorageBlob: readBlob }),
-        getAccount: () => ADMIN,
+        getAccount: () => AUTHOR,
         getProviderLike: () => null,
         getCurrentSessionConfig: () => adminConfig,
         shouldAbort: () => false,
@@ -675,18 +733,21 @@ describe('answers with research material, which the Worker sends only to their a
         },
         updateUserCacheAtomic: async () => true,
       });
-    const cached = () => questions.worker.questionResponses.q1['0xabc'];
+    const cached = (responder: string) => questions.worker.questionResponses.q1[responder];
+    // Cached stripped, as an older site or a read before signing in left it.
     await refresh();
-    // A cache from before this release: read signed out, without the mark.
-    delete questions.worker.workerResponseReadsResearch;
-    expect(cached().interviewProvenance).toBeUndefined();
-    withMaterial = true;
+    expect(cached(AUTHOR).interviewProvenanceWithheld).toBe(true);
+    reader = AUTHOR;
+    readBlob.mockClear();
     await refresh();
-    expect(readBlob).toHaveBeenCalledTimes(2);
-    expect(cached().interviewProvenance).toEqual({ originalPrediction: { answer: 'Agree' } });
-    expect(questions.worker.workerResponseReadsResearch).toBe(true);
-    // Marked, the copy is reused as before.
+    // Only the author's own copy is read again, and it replaces the stripped one.
+    expect(readBlob).toHaveBeenCalledTimes(1);
+    expect(cached(AUTHOR).interviewProvenance).toEqual({ originalPrediction: { answer: 'Agree' } });
+    expect(cached(AUTHOR).interviewProvenanceWithheld).toBeUndefined();
+    expect(cached(OTHER).interviewProvenanceWithheld).toBe(true);
+    // Whole now, it is reused.
+    readBlob.mockClear();
     await refresh();
-    expect(readBlob).toHaveBeenCalledTimes(2);
+    expect(readBlob).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,9 @@
-import { buildSavedInterviewConsent, consentSignature, keepConsentWithdrawals } from './sessionInterviewConsent';
+import {
+  buildSavedInterviewConsent,
+  consentSignature,
+  isWithheldConsent,
+  keepConsentWithdrawals,
+} from './sessionInterviewConsent';
 import { buildRenderedIdsSignature, normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import { withoutStaleDraftFields, withoutUnrestorableUnlocks } from './surveyDraftSavedBaseline';
 import { shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
@@ -2894,7 +2899,10 @@ export const buildLocalCacheRehydrationState = ({
       // An authoritative own-answer read must not be replaced by an unversioned public cache.
       const canRefresh =
         !Object.hasOwn(baselineConsent, questionId) ||
-        (incomingSavedAt >= previousSavedAt && (!knownOwnResponse || incomingSavedAt > 0));
+        (incomingSavedAt >= previousSavedAt &&
+          (!knownOwnResponse || incomingSavedAt > 0) &&
+          // A copy stripped of research material never replaces consent the page already holds.
+          !isWithheldConsent(incomingConsent));
       if (
         canRefresh &&
         (consentSignature(previousConsent) !== consentSignature(cachedConsent) ||
