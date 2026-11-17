@@ -6379,7 +6379,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 // !important, so this does too.
 .pileSubmitButton.pileSubmitDone {
   justify-content: center;
-  color: var(--ce-color-white) !important;
+  color: var(--ce-status-success-contrast) !important;
   background-color: var(--ce-status-success) !important;
   font-weight: 700;
   cursor: default;
