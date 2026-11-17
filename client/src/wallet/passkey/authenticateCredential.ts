@@ -2,6 +2,7 @@ import type { PasskeyCredentialClient, PasskeyWalletConfig } from '../types.js';
 import { PasskeysUnavailableError } from './unavailable.js';
 import { base64URLToBuffer, randomBytes } from './encoding.js';
 import { buildPrfExtension, getCredentialPrfOutput } from './prf.js';
+import { describePasskeyPromptError } from './promptError.js';
 
 // Browsers refuse a passkey prompt from a page that is not in front (WebKit: "The document is not focused."), as a
 // page opened in a new tab can be when its sign-in starts on load. Wait until it is in front, rather than fail.
@@ -54,9 +55,12 @@ export const authenticatePasskeyCredential = async ({
       },
     ];
   }
-  const credential = (await credentials.get({
-    publicKey,
-  } as CredentialRequestOptions)) as PublicKeyCredential | null;
+  let credential: PublicKeyCredential | null;
+  try {
+    credential = (await credentials.get({ publicKey } as CredentialRequestOptions)) as PublicKeyCredential | null;
+  } catch (error) {
+    throw describePasskeyPromptError(error);
+  }
   if (!credential) throw new Error('No passkey assertion was returned.');
   return { credential, prfOutput: getCredentialPrfOutput(credential) };
 };
