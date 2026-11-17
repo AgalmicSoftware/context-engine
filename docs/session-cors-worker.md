@@ -3512,7 +3512,8 @@ set; the flag stays advertised, and changing the setting signs no one out).
     alphabet, and a word never mixes two of those drawn like Latin (Greek,
     Cyrillic, Armenian, Cherokee, Lisu, Coptic, Canadian syllabics,
     Tifinagh). The address, ENS, web-address and role checks drop accents and
-    read such letters, and Latin small capitals and IPA letters, each case by
+    read such letters, and Latin small capitals, IPA letters and letters
+    with a stroke or hook, each case by
     its shape, as the Latin ones they resemble. This covers the common
     look-alikes, not every confusable Unicode lists.
     Refusals are `400` `{ error, reason }`: `empty`,

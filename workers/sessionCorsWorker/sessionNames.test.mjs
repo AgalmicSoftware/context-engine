@@ -46,6 +46,7 @@ test('a name is stored as typed, tidied, and refused with a reason when it could
     ['J.R. Hall', 'J.R. Hall'], ['Hostetler', 'Hostetler'], ["Sam's agent", "Sam's agent"], ['', ''], ['   ', ''],
     ['Ελένη', 'Ελένη'], ['Олена', 'Олена'], ['ﬁona', 'fiona'], ['ΕΛΕΝΗ', 'ΕΛΕΝΗ'], ['ОЛЕНА', 'ОЛЕНА'], ['Мира Smith', 'Мира Smith'],
     ['Ἀλέξανδρος', 'Ἀλέξανδρος'], ['Արամ', 'Արամ'], ['Oxford', 'Oxford'], ['ΧΡΗΣΤΟΣ', 'ΧΡΗΣΤΟΣ'], ['ᏣᎳᎩ', 'ᏣᎳᎩ'],
+    ['Søren', 'Søren'], ['Łukasz', 'Łukasz'], ['Ħamrun', 'Ħamrun'], ['Đorđe', 'Đorđe'], ['Şebnem', 'Şebnem'], ['Ŋozi', 'Ŋozi'],
     ['Kɔfi', 'Kɔfi'], ['Keʻala', 'Keʻala'], ['ᐃᓄᒃ', 'ᐃᓄᒃ'], ['Sam 山田', 'Sam 山田'], ['Hosts', 'Hosts'],
   ]) assert.deepEqual(normalizeSessionName(typed), { ok: true, name: stored }, typed);
   for (const [typed, reason] of [
@@ -63,6 +64,8 @@ test('a name is stored as typed, tidied, and refused with a reason when it could
     ['ᎻᎾᏚᎢ', 'role'], ['ᏚᎽᏚᎢᎬᎷ', 'role'], ['ꮋꮎꮪꭲ', 'role'], ['1234ᎪᏴᏟᎠ5678ᎬᎪᏴ1', 'address'], ['ʜᴏꜱᴛ', 'role'], ['ʀxᴄ', 'role'],
     ['Admɩn', 'role'], ['Admǀn', 'role'], ['ҺОЅТ', 'role'], ['ᔕTᗩᖴᖴ', 'mixed_scripts'], ['Hⵔst', 'mixed_scripts'],
     ['HOST\u0f8c', 'mixed_scripts'], ['Ádmin', 'role'], ['ᕼᎾᔕᎢ', 'mixed_scripts'],
+    ['ĦØŞŦ', 'role'], ['Høst', 'role'], ['ȺĐMƗN', 'role'], ['ąɗɱįɲ', 'role'], ['ɱoderator', 'role'], ['ꞨŦÆFF', 'role'],
+    ['ᗩᗪᗰᓰᑎ', 'role'], ['ᕼᗝᔕᖶ', 'role'], ['ᏂᎧᏕᏖ', 'role'], ['ᎪᎠᎷᎥᏁ', 'role'],
   ]) assert.equal(normalizeSessionName(typed).reason, reason, String(typed));
   assert.equal(normalizeSessionName('x'.repeat(32)).ok, true);
   assert.match(normalizeSessionName('Admin').error, /role/);

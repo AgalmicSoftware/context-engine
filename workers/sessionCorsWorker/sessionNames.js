@@ -43,13 +43,14 @@ const refuse = (reason) => ({ ok: false, reason, error: REFUSALS[reason] });
 // already folded fullwidth and styled letters, and a word mixing these
 // alphabets is refused outright, so this only has to cover a whole word
 // written in one of them: Greek, Cyrillic, Armenian, Cherokee, Lisu, Coptic,
-// Canadian syllabics, Tifinagh, and Latin small capitals and IPA letters.
+// Canadian syllabics, Tifinagh, and Latin small capitals, IPA letters and
+// letters with a stroke or hook (ø, đ, ħ), which carry no accent to drop.
 const SHAPES = {
-  a: 'АаΑαɑꓮᎪᗩᴀⲀⲁ', b: 'ВвΒβꓐᏴᗷʙⲂⲃ', c: 'СсϹϲꓚᏟᑕᴄⲤⲥ', d: 'ԀԁꓓᎠᗪᴅ', e: 'ЕеΕεꓰᎬᴇⲈⲉᕮ', f: 'ꓝᖴꜰ',
-  g: 'ɡꓖᏀɢց', h: 'НнҺһΗꓧᎻᕼʜհⲎ', i: 'ІіΙιıɩƖǀꓲɪⲒⲓⵏ', j: 'ЈјȷꓙᎫᒍᴊ', k: 'КкΚκꓗᏦᴋⲔⲕ', l: 'ӀӏꓡᏞᒪʟ',
-  m: 'МмΜꓟᎷᗰᴍⲘⲙ', n: 'ΝηꓠᑎɴոⲚⲛ', o: 'ОоΟοօꓳᎾᗝᴏⲞⲟⵔ', p: 'РрΡρꓑᏢᑭᴘքⲢⲣ', q: 'Ԛԛᑫ', r: 'ꓣᎡᖇʀ',
-  s: 'ЅѕꓢᏚᔕꜱ', t: 'ТтΤτꓔᎢᴛⲦⲧ', u: 'μυսꓴᑌᴜ', v: 'νꓦᏙᐯᴠ', w: 'ԜԝꓪᏔᗯᴡᎳ', x: 'ХхΧχꓫ᙭Ⲭⲭⵝⵅ',
-  y: 'УуΥγꓬᎩʏⲨⲩᎽ', z: 'ΖζꓜᏃᘔᴢⲌⲍ',
+  a: 'АаΑαɑꓮᎪᗩᴀⲀⲁȺÆæ', b: 'ВвΒβꓐᏴᗷʙⲂⲃƀɓ', c: 'СсϹϲꓚᏟᑕᴄⲤⲥƈȼ', d: 'ԀԁꓓᎠᗪᴅđɗɖĐᕲ', e: 'ЕеΕεꓰᎬᴇⲈⲉᕮɇ', f: 'ꓝᖴꜰƒ',
+  g: 'ɡꓖᏀɢցǥɠ', h: 'НнҺһΗꓧᎻᕼʜհⲎħɦɧĦᏂ', i: 'ІіΙιıɩƖǀꓲɪⲒⲓⵏɨƗᓰᎥ', j: 'ЈјȷꓙᎫᒍᴊɉʝ', k: 'КкΚκꓗᏦᴋⲔⲕƙꝁ', l: 'ӀӏꓡᏞᒪʟłƚŁ',
+  m: 'МмΜꓟᎷᗰᴍⲘⲙɱᘻ', n: 'ΝηꓠᑎɴոⲚⲛɲɳŋŊᘉᏁ', o: 'ОоΟοօꓳᎾᗝᴏⲞⲟⵔøɵØᓍᎧ', p: 'РрΡρꓑᏢᑭᴘքⲢⲣᵽ', q: 'Ԛԛᑫ', r: 'ꓣᎡᖇʀɍ',
+  s: 'ЅѕꓢᏚᔕꜱʂꞩꞨŞşᏕ', t: 'ТтΤτꓔᎢᴛⲦⲧŧƭʈŦᖶᏖ', u: 'μυսꓴᑌᴜʉ', v: 'νꓦᏙᐯᴠʋ', w: 'ԜԝꓪᏔᗯᴡᎳ', x: 'ХхΧχꓫ᙭Ⲭⲭⵝⵅ',
+  y: 'УуΥγꓬᎩʏⲨⲩᎽɏƴ', z: 'ΖζꓜᏃᘔᴢⲌⲍƶȥ',
 };
 const LOOK_ALIKES = new Map(Object.entries(SHAPES).flatMap(([latin, shapes]) => [...shapes].map((shape) => [shape, latin])));
 const skeleton = (name) => [...name.normalize('NFD').replace(/\p{M}/gu, '')]
