@@ -18,7 +18,7 @@ import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
 import React from 'react';
-import { resolvePileAutoAdvanceEnabled, SINGLE_CHOICE_ADVANCE_DELAY_MS } from './surveyPileNavigation';
+import { CHOICE_ADVANCE_DELAY_MS, resolvePileAutoAdvanceEnabled, SCROLL_TAP_GUARD_MS } from './surveyPileNavigation';
 // Styles
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
@@ -1210,6 +1210,15 @@ const stripUnknownSessionModeQuery = () => {
 
 const runPileComponentDidMount = (engine: PileViewModeEngine) => {
   engine._isMounted = true;
+  // When the person last dragged or wheeled the card's content, so a tap that ends a scroll is not taken as a choice
+  // to move on. Scrolls the page makes itself (focus, scrolling into view) are not theirs and do not count.
+  engine._pileScrollListener = (event: Event) => {
+    if (event.target instanceof Node && engine.pileContainer?.contains(event.target))
+      engine._pileLastScrollAt = Date.now();
+  };
+  ['touchmove', 'wheel'].forEach((type) =>
+    document.addEventListener(type, engine._pileScrollListener, { capture: true, passive: true }),
+  );
   stripUnknownSessionModeQuery();
   // Regression guard: consume the prefill during pure initialization, but clear it only after mount.
   // Clearing inside the reducer initializer makes React Strict Mode's second initialization lose the packet.
@@ -1442,6 +1451,9 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
 };
 
 const runPileComponentWillUnmount = (engine: PileViewModeEngine) => {
+  ['touchmove', 'wheel'].forEach((type) =>
+    document.removeEventListener(type, engine._pileScrollListener, { capture: true }),
+  );
   engine._pileOwnAnswersSubmitController?.abort();
   engine._pileOwnAnswersSubmitController = null;
   try {
@@ -1519,6 +1531,7 @@ const triggerNavFade = (engine: PileViewModeEngine) => {
 const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
   // A move by hand cancels a pending move-on from a single choice.
   clearTimeout(engine._pileChoiceAdvanceTimer);
+  engine._pileChoicePendingQuestionId = null;
   if (engine._persistTimer) {
     clearTimeout(engine._persistTimer);
     engine._persistTimer = null;
@@ -1557,6 +1570,7 @@ const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
 const handlePrev = (engine: PileViewModeEngine) => {
   // A move by hand cancels a pending move-on from a single choice.
   clearTimeout(engine._pileChoiceAdvanceTimer);
+  engine._pileChoicePendingQuestionId = null;
   if (engine._persistTimer) {
     clearTimeout(engine._persistTimer);
     engine._persistTimer = null;
@@ -2831,22 +2845,33 @@ const renderPileResponseInput = (
       // double-click/tap cannot answer the card the first press just revealed.
       const repeatedPress = engine._pileAnswerClickCount > 1;
       engine._pileAnswerClickCount = 0;
-      if (repeatedPress && engine._pileAdvancedIntoQuestionId === questionId) return;
+      // The second press of a double tap lands on the card it moved to, or on this card while it waits to move on.
+      if (
+        repeatedPress &&
+        (engine._pileAdvancedIntoQuestionId === questionId || engine._pileChoicePendingQuestionId === questionId)
+      )
+        return;
       // A new choice replaces any move a single choice was waiting to make.
       clearTimeout(engine._pileChoiceAdvanceTimer);
+      engine._pileChoicePendingQuestionId = null;
       // An accepted interaction starts a new gesture on this card. Retaining the
       // transition marker would reject later quadratic steps in that gesture.
       engine._pileAdvancedIntoQuestionId = null;
       const inputType = normalizePileQuestionInputType(question);
       const canAdvance =
-        inputType === 'binary' ||
-        (SINGLE_CHOICE_ADVANCE_DELAY_MS !== null &&
-          inputType === 'multichoice' &&
-          (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question)));
+        CHOICE_ADVANCE_DELAY_MS !== null &&
+        (inputType === 'binary' ||
+          (inputType === 'multichoice' &&
+            (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question))));
       const arrowSelection = engine._pileAnswerArrowKeyDown === true;
+      const chosenAt = Date.now();
+      // A tap that ended a scroll of the card picks, but never moves on; nor does a choice the person scrolled away from.
+      const endedScroll = chosenAt - Number(engine._pileLastScrollAt || 0) < SCROLL_TAP_GUARD_MS;
       // Moves on only while this card is still showing one committed answer and nothing is being written on it.
       const advance = () => {
+        engine._pileChoicePendingQuestionId = null;
         if (!engine._isMounted || engine.state.showComments?.[question.id]) return;
+        if (Number(engine._pileLastScrollAt || 0) > chosenAt) return;
         if (!resolvePileAutoAdvanceEnabled(engine.getEffectivePileSessionConfig())) return;
         // Inspect the committed answer: clicking a selected binary option clears it.
         // Only direct card edits reach this callback; interview drafts and hydration do not.
@@ -2877,10 +2902,10 @@ const renderPileResponseInput = (
         afterUpdate: () => {
           // Radio arrows select within the group. An open comment editor may still
           // be receiving dictation, so leave both on this card until explicit Next.
-          if (!canAdvance || arrowSelection) return;
-          // A single choice stays ticked on the card for a moment, so it reads as kept before the card moves on.
-          if (inputType === 'binary') advance();
-          else engine._pileChoiceAdvanceTimer = setTimeout(advance, SINGLE_CHOICE_ADVANCE_DELAY_MS ?? 0);
+          if (!canAdvance || arrowSelection || endedScroll) return;
+          // The choice stays ticked on the card for a moment, so it reads as kept before the card moves on.
+          engine._pileChoicePendingQuestionId = questionId;
+          engine._pileChoiceAdvanceTimer = setTimeout(advance, CHOICE_ADVANCE_DELAY_MS ?? 0);
         },
       });
     });
