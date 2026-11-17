@@ -16,10 +16,14 @@ All notable changes to this project will be documented in this file.
 - Copy buttons work in browsers that refuse the clipboard, such as in-app browsers. Where copying is refused, the text is selected to copy by hand, and every button shows whether it copied.
 - The interview's AI prompt, if it can't be copied, is shown whole and selected; the formatted view shortens its links.
 - The interview's **Discard** button sits left of the microphone, away from a right thumb.
+- Drafted answers no longer carry filler comments when the person said nothing on a question.
+- The voice interviewer builds each question on the last reply instead of working through the newest questions first.
+- Admins, and each person for their own answers, keep seeing an answer's AI research material in Results, after a reload and when an answer is saved again. Reading it never asks for a signature, and an answer put on Arweave leaves it out.
 - A voice interview's call is sent once. The site puts a sign-in on it only for a private session, so a Worker still on 0.9.10 never receives one, and a refused call shows its own reason. This replaces 0.9.11's second try without the sign-in.
 
 ### Workers — requires redeployment
 
+- **Research material is for admins only.** An answer's AI research material (the AI's prediction and confidence, the answer given before a hidden draft was shown, the changed fields, the platform and model) now reaches only the session's admins, and each person for their own answers. Everyone else who reads answers, including through the MCP and Agent HTTP, gets them without it, marked `interviewProvenanceWithheld: true`: the mark says material is attached, not what it is. Until a Worker is redeployed, anyone who can read a session's answers can read that material.
 - AI Views, the atlas and the risk matrix keep building when the page that started them closes; a second press joins the running build, and a failed build can be pressed again at once.
 - An answer an agent sends again while its first copy is still being saved now ends on the latest choice.
 - A delayed retry of an older queued answer no longer replaces a newer one.
