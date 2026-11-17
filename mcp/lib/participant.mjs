@@ -603,6 +603,20 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     return isRecord(entry) ? entry : {};
   };
 
+  // A Worker that keeps names holds the agent's own, set with set_profile or
+  // on joining, and shows it in place of the address; answers there carry no
+  // name of their own.
+  const keepsNames = async (ctx) => !ctx.registry && !!(await ctx.client.readFeatures())?.includes('session_names_v1');
+  const saveName = async (ctx) => {
+    if (!(await keepsNames(ctx))) return null;
+    try {
+      const saved = await ctx.client.request('/names/set', { method: 'POST', auth: true, body: { name: profile().displayName } });
+      return { saved: true, name: saved?.name ?? null };
+    } catch (error) {
+      return { saved: false, error: text(error?.message) || 'The session didn’t save your name.' };
+    }
+  };
+
   // The agent keeps its own record of what it answered, so a very large
   // session whose answer listing is cut short still shows its answers.
   const rememberAnswers = (ctx, answered) =>
@@ -978,8 +992,18 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       await saveState((fresh) => {
         fresh.profile = { ...fresh.profile, ...next };
       });
+      const names = 'displayName' in next
+        ? (await mapLimit(Object.values(state.sessions).filter((entry) => isRecord(entry) && entry.kind !== 'registry'), READ_CONCURRENCY,
+          async (entry) => {
+            const saved = await openEntry(entry).then(async (ctx) => { await ensureReady(ctx); return saveName(ctx); })
+              .catch((error) => ({ saved: false, error: text(error?.message) || 'The session couldn’t be reached.' }));
+            return saved && { session: entry.slug, ...saved };
+          })).filter(Boolean)
+        : [];
       return {
         profile: profile(),
+        // Sessions whose Worker keeps names: whether each saved the new one.
+        ...(names.length ? { names } : {}),
         note: kept.length
           ? `Your host set ${kept.join(' and ')}, which stay${kept.length > 1 ? '' : 's'} as it set ${kept.length > 1 ? 'them' : 'it'}. The rest applies to answers and statements submitted from now on.`
           : 'Applies to answers and statements submitted from now on.',
@@ -1136,6 +1160,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         named: !!profile().displayName, groups: outcome.groups, addingContext: outcome.addingContext, instructions,
       });
       if (youMay.length) outcome.youMay = youMay;
+      if (profile().displayName) {
+        const saved = await saveName(ctx);
+        if (saved) outcome.name = saved;
+      }
       return outcome;
     },
 
@@ -1206,6 +1234,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const loaded = await loadQuestions(ctx);
       const questions = new Map(loaded.map((question) => [question.id, question]));
       const recruitmentSource = text(sessionState(ctx).recruitmentSource);
+      const answerProfile = (await keepsNames(ctx)) ? { ...profile(), displayName: '' } : profile();
       const results = [];
       const answered = [];
       const pendingAnswers = [];
@@ -1243,7 +1272,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
             conviction: item.conviction,
             responder: wallet.address,
             session: { sessionSlug: ctx.info.slug, sessionId: ctx.client.sessionId },
-            profile: profile(),
+            profile: answerProfile,
             recruitmentSource,
           });
         } catch {
