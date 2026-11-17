@@ -33,6 +33,8 @@ type WorkerGroupMembersModalProps = {
   nextCursor: string;
   onClose: () => void;
   onLoadMore: () => void;
+  /** Names people set in this session, by lowercased address. */
+  nameLabels?: Record<string, string>;
   // Profiles open in this session.
   sessionSlug: string;
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -47,6 +49,7 @@ const WorkerGroupMembersModal = ({
   nextCursor,
   onClose,
   onLoadMore,
+  nameLabels = {},
   sessionSlug,
   status,
 }: WorkerGroupMembersModalProps) => {
@@ -118,7 +121,7 @@ const WorkerGroupMembersModal = ({
                       title={identity}
                     >
                       {kindLabel ? `${kindLabel} · ` : ''}
-                      {getShortenedAddress(identity, false)}
+                      {nameLabels[identity.toLowerCase()] || getShortenedAddress(identity, false)}
                     </a>
                   ) : (
                     <span className={sbtPageStyles.userAddressLink} title={identity}>

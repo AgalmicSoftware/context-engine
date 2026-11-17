@@ -48,6 +48,8 @@ import {
   projectWorkerGroupMemberships,
 } from '../../domains/membership/membershipProjection';
 import styles from './OnePageSession.module.scss';
+import { useSessionNames } from '../../utilities/session/useSessionNames';
+import { sessionNameLabels } from '../../utilities/session/sessionNames';
 
 export type WorkerGroupMembershipPanelProps = {
   envelope?: AgentClientLoginEnvelope;
@@ -181,6 +183,8 @@ type WorkerGroupDetailViewProps = {
   onLoadMoreMembers: () => void;
   onOpenMembers: () => void;
   onBack?: () => void;
+  /** Names people set in this session, by lowercased address. */
+  nameLabels: Record<string, string>;
   sessionConfig: unknown;
   sessionName: string;
   sessionSlug: string;
@@ -201,6 +205,7 @@ const WorkerGroupDetailView = ({
   onLoadMoreMembers,
   onOpenMembers,
   onBack,
+  nameLabels,
   sessionName,
   sessionConfig,
   sessionSlug,
@@ -375,7 +380,7 @@ const WorkerGroupDetailView = ({
                     title={group.adminAddress}
                     aria-label={`View admin profile ${group.adminAddress}`}
                   >
-                    {getShortenedAddress(group.adminAddress, false)}
+                    {nameLabels[group.adminAddress.toLowerCase()] || getShortenedAddress(group.adminAddress, false)}
                   </a>
                 </p>
               ) : null}
@@ -436,6 +441,7 @@ const WorkerGroupDetailView = ({
         nextCursor={memberListState.nextCursor}
         onClose={onCloseMembers}
         onLoadMore={onLoadMoreMembers}
+        nameLabels={nameLabels}
         sessionSlug={sessionSlug}
         status={memberListState.status}
       />
@@ -477,6 +483,8 @@ const WorkerGroupMembershipPanel = ({
   const sessionId = normalizeWorkerCanonicalSessionIdHex(sessionIdProp || envelope?.sessionId || '');
   const sessionSlug = canonicalizeSessionSlug(sessionSlugProp || envelope?.sessionSlug || '');
   const address = String(participantAddress || envelope?.address || '').trim();
+  const sessionNames = useSessionNames({ sessionSlug, sessionConfig, account: address });
+  const nameLabels = useMemo(() => sessionNameLabels(sessionNames.names), [sessionNames.names]);
   const groupIdFilter = String(groupIdFilterProp || '').trim();
   const navigationKey = `${sessionId}\n${sessionSlug}\n${workerUrl}\n${groupIdFilter}`;
   const [inlineSelection, setInlineSelection] = useState({ navigationKey, groupId: '' });
@@ -1023,6 +1031,7 @@ const WorkerGroupMembershipPanel = ({
         {shareStatus ? <div className={styles.agentReportApprox}>{shareStatus}</div> : null}
         {selectedGroup ? (
           <WorkerGroupDetailView
+            nameLabels={nameLabels}
             canViewMembers={canViewSelectedGroupMembers}
             copyGroupLink={copyGroupLink}
             fetchImpl={fetchImpl}

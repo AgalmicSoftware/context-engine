@@ -28,6 +28,8 @@ jest.mock('../../domains/worker/workerGroupPorts', () => ({
   joinWorkerGroup: jest.fn(),
 }));
 jest.mock('./WorkerParticipantGroupCreatePanel', () => () => null);
+// The fake Worker host doesn't exist: reading its names would wait on the network and outlast the waits below.
+jest.mock('../../utilities/session/useSessionNames', () => ({ useSessionNames: () => ({ source: null, names: {} }) }));
 
 const SESSION = { slug: 'linked-session', sessionId: `0x${'44'.repeat(16)}` };
 const WORKER = 'https://linked-worker.example/';

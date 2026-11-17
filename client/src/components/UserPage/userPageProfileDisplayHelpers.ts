@@ -28,6 +28,8 @@ export type ResolveUserPageAddressDisplayStateArgs = {
   minimized?: unknown;
   nicknameInput?: unknown;
   propViewAddress?: unknown;
+  /** The name this account's owner set in the session. */
+  sessionName?: unknown;
   /** The session the page is showing, kept on the link to the full profile. */
   sessionSlug?: unknown;
   stateViewAddress?: unknown;
@@ -162,6 +164,7 @@ export const resolveUserPageAddressDisplayState = ({
   minimized = false,
   nicknameInput = '',
   propViewAddress = '',
+  sessionName = '',
   sessionSlug = '',
   stateViewAddress = '',
   username = '',
@@ -181,7 +184,9 @@ export const resolveUserPageAddressDisplayState = ({
   const shortAddress = propViewAddress
     ? String(typeof getShortenedAddress === 'function' ? getShortenedAddress(propViewAddress, false) : propViewAddress)
     : '';
+  // The name someone set in the session comes first; your own label for them shows beside it.
   const addressLabel =
+    String(sessionName || '') ||
     nicknameToUse ||
     (isSimulated && usernameText ? usernameText : '') ||
     (usernameText && !isSimulated ? usernameText : '') ||

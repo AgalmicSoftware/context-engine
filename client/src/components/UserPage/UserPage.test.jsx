@@ -254,6 +254,54 @@ describe('UserPage username editing', () => {
     localStorage.removeItem(key);
   });
 
+  it("saves your name to the session's store once, and keeps it off this device", async () => {
+    const viewAddress = '0x00000000000000000000000000000000000000ee';
+    const setOwn = jest.fn(async (name) => name.replace(/\s+/g, ' '));
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    instance.state = {
+      ...instance.state,
+      sessionNamesSource: { enabled: true, setOwn, readAll: jest.fn() },
+      sessionNames: { [viewAddress]: 'Sam' },
+      username: 'Sam',
+      isEditingUsername: true,
+    };
+
+    instance.setUsername();
+    expect(setOwn).not.toHaveBeenCalled();
+    expect(instance.state.isEditingUsername).toBe(false);
+
+    instance.state = { ...instance.state, username: ' Sam  Lee ', isEditingUsername: true };
+    instance.setUsername();
+    instance.setUsername();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(setOwn).toHaveBeenCalledTimes(1);
+    expect(setOwn).toHaveBeenCalledWith('Sam  Lee');
+    expect(instance.state.username).toBe('Sam Lee');
+    expect(instance.state.sessionNames[viewAddress]).toBe('Sam Lee');
+    expect(localStorage.getItem(`userPageUsername_${viewAddress}`)).toBeNull();
+  });
+
+  it("reopens the field with the Worker's reason when it refuses a name", async () => {
+    const viewAddress = '0x00000000000000000000000000000000000000ef';
+    const setOwn = jest.fn(async () => {
+      throw new Error("Names can't claim a role");
+    });
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    instance.state = {
+      ...instance.state,
+      sessionNamesSource: { enabled: true, setOwn, readAll: jest.fn() },
+      sessionNames: {},
+      username: 'Admin',
+      isEditingUsername: true,
+    };
+
+    instance.setUsername();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(instance.state.usernameError).toBe("Names can't claim a role");
+    expect(instance.state.isEditingUsername).toBe(true);
+  });
+
   it('drops the typed text when a first edit is cancelled', () => {
     const viewAddress = '0x00000000000000000000000000000000000000dd';
     localStorage.removeItem(`userPageUsername_${viewAddress}`);

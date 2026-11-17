@@ -70,7 +70,10 @@ type UserPageAvatarDisplayState = {
 
 type UserPageHeaderProps = {
   addressDisplay: React.ReactNode;
-  addressIsPrivateLabel?: boolean;
+  /** Your private label for someone else's account, shown beside their name: 'your label' when it stands in for it. */
+  privateLabelTag?: string;
+  /** Where your own username is saved: the session's store, or only this device. */
+  usernameSavedTo?: 'session' | 'device';
   analyzeButtonDisplayState: UserPageAnalyzeButtonDisplayState;
   avatarDisplayState: UserPageAvatarDisplayState;
   bookmarkButtonDisplayState: UserPageBookmarkButtonDisplayState;
@@ -110,7 +113,8 @@ const PRIVATE_LABEL_NOTE = "Your private label for this account. Only you see it
 
 const UserPageHeader = ({
   addressDisplay,
-  addressIsPrivateLabel = false,
+  privateLabelTag = '',
+  usernameSavedTo = 'device',
   analyzeButtonDisplayState,
   avatarDisplayState,
   bookmarkButtonDisplayState,
@@ -157,9 +161,10 @@ const UserPageHeader = ({
         </div>
         <h1 id={styles.userPageAddress}>
           {addressDisplay}
-          {addressIsPrivateLabel && (
+          {privateLabelTag && (
             <span className={styles.privateLabelTag} title={PRIVATE_LABEL_NOTE}>
-              <span className={styles.visuallyHidden}>, </span>your label
+              <span className={styles.visuallyHidden}>, </span>
+              {privateLabelTag}
             </span>
           )}
           {showPen && (
@@ -179,7 +184,11 @@ const UserPageHeader = ({
               className={styles.copyButton}
               data-ce-control-appearance="frameless"
               aria-label="Set username"
-              title="Set username, saved on this device only"
+              title={
+                usernameSavedTo === 'session'
+                  ? 'Set your name in this session'
+                  : 'Set username, saved on this device only'
+              }
             >
               <FontAwesomeIcon icon={faPen} />
             </button>
@@ -304,7 +313,7 @@ const UserPageHeader = ({
         )}
         {isOwner && isEditingUsername && (
           <span id="ce-username-note" className={styles.usernameHint}>
-            Saved on this device only
+            {usernameSavedTo === 'session' ? 'Shown to people in this session' : 'Saved on this device only'}
           </span>
         )}
       </div>
