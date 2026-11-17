@@ -113,7 +113,7 @@ import {
   shouldInitializePileResponses,
 } from './surveyPileResponseController';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation';
-import { clearSurveyDraftsForAccount, hasMeaningfulFieldValue } from './surveyToolDraftState';
+import { clearSurveyDraftsForAccount } from './surveyToolDraftState';
 import PileEndOfSetCard from './PileEndOfSetCard';
 import {
   buildClearedTransientSubmitFeedbackState,
@@ -1296,6 +1296,13 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   }
   if (prevState.pileQuestions !== engine.state.pileQuestions) {
     engine.syncCurrentPileQuestionsSignature(engine.state.pileQuestions);
+  }
+  // The end of the set ends with a new filter, or once its last question is no longer the active last one.
+  if (
+    engine.state.pileSetEndQuestionId &&
+    (prevState.filterState !== engine.state.filterState || !isPileSetEndShown(engine.state, engine.props))
+  ) {
+    engine.setState({ pileSetEndQuestionId: null });
   }
 
   // Rebuild guard: never rebuild lists/slices while user has pending edits
@@ -3530,12 +3537,18 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
               pileQuestions.map((question) => normalizeQuestionIdKey(question.id)),
             ).answers,
           ),
-        ).filter((entry) => hasMeaningfulFieldValue(readPlainRecord(entry))).length
+        ).filter((entry) => pileAnswerIsGiven(readPlainRecord(entry).value)).length
       }
       total={pileQuestions.length}
       unsent={Number(_pileStats.total || 0)}
       isSubmitting={!!engine.state.isSubmitting}
-      onSubmit={() => void submitPile()}
+      onSubmit={() =>
+        void submitPile().then(() => {
+          // The Submit button goes once nothing is unsent, so focus returns to the card rather than the page.
+          const card = engine.pileContainer?.querySelector('[data-testid="ce-pile-end-of-set"]');
+          if (card && !card.contains(document.activeElement)) card.focus({ preventScroll: true });
+        })
+      }
       onSeeResults={() => openSessionResults(engine)}
       onTalkItThrough={
         isInterviewFeatureEnabled(engine.props?.sessionConfig) ? () => engine.toggleSessionVoiceModeModal() : null

@@ -512,6 +512,58 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(screen.getByLabelText('Next Question').parentElement).toHaveTextContent('2 / 2');
   });
 
+  it('counts a quadratic moved back to zero as unanswered at the end of the set', async () => {
+    renderPile({
+      questionPool: [
+        {
+          id: 'quadratic-q',
+          type: 'quadratic',
+          prompt: 'Allocate support',
+          options: ['Parks', 'Transit'],
+          voiceCredits: 25,
+        },
+      ],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    const parks = await screen.findByLabelText('Parks');
+    fireEvent.change(parks, { target: { value: '2' } });
+    fireEvent.change(parks, { target: { value: '0' } });
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    expect(await screen.findByTestId('ce-pile-end-of-set')).toHaveTextContent('You answered 0 of 1.');
+  });
+
+  it('ends the end of the set once its last question is no longer last', async () => {
+    const first = { id: 'demo-q1', prompt: 'First canonical question' };
+    const second = { id: 'demo-q2', prompt: 'Second canonical question' };
+    const harness = renderPile({
+      questionPool: [first, second],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    expect(await screen.findByText('First canonical question')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    fireEvent.click(await screen.findByLabelText('Next Question'));
+    expect(await screen.findByTestId('ce-pile-end-of-set')).toBeInTheDocument();
+
+    harness.rerenderSurveyQuestions({ questionPool: [first, second, { id: 'demo-q3', prompt: 'Third question' }] });
+    expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-pile-end-of-set')).not.toBeInTheDocument();
+
+    // The old marker does not bring the end back when the list returns to how it was.
+    harness.rerenderSurveyQuestions({ questionPool: [first, second] });
+    expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-pile-end-of-set')).not.toBeInTheDocument();
+  });
+
   it('renders triple trailing arrows inside the pile submit button', () => {
     const tree = renderPileInteractionSurface(buildSurfaceProps());
     const submitButton = findElement(
