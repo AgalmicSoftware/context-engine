@@ -821,6 +821,18 @@ describe('aiClient worker auth options', () => {
     );
     expect(JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body).taskType).toBe('compare');
   });
+
+  it('hands a failed compare call to a caller that asks for it, and null to one that does not', async () => {
+    getEffectiveAiConfig.mockResolvedValue({ provider: 'openai', model: 'gpt-4o-mini', apiKeySource: 'worker' });
+    getCorsProxyUrlOrThrow.mockRejectedValue(new Error('Worker URL is not configured.'));
+    const payload = { users: [], sessionSlug: 'unlisted' };
+
+    await expect(runCompareToolkit('compare', payload, { throwOnError: true })).rejects.toThrow(
+      'Worker URL is not configured.',
+    );
+    await expect(runCompareToolkit('compare', payload)).resolves.toBeNull();
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  });
 });
 
 describe('group transcription fallback', () => {

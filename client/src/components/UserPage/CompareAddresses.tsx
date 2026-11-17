@@ -17,7 +17,7 @@ import {
   resolveCompareErrorStyle,
 } from './compareAddressStyles';
 import ComparePresentation, { type ComparisonGeneration } from './ComparePresentation';
-import { normalizeUserAnalysisResult } from './userPageAnalysisStateHelpers';
+import { buildUserPageAnalysisErrorPresentation, normalizeUserAnalysisResult } from './userPageAnalysisStateHelpers';
 
 // NEW: blockie data URL generator (tiny, deterministic)
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -183,6 +183,14 @@ interface CompareAddressProps {
   scanSpecificUserProfile?: (address: string) => Promise<unknown> | unknown;
 }
 
+const AI_REPLY_UNREADABLE = 'The AI reply could not be read.';
+
+/** Why the AI summary is missing, in the words the profile analysis uses for the same failures. */
+export const describeCompareAiFailure = (error: unknown): string => {
+  const { message } = buildUserPageAnalysisErrorPresentation(error);
+  return /worker url is not configured/i.test(message) ? 'This page has no AI service for this session.' : message;
+};
+
 const EMPTY_SUBJECT_COMPATIBILITY: CompareSubjectCompatibility = {
   membershipComparable: false,
   notice: '',
@@ -210,6 +218,7 @@ const CompareAddress = ({
   const [compassLoading, setCompassLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState('');
   const [generation, setGeneration] = useState<ComparisonGeneration | null>(null);
+  const [aiUnavailableReason, setAiUnavailableReason] = useState('');
   const [axesSource, setAxesSource] = useState<'ai' | 'fallback' | 'mock'>('fallback');
 
   // Bullets + visuals fed by the unified bundle
@@ -468,6 +477,7 @@ const CompareAddress = ({
     // Clear prior-run slices before either waiting for caches or resolving the new subjects.
     setComparisonResult(null);
     setGeneration(null);
+    setAiUnavailableReason('');
     setAxesSource('fallback');
     setCompassData(null);
     setCurrentUsers([]);
@@ -546,7 +556,11 @@ const CompareAddress = ({
         return;
       }
       try {
-        const bulletsRaw: UnknownRecord | null = await runCompareToolkit('compare', { users, ...aiScope });
+        const bulletsRaw: UnknownRecord | null = await runCompareToolkit(
+          'compare',
+          { users, ...aiScope },
+          { throwOnError: true },
+        );
         const validSummary =
           bulletsRaw &&
           Array.isArray(bulletsRaw.agreements) &&
@@ -555,6 +569,7 @@ const CompareAddress = ({
         const bullets = normalizeCompareBullets(validSummary ? bulletsRaw : null, fallbackBullets(users), 3);
         if (!isStale()) {
           setComparisonResult(bullets);
+          if (!validSummary) setAiUnavailableReason(AI_REPLY_UNREADABLE);
           const metadata = validSummary && bulletsRaw && 'generation' in bulletsRaw ? bulletsRaw.generation : null;
           setGeneration(
             metadata && typeof metadata === 'object' && 'source' in metadata && metadata.source === 'mock'
@@ -566,6 +581,7 @@ const CompareAddress = ({
         accountLog.error('compare bullets failed:', err);
         const fallback = fallbackBullets(users);
         if (!isStale()) {
+          setAiUnavailableReason(describeCompareAiFailure(err));
           setComparisonResult({
             agreements: (fallback.agreements || []).slice(0, 12),
             disagreements: (fallback.disagreements || []).slice(0, 12),
@@ -853,6 +869,7 @@ const CompareAddress = ({
             compass={compassData}
             axesSource={axesSource}
             generation={generation}
+            aiUnavailableReason={aiUnavailableReason}
             bulletsLoading={bulletsLoading}
             compassLoading={compassLoading}
             opinionComparable={subjectCompatibility.opinionComparable}
