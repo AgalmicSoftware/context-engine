@@ -214,8 +214,11 @@ export const loadWorkerResponses = async (
     readsAllWhole || (!!reader && readString(metadata.responder).toLowerCase() === reader);
   // Own answers are read signed in as before. Results never ask anyone to sign: without a token held, these reads
   // go signed out, and the copies come back marked so a later load reads them again.
+  // Once one signed-in read fails or times out, the rest of this load go signed out, so the limit is paid once.
+  let signedInGaveUp = false;
   const readWhole = async <T>(read: (auth: { preferAnonymous?: false; prompt?: false }) => Promise<T>) => {
     if (ownResponses) return read({ preferAnonymous: false });
+    if (signedInGaveUp) return read({});
     // A silent sign-in that never settles (a passkey sheet closed unanswered) must not hold Results: past a limit,
     // read signed out.
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -228,6 +231,7 @@ export const loadWorkerResponses = async (
       ]);
     } catch {
       signal?.throwIfAborted();
+      signedInGaveUp = true;
       return read({});
     } finally {
       clearTimeout(timer);

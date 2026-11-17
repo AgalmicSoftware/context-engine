@@ -715,6 +715,45 @@ describe('answers with research material, which the Worker sends only to their a
     }
   });
 
+  it('pays the signed-in limit once a load, not once a batch', async () => {
+    jest.useFakeTimers();
+    try {
+      const listMany = async () => ({
+        items: Array.from({ length: 150 }, (_, i) => ({
+          storageRef: { id: `ref-${i}` },
+          metadata: { responder: OTHER, createdAt: '2026-01-01T00:00:00Z' },
+        })),
+        cursor: null,
+        listComplete: true,
+      });
+      const readBatch = jest.fn(({ ids, preferAnonymous }: Record<string, any>) =>
+        preferAnonymous === false
+          ? new Promise<unknown[]>(() => {})
+          : Promise.resolve(
+              ids.map(() => ({ sessionSlug: 'demo-sh', sessionId: SESSION_ID, questionID: 'q1', answer: {} })),
+            ),
+      );
+      let settled = false;
+      const loading = loadWorkerResponses(
+        { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account: ADMIN },
+        {
+          listSessionStorageRefsPage: listMany,
+          readSessionStorageBatch: readBatch,
+          readWorkerCapabilities: async () => ({ features: ['storage_read_batch_v1'] }) as any,
+        },
+      ).then((rows) => ((settled = true), rows));
+      while (!readBatch.mock.calls.length) await jest.advanceTimersByTimeAsync(0);
+      await jest.advanceTimersByTimeAsync(SIGNED_IN_READ_LIMIT_MS);
+      // The second batch reads signed out at once, without waiting out the limit again.
+      for (let i = 0; i < 20 && !settled; i += 1) await jest.advanceTimersByTimeAsync(0);
+      expect(settled).toBe(true);
+      expect(await loading).toHaveLength(150);
+      expect(readBatch.mock.calls.filter(([options]) => options.preferAnonymous === false)).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('reads own answers signed in, so ticks restore on a fresh browser', async () => {
     const rows = await loadWorkerResponses(
       { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account: AUTHOR, ownResponses: true },
