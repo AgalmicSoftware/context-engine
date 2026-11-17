@@ -209,14 +209,20 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
 
   const persistDraftSafely = (delayMs: SurveyQuestionsLegacyValue = 150) => {
     if (inst._persistTimer) clearTimeout(inst._persistTimer);
-    const scheduledKey = getDraftKey();
-    inst._persistTimer = setTimeout(() => {
-      inst._persistTimer = null;
-      // A pending edit belongs to the source that scheduled it, even if the
-      // component survives a same-slug Worker/account/survey switch.
-      if (getDraftKey() !== scheduledKey) return;
-      persistDraft();
-    }, delayMs);
+    inst._persistTimerKey = getDraftKey();
+    inst._persistTimer = setTimeout(flushPendingDraft, delayMs);
+  };
+
+  // Also runs on pagehide: a reload or closed tab never unmounts React, so a
+  // write still waiting on the timer would lose the last keystrokes.
+  const flushPendingDraft = () => {
+    if (!inst._persistTimer) return;
+    clearTimeout(inst._persistTimer);
+    inst._persistTimer = null;
+    // A pending edit belongs to the source that scheduled it, even if the
+    // component survives a same-slug Worker/account/survey switch.
+    if (getDraftKey() !== inst._persistTimerKey) return;
+    persistDraft();
   };
 
   const persistDraft = () =>
@@ -502,6 +508,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
   return {
     clearDraft,
     clearDraftFor,
+    flushPendingDraft,
     getDraftKey,
     loadDraft,
     migratePersistedDraftForActiveAccount,

@@ -7,6 +7,7 @@ import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoa
 import { buildAtlasNodeRoute, readWindowLocationPath } from '../../utilities/ui/publicUrl.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
+import { copyText } from '../../utilities/ui/copyText';
 import { notify } from '../../utilities/ui/notify.js';
 import { sbtBasePath, t } from '../../utilities/ui/terminology.js';
 import styles from './BookmarksPage.module.scss';
@@ -19,6 +20,8 @@ type BookmarkUser = {
   nickname: string;
   username: string;
   networkId: string;
+  // The session the bookmark (and its nickname) was saved in.
+  sessionSlug: string;
 };
 
 type FilterEntry = {
@@ -174,7 +177,7 @@ export const buildQuestionBookmarkHref = (question: unknown, sessionSlug: unknow
   return buildQuestionRoutePath(ref.id, { sessionSlug: ref.sessionSlug });
 };
 
-const normalizeUsers = (entries: unknown): BookmarkUser[] => {
+const normalizeUsers = (entries: unknown, fallbackSessionSlug: unknown = ''): BookmarkUser[] => {
   if (!Array.isArray(entries)) return [];
   const seen = new Set();
   const out: BookmarkUser[] = [];
@@ -183,6 +186,7 @@ const normalizeUsers = (entries: unknown): BookmarkUser[] => {
     let nickname = '';
     let username = '';
     let networkId = '';
+    let sessionSlug = normalizeSessionSlug(fallbackSessionSlug || '');
     if (typeof entry === 'string') {
       address = entry;
     } else if (entry && typeof entry === 'object') {
@@ -190,10 +194,11 @@ const normalizeUsers = (entries: unknown): BookmarkUser[] => {
       nickname = entry.nickname || '';
       username = entry.username || '';
       networkId = entry.networkId || '';
+      sessionSlug = normalizeSessionSlug(entry.sessionSlug ?? sessionSlug);
     }
     address = toText(address);
     if (!address) return;
-    const key = address.toLowerCase();
+    const key = `${address.toLowerCase()}|${sessionSlug.toLowerCase()}`;
     if (seen.has(key)) return;
     seen.add(key);
     out.push({
@@ -201,9 +206,16 @@ const normalizeUsers = (entries: unknown): BookmarkUser[] => {
       nickname: toText(nickname),
       username: toText(username),
       networkId: toText(networkId),
+      sessionSlug,
     });
   });
   return out;
+};
+
+/** A user bookmark opens in the session it was saved in, where its nickname and Remove control live. */
+export const buildUserBookmarkHref = (user: { address: string; sessionSlug?: string }) => {
+  const base = `/u/${encodeURIComponent(user.address)}`;
+  return user.sessionSlug ? `${base}?session=${encodeURIComponent(user.sessionSlug)}` : base;
 };
 
 const userLabel = (user: BookmarkUser) => {
@@ -479,7 +491,7 @@ const BookmarksPage = () => {
 
       const mergeCache = (obj: any, entrySlug = '') => {
         if (!obj || typeof obj !== 'object') return;
-        merged.users.push(...(Array.isArray(obj.users) ? obj.users : []));
+        merged.users.push(...normalizeUsers(obj.users, entrySlug));
         merged.surveys.push(...normalizeBookmarkRefs(obj.surveys, entrySlug));
         merged.questions.push(...normalizeBookmarkRefs(obj.questions, entrySlug));
         merged.sbts.push(...normalizeList(obj.sbts));
@@ -622,8 +634,13 @@ const BookmarksPage = () => {
 
   const handleCopyFilter = useCallback((filterEntry: FilterEntry) => {
     const value = getFilterCopyValue(filterEntry);
-    if (!value || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
-    navigator.clipboard.writeText(value).then(() => {
+    if (!value) return;
+    void copyText(value).then((done) => {
+      if (!done) {
+        // The full code is not on screen, so there is nothing to select instead.
+        notify.error("Copying isn't allowed here, so the filter code could not be copied.");
+        return;
+      }
       notify.success('Copied to clipboard');
       setCopiedFilterKey(filterEntry.key);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
@@ -677,11 +694,15 @@ const BookmarksPage = () => {
                   <ul className={styles.list}>
                     {section.key === 'users' &&
                       data.users.map((user) => (
-                        <li key={user.address.toLowerCase()} className={styles.listItem}>
+                        <li
+                          key={`${user.address.toLowerCase()}|${user.sessionSlug.toLowerCase()}`}
+                          className={styles.listItem}
+                        >
                           <div className={styles.itemRow}>
-                            <a href={`/u/${user.address}`} className={styles.itemLink}>
+                            <a href={buildUserBookmarkHref(user)} className={styles.itemLink}>
                               {userLabel(user)}
                             </a>
+                            {user.sessionSlug && <span className={styles.badge}>{user.sessionSlug}</span>}
                             {user.networkId && <span className={styles.badge}>net {user.networkId}</span>}
                           </div>
                           <div className={styles.itemMeta}>{user.address}</div>

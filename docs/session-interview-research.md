@@ -12,6 +12,8 @@ When a session URL includes a valid `src` query parameter, the browser keeps the
 
 Encrypted answer or comment fields are redacted before this metadata is written, and the full interview transcript or imported conversation history is not attached. Saved AI draft changes appear in exportable data only after a selected draft is submitted and the relevant research controls allow the metadata; in-memory review state that is closed or discarded without submission is not a stored research record.
 
+The Session Worker sends this metadata (`interviewProvenance`) only to the session's admins and to the person who answered, for their own answers. Everyone else reading answers, signed in or not, through Results, the MCP or Agent HTTP, gets them without it; the stored answers are not rewritten. Admin backups keep it. AI Views, the atlas, the risk matrix and the Session Agent never read it. Sessions that store answers on Arweave publish the whole answer there, outside the Worker's control.
+
 For a visual overview, see the [interview research diagrams](assets/interview-research/README.md). Click either diagram there to open the full-size image.
 
 ## Consent Controls

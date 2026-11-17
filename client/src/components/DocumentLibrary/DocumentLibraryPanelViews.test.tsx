@@ -1,7 +1,8 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import { DocumentLibraryViewerBody } from './DocumentLibraryPanelViews';
+import { DocumentLibraryList, DocumentLibraryViewerBody } from './DocumentLibraryPanelViews';
+import { notify } from '../../utilities/ui/notify.js';
 
 const renderLinkDocument = (url: string) =>
   render(
@@ -34,5 +35,35 @@ describe('DocumentLibraryViewerBody link documents', () => {
 
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByText('Unsafe or invalid URL (not rendered as a link):', { exact: false })).toBeInTheDocument();
+  });
+});
+
+describe('DocumentLibraryList copy link', () => {
+  it('says so when copying a document link is refused', async () => {
+    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const error = jest.spyOn(notify, 'error').mockImplementation(() => '');
+    const success = jest.spyOn(notify, 'success').mockImplementation(() => '');
+    try {
+      render(
+        <DocumentLibraryList
+          docs={[{ txId: 'tx-1', tagMap: { 'CE-DocName': 'Brief' } } as never]}
+          loading={false}
+          canList
+          cursor={null}
+          onLoadMore={jest.fn()}
+          openDoc={jest.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByTitle('Copy link'));
+      await waitFor(() =>
+        expect(error).toHaveBeenCalledWith("Copying isn't allowed here, so the link could not be copied."),
+      );
+      expect(writeText.mock.calls[0][0]).toContain('tx-1');
+      expect(success).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+      success.mockRestore();
+    }
   });
 });

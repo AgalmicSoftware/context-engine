@@ -306,6 +306,20 @@ describe('SponsorPage', () => {
 
     fireEvent.change(workerInput, { target: { value: 'https://edited.example.test' } });
     expect(screen.getByDisplayValue('https://edited.example.test')).toBeInTheDocument();
+
+    // Where copying is refused, the worker URL is selected to copy by hand.
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+      configurable: true,
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy worker URL' }));
+    });
+    const { notify } = jest.requireMock<typeof import('../../utilities/ui/notify.js')>('../../utilities/ui/notify.js');
+    expect(notify.error).toHaveBeenCalledWith(
+      "Copying isn't allowed here, so the worker URL is selected. Copy it yourself.",
+    );
+    expect(document.activeElement).toBe(workerInput);
   });
 
   it('tells sponsors that grant deploys use the release recorded on their session Worker', async () => {

@@ -229,6 +229,21 @@ describe('PolisReportFidelitySection', () => {
     );
   });
 
+  it('shows nothing to a reader the Worker sent no AI predictions, as it does everyone but admins', async () => {
+    const withheld = sixPeople()
+      .flat()
+      .map(({ response: { interviewProvenance: _withheld, ...response }, ...entry }) => ({ ...entry, response }));
+    const { container } = render(
+      <PolisReportFidelitySection
+        sessionConfig={sessionConfig}
+        questions={questions}
+        questionResponses={byQuestion(withheld as ReturnType<typeof row>[])}
+      />,
+    );
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('says when it will show, and stays hidden while the session has it off', async () => {
     const three = byQuestion(sixPeople().slice(0, 3).flat());
     const { rerender, container } = render(

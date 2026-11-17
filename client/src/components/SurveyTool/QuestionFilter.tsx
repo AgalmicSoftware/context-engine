@@ -25,6 +25,7 @@ import { createLogger } from '../../utilities/logging.js';
 import { peekCacheSync, readCache, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { copyText } from '../../utilities/ui/copyText';
 import { notify } from '../../utilities/ui/notify.js';
 import {
   QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE,
@@ -2283,21 +2284,20 @@ class QuestionFilter extends React.Component<any, any> {
     const url = new URL(window.location.href);
     url.searchParams.set('filter', serializedState);
 
-    navigator.clipboard
-      .writeText(url.toString())
-      .then(() => {
-        notify.success('Copied to clipboard');
-        if (this.copySuccessTimeout) clearTimeout(this.copySuccessTimeout);
-        this.setState(buildQuestionFilterCopyUrlSuccessPatch(true));
-        this.copySuccessTimeout = setTimeout(() => {
-          if (this._isMounted) {
-            this.setState(buildQuestionFilterCopyUrlSuccessPatch(false));
-          }
-        }, 2000);
-      })
-      .catch((err: unknown) => {
-        questionFilterLog.error('Failed to copy filter URL to clipboard:', err);
-      });
+    void copyText(url.toString()).then((done) => {
+      if (!done) {
+        notify.error("Copying isn't allowed here, so the filter link could not be copied.");
+        return;
+      }
+      notify.success('Copied to clipboard');
+      if (this.copySuccessTimeout) clearTimeout(this.copySuccessTimeout);
+      this.setState(buildQuestionFilterCopyUrlSuccessPatch(true));
+      this.copySuccessTimeout = setTimeout(() => {
+        if (this._isMounted) {
+          this.setState(buildQuestionFilterCopyUrlSuccessPatch(false));
+        }
+      }, 2000);
+    });
   };
 
   toggleSection = (section: string): void => {

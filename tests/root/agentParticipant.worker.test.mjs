@@ -20,6 +20,7 @@ const SLUG = 'town-hall';
 const SESSION_ID = '0x00112233445566778899aabbccddeeff';
 const LINK = `https://contextengine.sh/session/${SLUG}?worker=${encodeURIComponent(WORKER_ORIGIN)}`;
 const STATEMENT = 'Every account should say plainly whether a human or an agent is writing.';
+const NO_SUCH_QUESTION = 'No question in list_questions has this id. This answer was not stored: copy the id from list_questions and send it again.';
 
 const publicProfile = (visibility = 'public_full_if_storage_public') => ({
   profileVersion: 1,
@@ -468,7 +469,47 @@ test('locked questions are listed as locked and cannot be answered', async () =>
   assert.equal(listed.lockedQuestions, 1);
   const answered = await participant.answer({ answers: [{ questionId: lockedId, value: 'Agree' }] });
   assert.equal(answered.failed, 1);
+  assert.equal(answered.results[0].error, 'This question is locked to certain members; agents cannot answer locked questions yet.');
+  // A slip of the locked id is not pointed at it: the list never gave the agent that id.
+  const near = await participant.answer({ answers: [{ questionId: lockedId.slice(0, -1), value: 'Agree' }] });
+  assert.equal(near.results[0].error, NO_SUCH_QUESTION);
   assert.equal(storedRecords(env, 'responses').filter((row) => row.resource === 'responses').length, 0);
+});
+
+test('a batch with a mistyped question id stores the rest and says which answers went through', async () => {
+  const env = createEnv([sessionConfig()]);
+  const { participant } = await createAgent(env, 'typist', []);
+  await participant.joinSession({ link: LINK });
+  const first = (await participant.addStatement({ prompt: 'Budget   explainers\ncome first.' })).questionId;
+  const second = (await participant.addStatement({ prompt: 'Benefit eligibility comes first.' })).questionId;
+  const third = (await participant.addStatement({ prompt: 'Neither comes first.' })).questionId;
+  const slip = second.slice(0, -1);
+  const nowhere = `0x${'5'.repeat(64)}`;
+  const result = await participant.answer({ answers: [
+    { questionId: first, value: 'Agree' },
+    { questionId: slip, value: 'Disagree' },
+    { questionId: nowhere, value: 'Agree' },
+    { questionId: third, value: 'Unsure' },
+    { value: 'Agree' },
+  ] });
+  assert.deepEqual(result.results, [
+    { questionId: first, ok: true, answer: 'Agree' },
+    { questionId: slip, ok: false, error: `No question in list_questions has this id; it looks mistyped. Did you mean ${second} (“Benefit eligibility comes first.”)? This answer was not stored: send it again with the right id.` },
+    { questionId: nowhere, ok: false, error: NO_SUCH_QUESTION },
+    { questionId: third, ok: true, answer: 'Unsure' },
+    { questionId: '', ok: false, error: 'This answer has no questionId; copy one from list_questions. For example: "answers": [{ "questionId": "0x1a…", "value": "Agree", "comment": "Why I agree." }]' },
+  ]);
+  assert.deepEqual({ submitted: result.submitted, failed: result.failed }, { submitted: 2, failed: 3 });
+  assert.equal(result.next, `2 of 5 answers were stored and stay stored; don’t send those again. 3 did not go through: ${slip}, ${nowhere}, (no questionId). Each one’s error in results says why; fix them and send only those.`);
+  const mine = await participant.listQuestions({ filter: 'answered' });
+  assert.deepEqual(mine.questions.map((question) => [question.id, question.myAnswer.value]).sort(), [[first, 'Agree'], [third, 'Unsure']].sort());
+
+  // The corrected answer alone completes the batch, and a clean call carries no summary.
+  const fixed = await participant.answer({ answers: [{ questionId: second, value: 'Disagree' }] });
+  assert.deepEqual({ submitted: fixed.submitted, failed: fixed.failed, next: fixed.next }, { submitted: 1, failed: 0, next: undefined });
+  const lone = await participant.answer({ answers: [{ questionId: first.slice(0, -1), value: 'Agree' }] });
+  assert.equal(lone.next, `None of these answers went through: ${first.slice(0, -1)}. Its error in results says why; fix it and send only that one.`);
+  assert.match(lone.results[0].error, /Did you mean 0x[0-9a-f]{64} \(“Budget explainers come first\.”\)\?/);
 });
 
 test('an earlier stored version wins even when a later upload hashes to either id encoding', async () => {
@@ -504,7 +545,10 @@ test('a long-running agent picks up admin changes to the session', async () => {
   clock += 31_000;
   assert.equal((await participant.listQuestions({ filter: 'all' })).total, 0);
   assert.equal((await participant.getResults()).resultsPublic, false);
-  assert.equal((await participant.answer({ answers: [{ questionId, value: 'Agree' }] })).failed, 1);
+  // A question an admin removed answers like an id that never existed.
+  const refused = await participant.answer({ answers: [{ questionId, value: 'Agree' }] });
+  assert.equal(refused.failed, 1);
+  assert.equal(refused.results[0].error, NO_SUCH_QUESTION);
 });
 
 test('results count only participants with a valid answer, and cleared answers drop out', async () => {
@@ -1143,7 +1187,7 @@ test('an agent adds a file, a link and a note that everyone sees as its own, and
   assert.equal((await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() })).sources.length, 3);
 });
 
-test('an agent makes a file or a note visible to some of the session’s groups, as the website’s Visible to does', async (t) => {
+test('an agent makes a file, a link or a note visible to some of the session’s groups, as the website’s Visible to does', async (t) => {
   const env = createEnv([groupSessionConfig()]);
   const host = groupHost(env);
   const salon = await createGroup(host, { label: 'Salon', joinMode: 'open' });
@@ -1163,6 +1207,11 @@ test('an agent makes a file or a note visible to some of the session’s groups,
   const file = await kami.participant.addContext({ file: notes, groups: [hosts.groupId, salon.groupId.toUpperCase(), hosts.groupId] });
   const both = [hosts.groupId, salon.groupId].sort();
   assert.equal(file.visibleTo, 'members of “Hosts” or “Salon”, and the session’s admins');
+  t.mock.method(globalThis, 'fetch', async () => new Response('<html><title>Essay</title><body><p>For the salon.</p></body></html>', {
+    headers: { 'content-type': 'text/html; charset=utf-8' },
+  }));
+  const link = await kami.participant.addContext({ url: 'https://example.org/essay', groups: [salon.groupId] });
+  assert.equal(link.visibleTo, 'members of “Salon”, and the session’s admins');
 
   // Stored under the website's own rule, which the Worker applies to whoever lists: someone in neither
   // group sees nothing, and a member of one of the file's two groups sees the file, not Salon's note.
@@ -1183,8 +1232,6 @@ test('an agent makes a file or a note visible to some of the session’s groups,
   // Refused before anything is sent: the choices the website doesn't offer.
   const refused = async (args, message) => assert.rejects(kami.participant.addContext(args), { message });
   await refused({ text: 'x', groups: [salon.groupId], adminsOnly: true }, 'Pass groups or adminsOnly, not both.');
-  await refused({ url: 'https://example.org/essay', groups: [salon.groupId] },
-    'A link is for everyone in the session or its admins alone. Only a file or text can be for groups.');
   await refused({ text: 'x', groups: 'salon' }, 'groups must be a list of group IDs.');
   await refused({ text: 'x', groups: Array.from({ length: 21 }, (_, index) => `g${index}`) }, 'Name at most 20 groups.');
   await refused({ text: 'x', groups: ['no-such-group'] }, 'This session lists no group "no-such-group". get_session lists the groups you can name.');
@@ -1370,6 +1417,21 @@ const workerWith = (env, seen, change) => {
   return async (url, init = {}) => (await change(new URL(url).pathname, init, () => worker(url, init))) || worker(url, init);
 };
 const editJson = async (response, edit) => Response.json(edit(await response.json()), { status: response.status });
+
+test('a link for some groups needs a Worker that says it takes them, and reaches no older one', async (t) => {
+  const env = createEnv([groupSessionConfig()]);
+  const salon = await createGroup(groupHost(env), { label: 'Salon', joinMode: 'open' });
+  const seen = [];
+  const older = workerWith(env, seen, (pathname, init, send) => pathname === '/capabilities'
+    ? send().then((response) => editJson(response, (body) => ({ ...body, features: body.features.filter((feature) => feature !== 'context_link_groups_v1') })))
+    : null);
+  const kami = await createAgent(env, 'Test Kami', seen, older);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  await kami.participant.joinSession({ link: LINK });
+  await assert.rejects(kami.participant.addContext({ url: 'https://example.org/essay', groups: [salon.groupId] }),
+    /Worker doesn’t limit links to groups yet/);
+  assert.equal(seen.some((call) => new URL(call.url).pathname === '/storage/context'), false);
+});
 
 test('a Worker that takes no links from participants is invited and asked only for a file or text', async (t) => {
   for (const [features, invitation] of [

@@ -120,7 +120,7 @@ export const buildTools = (participant) => [
     name: 'answer',
     title: 'Answer questions',
     description:
-      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a number on the question’s scale and step grid (default step 1); multichoice the option text (an array when several are allowed); quadratic a list of signed whole-number votes, one per option in order (such as [2, -1, 0]), whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer.',
+      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a number on the question’s scale and step grid (default step 1); multichoice the option text (an array when several are allowed); quadratic a list of signed whole-number votes, one per option in order (such as [2, -1, 0]), whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer. When some answers are refused the rest are still stored: next says which went through, and each refused answer’s error says why, naming the nearest listed id when one looks mistyped.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -188,7 +188,7 @@ export const buildTools = (participant) => [
     name: 'add_context',
     title: 'Add context',
     description:
-      'Add context to a hosted session, when it invites you to: exactly one of file (a local PDF, Markdown, plain text, CSV or JSON file), url (a public https:// page the Session Worker reads now, where the invitation offers a link) or text (stored as a Markdown file). Everyone in the session sees it, unless adminsOnly is true or groups names some of the session’s groups; then the members of any one of those groups see it, and the admins always do. A link takes no groups. It is marked as added by an agent, under your display name. Add no private or personal data.',
+      'Add context to a hosted session, when it invites you to: exactly one of file (a local PDF, Markdown, plain text, CSV or JSON file), url (a public https:// page the Session Worker reads now, where the invitation offers a link) or text (stored as a Markdown file). Everyone in the session sees it, unless adminsOnly is true or groups names some of the session’s groups; then the members of any one of those groups see it, and the admins always do. It is marked as added by an agent, under your display name. Add no private or personal data.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -202,7 +202,7 @@ export const buildTools = (participant) => [
           type: 'array',
           items: { type: 'string' },
           maxItems: CONTEXT_SOURCE_LIMITS.lockedGroups,
-          description: `Show a file or text to the members of any of these groups, and the session’s admins: up to ${CONTEXT_SOURCE_LIMITS.lockedGroups} group IDs from get_session. Not with url or adminsOnly.`,
+          description: `Show it to the members of any of these groups, and the session’s admins: up to ${CONTEXT_SOURCE_LIMITS.lockedGroups} group IDs from get_session. Not with adminsOnly.`,
         },
       },
       additionalProperties: false,

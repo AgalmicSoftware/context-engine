@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { ethers } from 'ethers';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
+import { notify } from '../../utilities/ui/notify.js';
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated';
@@ -199,7 +200,19 @@ describe('AdminPage metadata panel', () => {
     );
     expect(metadataPanel.querySelector(`a[href="/u/${encodeURIComponent(ADMIN_ADDRESS)}"]`)).not.toBeNull();
     expect(metadataPanel.querySelector('a[href*="old-metadata"]')).not.toBeNull();
-    expect(within(metadataPanel).getByRole('button', { name: 'Copy raw metadata JSON' })).toBeInTheDocument();
+    // Where copying is refused, the JSON is selected to copy by hand, and the admin is told.
+    const notifyError = jest.spyOn(notify, 'error').mockImplementation(() => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+      configurable: true,
+    });
+    fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Copy raw metadata JSON' }));
+    await act(async () => {});
+    expect(notifyError).toHaveBeenCalledWith(
+      "Copying isn't allowed here, so the raw metadata is selected. Copy it yourself.",
+    );
+    expect(window.getSelection().toString()).toContain('"slug": "edge"');
+    notifyError.mockRestore();
     // A registry session is edited on its settings page too, found through the registry.
     expect(within(metadataPanel).getByTestId(EDIT_SETTINGS_LINK_TESTID)).toHaveAttribute(
       'href',

@@ -300,6 +300,8 @@ export function anonymizeAgentGroups(groups = [], minGroupSize = 2, participants
     topStatements: Array.isArray(group.topStatements)
       ? group.topStatements.map((statement) => ({
           label: safeString(statement.label),
+          // Questions may share a wording; the report places a statement by its id.
+          questionId: safeString(statement.questionId),
           prompt: safeString(statement.prompt),
           cluster:
             statement.cluster && typeof statement.cluster === 'object' && !Array.isArray(statement.cluster)

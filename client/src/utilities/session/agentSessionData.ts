@@ -234,6 +234,7 @@ const normalizeGroups = (body: UnknownRecord): UnknownRecord => ({
           const item = toRecord(statement);
           return {
             label: toStr(item.label),
+            questionId: toStr(item.questionId),
             prompt: toStr(item.prompt),
             cluster: toRecord(item.cluster),
             overall: toRecord(item.overall),
@@ -303,6 +304,8 @@ const normalizePromptKey = (value: unknown): string => toStr(value).replace(/\s+
 const aggregateRowsFromViews = (views: UnknownRecord) => {
   const rowsByQuestionId = new Map<string, UnknownRecord>();
   const rowsByPrompt = new Map<string, UnknownRecord>();
+  // Wordings that more than one question shares: a statement can't be matched to a question by these.
+  const sharedPrompts = new Set<string>();
   ['consensus', 'difference'].forEach((viewKey) => {
     const view = toRecord(views[viewKey]);
     if (view.status !== 'ready') return;
@@ -313,6 +316,8 @@ const aggregateRowsFromViews = (views: UnknownRecord) => {
       const prompt = toStr(record.prompt);
       if (!prompt) return;
       const existingByPrompt = rowsByPrompt.get(normalizePromptKey(prompt));
+      const existingId = toStr(existingByPrompt?.questionId);
+      if (questionId && existingId && existingId !== questionId) sharedPrompts.add(normalizePromptKey(prompt));
       const normalized = { ...record, questionId: questionId || toStr(existingByPrompt?.questionId), prompt };
       if (questionId && !rowsByQuestionId.has(questionId)) rowsByQuestionId.set(questionId, normalized);
       if (!existingByPrompt || (!toStr(existingByPrompt.questionId) && toStr(normalized.questionId))) {
@@ -324,7 +329,9 @@ const aggregateRowsFromViews = (views: UnknownRecord) => {
     rows: Array.from(rowsByQuestionId.values()).concat(
       Array.from(rowsByPrompt.values()).filter((row) => !toStr(row.questionId)),
     ),
+    rowsByQuestionId,
     rowsByPrompt,
+    sharedPrompts,
   };
 };
 
@@ -441,7 +448,7 @@ export const buildAgentPolisDataset = (viewsInput: unknown): AgentPolisDataset =
     };
   }
 
-  const { rows, rowsByPrompt } = aggregateRowsFromViews(views);
+  const { rows, rowsByQuestionId, rowsByPrompt, sharedPrompts } = aggregateRowsFromViews(views);
   const groupsView = toRecord(views.groups);
   const groupsData = toRecord(groupsView.data);
   const groups = groupsView.status === 'ready' && Array.isArray(groupsData.groups) ? groupsData.groups : [];
@@ -457,7 +464,14 @@ export const buildAgentPolisDataset = (viewsInput: unknown): AgentPolisDataset =
       (Array.isArray(group.topStatements) ? group.topStatements : []).forEach((statementInput) => {
         const statement = toRecord(statementInput);
         const prompt = toStr(statement.prompt);
-        const matchingRow = rowsByPrompt.get(normalizePromptKey(prompt));
+        // By id; by wording only where no other question shares it, or a rating could take a yes/no's votes.
+        const statementId = toStr(statement.questionId);
+        const promptKey = normalizePromptKey(prompt);
+        const matchingRow = statementId
+          ? rowsByQuestionId.get(statementId)
+          : sharedPrompts.has(promptKey)
+            ? undefined
+            : rowsByPrompt.get(promptKey);
         const questionId = toStr(matchingRow?.questionId);
         if (!questionId || !prompt) return;
         const counts = voteCountsFromCluster(toRecord(statement.cluster), groupSize);

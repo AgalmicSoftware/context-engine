@@ -196,6 +196,7 @@ export function buildParticipantResultGroups({
         const overallAverage = averageAnswerScore(overallQuestionRecords, questionLookup);
         return {
           label: questionIndex.get(id) || `Q${questionNumber + 1}`,
+          questionId: id,
           questionIndex: questionNumber,
           prompt: promptMap.get(id) || shortQuestionId(id),
           cluster: countResultVotes(clusterQuestionRecords, questionLookup),

@@ -11,6 +11,7 @@ import {
   setupCreateSBTGroupTestLifecycle,
   within,
 } from './CreateSBTGroup.testUtils';
+import { notify } from '../../utilities/ui/notify.js';
 
 const PASSPHRASE_PATTERN = /^[a-z]+(-[a-z]+){4}$/;
 
@@ -426,6 +427,31 @@ describe('CreateSBTGroup group password', () => {
         fireEvent.click(success.getByRole('button', { name: 'Copy group password' }));
         expect(writeText).toHaveBeenCalledWith(PASSPHRASE);
       } finally {
+        if (originalClipboard) Object.defineProperty(navigator, 'clipboard', originalClipboard);
+        else delete navigator.clipboard;
+      }
+    });
+
+    it('selects the shown password where copying is refused', async () => {
+      const instance = await createGroup();
+      const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+      });
+      const notifyError = jest.spyOn(notify, 'error').mockImplementation(() => undefined);
+      try {
+        render(instance.render());
+        const success = within(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_SUCCESS));
+        await act(async () => {
+          fireEvent.click(success.getByRole('button', { name: 'Copy group password' }));
+        });
+        expect(notifyError).toHaveBeenCalledWith(
+          "Copying isn't allowed here, so the password is selected. Copy it yourself.",
+        );
+        expect(window.getSelection().toString()).toBe(PASSPHRASE);
+      } finally {
+        notifyError.mockRestore();
         if (originalClipboard) Object.defineProperty(navigator, 'clipboard', originalClipboard);
         else delete navigator.clipboard;
       }

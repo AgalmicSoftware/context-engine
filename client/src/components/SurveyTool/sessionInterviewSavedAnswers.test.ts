@@ -257,3 +257,20 @@ it.each(['answers', 'additionalComments'] as const)(
     expect(merged.baseline[key].q1).toEqual(publicBlank);
   },
 );
+
+it('never lets a copy read without research material replace the consent the page holds', () => {
+  const whole = { includePredictionComparison: true, predictionComparison: { version: 2 }, consentSavedAt: 1 };
+  const withheld = { consentWithheld: true, consentSavedAt: 2 };
+  const merged = mergeInterviewSavedAnswerBaseline(
+    slice({ answers: { q1: field('Agree') } }),
+    { ...slice({ answers: { q1: field('Agree') } }), interviewProvenance: { q1: whole } },
+    {
+      ...slice({ answers: { q1: field('Agree'), q2: field('Agree') } }),
+      interviewProvenance: { q1: withheld, q2: withheld },
+    },
+    ['q1', 'q2'],
+    diff,
+  );
+  // Where the page holds nothing, the stripped copy is all there is, and stays marked as such.
+  expect(merged.baseline.interviewProvenance).toEqual({ q1: whole, q2: withheld });
+});

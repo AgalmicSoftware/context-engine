@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
@@ -13,6 +13,7 @@ import {
   buildOnMyBehalfPrompt,
   type AgentDelegateKey,
 } from '../../utilities/session/agentHandoff';
+import { copyText, selectText } from '../../utilities/ui/copyText';
 import styles from './Account.module.scss';
 
 export type LoginAgentHandoffPanelProps = {
@@ -86,7 +87,11 @@ const Step = ({ id, label, shown, copyLabel, copied, onCopy, children }: StepPro
   <div className={styles.agentHandoffStep}>
     <div className={styles.agentHandoffStepLabel}>{label}</div>
     <div className={styles.agentHandoffCommandBox}>
-      <code className={styles.agentHandoffCommand} data-testid={`ce-agent-handoff-${id}`}>
+      <code
+        id={`ce-agent-handoff-${id}-text`}
+        className={styles.agentHandoffCommand}
+        data-testid={`ce-agent-handoff-${id}`}
+      >
         {shown}
       </code>
       <button
@@ -123,6 +128,8 @@ const LoginAgentHandoffPanel = ({
   const [copyCount, setCopyCount] = useState(0);
   // The step whose icon shows a tick, for a moment after it was copied.
   const [copiedStep, setCopiedStep] = useState('');
+  // The step whose text is selected, once shown, because copying it was refused.
+  const [selectStep, setSelectStep] = useState('');
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
   const displayName = agentDisplayName(ownerName);
@@ -130,16 +137,23 @@ const LoginAgentHandoffPanel = ({
   const copy = async (step: string, what: string, text: string) => {
     clearTimeout(copiedTimer.current);
     setCopiedStep('');
-    try {
-      await navigator.clipboard.writeText(text);
+    if (await copyText(text)) {
       setCopyStatus(`Copied the ${what}.`);
       setCopiedStep(step);
       copiedTimer.current = setTimeout(() => setCopiedStep(''), 1800);
-    } catch {
-      setCopyStatus(`Couldn't copy the ${what}. Select it and copy it yourself.`);
+    } else {
+      setCopyStatus(`Copying isn't allowed here, so the ${what} is selected. Copy it yourself.`);
+      // A hidden key is shown, since the masked one is no use to copy.
+      if (step === 'key') setKeyShown(true);
+      setSelectStep(step);
     }
     setCopyCount((count) => count + 1);
   };
+  useLayoutEffect(() => {
+    if (!selectStep) return;
+    setSelectStep('');
+    selectText(document.getElementById(`ce-agent-handoff-${selectStep}-text`));
+  }, [selectStep]);
 
   const makeKey = async () => {
     setMaking(true);

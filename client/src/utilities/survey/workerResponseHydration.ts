@@ -1,6 +1,7 @@
 import { isWorkerResponseNewer } from './workerResponseRecency';
 import {
   STORAGE_READ_BATCH_MAX_IDS,
+  isConfiguredAdmin,
   listSessionStorageRefsPage,
   readSessionStorageBatch,
   readSessionStorageBlob,
@@ -60,6 +61,10 @@ export const isWorkerCanonicalSessionConfig = (value: unknown): boolean => {
   const projection = resolveSessionCapabilityProjection(value);
   return projection.profileValid && projection.isWorkerCanonical;
 };
+
+/** Whether this reader gets answers' research material from the Worker: a session admin (authors get their own). */
+export const readsResearchMaterial = (sessionConfig: unknown, account: unknown): boolean =>
+  isConfiguredAdmin(sessionConfig, { account });
 
 export const loadWorkerResponses = async (
   {
@@ -199,6 +204,24 @@ export const loadWorkerResponses = async (
     workerUrl: target.workerUrl,
     ...(signal ? { signal } : {}),
   };
+  // The Worker sends an answer's research material only to its author and the session's admins, so those reads
+  // go signed in: a signed-out copy would drop it from Results, the export, and a resubmitted answer. Everyone
+  // else's answers are read signed out first, as before.
+  const reader = readString(account).toLowerCase();
+  const readsAllWhole = ownResponses || readsResearchMaterial(target.sessionConfig, account);
+  const signedIn = ({ metadata }: WantedRead) =>
+    readsAllWhole || (!!reader && readString(metadata.responder).toLowerCase() === reader);
+  // Own answers are read signed in as before. Results never ask anyone to sign: without a token held, these reads
+  // go signed out, and the copies come back marked so a later load reads them again.
+  const readWhole = async <T>(read: (auth: { preferAnonymous?: false; prompt?: false }) => Promise<T>) => {
+    if (ownResponses) return read({ preferAnonymous: false });
+    try {
+      return await read({ preferAnonymous: false, prompt: false });
+    } catch {
+      signal?.throwIfAborted();
+      return read({});
+    }
+  };
   const batched =
     !!wanted.length &&
     (
@@ -210,11 +233,34 @@ export const loadWorkerResponses = async (
   for (let offset = 0; offset < wanted.length; offset += step) {
     signal?.throwIfAborted();
     const chunk = wanted.slice(offset, offset + step);
-    const payloads = batched
-      ? await readBatch({ ...readTarget, ids: chunk.map((read) => read.storageRefId) })
-      : await Promise.all(
-          chunk.map(async ({ storageRef }) => (await readBlob({ ...readTarget, storageRef })).json().catch(() => null)),
-        );
+    const payloads: unknown[] = [];
+    if (batched) {
+      // At most two requests a chunk: the reader's own answers (or all, for an admin) signed in, the rest as before.
+      for (const whole of [true, false]) {
+        const part = chunk.map((read, index) => ({ read, index })).filter(({ read }) => signedIn(read) === whole);
+        if (!part.length) continue;
+        const ids = part.map(({ read: entry }) => entry.storageRefId);
+        const read = whole
+          ? await readWhole((auth) => readBatch({ ...readTarget, ...auth, ids }))
+          : await readBatch({ ...readTarget, ids });
+        part.forEach(({ index }, at) => {
+          payloads[index] = read[at];
+        });
+      }
+    } else {
+      payloads.push(
+        ...(await Promise.all(
+          chunk.map(async (read) =>
+            (signedIn(read)
+              ? await readWhole((auth) => readBlob({ ...readTarget, ...auth, storageRef: read.storageRef }))
+              : await readBlob({ ...readTarget, storageRef: read.storageRef })
+            )
+              .json()
+              .catch(() => null),
+          ),
+        )),
+      );
+    }
     chunk.forEach((read, index) => {
       const row = toRow(read, payloads[index]);
       if (row) rows.push(row);
@@ -256,6 +302,17 @@ const dropStaleResponses = (
         : byResponder,
     ]),
   );
+
+// The Worker sends an answer's research material only to its author and the admins, so one stored answer can be
+// cached stripped (read signed out) or whole. Whatever lands first, the whole copy is kept: it replaces a stripped
+// copy of the same stored answer, and a stripped copy never replaces it.
+const fillsWithheldCopy = (cached: unknown, cachedMeta: unknown, row: WorkerCanonicalResponseRow): boolean =>
+  isRecord(cached) &&
+  cached.interviewProvenanceWithheld === true &&
+  row.response?.interviewProvenanceWithheld !== true &&
+  !!readString(row.storageRefId) &&
+  isRecord(cachedMeta) &&
+  readString(cachedMeta.storageRefId) === readString(row.storageRefId);
 
 export const mergeWorkerQuestionResponses = (
   current: unknown,
@@ -299,16 +356,17 @@ export const mergeWorkerQuestionResponses = (
 
   rows.forEach((row) => {
     const storageRefId = readString(row.storageRefId);
-    if (storageRefId && seenRefs[storageRefId] != null) return;
-    if (storageRefId) seenRefs[storageRefId] = Number(row.timestamp || 0);
     const questionId = readString(row.questionId).toLowerCase();
     const responder = readString(row.responder).toLowerCase();
-    if (!questionId || !responder) return;
     const byResponder = isRecord(responses[questionId]) ? { ...(responses[questionId] as UnknownRecord) } : {};
     const metaByResponder = isRecord(responseMeta[questionId])
       ? { ...(responseMeta[questionId] as UnknownRecord) }
       : {};
-    if (!isWorkerResponseNewer(row.timestamp, storageRefId, metaByResponder[responder])) return;
+    const fills = fillsWithheldCopy(byResponder[responder], metaByResponder[responder], row);
+    if (storageRefId && seenRefs[storageRefId] != null && !fills) return;
+    if (storageRefId) seenRefs[storageRefId] = Number(row.timestamp || 0);
+    if (!questionId || !responder) return;
+    if (!fills && !isWorkerResponseNewer(row.timestamp, storageRefId, metaByResponder[responder])) return;
     const incoming = { ts: row.timestamp, storageRefId };
     byResponder[responder] = row.response;
     metaByResponder[responder] = incoming;
@@ -429,7 +487,10 @@ export const mergeWorkerUserResponses = (
     };
     if (existingIndex < 0) {
       entries.push(incoming);
-    } else if (isWorkerResponseNewer(incoming.timestamp, incoming.storageRefId, entries[existingIndex])) {
+    } else if (
+      isWorkerResponseNewer(incoming.timestamp, incoming.storageRefId, entries[existingIndex]) ||
+      fillsWithheldCopy(entries[existingIndex].response, entries[existingIndex], row)
+    ) {
       entries[existingIndex] = incoming;
     }
     network.data = data;

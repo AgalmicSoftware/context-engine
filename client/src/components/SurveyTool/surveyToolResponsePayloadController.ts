@@ -7,7 +7,7 @@ import {
   isTextInterviewQuestion,
   type InterviewResearchTier,
 } from './sessionInterviewResearch';
-import { resolveConsentFlags } from './sessionInterviewConsent';
+import { isWithheldConsent, resolveConsentFlags } from './sessionInterviewConsent';
 import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 
@@ -196,6 +196,8 @@ export interface BuildResponsePayloadOptions {
   // State slices
   surveyResponseState: ResponseSlice | null;
   savedInterviewProvenance?: Record<string, unknown> | null;
+  // An upload refuses an answer whose saved research choices came from a copy without them; a preview shows it without.
+  refuseWithheldConsent?: boolean;
   questionPool: unknown[];
   pileQuestions: unknown[];
 
@@ -288,6 +290,10 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       ? surveyResponseState.interviewProvenance?.[q.id]
       : opts.savedInterviewProvenance?.[q.id];
     const interviewProvenanceRecord = asRecord(rawInterviewProvenance);
+    // Built from a copy the Worker stripped of research material, this answer would leave the evaluation without
+    // the person choosing to, so it isn't sent. Submit first tries to read it again signed in.
+    if (opts.refuseWithheldConsent && isWithheldConsent(interviewProvenanceRecord))
+      throw new Error('Your research choices need a sign-in to load: submit again and approve it.');
     const interviewSource = asRecord(interviewProvenanceRecord.source);
     const researchCoverage = buildSubmittedResearchCoverage(interviewSource.researchCoverage);
     // A saved name or timestamp alone is not consent to AI attribution.

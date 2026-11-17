@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
+import { copyText } from '../../utilities/ui/copyText';
 import { sortInterviewQuestionPoolNewestFirst, buildInterviewQuestionPriority } from './sessionInterviewQuestionOrder';
 import { buildExternalInterviewKickoff, normalizeInterviewQuestions } from './sessionInterview';
 import { InterviewCatalogSignInError, verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
@@ -132,11 +133,11 @@ export default function SessionVoicePrefillCard({
   };
   const copyPrompt = async (prompt: string) => {
     setPromptCopied(false);
-    if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-    await navigator.clipboard.writeText(prompt);
+    if (!(await copyText(prompt))) return false;
     setPromptCopied(true);
     if (copyResetRef.current) clearTimeout(copyResetRef.current);
     copyResetRef.current = setTimeout(() => setPromptCopied(false), 1800);
+    return true;
   };
   return (
     <section

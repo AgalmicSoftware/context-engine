@@ -39,6 +39,17 @@ it('keeps same-session source, mode, and Worker while dropping private prefill c
   );
 });
 
+it('says copying is not allowed when the clipboard refuses the auto-join link', async () => {
+  window.history.replaceState({}, '', '/session/alpha');
+  const writeText = jest.fn().mockRejectedValue(new Error('denied'));
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  render(<WorkerGroupAutoJoinLink group={group} sessionSlug="alpha" workerUrl="https://worker.example" />);
+  fireEvent.click(screen.getByRole('button', { name: 'Copy auto-join link for Participants 2026' }));
+  expect(
+    await screen.findByText("Copying isn't allowed here, so the auto-join link could not be copied."),
+  ).toBeInTheDocument();
+});
+
 it('does not offer auto-join for closed or restricted groups', () => {
   const { rerender } = render(
     <WorkerGroupAutoJoinLink

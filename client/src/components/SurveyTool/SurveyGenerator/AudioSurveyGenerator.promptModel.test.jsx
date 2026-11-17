@@ -12,6 +12,7 @@ import {
 } from './AudioSurveyGenerator.testUtils';
 import { getEffectiveAiConfig, saveLocalAiSettings } from '../../../utilities/ai/aiSettings';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../../utilities/session/sessionModeProfile';
+import { notify } from '../../../utilities/ui/notify.js';
 
 describe('Context AI prompt model preview', () => {
   setupAudioSurveyGeneratorTestLifecycle();
@@ -56,6 +57,32 @@ describe('Context AI prompt model preview', () => {
       provider: 'openai',
       model: expectedModel,
     });
+  });
+});
+
+describe('Context AI prompt copy', () => {
+  setupAudioSurveyGeneratorTestLifecycle();
+
+  it('selects the shown prompt where copying is refused', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+      configurable: true,
+    });
+    const notifyError = jest.spyOn(notify, 'error').mockImplementation(() => undefined);
+    await renderSubject(
+      <AudioSurveyGenerator provider={{}} network={{}} account="" loginComplete={false} toggleLoginModal={jest.fn()} />,
+    );
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Show AI Prompt')
+        .click();
+    });
+    await act(async () => container.querySelector('button[title="Copy prompt"]').click());
+    expect(notifyError).toHaveBeenCalledWith(
+      "Copying isn't allowed here, so the prompt is selected. Copy it yourself.",
+    );
+    expect(window.getSelection().toString()).toBe(container.querySelector('pre').textContent);
+    notifyError.mockRestore();
   });
 });
 

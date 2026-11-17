@@ -8,6 +8,7 @@ import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClie
 import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
+import { copyText } from '../../utilities/ui/copyText';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { withCurrentWorkerHint } from '../../utilities/ui/currentWorkerHint';
@@ -115,6 +116,9 @@ const emptyMemberListState = (targetKey: string, groupId = ''): WorkerGroupMembe
   members: [],
   nextCursor: '',
 });
+
+// Pages of only departed members read in one go before "Load more" takes over.
+const MEMBER_PAGES_SKIPPED_MAX = 20;
 
 const groupJoinHasEnded = (group: WorkerGroup): boolean =>
   Boolean(group.joinEndsAt && Date.parse(group.joinEndsAt) <= Date.now());
@@ -621,19 +625,26 @@ const WorkerGroupMembershipPanel = ({
         };
       });
       try {
-        const page = await loadWorkerGroupMembers({
-          workerUrl,
-          credentialToken: workerToken,
-          sessionId,
-          sessionSlug,
-          groupId: requestGroupId,
-          cursor,
-          limit: 100,
-          fetchImpl,
-        });
-        if (targetKeyRef.current !== requestTargetKey || memberListRequestIdRef.current !== requestId) {
-          return;
+        const isStale = () => targetKeyRef.current !== requestTargetKey || memberListRequestIdRef.current !== requestId;
+        const readPage = (pageCursor?: string) =>
+          loadWorkerGroupMembers({
+            workerUrl,
+            credentialToken: workerToken,
+            sessionId,
+            sessionSlug,
+            groupId: requestGroupId,
+            cursor: pageCursor,
+            limit: 100,
+            fetchImpl,
+          });
+        let page = await readPage(cursor);
+        // A page can hold only people who have left; read on, so "No members found" waits for the list's end.
+        for (let skipped = 0; !page.members.length && page.nextCursor && skipped < MEMBER_PAGES_SKIPPED_MAX;) {
+          if (isStale()) return;
+          skipped += 1;
+          page = await readPage(page.nextCursor);
         }
+        if (isStale()) return;
         setMemberListState((current) => {
           if (current.targetKey !== requestTargetKey || current.groupId !== requestGroupId) return current;
           const combined = append ? [...current.members, ...page.members] : page.members;
@@ -856,24 +867,20 @@ const WorkerGroupMembershipPanel = ({
   };
   const copyGroupLink = async (groupId: string) => {
     const shareTargetKey = targetKey;
+    let status = "Copying isn't allowed here, so the group link could not be copied.";
     try {
-      if (typeof window === 'undefined' || !navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      if (typeof window === 'undefined') throw new Error('Window unavailable');
       if (!sessionSlug) throw new Error('Session slug unavailable');
       const currentUrl = new URL(window.location.href);
       const link = new URL(buildWorkerGroupsPath({ sessionSlug, groupId, workerUrl }), currentUrl.origin);
-      await navigator.clipboard.writeText(link.toString());
-      if (targetKeyRef.current !== shareTargetKey) return;
-      setShareState({
-        targetKey: shareTargetKey,
-        status: 'Group link copied. It contains no invitation token or credential.',
-      });
+      if (await copyText(link.toString())) {
+        status = 'Group link copied. It contains no invitation token or credential.';
+      }
     } catch {
-      if (targetKeyRef.current !== shareTargetKey) return;
-      setShareState({
-        targetKey: shareTargetKey,
-        status: 'Could not copy the group link. Copy the current session URL manually.',
-      });
+      status = 'Could not make the group link. Copy the current session URL manually.';
     }
+    if (targetKeyRef.current !== shareTargetKey) return;
+    setShareState({ targetKey: shareTargetKey, status });
   };
   const openGroupDetails = (groupId: string) => {
     if (inlineDetails) {

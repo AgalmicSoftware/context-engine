@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -7,6 +7,7 @@ import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection';
 import { buildGroupRecorderLink, normalizeShareableWorkerOrigin } from './sessionWizardUrlSupport';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { copyText } from '../../utilities/ui/copyText';
 import { buildExternalInterviewKickoff } from '../SurveyTool/sessionInterview';
 import {
   InterviewCatalogSignInError,
@@ -35,6 +36,12 @@ export default function SessionJoinPanel({
   const [attempt, setAttempt] = useState(0);
   const [validation, setValidation] = useState({ key: '', error: '' });
   const [copyState, setCopyState] = useState({ key: '', text: '', error: '' });
+  const copyFieldRef = useRef<HTMLTextAreaElement>(null);
+  // The text shown after a refused copy is selected, ready to copy by hand.
+  useLayoutEffect(() => {
+    copyFieldRef.current?.focus();
+    copyFieldRef.current?.select();
+  }, [copyState]);
   const helpId = `ce-join-help-${useId().replace(/:/g, '')}`;
   let url: URL | null = null;
   let slug = '';
@@ -96,12 +103,14 @@ export default function SessionJoinPanel({
     };
   }, [open, slug, activeWorker, returnUrl, kickoff, sessionConfig, attempt]);
   const copy = async (text: string) => {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-      await navigator.clipboard.writeText(text);
+    if (await copyText(text)) {
       setCopyState({ key: returnUrl, text: '', error: '' });
-    } catch {
-      setCopyState({ key: returnUrl, text, error: 'Could not use the clipboard. Copy the text below.' });
+    } else {
+      setCopyState({
+        key: returnUrl,
+        text,
+        error: "Copying isn't allowed here, so the text below is selected. Copy it yourself.",
+      });
     }
   };
   if (!slug) return null;
@@ -174,7 +183,9 @@ export default function SessionJoinPanel({
           {returnUrl && copyState.key === returnUrl ? (
             <div role={copyState.error ? 'alert' : 'status'}>
               {copyState.error || 'Copied.'}
-              {copyState.text ? <textarea aria-label="Text to copy" value={copyState.text} readOnly rows={5} /> : null}
+              {copyState.text ? (
+                <textarea ref={copyFieldRef} aria-label="Text to copy" value={copyState.text} readOnly rows={5} />
+              ) : null}
             </div>
           ) : null}
         </div>

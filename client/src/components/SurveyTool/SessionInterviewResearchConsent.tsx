@@ -274,16 +274,16 @@ export function SessionInterviewResearchShare({
       </button>
       <span id="ce-interview-research-description" className={styles.srOnly}>
         {minimal
-          ? 'Includes the AI’s predicted answers, ratings and confidence, its revision history, and which fields you changed. It excludes the AI’s notes and drafted text, drafts you did not select, encrypted answers, full interview transcripts, and imported conversation history. Edits are not treated as agreement.'
-          : 'Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported conversation history are excluded.'}
+          ? 'For the agent mirror evaluation, which measures how well your AI predicts you. Only the session’s admins see it. Includes the AI’s predicted answers, ratings and confidence, its revision history, and which fields you changed. It excludes the AI’s notes and drafted text, drafts you did not select, encrypted answers, full interview transcripts, and imported conversation history. Edits are not treated as agreement.'
+          : 'For the agent mirror evaluation, which measures how well your AI predicts you. Only the session’s admins see it. Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported conversation history are excluded.'}
         {draftTextNote}
         {dataNote.trim() ? ` ${dataNote.trim()}` : ''}
         {mixed ? ' Your saved responses have different choices; ticking or unticking sets them all.' : ''}
       </span>
       <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus" autohide={false}>
         {minimal
-          ? 'Records the AI’s predicted answers and confidence and which ones you changed, not its notes or drafted text.'
-          : 'Records draft provenance, revisions, selected status, and changed fields. It excludes encrypted answer text, transcripts, and imported conversation history.'}
+          ? 'For the agent mirror evaluation: keeps your AI’s predicted answers, how sure it was, and which you changed, not its notes or drafted text. Only the session’s admins see it.'
+          : 'For the agent mirror evaluation: keeps your AI’s drafts, their revisions, and which fields you changed, but no encrypted text, transcripts or imported history. Only the session’s admins see it.'}
         {draftTextNote}{' '}
         {dataNote.trim() ? (
           <>

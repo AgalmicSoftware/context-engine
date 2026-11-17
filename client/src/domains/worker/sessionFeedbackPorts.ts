@@ -230,8 +230,11 @@ export const listFeedback = async (admin: FeedbackAdmin): Promise<FeedbackMessag
     if (!response.ok) {
       throw new Error(toStr(result.error) || `The Session Worker couldn’t list the feedback (${response.status}).`);
     }
-    if (Array.isArray(result.messages))
-      messages.push(...result.messages.map(messageOf).filter((message) => message.id));
+    // "Delete all" removes everything up to the newest message listed, so a page that can't be read must fail
+    // the list rather than leave out messages that would then be deleted unseen.
+    if (!Array.isArray(result.messages))
+      throw new Error('Couldn’t read every page of feedback, so nothing is shown. Try again.');
+    messages.push(...result.messages.map(messageOf).filter((message) => message.id));
     cursor = toStr(result.cursor);
     if (!cursor) break;
   }

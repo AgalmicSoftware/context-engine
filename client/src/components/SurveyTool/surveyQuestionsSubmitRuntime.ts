@@ -1,4 +1,5 @@
-import { buildSavedInterviewConsent } from './sessionInterviewConsent';
+import { buildSavedInterviewConsent, isWithheldConsent } from './sessionInterviewConsent';
+import { loadSessionInterviewSavedAnswers } from './sessionInterviewSavedAnswers';
 import { planDraftTextSync, resendPendingDraftTextDeletes, syncDraftText } from './sessionInterviewDraftText';
 import { getSubmittedWorkerResponseRecency } from '../../utilities/survey/workerResponseRecency';
 import {
@@ -251,6 +252,34 @@ export const createSurveyQuestionsSubmitRuntime = (
     ].join('|');
   };
 
+  // Saved answers read without a sign-in lack their research material, so the person's saved research choices are
+  // unknown and an upload built from them would drop it. They pressed Submit, so their own answers are read again
+  // signed in (this may ask them to sign) before anything is built; if that fails, the upload refuses.
+  const restoreWithheldConsent = async (submitContext: SurveyQuestionsLegacyValue) => {
+    const baseline = stateRef.current.editBaseline;
+    const held: Record<string, unknown> = baseline?.interviewProvenance || {};
+    const withheld = Object.keys(held).filter((qid) => isWithheldConsent(held[qid]));
+    if (!withheld.length || !submitContext.account) return;
+    const rows = await loadSessionInterviewSavedAnswers({
+      questionIds: withheld,
+      account: submitContext.account,
+      provider: submitContext.provider,
+      sessionSlug: submitContext.effectiveDraftSlug,
+      sessionConfig: resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props),
+      signal: new AbortController().signal,
+    }).catch(() => null);
+    const restored = Object.fromEntries(
+      (rows || [])
+        .map((row) => [normalizeQuestionIdKey(row.questionID), buildSavedInterviewConsent(row)] as const)
+        .filter(([qid, consent]) => withheld.includes(qid) && !isWithheldConsent(consent)),
+    );
+    if (!Object.keys(restored).length || stateRef.current.editBaseline !== baseline) return;
+    const editBaseline = { ...baseline, interviewProvenance: { ...held, ...restored } };
+    // The payload is built from stateRef before React renders this.
+    stateRef.current = { ...stateRef.current, editBaseline };
+    setState({ editBaseline });
+  };
+
   const isSubmitContextCurrent = (snapshot: SurveyQuestionsLegacyValue = null) =>
     !!snapshot &&
     snapshot.workerTargetValid !== false &&
@@ -356,6 +385,7 @@ export const createSurveyQuestionsSubmitRuntime = (
       undefined,
       sizeSlice,
       changedQids,
+      true,
     );
     const rows: SurveyQuestionsLegacyValue[] = Array.isArray(built?.responses)
       ? built.responses
@@ -471,6 +501,7 @@ export const createSurveyQuestionsSubmitRuntime = (
         ),
       );
       if (!changedQids.size) throw new Error('No new or changed responses to submit.');
+      await restoreWithheldConsent(submitContext);
 
       // Local state tracker to ensure baseline syncs with encrypted data even if React is slow
       let activeSlice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex] || {

@@ -1,5 +1,6 @@
 import {
   getChangedInterviewConsentQids,
+  isWithheldConsent,
   keepConsentWithdrawals,
   resolveConsentFlags,
   type InterviewConsentOverrides,
@@ -1725,7 +1726,10 @@ export const recordInterviewProvenance = (
         const reviewedByQuestionId = new Map(review.map((entry) => [entry.questionId, entry]));
         const savedConsentFor = (questionId: string) => {
           const consent = provenance[questionId] ?? prev.editBaseline?.interviewProvenance?.[questionId];
-          return consent && typeof consent === 'object' ? (consent as Record<string, unknown>) : null;
+          // A copy stripped of research material holds no choices: these drafts take the defaults instead.
+          return consent && typeof consent === 'object' && !isWithheldConsent(consent)
+            ? (consent as Record<string, unknown>)
+            : null;
         };
         // Without an imported name, a ticked box shows the saved name and every submitted response gets one.
         const shownSavedName =

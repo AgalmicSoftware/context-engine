@@ -1,6 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useInterviewOpening } from './useInterviewOpening';
-import { holdSignInAndProof, TEST_READ_PROOF } from '../../utilities/worker/workerSessionReadHeaders.testUtils';
+import {
+  holdSignIn,
+  holdSignInAndProof,
+  TEST_READ_PROOF,
+} from '../../utilities/worker/workerSessionReadHeaders.testUtils';
 
 const originalFetch = global.fetch;
 const options = { config: {}, workerUrl: 'https://worker.example', sessionSlug: 'demo', hasQuestions: true };
@@ -22,6 +26,17 @@ it('waits for questions and loads a Worker-cached opening without credentials in
     headers: {},
     signal: expect.any(AbortSignal),
   });
+});
+it('sends an older Worker no sign-in for the opening of a session not known private', async () => {
+  const release = holdSignIn(options.workerUrl, 'demo');
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ openingPrompt: 'Why?' }) });
+  try {
+    const { result } = renderHook(() => useInterviewOpening(options));
+    await waitFor(() => expect(result.current.opening).toBe('Why?'));
+    expect(jest.mocked(global.fetch).mock.calls[0][1]?.headers).toEqual({});
+  } finally {
+    release();
+  }
 });
 it('sends a private session’s sign-in and invite proof for its opening', async () => {
   const release = holdSignInAndProof(options.workerUrl, 'demo');

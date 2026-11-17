@@ -5,7 +5,7 @@ import { safeString, lower, safeJsonParse, sanitizeSessionSlug, sha256Hex } from
 import { loadQuestionsForSession, readAgentSkillUpdateFlag } from './agentSessionRuntime.mjs';
 import { geoTagsFromRefs, inferQuestionTags, normalizeQuestionReferences, normalizeQuestionGeoRefs, normalizeQuestionTags, persistAgentProposedQuestion, sessionContextFromPolicySession } from './agentQuestionProposals.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
-import { SUBMITTED_RESULT_STATUSES, submitRequestUserKvPrefix } from './agentSubmitQueue.mjs';
+import { SUBMITTED_RESULT_STATUSES, canonicalAnswerUserKvPrefix, submitRequestUserKvPrefix } from './agentSubmitQueue.mjs';
 import { ADMIN_METRICS_SUBMIT_ENTRY_LIMIT, CE_AGENT_ACCESS_SKILL_VERSION } from './httpConstants.mjs';
 import { sessionAgentOrigin, firstValue, json, safeAnswerString } from './httpInput.mjs';
 import { listHandoffKvRecordsByPrefix } from './adminMetrics.mjs';
@@ -158,18 +158,23 @@ export async function loadAgentQuestionAnswerState({ env = {}, context = {}, que
     };
   }
   const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
+  // The permanent index keeps answers past the 30-day submission index, which
+  // still holds answers saved before the permanent one existed. A queued answer
+  // counts only while its 30-day record lasts, so one that never finishes
+  // does not stay answered for good.
+  const indexes = [
+    [canonicalAnswerUserKvPrefix, new Set(['direct_submitted'])],
+    [submitRequestUserKvPrefix, submittedStatuses],
+  ];
   const indexedRecordGroups = await Promise.all(
-    [...sessionSlugs].map((sessionSlug) => {
-      const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
-      return prefix
-        ? listHandoffKvRecordsByPrefix(env, prefix, {
-            limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT,
-          })
-        : [];
-    }),
+    [...sessionSlugs].flatMap((sessionSlug) => indexes.map(async ([prefixOf, statuses]) => {
+      const prefix = prefixOf({ sessionSlug, telegramUserId });
+      const listed = prefix ? await listHandoffKvRecordsByPrefix(env, prefix, { limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT }) : [];
+      return listed.filter(record => statuses.has(safeString(record.status)));
+    })),
   );
   const records = selectCurrentSubmittedAnswers(indexedRecordGroups.flat().filter(record =>
-    safeString(record.telegramUserId) === telegramUserId && submittedStatuses.has(safeString(record.status))));
+    safeString(record.telegramUserId) === telegramUserId));
   const answeredByRef = new Map();
   records.forEach((record) => {
     if (safeString(record.telegramUserId) !== telegramUserId) return;

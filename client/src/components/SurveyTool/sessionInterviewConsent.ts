@@ -29,8 +29,14 @@ export const buildSavedInterviewConsent = (value: unknown, metadata: unknown = n
     consentSavedAt: timestamp > 0 && timestamp < 1e12 ? timestamp * 1000 : timestamp,
     consentStorageRefId: String(meta.storageRefId ?? record._responseStorageRefId ?? ''),
     ...(record._consentOwnRead === true ? { consentReadAuthority: 'own' } : {}),
+    // The Worker left out the research material (it sends it only to the author and the admins): this copy
+    // says nothing about the person's choices, so it never stands in for them.
+    ...(record.interviewProvenanceWithheld === true ? { consentWithheld: true } : {}),
   };
 };
+
+/** Whether saved consent came from a copy the Worker stripped of research material, and so is unknown. */
+export const isWithheldConsent = (value: unknown): boolean => asRecord(value).consentWithheld === true;
 
 export const resolveConsentFlags = (value: unknown) => {
   const record = asRecord(value);

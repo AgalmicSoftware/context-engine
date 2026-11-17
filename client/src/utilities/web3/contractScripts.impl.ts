@@ -171,6 +171,7 @@ declare global {
 
 // Embedded passkey EOA sidecar.
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
+import { withoutResearchMaterial } from '../storage/withoutResearchMaterial';
 
 export {
   normalizeSessionSlug,
@@ -638,9 +639,11 @@ const uploadJsonPayloadForContractPointer = async ({
   if (!ARWEAVE_ACTIVE) {
     throw new Error(`${resource} upload requires Arweave because this session resource is not Cloudflare-active.`);
   }
+  // Arweave is public for good, so an answer goes there without its research material.
+  const publicString = resource === 'responses' ? withoutResearchMaterial(payloadString) : payloadString;
   const txId = uploadWithRetry
-    ? await uploadDataToArweaveWithRetry(payloadString, 'json', arweaveUploadOpts)
-    : await arweaveClient.uploadDataToArweave(payloadString, 'json', arweaveUploadOpts);
+    ? await uploadDataToArweaveWithRetry(publicString, 'json', arweaveUploadOpts)
+    : await arweaveClient.uploadDataToArweave(publicString, 'json', arweaveUploadOpts);
   return {
     pointerId: txId,
     pointerBytes: payloadPointerIdToBytes32(txId, `${resource} Arweave upload`),

@@ -2234,7 +2234,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 100%;
   min-width: 0;
   max-width: 360px;
-  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
   margin: 0;
   border: 1px solid color-mix(in srgb, var(--ce-status-info-text) 90%, transparent);
   border-radius: var(--ce-radius-8);
@@ -2785,7 +2785,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   // A phone wraps each turn over several lines; a taller box keeps more of the conversation in view.
   @media (max-width: 640px) {
-    min-height: min(45vh, 320px);
+    min-height: min(45dvh, 320px);
   }
 }
 
@@ -3535,7 +3535,9 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   display: flex;
   flex-direction: column;
-  max-height: min(90vh, 900px);
+  // Dynamic units: on a phone `vh` counts the space under the browser's bars, so a full dialog's foot, where
+  // Submit floats, would sit beneath them.
+  max-height: min(90dvh, 900px);
   overflow: hidden;
   background: var(--ce-surface-sunken) !important;
   color: var(--ce-panel-text) !important;
@@ -3857,10 +3859,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// The transcript level with the microphone's circle, Discard level with its label.
+// The transcript level with the microphone's circle: the second row is as tall as Discard and its gap.
 .sessionInterviewSideActions {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) 52px;
   align-self: stretch;
   align-items: center;
   justify-items: start;
@@ -4028,12 +4030,15 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   border-radius: 50%;
 }
 
-// Discard sits right of the microphone, level with its label and set apart from it, in the danger tone.
+// Discard sits left of the microphone, level with its label and set apart from it, in the danger tone.
 .sessionInterviewPanel .sessionInterviewDiscard {
   display: inline-flex;
-  grid-row: 2;
+  grid-row: 1;
+  grid-column: 1;
+  align-self: end;
+  justify-self: end;
   // Level with the label, which ends above the microphone's 10px bottom padding.
-  margin: 0 0 8px 16px;
+  margin: 0 16px 8px 0;
   padding: 0;
   border-radius: 50%;
   background: transparent !important;
@@ -4415,6 +4420,22 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+.sessionAgentKickoffManualCopy {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
+  font-family: var(--ce-font-mono);
+  // 16px keeps iOS from zooming in when the field takes focus.
+  font-size: 16px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
 .sessionAgentKickoffCopied {
   border-color: var(--ce-status-info-text);
 
@@ -4744,7 +4765,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 // The choices open inside the dropdown, under its summary, and scroll within it.
 .sessionInterviewChoicesPanel {
   min-width: 0;
-  max-height: min(35vh, 320px);
+  max-height: min(35dvh, 320px);
   overflow: auto;
   overscroll-behavior: contain;
   padding: 10px;

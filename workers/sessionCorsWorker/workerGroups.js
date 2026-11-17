@@ -1754,13 +1754,28 @@ const isSelfJoinableWorkerGroup = (group, nowMs) => {
 	return group?.joinMode === WORKER_GROUP_JOIN_MODES.OPEN && !(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs);
 };
 
+/** Whether a group listed with its member count has room under its own limit and the session's ceiling. */
+const workerGroupHasRoom = (group, config) => {
+	const ceiling = resolveWorkerGroupMemberCeiling(config?.groupMemberCeiling);
+	const limit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? Math.min(group.memberLimit, ceiling) : ceiling;
+	return group.memberCount < limit;
+};
+
 /**
  * The groups a signed-out visitor may see: listed groups only. A private session shows them only to
  * someone whose join link names a listed group, so an unlisted group's link reveals nothing.
  * `invitedOnly`: a visitor to a session whose rule names groups, whose read invite has been checked for
  * `inviteGroupId`, sees that group and no other, listed or not.
  */
-export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, invitedOnly = false, deps = {} } = {}) => {
+export const listWorkerGroupsForVisitor = async ({
+	env,
+	config,
+	slug,
+	inviteGroupId,
+	invitedOnly = false,
+	includeMemberCount = false,
+	deps = {},
+} = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
 	if (!sessionIdentity.ok) return sessionIdentity;
 	const publicDiscovery = !invitedOnly && workerConfigAllowsAnonymousGroupDiscovery(config);
@@ -1779,7 +1794,7 @@ export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGrou
 			slug,
 			sessionId: sessionIdentity.sessionId,
 			admin: false,
-			includeMemberCount: false,
+			includeMemberCount,
 			expectedGroupCount: ready.meta?.groupCount,
 			...(invitedOnly ? { revealGroupId: invite } : {}),
 		});
@@ -1806,9 +1821,13 @@ export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGrou
 /** The groups a visitor could join on their own, for an AI to match them to. Empty when none may be shown. */
 export const listSelfJoinableWorkerGroupsForVisitor = async (args = {}) => {
 	try {
-		const result = await listWorkerGroupsForVisitor(args);
+		// Counts only to leave out full groups; a signed-out visitor is never shown them.
+		const result = await listWorkerGroupsForVisitor({ ...args, includeMemberCount: true });
 		const nowMs = Number(args.deps?.now?.() || Date.now());
-		return result.ok ? result.groups.filter((group) => isSelfJoinableWorkerGroup(group, nowMs)) : [];
+		if (!result.ok) return [];
+		return result.groups
+			.filter((group) => isSelfJoinableWorkerGroup(group, nowMs) && workerGroupHasRoom(group, args.config))
+			.map(({ memberCount: _memberCount, ...group }) => group);
 	} catch {
 		return [];
 	}
@@ -1842,12 +1861,9 @@ export const listSelfJoinableWorkerGroupsForMember = async ({ env, config, slug,
 		if (!listed.ok || !joined.ok) return [];
 		const joinedIds = new Set(joined.memberships.map((membership) => normalizeWorkerGroupId(membership?.group?.groupId)));
 		const nowMs = Number(deps.now?.() || Date.now());
-		const ceiling = resolveWorkerGroupMemberCeiling(config?.groupMemberCeiling);
-		return listed.groups.filter((group) => {
-			const limit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? Math.min(group.memberLimit, ceiling) : ceiling;
-			const full = group.memberCount >= limit;
-			return isSelfJoinableWorkerGroup(group, nowMs) && !joinedIds.has(group.groupId) && !full;
-		});
+		return listed.groups.filter(
+			(group) => isSelfJoinableWorkerGroup(group, nowMs) && !joinedIds.has(group.groupId) && workerGroupHasRoom(group, config),
+		);
 	} catch {
 		return [];
 	}

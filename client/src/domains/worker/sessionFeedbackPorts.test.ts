@@ -263,6 +263,17 @@ describe('sessionFeedbackPorts', () => {
     await expect(listFeedback(ADMIN)).rejects.toThrow('The Session Worker couldn’t list the feedback (502).');
   });
 
+  it('fails the whole list when a later page arrives unreadable, so "Delete all" never covers unseen messages', async () => {
+    fetchWorker
+      .mockResolvedValueOnce(response(200, { messages: [stored('b')], cursor: 'b' }))
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => Promise.reject(new Error('cut')) } as never);
+    await expect(listFeedback(ADMIN)).rejects.toThrow('Couldn’t read every page of feedback');
+    fetchWorker
+      .mockResolvedValueOnce(response(200, { messages: [stored('b')], cursor: 'b' }))
+      .mockResolvedValueOnce(response(200, { cursor: 'a' }));
+    await expect(listFeedback(ADMIN)).rejects.toThrow('Couldn’t read every page of feedback');
+  });
+
   it('deletes named messages, or everything up to one, in a single signed call', async () => {
     adminPost.mockResolvedValue({ data: { deleted: 1 } } as never);
     await deleteFeedback(ADMIN, { ids: ['b'] });

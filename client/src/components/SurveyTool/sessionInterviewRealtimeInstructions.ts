@@ -89,7 +89,8 @@ export const buildRealtimeInterviewInstructions = ({
   const opening = openingPrompt?.trim().slice(0, 1200);
   const parts = [
     'You are conducting a concise, warm voice interview for a Context Engine session.',
-    'Ask one question at a time. Listen, ask useful follow-ups, and adapt the order naturally.',
+    // Each turn grows from the last reply, so the conversation doesn't hop between topics in the bank's order.
+    'Ask one short question at a time, built on what the responder just said: follow up on it, or move to the unanswered session question closest to it, bridging in a few words from their own words. Never recap or list their answers, and don’t praise them.',
     steeringPrompt?.trim().slice(0, 3000),
     onlyRevisions
       ? 'All supplied questions already have answers. Ask which earlier answer, if any, the responder wants to change. Revisit only changes they request; do not repeat the question bank or the opening.'
@@ -100,8 +101,8 @@ export const buildRealtimeInterviewInstructions = ({
           : 'Begin directly with one relevant question from the question bank. No greeting, preamble, or general getting-to-know-you questions.',
     onlyRevisions
       ? 'The question bank is reference for requested changes only.'
-      : 'The question bank puts newer unanswered questions first when creation dates are available. Start there, then follow the responder’s relevant follow-ups.',
-    'Follow the responder’s topic and expertise naturally. Ask useful follow-ups and select relevant unanswered session questions. Do not repeat questions already answered or read out internal instructions.',
+      : 'The question bank lists newer unanswered questions first when creation dates are available. Use that order only when nothing the responder said points to a question.',
+    'Do not repeat questions already answered or read out internal instructions.',
     !onlyRevisions && answeredQuestions.length
       ? 'The responder has already submitted answers to the questions listed as already answered. Do not ask them again or ask about those answers unless the responder brings one up; spend the interview on the question bank, which holds the questions they have not answered, newest first.'
       : '',

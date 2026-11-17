@@ -251,14 +251,14 @@ describe('SessionVoiceModeModal', () => {
     view.rerender(<SessionVoiceModeModal {...props} />);
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1);
-    // Discard sits right of the microphone and explains itself on hover, and to screen readers.
+    // Discard sits in the microphone's row, in its left column (SurveyTool.styles.test.ts checks the
+    // placement), and explains itself on hover, and to screen readers.
     const discard = screen.getByRole('button', { name: 'Discard interview' });
     const microphone = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
-    // With no transcript, Discard is alone in the column right of the microphone.
-    expect(discard.parentElement).toHaveClass('sessionInterviewSideActions');
-    expect(discard.parentElement?.children).toHaveLength(1);
-    expect(discard.parentElement?.parentElement).toContainElement(microphone);
-    expect(microphone.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(discard).toHaveClass('sessionInterviewDiscard');
+    expect(discard.parentElement).toHaveClass('sessionInterviewPrimaryAction');
+    expect(discard.parentElement).toBe(microphone.parentElement);
+    expect(document.querySelector('.sessionInterviewSideActions')).toBeNull();
     expect(document.querySelector('.modal-footer')).toBeNull();
     expect(discard).toHaveAccessibleDescription(/Responses you’ve submitted are kept\.$/);
     fireEvent.mouseOver(discard);
@@ -2366,7 +2366,7 @@ describe('SessionVoiceModeModal', () => {
     }
   });
 
-  it.each(['rejected', 'unavailable'])('reveals a manual prompt when clipboard is %s', async (failure) => {
+  it.each(['rejected', 'unavailable'])('shows the prompt selected when the clipboard is %s', async (failure) => {
     const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -2384,10 +2384,62 @@ describe('SessionVoiceModeModal', () => {
       render(<SessionVoiceModeModal {...baseProps} />);
       await act(async () => {});
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
-      expect(await screen.findByRole('alert')).toHaveTextContent('Copy the prompt below by hand');
-      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).toBeVisible();
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Copying isn’t allowed here, so the prompt below is selected. Copy it yourself.',
+      );
+      // The exact prompt, links whole: the formatted view shortens them.
+      const field = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Memory augmentation prompt to copy' });
+      expect(field.value).toContain('https://');
+      expect(field.value).toContain('Context Engine');
+      expect(document.activeElement).toBe(field);
+      expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length]);
       expect(screen.queryByRole('button', { name: 'Memory augmentation prompt copied' })).not.toBeInTheDocument();
     } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('says to tap again when Copy is tapped while the session is checked', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockReturnValue(new Promise<Response>(() => undefined));
+    try {
+      render(<SessionVoiceModeModal {...baseProps} />);
+      await act(async () => {});
+      expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
+      expect(screen.getByText('Checking the session. Tap Copy again when this finishes.')).toBeInTheDocument();
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('copies with the older copy command where the clipboard is missing', async () => {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: 'demo',
+          prefillPromptVersion: 'ce-interview-brief-v5',
+        }),
+      ),
+    );
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    const copied: string[] = [];
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: () => copied.push((document.activeElement as HTMLTextAreaElement).value) > 0,
+    });
+    try {
+      render(<SessionVoiceModeModal {...baseProps} />);
+      await act(async () => {});
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
+      expect(await screen.findByRole('button', { name: 'Memory augmentation prompt copied' })).toBeInTheDocument();
+      expect(copied).toHaveLength(1);
+      expect(copied[0]).toContain('Context Engine');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(document, 'execCommand');
       fetchMock.mockRestore();
     }
   });

@@ -241,6 +241,17 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.5.1
+
+- `answer` tells a mistyped question id from a locked one. An id that matches
+  nothing is no longer reported as locked; when it looks mistyped, the reply
+  names the nearest listed id. When some answers are refused, the rest are
+  still stored and `next` says which went through.
+- `add_context` takes `groups` with a `url` as well as with a file or text,
+  where the session's Worker advertises `context_link_groups_v1` (Context
+  Engine 0.9.12 or later). On an older Worker the call is refused in a plain
+  sentence; nothing is added.
+
 ## Upgrading to 0.5.0
 
 - New tool `ask_session_agent`: asks a session's own Session Agent one
@@ -388,9 +399,9 @@ directory when upgrading; identities and saved session access do not change.
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it (a private session's is joined first), and returns the session context, its instructions for agents, its groups and any invitation to add context. It also returns `youMay`: what the agent may do next if it wants to (set a display name, join an open group, add context). |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, whether the session has a Session Agent and records chats with it, end time and the agent's progress. |
 | `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; only unanswered ones unless `filter` asks for `answered` or `all`. Up to 100 a call; `more` and `next` say how to get the rest. |
-| `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. |
+| `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. When some are refused the rest are still stored: `next` says which went through, and a question id that matches nothing gets the nearest listed id when it looks mistyped. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
-| `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set, or `groups` names some of the session's groups for a file or text: then the members of any one of them see it, and the admins. |
+| `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set, or `groups` names some of the session's groups: then the members of any one of them see it, and the admins. |
 | `ask_session_agent` | Asks the session's own Session Agent one question, when it has one and its admins let the agent ask. Chats with it can be recorded when the session's recording setting is on (`get_session` shows `sessionAgent.recording`): the question and answer are then stored for the session's organisers unless `store` is false, with the agent's address only if `attribution` is `address`. |
 | `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
 | `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`: a code, a password or the group's whole invite link; or the one its link carried, held until the MCP restarts; after that, join with the link again). |
@@ -476,10 +487,11 @@ unknown `CE_MCP_*` name.
   with the limits: a file, a link or text, or a file or text where the Worker
   doesn't take participants' links or the agent's sign-in can't have it fetch
   pages. `add_context` takes exactly one. As on the website's **Visible to**,
-  a file or text can be for everyone in the session, for its admins alone
-  (`adminsOnly`), or for the members of up to 20 of its groups (`groups`, by
-  the IDs `get_session` lists): belonging to any one of them is enough, and
-  admins always see it. A link is for everyone or for admins alone. Files are
+  a file, a link or text can be for everyone in the session, for its admins
+  alone (`adminsOnly`), or for the members of up to 20 of its groups
+  (`groups`, by the IDs `get_session` lists): belonging to any one of them is
+  enough, and admins always see it. A link for groups needs a Worker that
+  advertises `context_link_groups_v1`. Files are
   a PDF up to 20 MB, or
   Markdown, plain text, CSV or JSON up to 1 MB. Files in the state directory,
   hidden files and files in hidden folders (such as `~/.config` or `~/.aws`)

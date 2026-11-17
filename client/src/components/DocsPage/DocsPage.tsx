@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { connect } from 'react-redux';
 import { Modal, ModalBody } from 'reactstrap';
 import {
@@ -23,6 +23,7 @@ import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { faCaretDown, faCaretUp, faCheck, faCopy, faExpand } from '@fortawesome/free-solid-svg-icons';
+import { copyText, selectText } from '../../utilities/ui/copyText';
 import { notify } from '../../utilities/ui/notify.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
@@ -367,6 +368,8 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
 
   const [openPromptItems, setOpenPromptItems] = useState<Record<string, boolean>>({});
   const [copiedPromptKey, setCopiedPromptKey] = useState('');
+  // The prompt whose text is selected, once shown, because copying it was refused.
+  const [selectPromptKey, setSelectPromptKey] = useState('');
   const [graphicOpen, setGraphicOpen] = useState(false);
   const copyResetTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -393,19 +396,25 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
   };
 
   const handleCopyPrompt = (promptKey: string, content: string) => {
-    if (!content || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
-    navigator.clipboard
-      .writeText(content)
-      .then(() => {
-        notify.success('Copied to clipboard');
-        setCopiedPromptKey(promptKey);
-        scheduleCopyReset('copiedPromptKey', () => setCopiedPromptKey(''));
-      })
-      .catch((e) => {
-        void e;
-        notify.warn('Copy failed');
-      });
+    if (!content) return;
+    void copyText(content).then((done) => {
+      if (!done) {
+        notify.warn("Copying isn't allowed here, so the prompt is selected. Copy it yourself.");
+        // Opens the prompt, if closed, so its text can be selected once shown.
+        setOpenPromptItems((prev) => ({ ...prev, [promptKey]: true }));
+        setSelectPromptKey(promptKey);
+        return;
+      }
+      notify.success('Copied to clipboard');
+      setCopiedPromptKey(promptKey);
+      scheduleCopyReset('copiedPromptKey', () => setCopiedPromptKey(''));
+    });
   };
+  useLayoutEffect(() => {
+    if (!selectPromptKey) return;
+    setSelectPromptKey('');
+    selectText(document.getElementById(`prompt-${selectPromptKey}`));
+  }, [selectPromptKey]);
 
   const handlePromptToggle = (promptId: string) => {
     setOpenPromptItems((prev) => ({

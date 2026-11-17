@@ -28,6 +28,7 @@ import { applyBookmarkChange } from '../../utilities/cache/bookmarkChanges';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { copyText, selectText } from '../../utilities/ui/copyText';
 import { isInertRasterImageMime, toViewerBlob } from '../../utilities/ui/viewerMime';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -3544,21 +3545,22 @@ class SBTPage extends Component<any, any> {
     }, intervalMs);
   };
 
-  copyToClipboard = async (text: unknown, addressType: unknown): Promise<void> => {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard write is unavailable');
-      await navigator.clipboard.writeText(String(text ?? ''));
-      notify.success('Copied to clipboard');
-      if (this._isMounted)
-        this.setState(buildSbtPageCopiedAddressPatch({ addressType }), () => {
-          setTimeout(() => {
-            if (this._isMounted) this.setState(buildSbtPageCopiedAddressPatch());
-          }, 2500);
-        });
-    } catch (error: unknown) {
-      sbtLog.warn('SBTPage clipboard write failed', error);
-      notify.warn('Copy failed');
+  // `shown` is the text on screen, selected where copying is refused; addresses show shortened, so have none.
+  copyToClipboard = async (text: unknown, addressType: unknown, shown?: Element | null): Promise<void> => {
+    if (!(await copyText(String(text ?? '')))) {
+      if (shown) {
+        selectText(shown);
+        notify.error("Copying isn't allowed here, so the link is selected. Copy it yourself.");
+      } else notify.error("Copying isn't allowed here, so nothing was copied.");
+      return;
     }
+    notify.success('Copied to clipboard');
+    if (this._isMounted)
+      this.setState(buildSbtPageCopiedAddressPatch({ addressType }), () => {
+        setTimeout(() => {
+          if (this._isMounted) this.setState(buildSbtPageCopiedAddressPatch());
+        }, 2500);
+      });
   };
 
   bookmarkSBT = (): void => {
@@ -3987,7 +3989,8 @@ class SBTPage extends Component<any, any> {
       encryptedRecoveryStatus,
       onAdminBurn: this.handleAdminBurn,
       onBurnSearchChange: this.handleBurnSearchChange,
-      onCopyOpenMintUrl: () => this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url'),
+      onCopyOpenMintUrl: (event: React.MouseEvent<HTMLButtonElement>) =>
+        this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url', event.currentTarget.previousElementSibling),
       onExportFormatChange: this.handleExportFormatChange,
       onExportPasswords: this.exportPasswords,
       onClearLocalRecovery: this.handleClearLocalRecovery,
@@ -4004,23 +4007,23 @@ class SBTPage extends Component<any, any> {
     });
   };
 
-  copyErrorToClipboard = async (): Promise<void> => {
+  copyErrorToClipboard = async (event: React.MouseEvent<HTMLButtonElement>): Promise<void> => {
     const raw = resolveSbtPageCopyableErrorText(this.state.error);
     if (!raw) return;
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard write is unavailable');
-      await navigator.clipboard.writeText(raw);
-      notify.success('Copied to clipboard');
-      if (this._isMounted) {
-        this.setState(buildSbtPageCopiedErrorPatch({ copied: true }), () => {
-          setTimeout(() => {
-            if (this._isMounted) this.setState(buildSbtPageCopiedErrorPatch());
-          }, 2000);
-        });
-      }
-    } catch (error: unknown) {
-      sbtLog.warn('SBTPage error clipboard write failed', error);
-      notify.warn('Copy failed');
+    // The alert that shows the error, selected to copy by hand where copying is refused.
+    const shown = event.currentTarget.parentElement;
+    if (!(await copyText(raw))) {
+      selectText(shown);
+      notify.error("Copying isn't allowed here, so the error is selected. Copy it yourself.");
+      return;
+    }
+    notify.success('Copied to clipboard');
+    if (this._isMounted) {
+      this.setState(buildSbtPageCopiedErrorPatch({ copied: true }), () => {
+        setTimeout(() => {
+          if (this._isMounted) this.setState(buildSbtPageCopiedErrorPatch());
+        }, 2000);
+      });
     }
   };
 

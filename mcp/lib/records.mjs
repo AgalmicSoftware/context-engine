@@ -40,6 +40,41 @@ export const isLockedQuestion = (question) =>
   !!question?.promptEncrypted ||
   (!!question?.encryption && typeof question.encryption === 'object') ||
   (typeof question?.prompt === 'string' && question.prompt.trim() === '[encrypted]');
+export const LOCKED_QUESTION_ERROR = 'This question is locked to certain members; agents cannot answer locked questions yet.';
+
+/** Edits (a character added, dropped or changed) between two strings; anything over `limit` comes back as `limit + 1`. */
+const editDistance = (a, b, limit) => {
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      row[j] = Math.min(previous[j] + 1, row[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    if (Math.min(...row) > limit) return limit + 1;
+    previous = row;
+  }
+  return Math.min(previous[b.length], limit + 1);
+};
+
+/**
+ * The listed id a mistyped one was meant to be: within three edits of it and nearer to it than to
+ * any other. Short ids get fewer edits (none under eight characters), so a guess is never offered.
+ */
+export const closestQuestionId = (typed, ids) => {
+  const limit = Math.min(3, Math.floor(typed.length / 8));
+  let closest;
+  let closestDistance = limit + 1;
+  let tied = false;
+  for (const id of ids) {
+    const distance = editDistance(typed, id, limit);
+    if (distance > limit || distance > closestDistance) continue;
+    tied = distance === closestDistance;
+    closest = id;
+    closestDistance = distance;
+  }
+  return tied ? undefined : closest;
+};
 
 export const normalizeRecruitmentSource = (value) => {
   const normalized = (typeof value === 'string' ? value : '').trim().replace(/\s+/g, '-').slice(0, 128);
@@ -93,7 +128,7 @@ export const buildResponseRecord = ({
   recruitmentSource = '',
 }) => {
   if (!isRecord(question) || !trim(question.id)) return fail('Unknown question.');
-  if (isLockedQuestion(question)) return fail('This question is locked to certain members; agents cannot answer locked questions yet.');
+  if (isLockedQuestion(question)) return fail(LOCKED_QUESTION_ERROR);
   // Models often send votes keyed by option; say what shape is wanted.
   if (question.type === 'quadratic' && !Array.isArray(value)) {
     return fail('Quadratic answers are a list of signed whole-number votes, one per option in the question’s order, such as [2, -1, 0]: send the list, not an object keyed by option.');

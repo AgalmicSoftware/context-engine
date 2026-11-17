@@ -31,7 +31,6 @@ import {
   buildQuestionsDashboardFilterLoadingPatch,
   buildQuestionsDashboardFilteredQuestionsPatch,
   buildQuestionsDashboardNoNetworkPatch,
-  buildSurveySelectorCopySuccessPatch,
   buildSurveySelectorEmptySurveyListPatch,
   buildSurveySelectorFilterActivePatch,
   buildSurveySelectorFilterStatePatch,
@@ -50,7 +49,6 @@ import {
   getSurveyDocumentLinkTitle,
   getSurveyDocumentUrls,
   resolveSelectedSurveyIndex,
-  resolveSurveyIdToCopy,
 } from './surveySelectorHelpers.js';
 
 import {
@@ -316,7 +314,6 @@ export class SurveySelector extends Component<any, any> {
   questionFilterRef: React.RefObject<QuestionFilterHandle>;
   surveyQuestionsRef: React.RefObject<unknown>;
   loadingTimeout: ReturnType<typeof setTimeout> | null;
-  _copySurveyIdTimer: ReturnType<typeof setTimeout> | null;
   _renderQuestionsCacheMemoKey: string;
   _renderQuestionsCacheMemoValue: SurveySelectorRenderQuestionsCache;
   _isMounted: boolean;
@@ -346,7 +343,6 @@ export class SurveySelector extends Component<any, any> {
       encryptedQuestionCount: 0,
       currentPath: window.location.pathname,
       filterState: normalizeSurveyToolFilterState(this.props.filterState),
-      copySurveyIdSuccess: false,
       isFilterActive: isSurveyToolFilterStateActive(this.props.filterState),
       showLongLoading: false,
       selectorDropdownOpen: false,
@@ -355,7 +351,6 @@ export class SurveySelector extends Component<any, any> {
     this.questionFilterRef = React.createRef();
     this.surveyQuestionsRef = React.createRef();
     this.loadingTimeout = null;
-    this._copySurveyIdTimer = null;
     this._renderQuestionsCacheMemoKey = '';
     this._renderQuestionsCacheMemoValue = null;
     this._isMounted = false;
@@ -512,10 +507,6 @@ export class SurveySelector extends Component<any, any> {
     }
     if (this.loadingTimeout) {
       clearTimeout(this.loadingTimeout);
-    }
-    if (this._copySurveyIdTimer) {
-      clearTimeout(this._copySurveyIdTimer);
-      this._copySurveyIdTimer = null;
     }
   }
 
@@ -1011,38 +1002,6 @@ export class SurveySelector extends Component<any, any> {
 
   handleUpdateSelectedTypes = (selectedTypes: unknown): void => {
     this.setState(buildSurveySelectorSelectedTypesPatch(selectedTypes));
-  };
-
-  copySurveyIdToClipboard = (surveyID: unknown = null): void => {
-    const { surveys, selectedSurveyIndex } = this.state;
-    const idToCopy = resolveSurveyIdToCopy({
-      surveyID,
-      search: window.location.search,
-      surveys,
-      selectedSurveyIndex,
-    });
-
-    if (idToCopy) {
-      navigator.clipboard
-        .writeText(String(idToCopy))
-        .then(() => {
-          if (!this._isMounted) return;
-          this.setState(buildSurveySelectorCopySuccessPatch(true));
-          if (this._copySurveyIdTimer) {
-            clearTimeout(this._copySurveyIdTimer);
-          }
-          this._copySurveyIdTimer = setTimeout(() => {
-            if (!this._isMounted) return;
-            this._copySurveyIdTimer = null;
-            this.setState(buildSurveySelectorCopySuccessPatch(false));
-          }, 2000);
-        })
-        .catch((err: unknown) => {
-          surveyLog.error('Could not copy survey ID:', err);
-        });
-    } else {
-      surveyLog.error('No survey ID available to copy.');
-    }
   };
 
   getParsedQuestionsCacheForRender = (slug: unknown, networkID: unknown): SurveySelectorRenderQuestionsCache => {

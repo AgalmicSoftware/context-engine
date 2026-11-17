@@ -8,7 +8,13 @@ import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmi
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { resendPendingDraftTextDeletes, syncDraftText } from './sessionInterviewDraftText';
+import { loadSessionInterviewSavedAnswers } from './sessionInterviewSavedAnswers';
+import { isWithheldConsent } from './sessionInterviewConsent';
 
+jest.mock('./sessionInterviewSavedAnswers', () => ({
+  ...jest.requireActual<Record<string, unknown>>('./sessionInterviewSavedAnswers'),
+  loadSessionInterviewSavedAnswers: jest.fn(),
+}));
 jest.mock('./sessionInterviewDraftText', () => ({
   ...jest.requireActual<Record<string, unknown>>('./sessionInterviewDraftText'),
   resendPendingDraftTextDeletes: jest.fn(async () => undefined),
@@ -1179,4 +1185,66 @@ it('an unselected draft is neither validated nor encrypted nor cleared', async (
   expect(context.cryptoUtils.encryptMultipleAnswers).not.toHaveBeenCalled();
   expect(context.clearDraftFor.mock.calls).toEqual([['q1']]);
   expect(slice.answers.q2).toEqual(before);
+});
+
+describe('answers loaded without their research material', () => {
+  // Another device, a cleared cache, or a sign-in that would have to ask: the person's saved answers were read
+  // signed out, so their saved research choices are unknown.
+  const withheld = { consentWithheld: true, consentSavedAt: 1 };
+  const setUp = () => {
+    const context = createContext();
+    context.stateRef.current.editBaseline = { interviewProvenance: { q1: withheld, q2: withheld } };
+    const seen: unknown[] = [];
+    // As prepareJsonAndHash does for an upload: refuse an answer built from unknown choices.
+    context.prepareJsonAndHash.mockImplementation((...args: unknown[]) => {
+      const provenance = context.stateRef.current.editBaseline.interviewProvenance;
+      if (args[4] === true && Object.values(provenance).some(isWithheldConsent))
+        throw new Error('Your research choices need a sign-in to load: submit again and approve it.');
+      seen.push(provenance);
+      return { answers: { q1: 'Yes' } };
+    });
+    // The upload builds its payload as surveyQuestionsRuntimeMethods does.
+    const upload = context.submitSurveyResponse.getMockImplementation();
+    context.submitSurveyResponse.mockImplementation(async (slice: unknown, qids: Set<string>, ...rest: unknown[]) => {
+      context.prepareJsonAndHash(2, undefined, slice, qids, true);
+      return upload(slice, qids, ...rest);
+    });
+    return { context, seen };
+  };
+
+  it('reads them again signed in once, and every answer is sent with its material', async () => {
+    const { context, seen } = setUp();
+    jest.mocked(loadSessionInterviewSavedAnswers).mockResolvedValueOnce(
+      ['q1', 'q2'].map((questionID) => ({
+        questionID,
+        answer: { value: 'Yes' },
+        interviewProvenance: { predictionComparison: { version: 2 }, source: { platform: 'claude' } },
+        _consentOwnRead: true,
+      })),
+    );
+    const runtime = createSurveyQuestionsSubmitRuntime(context);
+    await expect(runtime.encryptAndUpload()).resolves.toEqual({ status: 'submitted' });
+    expect(loadSessionInterviewSavedAnswers).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(loadSessionInterviewSavedAnswers).mock.calls[0][0]).toMatchObject({
+      questionIds: ['q1', 'q2'],
+      account: '0xabc',
+    });
+    expect(context.submitSurveyResponse).toHaveBeenCalled();
+    for (const provenance of seen as Record<string, any>[]) {
+      expect(provenance.q1).toMatchObject({ predictionComparison: { version: 2 } });
+      expect(provenance.q2).toMatchObject({ predictionComparison: { version: 2 } });
+    }
+    expect(context.setState).toHaveBeenCalledWith({ editBaseline: context.stateRef.current.editBaseline });
+  });
+
+  it('refuses when the sign-in is declined, and keeps the typed answer', async () => {
+    const { context } = setUp();
+    jest.mocked(loadSessionInterviewSavedAnswers).mockRejectedValueOnce(new Error('User rejected the request.'));
+    const typed = JSON.parse(JSON.stringify(context.stateRef.current.surveysResponseState[2]));
+    const runtime = createSurveyQuestionsSubmitRuntime(context);
+    await expect(runtime.encryptAndUpload()).resolves.toMatchObject({ status: 'failed' });
+    expect(context.stateRef.current.surveysResponseState[2]).toEqual(typed);
+    expect(context.runSurveyQuestionsSubmitFailureController).toHaveBeenCalled();
+    expect(context.runSurveyQuestionsSubmitFailureController.mock.calls[0][0].error.message).toMatch(/need a sign-in/);
+  });
 });

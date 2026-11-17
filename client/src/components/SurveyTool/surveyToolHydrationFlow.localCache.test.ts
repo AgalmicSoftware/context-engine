@@ -332,6 +332,35 @@ describe('surveyToolHydrationFlow local-cache hydration helpers', () => {
     expect(result.nextBaseline.answers?.q2).toEqual({ value: 'Saved q2' });
   });
 
+  it('keeps saved consent when a newer cached copy was read without its research material', () => {
+    const whole = { includePredictionComparison: true, predictionComparison: { version: 2 }, consentSavedAt: 10 };
+    const result = buildLocalCacheRehydrationState({
+      renderedQuestionIds: ['q1'],
+      baseSlice: { answers: { q1: { value: 'Agree' } }, additionalComments: {}, importance: {}, conviction: {} },
+      prevBaseline: {
+        answers: { q1: { value: 'Agree' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+        interviewProvenance: { q1: whole },
+      },
+      cacheSlice: {
+        answers: { q1: { value: 'Agree' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+        interviewProvenance: { q1: { consentWithheld: true, consentSavedAt: 20 } },
+      },
+      cloneBaseline: (value: unknown) => JSON.parse(JSON.stringify(value)),
+      buildDraftAwareCacheHydrationState: ({ cachedAnswer, cachedAdditional }: Record<string, unknown>) => ({
+        effectiveAnswerState: cachedAnswer,
+        effectiveAdditionalState: cachedAdditional,
+      }),
+      applyLocalCacheHydrationEntryToSlice: () => false,
+    });
+    expect(result.nextBaseline.interviewProvenance).toEqual({ q1: whole });
+  });
+
   it('builds hydrated response slices from single or multi-response payloads', () => {
     const applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses, parseValue }) => {
       const [first, second] = responses;

@@ -13,6 +13,7 @@ import {
   normalizeSessionStorageConfig,
   resolveSessionStorageBackend,
 } from './sessionStorageConfig.js';
+import { withoutResearchMaterial } from './withoutResearchMaterial';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -246,7 +247,9 @@ export const uploadDataToSessionStorage = async (
   const storageConfig = normalizeSessionStorageConfig(sessionConfig);
 
   if (backend === STORAGE_BACKENDS.ARWEAVE || backend === STORAGE_BACKENDS.LIT_ARWEAVE) {
-    const txId = await arweaveClient.uploadDataToArweave(data, format, {
+    // Arweave is public for good, so an answer goes there without its research material.
+    const publicData = resource === 'responses' ? withoutResearchMaterial(data) : data;
+    const txId = await arweaveClient.uploadDataToArweave(publicData, format, {
       sessionSlug,
       sessionConfig,
       context,
@@ -424,7 +427,8 @@ export const readSessionStorageBatch = async ({
   workerUrl = '',
   signal,
   preferAnonymous = true,
-}: Omit<ReadSessionStorageBlobOptions, 'storageRef' | 'prompt'> & { ids: string[] }): Promise<unknown[]> => {
+  prompt,
+}: Omit<ReadSessionStorageBlobOptions, 'storageRef'> & { ids: string[] }): Promise<unknown[]> => {
   if (!ids.length || ids.length > STORAGE_READ_BATCH_MAX_IDS) throw new Error('A batch read takes 1 to 100 ids.');
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   const response = await fetchWorkerWithAuth(
@@ -442,6 +446,7 @@ export const readSessionStorageBatch = async ({
       workerUrl: baseUrl,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
       preferAnonymous,
+      prompt,
       anonymousRefused: batchNeedsSignIn,
     },
   );
@@ -472,6 +477,7 @@ export const readSessionStorageBatch = async ({
           workerUrl: baseUrl,
           signal,
           preferAnonymous,
+          prompt,
         });
         return parse(await single.text());
       }

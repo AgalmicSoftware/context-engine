@@ -17,7 +17,8 @@ Arweave and not Lit-encrypted, because the Worker must be able to read them.
 Session Workers advertise them as the `context_sources_v1` capability; the page
 asks admins to update an older Worker. Workers that also let participants add
 files advertise `participant_context_v1`, and those that let them add links too
-advertise `participant_context_links_v1`.
+advertise `participant_context_links_v1`. Workers that lock a link to some groups,
+as a file is locked, advertise `context_link_groups_v1`.
 
 ## Limits
 

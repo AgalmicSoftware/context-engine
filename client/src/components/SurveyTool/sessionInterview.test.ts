@@ -299,7 +299,10 @@ describe('session interview protocol', () => {
     // Confidence follows the catalog version the AI verified.
     expect(kickoff).toContain('v6 confidence: the chance I keep that answer unchanged on review');
     expect(kickoff).toContain('v4/v5: strength of support. Anchors: 0-.39 weak');
-    expect(kickoff).toContain('additionalComments is text');
+    // A comment only carries what the person said, never a note that they said nothing.
+    expect(kickoff).toContain(
+      'additionalComments: only what I said that bears on the question, never a note that I said nothing',
+    );
     expect(kickoff).toContain('Platform/model are self-reported fidelity metadata');
     expect(kickoff).toContain('historyChatsSearched');
     expect(kickoff).toContain('count distinct prior chats/memories/sources searched and actually used');
@@ -313,7 +316,7 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('Nothing is submitted;');
     expect(kickoff).toContain('Markdown link labeled "Review your drafted answers"');
     expect(kickoff).toContain('never visible text or a code block');
-    expect(kickoff.length).toBeLessThan(4100);
+    expect(kickoff.length).toBeLessThan(4200);
 
     const mappingPrompt = buildInterviewResponseMappingPrompt({
       questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
@@ -326,6 +329,12 @@ describe('session interview protocol', () => {
     expect(mappingPrompt).toContain('the chance from 0 to 1 that the responder keeps this answer unchanged');
     expect(mappingPrompt).toContain('first person');
     expect(mappingPrompt).toContain('Do not add an "(Agent):" prefix');
+    // Silent on a question means no comment, not filler such as "I haven't compared these".
+    expect(mappingPrompt).toContain('When they said nothing like that, return "".');
+    expect(mappingPrompt).toContain(
+      "Never use it to say what they haven't said, considered or compared, or to explain a guess",
+    );
+    expect(mappingPrompt).not.toContain('Use additionalComments for relevant explanations');
     // The AI places someone no more precisely than their country.
     expect(mappingPrompt).toContain(
       'Never state where the responder lives more precisely than their country, in any answer, comment or evidence. Leave a question that asks for a smaller place, such as a region or city, without a draft.',
@@ -350,8 +359,7 @@ describe('session interview protocol', () => {
       openingPrompt: 'What is your uncommon AI view?',
     });
     expect(instructions).toContain('What is your uncommon AI view?');
-    expect(instructions).toContain('Ask useful follow-ups');
-    expect(instructions).toContain('one question at a time');
+    expect(instructions).toContain('one short question at a time, built on what the responder just said');
     expect(instructions).not.toContain('important insight');
   });
 
@@ -402,13 +410,23 @@ describe('session interview protocol', () => {
     });
     expect(instructions).toContain(steeringPrompt);
     expect(instructions.indexOf(steeringPrompt)).toBeGreaterThan(
-      instructions.indexOf('Ask one question at a time. Listen, ask useful follow-ups, and adapt the order naturally.'),
+      instructions.indexOf('Ask one short question at a time, built on what the responder just said'),
     );
     expect(instructions.indexOf(steeringPrompt)).toBeLessThan(
       instructions.indexOf('Ask this opening question immediately:'),
     );
     const withoutSteering = buildRealtimeInterviewInstructions({ questions });
     expect(buildRealtimeInterviewInstructions({ questions, steeringPrompt: '  ' })).toEqual(withoutSteering);
+  });
+
+  it('has the interviewer follow the last reply, not the question bank order', () => {
+    const instructions = buildRealtimeInterviewInstructions({
+      questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
+    });
+    expect(instructions).toContain('bridging in a few words from their own words');
+    expect(instructions).toContain('Never recap or list their answers');
+    expect(instructions).toContain('Use that order only when nothing the responder said points to a question.');
+    expect(instructions).not.toContain('Start there');
   });
 
   it('adds bounded untrusted prefill context and predictions to realtime instructions', () => {

@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
 
 import styles from '../OnePageSession.module.scss';
 import type { AgentQuestion, AgentResultsResult } from '../../../utilities/session/agentSessionData';
+import { copyText, selectText } from '../../../utilities/ui/copyText';
 
 type AgentDebateMapPanelProps = {
   questions: AgentQuestion[];
@@ -24,17 +25,15 @@ const buildPrompt = (questions: AgentQuestion[], results: AgentResultsResult | n
 };
 
 const AgentDebateMapPanel = ({ questions, results }: AgentDebateMapPanelProps): React.ReactElement => {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<boolean | null>(null);
+  const promptRef = useRef<HTMLPreElement>(null);
   const prompt = useMemo(() => buildPrompt(questions, results), [questions, results]);
   const topicCounts = results?.views?.topicMap?.data?.counts || {};
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard?.writeText(prompt);
-      setCopied(true);
-    } catch (_) {
-      setCopied(false);
-    }
+    const done = await copyText(prompt);
+    setCopied(done);
+    if (!done) selectText(promptRef.current);
   };
 
   return (
@@ -62,7 +61,14 @@ const AgentDebateMapPanel = ({ questions, results }: AgentDebateMapPanelProps): 
           <span className={styles.agentListEmpty}>Topic-map counts are not available yet.</span>
         )}
       </div>
-      <pre className={styles.agentTopicPrompt}>{prompt}</pre>
+      {copied === false ? (
+        <span role="status" className={styles.agentListError}>
+          Copying isn&apos;t allowed here, so the prompt is selected. Copy it yourself.
+        </span>
+      ) : null}
+      <pre ref={promptRef} className={styles.agentTopicPrompt}>
+        {prompt}
+      </pre>
     </section>
   );
 };

@@ -2,6 +2,7 @@ import type { ResponseValuesEqual } from './responseValueEquality';
 import { LegacyOwnResponseListingError } from '../../utilities/storage/storageClient';
 import { isWorkerCanonicalSessionConfig, loadWorkerResponses } from '../../utilities/survey/workerResponseHydration';
 import { isWorkerResponseNewer } from '../../utilities/survey/workerResponseRecency';
+import { isWithheldConsent } from './sessionInterviewConsent';
 import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionReadsPort';
 import {
   buildChangedFieldResolvers,
@@ -201,7 +202,15 @@ export const mergeInterviewSavedAnswerBaseline = (
     },
     baseline: {
       ...nextBaseline,
-      interviewProvenance: { ...baseline?.interviewProvenance, ...saved?.interviewProvenance },
+      // A copy stripped of research material never replaces consent the page already holds.
+      interviewProvenance: {
+        ...baseline?.interviewProvenance,
+        ...Object.fromEntries(
+          Object.entries(saved?.interviewProvenance || {}).filter(
+            ([id, consent]) => !isWithheldConsent(consent) || !Object.hasOwn(baseline?.interviewProvenance || {}, id),
+          ),
+        ),
+      },
     },
   };
 };

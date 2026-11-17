@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClipboard } from '@fortawesome/free-solid-svg-icons';
 import { Input } from 'reactstrap';
@@ -9,7 +10,8 @@ type SponsorHandoffResultProps = {
   shareKey: string;
   shareTxId: string;
   shareUrl: string;
-  onCopy: (value: unknown, successLabel: string) => unknown;
+  /** Resolves false when nothing was copied. */
+  onCopy: (value: unknown, successLabel: string) => Promise<boolean>;
 };
 
 const resolveShareTxUrl = (shareTxId: string): string => {
@@ -31,6 +33,15 @@ const CopyButton = ({ ariaLabel, onClick, title }: { ariaLabel: string; onClick:
 );
 
 export const SponsorHandoffResult = ({ shareKey, shareTxId, shareUrl, onCopy }: SponsorHandoffResultProps) => {
+  // A masked key can't be copied by hand, so a refused copy shows it, selected; a new key starts masked.
+  const [shownKey, setShownKey] = useState('');
+  const keyShown = Boolean(shareKey) && shownKey === shareKey;
+  const keyRef = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => {
+    if (!keyShown) return;
+    keyRef.current?.focus();
+    keyRef.current?.select();
+  }, [keyShown]);
   if (!shareUrl) return null;
   const shareTxUrl = resolveShareTxUrl(shareTxId);
   return (
@@ -53,8 +64,9 @@ export const SponsorHandoffResult = ({ shareKey, shareTxId, shareUrl, onCopy }: 
       </div>
       <div className={styles.heroCardInputShell}>
         <Input
+          innerRef={keyRef}
           value={shareKey}
-          type="password"
+          type={keyShown ? 'text' : 'password'}
           readOnly
           autoComplete="off"
           className={styles.heroCardInput}
@@ -63,7 +75,9 @@ export const SponsorHandoffResult = ({ shareKey, shareTxId, shareUrl, onCopy }: 
         />
         <div className={styles.heroCardInputActions}>
           <CopyButton
-            onClick={() => onCopy(shareKey, 'Copied sponsored decryption key')}
+            onClick={async () => {
+              if (!(await onCopy(shareKey, 'Copied sponsored decryption key'))) setShownKey(shareKey);
+            }}
             title="Copy sponsored decryption key"
             ariaLabel="Copy sponsored decryption key"
           />

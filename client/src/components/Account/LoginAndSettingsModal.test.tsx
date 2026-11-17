@@ -916,6 +916,15 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       fireEvent.click(within(status).getByRole('button', { name: 'Copy link' }));
       expect(await within(status).findByRole('button', { name: 'Link copied' })).toBeInTheDocument();
       expect(writeText).toHaveBeenCalledWith(window.location.href);
+      writeText.mockRejectedValueOnce(new Error('denied'));
+      const prompt = jest.spyOn(window, 'prompt').mockReturnValue(null);
+      fireEvent.click(within(status).getByRole('button', { name: 'Link copied' }));
+      expect(
+        await within(status).findByText(/Copying isn't allowed here, so the link could not be copied\./),
+      ).toBeInTheDocument();
+      expect(within(status).getByRole('button', { name: 'Copy link' })).toBeInTheDocument();
+      expect(prompt).toHaveBeenCalledWith('Copy this link', window.location.href);
+      prompt.mockRestore();
     } finally {
       Reflect.deleteProperty(navigator, 'clipboard');
     }

@@ -30,6 +30,7 @@ import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalFigureData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
 import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { notify } from '../../utilities/ui/notify.js';
 import { getHistoricalFigureAvatarOrBlockie } from 'utilities/ui/historicalFigureAvatars.js';
 
 jest.setTimeout(30000);
@@ -1436,6 +1437,20 @@ describe('DebateMap', () => {
       });
       fireEvent.click(await screen.findByTitle('Copy Deep Link URL'));
       await waitFor(() => expect(writeText).toHaveBeenCalledWith('http://localhost/atlas/t1?session=salon'));
+    });
+
+    it('warns that copying is not allowed when the clipboard refuses the node link', async () => {
+      const writeText = jest.fn(async (_text: string) => {
+        throw new Error('denied');
+      });
+      jest.mocked(notify.success).mockClear();
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+      renderSessionAtlas({ requestedModalNodeId: 't1' });
+      fireEvent.click(await screen.findByTitle('Copy Deep Link URL'));
+      await waitFor(() =>
+        expect(notify.warn).toHaveBeenCalledWith("Copying isn't allowed here, so the link could not be copied."),
+      );
+      expect(notify.success).not.toHaveBeenCalledWith('Copied to clipboard');
     });
 
     it('keeps the demo atlas four levels when none are named', () => {

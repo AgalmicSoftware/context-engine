@@ -98,6 +98,13 @@ export const hydrateWorkerCanonicalResponses = async ({
   let cachedStorageRefIds = new Set<string>();
   let cachedRows: WorkerCanonicalResponseRow[] = [];
   let startCursor = '';
+  // Copies the Worker stripped of research material that this reader now gets whole (their own answers, or all
+  // for an admin), such as ones read before they signed in: read again, never reused.
+  const reader = String(getAccount() || '')
+    .trim()
+    .toLowerCase();
+  const readsAllWhole = workerHydration.readsResearchMaterial(sessionConfig, reader);
+  let strippedRefIds = new Set<string>();
   const initializedQuestions = await updateQuestionsCacheAtomic((current) => {
     const merged = targetIsCurrent()
       ? workerHydration.mergeWorkerQuestionResponses(current, [], sessionSlug, run.identity)
@@ -122,6 +129,16 @@ export const hydrateWorkerCanonicalResponses = async ({
         storageRefId: String(metadata[questionId]?.[responder]?.storageRefId || ''),
         timestamp: Number(metadata[questionId]?.[responder]?.ts || 0),
       })),
+    );
+    strippedRefIds = new Set(
+      cachedRows
+        .filter(
+          (row) =>
+            (row.response as CacheRecord)?.interviewProvenanceWithheld === true &&
+            (readsAllWhole || (!!reader && row.responder.toLowerCase() === reader)),
+        )
+        .map((row) => row.storageRefId)
+        .filter(Boolean),
     );
     return merged;
   });
@@ -157,7 +174,7 @@ export const hydrateWorkerCanonicalResponses = async ({
         listedStorageRefIds = storageRefIds;
       },
     });
-  let rows = await load(cachedStorageRefIds, startCursor);
+  let rows = await load(new Set([...cachedStorageRefIds].filter((refId) => !strippedRefIds.has(refId))), startCursor);
   if (shouldStop()) return;
   // A complete listing is authoritative for this reader.
   const listed = listedStorageRefIds as ReadonlySet<string> | null;
@@ -171,6 +188,9 @@ export const hydrateWorkerCanonicalResponses = async ({
     const relisted = listedStorageRefIds as ReadonlySet<string> | null;
     if (relisted) staleRefIds = cachedStorageRefIds;
   }
+  // A stripped copy read again whole replaces the cached one.
+  const reread = rows.filter((row) => strippedRefIds.has(row.storageRefId)).map((row) => row.storageRefId);
+  if (reread.length) staleRefIds = new Set([...(staleRefIds || []), ...reread]);
   // Only one run that lists from the first page to the last sees every row.
   const partial = capped || !!startCursor;
 

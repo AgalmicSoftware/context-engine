@@ -54,6 +54,7 @@ import { createLogger } from '../../utilities/logging.js';
 import { peekCacheSync, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { applyBookmarkChange } from '../../utilities/cache/bookmarkChanges';
 import { notify } from '../../utilities/ui/notify.js';
+import { copyText, selectText } from '../../utilities/ui/copyText';
 import { getRelevantDefaultTags } from '../../utilities/defaultTags.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { normalizeGateMode } from '../../utilities/web3/sponsoredAccess.js';
@@ -2087,12 +2088,23 @@ class CreateSBTGroup extends Component<any, any> {
       this.getEffectiveSessionSlug(),
     );
 
+  // Copies text for a tap. Where copying is refused, text the page shows is selected to copy by hand.
+  copyWithNotice = (text: string, what: string, shown: Element | null, onCopied: () => void): void => {
+    void copyText(text).then((copied) => {
+      if (copied) {
+        notify.success('Copied to clipboard');
+        if (this._isMounted) onCopied();
+      } else if (shown) {
+        selectText(shown);
+        notify.error(`Copying isn't allowed here, so the ${what} is selected. Copy it yourself.`);
+      } else notify.error(`Copying isn't allowed here, so the ${what} wasn't copied.`);
+    });
+  };
+
   copySbtLinkToClipboard = (): void => {
     const { shareableUrl } = this.state;
     if (!shareableUrl) return;
-    navigator.clipboard.writeText(shareableUrl).then(() => {
-      notify.success('Copied to clipboard');
-      if (!this._isMounted) return;
+    this.copyWithNotice(shareableUrl, 'link', null, () => {
       this.setState(buildCreateSbtCopySuccessPatch({ stateKey: 'copyLinkSuccess' }));
       this.scheduleTrackedStateReset(
         'copyLinkSuccess',
@@ -2105,9 +2117,7 @@ class CreateSBTGroup extends Component<any, any> {
   copySbtIdToClipboard = (): void => {
     const { sbtAddress } = this.state;
     if (!sbtAddress) return;
-    navigator.clipboard.writeText(sbtAddress).then(() => {
-      notify.success('Copied to clipboard');
-      if (!this._isMounted) return;
+    this.copyWithNotice(sbtAddress, 'address', null, () => {
       this.setState(buildCreateSbtCopySuccessPatch({ stateKey: 'copyIdSuccess' }));
       this.scheduleTrackedStateReset(
         'copyIdSuccess',
@@ -2117,23 +2127,15 @@ class CreateSBTGroup extends Component<any, any> {
     });
   };
 
-  copyJsonPreview = (jsonData: unknown): void => {
-    try {
-      const str = JSON.stringify(jsonData, null, 2);
-      navigator.clipboard.writeText(str).then(() => {
-        notify.success('Copied to clipboard');
-        if (!this._isMounted) return;
-        this.setState(buildCreateSbtCopySuccessPatch({ stateKey: 'copyJsonSuccess' }));
-        this.scheduleTrackedStateReset(
-          'copyJsonSuccess',
-          buildCreateSbtCopySuccessPatch({ stateKey: 'copyJsonSuccess', copied: false }),
-          1500,
-        );
-      });
-    } catch (e) {
-      void e;
-      notify.warn('Copy failed');
-    }
+  copyJsonPreview = (jsonData: unknown, shown: Element | null): void => {
+    this.copyWithNotice(JSON.stringify(jsonData, null, 2), 'JSON', shown, () => {
+      this.setState(buildCreateSbtCopySuccessPatch({ stateKey: 'copyJsonSuccess' }));
+      this.scheduleTrackedStateReset(
+        'copyJsonSuccess',
+        buildCreateSbtCopySuccessPatch({ stateKey: 'copyJsonSuccess', copied: false }),
+        1500,
+      );
+    });
   };
 
   handleInputChange = (event: CreateSbtInputChangeEvent): void => {
@@ -3621,9 +3623,11 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   copyToClipboard = (text: unknown, index: unknown): void => {
-    navigator.clipboard.writeText(String(text || '')).then(() => {
-      notify.success('Copied to clipboard');
-      if (!this._isMounted) return;
+    const value = String(text || '');
+    // Links and the group password are shown as text beside their copy buttons.
+    const shown = Array.from(document.querySelectorAll('span, code')).find((el) => el.textContent === value) ?? null;
+    const what = index === CREATED_GROUP_PASSWORD_COPY_KEY ? 'password' : 'link';
+    this.copyWithNotice(value, what, shown, () => {
       this.setState(buildCreateSbtCopiedLinkIndexPatch({ index }));
       this.scheduleTrackedStateReset('copiedLinkIndex', buildCreateSbtCopiedLinkIndexPatch(), 2000);
     });
@@ -3854,20 +3858,18 @@ class CreateSBTGroup extends Component<any, any> {
 
   copyQRImage = async (elementId: string, indexKey: unknown): Promise<void> => {
     try {
-      const blob = await this.processQrImage(elementId);
-      if (!(blob instanceof Blob)) throw new Error('QR image export failed');
       if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
         throw new Error('Clipboard image write is unavailable');
       }
-      // Clipboard API usually requires secure context (https or localhost)
-      const item = new ClipboardItem({ 'image/png': blob });
+      // The write starts inside the tap, with the image still being drawn: Safari refuses one after an await.
+      const item = new ClipboardItem({ 'image/png': this.processQrImage(elementId) });
       await navigator.clipboard.write([item]);
       if (!this._isMounted) return;
       this.setState(buildCreateSbtCopiedLinkIndexPatch({ index: indexKey }));
       this.scheduleTrackedStateReset('copiedLinkIndex', buildCreateSbtCopiedLinkIndexPatch(), 2000);
     } catch (error: unknown) {
       sbtLog.warn('QR clipboard write failed', error);
-      notify.warn('QR copy failed');
+      notify.warn("Copying the QR image isn't allowed here. Download it instead.");
     }
   };
 
@@ -4642,7 +4644,7 @@ class CreateSBTGroup extends Component<any, any> {
         {successDisplayState.shouldRenderJsonPanel && (
           <JsonPanel
             as="pre"
-            onCopy={() => this.copyJsonPreview(jsonData)}
+            onCopy={(event) => this.copyJsonPreview(jsonData, event.currentTarget.nextElementSibling)}
             copied={copyJsonSuccess}
             copyTitle="Copy JSON"
           >

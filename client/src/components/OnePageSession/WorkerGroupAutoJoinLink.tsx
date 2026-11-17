@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { buildWorkerGroupAutoJoinPath, canAutoJoinWorkerGroup } from '../../domains/worker/workerGroupAutoJoin';
 import type { WorkerGroup } from '../../domains/worker/workerGroupPorts';
+import { copyText } from '../../utilities/ui/copyText';
 import styles from './OnePageSession.module.scss';
 
 export default function WorkerGroupAutoJoinLink({
@@ -25,12 +26,18 @@ export default function WorkerGroupAutoJoinLink({
     ).toString();
   };
   const copy = async () => {
+    let text = '';
     try {
-      await navigator.clipboard.writeText(link());
-      setStatus('Auto-join link copied.');
+      text = link();
     } catch {
-      setStatus('Could not copy the auto-join link.');
+      setStatus('Could not make the auto-join link.');
+      return;
     }
+    setStatus(
+      (await copyText(text))
+        ? 'Auto-join link copied.'
+        : "Copying isn't allowed here, so the auto-join link could not be copied.",
+    );
   };
   let codeLink = '';
   if (showCode) {

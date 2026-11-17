@@ -208,7 +208,7 @@ describe('UserPage clipboard helpers', () => {
       await instance.copyToClipboard();
 
       expect(writeText).toHaveBeenCalledWith('0x00000000000000000000000000000000000000aa');
-      expect(errorSpy).toHaveBeenCalledWith('Could not copy address');
+      expect(errorSpy).toHaveBeenCalledWith("Copying isn't allowed here, so the address could not be copied.");
       expect(successSpy).not.toHaveBeenCalled();
       expect(instance.state.copied).not.toBe(true);
     } finally {

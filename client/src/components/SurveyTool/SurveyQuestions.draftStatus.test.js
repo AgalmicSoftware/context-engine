@@ -178,3 +178,29 @@ it.each([
   act(() => engine.persistDraft());
   await waitFor(() => expect(sessionStorage.getItem(engine.getDraftKey())).toContain('compat-question'));
 });
+
+it('writes a typed answer still waiting on the draft timer when the page is hidden', async () => {
+  let engine;
+  renderSurveyQuestions({
+    account,
+    loginComplete: true,
+    isStandalone: true,
+    sessionSlug: 'edge',
+    sessionConfig: legacyConfig,
+    questionPool: [question],
+    runtimeStrategy: {
+      render: (current) => {
+        engine = current;
+        return current.renderDefaultSurveyQuestionsRoute();
+      },
+    },
+  });
+  await waitFor(() => expect(engine).toBeTruthy());
+  act(() => engine.handleAnswer(0, 'q1', 'Last keystrokes'));
+  expect(engine._persistTimer).toBeTruthy();
+  expect(sessionStorage.getItem(engine.getDraftKey()) || '').not.toContain('Last keystrokes');
+  act(() => {
+    window.dispatchEvent(new Event('pagehide'));
+  });
+  expect(sessionStorage.getItem(engine.getDraftKey())).toContain('Last keystrokes');
+});

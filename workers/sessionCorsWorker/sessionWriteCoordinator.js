@@ -38,6 +38,8 @@ import { runQueuedAutomaticResultsAnalysisJob, valueLooksEncrypted } from './res
 import { publishCloudflareOwnedStorageMetadata, scanLegacyStorageOwnerIds, setCloudflareStorageResourceHidden } from './storageRouteExecution.js';
 import { finishContextPdfReading, removeContextSource } from './contextSourceRoute.js';
 import { dispatchResultsBuildStore } from './resultsBuildStore.js';
+import { nextResultsJobAt, readResultsJob, runResultsJobs, startResultsJob } from './resultsJobs.js';
+import { RESULTS_JOB_RUNNERS } from './resultsJobRunners.js';
 import { dispatchSessionAgentOptOutStore } from './sessionAgentOptOuts.js';
 import { dispatchSessionAgentHistoryStore } from './sessionAgentHistory.js';
 import { dispatchSessionFeedbackStore } from './sessionFeedback.js';
@@ -524,6 +526,7 @@ export class SessionWriteCoordinator {
     this.applySessionConfigMutation = deps.applySessionConfigMutation || applySessionConfigMutation;
     this.putSessionConfig = deps.putSessionConfig || putSessionConfig;
     this.runResultsAnalysisAutoJob = deps.runResultsAnalysisAutoJob || runQueuedAutomaticResultsAnalysisJob;
+    this.resultsJobRunners = deps.resultsJobRunners || RESULTS_JOB_RUNNERS;
     this.activeAttemptId = '';
     this.activeDirectAttemptId = '';
     this.sessionConfigQueue = createOperationQueue();
@@ -555,7 +558,7 @@ export class SessionWriteCoordinator {
 
   async scheduleUploadReceiptCleanup() {
     const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
-    const nextAlarm = Math.min(nextExpiry, await readUploadReceiptRegistrationRetryAt(this), await nextAgentSubmitProjectionAt(this));
+    const nextAlarm = Math.min(nextExpiry, await readUploadReceiptRegistrationRetryAt(this), await nextAgentSubmitProjectionAt(this), await nextResultsJobAt(this));
     if (!Number.isFinite(nextAlarm) || typeof this.state.storage.setAlarm !== 'function') return;
     // Keep an earlier alarm another queue set, such as the next page of AI Views receipts.
     const scheduled = await this.state.storage.getAlarm?.();
@@ -961,7 +964,7 @@ export class SessionWriteCoordinator {
 
   async scheduleResultsAnalysisAlarm(delayMs = 1_000) {
     if (typeof this.state.storage?.setAlarm !== 'function') return false;
-    await this.state.storage.setAlarm(Math.min((Number(this.now()) || Date.now()) + Math.max(0, Number(delayMs) || 0), await nextAgentSubmitProjectionAt(this)));
+    await this.state.storage.setAlarm(Math.min((Number(this.now()) || Date.now()) + Math.max(0, Number(delayMs) || 0), await nextAgentSubmitProjectionAt(this), await nextResultsJobAt(this)));
     return true;
   }
 
@@ -1130,16 +1133,76 @@ export class SessionWriteCoordinator {
   }
 
   async alarm() {
-    await repairAgentSubmitProjections(this);
-    if (await sweepUploadReceiptIndex(this)) return;
-    try { await registerUploadReceiptStore(this); } catch { /* The persisted backoff schedules another attempt. */ }
+    // A results job whose heartbeat stopped runs again here, beside the alarm's
+    // other work, and the alarm ends when it does: the alarm's 15 minutes are
+    // the surest place for it, though the next alarm waits behind it.
+    const resultsJobs = runResultsJobs(this, this.resultsJobRunners).catch(() => {});
     try {
-      await this.runQueuedResultsAnalysisAutoJob();
-    } catch (error) {
-      await this.recordResultsAnalysisQueueFailure(error);
+      await repairAgentSubmitProjections(this);
+      if (await sweepUploadReceiptIndex(this)) return;
+      try { await registerUploadReceiptStore(this); } catch { /* The persisted backoff schedules another attempt. */ }
+      try {
+        await this.runQueuedResultsAnalysisAutoJob();
+      } catch (error) {
+        await this.recordResultsAnalysisQueueFailure(error);
+      }
+      await this.pruneResultsAnalysisUploadReceipts();
+      await this.scheduleUploadReceiptCleanup();
+    } finally {
+      await resultsJobs;
     }
-    await this.pruneResultsAnalysisUploadReceipts();
-    await this.scheduleUploadReceiptCleanup();
+  }
+
+  // An admin's results build, started or joined (`start`), or read (`status`),
+  // as resultsJobs.js runs it. An atlas or risk matrix takes its store's lease first.
+  async executeResultsJob(operation, payload = {}) {
+    const kind = toTrimmedString(payload.kind);
+    if (operation === 'status') return jsonResponse({ ok: true, job: await readResultsJob(this, kind, this.resultsJobRunners) }, 200);
+    if (operation !== 'start') return jsonResponse({ error: 'Not found.' }, 404);
+    const input = isObjectRecord(payload.input) ? payload.input : {};
+    const builds = kind === 'debate-atlas' || kind === 'risk-matrix';
+    const started = await startResultsJob(this, {
+      kind,
+      slug: toTrimmedString(payload.slug),
+      input,
+      runners: this.resultsJobRunners,
+      reserve: builds
+        ? async () => {
+          const response = await dispatchResultsBuildStore(this, kind, 'reserve', { builder: input.builder });
+          const body = await response.json();
+          return response.ok ? { ok: true, attemptId: body.attemptId } : { ok: false, status: response.status, body };
+        }
+        : null,
+    });
+    return started.ok
+      ? jsonResponse({ ok: true, joined: started.joined, job: started.job }, 200)
+      : jsonResponse(started.body || { error: 'The build could not start; retry.' }, started.status || 503);
+  }
+
+  // Gives back the AI Views reservation a manual request holds. With `failure`,
+  // the request ends with it, as a failed run would; without, it may run again.
+  async releaseResultsAnalysisRequest(requestId, failure = null) {
+    const id = toTrimmedString(requestId);
+    if (!id) return;
+    const record = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
+    const active = record.active;
+    if (active?.requestId === id && failure) {
+      await this.finalizeResultsAnalysis({
+        requestId: id,
+        reservationKey: active.reservationKey,
+        attemptId: active.attemptId,
+        success: false,
+        receipt: { ok: false, status: failure.status, error: failure.error },
+      });
+      return;
+    }
+    await this.state.storage.transaction(async (transaction) => {
+      const current = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+      if (current.active?.requestId !== id) return;
+      current.active = null;
+      delete current.requests[id];
+      await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, current);
+    });
   }
 
   async readResultsAnalysisStatus() {
@@ -1317,6 +1380,7 @@ export class SessionWriteCoordinator {
   }
 
   async executeResultsAnalysisStatus() {
+    await readResultsJob(this, 'ai-views', this.resultsJobRunners);
     return jsonResponse({ ok: true, state: await this.readResultsAnalysisStatus() }, 200);
   }
 
@@ -3518,7 +3582,13 @@ export class SessionWriteCoordinator {
       return this.executeContextSourceOperation(url.pathname.split('/').pop(), payload);
     }
     const resultsBuild = url.pathname.match(/^\/session-config\/(debate-atlas|risk-matrix)\/([a-z]+)$/);
-    if (resultsBuild) return dispatchResultsBuildStore(this, resultsBuild[1], resultsBuild[2], payload || {});
+    if (resultsBuild) {
+      // A page reading builds wakes a job no one is running.
+      if (resultsBuild[2] === 'read') await readResultsJob(this, resultsBuild[1], this.resultsJobRunners);
+      return dispatchResultsBuildStore(this, resultsBuild[1], resultsBuild[2], payload || {});
+    }
+    const resultsJob = url.pathname.match(/^\/session-config\/results-job\/([a-z]+)$/);
+    if (resultsJob) return this.executeResultsJob(resultsJob[1], payload || {});
     if (url.pathname.startsWith('/session-config/session-agent/')) {
       return dispatchSessionAgentOptOutStore(this, url.pathname.split('/').pop(), payload || {});
     }

@@ -331,7 +331,7 @@ test('results admins and co-admins may build risk matrices; strangers may not', 
             : { ok: false, response: { body: { error: 'Admin authorization failed.' }, status: 403 } }
         ),
         buildDebateAtlas: async () => assert.fail('a risk matrix press must not build an atlas'),
-        buildRiskMatrix: async ({ builderAddress }) => {
+        pressResultsBuild: async ({ builderAddress }) => {
           built = true;
           return { ok: true, status: 200, build: { builtBy: builderAddress } };
         },

@@ -3,6 +3,7 @@ import { safeString, safeJsonParse, nowIso, sanitizeSessionSlug } from './runtim
 import { AGENT_EVENT_TYPES, AGENT_ACTIONS } from './constants.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { submitAgentResponseOnChain } from './onChainResponses.mjs';
+import { answerRevisionIdentity } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 import { normalizeAgentRatingScale } from './ratingScale.mjs';
@@ -12,6 +13,7 @@ export const SUBMIT_REQUEST_SESSION_KV_PREFIX = 'telegram:submit-request-by-sess
 export const SUBMIT_REQUEST_USER_KV_PREFIX = 'telegram:submit-request-by-user:v1:';
 export const CANONICAL_ANSWER_KV_PREFIX = 'telegram:canonical-answer:v1:';
 export const CANONICAL_ANSWER_SESSION_KV_PREFIX = 'telegram:canonical-answer-by-session:v1:';
+export const CANONICAL_ANSWER_USER_KV_PREFIX = 'telegram:canonical-answer-by-user:v1:';
 export const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const AGENT_SUBMIT_QUEUE_MESSAGE_TYPE = 'telegram_submit_direct_v1';
 export const SUBMIT_QUEUE_MAX_ATTEMPTS = 4;
@@ -64,6 +66,13 @@ export function canonicalAnswerKvKey(record = {}) {
 export function canonicalAnswerSessionKvPrefix(sessionSlug = '') {
   const slug = sanitizeSessionSlug(sessionSlug);
   return slug ? `${CANONICAL_ANSWER_SESSION_KV_PREFIX}${slug}:` : '';
+}
+
+// One person's permanent answers in a session, which outlast the 30-day
+// submission index, so their answered questions stay answered.
+export function canonicalAnswerUserKvPrefix({ sessionSlug = '', telegramUserId = '' } = {}) {
+  const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
+  return prefix ? `${CANONICAL_ANSWER_USER_KV_PREFIX}${prefix.slice(SUBMIT_REQUEST_USER_KV_PREFIX.length)}` : '';
 }
 
 export function canonicalAnswerSessionKvKey(record = {}) {
@@ -193,9 +202,11 @@ async function persistCanonicalAnswerRecord({
   if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
   const canonical = buildCanonicalAnswerRecord(record, { sourceKey });
   if (!canonical) return { ok: false, reason: 'canonical_answer_incomplete' };
+  const userPrefix = canonicalAnswerUserKvPrefix(canonical);
   const keys = [
     canonicalAnswerKvKey(canonical),
     canonicalAnswerSessionKvKey(canonical),
+    userPrefix ? `${userPrefix}${canonical.requestId}` : '',
   ].filter(Boolean);
   if (!keys.length) return { ok: false, reason: 'canonical_answer_key_missing' };
 
@@ -318,6 +329,33 @@ function sameQueuedRequest(left, right) {
 
 function staleQueueGeneration(existing, incoming) {
   return existing?.queueGeneration && incoming?.queueGeneration && existing.queueGeneration !== incoming.queueGeneration;
+}
+
+// Whether this person has stored a newer revision of this answer, newest first.
+// A head claimed for an edit that was never stored does not count, so a first
+// answer that was merely retried still lands.
+const NEWER_REVISIONS_CHECKED = 20;
+async function newerRevisionStored({ env, kv, source }) {
+  const revision = Number(source.answerRevision);
+  if (!Number.isSafeInteger(revision) || revision < 1 || typeof env.AGENT_SERVICES?.readAnswerHead !== 'function') return false;
+  try {
+    const read = await env.AGENT_SERVICES.readAnswerHead({ sessionId: source.sessionId, sessionSlug: source.sessionSlug,
+      workerOrigin: source.workerOrigin, principalId: source.principalId, questionId: source.questionId });
+    if (read?.ok !== true) throw new Error(safeString(read?.reason) || 'answer_head_unreadable');
+    const head = Number(read.head?.revision);
+    if (!Number.isSafeInteger(head)) return false;
+    for (let next = head; next > revision && next > head - NEWER_REVISIONS_CHECKED; next -= 1) {
+      const { requestId } = await answerRevisionIdentity({ transport: 'telegram_bot_submit', principalId: source.principalId,
+        sessionId: source.sessionId, questionId: source.questionId, revision: next });
+      const stored = objectOrNull(safeJsonParse(await kv.get(canonicalAnswerKvKey({ requestId })), null));
+      if (stored?.status === 'direct_submitted') return true;
+    }
+  } catch (error) {
+    // Unknown: deliver as before, but say why, so a wiring fault cannot hide.
+    console.warn({ event: 'agent_submit_head_read_failed', requestId: safeString(source.requestId),
+      reason: safeString(error?.reason || error?.message || error) });
+  }
+  return false;
 }
 
 function recoveryDiagnostics(record, reason) {
@@ -498,6 +536,14 @@ export async function processQueuedAgentSubmitRecord({
   catch (error) {
     return persistQueueOutcome({ env, source, now: executionTime,
       outcome: { ok: false, safeToRetry: true, retryable: false, reason: error.reason || 'queued_agent_authority_denied' } });
+  }
+  // A late delivery of an older revision never replaces a newer stored answer;
+  // it ends here and stays in history. Nothing has been sent, so the outcome is
+  // safe to retry, which rechecks the receipt: a duplicate delivery that already
+  // stored this revision keeps its outcome.
+  if (await newerRevisionStored({ env, kv, source })) {
+    return persistQueueOutcome({ env, source, now: executionTime,
+      outcome: { ok: false, retryable: false, safeToRetry: true, reason: 'superseded_by_newer_answer' } });
   }
   const answerCreatedAt = source.createdAt || createdAt || null;
   const answer = source.onChainAnswer || source.answer;

@@ -39,12 +39,57 @@ export const readGroupInviteFragment = (hash: string): string => {
 
 // The invite last taken out of the address, for its link's group, until an invitation holds it. The address
 // loses it before the session's Worker is known, so the invitation that forms for that group takes it from here.
-let heldInvite: { sessionSlug: string; groupId: string; token: string } | null = null;
+// The tab's storage keeps a copy, so a reload before the Worker is known does not lose it.
+const HELD_INVITE_STORAGE_KEY = 'ce:worker-group-held-invite:v1';
+type HeldInvite = { sessionSlug: string; groupId: string; token: string; createdAt: number };
+let heldInvite: HeldInvite | null = null;
+
+const readHeldInvite = (): HeldInvite | null => {
+  if (heldInvite) return heldInvite;
+  try {
+    const value = JSON.parse(sessionStorage.getItem(HELD_INVITE_STORAGE_KEY) || 'null');
+    if (
+      typeof value?.sessionSlug === 'string' &&
+      typeof value.groupId === 'string' &&
+      typeof value.token === 'string' &&
+      value.token &&
+      value.token.length <= MAX_TOKEN_LENGTH &&
+      Number.isFinite(value.createdAt) &&
+      value.createdAt <= Date.now() &&
+      Date.now() - value.createdAt < AUTO_JOIN_MAX_AGE_MS
+    )
+      return (heldInvite = {
+        sessionSlug: value.sessionSlug,
+        groupId: value.groupId,
+        token: value.token,
+        createdAt: value.createdAt,
+      });
+    sessionStorage.removeItem(HELD_INVITE_STORAGE_KEY);
+  } catch {
+    /* Storage can be disabled. */
+  }
+  return null;
+};
+
+const releaseHeldInvite = () => {
+  heldInvite = null;
+  try {
+    sessionStorage.removeItem(HELD_INVITE_STORAGE_KEY);
+  } catch {
+    /* Storage can be disabled. */
+  }
+};
 
 /** Keeps an invite handed over in the page (a recording's claim) for the link's group, never in the address. */
 export const holdGroupInviteForLink = (path: string, token: string) => {
   const target = readLinkTarget(path);
-  if (target && token) heldInvite = { sessionSlug: target.sessionSlug, groupId: target.groupId, token };
+  if (!target || !token) return;
+  heldInvite = { sessionSlug: target.sessionSlug, groupId: target.groupId, token, createdAt: Date.now() };
+  try {
+    sessionStorage.setItem(HELD_INVITE_STORAGE_KEY, JSON.stringify(heldInvite));
+  } catch {
+    /* The page still holds it until a reload. */
+  }
 };
 
 /**
@@ -104,9 +149,17 @@ export const readPendingAutoJoin = (): WorkerGroupAutoJoinIntent | null => {
   }
 };
 
+const heldInviteFor = ({ sessionSlug, groupId }: { sessionSlug: string; groupId: string }) => {
+  const held = readHeldInvite();
+  return held?.sessionSlug === sessionSlug && held.groupId === groupId ? held : null;
+};
+
 export const savePendingAutoJoin = (intent: WorkerGroupAutoJoinIntent) => {
-  // Once an invitation holds the invite, the tab's storage keeps it instead.
-  if (heldInvite && intent.token === heldInvite.token) heldInvite = null;
+  // The tab lets go of its held invite once an invitation takes it, or drops that very invite as refused, so a
+  // reload never sends a refused invite again. A save that never had the invite leaves it held.
+  const held = heldInviteFor(intent);
+  if (held && (intent.token === held.token || (!intent.token && readPendingAutoJoin()?.token === held.token)))
+    releaseHeldInvite();
   try {
     sessionStorage.setItem(AUTO_JOIN_STORAGE_KEY, JSON.stringify(intent));
   } catch {
@@ -115,6 +168,8 @@ export const savePendingAutoJoin = (intent: WorkerGroupAutoJoinIntent) => {
 };
 
 export const clearPendingAutoJoin = (intent: WorkerGroupAutoJoinIntent) => {
+  // The group's invitation is over (joined or cancelled), and its invite with it.
+  if (heldInviteFor(intent)) releaseHeldInvite();
   const stored = readPendingAutoJoin();
   if (stored && autoJoinIntentKey(stored) === autoJoinIntentKey(intent)) {
     try {
@@ -154,7 +209,8 @@ export const readAutoJoinLink = (path: string, context: Context): WorkerGroupAut
       matchingContext && parseSessionWorkerDiscoveryOrigin(matchingContext.workerUrl) === workerOrigin
         ? matchingContext.sessionId
         : undefined;
-    const held = heldInvite?.sessionSlug === sessionSlug && heldInvite.groupId === groupId ? heldInvite.token : '';
+    const stored = readHeldInvite();
+    const held = stored?.sessionSlug === sessionSlug && stored.groupId === groupId ? stored.token : '';
     const token = readGroupInviteFragment(url.hash) || held;
     return {
       version: 1,

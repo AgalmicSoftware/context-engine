@@ -9,31 +9,32 @@ import {
   faSpinner,
 } from '@fortawesome/free-solid-svg-icons';
 import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
+import { copyText } from '../../utilities/ui/copyText';
 import styles from './Account.module.scss';
 import { PASSKEYS_UNAVAILABLE_MESSAGE, type PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
 // For a browser without passkeys: the same page, to paste into one that has them.
 const CopyPageLink = () => {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<boolean | null>(null);
   return (
-    <Button
-      type="button"
-      size="sm"
-      color="primary"
-      className={styles.passkeyCopyLink}
-      data-testid="ce-passkey-copy-link"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(window.location.href);
-          setCopied(true);
-        } catch {
-          // Without clipboard access the address bar still holds the link.
-          window.prompt('Copy this link', window.location.href);
-        }
-      }}
-    >
-      {copied ? 'Link copied' : 'Copy link'}
-    </Button>
+    <>
+      <Button
+        type="button"
+        size="sm"
+        color="primary"
+        className={styles.passkeyCopyLink}
+        data-testid="ce-passkey-copy-link"
+        onClick={async () => {
+          const done = await copyText(window.location.href);
+          setCopied(done);
+          // Offers the link to copy by hand, where the browser shows prompts.
+          if (!done) window.prompt('Copy this link', window.location.href);
+        }}
+      >
+        {copied ? 'Link copied' : 'Copy link'}
+      </Button>
+      {copied === false ? <span> Copying isn&apos;t allowed here, so the link could not be copied.</span> : null}
+    </>
   );
 };
 

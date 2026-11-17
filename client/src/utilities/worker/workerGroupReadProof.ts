@@ -77,6 +77,20 @@ export const forgetGroupReadHeader = (workerUrl: unknown, sessionSlug: unknown) 
   writeStored(rest);
 };
 
+// Sessions whose Worker answered this page with a private shell. Only a Worker new enough to keep a session
+// private does, so only these, and sessions this browser holds a proof for, are sent what older Workers refuse.
+let privateSessions = new Set<string>();
+
+/** The Worker answered with a private session's shell: it reads sign-ins on routes older Workers keep signed out. */
+export const notePrivateSession = (workerUrl: unknown, sessionSlug: unknown) => {
+  const key = sessionKey(workerUrl, sessionSlug);
+  if (key) privateSessions = new Set(privateSessions).add(key);
+};
+
+/** Whether this page knows the session is private: its Worker said so, or this browser holds its read proof. */
+export const isKnownPrivateSession = (workerUrl: unknown, sessionSlug: unknown): boolean =>
+  privateSessions.has(sessionKey(workerUrl, sessionSlug)) || !!readGroupReadHeader(workerUrl, sessionSlug);
+
 /** The session's read-proof header, to spread into a request's headers; empty when this browser holds none. */
 export const groupReadHeaders = (workerUrl: unknown, sessionSlug: unknown): Record<string, string> => {
   const header = readGroupReadHeader(workerUrl, sessionSlug);

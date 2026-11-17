@@ -640,6 +640,24 @@ Admin test panel:
   /risk-matrix?sessionSlug=<slug>&id=` reads them under the atlas rule, with
   `canBuild` and, for builders, `nextBuild`, and the public config sets
   `riskMatrix: true`.
+- An atlas, a risk matrix or a manual AI Views run from stored responses runs
+  as a job in the session's coordinator, not in the request that pressed for
+  it, so a page that drops, reloads or closes loses nothing. One job of each
+  kind runs at a time; a press while one runs joins it and pays for nothing
+  more. The press waits while the page is connected (5 minutes for a build, 9
+  for AI Views) and answers with the result. After that the atlas and risk
+  matrix answer `409` with the running build's `reason` and `active`, and AI
+  Views answers `202`, as for a build someone else started; the page's own
+  checks, or a reload on any device, find the result when it lands. A build
+  that fails says why and frees the next press at once. A running job writes a
+  heartbeat every 15 seconds. If the heartbeat goes a minute stale (the
+  coordinator restarted), the next alarm, read of builds, AI Views status or
+  press runs the job again; a job cut off twice ends with "The build stopped
+  before it finished. Press again to start a new one." A job the alarm runs
+  again holds that alarm until it ends, so automatic AI Views and the other
+  alarm work wait up to a build's length behind it. AI Views from a
+  snapshot the browser supplies still runs in the request, since those rows
+  are not stored.
 - Manual generation uses signed admin action
   `POST /admin/results-analysis/generate` with action
   `results-analysis/generate`. Worker-canonical Cloudflare sessions can request
@@ -829,12 +847,15 @@ Authenticated clients can use the worker as the session storage boundary:
   against `limits.perWalletPerDay` as a fetch as well as a storage request (`403 context_link_fetch_denied` when the
   token lacks the scope; any other refusal, such as a failed authorization check or `429` over the limit, is
   `fetch_url`'s own). Every `add-link` passes the upload's access check before the Worker fetches the page.
-  `{ action: "add-link", url, title?, adminsOnly?, replaces?, adder?, adderName? }`
+  `{ action: "add-link", url, title?, adminsOnly?, groupIds?, replaces?, adder?, adderName? }`
   fetches the page under the public-artifact link policy and stores it as a context link record with its text
   snapshot and fetch date (`replaces` refreshes an existing one: the same `url`, else `400`, keeping its title,
-  privacy and adder, and an agent's mark; `adder: "agent"` and an optional `adderName` store an agent's
-  self-declared mark, as the `CE-AdderKind` and `CE-AdderName` tags a context file may carry,
-  `400 context_adder_invalid` for any other value);
+  privacy (everyone, admins or groups) and adder, and an agent's mark; `adder: "agent"` and an optional
+  `adderName` store an agent's self-declared mark, as the `CE-AdderKind` and `CE-AdderName` tags a context file
+  may carry, `400 context_adder_invalid` for any other value). `groupIds` (1 to 20) locks the link to those
+  groups as a file's lock does, not with `adminsOnly` (`400 context_policy_unsupported`, before any fetch);
+  Workers that take it advertise `context_link_groups_v1`, and the reply's `source` carries `adminsOnly` and
+  `lockedGroupIds`;
   `{ action: "read-pdf", id }` sends a context PDF to the session's own Claude or OpenAI model and stores the
   returned text beside it with the same privacy; `{ action: "remove", id }` deletes a context source and that
   text. A PDF has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the
@@ -3028,7 +3049,7 @@ Signed login/bootstrap requests:
 - `GET /capabilities` is public and returns the code-defined feature list, API
   version, optional bundle hash and the Worker's `release` (the version it was
   bundled from, `null` from unbundled source), cached for 30 seconds. Features
-  include `ai_daily_limit_v1` (`limits.aiPerWalletPerDay` is honoured), `draft_text_v1`, `session_feedback` and `storage_read_batch_v1`. With `?slug=<slug>`,
+  include `ai_daily_limit_v1` (`limits.aiPerWalletPerDay` is honoured), `context_link_groups_v1` (a context link may be locked to groups), `draft_text_v1`, `participant_context_links_v1`, `session_feedback` and `storage_read_batch_v1`. With `?slug=<slug>`,
   it also reports coordinator, config authority, storage-index and secret-presence
   readiness, plus fixed reasons for unavailable submit, publication, correction
   and backup operations. A fresh authority reports `seeding`; legacy config

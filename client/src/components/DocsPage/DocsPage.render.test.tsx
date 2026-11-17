@@ -7,6 +7,7 @@ import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-
 import { buildDocsContractsHref, getContractViewerSourceTestId } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
+import { notify } from '../../utilities/ui/notify.js';
 
 const mockGetSessionConfigBySlug = jest.fn();
 const mockGetDemoSessionConfigBySlug = jest.fn();
@@ -277,6 +278,24 @@ describe('DocsPage contract deep links', () => {
     expect(within(projectLinks).getAllByRole('link')).toEqual([repositoryLink]);
     expect(repositoryLink).not.toHaveAttribute('data-expanded');
     expect(within(projectLinks).queryByText('Repository')).not.toBeInTheDocument();
+  });
+
+  it('opens and selects a prompt when copying it is refused', async () => {
+    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const warn = jest.spyOn(notify, 'warn').mockImplementation(() => '');
+    try {
+      render(<DocsPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
+      fireEvent.click(screen.getByRole('button', { name: 'Prompts' }));
+      fireEvent.click(screen.getAllByRole('button', { name: 'Copy prompt' })[0]);
+      await waitFor(() =>
+        expect(warn).toHaveBeenCalledWith("Copying isn't allowed here, so the prompt is selected. Copy it yourself."),
+      );
+      const copied = String(writeText.mock.calls[0][0]);
+      await waitFor(() => expect(window.getSelection()?.toString()).toBe(copied));
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('explains the Session Agent and tells the four kinds of agent apart, marking planned ones', () => {

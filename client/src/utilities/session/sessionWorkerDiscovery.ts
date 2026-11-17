@@ -2,7 +2,7 @@ import { normalizeSessionIdHex } from '@ce-shared/auth/siweMessage.mjs';
 type UnknownRecord = Record<string, unknown>;
 
 import { classifySessionModeProfileSupport, type SessionModeProfile } from './sessionModeProfile';
-import { groupReadHeaders } from '../worker/workerGroupReadProof';
+import { groupReadHeaders, notePrivateSession } from '../worker/workerGroupReadProof';
 
 export type DiscoveryEnvironment = 'development' | 'production' | 'test' | string;
 
@@ -535,6 +535,7 @@ export const fetchWorkerCanonicalSessionBootstrap = async ({
   const request = { fetchImpl, workerOrigin, canonicalSlug, expectedSessionId, signal, environment };
   const bootstrap = await requestWorkerCanonicalSessionBootstrap(request);
   if (!bootstrap.config.privateSession) return bootstrap;
+  notePrivateSession(workerOrigin, canonicalSlug);
   // A private session admits its members and admins by their sign-in; other sessions never see it here.
   const token = memberToken?.(workerOrigin, canonicalSlug) || '';
   return token ? requestWorkerCanonicalSessionBootstrap({ ...request, token }) : bootstrap;

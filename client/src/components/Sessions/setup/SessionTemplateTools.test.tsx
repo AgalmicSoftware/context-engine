@@ -61,6 +61,23 @@ describe('session template tools', () => {
     expect(screen.getByTestId('ce-template-status')).toHaveTextContent('It carries no keys or tokens.');
   });
 
+  it('copies a made link on a second tap, and says when copying is refused', async () => {
+    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
+    Object.assign(navigator, { clipboard: { writeText } });
+    renderActions();
+    const share = screen.getByTestId('ce-template-share');
+    const status = (text: string) =>
+      waitFor(() => expect(screen.getByTestId('ce-template-status')).toHaveTextContent(text));
+    fireEvent.click(share);
+    await status('The link is ready. Tap the button again to copy it.');
+    fireEvent.click(share);
+    await status("Copying isn't allowed here. Download the .json instead.");
+    writeText.mockResolvedValue(undefined);
+    fireEvent.click(share);
+    await status('Share link copied.');
+    expect(new Set(writeText.mock.calls.map(([link]) => link)).size).toBe(1);
+  });
+
   it('offers a .json download when the link would pass 8,000 characters', async () => {
     const long = template({ sessionInfo: prose(9, 30000) });
     const encoded = await encodeSessionTemplateLink(long);

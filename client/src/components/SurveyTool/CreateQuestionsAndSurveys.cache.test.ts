@@ -25,6 +25,7 @@ import {
   sanitizeDocumentUrls,
   selectManagedNetBucketSnapshot,
 } from './CreateQuestionsAndSurveys.cacheTestUtils';
+import { notify } from '../../utilities/ui/notify.js';
 
 describe('CreateQuestionsAndSurveys managed cache reads', () => {
   beforeEach(() => {
@@ -153,6 +154,37 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         configurable: true,
         value: originalClipboard,
       });
+    }
+  });
+
+  it('says when copying is refused, and selects shown JSON to copy by hand', async () => {
+    const instance = makeInstance({ activeSessionSlug: 'edge' });
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const notifyError = jest.spyOn(notify, 'error').mockImplementation(() => undefined as never);
+    const shown = document.createElement('pre');
+    shown.textContent = '{"a": 1}';
+    document.body.appendChild(shown);
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+      });
+      instance.setCopySuccessState = jest.fn();
+      instance.copySurveyLinkToClipboard('0xSurvey');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(notifyError).toHaveBeenLastCalledWith("Copying isn't allowed here, so the link wasn't copied.");
+      instance.copyJsonPreview({ a: 1 }, shown);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(notifyError).toHaveBeenLastCalledWith(
+        "Copying isn't allowed here, so the JSON is selected. Copy it yourself.",
+      );
+      expect(window.getSelection()?.toString()).toBe('{"a": 1}');
+      expect(instance.setCopySuccessState).not.toHaveBeenCalled();
+    } finally {
+      shown.remove();
+      notifyError.mockRestore();
+      if (original) Object.defineProperty(navigator, 'clipboard', original);
+      else Reflect.deleteProperty(navigator, 'clipboard');
     }
   });
 

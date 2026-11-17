@@ -6073,19 +6073,21 @@ export const renderHtmlReport = (inputReport) => {
             atlasIssueCopyLinkButton.title = 'Copy deep link';
           }, 1400);
         };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(url.toString()).then(markCopied).catch(function () {});
-          return;
-        }
+        // As the live atlas does: the older copy command first, since it copies inside the tap, which Safari and
+        // in-app browsers allow; the clipboard API, which some of them refuse, is the second try.
         var input = document.createElement('textarea');
         input.value = url.toString();
         input.setAttribute('readonly', '');
-        input.style.position = 'fixed';
-        input.style.opacity = '0';
+        input.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;';
         document.body.appendChild(input);
         input.select();
-        try { document.execCommand('copy'); markCopied(); } catch (error) { /* Clipboard unavailable. */ }
+        var copied = false;
+        try { copied = document.execCommand('copy'); } catch (error) { copied = false; }
         document.body.removeChild(input);
+        if (copied) { markCopied(); return; }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url.toString()).then(markCopied).catch(function () {});
+        }
       }
       function setRawDemoViewActive(mode) {
         var activeMode = knownModes.indexOf(mode) === -1 || mode === 'snapshot-json' ? 'report' : mode;

@@ -53,8 +53,9 @@ import {
 } from '../shared/workerSessionConfig.mjs';
 import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 import { generateResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
-import { buildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
-import { buildRiskMatrix, RISK_MATRIX_BUILD_ACTION } from './riskMatrixBuild.js';
+import { DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
+import { RISK_MATRIX_BUILD_ACTION } from './riskMatrixBuild.js';
+import { pressResultsAnalysis, pressResultsBuild } from './resultsJobPress.js';
 import { canBuildResults } from './resultsBuild.js';
 import { callSessionFeedbackStore } from './sessionFeedbackRoute.js';
 import { SESSION_AGENT_EXPORT_ACTION, exportSessionAgent } from './sessionAgentExport.js';
@@ -242,15 +243,21 @@ export const dispatchAdminRequest = async ({
       return deps?.json?.({ error: 'Only the session admin can build AI Views from supplied answers.' }, 403, privateHeaders);
     }
     try {
-      const result = await (deps?.generateResultsAnalysisDraft || generateResultsAnalysisDraft)({
-        env,
-        slug: targetSlug,
-        config: existingConfig,
-        body,
-        headers: privateHeaders,
-        trigger: 'manual',
-        deps,
-      });
+      // From the Worker's own responses the build runs as a job that outlives this
+      // request; answers an admin supplies are read here, as they can't be kept.
+      const result = suppliesRows
+        ? await (deps?.generateResultsAnalysisDraft || generateResultsAnalysisDraft)({
+          env,
+          slug: targetSlug,
+          config: existingConfig,
+          body,
+          headers: privateHeaders,
+          trigger: 'manual',
+          deps,
+        })
+        : await (deps?.pressResultsAnalysis || pressResultsAnalysis)({
+          env, slug: targetSlug, config: existingConfig, body, deps,
+        });
       return deps?.json?.(
         result?.ok ? result : { ...result, error: result?.error || 'Results analysis generation failed.' },
         result?.status || (result?.ok ? 200 : 500),
@@ -263,15 +270,12 @@ export const dispatchAdminRequest = async ({
 
   if (action === DEBATE_ATLAS_BUILD_ACTION || action === RISK_MATRIX_BUILD_ACTION) {
     const privateHeaders = withPrivateNoStoreHeaders(headers);
-    const build = action === DEBATE_ATLAS_BUILD_ACTION
-      ? deps?.buildDebateAtlas || buildDebateAtlas
-      : deps?.buildRiskMatrix || buildRiskMatrix;
-    const result = await build({
+    const result = await (deps?.pressResultsBuild || pressResultsBuild)({
       env,
       slug: targetSlug,
+      kindName: action === DEBATE_ATLAS_BUILD_ACTION ? 'debate-atlas' : 'risk-matrix',
       config: existingConfig,
       body,
-      headers: privateHeaders,
       builderAddress: authorityResult.address,
       deps,
     });

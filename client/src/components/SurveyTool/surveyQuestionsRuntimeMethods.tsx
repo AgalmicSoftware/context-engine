@@ -433,6 +433,7 @@ export const createSurveyQuestionsRuntimeMethods = (
   const {
     clearDraft,
     clearDraftFor,
+    flushPendingDraft,
     getDraftKey,
     loadDraft,
     migratePersistedDraftForActiveAccount,
@@ -2143,7 +2144,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     }
 
     // Changed questions upload even when blank: clearing a saved answer is an edit.
-    const data: SurveyQuestionsLegacyValue = prepareJsonAndHash(idx, undefined, overrideState, changedSet);
+    const data: SurveyQuestionsLegacyValue = prepareJsonAndHash(idx, undefined, overrideState, changedSet, true);
     // A retry must not change otherwise identical bytes just because time passed.
     if (context.operationTimestamp && data?.timeStamp) data.timeStamp = context.operationTimestamp;
 
@@ -2611,6 +2612,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     persistDraft,
     clearDraft,
     clearDraftFor,
+    flushPendingDraft,
     getCurrentRenderedQuestionIds,
     getHydrationQuestionIds,
     buildLocalCacheHydrationSignature,

@@ -2,12 +2,14 @@ import {
   AUTO_JOIN_MAX_AGE_MS,
   AUTO_JOIN_STORAGE_KEY,
   clearPendingAutoJoin,
+  holdGroupInviteForLink,
   readAutoJoinLink,
   readGroupInviteFragment,
   readPendingAutoJoin,
   removeGroupInviteFromAddress,
   savePendingAutoJoin,
 } from './workerGroupAutoJoinIntent';
+import { followPastedPrivateInvite } from './privateSessionAccess';
 
 beforeEach(() => sessionStorage.clear());
 const intent = () => ({
@@ -95,4 +97,65 @@ it('keeps an invite taken out of the address for its group until the Worker is k
   savePendingAutoJoin(readAutoJoinLink(path, context as never)!);
   expect(readAutoJoinLink(path, context as never)?.token).toBeUndefined();
   expect(readPendingAutoJoin()?.token).toBe('gp:river stone');
+});
+
+it('keeps a held invite across a reload in this tab, until an invitation holds it or a day passes', () => {
+  window.history.replaceState(null, '', '/session/alpha?joinGroup=table-3#groupInvite=gp%3Ariver%20stone');
+  removeGroupInviteFromAddress();
+  const path = `${window.location.pathname}${window.location.search}`;
+  expect(path).not.toContain('river');
+  const context = { sessionSlug: 'alpha', sessionId: `0x${'1'.repeat(32)}`, workerUrl: 'https://worker.example' };
+  // A reload starts a fresh page: the module's memory is gone, the tab's storage is not.
+  const reload = () => {
+    let fresh: typeof import('./workerGroupAutoJoinIntent') | undefined;
+    jest.isolateModules(() => {
+      fresh = jest.requireActual('./workerGroupAutoJoinIntent');
+    });
+    return fresh!;
+  };
+  const afterReload = reload();
+  expect(afterReload.readAutoJoinLink(path, null)).toBeNull();
+  const invitation = afterReload.readAutoJoinLink(path, context as never)!;
+  expect(invitation.token).toBe('gp:river stone');
+  afterReload.savePendingAutoJoin(invitation);
+  expect(reload().readAutoJoinLink(path, context as never)?.token).toBeUndefined();
+
+  const clock = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+  window.history.replaceState(null, '', '/session/alpha?joinGroup=table-3#groupInvite=gp%3Aold');
+  removeGroupInviteFromAddress();
+  clock.mockReturnValue(1_000_000 + AUTO_JOIN_MAX_AGE_MS);
+  try {
+    expect(reload().readAutoJoinLink(path, context as never)?.token).toBeUndefined();
+  } finally {
+    jest.restoreAllMocks();
+  }
+});
+
+it('lets go of the held invite once the group’s invitation drops it, so a refused one is not sent again', () => {
+  const reloadedIntent = () => {
+    let fresh: typeof import('./workerGroupAutoJoinIntent') | undefined;
+    jest.isolateModules(() => {
+      fresh = jest.requireActual('./workerGroupAutoJoinIntent');
+    });
+    return fresh!;
+  };
+  const session = { sessionSlug: 'alpha', sessionId: `0x${'1'.repeat(32)}`, workerUrl: 'https://worker.example' };
+  const path = '/session/alpha?joinGroup=table-3';
+  // A pasted invite is refused: the tab keeps the invitation without its secret.
+  followPastedPrivateInvite({ path, groupId: 'table-3', token: 'gp:refused' }, session);
+  const { token: _refused, ...withoutToken } = readPendingAutoJoin()!;
+  savePendingAutoJoin(withoutToken);
+  expect(reloadedIntent().readAutoJoinLink(path, session as never)?.token).toBeUndefined();
+
+  // A save that never had the invite, such as pinning a bare invitation for the group, leaves it held.
+  savePendingAutoJoin(withoutToken);
+  holdGroupInviteForLink(path, 'cd:claimed');
+  savePendingAutoJoin({ ...withoutToken, sessionId: session.sessionId });
+  expect(reloadedIntent().readAutoJoinLink(path, session as never)?.token).toBe('cd:claimed');
+
+  // A finished or cancelled invitation lets go of it too.
+  window.history.replaceState(null, '', `${path}#groupInvite=gp%3Aused`);
+  removeGroupInviteFromAddress();
+  clearPendingAutoJoin(readAutoJoinLink(path, session as never)!);
+  expect(reloadedIntent().readAutoJoinLink(path, session as never)?.token).toBeUndefined();
 });

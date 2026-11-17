@@ -70,6 +70,7 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
     },
     claimAnswerSubmission: record => submitJournal('claim', record),
     readSubmitRecord: record => submitJournal('read', record),
+    readAnswerHead: record => submitJournal('head', record),
     async persistSubmitIntent(record) {
       await current();
       return submitJournal('begin', record);

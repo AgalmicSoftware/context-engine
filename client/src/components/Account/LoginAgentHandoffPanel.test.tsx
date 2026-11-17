@@ -62,15 +62,48 @@ it('copies with an icon in each box, which shows a tick for a moment', async () 
   }
 });
 
-it('leaves the tick off when copying fails', async () => {
+it('selects the text, without a tick, when copying is refused', async () => {
   writeText.mockImplementation(async () => {
     throw new Error('denied');
   });
   renderPanel();
   const copyPrompt = screen.getByRole('button', { name: 'Copy the prompt' });
   fireEvent.click(copyPrompt);
-  await screen.findByText("Couldn't copy the prompt. Select it and copy it yourself.");
+  await screen.findByText("Copying isn't allowed here, so the prompt is selected. Copy it yourself.");
   expect(copyPrompt.querySelector('[data-icon="check"]')).toBeNull();
+  expect(window.getSelection()?.toString()).toBe(screen.getByTestId('ce-agent-handoff-join').textContent);
+  window.getSelection()?.removeAllRanges();
+});
+
+it('copies with the older copy command where the clipboard is missing', async () => {
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+  const copied: string[] = [];
+  Object.defineProperty(document, 'execCommand', {
+    configurable: true,
+    value: () => copied.push((document.activeElement as HTMLTextAreaElement).value) > 0,
+  });
+  try {
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy the MCP command' }));
+    expect(await screen.findByText('Copied the command.')).toBeInTheDocument();
+    expect(copied).toEqual([screen.getByTestId('ce-agent-handoff-mcp').textContent]);
+  } finally {
+    Reflect.deleteProperty(document, 'execCommand');
+  }
+});
+
+it('shows and selects a hidden key when copying it is refused', async () => {
+  writeText.mockImplementation(async () => {
+    throw new Error('denied');
+  });
+  renderPanel();
+  fireEvent.click(screen.getByRole('button', { name: 'On my behalf' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Copy the key command' }));
+  await screen.findByText("Copying isn't allowed here, so the command is selected. Copy it yourself.");
+  expect(screen.getByRole('button', { name: 'Show the key' })).toHaveAttribute('aria-pressed', 'true');
+  expect(window.getSelection()?.toString()).toContain(key.token);
+  window.getSelection()?.removeAllRanges();
 });
 
 it('hands over a key on my behalf without showing it or putting it in the prompt', async () => {

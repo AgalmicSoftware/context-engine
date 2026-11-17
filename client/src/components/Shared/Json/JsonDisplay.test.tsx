@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import JsonDisplay from './JsonDisplay';
 import { copyJsonToClipboard, formatJsonForDisplay } from '../../../utilities/ui/jsonFunctions';
@@ -29,5 +29,13 @@ describe('JsonDisplay', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /copy json/i }));
     expect(copyJsonToClipboard).toHaveBeenCalledWith({ alpha: 1 });
+  });
+
+  it('selects the JSON shown when copying it is refused', async () => {
+    jest.mocked(copyJsonToClipboard).mockRejectedValueOnce(new Error('refused'));
+    render(<JsonDisplay data={{ alpha: 1 }} defaultOpen />);
+    fireEvent.click(screen.getByRole('button', { name: /copy json/i }));
+    await waitFor(() => expect(window.getSelection()?.toString()).toBe('{\n  "alpha": 1\n}'));
+    window.getSelection()?.removeAllRanges();
   });
 });

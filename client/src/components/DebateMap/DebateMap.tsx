@@ -33,6 +33,7 @@ import {
 } from 'utilities/ui/historicalFigureAvatars.js';
 import { buildPublicRoute, readSafeInternalReturnTo } from 'utilities/ui/publicUrl.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { copyText } from '../../utilities/ui/copyText';
 import { notify } from '../../utilities/ui/notify.js';
 import { buildTagHref } from '../SurveyTool/QuestionTagDropdown';
 import {
@@ -2426,17 +2427,15 @@ const DebateMap = ({
       if (demoMode && typeof buildNodeLink !== 'function') {
         deepLink.searchParams.set('demo', '1');
       }
-      navigator.clipboard
-        .writeText(deepLink.toString())
-        .then(() => {
-          notify.success('Copied to clipboard');
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        })
-        .catch((e) => {
-          void e;
-          notify.warn('Copy failed');
-        });
+      void copyText(deepLink.toString()).then((done) => {
+        if (!done) {
+          notify.warn("Copying isn't allowed here, so the link could not be copied.");
+          return;
+        }
+        notify.success('Copied to clipboard');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
     }
   }, [buildNodeLink, demoMode, modalContent]);
 

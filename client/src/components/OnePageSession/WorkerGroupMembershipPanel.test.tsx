@@ -714,6 +714,55 @@ describe('WorkerGroupMembershipPanel', () => {
     ).toHaveLength(1);
   });
 
+  it('reads past pages of members who left before saying nobody is in the group', async () => {
+    const group = {
+      groupId: 'reviewers',
+      sessionSlug: 'alpha',
+      label: 'Reviewers',
+      joinMode: 'open',
+      memberVisibility: 'session',
+    };
+    const json = (body: unknown) =>
+      new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', ...(body as object) }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/my-memberships')) return json({ memberships: [] });
+      if (pathname.endsWith('/groups/members')) {
+        const { cursor } = JSON.parse(String(init?.body));
+        if (!cursor) return json({ group, members: [], memberCount: 1, nextCursor: 'page-2' });
+        return json({
+          group,
+          members: [
+            {
+              groupId: 'reviewers',
+              sessionSlug: 'alpha',
+              principal: { kind: 'evm_address', address: '0x00000000000000000000000000000000000000cc' },
+            },
+          ],
+          memberCount: 1,
+          nextCursor: '',
+        });
+      }
+      return json({ groups: [group] });
+    });
+
+    render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        selectedGroupId="reviewers"
+        fetchImpl={fetchImpl as typeof fetch}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'View Reviewers members' }));
+
+    expect(await screen.findByTitle('0x00000000000000000000000000000000000000cc')).toBeInTheDocument();
+    expect(screen.queryByText('No members found.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+  });
+
   it('explains when an older session Worker does not expose the member directory', async () => {
     const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
       const pathname = new URL(String(input)).pathname;
@@ -1056,7 +1105,12 @@ describe('WorkerGroupMembershipPanel', () => {
     expect([...copiedGroupLink.searchParams.keys()]).toEqual(['sessionSlug', 'worker']);
     expect(copiedGroupLink.searchParams.has('inv')).toBe(false);
     expect(copiedGroupLink.searchParams.has('agentToken')).toBe(false);
-    expect(screen.getByText(/contains no invitation token or credential/i)).toBeInTheDocument();
+    expect(await screen.findByText(/contains no invitation token or credential/i)).toBeInTheDocument();
+    jest.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error('denied'));
+    fireEvent.click(copyGroupLinkButton);
+    expect(
+      await screen.findByText("Copying isn't allowed here, so the group link could not be copied."),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Join Open reviewers' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('Joined Open reviewers.');

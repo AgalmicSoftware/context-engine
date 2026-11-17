@@ -5,6 +5,8 @@ import { Wallet } from 'ethers';
 import {
   SLUG, createSessionEnv, fetchWorker, login, makeRequest, readJson, signedAdminRequest,
 } from './sessionWorkerRuntimeFixture.mjs';
+import { DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
+import { RISK_MATRIX_BUILD_ACTION } from './riskMatrixBuild.js';
 
 const AUTH_FAILED = 'Admin authorization failed.';
 
@@ -73,4 +75,20 @@ test('only the admin may build AI Views from answers the request supplies', asyn
     const asAdmin = await signedAdminRequest({ env: adminEnv, wallet: admin, action: 'results-analysis/generate', body });
     assert.doesNotMatch(String(asAdmin.body.error), /supplied answers|Admin authorization failed/);
   }
+});
+
+test('a results press runs as a job the Worker keeps, and an atlas or risk matrix that fails says why and can be pressed again at once', async () => {
+  const paths = [];
+  const { admin, env } = createSessionEnv({ onCoordinatorFetch: (request) => { paths.push(new URL(request.url).pathname); } });
+  for (const action of [DEBATE_ATLAS_BUILD_ACTION, RISK_MATRIX_BUILD_ACTION]) {
+    const first = await signedAdminRequest({ env, wallet: admin, action, body: {} });
+    // The session has no answers, so the build fails before any AI call.
+    assert.equal(first.status, 422, `${action}: ${JSON.stringify(first.body)}`);
+    assert.match(first.body.error, /\S/);
+    const again = await signedAdminRequest({ env, wallet: admin, action, body: {} });
+    assert.deepEqual([again.status, again.body.error], [first.status, first.body.error], 'no lease is left to wait out');
+  }
+  const views = await signedAdminRequest({ env, wallet: admin, action: 'results-analysis/generate', body: {} });
+  assert.equal(views.body.ok, false, JSON.stringify(views.body));
+  assert.equal(paths.filter((path) => path.endsWith('/results-job/start')).length, 5, 'each press went to the session’s job');
 });

@@ -22,6 +22,7 @@ import { STORAGE_BACKENDS, normalizeStorageRef } from '../../utilities/storage/s
 import { toStr } from '../../utilities/shared/primitives.js';
 import { toViewerBlob } from '../../utilities/ui/viewerMime';
 import { contextAdderLabel, type ContextSource } from '../../utilities/docLibrary/contextSources';
+import { copyText } from '../../utilities/ui/copyText';
 import { notify } from '../../utilities/ui/notify.js';
 import { createLogger } from '../../utilities/logging.js';
 import SBTSelector from '../SBTs/SBTSelector';
@@ -109,13 +110,10 @@ const normalizeDocStorageRef = normalizeStorageRef as (
 ) => StorageRef | null;
 
 const copyToClipboard = async (text: unknown): Promise<boolean> => {
-  try {
-    await navigator.clipboard.writeText(String(text || ''));
-    notify.success('Copied to clipboard');
-    return true;
-  } catch (_) {
-    return false;
-  }
+  const done = await copyText(String(text || ''));
+  if (done) notify.success('Copied to clipboard');
+  else notify.error("Copying isn't allowed here, so the link could not be copied.");
+  return done;
 };
 
 const safeFilename = (name: unknown, fallback = 'document'): string => {

@@ -37,7 +37,9 @@ describe('Set up with your AI', () => {
       expect(link).toHaveAttribute('target', '_blank');
       expect(link).toHaveAttribute('rel', 'noopener noreferrer');
       fireEvent.click(link);
-      expect(await screen.findByRole('status')).toHaveTextContent(`If ${name} opens without it, paste it`);
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent(`If ${name} opens without it, paste it`),
+      );
     }
     expect(writeText).toHaveBeenCalledTimes(2);
   });
@@ -47,7 +49,12 @@ describe('Set up with your AI', () => {
     render(<SetupWithAi setupUrl={SETUP_URL} />);
     expect(screen.queryByLabelText('Setup prompt')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('ce-setup-with-ai-copy'));
-    expect(await screen.findByRole('status')).toHaveTextContent('Copy failed.');
-    expect(screen.getByLabelText('Setup prompt')).toHaveValue(prompt);
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      "Copying isn't allowed here, so the prompt is selected. Copy it yourself.",
+    );
+    const field = screen.getByLabelText('Setup prompt') as HTMLTextAreaElement;
+    expect(field).toHaveValue(prompt);
+    expect(document.activeElement).toBe(field);
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, prompt.length]);
   });
 });
