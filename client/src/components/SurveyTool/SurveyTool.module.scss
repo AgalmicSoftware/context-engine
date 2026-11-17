@@ -7486,6 +7486,89 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// The end of the set, in place of the cards and at a card's own height, so nothing around it moves.
+.pileCardInner.pileEndCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 24px 20px;
+  color: var(--ce-panel-text);
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: -3px;
+  }
+}
+
+.pileEndTitle {
+  margin: 0;
+  color: inherit;
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.pileEndSummary {
+  margin: 0;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.pileEndActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.pileEndPrimary,
+.pileEndAction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: var(--ce-radius-10);
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.pileEndPrimary {
+  border: 0;
+  background: var(--ce-action-primary);
+  color: var(--ce-action-primary-text);
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+}
+
+.pileEndAction {
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+
+  &:hover {
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
 // On a phone every question card has one height, most of the screen under the session title, so the arrows below
 // it stay put from card to card. The small viewport unit keeps that height still while Safari's toolbars move.
 // Choice and quadratic prompts take what they need up to 40% of the card, then scroll; the answers get the rest.

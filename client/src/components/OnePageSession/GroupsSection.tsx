@@ -19,6 +19,7 @@ import {
   resolveGroupCreationPolicy,
 } from '../../utilities/session/groupCreationPolicy';
 import styles from './OnePageSession.module.scss';
+import { SESSION_GROUPS_SECTION_ID } from './sessionSectionIds';
 import WorkerGroupsLoading from './WorkerGroupsLoading';
 import WorkerSessionGroupsPanel from './WorkerSessionGroupsPanel';
 import LinkedWorkerGroup, { type LinkedWorkerGroupReference } from './LinkedWorkerGroup';
@@ -169,7 +170,10 @@ const OnePageSessionGroupsSection = ({
     (usesWorkerNativeGroups && (participantGroupCreationEnabled || canAttemptWorkerGroupCreate));
 
   return (
-    <div className={`${styles.sectionContainer} ${showGroups ? styles.sectionExpanded : ''}`}>
+    <div
+      id={SESSION_GROUPS_SECTION_ID}
+      className={`${styles.sectionContainer} ${showGroups ? styles.sectionExpanded : ''}`}
+    >
       <div
         className={`${styles.sectionHeaderRow} ${styles.groupsHeaderRow} ${usesWorkerNativeGroups ? styles.workerGroupsHeaderRow : ''}`}
       >

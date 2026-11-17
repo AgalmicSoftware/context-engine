@@ -471,6 +471,47 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(screen.getByLabelText('Next Question').parentElement).toHaveTextContent('2 / 2');
   });
 
+  it('opens the end of the set after the last question, and Back returns to it', async () => {
+    const onViewSessionResults = jest.fn();
+    const onViewSessionGroups = jest.fn();
+    renderPile({
+      questionPool: [
+        { id: 'demo-q1', prompt: 'First canonical question' },
+        { id: 'demo-q2', prompt: 'Second canonical question' },
+      ],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+      onViewSessionResults,
+      onViewSessionGroups,
+    });
+
+    expect(await screen.findByText('First canonical question')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
+    expect(screen.getByLabelText('Next Question')).toBeEnabled();
+
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    const end = await screen.findByTestId('ce-pile-end-of-set');
+    expect(end).toHaveTextContent('That was the last question.');
+    expect(end).toHaveTextContent('You answered 0 of 2.');
+    expect(end).toHaveFocus();
+    expect(screen.queryByText('Second canonical question')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Next Question')).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'See results' }));
+    expect(onViewSessionResults).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Join a group' }));
+    expect(onViewSessionGroups).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByLabelText('Previous Question'));
+    expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-pile-end-of-set')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Next Question').parentElement).toHaveTextContent('2 / 2');
+  });
+
   it('renders triple trailing arrows inside the pile submit button', () => {
     const tree = renderPileInteractionSurface(buildSurfaceProps());
     const submitButton = findElement(

@@ -113,7 +113,8 @@ import {
   shouldInitializePileResponses,
 } from './surveyPileResponseController';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation';
-import { clearSurveyDraftsForAccount } from './surveyToolDraftState';
+import { clearSurveyDraftsForAccount, hasMeaningfulFieldValue } from './surveyToolDraftState';
+import PileEndOfSetCard from './PileEndOfSetCard';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildTransientSubmitFeedbackState,
@@ -1548,6 +1549,22 @@ const triggerNavFade = (engine: PileViewModeEngine) => {
   }, 2000);
 };
 
+/** Whether Next has passed the last question: it still is the active one, and the last. */
+const isPileSetEndShown = (state: any, props: any): boolean => {
+  if (!state.pileSetEndQuestionId) return false;
+  const questions = resolveEarlyVisiblePileQuestions({
+    pileQuestions: state.pileQuestions,
+    questionPool: state.questionPool?.length ? state.questionPool : props.questionPool || [],
+    isFilterActive: !!state.isFilterActive || isSurveyToolFilterStateActive(state.filterState),
+  });
+  const last = questions.length - 1;
+  return (
+    last >= 0 &&
+    Math.min(Number(state.activePileIndex || 0), last) === last &&
+    normalizeQuestionIdKey(questions[last]?.id) === state.pileSetEndQuestionId
+  );
+};
+
 const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
   // A move by hand cancels a pending move-on from a single choice.
   clearTimeout(engine._pileChoiceAdvanceTimer);
@@ -1571,12 +1588,20 @@ const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
         questionPool: fallbackQuestionPool,
         isFilterActive,
       });
-      return {
-        activePileIndex: Math.min(Number(prev.activePileIndex || 0) + 1, Math.max(navigableQuestions.length - 1, 0)),
-      };
+      const lastIndex = navigableQuestions.length - 1;
+      const index = Number(prev.activePileIndex || 0);
+      // Next on the last question opens the end of the set, marked with that question so any move away ends it.
+      if (lastIndex >= 0 && index >= lastIndex) {
+        return { pileSetEndQuestionId: normalizeQuestionIdKey(navigableQuestions[lastIndex]?.id) };
+      }
+      return { activePileIndex: Math.min(index + 1, Math.max(lastIndex, 0)), pileSetEndQuestionId: null };
     },
     () => {
       engine.ensureVisiblePileResponseState();
+      if (engine.state.pileSetEndQuestionId) {
+        engine.pileContainer?.querySelector('[data-testid="ce-pile-end-of-set"]')?.focus({ preventScroll: true });
+        return;
+      }
       if (focusQuestion === true) {
         const card = engine.pileContainer?.querySelector('[data-testid="ce-pile-active-question"]');
         card?.focus({ preventScroll: true });
@@ -1597,9 +1622,11 @@ const handlePrev = (engine: PileViewModeEngine) => {
     engine.persistDraft();
   }
   engine.setState(
-    (prev: any) => ({
-      activePileIndex: Math.max(prev.activePileIndex - 1, 0),
-    }),
+    (prev: any, props: any = engine.props) =>
+      // Back from the end of the set returns to the last question.
+      isPileSetEndShown(prev, props)
+        ? { pileSetEndQuestionId: null }
+        : { activePileIndex: Math.max(prev.activePileIndex - 1, 0), pileSetEndQuestionId: null },
     () => {
       engine.ensureVisiblePileResponseState();
     },
@@ -1714,6 +1741,10 @@ const appendCurrentWorkerHintToPath = (pathIn = ''): string => {
 
 const viewResultsFromSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   engine.closeSessionVoiceModeModal();
+  openSessionResults(engine);
+};
+
+const openSessionResults = (engine: PileViewModeEngine) => {
   if (engine.props.onViewSessionResults) {
     engine.props.onViewSessionResults();
     return;
@@ -3459,6 +3490,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     hasPendingPileChanges,
     shouldHidePileSubmitButton,
     finalSubmitText,
+    pileSubmitResponderHref,
     pileTopRailVisible,
     showSubmitButton,
     showSuccessBadge,
@@ -3474,6 +3506,44 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     isAddress: utils.isAddress,
     sessionSlug: resolveEffectiveSlug(engine.props),
   });
+
+  const submitPile = async () => {
+    const context = buildSessionInterviewSubmitContextToken(engine.props);
+    const result = await handlePileSubmitWithOwnAnswers(engine);
+    if (
+      engine._isMounted &&
+      result?.status === 'submitted' &&
+      context === buildSessionInterviewSubmitContextToken(engine.props)
+    ) {
+      engine.setState({ interviewPendingNoticeContext: '' });
+    }
+    return result;
+  };
+  // After Next on the last question: how many were answered, what is still unsent, and where to go from here.
+  const endOfSetCard = isPileSetEndShown(engine.state, engine.props) ? (
+    <PileEndOfSetCard
+      answered={
+        Object.values(
+          readPlainRecord(
+            buildSessionInterviewResponseSlice(
+              engine,
+              pileQuestions.map((question) => normalizeQuestionIdKey(question.id)),
+            ).answers,
+          ),
+        ).filter((entry) => hasMeaningfulFieldValue(readPlainRecord(entry))).length
+      }
+      total={pileQuestions.length}
+      unsent={Number(_pileStats.total || 0)}
+      isSubmitting={!!engine.state.isSubmitting}
+      onSubmit={() => void submitPile()}
+      onSeeResults={() => openSessionResults(engine)}
+      onTalkItThrough={
+        isInterviewFeatureEnabled(engine.props?.sessionConfig) ? () => engine.toggleSessionVoiceModeModal() : null
+      }
+      onJoinGroup={typeof engine.props.onViewSessionGroups === 'function' ? engine.props.onViewSessionGroups : null}
+      answersHref={pileSubmitResponderHref}
+    />
+  ) : null;
 
   const gatedEmptyHasDetails = lockedGateDetails.length > 0;
   const gatedEmptyRequirementSentence = engine.getLockedGateRequirementSentence(lockedGateDetails);
@@ -3572,18 +3642,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             pileTopRailVisible,
             showSuccessBadge,
             showSubmitButton,
-            handlePileSubmitClick: async () => {
-              const context = buildSessionInterviewSubmitContextToken(engine.props);
-              const result = await handlePileSubmitWithOwnAnswers(engine);
-              if (
-                engine._isMounted &&
-                result?.status === 'submitted' &&
-                context === buildSessionInterviewSubmitContextToken(engine.props)
-              ) {
-                engine.setState({ interviewPendingNoticeContext: '' });
-              }
-              return result;
-            },
+            handlePileSubmitClick: submitPile,
             hasPendingPileChanges,
             pendingAnswerCount:
               engine.state.interviewPendingNoticeContext === buildSessionInterviewSubmitContextToken(engine.props)
@@ -3607,6 +3666,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 ],
               ).value,
             ),
+            endOfSetCard,
             handlePrev: engine.handlePrev,
             handleNext: engine.handleNext,
           })}

@@ -57,6 +57,8 @@ type PileNavControlsProps = {
   navCounterVisible: boolean;
   /** The card has an answer, so Next is the step to take. */
   nextIsPrimary?: boolean;
+  /** Next has opened the end of the set; on the last question it opens it. */
+  endOfSetShown?: boolean;
   handlePrev: VoidHandler;
   handleNext: VoidHandler;
 };
@@ -164,6 +166,8 @@ export type PileInteractionSurfaceProps = {
   handleRevertPendingChanges: VoidHandler;
   navCounterVisible: boolean;
   nextIsPrimary?: boolean;
+  /** Shown in place of the cards once Next passes the last question. */
+  endOfSetCard?: React.ReactNode;
   handlePrev: VoidHandler;
   handleNext: VoidHandler;
 };
@@ -244,10 +248,12 @@ const renderPileNavControls = ({
   activePileIndex,
   navCounterVisible,
   nextIsPrimary = false,
+  endOfSetShown = false,
   handlePrev,
   handleNext,
 }: PileNavControlsProps): React.ReactElement => {
-  const nextDisabled = pileQuestions.length === 0 || activePileIndex === pileQuestions.length - 1;
+  // Next on the last card opens the end of the set; there it has nowhere to go.
+  const nextDisabled = pileQuestions.length === 0 || endOfSetShown;
   // A disabled Next is never the step to take, answered or not.
   const nextStands = nextIsPrimary && !nextDisabled;
   return (
@@ -648,6 +654,7 @@ export const renderPileInteractionSurface = ({
   handleRevertPendingChanges,
   navCounterVisible,
   nextIsPrimary,
+  endOfSetCard = null,
   handlePrev,
   handleNext,
 }: PileInteractionSurfaceProps): React.ReactElement => (
@@ -708,6 +715,7 @@ export const renderPileInteractionSurface = ({
           })}
         </div>
       ) : (
+        endOfSetCard ||
         renderPileDeckWindow({
           pileQuestions,
           activePileIndex,
@@ -748,6 +756,7 @@ export const renderPileInteractionSurface = ({
         activePileIndex,
         navCounterVisible,
         nextIsPrimary,
+        endOfSetShown: !!endOfSetCard,
         handlePrev,
         handleNext,
       })}

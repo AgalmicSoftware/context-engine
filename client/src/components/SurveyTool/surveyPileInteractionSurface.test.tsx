@@ -494,7 +494,7 @@ describe('the check after a submit', () => {
   });
 });
 
-it('makes Next the step to take once the card has an answer, unless it is the last card', () => {
+it('makes Next the step to take once the card has an answer, until the end of the set', () => {
   const props = { ...buildBaseProps(), pileQuestions: [{ id: 'q1' }, { id: 'q2' }] };
   const { rerender } = render(renderPileInteractionSurface(props));
   const next = screen.getByRole('button', { name: 'Next Question' });
@@ -503,8 +503,8 @@ it('makes Next the step to take once the card has an answer, unless it is the la
   rerender(renderPileInteractionSurface({ ...props, nextIsPrimary: true }));
   expect(screen.getByRole('button', { name: 'Next Question' })).toHaveClass('pileNavArrowPrimary');
   expect(screen.getByRole('button', { name: 'Next Question' })).toHaveTextContent('Next');
-  // On the last card Next does nothing, so it does not look like the step to take.
-  rerender(renderPileInteractionSurface({ ...props, nextIsPrimary: true, activePileIndex: 1 }));
+  // At the end of the set Next does nothing, so it does not look like the step to take.
+  rerender(renderPileInteractionSurface({ ...props, nextIsPrimary: true, activePileIndex: 1, endOfSetCard: <div /> }));
   expect(screen.getByRole('button', { name: 'Next Question' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Next Question' })).not.toHaveClass('pileNavArrowPrimary');
   expect(screen.getByRole('button', { name: 'Next Question' })).not.toHaveTextContent('Next');
@@ -518,6 +518,22 @@ it('reads the submit out from a status region that was already there', () => {
   rerender(renderPileInteractionSurface({ ...buildBaseProps(), showSuccessBadge: true }));
   expect(document.querySelector('.pileSubmitStatusText')).toBe(status);
   expect(status).toHaveTextContent('Your answers are submitted.');
+});
+
+it('shows the end of the set in place of the cards and stops Next there', () => {
+  render(
+    renderPileInteractionSurface({
+      ...buildBaseProps(),
+      pileQuestions: [{ id: 'q1' }],
+      nextIsPrimary: true,
+      endOfSetCard: <div data-testid="end-of-set">End</div>,
+    }),
+  );
+  expect(screen.getByTestId('end-of-set')).toBeInTheDocument();
+  expect(screen.queryByTestId('active-question')).not.toBeInTheDocument();
+  const next = screen.getByRole('button', { name: 'Next Question' });
+  expect(next).toBeDisabled();
+  expect(next).not.toHaveClass('pileNavArrowPrimary');
 });
 
 it('announces a draft storage failure without hiding the submit error', () => {
