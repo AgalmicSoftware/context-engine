@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Questions and surveys no longer wait for a session's answers to load.
 - The page reconnects to its browser cache when iOS drops the connection, instead of failing every later save.
 - Question links to a Worker-run session open again: a listed session's link no longer needs `worker=`, links built inside an unlisted session keep its Worker, and a session that can't load says so instead of loading forever.
+- On a phone the atlas topic panel's close button stays at the top right of the screen, Escape closes the panel, and the title is no longer squeezed out.
 - The **Your AI agent** section starts collapsed.
 - A passkey account's username now saves.
 - The username can be set from the account dialog, and its field fits a phone.
