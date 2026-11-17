@@ -134,6 +134,15 @@ or, when no audience gives Detailed answers, only its admins. An audience that
 an earlier one already answers is passed over, as the first audience to admit
 a person sets their answers.
 
+## Asking by voice
+
+The question box has a microphone wherever an answer box would: the session
+pays for AI, has not ended, and gives this person transcription, signed in or
+not. Speech is written down by the session's Worker on the same route and
+limits as a spoken answer, and joins the end of what is typed, up to the 500
+characters a question may have. A visitor the session writes no speech down
+for is told signing in would allow it.
+
 ## Instructions and rules
 
 Each style has default instructions, which an admin may replace with up to

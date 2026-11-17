@@ -1,12 +1,14 @@
 /** @file SessionAgentModal.tsx: asks the Session Agent, and sets how it and its export may use what you gave. */
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
+import { dictationNeedsSignIn, dictationOffered } from '../../domains/worker/sessionFeedbackPorts';
 import CETooltip from '../Shared/CETooltip';
 import SessionAgentNotice from './SessionAgentNotice';
+import SessionDictation from './SessionDictation';
 import { sessionAgentAddressNotice, sessionAgentFullerAnswersNote } from './sessionAgentWording';
 import {
   askSessionAgent,
@@ -100,6 +102,16 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   const [store, setStore] = useState(STORE_TO_START);
   const [withAddress, setWithAddress] = useState(ADDRESS_TO_START);
   const [name, setName] = useState('');
+  // Whether the session writes this person's speech down, as for an answer: asked once they may ask.
+  const [speech, setSpeech] = useState<boolean | null>(null);
+  // A visitor the session writes no speech down for, though it would once they sign in.
+  const [speechAfterSignIn, setSpeechAfterSignIn] = useState(false);
+  const [listening, setListening] = useState(false);
+  // Spoken words that didn't fit under the question's limit.
+  const [cut, setCut] = useState(false);
+  // What is in the box now: words are written down after a wait, during which more may be typed.
+  const typed = useRef(question);
+  typed.current = question;
   const [savingSwitch, setSavingSwitch] = useState(false);
   const [switchError, setSwitchError] = useState('');
   const switchSaves = useRef(0);
@@ -119,6 +131,9 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
       setReply(null);
       // What the person before typed and chose is theirs: the next starts as anyone does.
       setQuestion('');
+      setSpeech(null);
+      setSpeechAfterSignIn(false);
+      setCut(false);
       setStore(STORE_TO_START);
       setWithAddress(ADDRESS_TO_START);
       setName('');
@@ -140,10 +155,37 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     };
   }, [sessionSlug, sessionConfig, account, attempt, person]);
 
+  const mayAsk = !!status?.on && !status.closed && !!status.answers;
+  useEffect(() => {
+    if (!mayAsk || speech !== null) return undefined;
+    let active = true;
+    // A Worker that couldn't be read gives null, so the next check asks again.
+    void dictationOffered({ sessionSlug, sessionConfig, account }).then(async (value) => {
+      if (!active || value === null || shownFor.current !== person) return;
+      setSpeech(value);
+      if (value) return;
+      const afterSignIn = await dictationNeedsSignIn({ sessionSlug, sessionConfig, account });
+      if (active && shownFor.current === person) setSpeechAfterSignIn(afterSignIn);
+    });
+    return () => {
+      active = false;
+    };
+  }, [mayAsk, speech, sessionSlug, sessionConfig, account, person]);
+
+  // Spoken words join the end of what is there, as in an answer, up to the question's limit.
+  const addWords = useCallback((words: string) => {
+    const spoken = words.trim();
+    if (!spoken) return;
+    const base = typed.current.trimEnd();
+    const joined = `${base}${base ? ' ' : ''}${spoken}`;
+    setQuestion(joined.slice(0, SESSION_AGENT_LIMITS.questionChars));
+    setCut(joined.length > SESSION_AGENT_LIMITS.questionChars);
+  }, []);
+
   const hasAddress = status?.unattributed != null;
   const ask = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!question.trim() || asking) return;
+    if (!question.trim() || asking || listening) return;
     setAsking(true);
     setAskError('');
     try {
@@ -303,8 +345,16 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             rows={3}
             aria-describedby={`${baseId}-limits`}
             data-testid="ce-session-agent-question"
-            onChange={(event) => setQuestion(event.target.value)}
+            onChange={(event) => {
+              setQuestion(event.target.value);
+              setCut(false);
+            }}
           />
+          {cut ? (
+            <p className={styles.hint} role="status">
+              The end of what you said didn’t fit in {SESSION_AGENT_LIMITS.questionChars} characters.
+            </p>
+          ) : null}
           {status.recording ? (
             <div className={styles.keep} data-testid="ce-session-agent-keep">
               <div className={styles.switchRow}>
@@ -367,11 +417,20 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             <p id={`${baseId}-limits`} className={styles.hint}>
               Answers are at most {SESSION_AGENT_LIMITS.answerWords} words.{' '}
               {!status.recording ? 'Questions and answers aren’t kept.' : store ? '' : 'This chat won’t be kept.'}
+              {speech === false && speechAfterSignIn ? ' Sign in to ask by voice.' : ''}
             </p>
+            {speech ? (
+              <SessionDictation
+                options={{ sessionSlug, sessionConfig, account }}
+                onWords={addWords}
+                onBusy={setListening}
+                testId="ce-session-agent-mic"
+              />
+            ) : null}
             <button
               type="submit"
               className={styles.ask}
-              disabled={asking || !question.trim()}
+              disabled={asking || listening || !question.trim()}
               data-testid="ce-session-agent-ask"
             >
               {asking ? 'Asking…' : 'Ask'}

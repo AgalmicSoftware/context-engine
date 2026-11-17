@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
+import { dictationNeedsSignIn, dictationOffered } from '../../domains/worker/sessionFeedbackPorts';
 import SessionAgentModal from './SessionAgentModal';
 import {
   askSessionAgent,
@@ -10,6 +11,24 @@ import {
   type SessionAgentReply,
   type SessionAgentStatus,
 } from './sessionAgentRequests';
+
+jest.mock('../../domains/worker/sessionFeedbackPorts', () => ({
+  dictationOffered: jest.fn(),
+  dictationNeedsSignIn: jest.fn(),
+}));
+
+// The recorder the answer field uses, as a test sets it.
+const mockWhisper = {
+  options: null as null | { sessionSlug: string; context: unknown; onTranscriptionComplete: (words: string) => void },
+  state: {} as Record<string, unknown>,
+};
+jest.mock('../../utilities/useWhisper', () => ({
+  RECORDING_STATUS: { PROCESSING: 'processing' },
+  useWhisper: (options: typeof mockWhisper.options) => {
+    mockWhisper.options = options;
+    return mockWhisper.state;
+  },
+}));
 
 jest.mock('./sessionAgentRequests', () => ({
   readSessionAgentStatus: jest.fn(),
@@ -22,6 +41,8 @@ const readStatus = jest.mocked(readSessionAgentStatus);
 const ask = jest.mocked(askSessionAgent);
 const setOptOut = jest.mocked(setSessionAgentOptOut);
 const setUnattributed = jest.mocked(setSessionAgentUnattributed);
+const speech = jest.mocked(dictationOffered);
+const speechNeedsSignIn = jest.mocked(dictationNeedsSignIn);
 
 const OPTIONS = { sessionSlug: 'salon', sessionConfig: { slug: 'salon' }, account: '0xabc' };
 const member: SessionAgentStatus = {
@@ -57,8 +78,74 @@ const askQuestion = (dialog: ReturnType<typeof within>, text: string) => {
 };
 
 describe('SessionAgentModal', () => {
+  beforeEach(() => {
+    speech.mockResolvedValue(false);
+    speechNeedsSignIn.mockResolvedValue(false);
+    mockWhisper.state = {};
+  });
   afterEach(() => {
     jest.resetAllMocks();
+  });
+
+  it('takes a spoken question where the session writes speech down, up to the question’s limit', async () => {
+    speech.mockResolvedValue(true);
+    const { dialog } = await renderModal(member);
+    const mic = await dialog.findByRole('button', { name: 'Start recording' });
+    expect(mic).toHaveAttribute('data-testid', 'ce-session-agent-mic');
+    expect(speech).toHaveBeenCalledWith(OPTIONS);
+    // As for an answer: the session's Worker writes it down, and speaking never asks for a signature.
+    expect(mockWhisper.options).toEqual(
+      expect.objectContaining({ sessionSlug: 'salon', context: { account: '0xabc' }, signInPrompt: false }),
+    );
+    fireEvent.change(dialog.getByLabelText('Your question'), { target: { value: 'About meetings: ' } });
+    act(() => mockWhisper.options?.onTranscriptionComplete('  should they be shorter?  '));
+    expect(dialog.getByLabelText('Your question')).toHaveValue('About meetings: should they be shorter?');
+    expect(dialog.queryByText(/didn’t fit/)).not.toBeInTheDocument();
+    act(() => mockWhisper.options?.onTranscriptionComplete('x'.repeat(600)));
+    expect((dialog.getByLabelText('Your question') as HTMLTextAreaElement).value).toHaveLength(500);
+    expect(dialog.getByText('The end of what you said didn’t fit in 500 characters.')).toBeInTheDocument();
+  });
+
+  it('holds Ask while speech is recorded or written down, so no half question is sent', async () => {
+    speech.mockResolvedValue(true);
+    mockWhisper.state = { isRecording: true };
+    const { dialog } = await renderModal(member);
+    await dialog.findByRole('button', { name: 'Stop recording' });
+    fireEvent.change(dialog.getByLabelText('Your question'), { target: { value: 'Why?' } });
+    expect(dialog.getByRole('button', { name: 'Ask' })).toBeDisabled();
+    fireEvent.submit(dialog.getByLabelText('Your question').closest('form') as HTMLFormElement);
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it('shows no microphone where the session writes no speech down, and tells a visitor when signing in would', async () => {
+    const { dialog } = await renderModal(member);
+    await waitFor(() => expect(speech).toHaveBeenCalled());
+    expect(dialog.queryByTestId('ce-session-agent-mic')).not.toBeInTheDocument();
+    expect(dialog.queryByText(/Sign in to ask by voice/)).not.toBeInTheDocument();
+    cleanup();
+
+    speechNeedsSignIn.mockResolvedValue(true);
+    readStatus.mockResolvedValue({ ...member, unattributed: null, signedOut: true });
+    render(<SessionAgentModal {...OPTIONS} account="" onClose={() => {}} />);
+    const visitor = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    expect(await visitor.findByText(/Sign in to ask by voice\.$/)).toBeInTheDocument();
+    expect(visitor.queryByTestId('ce-session-agent-mic')).not.toBeInTheDocument();
+  });
+
+  it('starts the microphone afresh for the next person, and frees Ask if the one before was recording', async () => {
+    speech.mockResolvedValue(true);
+    mockWhisper.state = { isRecording: true };
+    readStatus.mockResolvedValue(member);
+    const view = render(<SessionAgentModal {...OPTIONS} onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    await dialog.findByRole('button', { name: 'Stop recording' });
+    // The next person's session writes no speech down for them.
+    speech.mockResolvedValue(false);
+    view.rerender(<SessionAgentModal {...OPTIONS} account="0xdef" onClose={() => {}} />);
+    await waitFor(() => expect(speech).toHaveBeenLastCalledWith({ ...OPTIONS, account: '0xdef' }));
+    await waitFor(() => expect(dialog.queryByTestId('ce-session-agent-mic')).not.toBeInTheDocument());
+    fireEvent.change(dialog.getByLabelText('Your question'), { target: { value: 'Why?' } });
+    expect(dialog.getByRole('button', { name: 'Ask' })).toBeEnabled();
   });
 
   it('says behind the General "?" who the session gives Detailed answers', async () => {
