@@ -987,7 +987,7 @@ describe('AppShell route render smoke', () => {
     expect(subject.setReadinessStateIfChanged).not.toHaveBeenCalled();
   });
 
-  it("clears the previous account's unsaved answers for every session when the account changes", () => {
+  it("keeps every account's unsent answers when the account changes or empties", () => {
     const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
     subject.handleNetworkChange = jest.fn();
     const ACCOUNT_A = '0x00000000000000000000000000000000000000aa';
@@ -1006,15 +1006,11 @@ describe('AppShell route render smoke', () => {
     };
 
     try {
+      // A wallet that switches, locks or disconnects changes the store account; only a
+      // deliberate log-out clears drafts (see clientAuthLogout).
       update(ACCOUNT_A, ACCOUNT_B);
-      expect(sessionStorage.getItem(drafts.a)).toBeNull();
-      expect(sessionStorage.getItem(drafts.aOtherSession)).toBeNull();
-      expect(sessionStorage.getItem(drafts.b)).toBe('{}');
-
-      // Logout clears the store account.
       update(ACCOUNT_B, undefined);
-      expect(sessionStorage.getItem(drafts.b)).toBeNull();
-      expect(sessionStorage.getItem(drafts.anon)).toBe('{}');
+      Object.values(drafts).forEach((key) => expect(sessionStorage.getItem(key)).toBe('{}'));
     } finally {
       sessionStorage.clear();
     }

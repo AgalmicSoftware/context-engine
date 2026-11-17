@@ -230,7 +230,7 @@ it('drops the previous account saved answers when another account takes over the
 it.each([
   ['sign-out', { account: '', loginComplete: false }],
   ['account switch', { account: OTHER, loginComplete: true }],
-])("removes the previous account's drafts for the session on %s", async (_label, next) => {
+])("keeps the previous account's drafts for when it returns, on %s", async (_label, next) => {
   mockCaches();
   jest.spyOn(savedAnswersLoader, 'loadSessionInterviewSavedAnswers').mockResolvedValue(null);
   const pile = mountPile();
@@ -250,5 +250,9 @@ it.each([
   });
   await settle();
 
-  expect(ownerDraftKeys()).toEqual([]);
+  expect(
+    ownerDraftKeys()
+      .map((key) => sessionStorage.getItem(key))
+      .join(),
+  ).toContain('Unsaved note');
 });

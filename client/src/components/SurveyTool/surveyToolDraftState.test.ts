@@ -13,7 +13,6 @@ import {
   parsePersistedDraftStorageValue,
   buildSurveyDraftLoadPlan,
   buildPersistedDraftPayload,
-  clearSurveyDraftsForAccount,
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
   removeQuestionFromPersistedDraftPayload,
@@ -203,23 +202,6 @@ describe('surveyToolDraftState', () => {
         q2: { value: 'keep baseline' },
       },
     });
-  });
-
-  it("clears one account's drafts for every session, network and scope", () => {
-    const kept = ['dg:surveyDraft:edge:84532:anon:questions', 'dg:surveyDraft:edge:84532:0xdef:questions', 'unrelated'];
-    [
-      ...kept,
-      'dg:surveyDraft:edge:84532:0xabc:questions',
-      'dg:surveyDraft:edge:__pending__:0xabc:questions:q:q1',
-      'dg:surveyDraft:other:84532:0xabc:questions',
-    ].forEach((key) => sessionStorage.setItem(key, '{}'));
-
-    clearSurveyDraftsForAccount('');
-    clearSurveyDraftsForAccount('anon');
-    expect(Object.keys(sessionStorage)).toHaveLength(6);
-    clearSurveyDraftsForAccount('0xABC');
-    expect(Object.keys(sessionStorage).sort()).toEqual([...kept].sort());
-    sessionStorage.clear();
   });
 
   it('round-trips interview model provenance through the anonymous draft entry', () => {

@@ -34,7 +34,6 @@ import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js
 import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
 import { clearDecryptCaches, cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { clearSurveyDraftsForAccount } from '../SurveyTool/surveyToolDraftState.js';
 import { purgeWorkerCanonicalCaches } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
@@ -2652,7 +2651,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         .toLowerCase();
     if (accountKey(prevProps.account) !== accountKey(this.props.account)) {
       clearDecryptCaches();
-      clearSurveyDraftsForAccount(prevProps.account);
       void purgeWorkerCanonicalCaches(prevProps.account)
         // Survey titles relocked by the purge are decrypted again for the new reader.
         .then(() => this.refreshEncryptedSurveyPayloadsForGroup(this.getActiveSessionSlug(), { force: true }))

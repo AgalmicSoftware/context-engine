@@ -113,7 +113,6 @@ import {
   shouldInitializePileResponses,
 } from './surveyPileResponseController';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation';
-import { clearSurveyDraftsForAccount } from './surveyToolDraftState';
 import PileEndOfSetCard from './PileEndOfSetCard';
 import {
   buildClearedTransientSubmitFeedbackState,
@@ -1407,8 +1406,6 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
     engine._savedAnswersSeenReady = !!engine.props.isResponsesCacheReady;
     engine._pileOwnAnswersSubmitController?.abort();
     engine._pileOwnAnswersSubmitController = null;
-    // Unsaved edits belong to the signed-in account; never leave them for the next person.
-    if (accountChanged && prevProps.account) clearSurveyDraftsForAccount(prevProps.account);
 
     // If context changes, we must reset optimistic flags and reload immediately
     // We do engine regardless of edits because the context (wallet/chain) invalidates the current session
