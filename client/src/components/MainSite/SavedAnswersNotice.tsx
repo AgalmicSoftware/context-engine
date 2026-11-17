@@ -34,10 +34,15 @@ export const readSavedAnswersProgress = (
   return progress && Number.isFinite(progress.loaded) && Number.isFinite(progress.listed) ? progress : null;
 };
 
-/** " (1,200 of 2,000+)": the "+" while the list is still being read. */
+/**
+ * " (1,200 of 2,000+ session answers read)": a person's answers are found only by reading everyone's,
+ * so this counts that read. The "+" while the list is still being read.
+ */
 export const savedAnswersProgressText = (progress: WorkerResponseLoadProgress | null): string =>
   progress
-    ? ` (${progress.loaded.toLocaleString()} of ${progress.listed.toLocaleString()}${progress.listComplete ? '' : '+'})`
+    ? ` (${progress.loaded.toLocaleString()} of ${progress.listed.toLocaleString()}${
+        progress.listComplete ? '' : '+'
+      } session answers read)`
     : '';
 
 /** True once `active` has held for `ms`; false again as soon as it stops. */
