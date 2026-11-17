@@ -2234,7 +2234,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 100%;
   min-width: 0;
   max-width: 360px;
-  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
   margin: 0;
   border: 1px solid color-mix(in srgb, var(--ce-status-info-text) 90%, transparent);
   border-radius: var(--ce-radius-8);
@@ -2785,7 +2785,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   // A phone wraps each turn over several lines; a taller box keeps more of the conversation in view.
   @media (max-width: 640px) {
-    min-height: min(45vh, 320px);
+    min-height: min(45dvh, 320px);
   }
 }
 
@@ -3535,7 +3535,9 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   display: flex;
   flex-direction: column;
-  max-height: min(90vh, 900px);
+  // Dynamic units: on a phone `vh` counts the space under the browser's bars, so a full dialog's foot, where
+  // Submit floats, would sit beneath them.
+  max-height: min(90dvh, 900px);
   overflow: hidden;
   background: var(--ce-surface-sunken) !important;
   color: var(--ce-panel-text) !important;
@@ -4744,7 +4746,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 // The choices open inside the dropdown, under its summary, and scroll within it.
 .sessionInterviewChoicesPanel {
   min-width: 0;
-  max-height: min(35vh, 320px);
+  max-height: min(35dvh, 320px);
   overflow: auto;
   overscroll-behavior: contain;
   padding: 10px;
