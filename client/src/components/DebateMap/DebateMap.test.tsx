@@ -409,6 +409,39 @@ describe('DebateMap', () => {
     expect(screen.queryByTitle('Cast Upvotes')).not.toBeInTheDocument();
   });
 
+  it('closes a node panel from its named close button or with Escape', () => {
+    render(
+      <MemoryRouter>
+        <DebateMapComponent
+          hideDemoModeToggle={true}
+          readOnly={true}
+          treeData={[
+            {
+              id: 'priorities',
+              name: 'Project and debate priorities',
+              votes: { up: 0, down: 0 },
+              children: [{ id: 'leaf', name: 'Priority disagreement', votes: { up: 0, down: 0 } }],
+            },
+          ]}
+        />
+      </MemoryRouter>,
+    );
+    const openLeaf = () => {
+      fireEvent.click(getAtlasNodeElementById('leaf', 'packed') as HTMLElement);
+      expect(screen.getByRole('heading', { name: 'Priority disagreement' })).toBeInTheDocument();
+    };
+    fireEvent.click(getDebateViewModeButton('circles'));
+    fireEvent.click(getAtlasNodeElementById('priorities', 'packed') as HTMLElement);
+
+    openLeaf();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('heading', { name: 'Priority disagreement' })).not.toBeInTheDocument();
+
+    openLeaf();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('heading', { name: 'Priority disagreement' })).not.toBeInTheDocument();
+  });
+
   it('does not fall back to demo fixtures for explicit empty generated tree data', () => {
     render(
       <MemoryRouter>
@@ -1170,6 +1203,19 @@ describe('DebateMap', () => {
     expect(screen.getByRole('heading', { name: 'For' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Historical Cases/i })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('button', { name: 'View full brief' })).not.toBeInTheDocument();
+  });
+
+  it('cancels a vote being typed with Escape and leaves the panel open', async () => {
+    renderDemoAtlasNode(liabilityFrameworksNodeId);
+
+    expect(await screen.findByRole('heading', { name: 'Liability Frameworks' })).toBeInTheDocument();
+    const modal = getAtlasModalContent('Liability Frameworks');
+    fireEvent.click(within(modal).getByTitle('Cast Upvotes'));
+    fireEvent.change(within(modal).getByRole('spinbutton'), { target: { value: '3' } });
+    fireEvent.keyDown(within(modal).getByRole('spinbutton'), { key: 'Escape' });
+
+    expect(within(modal).queryByRole('spinbutton')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Liability Frameworks' })).toBeInTheDocument();
   });
 
   it('preserves local atlas votes across demo-mode tree rebuilds', async () => {
