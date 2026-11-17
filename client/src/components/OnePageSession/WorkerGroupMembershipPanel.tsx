@@ -123,6 +123,27 @@ const groupJoinHasEnded = (group: WorkerGroup): boolean =>
 // A person can still join it: by link, or with a password or claim code.
 const groupIsJoinable = (group: WorkerGroup): boolean => group.joinMode !== 'admin_add' && !groupJoinHasEnded(group);
 
+const WorkerGroupMemberCountHelp = () => {
+  const id = `worker-group-member-count-${React.useId().replace(/:/g, '')}`;
+  return (
+    <>
+      <button
+        type="button"
+        id={id}
+        className={styles.workerGroupDetailInfoButton}
+        data-ce-control-appearance="frameless"
+        aria-label="About the member count"
+        onClick={(event) => event.currentTarget.focus()}
+      >
+        <FontAwesomeIcon icon={faQuestionCircle} />
+      </button>
+      <CETooltip target={id} placement="top" trigger="hover focus" autohide={false}>
+        Sign in to see how many have joined.
+      </CETooltip>
+    </>
+  );
+};
+
 const WorkerGroupBackControl = ({
   onBack,
   sessionSlug,
@@ -273,12 +294,14 @@ const WorkerGroupDetailView = ({
           <section className={sbtPageStyles.statsSection}>
             <h2 className={`${sbtPageStyles.sectionHeader} ${styles.workerGroupDetailStaticHeader}`}>STATS</h2>
             <div className={sbtPageStyles.stats}>
-              {hasVisibleMemberCount ? (
-                <p>
+              {hasVisibleMemberCount || !workerToken ? (
+                <p data-testid="ce-worker-group-member-count">
                   <span className={sbtPageStyles.label}>Members:</span>
                   <span>
-                    {memberCount} / {memberLimitDisplay}
+                    {hasVisibleMemberCount ? memberCount : '–'} / {memberLimitDisplay}
                   </span>
+                  {/* The Worker counts members only for those signed in to the session. */}
+                  {hasVisibleMemberCount ? null : <WorkerGroupMemberCountHelp />}
                   {canViewMembers ? (
                     <button
                       type="button"

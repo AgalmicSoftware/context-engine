@@ -460,8 +460,10 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.getByText('Visible before sign-in.').parentElement).toHaveClass('workerGroupDetailDescription');
     expect(screen.getByText('Joining open')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'STATS' })).toBeInTheDocument();
-    expect(screen.getByText('Member limit:')).toBeInTheDocument();
-    expect(screen.queryByText('Members:')).not.toBeInTheDocument();
+    // Signed out there is no count to show (the Worker counts only for those signed in), so the limit stands alone.
+    expect(screen.getByTestId('ce-worker-group-member-count')).toHaveTextContent('Members:– / 25');
+    expect(screen.getByRole('button', { name: 'About the member count' })).toBeInTheDocument();
+    expect(screen.queryByText('Member limit:')).not.toBeInTheDocument();
     expect(screen.getByText('Joining ends:')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Group actions' })).toContainElement(
       screen.getByRole('heading', { name: 'ACTIONS' }),
@@ -471,7 +473,6 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.queryByText('Tags:')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'research' })).toHaveAttribute('href', '/tag/research?session=alpha');
     expect(screen.getByRole('link', { name: 'reviewers' })).toHaveAttribute('href', '/tag/reviewers?session=alpha');
-    expect(screen.getByText('25')).toBeInTheDocument();
     const adminLink = screen.getByRole('link', {
       name: 'View admin profile 0x00000000000000000000000000000000000000aa',
     });
@@ -558,6 +559,7 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.getByText('Joining closed')).toBeInTheDocument();
     expect(screen.getByText('Members:')).toBeInTheDocument();
     expect(screen.getByText('4 / 10')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'About the member count' })).not.toBeInTheDocument();
     expect(screen.queryByText('Member limit:')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Leave Members' })).toBeInTheDocument();
   });

@@ -142,6 +142,7 @@ describe('AdminWorkerGroupsPanel', () => {
                 imageUrl: 'https://ar-io.dev/reviewers-image',
                 joinMode: 'admin_add',
                 memberVisibility: 'members',
+                memberCount: 3,
               },
             ],
           },
@@ -211,6 +212,8 @@ describe('AdminWorkerGroupsPanel', () => {
     expect(screen.getByRole('button', { name: 'Edit Reviewers' })).toHaveClass('subtleActionButton');
     expect(screen.getByRole('button', { name: 'Manage Reviewers members' })).toHaveClass('subtleActionButton');
     expect(screen.getByRole('button', { name: 'Delete Reviewers' })).toHaveClass('dangerActionButton');
+    // A group with no limit of its own stops at the session's.
+    expect(screen.getByText('Members: 3 / 1000 (the session’s limit)')).toBeInTheDocument();
     expect(postSignedRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'groups/list',

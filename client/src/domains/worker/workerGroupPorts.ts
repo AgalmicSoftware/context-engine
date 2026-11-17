@@ -876,7 +876,7 @@ export const listWorkerGroupsAdmin = ({
 }): Promise<UnknownRecord> =>
   runAdminAction({ action: 'groups/list', body: {}, sessionId, sessionSlug, postSignedRequest }).then((payload) => ({
     ...payload,
-    groups: normalizeGroups(payload.groups, sessionSlug),
+    groups: normalizeGroups(payload.groups, sessionSlug, true),
   }));
 
 export const listWorkerGroupMembers = ({
@@ -1119,7 +1119,7 @@ export const setWorkerGroupPassword = ({ signer, ...request }: AdminGroupRequest
   });
 
 export const normalizeWorkerGroupsAdminPayload = (payload: unknown, sessionSlug?: unknown): WorkerGroup[] =>
-  normalizeGroups(toRecord(payload).groups, sessionSlug);
+  normalizeGroups(toRecord(payload).groups, sessionSlug, true);
 
 export const normalizeWorkerGroupMembersAdminPayload = (payload: unknown, sessionSlug?: unknown): WorkerGroupMember[] =>
   (Array.isArray(toRecord(payload).members) ? (toRecord(payload).members as unknown[]) : []).map((member) => {
