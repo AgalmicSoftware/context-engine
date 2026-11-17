@@ -231,7 +231,7 @@ export const buildTools = (participant) => [
     name: 'ask_session_agent',
     title: 'Ask the session’s agent',
     description:
-      'Ask the session’s own Session Agent one question about the session, when it has one and its admins let you ask. It answers from the session’s context, results and, for some askers, members’ answers, naming no one, in at most 150 words. Chats with a session’s agent can be recorded when the session’s recording setting is on: get_session shows this session’s setting as sessionAgent.recording. While it is on, this call stores your question and the answer for the session’s organisers, who may export them, unless you pass store false; your address is stored only if you pass attribution "address". While it is off, nothing is kept. Returns the answer, how much it drew on, and whether the chat was stored.',
+      'Ask the session’s own Session Agent one question about the session, when it has one and its admins let you ask. It answers from the session’s context, results and, for some askers, members’ answers, naming no one, in at most 150 words. Chats with a session’s agent can be recorded when the session’s recording setting is on: get_session shows this session’s setting as sessionAgent.recording. While it is on, this call stores your question and the answer for the session’s organisers, who may export them, unless you pass store false; your address is stored only if you pass attribution "address". While it is off, nothing is kept. Returns the answer, how much it drew on, and whether the chat was stored: stored says so, and chat says it in a sentence to pass on with the answer.',
     inputSchema: {
       type: 'object',
       properties: {

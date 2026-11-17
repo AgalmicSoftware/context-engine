@@ -1636,7 +1636,18 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const reply = await ctx.client.request('/session-agent/ask', {
         method: 'POST', auth: true, signal, body: { question: asked, ...keep },
       });
-      const stored = typeof reply?.stored === 'boolean';
+      const recording = typeof reply?.stored === 'boolean';
+      const stored = reply?.stored === true;
+      // In words as well: an agent passing the answer on to a person passes on sentences, not fields.
+      let chat = 'This question and its answer were not stored: this session records no chats.';
+      if (stored) {
+        chat = `This question and its answer were stored for the session’s organisers, who may export them, ${
+          keep.attribution === 'address' ? 'with' : 'without'} your address.`;
+      } else if (recording) {
+        chat = keep.store === false
+          ? 'This question and its answer were not stored, as you asked.'
+          : 'This question and its answer were not stored; note says why.';
+      }
       return {
         session: ctx.info.slug,
         answer: text(reply?.answer),
@@ -1644,8 +1655,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         ...(isRecord(reply?.read) ? { read: reply.read } : {}),
         ...(text(reply?.note) ? { note: text(reply.note) } : {}),
         // The Worker's own word on both: its setting may have changed since this session was read.
-        recording: stored,
-        stored: reply?.stored === true,
+        recording,
+        stored,
+        chat,
       };
     },
 
