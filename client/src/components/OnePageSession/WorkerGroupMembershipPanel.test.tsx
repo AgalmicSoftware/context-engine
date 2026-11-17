@@ -44,12 +44,31 @@ describe('WorkerGroupMembershipPanel', () => {
     });
   });
 
+  it('shows the same spinner while one group loads', () => {
+    const fetchImpl = jest.fn(() => new Promise<Response>(() => undefined));
+
+    render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        fetchImpl={fetchImpl as typeof fetch}
+        selectedGroupId="reviewers"
+      />,
+    );
+
+    expect(screen.getByRole('status')).toContainElement(screen.getByRole('img', { name: 'Loading group' }));
+    expect(screen.queryByText(/Loading group/i, { ignore: 'title, script, style' })).not.toBeInTheDocument();
+  });
+
   it('uses concise copy while the group collection is loading', () => {
     const fetchImpl = jest.fn(() => new Promise<Response>(() => undefined));
 
     render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
 
-    expect(screen.getByText('Loading groups…')).toHaveClass('agentListEmpty', 'workerGroupsLoadingState');
+    // The report's centred spinner, not text, that screen readers still name.
+    const status = screen.getByRole('status');
+    expect(status).toHaveClass('workerGroupsLoadingState');
+    expect(status).toContainElement(screen.getByRole('img', { name: 'Loading groups' }));
+    expect(screen.queryByText(/Loading groups/i, { ignore: 'title, script, style' })).not.toBeInTheDocument();
     expect(screen.queryByText('Loading access groups…')).not.toBeInTheDocument();
   });
 
@@ -75,7 +94,7 @@ describe('WorkerGroupMembershipPanel', () => {
       fetchImpl: fetchImpl as typeof fetch,
     };
     const { rerender } = render(<WorkerGroupMembershipPanel {...props} showEmptyState={false} />);
-    await waitFor(() => expect(screen.queryByText('Loading groups…')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('img', { name: 'Loading groups' })).not.toBeInTheDocument());
     expect(screen.queryByText('No visible Groups are configured.')).not.toBeInTheDocument();
     rerender(<WorkerGroupMembershipPanel {...props} />);
     expect(screen.getByText('No visible Groups are configured.')).toBeInTheDocument();
@@ -142,7 +161,7 @@ describe('WorkerGroupMembershipPanel', () => {
       />,
     );
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('Loading groups…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Loading groups' })).not.toBeInTheDocument();
     await act(async () => {
       response.resolve(
         new Response(

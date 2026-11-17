@@ -27,6 +27,7 @@ import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
 import type { RiskMatrixBuild } from '../../domains/riskMatrix/riskMatrixTypes';
 import styles from './OnePageSession.module.scss';
+import WorkerGroupsLoading from './WorkerGroupsLoading';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
 import SessionContextSources from './SessionContextSources';
 import SessionAgentNotice from './SessionAgentNotice';
@@ -666,7 +667,7 @@ export default function OnePageSessionStandardShell({
       )}
 
       <div className={sectionsGridClassName}>
-        <Suspense fallback={<LazyFallback label="Loading Groups..." minHeight="8vh" />}>
+        <Suspense fallback={<WorkerGroupsLoading />}>
           <OnePageSessionGroupsSection
             account={account}
             autoMintingMode={autoMintingMode}

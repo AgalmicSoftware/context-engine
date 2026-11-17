@@ -19,10 +19,18 @@ const counts = (process.env.QUESTION_COUNTS || "5,20,40")
 const themes = (process.env.THEMES || "civic,context-engine,classic-95").split(
   ",",
 );
+// [width, visible height, large height]. A phone browser shows its bars over part of a larger viewport: there
+// `vh` and a fixed box's 100% count the large height and `dvh` the visible one, which desktop Chromium can't
+// model, so the large phone rows rewrite those units to the large height. 440 × 755/956 is Brave on an iPhone
+// Pro Max with its bottom bar shown, measured from a real screenshot; the others are rough.
 const sizes = [
-  [375, 667],
-  [466, 800],
-  [1280, 900],
+  [375, 667, 667],
+  [375, 553, 667],
+  [393, 659, 852],
+  [440, 755, 956],
+  [440, 956, 956],
+  [466, 800, 800],
+  [1280, 900, 900],
 ];
 const worker = "https://worker.example.test";
 const sessionSlug = "fixture";
@@ -106,6 +114,47 @@ const measure = (page) =>
     };
   });
 
+// Where the dialog sits, and whether the overlay itself scrolls (on a phone it springs back under the finger).
+const dialogBox = (page) =>
+  page.evaluate(() => {
+    const content = document.querySelector(".modal.show .modal-content");
+    const overlay = content.closest(".modal");
+    const box = content.getBoundingClientRect();
+    return {
+      dialogTop: Math.round(box.top),
+      dialogBottom: Math.round(box.bottom),
+      overlayScroll: overlay.scrollHeight - overlay.clientHeight,
+    };
+  });
+
+// Gives `vh` and the overlay's 100% the large viewport's height, as a phone browser does with its bars shown.
+const simulateBars = (page, large) =>
+  page.evaluate((largeHeight) => {
+    const toPx = (value) =>
+      value.replace(
+        /(\d*\.?\d+)vh\b/g,
+        (_, amount) => `${(amount * largeHeight) / 100}px`,
+      );
+    const walk = (rules) => {
+      for (const rule of rules) {
+        if (rule.cssRules) walk(rule.cssRules);
+        if (!rule.style) continue;
+        for (const property of [...rule.style]) {
+          const value = rule.style.getPropertyValue(property);
+          if (/\dvh\b/.test(value))
+            rule.style.setProperty(
+              property,
+              toPx(value),
+              rule.style.getPropertyPriority(property),
+            );
+        }
+        if (rule.selectorText === ".modal" && rule.style.height === "100%")
+          rule.style.setProperty("height", `${largeHeight}px`);
+      }
+    };
+    for (const sheet of document.styleSheets) walk(sheet.cssRules);
+  }, large);
+
 const scrollDialog = (page, where) =>
   page.evaluate((to) => {
     const submit = document.querySelector(
@@ -127,7 +176,7 @@ const browser = await chromium.launch({ headless: true });
 const results = [];
 try {
   for (const theme of themes) {
-    for (const [width, height] of sizes) {
+    for (const [width, height, large] of sizes) {
       for (const count of counts) {
         const page = await browser.newPage({ viewport: { width, height } });
         page.setDefaultTimeout(20000);
@@ -161,21 +210,33 @@ try {
             );
             throw error;
           });
+        if (large > height) await simulateBars(page, large);
+        // The dialog slides in; measure where it settles.
+        await page.waitForFunction(() => {
+          const dialog = document.querySelector(".modal.show .modal-dialog");
+          return dialog && getComputedStyle(dialog).transform === "none";
+        });
         await page.waitForTimeout(400);
-        const name = `${label}-${theme}-${width}-${count}q`;
-        const closedTop = await measure(page);
+        const name = `${label}-${theme}-${width}x${height}-${count}q`;
+        const closedTop = {
+          ...(await measure(page)),
+          ...(await dialogBox(page)),
+        };
         if (output)
           await page.screenshot({ path: path.join(output, `${name}-top.png`) });
         await page.getByText("AI submission info", { exact: true }).click();
         await page.waitForTimeout(200);
         await scrollDialog(page, "end");
         await page.waitForTimeout(200);
-        const openEnd = await measure(page);
+        const openEnd = {
+          ...(await measure(page)),
+          ...(await dialogBox(page)),
+        };
         if (output)
           await page.screenshot({
             path: path.join(output, `${name}-open.png`),
           });
-        results.push({ theme, width, count, closedTop, openEnd });
+        results.push({ theme, width, height, count, closedTop, openEnd });
         await page.close();
       }
     }
@@ -183,18 +244,32 @@ try {
 } finally {
   await browser.close();
 }
-for (const { theme, width, count, closedTop, openEnd } of results) {
+for (const { theme, width, height, count, closedTop, openEnd } of results) {
   console.log(
-    `${theme} ${width}px ${count}q | top: submit ${closedTop.submitVisible ? "visible" : "HIDDEN"} (y=${closedTop.submitTop}/${closedTop.viewport}, bar ${closedTop.barHeight}px, scroller ${closedTop.scroller}) | info open, scrolled to end: submit ${openEnd.submitVisible ? "visible" : "HIDDEN"} (y=${openEnd.submitTop}, bar ${openEnd.barHeight}px)`,
+    `${theme} ${width}x${height} ${count}q | dialog ${closedTop.dialogTop}-${closedTop.dialogBottom}, overlay scroll ${closedTop.overlayScroll} | top: submit ${closedTop.submitVisible ? "visible" : "HIDDEN"} (y=${closedTop.submitTop}/${closedTop.viewport}, bar ${closedTop.barHeight}px, scroller ${closedTop.scroller}) | info open, scrolled to end: submit ${openEnd.submitVisible ? "visible" : "HIDDEN"} (y=${openEnd.submitTop}, bar ${openEnd.barHeight}px)`,
   );
 }
+// On a phone a full review fills the screen from near the top, and only the dialog's body scrolls.
+const phoneMisfit = ({ width, count, closedTop, openEnd }) =>
+  width < 576 &&
+  count >= 20 &&
+  (closedTop.dialogTop < 0 ||
+    closedTop.dialogTop > 16 ||
+    closedTop.dialogBottom > closedTop.viewport ||
+    closedTop.overlayScroll > 0 ||
+    openEnd.overlayScroll > 0);
 if (process.env.CHECK !== "0") {
   const failed = results.filter(
-    ({ closedTop, openEnd }) =>
-      !closedTop.submitVisible || !openEnd.submitVisible,
+    (result) =>
+      !result.closedTop.submitVisible ||
+      !result.openEnd.submitVisible ||
+      phoneMisfit(result),
   );
   assert.deepEqual(
-    failed.map(({ theme, width, count }) => `${theme} ${width}px ${count}q`),
+    failed.map(
+      ({ theme, width, height, count }) =>
+        `${theme} ${width}x${height} ${count}q`,
+    ),
     [],
     "Submit out of reach",
   );

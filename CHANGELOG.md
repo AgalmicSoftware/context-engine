@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.13] - 2026-11-17
+
+### Client — available when the site deploys
+
+- On a session's page, the groups show a centred spinner while they load, like the report's, in place of "Loading groups…".
+- In the civic theme, the welcome slides have their navy backdrop again, with readable text and arrows.
+- On an iPhone, the Interview fills the screen and **Submit** stays above the browser's bar, however many questions the AI drafted.
+- On a phone, Login and other dialogs sit in the middle of the visible screen instead of running under the browser's bottom bar.
+
 ## [0.9.12] - 2026-11-17
 
 ### Client — available when the site deploys

@@ -9,7 +9,6 @@ import {
   faSyncAlt,
 } from '@fortawesome/free-solid-svg-icons';
 import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
-import LazyFallback from '../Shared/LazyFallback';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -20,6 +19,7 @@ import {
   resolveGroupCreationPolicy,
 } from '../../utilities/session/groupCreationPolicy';
 import styles from './OnePageSession.module.scss';
+import WorkerGroupsLoading from './WorkerGroupsLoading';
 import WorkerSessionGroupsPanel from './WorkerSessionGroupsPanel';
 import LinkedWorkerGroup, { type LinkedWorkerGroupReference } from './LinkedWorkerGroup';
 
@@ -292,7 +292,7 @@ const OnePageSessionGroupsSection = ({
               ) : null}
             </>
           ) : usesRegistryGroups ? (
-            <Suspense fallback={<LazyFallback label="Loading Groups..." minHeight="8vh" />}>
+            <Suspense fallback={<WorkerGroupsLoading />}>
               <SBTsPage
                 key={`sbtspage:${embeddedGroupsSessionSlug || 'general'}`}
                 provider={provider}

@@ -275,6 +275,10 @@ presentation while Classic 95 uses normal image blending, restrained partial
 grayscale, and moderate opacity so the illustrations stay visible without
 competing with the accessible HTML heading and bullet copy. The final Classic
 95 action uses the theme's native control-face and control-text colors.
+`--ce-welcome-artwork-backdrop` fills `background-image`, so every theme gives
+an image (a gradient), never a plain color. Civic uses a navy gradient so the
+first-visit overlay's white artwork, copy, and `--ce-welcome-control-text`
+arrows read at 4.5:1 or more; the in-page Welcome tab keeps its own surface.
 
 Account and Settings surfaces consume `--ce-settings-*` tokens for panel,
 section, field, control, primary-text, muted-text, and placeholder pairings.

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
 import WorkerSessionGroupsPanel, { type WorkerSessionGroupsPanelProps } from './WorkerSessionGroupsPanel';
-import styles from './OnePageSession.module.scss';
+import WorkerGroupsLoading from './WorkerGroupsLoading';
 
 export type LinkedWorkerGroupReference = {
   sessionSlug: string;
@@ -37,11 +37,7 @@ export default function LinkedWorkerGroup({ reference, ...props }: Props) {
     return () => abort.abort();
   }, [sessionSlug, sessionId, workerUrl, target, props.refreshNonce]);
   if (state?.target !== target) {
-    return (
-      <div className={`${styles.agentListEmpty} ${styles.workerGroupsLoadingState}`} role="status">
-        Loading groups…
-      </div>
-    );
+    return <WorkerGroupsLoading />;
   }
   if (!state.config) return <p role="alert">{state.error}</p>;
   return (

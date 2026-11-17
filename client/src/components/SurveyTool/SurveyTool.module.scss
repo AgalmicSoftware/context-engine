@@ -3546,6 +3546,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   box-shadow: var(--ce-card-shadow) !important;
   font-family: var(--ce-font-mono);
 
+  // A phone gives the review the whole visible screen, less the dialog's 0.5rem margins.
+  @media (max-width: 575.98px) {
+    max-height: calc(100dvh - 1rem);
+  }
+
   :global(.modal-header) {
     background: var(--ce-surface-sunken) !important;
     color: var(--ce-panel-text) !important;

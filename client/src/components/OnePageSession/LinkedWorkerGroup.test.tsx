@@ -29,9 +29,11 @@ beforeEach(() => {
 });
 it('uses the verified owning session for membership and authentication without auto-joining', async () => {
   render(<LinkedWorkerGroup reference={reference} account="" provider={null} networkChainId={null} />);
-  expect(screen.getByRole('status')).toHaveTextContent('Loading groups…');
+  // A centred spinner, not text, that screen readers still name.
+  expect(screen.getByRole('status')).toContainElement(screen.getByRole('img', { name: 'Loading groups' }));
+  expect(screen.queryByText(/Loading groups/i, { ignore: 'title, script, style' })).not.toBeInTheDocument();
   await screen.findByText('Original group memberships');
-  expect(screen.queryByText('Loading groups…')).not.toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: 'Loading groups' })).not.toBeInTheDocument();
   expect(fetchWorkerCanonicalSessionBootstrap).toHaveBeenCalledWith(
     expect.objectContaining({ sessionSlug: 'source', workerQueryValue: reference.workerUrl }),
   );

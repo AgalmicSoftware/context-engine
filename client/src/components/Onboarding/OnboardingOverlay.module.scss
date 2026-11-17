@@ -276,7 +276,7 @@
   text-transform: uppercase;
   font-weight: 600;
   font-size: 1.35em;
-  color: color-mix(in srgb, var(--ce-overlay-base) 82%, transparent);
+  color: var(--ce-welcome-control-text);
   border: none;
   background: color-mix(in srgb, var(--ce-status-success) 42%, transparent);
   backdrop-filter: saturate(120%);
@@ -319,7 +319,7 @@
 .skipButton:focus {
   opacity: 0.84;
   background: color-mix(in srgb, var(--ce-compat-dark) 58%, transparent);
-  color: var(--ce-color-panel-text);
+  color: var(--ce-text-inverse);
 }
 
 @media (max-width: 1400px) {
@@ -403,7 +403,7 @@
     width: 100%;
     font-size: 1.1em;
     background: color-mix(in srgb, var(--ce-status-success) 42%, transparent);
-    color: color-mix(in srgb, var(--ce-overlay-base) 82%, transparent);
+    color: var(--ce-welcome-control-text);
   }
 
   .skipButton {
