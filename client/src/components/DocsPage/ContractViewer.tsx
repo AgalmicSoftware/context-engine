@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCopy } from '@fortawesome/free-solid-svg-icons';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
+import { copyText, selectText } from '../../utilities/ui/copyText';
 import { notify } from '../../utilities/ui/notify.js';
 import {
   CONTRACT_VIEWER_SECTION_TESTID,
@@ -122,18 +123,17 @@ const ContractViewer = ({
 
   const handleCopyContract = useCallback(
     (contractKey: string, source?: string) => {
-      if (!source || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
-      navigator.clipboard
-        .writeText(source)
-        .then(() => {
-          notify.success('Copied to clipboard');
-          setCopiedContractKey(contractKey);
-          scheduleCopyReset('copiedContractKey', () => setCopiedContractKey(''));
-        })
-        .catch((error) => {
-          void error;
-          notify.warn('Copy failed');
-        });
+      if (!source) return;
+      void copyText(source).then((done) => {
+        if (!done) {
+          selectText(sourceRefs.current[contractKey]?.querySelector('code') || null);
+          notify.warn("Copying isn't allowed here, so the contract source is selected. Copy it yourself.");
+          return;
+        }
+        notify.success('Copied to clipboard');
+        setCopiedContractKey(contractKey);
+        scheduleCopyReset('copiedContractKey', () => setCopiedContractKey(''));
+      });
     },
     [scheduleCopyReset],
   );

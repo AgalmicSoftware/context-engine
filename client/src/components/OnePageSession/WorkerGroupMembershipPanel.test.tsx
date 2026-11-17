@@ -1105,7 +1105,12 @@ describe('WorkerGroupMembershipPanel', () => {
     expect([...copiedGroupLink.searchParams.keys()]).toEqual(['sessionSlug', 'worker']);
     expect(copiedGroupLink.searchParams.has('inv')).toBe(false);
     expect(copiedGroupLink.searchParams.has('agentToken')).toBe(false);
-    expect(screen.getByText(/contains no invitation token or credential/i)).toBeInTheDocument();
+    expect(await screen.findByText(/contains no invitation token or credential/i)).toBeInTheDocument();
+    jest.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error('denied'));
+    fireEvent.click(copyGroupLinkButton);
+    expect(
+      await screen.findByText("Copying isn't allowed here, so the group link could not be copied."),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Join Open reviewers' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('Joined Open reviewers.');

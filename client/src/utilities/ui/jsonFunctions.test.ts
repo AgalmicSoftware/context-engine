@@ -35,8 +35,9 @@ describe('jsonFunctions', () => {
       value: { writeText },
     });
 
-    await expect(copyJsonToClipboard({ alpha: 1 })).rejects.toThrow('nope');
-    expect(notify.error).toHaveBeenCalledWith('Failed to copy JSON');
+    await expect(copyJsonToClipboard({ alpha: 1 })).rejects.toThrow('Copying isn’t allowed here.');
+    expect(notify.error).toHaveBeenCalledWith("Copying isn't allowed here, so the JSON could not be copied.");
+    expect(notify.success).not.toHaveBeenCalled();
   });
 
   it('formats JSON for display and falls back to an empty string on errors', () => {

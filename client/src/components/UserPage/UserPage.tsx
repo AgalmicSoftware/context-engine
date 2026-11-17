@@ -203,6 +203,7 @@ import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
+import { copyText } from '../../utilities/ui/copyText';
 import { notify } from '../../utilities/ui/notify.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -2776,22 +2777,20 @@ class UserPage extends Component<any, any> {
   // -----------------------------------------------------------
 
   copyToClipboard = async (): Promise<void> => {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard write is unavailable');
-      await navigator.clipboard.writeText(this.props.viewAddress);
-      notify.success('Copied to clipboard');
-      if (this._isMounted) {
-        this.setState(buildUserPageCopiedStatePatch({ copied: true }), () => {
-          setTimeout(() => {
-            if (this._isMounted) {
-              this.setState(buildUserPageCopiedStatePatch());
-            }
-          }, 2500);
-        });
-      }
-    } catch (error: unknown) {
-      accountLog.warn('UserPage address clipboard write failed:', error);
-      notify.error('Could not copy address');
+    if (!(await copyText(this.props.viewAddress))) {
+      // The full address is not on screen, so there is nothing to select instead.
+      notify.error("Copying isn't allowed here, so the address could not be copied.");
+      return;
+    }
+    notify.success('Copied to clipboard');
+    if (this._isMounted) {
+      this.setState(buildUserPageCopiedStatePatch({ copied: true }), () => {
+        setTimeout(() => {
+          if (this._isMounted) {
+            this.setState(buildUserPageCopiedStatePatch());
+          }
+        }, 2500);
+      });
     }
   };
 

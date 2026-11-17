@@ -1,3 +1,4 @@
+import { waitFor } from '@testing-library/react';
 import { QuestionFilter as QuestionFilterComponent, shouldEnableQuestionFilterSbt } from './QuestionFilter';
 import {
   QuestionFilterQuestionTypesSection,
@@ -32,6 +33,7 @@ import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import { serializeFilterState as serializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { notify } from '../../utilities/ui/notify.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import {
   SESSION_MODE_PRESET_IDS,
@@ -118,6 +120,31 @@ describe('question filter loaded metadata', () => {
     instance.buildFilterPipelineResult = jest.fn(() => ({ finalQuestions: [{ id: 'q1' }], count: 1 }));
     instance.getAiAccessState = jest.fn(() => ({ enabled: false, localKeyAvailable: false }));
     expect(getNodeText(instance.render())).toContain('Filter Questions (1');
+  });
+});
+
+describe('QuestionFilter copy filter link', () => {
+  it('says so when copying the filter link is refused', async () => {
+    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const error = jest.spyOn(notify, 'error').mockImplementation(() => '');
+    const success = jest.spyOn(notify, 'success').mockImplementation(() => '');
+    const instance = new QuestionFilter({ currentViewModeForUrl: 'questions' });
+    instance.buildFilterState = jest.fn(() => ({ tags: ['topic'] }));
+    instance.isFilterStateDefault = jest.fn(() => false);
+    instance.setState = jest.fn();
+    try {
+      instance.handleCopyFilterUrl();
+      await waitFor(() =>
+        expect(error).toHaveBeenCalledWith("Copying isn't allowed here, so the filter link could not be copied."),
+      );
+      expect(writeText.mock.calls[0][0]).toContain('filter=');
+      expect(success).not.toHaveBeenCalled();
+      expect(instance.setState).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+      success.mockRestore();
+    }
   });
 });
 

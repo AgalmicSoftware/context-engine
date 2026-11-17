@@ -17,6 +17,7 @@ import { getDemoSessionConfigByKey } from '../../utilities/session/sessionDemoCo
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import { normalizeShareableWorkerOrigin } from '../Sessions/sessionWizardUrlSupport';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { copyText } from '../../utilities/ui/copyText';
 import { speakerColor } from './SessionListeningTranscript';
 import {
   CLAIM_CODE_MS,
@@ -190,8 +191,11 @@ function ClaimCodeDialog({
                 type="button"
                 className={styles.sessionRecordingButton}
                 onClick={async () => {
-                  await navigator.clipboard?.writeText(share.link);
-                  setCopied(true);
+                  const done = await copyText(share.link);
+                  setCopied(done);
+                  setError(
+                    done ? '' : "Copying isn't allowed here, so the link could not be copied. Scan the code instead.",
+                  );
                 }}
               >
                 {copied ? 'Link copied' : 'Copy link instead'}

@@ -312,6 +312,15 @@ describe('SessionSettingsPage', () => {
     expect(screen.getByTestId('ce-setup-questions-publish')).toHaveTextContent('Add 1 question to the session');
   });
 
+  it('shows the group recorder link where copying is refused', async () => {
+    Object.assign(navigator, { clipboard: { writeText: jest.fn().mockRejectedValue(new Error('denied')) } });
+    renderPage();
+    fireEvent.click(await screen.findByTestId('ce-settings-group-recorder-link'));
+    expect(await screen.findByTestId('ce-settings-status')).toHaveTextContent(
+      `Copying isn't allowed here. Copy the link yourself: ${window.location.origin}/session/edit-salon?`,
+    );
+  });
+
   it('copies the group recorder link', async () => {
     const writeText = jest.fn(async () => undefined);
     Object.assign(navigator, { clipboard: { writeText } });

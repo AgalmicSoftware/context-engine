@@ -1,3 +1,4 @@
+import { waitFor } from '@testing-library/react';
 import { createSurveyQuestionsJsonRuntime } from './surveyQuestionsJsonRuntime';
 import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
 
@@ -72,5 +73,23 @@ describe('surveyQuestionsJsonRuntime', () => {
     expect(buildResponsePayload).toHaveBeenCalledWith(
       expect.objectContaining({ recruitmentSource: 'partner-outreach' }),
     );
+  });
+
+  it('says when copying JSON is refused, and shows no copied tick', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+      configurable: true,
+    });
+    const notify = { success: jest.fn(), error: jest.fn() };
+    const setState = jest.fn();
+    const runtime = createSurveyQuestionsJsonRuntime({ notify, setState, buildCopiedQuestionsJsonState: jest.fn() });
+
+    runtime.copyJsonToClipboard({ questions: [] }, 'questions');
+
+    await waitFor(() =>
+      expect(notify.error).toHaveBeenCalledWith("Copying isn't allowed here, so the JSON wasn't copied."),
+    );
+    expect(notify.success).not.toHaveBeenCalled();
+    expect(setState).not.toHaveBeenCalled();
   });
 });

@@ -16,6 +16,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { normalizeSessionSlugToken as normalizeSlug } from '../../utilities/session/sessionSlug';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { copyText } from '../../utilities/ui/copyText';
 import { buildPublicRepoBlobUrl } from '../../variables/publicRepoMetadata.js';
 import { SponsorHandoffResult } from './SponsorHandoffResult';
 
@@ -1057,11 +1058,25 @@ const SponsorPage = ({
 
   const handleCopy = useCallback(async (value: unknown, successLabel: string) => {
     const text = toStr(value).trim();
-    if (!text || !navigator?.clipboard?.writeText) return;
-    try {
-      await navigator.clipboard.writeText(text);
+    if (!text) return false;
+    if (await copyText(text)) {
       notify.success(successLabel);
-    } catch (_) {}
+      return true;
+    }
+    // A URL shown in its field is selected to copy by hand; the masked key is shown and selected by its field.
+    const field = [E2E_TESTIDS.SPONSOR_WORKER_URL, E2E_TESTIDS.SPONSOR_SHARE_URL, E2E_TESTIDS.SPONSOR_SHARE_KEY]
+      .map((testId) => document.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`))
+      .find((input) => toStr(input?.value).trim() === text);
+    if (!field) {
+      notify.error("Copying isn't allowed here.");
+      return false;
+    }
+    field.focus();
+    field.select();
+    notify.error(
+      `Copying isn't allowed here, so the ${successLabel.replace(/^Copied /, '')} is selected. Copy it yourself.`,
+    );
+    return false;
   }, []);
 
   return (

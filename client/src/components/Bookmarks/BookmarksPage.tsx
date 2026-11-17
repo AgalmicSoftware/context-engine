@@ -7,6 +7,7 @@ import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoa
 import { buildAtlasNodeRoute, readWindowLocationPath } from '../../utilities/ui/publicUrl.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
+import { copyText } from '../../utilities/ui/copyText';
 import { notify } from '../../utilities/ui/notify.js';
 import { sbtBasePath, t } from '../../utilities/ui/terminology.js';
 import styles from './BookmarksPage.module.scss';
@@ -633,8 +634,13 @@ const BookmarksPage = () => {
 
   const handleCopyFilter = useCallback((filterEntry: FilterEntry) => {
     const value = getFilterCopyValue(filterEntry);
-    if (!value || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
-    navigator.clipboard.writeText(value).then(() => {
+    if (!value) return;
+    void copyText(value).then((done) => {
+      if (!done) {
+        // The full code is not on screen, so there is nothing to select instead.
+        notify.error("Copying isn't allowed here, so the filter code could not be copied.");
+        return;
+      }
       notify.success('Copied to clipboard');
       setCopiedFilterKey(filterEntry.key);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);

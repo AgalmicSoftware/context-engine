@@ -18,6 +18,7 @@ import {
 } from '../../domains/worker/workerGroupSecrets';
 import { WORKER_GROUP_INVITE_BATCH_MAX, workerGroupPasswordProblem } from '../../../../shared/workerGroupJoin.mjs';
 import WorkerGroupPasswordReveal from './WorkerGroupPasswordReveal';
+import { copyText } from '../../utilities/ui/copyText';
 import { generateWorkerGroupPassphrase } from '../SBTs/createSbtGroupPasswordHelpers';
 import styles from './AdminPage.module.scss';
 
@@ -131,12 +132,8 @@ function OneUseInvites({ group, sessionId, sessionSlug, workerUrl, postSignedReq
     }
   };
   const copyAll = async () => {
-    try {
-      await navigator.clipboard.writeText(fresh.map(({ link }) => link).join('\n'));
-      setStatus('Links copied.');
-    } catch {
-      setStatus('Could not copy the links. Use Export Passwords.');
-    }
+    const copied = await copyText(fresh.map(({ link }) => link).join('\n'));
+    setStatus(copied ? 'Links copied.' : "Copying isn't allowed here. Use Export Passwords.");
   };
 
   return (

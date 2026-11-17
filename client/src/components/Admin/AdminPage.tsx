@@ -60,6 +60,7 @@ import AdminDraftTextPanel from './AdminDraftTextPanel';
 import { resolveAdminCapabilityRoute, resolveAdminSessionRecoveryMessage } from './adminPageCapabilityRoutingHelpers';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
+import { copyText, selectText } from '../../utilities/ui/copyText';
 import {
   buildTxExplorerUrl,
   countSessionsForChain,
@@ -2033,20 +2034,27 @@ const AdminPageRuntime = ({
       transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '',
     }));
   }, []);
-  const handleCopyRawMetadata = useCallback(() => {
-    if (!groupMetadata || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
-    navigator.clipboard
-      .writeText(JSON.stringify(groupMetadata, null, 2))
-      .then(() => {
+  const handleCopyRawMetadata = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (!groupMetadata) return;
+      // The JSON shown beside the button, selected to copy by hand where copying is refused.
+      const shown = event.currentTarget.nextElementSibling;
+      void copyText(JSON.stringify(groupMetadata, null, 2)).then((copied) => {
+        if (!copied) {
+          selectText(shown);
+          notify.error("Copying isn't allowed here, so the raw metadata is selected. Copy it yourself.");
+          return;
+        }
         setCopiedRawMetadataJson(true);
         if (rawMetadataCopyResetRef.current) clearTimeout(rawMetadataCopyResetRef.current);
         rawMetadataCopyResetRef.current = setTimeout(() => {
           setCopiedRawMetadataJson(false);
         }, 1500);
         notify.success('Copied metadata JSON');
-      })
-      .catch(() => {});
-  }, [groupMetadata]);
+      });
+    },
+    [groupMetadata],
+  );
 
   return (
     <div className={styles.adminPage}>
@@ -2183,12 +2191,22 @@ const AdminPageRuntime = ({
                               <button
                                 type="button"
                                 className={`${styles.heroCardInputActionButton} ${styles.heroCardInputIconButton}`}
-                                onClick={() =>
-                                  navigator.clipboard
-                                    .writeText(workerUrl)
-                                    .then(() => notify.success('Copied to clipboard'))
-                                    .catch(() => {})
-                                }
+                                onClick={(event) => {
+                                  const field = event.currentTarget
+                                    .closest(`.${styles.heroCardInputShell}`)
+                                    ?.querySelector('input');
+                                  void copyText(workerUrl).then((copied) => {
+                                    if (copied) {
+                                      notify.success('Copied to clipboard');
+                                      return;
+                                    }
+                                    field?.focus();
+                                    field?.select();
+                                    notify.error(
+                                      "Copying isn't allowed here, so the worker URL is selected. Copy it yourself.",
+                                    );
+                                  });
+                                }}
                                 title="Copy worker URL"
                                 aria-label="Copy worker URL"
                               >

@@ -82,8 +82,13 @@ it('offers selectable text if clipboard access fails', async () => {
   render(<SessionJoinPanel sessionUrl={sessionUrl} />);
   fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
   fireEvent.click(screen.getByRole('button', { name: 'Copy voice link' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Copy the text below');
-  expect(screen.getByLabelText('Text to copy')).toHaveValue(`${cleanUrl}&mode=voice`);
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    "Copying isn't allowed here, so the text below is selected. Copy it yourself.",
+  );
+  const field = screen.getByLabelText('Text to copy') as HTMLTextAreaElement;
+  expect(field).toHaveValue(`${cleanUrl}&mode=voice`);
+  expect(field).toHaveFocus();
+  expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length]);
 });
 
 it.each([

@@ -7,6 +7,7 @@ import { SetupHelp, setupHelpId } from './setup/SetupPrimitives';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { CLOUDFLARE_NATIVE_DEPLOY_URL } from '../../variables/publicDeploymentConfig.js';
 import { createCloudflareNativeSetupSecrets } from '../../utilities/worker/cloudflareNativeDeploy.js';
+import { copyText } from '../../utilities/ui/copyText';
 import type { SessionWizardVerifiedWorkerConnection } from './sessionWizardNativeWorkerVerification';
 
 type DeployForm = {
@@ -237,15 +238,17 @@ const WorkerDeploySection = ({
       setNativeSetupError(error instanceof Error ? error.message : 'Secure setup-secret generation failed.');
     }
   };
-  const copyNativeValue = async (label: string, value: string) => {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard is unavailable.');
-      await navigator.clipboard.writeText(value);
+  const copyNativeValue = async (label: string, value: string, testId: string) => {
+    if (await copyText(value)) {
       setCopiedNativeField(label);
       setNativeStatus(`${label} copied. The value is not shown in this status message.`);
-    } catch {
-      setNativeStatus(`Could not copy ${label}. Select the field and copy it manually.`);
+      return;
     }
+    setCopiedNativeField('');
+    const field = document.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`);
+    field?.focus();
+    field?.select();
+    setNativeStatus(`Copying isn't allowed here, so ${label} is selected. Copy it yourself.`);
   };
   const verifyNativeDeployment = async () => {
     const candidate = String(displayedWorkerUrl || '').trim();
@@ -317,7 +320,7 @@ const WorkerDeploySection = ({
           type="button"
           className={styles.secondaryButton}
           data-testid={`ce-wizard-cloudflare-native-copy-${label.toLowerCase().replace(/_/g, '-')}`}
-          onClick={() => void copyNativeValue(label, value)}
+          onClick={() => void copyNativeValue(label, value, testId)}
         >
           {copiedNativeField === label ? 'Copied' : 'Copy'}
         </Button>

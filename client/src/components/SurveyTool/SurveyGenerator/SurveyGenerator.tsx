@@ -85,6 +85,7 @@ import { createLogger } from 'utilities/logging.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../../utilities/shared/questionUtils.mjs';
 import { notify } from '../../../utilities/ui/notify.js';
+import { copyText, selectText } from '../../../utilities/ui/copyText';
 import { fetchImageFromURL } from '../../../utilities/ui/imageFetchClient.js';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
@@ -1520,19 +1521,21 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     });
   };
 
-  const copyAIPromptToClipboard = () => {
+  const copyAIPromptToClipboard = (event: React.MouseEvent<HTMLButtonElement>) => {
     const text = aiPromptText || '';
     if (!text) return;
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        notify.success('Copied to clipboard');
-        setAiPromptCopySuccess(true);
-        setTimeout(() => setAiPromptCopySuccess(false), 1500);
-      })
-      .catch((_e: unknown) => {
-        notify.warn('Copy failed');
-      });
+    // The prompt shown beside the button, selected to copy by hand where copying is refused.
+    const shown = event.currentTarget.parentElement?.querySelector('pre') ?? null;
+    void copyText(text).then((copied) => {
+      if (!copied) {
+        selectText(shown);
+        notify.error("Copying isn't allowed here, so the prompt is selected. Copy it yourself.");
+        return;
+      }
+      notify.success('Copied to clipboard');
+      setAiPromptCopySuccess(true);
+      setTimeout(() => setAiPromptCopySuccess(false), 1500);
+    });
   };
 
   const highlightPromptVariables = (str: unknown) => {

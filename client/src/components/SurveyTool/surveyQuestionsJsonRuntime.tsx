@@ -8,6 +8,7 @@ import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
 import { collectSubmitQuestionIds, readOwnAnswersBeforeUpload } from './surveySavedAnswerGate';
 import { resolveEditableQuestionList } from './surveyToolResponsePayloadController';
 import { isWorkerCanonicalSessionConfig } from '../../utilities/survey/workerResponseHydration';
+import { copyText } from '../../utilities/ui/copyText';
 
 export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyRecord) => {
   const {
@@ -327,30 +328,30 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
 
     const jsonString: SurveyQuestionsLegacyValue =
       typeof jsonToUse === 'string' ? jsonToUse : JSON.stringify(jsonToUse, null, 2);
-    navigator.clipboard
-      .writeText(jsonString)
-      .then(() => {
-        notify.success('Copied to clipboard');
-        if (type === 'questions') {
-          setState(buildCopiedQuestionsJsonState(true));
-          setManagedTimeout(() => {
-            setState(buildCopiedQuestionsJsonState(false));
-          }, 2000);
-        } else if (type === 'response') {
-          setState(buildCopiedResponseJsonState(true));
-          setManagedTimeout(() => {
-            setState(buildCopiedResponseJsonState(false));
-          }, 2000);
-        } else if (type === 'survey') {
-          setState(buildCopiedSurveyJsonState(true));
-          setManagedTimeout(() => {
-            setState(buildCopiedSurveyJsonState(false));
-          }, 2000);
-        }
-      })
-      .catch((error: unknown) => {
-        surveyLog.error('Failed to copy JSON to clipboard:', error);
-      });
+    void copyText(String(jsonString)).then((copied) => {
+      // The panel shows the JSON as a tree, not as text to select.
+      if (!copied) {
+        notify.error("Copying isn't allowed here, so the JSON wasn't copied.");
+        return;
+      }
+      notify.success('Copied to clipboard');
+      if (type === 'questions') {
+        setState(buildCopiedQuestionsJsonState(true));
+        setManagedTimeout(() => {
+          setState(buildCopiedQuestionsJsonState(false));
+        }, 2000);
+      } else if (type === 'response') {
+        setState(buildCopiedResponseJsonState(true));
+        setManagedTimeout(() => {
+          setState(buildCopiedResponseJsonState(false));
+        }, 2000);
+      } else if (type === 'survey') {
+        setState(buildCopiedSurveyJsonState(true));
+        setManagedTimeout(() => {
+          setState(buildCopiedSurveyJsonState(false));
+        }, 2000);
+      }
+    });
   };
 
   const toggleShowQuestionsJson = () => {

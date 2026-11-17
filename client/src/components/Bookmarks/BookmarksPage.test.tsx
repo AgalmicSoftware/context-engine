@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import {
   default as BookmarksPage,
   buildQuestionBookmarkHref,
@@ -9,6 +9,7 @@ import {
   readManagedBookmarkPageEntries,
 } from './BookmarksPage';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import { notify } from '../../utilities/ui/notify.js';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   listNamespaceEntriesSync: jest.fn(() => []),
@@ -174,5 +175,29 @@ describe('BookmarksPage cache scan helpers', () => {
 
     expect((await screen.findByRole('link', { name: 'Sam' })).getAttribute('href')).toBe('/u/0xabc?session=edge');
     expect(screen.getByRole('link', { name: 'S.' }).getAttribute('href')).toBe('/u/0xabc?session=beta');
+  });
+
+  it('says so when copying a filter code is refused', async () => {
+    mockListNamespaceEntriesSync.mockImplementation((namespace: unknown) =>
+      namespace === 'filters'
+        ? [{ key: 'dg:filters:edge', slug: 'edge', value: { bookmarkedFilters: ['f=abc'] } }]
+        : [],
+    );
+    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const error = jest.spyOn(notify, 'error').mockImplementation(() => '');
+    const success = jest.spyOn(notify, 'success').mockImplementation(() => '');
+
+    render(<BookmarksPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /filters/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy filter code' }));
+
+    await waitFor(() =>
+      expect(error).toHaveBeenCalledWith("Copying isn't allowed here, so the filter code could not be copied."),
+    );
+    expect(writeText).toHaveBeenCalledWith('f=abc');
+    expect(success).not.toHaveBeenCalled();
+    error.mockRestore();
+    success.mockRestore();
   });
 });

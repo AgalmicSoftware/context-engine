@@ -584,6 +584,19 @@ describe('SessionWizard publish boundary rendering', () => {
       const restoredAdminUrl = `${window.location.origin}/admin?sessionId=${publishedSessionId}&sessionSlug=single-worker-session&worker=${encodeURIComponent(workerUrl)}`;
       expect(screen.getByRole('link', { name: restoredSessionUrl })).toHaveAttribute('href', restoredSessionUrl);
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL)).toHaveAttribute('href', restoredAdminUrl);
+      // Where copying is refused, the admin URL is selected to copy by hand.
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+        configurable: true,
+      });
+      const adminUrlRow = screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL).parentElement;
+      await act(async () => {
+        fireEvent.click(within(adminUrlRow).getByRole('button', { name: /Copy/ }));
+      });
+      expect(
+        await screen.findByText("Copying isn't allowed here, so the admin URL is selected. Copy it yourself."),
+      ).toBeInTheDocument();
+      expect(window.getSelection().toString()).toBe(restoredAdminUrl);
       fireEvent.click(reloadedPublishButton);
       expect(countConfigWrites()).toBe(configWritesAfterDeploy + 1);
       expect(readWizardCache()).toEqual({

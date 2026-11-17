@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCode, faCopy, faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { copyJsonToClipboard, formatJsonForDisplay } from '../../../utilities/ui/jsonFunctions';
+import { selectText } from '../../../utilities/ui/copyText';
 import styles from './JsonDisplay.module.scss';
 
 type JsonDisplayProps = {
@@ -13,6 +14,7 @@ type JsonDisplayProps = {
 
 const JsonDisplay = ({ data, label = 'View .json', defaultOpen = false, maxHeight = 300 }: JsonDisplayProps) => {
   const [open, setOpen] = useState(defaultOpen);
+  const preRef = useRef<HTMLPreElement>(null);
 
   if (data == null) return null;
 
@@ -30,7 +32,8 @@ const JsonDisplay = ({ data, label = 'View .json', defaultOpen = false, maxHeigh
           <button
             className={styles.copyButton}
             onClick={() => {
-              void copyJsonToClipboard(data);
+              // Refused: the JSON shown below is selected, to copy by hand.
+              copyJsonToClipboard(data).catch(() => selectText(preRef.current));
             }}
             type="button"
             title="Copy JSON"
@@ -38,7 +41,7 @@ const JsonDisplay = ({ data, label = 'View .json', defaultOpen = false, maxHeigh
           >
             <FontAwesomeIcon icon={faCopy} />
           </button>
-          <pre className={styles.jsonPre} style={{ maxHeight }}>
+          <pre ref={preRef} className={styles.jsonPre} style={{ maxHeight }}>
             {formatted}
           </pre>
         </div>

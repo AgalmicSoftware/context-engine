@@ -1,11 +1,12 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ContractViewer from './ContractViewer';
 import {
   CONTRACT_VIEWER_TOGGLE_TESTID,
   getContractViewerCardTestId,
   getContractViewerSourceTestId,
 } from './contractMetadata.js';
+import { notify } from '../../utilities/ui/notify.js';
 
 describe('ContractViewer compact variant', () => {
   it('renders a single expanded contract reader without the full-page section toggle', () => {
@@ -35,5 +36,32 @@ describe('ContractViewer compact variant', () => {
       '/docs?contract=surveys',
     );
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
+  it('selects the source and says so when copying it is refused', async () => {
+    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const warn = jest.spyOn(notify, 'warn').mockImplementation(() => '');
+    const source = 'contract Surveys { function ask() external {} }';
+    try {
+      render(
+        <ContractViewer
+          variant="compact"
+          contracts={[
+            { key: 'surveys', name: 'Surveys', explainer: '', sourceFile: 'Surveys.sol', source, addresses: [] },
+          ]}
+          onClose={jest.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Copy contract source' }));
+      await waitFor(() =>
+        expect(warn).toHaveBeenCalledWith(
+          "Copying isn't allowed here, so the contract source is selected. Copy it yourself.",
+        ),
+      );
+      expect(window.getSelection()?.toString()).toBe(source);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

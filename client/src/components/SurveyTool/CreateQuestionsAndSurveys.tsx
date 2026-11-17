@@ -68,6 +68,7 @@ import { applyBookmarkChange, type BookmarkList } from '../../utilities/cache/bo
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import { notify } from '../../utilities/ui/notify.js';
+import { copyText, selectText } from '../../utilities/ui/copyText';
 import { t } from '../../utilities/ui/terminology.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
 import { chainHttpRpc, chainHttpRpcNoPath } from '../../variables/chains.js';
@@ -697,6 +698,7 @@ export const buildCreateSurveyDraftStorageKey = (sessionSlug: unknown = ''): str
 
 class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps, CreateQuestionsAndSurveysState> {
   _isMounted: boolean = false;
+  submissionErrorRef = React.createRef<HTMLDivElement>();
   _cacheWatchTimer: ReturnType<typeof setInterval> | null = null;
   _cacheWatchUnsubscribe: (() => void) | null = null;
   _cacheWatchCoalescer: CacheUpdateCoalescerLike | null = null;
@@ -1462,27 +1464,39 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
   copyUnfinishedSurveyDraft = async (): Promise<void> => {
     const serializedDraft = this.serializeUnfinishedSurveyDraft();
-    try {
-      await navigator.clipboard.writeText(serializedDraft);
+    if (await copyText(serializedDraft)) {
       notify.success('Draft copied to clipboard');
-    } catch (_) {
-      let url: string | null = null;
-      const anchor = document.createElement('a');
-      try {
-        url = URL.createObjectURL(new Blob([serializedDraft], { type: 'application/json' }));
-        anchor.href = url;
-        anchor.download = 'context-engine-draft.json';
-        document.body.appendChild(anchor);
-        anchor.click();
-        notify.success('Draft download started');
-      } catch (_) {
-        notify.warn('Draft could not be copied or downloaded.');
-      } finally {
-        anchor.remove();
-        const downloadUrl = url;
-        if (downloadUrl) setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
-      }
+      return;
     }
+    let url: string | null = null;
+    const anchor = document.createElement('a');
+    try {
+      url = URL.createObjectURL(new Blob([serializedDraft], { type: 'application/json' }));
+      anchor.href = url;
+      anchor.download = 'context-engine-draft.json';
+      document.body.appendChild(anchor);
+      anchor.click();
+      notify.success("Copying isn't allowed here, so the draft is downloading instead.");
+    } catch (_) {
+      notify.warn('Draft could not be copied or downloaded.');
+    } finally {
+      anchor.remove();
+      const downloadUrl = url;
+      if (downloadUrl) setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+    }
+  };
+
+  // Copies text for a tap. Where copying is refused, text the page shows is selected to copy by hand.
+  copyWithNotice = (text: string, what: string, shown: Element | null, onCopied?: () => void): void => {
+    void copyText(text).then((copied) => {
+      if (copied) {
+        notify.success('Copied to clipboard');
+        onCopied?.();
+      } else if (shown) {
+        selectText(shown);
+        notify.error(`Copying isn't allowed here, so the ${what} is selected. Copy it yourself.`);
+      } else notify.error(`Copying isn't allowed here, so the ${what} wasn't copied.`);
+    });
   };
 
   saveToLocalStorage = (options: CreateSurveyDraftSaveOptions = {}): void => {
@@ -2975,15 +2989,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     const { isSubmitting, submissionError } = this.state;
     if (isSubmitting) return;
     if (submissionError) {
-      navigator.clipboard
-        .writeText(submissionError)
-        .then(() => {
-          notify.success('Copied to clipboard');
-        })
-        .catch((e: unknown) => {
-          void e;
-          notify.warn('Copy failed');
-        });
+      this.copyWithNotice(submissionError, 'error', this.submissionErrorRef.current);
       return;
     }
     this.createSurvey();
@@ -2994,29 +3000,14 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   copyQuestionIdToClipboard = (qid: unknown): void => {
-    navigator.clipboard
-      .writeText(qid as string)
-      .then(() => {
-        notify.success('Copied to clipboard');
-      })
-      .catch((e: unknown) => {
-        void e;
-        notify.warn('Copy failed');
-      });
+    this.copyWithNotice(String(qid), 'question ID', null);
   };
 
   copySurveyIdToClipboard = (surveyID: unknown): void => {
     if (!surveyID) return;
-    navigator.clipboard
-      .writeText(surveyID as string)
-      .then(() => {
-        notify.success('Copied to clipboard');
-        this.setCopySuccessState('copySurveyIdSuccess', 2000);
-      })
-      .catch((e: unknown) => {
-        void e;
-        notify.warn('Copy failed');
-      });
+    this.copyWithNotice(String(surveyID), 'survey ID', null, () =>
+      this.setCopySuccessState('copySurveyIdSuccess', 2000),
+    );
   };
 
   copySurveyLinkToClipboard = (surveyID: unknown = null): void => {
@@ -3024,16 +3015,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     if (!finalID) return;
     const slug = this.getActiveSessionSlug();
     const link = `${window.location.origin}/survey/${String(finalID)}${slug ? `?session=${encodeURIComponent(slug)}` : ''}`;
-    navigator.clipboard
-      .writeText(link)
-      .then(() => {
-        notify.success('Copied to clipboard');
-        this.setCopySuccessState('copySurveyLinkSuccess', 2000);
-      })
-      .catch((e: unknown) => {
-        void e;
-        notify.warn('Copy failed');
-      });
+    this.copyWithNotice(link, 'link', null, () => this.setCopySuccessState('copySurveyLinkSuccess', 2000));
   };
 
   handleAutoQuestionsGenerated: (
@@ -3170,17 +3152,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     );
   };
 
-  copyJsonPreview = (jsonData: unknown): void => {
-    try {
-      const str = JSON.stringify(jsonData, null, 2);
-      navigator.clipboard.writeText(str).then(() => {
-        notify.success('Copied to clipboard');
-        this.setCopySuccessState('copyJsonSuccess', 1500);
-      });
-    } catch (e: unknown) {
-      void e;
-      notify.warn('Copy failed');
-    }
+  copyJsonPreview = (jsonData: unknown, shown: Element | null): void => {
+    this.copyWithNotice(JSON.stringify(jsonData, null, 2), 'JSON', shown, () =>
+      this.setCopySuccessState('copyJsonSuccess', 1500),
+    );
   };
 
   // AI prompt panel handlers
@@ -3200,19 +3175,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     );
   };
 
-  copyAIPromptToClipboard: () => void = () => {
+  copyAIPromptToClipboard = (event: React.MouseEvent<HTMLButtonElement>): void => {
     const text = this.state.aiPromptText || '';
     if (!text) return;
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        notify.success('Copied to clipboard');
-        this.setCopySuccessState('aiPromptCopySuccess', 1500);
-      })
-      .catch((e: unknown) => {
-        void e;
-        notify.warn('Copy failed');
-      });
+    this.copyWithNotice(text, 'prompt', event.currentTarget.parentElement?.querySelector('pre') ?? null, () =>
+      this.setCopySuccessState('aiPromptCopySuccess', 1500),
+    );
   };
 
   /** Highlight <Variables> using React nodes (no HTML injection) */
@@ -4089,7 +4057,11 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           </>
         )}
 
-        {submissionError && !isSubmitting && <div className={styles.errorMessage}>Error: {submissionError}</div>}
+        {submissionError && !isSubmitting && (
+          <div className={styles.errorMessage} ref={this.submissionErrorRef}>
+            Error: {submissionError}
+          </div>
+        )}
 
         {questionsAddedSuccessfully && (
           <div className={styles.surveySubmissionConfirmation} data-testid={E2E_TESTIDS.CREATE_SUCCESS}>
@@ -4242,7 +4214,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           {showJson && (
             <JsonPanel
               as="pre"
-              onCopy={() => this.copyJsonPreview(jsonData)}
+              onCopy={(event) => this.copyJsonPreview(jsonData, event.currentTarget.nextElementSibling)}
               copied={this.state.copyJsonSuccess}
               copyTitle="Copy JSON"
             >

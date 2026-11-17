@@ -36,7 +36,7 @@ describe('SBTPage session routing and holder loading', () => {
     const subject = createSubject();
     const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     const writeText = jest.fn().mockRejectedValue(new Error('clipboard denied'));
-    const warnSpy = jest.spyOn(notify, 'warn').mockImplementation(() => undefined);
+    const errorSpy = jest.spyOn(notify, 'error').mockImplementation(() => undefined);
     const successSpy = jest.spyOn(notify, 'success').mockImplementation(() => undefined);
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -47,9 +47,20 @@ describe('SBTPage session routing and holder loading', () => {
       await subject.copyToClipboard('0x0000000000000000000000000000000000000001', 'admin');
 
       expect(writeText).toHaveBeenCalledWith('0x0000000000000000000000000000000000000001');
-      expect(warnSpy).toHaveBeenCalledWith('Copy failed');
+      expect(errorSpy).toHaveBeenCalledWith("Copying isn't allowed here, so nothing was copied.");
       expect(successSpy).not.toHaveBeenCalled();
       expect(subject.state.copiedAddress).toBeNull();
+
+      // A link shown in full, as the open-mint URL is, is selected to copy by hand.
+      const shown = document.body.appendChild(document.createElement('span'));
+      shown.textContent = 'https://site.example/session/salon?join=open';
+      await subject.copyToClipboard(shown.textContent, 'open-mint-url', shown);
+      expect(errorSpy).toHaveBeenLastCalledWith(
+        "Copying isn't allowed here, so the link is selected. Copy it yourself.",
+      );
+      expect(window.getSelection()?.toString()).toBe(shown.textContent);
+      window.getSelection()?.removeAllRanges();
+      shown.remove();
     } finally {
       if (originalClipboardDescriptor) {
         Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
@@ -59,7 +70,7 @@ describe('SBTPage session routing and holder loading', () => {
     }
   });
 
-  it('does not mark an error copied when error clipboard write rejects', async () => {
+  it('selects the shown error, unmarked, when error clipboard write rejects', async () => {
     const subject = createSubject();
     subject.state = {
       ...subject.state,
@@ -67,21 +78,28 @@ describe('SBTPage session routing and holder loading', () => {
     };
     const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     const writeText = jest.fn().mockRejectedValue(new Error('clipboard denied'));
-    const warnSpy = jest.spyOn(notify, 'warn').mockImplementation(() => undefined);
+    const errorSpy = jest.spyOn(notify, 'error').mockImplementation(() => undefined);
     const successSpy = jest.spyOn(notify, 'success').mockImplementation(() => undefined);
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText },
     });
+    const alert = document.createElement('div');
+    alert.textContent = 'Transaction Failed: Mint failed: denied';
+    const button = document.createElement('button');
+    alert.appendChild(button);
+    document.body.appendChild(alert);
 
     try {
-      await subject.copyErrorToClipboard();
+      await subject.copyErrorToClipboard({ currentTarget: button });
 
       expect(writeText).toHaveBeenCalledWith('Mint failed: denied');
-      expect(warnSpy).toHaveBeenCalledWith('Copy failed');
+      expect(errorSpy).toHaveBeenCalledWith("Copying isn't allowed here, so the error is selected. Copy it yourself.");
+      expect(window.getSelection().toString()).toBe('Transaction Failed: Mint failed: denied');
       expect(successSpy).not.toHaveBeenCalled();
       expect(subject.state.copiedError).not.toBe(true);
     } finally {
+      alert.remove();
       if (originalClipboardDescriptor) {
         Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
       } else {

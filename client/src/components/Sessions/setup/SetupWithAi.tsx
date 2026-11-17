@@ -1,10 +1,11 @@
 /** @file SetupWithAi.tsx: "Set up with your AI" on /new. */
-import { useContext, useState } from 'react';
+import { useContext, useLayoutEffect, useRef, useState } from 'react';
 import { ReactReduxContext } from 'react-redux';
 
 import SessionWizardInfoTooltip from '../SessionWizardInfoTooltip';
 import useSessionWizardTooltipPreference from '../hooks/useSessionWizardTooltipPreference';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
+import { copyText } from '../../../utilities/ui/copyText';
 import { SESSION_SETUP_AI_APPS, buildSessionSetupKickoff } from './sessionSetupKickoff';
 import styles from './SessionSetup.module.scss';
 
@@ -22,19 +23,28 @@ export const SetupWithAi = ({ setupUrl }: Props) => {
   const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
   const [status, setStatus] = useState('');
   const [showPrompt, setShowPrompt] = useState(false);
+  // Set where copying was refused: the prompt, once shown, is selected to copy by hand.
+  const [selectPrompt, setSelectPrompt] = useState(false);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
   const prompt = buildSessionSetupKickoff({ setupUrl });
-  // Safari needs the clipboard write to start in the tap itself, so it isn't awaited first.
+  // Safari needs the copy to start in the tap itself, so nothing is awaited first.
   const copy = (copied: string) => {
-    void (async () => {
-      try {
-        await navigator.clipboard.writeText(prompt);
+    void copyText(prompt).then((done) => {
+      if (done) {
         setStatus(copied);
-      } catch {
-        setShowPrompt(true);
-        setStatus('Copy failed. Copy the prompt below.');
+        return;
       }
-    })();
+      setShowPrompt(true);
+      setSelectPrompt(true);
+      setStatus("Copying isn't allowed here, so the prompt is selected. Copy it yourself.");
+    });
   };
+  useLayoutEffect(() => {
+    if (!selectPrompt) return;
+    setSelectPrompt(false);
+    promptRef.current?.focus();
+    promptRef.current?.select();
+  }, [selectPrompt]);
   return (
     <section className={styles.banner} aria-labelledby="ce-setup-ai-title" data-testid={E2E_TESTIDS.SETUP_WITH_AI}>
       <div className={styles.fieldLabelRow}>
@@ -96,6 +106,7 @@ export const SetupWithAi = ({ setupUrl }: Props) => {
           id="ce-setup-ai-prompt"
           className={styles.textarea}
           aria-label="Setup prompt"
+          ref={promptRef}
           readOnly
           rows={8}
           value={prompt}

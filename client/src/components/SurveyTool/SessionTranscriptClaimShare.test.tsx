@@ -237,6 +237,21 @@ describe('giving each person their part', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     await waitFor(() => expect(screen.queryByTestId('code')).toBeNull());
   });
+
+  it('says so when copying the link is refused', async () => {
+    render(<Share transcript={TRANSCRIPT} sessionSlug="salon" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Person 2' }));
+    await screen.findByTestId('code');
+    const writeText = jest.fn(async () => {
+      throw new Error('denied');
+    });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Copy link instead' })));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Copying isn't allowed here, so the link could not be copied. Scan the code instead.",
+    );
+    expect(screen.queryByRole('button', { name: 'Link copied' })).toBeNull();
+  });
 });
 
 // jsdom has no PointerEvent: a MouseEvent with a pointer id stands in, so a drag keeps its coordinates.

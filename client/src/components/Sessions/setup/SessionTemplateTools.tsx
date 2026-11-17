@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { Input } from 'reactstrap';
 
@@ -15,6 +15,7 @@ import {
 } from '@ce-shared/sessionTemplate.mjs';
 import { encodeSessionTemplateLink } from '@ce-shared/sessionTemplateLink.mjs';
 import { notify } from '../../../utilities/ui/notify.js';
+import { copyText } from '../../../utilities/ui/copyText';
 import { publishSetupQuestions } from './setupQuestionsPublish';
 import type { SetupQuestion } from './setupSectionTypes';
 import styles from './SessionSetup.module.scss';
@@ -106,25 +107,36 @@ export const SessionTemplateActions = ({
     downloadSessionTemplate(template, fileName);
     setStatus('Template downloaded.');
   };
+  // The last link made. Making one takes an await, after which phones refuse to copy, so a second
+  // tap on an unchanged draft copies this one inside the tap.
+  const made = useRef({ key: '', link: '' });
   const share = async () => {
     setErrors([]);
     setTooLong(false);
     const template = current();
     if (!template) return;
-    const result = await encodeSessionTemplateLink(template);
-    if (!result.ok) {
-      if (result.reason === 'too_long') {
-        setTooLong(true);
-        setStatus(`This draft is too long for a link (${result.length} characters). Download the .json instead.`);
-      } else setErrors(result.errors);
-      return;
+    const key = `${linkBase}${JSON.stringify(template)}`;
+    const ready = made.current.key === key;
+    if (!ready) {
+      const result = await encodeSessionTemplateLink(template);
+      if (!result.ok) {
+        if (result.reason === 'too_long') {
+          setTooLong(true);
+          setStatus(`This draft is too long for a link (${result.length} characters). Download the .json instead.`);
+        } else setErrors(result.errors);
+        return;
+      }
+      made.current = { key, link: `${linkBase}${result.fragment}` };
     }
-    try {
-      await navigator.clipboard.writeText(`${linkBase}${result.fragment}`);
+    if (await copyText(made.current.link)) {
       notify.success('Copied to clipboard');
       setStatus('Share link copied. It carries no keys or tokens.');
-    } catch {
-      setStatus('Copy failed. Download the .json instead.');
+    } else {
+      setStatus(
+        ready
+          ? "Copying isn't allowed here. Download the .json instead."
+          : 'The link is ready. Tap the button again to copy it.',
+      );
     }
   };
   const check = (json: string) => {

@@ -308,8 +308,13 @@ describe('CreateSBTGroup cache helpers', () => {
     try {
       await instance.copyQRImage('hidden-page-qr', 'copy-key');
       expect(write).toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalledWith('QR copy failed');
+      expect(warnSpy).toHaveBeenCalledWith("Copying the QR image isn't allowed here. Download it instead.");
       expect(instance.state.copiedLinkIndex).not.toBe('copy-key');
+      // The write starts inside the tap, before the image is drawn, as Safari requires.
+      write.mockClear();
+      instance.processQrImage = jest.fn(() => new Promise(() => undefined));
+      void instance.copyQRImage('hidden-page-qr', 'copy-key');
+      expect(write).toHaveBeenCalledTimes(1);
     } finally {
       if (originalClipboardItem) {
         global.ClipboardItem = originalClipboardItem;

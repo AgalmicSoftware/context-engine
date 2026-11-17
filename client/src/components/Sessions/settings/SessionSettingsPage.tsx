@@ -32,6 +32,7 @@ import { setValueAtPath } from '../sessionWizardGateUtils';
 import { buildTxExplorerUrl } from '../../Admin/adminPageHelpers';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import { notify } from '../../../utilities/ui/notify.js';
+import { copyText } from '../../../utilities/ui/copyText';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import { resolveSessionCapabilityProjection } from '../../../utilities/session/sessionCapabilityProjection';
 import {
@@ -319,13 +320,10 @@ const SessionSettingsPage = ({
   const sessionUrl = buildSessionWizardSessionUrl({ slug: sessionSlug, workerOrigin: linkWorker });
   const groupRecorderLink = buildGroupRecorderLink(sessionUrl);
   const copyGroupRecorderLink = async () => {
-    try {
-      await navigator.clipboard.writeText(groupRecorderLink);
+    if (await copyText(groupRecorderLink)) {
       notify.success('Copied to clipboard');
       setStatus('Group recorder link copied.');
-    } catch {
-      setStatus(`Copy failed. The link is ${groupRecorderLink}`);
-    }
+    } else setStatus(`Copying isn't allowed here. Copy the link yourself: ${groupRecorderLink}`);
   };
 
   // The page's limits (the AI one) merge through set-limits, so a limit

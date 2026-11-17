@@ -454,3 +454,26 @@ it('shows an independent agent signing secret in native setup without putting it
     root.value,
   );
 });
+
+it('selects a setup value to copy by hand where copying is refused', async () => {
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+    configurable: true,
+  });
+  renderWorkerDeploySection({
+    cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+    cloudflareTokenSlug: 'demo-sh',
+    account: '0x0000000000000000000000000000000000000001',
+  });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+  await act(async () => {
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-copy-token-hmac-secret'));
+  });
+  expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+    "Copying isn't allowed here, so TOKEN_HMAC_SECRET is selected. Copy it yourself.",
+  );
+  const field = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC) as HTMLInputElement;
+  expect(document.activeElement).toBe(field);
+  expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length]);
+  expect(screen.getByTestId('ce-wizard-cloudflare-native-copy-token-hmac-secret')).toHaveTextContent('Copy');
+});

@@ -37,6 +37,8 @@ import { resolveSessionWizardDeployStatusDisplayState } from './sessionWizardDep
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { copyText, selectText } from '../../utilities/ui/copyText';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import usePendingSbtDrafts, { normalizePendingSbtDrafts } from './hooks/usePendingSbtDrafts.js';
 import useSessionWizardWorkerDeploy, {
   type SessionWizardWorkerDeployRuntime,
@@ -2119,14 +2121,17 @@ const SessionWizard = ({
       setAdminUrlStatus('Admin URL unavailable yet.');
       return;
     }
-    try {
-      await navigator.clipboard.writeText(url);
+    if (await copyText(url)) {
       notify.success('Copied to clipboard');
       setAdminUrlStatus('Admin URL copied.');
-    } catch {
-      setAdminUrlStatus('Copy failed. Select the URL manually.');
+      scheduleAdminUrlStatusReset();
+      return;
     }
-    scheduleAdminUrlStatusReset();
+    // The note stays, since the selected URL is still to be copied.
+    if (adminUrlStatusTimerRef.current) clearTimeout(adminUrlStatusTimerRef.current);
+    adminUrlStatusTimerRef.current = null;
+    selectText(document.querySelector(`[data-testid="${E2E_TESTIDS.WIZARD_ADMIN_URL}"]`));
+    setAdminUrlStatus("Copying isn't allowed here, so the admin URL is selected. Copy it yourself.");
   };
 
   const {
