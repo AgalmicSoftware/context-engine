@@ -7558,13 +7558,13 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// A fill, not just a border: the minimal theme takes button borders away.
 .pileEndAction {
-  border: 1px solid currentColor;
-  background: transparent;
-  color: inherit;
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
 
   &:hover {
-    color: inherit;
+    color: var(--ce-control-text);
     text-decoration: none;
   }
 }
