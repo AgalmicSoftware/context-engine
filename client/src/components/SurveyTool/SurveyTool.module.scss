@@ -6329,6 +6329,18 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   text-transform: uppercase;
 }
 
+// While a Submit saves: what it is doing, its seconds, and the spinner, in plain case. A little smaller, with even
+// digits, so the longest count fits a phone's Submit and the button holds still as the seconds tick.
+.pileSubmitProgress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .pileSubmitButtonCopy {
   display: flex;
   flex-direction: column;

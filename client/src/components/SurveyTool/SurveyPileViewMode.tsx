@@ -3555,6 +3555,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
       total={pileQuestions.length}
       unsent={Number(_pileStats.total || 0)}
       isSubmitting={!!engine.state.isSubmitting}
+      submitCountText={engine.state.submitCountText}
       onSubmit={() =>
         void submitPile().then(() => {
           // The Submit button goes once nothing is unsent, so focus returns to the card rather than the page.
@@ -3676,6 +3677,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 : 0,
             shouldHidePileSubmitButton,
             isSubmitting: engine.state.isSubmitting,
+            submitCountText: engine.state.submitCountText,
             activePromptMasked,
             finalSubmitText,
             showClearPendingButton,

@@ -1,7 +1,7 @@
 import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import { responseValuesEqual } from './responseValueEquality';
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import {
@@ -630,6 +630,15 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(await screen.findByLabelText('Parks')).toBeInTheDocument();
     expect(screen.getByTestId('ce-pile-active-question')).toHaveFocus();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).not.toHaveClass('pileFooterControlAway');
+  });
+
+  it('shows the Submit count from the questions state on both Submits', async () => {
+    const engine = await openEndWithUnsentAnswer();
+    act(() => engine.setState({ isSubmitting: true, submitCountText: '1 of 1' }));
+    expect(
+      within(screen.getByTestId('ce-pile-end-of-set')).getByRole('button', { name: 'Saving 1 of 1' }),
+    ).toBeDisabled();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent('Saving 1 of 1');
   });
 
   it('ends the end of the set when the filter changes', async () => {

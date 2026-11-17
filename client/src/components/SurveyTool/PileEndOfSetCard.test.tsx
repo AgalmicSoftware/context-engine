@@ -36,8 +36,29 @@ describe('PileEndOfSetCard', () => {
     expect(screen.getByRole('link', { name: 'See your answers' })).toHaveAttribute('href', '/user/me');
   });
 
-  it('holds Submit while answers are being sent', () => {
-    render(<PileEndOfSetCard answered={2} total={4} unsent={2} isSubmitting onSubmit={jest.fn()} />);
-    expect(screen.getByRole('button', { name: 'Submitting…' })).toBeDisabled();
+  it('holds Submit while answers are being sent, with the count and seconds', () => {
+    const { rerender } = render(
+      <PileEndOfSetCard answered={2} total={4} unsent={2} isSubmitting onSubmit={jest.fn()} />,
+    );
+    // The seconds are for the eye only; screen readers hear what the Submit is doing.
+    expect(screen.getByRole('button', { name: 'Saving' })).toBeDisabled();
+    rerender(
+      <PileEndOfSetCard answered={2} total={4} unsent={2} isSubmitting submitCountText="1 of 2" onSubmit={jest.fn()} />,
+    );
+    const submit = screen.getByRole('button', { name: 'Saving 1 of 2' });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveTextContent('Saving 1 of 2 · 0s');
+    // Once the Submit ends, a count left from it does not show.
+    rerender(
+      <PileEndOfSetCard
+        answered={2}
+        total={4}
+        unsent={2}
+        isSubmitting={false}
+        submitCountText="2 of 2"
+        onSubmit={jest.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Submit 2 answers' })).toBeEnabled();
   });
 });

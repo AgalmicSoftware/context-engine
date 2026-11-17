@@ -19,7 +19,9 @@ import {
   usesPublicReadCloudflareStorage,
 } from '../../utilities/storage/sessionStorageConfig';
 
+import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import PileQuestionActionMenu from './PileQuestionActionMenu';
+import { submittingLabel } from './surveyToolDraftState';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { readGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
@@ -85,6 +87,8 @@ type PileFooterControlsProps = {
   pendingAnswerCount?: number;
   shouldHidePileSubmitButton: boolean;
   isSubmitting: boolean;
+  /** "12 of 40" while a Submit saves several answers. */
+  submitCountText?: string;
   activePromptMasked: boolean;
   finalSubmitText: string;
   showClearPendingButton: boolean;
@@ -162,6 +166,7 @@ export type PileInteractionSurfaceProps = {
   pendingAnswerCount?: number;
   shouldHidePileSubmitButton: boolean;
   isSubmitting: boolean;
+  submitCountText?: string;
   activePromptMasked: boolean;
   finalSubmitText: string;
   showClearPendingButton: boolean;
@@ -422,6 +427,7 @@ const renderPileFooterControls = ({
   pendingAnswerCount = 0,
   shouldHidePileSubmitButton,
   isSubmitting,
+  submitCountText,
   activePromptMasked,
   finalSubmitText,
   showClearPendingButton,
@@ -446,7 +452,11 @@ const renderPileFooterControls = ({
           disabled={isSubmitting || activePromptMasked}
         >
           {isSubmitting ? (
-            <FontAwesomeIcon icon={faSpinner} spin />
+            // Counts seconds from the Submit's start, as the AI flows' progress labels do.
+            <span className={styles.pileSubmitProgress}>
+              <ElapsedLoadingLabel label={submittingLabel(submitCountText)} />
+              <FontAwesomeIcon icon={faSpinner} spin />
+            </span>
           ) : (
             <span className={styles.pileSubmitButtonContent}>
               <span className={styles.pileSubmitButtonCopy}>
@@ -654,6 +664,7 @@ export const renderPileInteractionSurface = ({
   pendingAnswerCount = 0,
   shouldHidePileSubmitButton,
   isSubmitting,
+  submitCountText,
   activePromptMasked,
   finalSubmitText,
   showClearPendingButton,
@@ -753,6 +764,7 @@ export const renderPileInteractionSurface = ({
         pendingAnswerCount,
         shouldHidePileSubmitButton,
         isSubmitting,
+        submitCountText,
         activePromptMasked,
         finalSubmitText,
         showClearPendingButton,

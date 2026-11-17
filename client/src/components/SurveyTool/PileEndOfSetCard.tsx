@@ -1,12 +1,16 @@
 /** @file PileEndOfSetCard.tsx: what Next opens after the last question, so the end of the set is plain. */
 import React from 'react';
+import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import styles from './SurveyTool.module.scss';
+import { submittingLabel } from './surveyToolDraftState';
 
 type Props = {
   answered: number;
   total: number;
   unsent: number;
   isSubmitting: boolean;
+  /** "12 of 40" while a Submit saves several answers. */
+  submitCountText?: string;
   onSubmit: () => void;
   onSeeResults?: (() => void) | null;
   onTalkItThrough?: (() => void) | null;
@@ -19,6 +23,7 @@ const PileEndOfSetCard = ({
   total,
   unsent,
   isSubmitting,
+  submitCountText,
   onSubmit,
   onSeeResults,
   onTalkItThrough,
@@ -42,7 +47,11 @@ const PileEndOfSetCard = ({
     <div className={styles.pileEndActions}>
       {unsent > 0 && (
         <button type="button" className={styles.pileEndPrimary} onClick={onSubmit} disabled={isSubmitting}>
-          {isSubmitting ? 'Submitting…' : `Submit ${unsent} ${unsent === 1 ? 'answer' : 'answers'}`}
+          {isSubmitting ? (
+            <ElapsedLoadingLabel label={submittingLabel(submitCountText)} />
+          ) : (
+            `Submit ${unsent} ${unsent === 1 ? 'answer' : 'answers'}`
+          )}
         </button>
       )}
       {onSeeResults && (

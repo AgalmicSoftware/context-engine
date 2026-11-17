@@ -520,6 +520,32 @@ it('reads the submit out from a status region that was already there', () => {
   expect(status).toHaveTextContent('Your answers are submitted.');
 });
 
+it('times a Submit and shows its count, as the AI flows do', () => {
+  const { rerender } = render(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: true }));
+  expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent('Saving · 0s');
+  rerender(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: true, submitCountText: '12 of 40' }));
+  expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent('Saving 12 of 40 · 0s');
+  // A stale count from an earlier Submit never shows once it is done.
+  rerender(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: false, submitCountText: '40 of 40' }));
+  expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).not.toHaveTextContent('Saving');
+});
+
+it('counts the seconds of each Submit from its own start', () => {
+  jest.useFakeTimers();
+  try {
+    const { rerender } = render(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: true }));
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent('Saving · 5s');
+    rerender(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: false }));
+    rerender(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: true }));
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent('Saving · 0s');
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 it('shows the end of the set in place of the cards and stops Next there', () => {
   render(
     renderPileInteractionSurface({
