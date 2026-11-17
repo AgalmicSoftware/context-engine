@@ -550,6 +550,34 @@ test('a late retry of an older answer never replaces a newer one stored meanwhil
   assert.deepEqual(current.map(answer => [answer.label, answer.answerRevision]), [['Disagree', 2]]);
 });
 
+test('a duplicate delivery that finds a newer answer leaves the stored outcome of the first alone', async () => {
+  const { f, state, submit, qid } = await submissionFixture({ registry: true, queued: true });
+  const send = value => submit({ preferences: [{ questionId: qid, value }] });
+  const deliver = body => f.queue({ messages: [{ body, attempts: 1, ack() {}, retry() {} }] });
+  assert.equal((await send('agree')).status, 200);
+  const first = state.messages[0];
+  const receiptKey = `ce-agent:${sessionId}:telegram:submit-request:${first.requestId}`;
+  const queuedReceipt = f.records.get(receiptKey);
+  assert.equal(JSON.parse(queuedReceipt).status, 'submit_queued');
+  assert.equal((await deliver(first)).ok, true);
+  const storedReceipt = f.records.get(receiptKey);
+  assert.equal((await send('disagree')).status, 200);
+  assert.equal((await deliver(state.messages[1])).ok, true);
+  // A duplicate of the first delivery read its receipt while it was queued; the
+  // first delivery finishes while the duplicate checks for a newer answer.
+  f.records.set(receiptKey, queuedReceipt);
+  const get = f.records.get.bind(f.records);
+  let finished = false;
+  f.records.get = key => {
+    if (!finished && key.includes(':telegram:canonical-answer:v1:')) { finished = true; f.records.set(receiptKey, storedReceipt); }
+    return get(key);
+  };
+  await deliver(first);
+  assert.equal(finished, true);
+  assert.equal(JSON.parse(f.records.get(receiptKey)).status, 'direct_submitted');
+  assert.equal(state.broadcasts, 2);
+});
+
 test('a retried first answer still lands when the newer edit was never stored', async () => {
   const { f, state, submit, qid } = await submissionFixture({ registry: true, queued: true });
   const send = value => submit({ preferences: [{ questionId: qid, value }] });

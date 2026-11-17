@@ -341,15 +341,20 @@ async function newerRevisionStored({ env, kv, source }) {
   try {
     const read = await env.AGENT_SERVICES.readAnswerHead({ sessionId: source.sessionId, sessionSlug: source.sessionSlug,
       workerOrigin: source.workerOrigin, principalId: source.principalId, questionId: source.questionId });
-    const head = Number(read?.head?.revision);
-    if (read?.ok !== true || !Number.isSafeInteger(head)) return false;
+    if (read?.ok !== true) throw new Error(safeString(read?.reason) || 'answer_head_unreadable');
+    const head = Number(read.head?.revision);
+    if (!Number.isSafeInteger(head)) return false;
     for (let next = head; next > revision && next > head - NEWER_REVISIONS_CHECKED; next -= 1) {
       const { requestId } = await answerRevisionIdentity({ transport: 'telegram_bot_submit', principalId: source.principalId,
         sessionId: source.sessionId, questionId: source.questionId, revision: next });
       const stored = objectOrNull(safeJsonParse(await kv.get(canonicalAnswerKvKey({ requestId })), null));
       if (stored?.status === 'direct_submitted') return true;
     }
-  } catch { /* Unknown: deliver as before. */ }
+  } catch (error) {
+    // Unknown: deliver as before, but say why, so a wiring fault cannot hide.
+    console.warn({ event: 'agent_submit_head_read_failed', requestId: safeString(source.requestId),
+      reason: safeString(error?.reason || error?.message || error) });
+  }
   return false;
 }
 
@@ -533,10 +538,12 @@ export async function processQueuedAgentSubmitRecord({
       outcome: { ok: false, safeToRetry: true, retryable: false, reason: error.reason || 'queued_agent_authority_denied' } });
   }
   // A late delivery of an older revision never replaces a newer stored answer;
-  // it ends here and stays in history.
+  // it ends here and stays in history. Nothing has been sent, so the outcome is
+  // safe to retry, which rechecks the receipt: a duplicate delivery that already
+  // stored this revision keeps its outcome.
   if (await newerRevisionStored({ env, kv, source })) {
     return persistQueueOutcome({ env, source, now: executionTime,
-      outcome: { ok: false, retryable: false, safeToRetry: false, reason: 'superseded_by_newer_answer' } });
+      outcome: { ok: false, retryable: false, safeToRetry: true, reason: 'superseded_by_newer_answer' } });
   }
   const answerCreatedAt = source.createdAt || createdAt || null;
   const answer = source.onChainAnswer || source.answer;
