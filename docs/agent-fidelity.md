@@ -190,7 +190,9 @@ Similarity between a prediction and an answer runs from 0 to 1:
 ## Running it
 
 Download **JSON: Questions + Responses** from the session's Results screen
-(either view), then:
+(either view) while signed in as a session admin: the Session Worker sends the
+AI's predictions only to admins and to each person for their own answers, so
+anyone else's download has nothing to score. Then:
 
 ```bash
 node scripts/agent-fidelity-report.mjs --export results.json --out reports/

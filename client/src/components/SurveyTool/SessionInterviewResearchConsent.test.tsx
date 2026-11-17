@@ -281,6 +281,13 @@ describe('AI draft text for admins', () => {
     expect(screen.getByText(/Drafted text is not kept/)).toBeInTheDocument();
   });
 
+  it('says beside Share for research that the agent mirror evaluation is for admins alone', () => {
+    render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
+    expect(screen.getByText(/Includes the AI’s predicted answers/)).toHaveTextContent(
+      /^For the agent mirror evaluation, which measures how well your AI predicts you\. Only the session’s admins see it\./,
+    );
+  });
+
   it('says so beside Share for research when the session keeps the text', () => {
     const { rerender } = render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
     expect(screen.getByText(/Includes the AI’s predicted answers/)).not.toHaveTextContent(/admins can read/);

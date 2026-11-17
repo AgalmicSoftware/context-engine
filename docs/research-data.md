@@ -48,12 +48,12 @@ This is the Agent Mirror Test from the
 
 ## Who sees it
 
-It is stored with your answer, so whoever can read the session's answers can
-read it.
+Only the session's admins, and you for your own answers. Everyone else who
+can read the session's answers, signed in or not, gets them without it.
 
-- If a session shows AI results, they are group figures, overall and by
-  platform, hiding any from fewer people than its minimum (5 unless an admin
-  changes it).
+- If a session shows AI results, only its admins see them: group figures,
+  overall and by platform, hiding any from fewer people than its minimum (5
+  unless an admin changes it).
 - The score you see after submitting is shown only to you.
 
 ## How to stop
