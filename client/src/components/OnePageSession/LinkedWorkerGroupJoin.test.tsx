@@ -129,7 +129,7 @@ it('does not join after a rejected sign-in', async () => {
   jest.mocked(getWorkerSessionToken).mockRejectedValueOnce(new Error('Sign-in rejected'));
   await mount(false);
   await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'Join' })));
-  expect(await screen.findByText('Sign-in rejected')).toBeInTheDocument();
+  expect(await screen.findByText('Sign-in didn’t work.')).toBeInTheDocument();
   expect(joinWorkerGroup).not.toHaveBeenCalled();
 });
 

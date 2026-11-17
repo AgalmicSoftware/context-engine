@@ -610,6 +610,21 @@ describe('WorkerGroupAutoJoin', () => {
     expect(joins()).toHaveLength(2);
   });
 
+  it('says a declined sign-in plainly, never the wallet’s text, and keeps the join retryable', async () => {
+    getToken.mockRejectedValueOnce(
+      Object.assign(new Error(`user rejected signing (action="signMessage", from="${account}", nonce: n1681)`), {
+        code: 'ACTION_REJECTED',
+      }),
+    );
+    render(<WorkerGroupAutoJoin {...props} />);
+    await tick();
+    expect(screen.getByRole('alert')).toHaveTextContent('Sign-in was cancelled.');
+    expect(screen.getByRole('alert')).not.toHaveTextContent(account);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await tick();
+    expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
+  });
+
   it('waits out a busy session, then says so and keeps the join retryable', async () => {
     const initial = fetchMock.getMockImplementation();
     const busy = () =>

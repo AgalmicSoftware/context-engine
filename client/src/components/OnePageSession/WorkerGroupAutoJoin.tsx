@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { finishWorkerGroupAutoJoin, canAutoJoinWorkerGroup } from '../../domains/worker/workerGroupAutoJoin';
+import { workerSignInProblem } from '../../utilities/worker/workerSignInProblem';
 import { resolveWorkerGroupAutoJoinContext } from '../../domains/worker/workerGroupAutoJoinContext';
 import {
   autoJoinIntentKey,
@@ -161,6 +162,8 @@ function AutoJoinIntent({
           sessionSlug,
           workerUrl,
           context: { account, providerLike: props.provider, chainId },
+        }).catch((error: unknown) => {
+          throw new Error(workerSignInProblem(error));
         });
         if (!active) return;
         const request = { workerUrl, credentialToken, sessionId, sessionSlug };

@@ -19,6 +19,7 @@ import {
 import { GROUP_CREATION_POLICIES, resolveGroupCreationPolicy } from '../../utilities/session/groupCreationPolicy';
 import { sessionModeAllowsAnonymousWorkerGroupDiscovery } from '../../utilities/session/sessionModeProfile';
 import type { PostSignedWorkerGroupRequest } from '../../domains/worker/workerGroupPorts';
+import { workerSignInProblem } from '../../utilities/worker/workerSignInProblem';
 import { WorkerGroupCreateMessage } from '../Shared/WorkerGroupCreateForm';
 import WorkerGroupMembershipPanel from './WorkerGroupMembershipPanel';
 import WorkerParticipantGroupCreatePanel from './WorkerParticipantGroupCreatePanel';
@@ -194,7 +195,7 @@ const WorkerSessionGroupsPanel = ({
           targetKey: requestTargetKey,
           token: '',
           status: 'error',
-          error: error instanceof Error ? error.message : 'Could not authenticate with the session worker.',
+          error: workerSignInProblem(error),
         });
       }
     },

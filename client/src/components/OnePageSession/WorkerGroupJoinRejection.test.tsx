@@ -129,7 +129,7 @@ it('G5 rejected sign-in, then the error notice Retry: is the earlier Join still 
   jest.mocked(getWorkerSessionToken).mockRejectedValueOnce(new Error('Sign-in rejected'));
   await mountLinked(true);
   await act(async () => fireEvent.click(await findJoinButton()));
-  expect(await screen.findByText('Sign-in rejected')).toBeInTheDocument();
+  expect(await screen.findByText('Sign-in didn’t work.')).toBeInTheDocument();
   await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry' })));
   await tick(80);
   expect(joinWorkerGroup).not.toHaveBeenCalled();
@@ -139,7 +139,7 @@ it('G6 session panel: Join -> rejected sign-in -> account B -> back to A auto-si
   // Auth on render for A is rejected, so A sees "Sign in to join".
   jest
     .mocked(getWorkerSessionToken)
-    .mockRejectedValueOnce(new Error('Auth on render rejected')) // A, render
+    .mockRejectedValueOnce(Object.assign(new Error('user rejected signing'), { code: 'ACTION_REJECTED' })) // A, render
     .mockRejectedValueOnce(new Error('Sign-in rejected')) // A, Join click
     .mockResolvedValueOnce('token-b') // B, render
     .mockResolvedValueOnce('token-a'); // A again, render
@@ -152,10 +152,10 @@ it('G6 session panel: Join -> rejected sign-in -> account B -> back to A auto-si
   };
   const view = render(<WorkerSessionGroupsPanel {...props} account={A} />);
   // Let A's render-time sign-in fail first, so the Join click makes the second attempt.
-  expect(await screen.findByText('Auth on render rejected', undefined, MOUNT_TIMEOUT)).toBeInTheDocument();
+  expect(await screen.findByText('Sign-in was cancelled.', undefined, MOUNT_TIMEOUT)).toBeInTheDocument();
   expect(getWorkerSessionToken).toHaveBeenCalledTimes(1);
   await act(async () => fireEvent.click(await findJoinButton()));
-  expect(await screen.findByText('Sign-in rejected')).toBeInTheDocument();
+  expect(await screen.findByText('Sign-in didn’t work.')).toBeInTheDocument();
   view.rerender(<WorkerSessionGroupsPanel {...props} account={B} />);
   await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(3), MOUNT_TIMEOUT);
   view.rerender(<WorkerSessionGroupsPanel {...props} account={A} />);
