@@ -7513,6 +7513,45 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
       min-height: 0;
     }
   }
+
+  // Choice options stack one per line and scroll up and down inside the answer area, never sideways. The faded
+  // bottom edge shows an option cut off when more are below; the padding clears it once scrolled to the end.
+  .pileCardInner .pileCardMainContent:has(.multichoiceQuestionContainer) {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    padding-bottom: 28px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  }
+
+  .pileCardInner .multichoiceQuestionContainer {
+    height: auto;
+    overflow: visible;
+    padding: 2px 0;
+  }
+
+  .pileCardInner .multichoiceQuestionContainer #multiChoice {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 2px;
+  }
+
+  .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
+    width: 100%;
+    height: auto;
+    min-height: 44px;
+    margin: 0;
+    overflow: visible;
+    padding: 10px 14px;
+  }
 }
 
 // The portal keeps the backdrop out of transformed question-card stacking contexts.
