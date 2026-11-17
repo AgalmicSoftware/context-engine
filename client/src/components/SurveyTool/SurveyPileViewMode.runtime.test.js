@@ -622,6 +622,13 @@ describe('SurveyPileViewMode runtime surface', () => {
     // Back is off on the first card, so focus goes to the question rather than staying stuck on it.
     expect(back).toBeDisabled();
     expect(screen.getByTestId('ce-pile-active-question')).toHaveFocus();
+    // A tap on Safari never focuses the button, so focus starts on the page; it still lands on the question.
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    expect(await screen.findByTestId('ce-pile-end-of-set')).toBeInTheDocument();
+    document.activeElement?.blur();
+    fireEvent.click(back);
+    expect(await screen.findByLabelText('Parks')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-pile-active-question')).toHaveFocus();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).not.toHaveClass('pileFooterControlAway');
   });
 
