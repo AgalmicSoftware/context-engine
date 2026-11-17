@@ -128,7 +128,12 @@ it('stays on a one-choice card until Next when the move-on is switched off', asy
 
 it('never moves on from a tap that ended a scroll, or once the person scrolls the card during the beat', async () => {
   const pile = await mountPile();
-  const scrollCard = () => fireEvent.touchMove(within(card()).getAllByRole('radio')[0].closest('div'));
+  const drag = (distance) => {
+    const target = within(card()).getAllByRole('radio')[0].closest('div');
+    fireEvent.touchStart(target, { touches: [{ clientX: 100, clientY: 300 }] });
+    fireEvent.touchMove(target, { touches: [{ clientX: 100, clientY: 300 - distance }] });
+  };
+  const scrollCard = () => drag(30);
   scrollCard();
   choose('radio', 'Agree');
   await pause(TEST_DELAY_MS * 2);
@@ -140,6 +145,15 @@ it('never moves on from a tap that ended a scroll, or once the person scrolls th
   await pause(TEST_DELAY_MS * 2);
   expect(answer(pile, 'q1')).toBe('Disagree');
   expect(card()).toHaveAccessibleName('Question 1 of 6');
+});
+
+it('moves on after a tap whose finger drifted a few pixels', async () => {
+  await mountPile();
+  const target = within(card()).getByRole('radio', { name: 'Agree' }).closest('label');
+  fireEvent.touchStart(target, { touches: [{ clientX: 100, clientY: 300 }] });
+  fireEvent.touchMove(target, { touches: [{ clientX: 103, clientY: 296 }] });
+  choose('radio', 'Agree');
+  await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 6'));
 });
 
 it('uses updated session config and leaves multi-select and final questions in place', async () => {
@@ -207,6 +221,19 @@ it('keeps a double tap on one option as one choice while the card waits to move 
   expect(answer(pile, 'q1')).toBe('Agree');
   await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 6'));
   expect(answer(pile, 'q1')).toBe('Agree');
+});
+
+it('takes a quick press on another option while the card waits as the new choice', async () => {
+  const pile = await mountPile();
+  const agree = within(card()).getByRole('radio', { name: 'Agree' });
+  const disagree = within(card()).getByRole('radio', { name: 'Disagree' });
+  fireEvent.mouseDown(agree.closest('label'), { detail: 1 });
+  fireEvent.click(agree, { detail: 0 });
+  fireEvent.mouseDown(disagree.closest('label'), { detail: 2 });
+  fireEvent.click(disagree, { detail: 0 });
+  expect(answer(pile, 'q1')).toBe('Disagree');
+  await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 6'));
+  expect(answer(pile, 'q1')).toBe('Disagree');
 });
 
 it('keeps arrow-key radio selection on the card and still advances on a later Space choice', async () => {

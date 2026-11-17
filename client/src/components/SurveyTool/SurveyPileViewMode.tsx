@@ -18,7 +18,12 @@ import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
 import React from 'react';
-import { CHOICE_ADVANCE_DELAY_MS, resolvePileAutoAdvanceEnabled, SCROLL_TAP_GUARD_MS } from './surveyPileNavigation';
+import {
+  CHOICE_ADVANCE_DELAY_MS,
+  resolvePileAutoAdvanceEnabled,
+  SCROLL_MOVE_PX,
+  SCROLL_TAP_GUARD_MS,
+} from './surveyPileNavigation';
 // Styles
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
@@ -1211,12 +1216,24 @@ const stripUnknownSessionModeQuery = () => {
 const runPileComponentDidMount = (engine: PileViewModeEngine) => {
   engine._isMounted = true;
   // When the person last dragged or wheeled the card's content, so a tap that ends a scroll is not taken as a choice
-  // to move on. Scrolls the page makes itself (focus, scrolling into view) are not theirs and do not count.
+  // to move on. Scrolls the page makes itself (focus, scrolling into view) are not theirs and do not count, and nor
+  // does the few pixels a finger drifts during an ordinary tap.
   engine._pileScrollListener = (event: Event) => {
-    if (event.target instanceof Node && engine.pileContainer?.contains(event.target))
-      engine._pileLastScrollAt = Date.now();
+    if (!(event.target instanceof Node && engine.pileContainer?.contains(event.target))) return;
+    const touch = (event as TouchEvent).touches?.[0];
+    if (event.type === 'touchstart') {
+      engine._pileTouchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
+      return;
+    }
+    const start = engine._pileTouchStart;
+    if (
+      event.type === 'touchmove' &&
+      (!touch || !start || Math.hypot(touch.clientX - start.x, touch.clientY - start.y) < SCROLL_MOVE_PX)
+    )
+      return;
+    engine._pileLastScrollAt = Date.now();
   };
-  ['touchmove', 'wheel'].forEach((type) =>
+  ['touchstart', 'touchmove', 'wheel'].forEach((type) =>
     document.addEventListener(type, engine._pileScrollListener, { capture: true, passive: true }),
   );
   stripUnknownSessionModeQuery();
@@ -1451,7 +1468,7 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
 };
 
 const runPileComponentWillUnmount = (engine: PileViewModeEngine) => {
-  ['touchmove', 'wheel'].forEach((type) =>
+  ['touchstart', 'touchmove', 'wheel'].forEach((type) =>
     document.removeEventListener(type, engine._pileScrollListener, { capture: true }),
   );
   engine._pileOwnAnswersSubmitController?.abort();
@@ -2846,9 +2863,13 @@ const renderPileResponseInput = (
       const repeatedPress = engine._pileAnswerClickCount > 1;
       engine._pileAnswerClickCount = 0;
       // The second press of a double tap lands on the card it moved to, or on this card while it waits to move on.
+      // There it would clear or repeat the choice; a quick press on another option is a new choice and counts.
+      const picksAnother =
+        pileAnswerIsGiven(value) && JSON.stringify(value) !== JSON.stringify(engine._pileChoicePendingValue);
       if (
         repeatedPress &&
-        (engine._pileAdvancedIntoQuestionId === questionId || engine._pileChoicePendingQuestionId === questionId)
+        (engine._pileAdvancedIntoQuestionId === questionId ||
+          (engine._pileChoicePendingQuestionId === questionId && !picksAnother))
       )
         return;
       // A new choice replaces any move a single choice was waiting to make.
@@ -2905,6 +2926,7 @@ const renderPileResponseInput = (
           if (!canAdvance || arrowSelection || endedScroll) return;
           // The choice stays ticked on the card for a moment, so it reads as kept before the card moves on.
           engine._pileChoicePendingQuestionId = questionId;
+          engine._pileChoicePendingValue = value;
           engine._pileChoiceAdvanceTimer = setTimeout(advance, CHOICE_ADVANCE_DELAY_MS ?? 0);
         },
       });
