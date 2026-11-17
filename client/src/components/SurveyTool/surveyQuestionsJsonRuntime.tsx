@@ -118,6 +118,7 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
     responderAddress?: SurveyQuestionsLegacyValue,
     overrideState: SurveyQuestionsLegacyValue = null,
     includeQuestionIds: Iterable<string> | null = null,
+    forUpload = false,
   ) => {
     surveyIndex = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex;
     const surveyResponseState: SurveyQuestionsLegacyValue =
@@ -130,6 +131,7 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
       surveyIndex,
       surveyResponseState,
       savedInterviewProvenance: stateRef.current.editBaseline?.interviewProvenance,
+      refuseWithheldConsent: forUpload,
       questionPool: Array.isArray(stateRef.current.questionPool) ? stateRef.current.questionPool : [],
       pileQuestions: resolveEditableQuestionList(stateRef.current),
       resolveFieldEncryptionAudience: (

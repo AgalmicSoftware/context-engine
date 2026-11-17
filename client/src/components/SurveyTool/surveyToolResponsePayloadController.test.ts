@@ -1048,9 +1048,10 @@ describe('re-saving an answer with research material', () => {
       predictionComparison: { version: 2, original: { answer: 'Agree' }, changedFields: [] },
     },
   };
-  const resave = (record: Record<string, unknown>) =>
+  const resave = (record: Record<string, unknown>, refuseWithheldConsent = true) =>
     buildResponsePayload(
       defaultOpts({
+        refuseWithheldConsent,
         questionPool: [{ id: 'q1', type: 'binary', prompt: 'Proceed?' }],
         // Edited by hand after the saved answer loaded.
         surveyResponseState: {
@@ -1071,6 +1072,13 @@ describe('re-saving an answer with research material', () => {
 
   it('refuses to save from a copy read without it, which would drop the material', () => {
     const { interviewProvenance: _withheld, ...rest } = stored;
-    expect(() => resave({ ...rest, interviewProvenanceWithheld: true })).toThrow(/research choices didn’t load/);
+    expect(() => resave({ ...rest, interviewProvenanceWithheld: true })).toThrow(/need a sign-in to load/);
+  });
+
+  it('still shows a preview of it, without the material', () => {
+    const { interviewProvenance: _withheld, ...rest } = stored;
+    const response = resave({ ...rest, interviewProvenanceWithheld: true }, false).responses![0];
+    expect(response.answer).toMatchObject({ value: 'Disagree' });
+    expect(response).not.toHaveProperty('interviewProvenance');
   });
 });

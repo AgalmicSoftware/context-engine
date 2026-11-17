@@ -73,6 +73,10 @@ describe('surveyQuestionsJsonRuntime', () => {
     expect(buildResponsePayload).toHaveBeenCalledWith(
       expect.objectContaining({ recruitmentSource: 'partner-outreach' }),
     );
+    // Only an upload refuses answers whose saved research choices didn't load; a preview never does.
+    expect(buildResponsePayload).toHaveBeenLastCalledWith(expect.objectContaining({ refuseWithheldConsent: false }));
+    runtime.prepareJsonAndHash(0, undefined, null, null, true);
+    expect(buildResponsePayload).toHaveBeenLastCalledWith(expect.objectContaining({ refuseWithheldConsent: true }));
   });
 
   it('says when copying JSON is refused, and shows no copied tick', async () => {
