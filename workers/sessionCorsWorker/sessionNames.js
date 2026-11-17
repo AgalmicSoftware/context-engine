@@ -39,22 +39,22 @@ const refuse = (reason) => ({ ok: false, reason, error: REFUSALS[reason] });
 
 // Letters drawn like Latin ones, read as those Latin letters when checking
 // for an address or a role, each case by its own shape (capital Greek Η is an
-// H, small η an n); a small letter not listed is read by its capital. NFKC has
+// H, small η an n); a letter not listed is read by its other case. NFKC has
 // already folded fullwidth and styled letters, and a word mixing these
 // alphabets is refused outright, so this only has to cover a whole word
 // written in one of them: Greek, Cyrillic, Armenian, Cherokee, Lisu, Coptic,
 // Canadian syllabics, Tifinagh, and Latin small capitals, IPA letters and
 // letters with a stroke or hook (ø, đ, ħ), which carry no accent to drop.
 const SHAPES = {
-  a: 'АаΑαɑꓮᎪᗩᴀⲀⲁȺÆæ', b: 'ВвΒβꓐᏴᗷʙⲂⲃƀɓ', c: 'СсϹϲꓚᏟᑕᴄⲤⲥƈȼ', d: 'ԀԁꓓᎠᗪᴅđɗɖĐᕲ', e: 'ЕеΕεꓰᎬᴇⲈⲉᕮɇ', f: 'ꓝᖴꜰƒ',
-  g: 'ɡꓖᏀɢցǥɠ', h: 'НнҺһΗꓧᎻᕼʜհⲎħɦɧĦᏂ', i: 'ІіΙιıɩƖǀꓲɪⲒⲓⵏɨƗᓰᎥ', j: 'ЈјȷꓙᎫᒍᴊɉʝ', k: 'КкΚκꓗᏦᴋⲔⲕƙꝁ', l: 'ӀӏꓡᏞᒪʟłƚŁ',
-  m: 'МмΜꓟᎷᗰᴍⲘⲙɱᘻ', n: 'ΝηꓠᑎɴոⲚⲛɲɳŋŊᘉᏁ', o: 'ОоΟοօꓳᎾᗝᴏⲞⲟⵔøɵØᓍᎧ', p: 'РрΡρꓑᏢᑭᴘքⲢⲣᵽ', q: 'Ԛԛᑫ', r: 'ꓣᎡᖇʀɍ',
-  s: 'ЅѕꓢᏚᔕꜱʂꞩꞨŞşᏕ', t: 'ТтΤτꓔᎢᴛⲦⲧŧƭʈŦᖶᏖ', u: 'μυսꓴᑌᴜʉ', v: 'νꓦᏙᐯᴠʋ', w: 'ԜԝꓪᏔᗯᴡᎳ', x: 'ХхΧχꓫ᙭Ⲭⲭⵝⵅ',
+  a: 'АаΑαɑꓮᎪᗩᴀⲀⲁȺÆæᏗ', b: 'ВвΒβꓐᏴᗷʙⲂⲃƀɓ', c: 'СсϹϲꓚᏟᑕᴄⲤⲥƈȼ', d: 'ԀԁꓓᎠᗪᴅđɗɖĐᕲᎴ', e: 'ЕеΕεꓰᎬᴇⲈⲉᕮɇєЄᏋ', f: 'ꓝᖴꜰƒʄᎦ',
+  g: 'ɡꓖᏀɢցǥɠᎶ', h: 'НнҺһΗꓧᎻᕼʜհⲎħɦɧĦᏂ', i: 'ІіΙιıɩƖǀꓲɪⲒⲓⵏɨƗᓰᎥ', j: 'ЈјȷꓙᎫᒍᴊɉʝ', k: 'КкΚκꓗᏦᴋⲔⲕƙꝁ', l: 'ӀӏꓡᏞᒪʟłƚŁᏝ',
+  m: 'МмΜꓟᎷᗰᴍⲘⲙɱᘻ', n: 'ΝηꓠᑎɴոⲚⲛɲɳŋŊᘉᏁ', o: 'ОоΟοօꓳᎾᗝᴏⲞⲟⵔøɵØᓍᎧ', p: 'РрΡρꓑᏢᑭᴘքⲢⲣᵽ', q: 'Ԛԛᑫ', r: 'ꓣᎡᖇʀɍᏒ',
+  s: 'ЅѕꓢᏚᔕꜱʂꞩꞨŞşᏕ', t: 'ТтΤτꓔᎢᴛⲦⲧŧƭʈŦᖶᏖɬ', u: 'μυսꓴᑌᴜʉ', v: 'νꓦᏙᐯᴠʋ', w: 'ԜԝꓪᏔᗯᴡᎳ', x: 'ХхΧχꓫ᙭Ⲭⲭⵝⵅ',
   y: 'УуΥγꓬᎩʏⲨⲩᎽɏƴ', z: 'ΖζꓜᏃᘔᴢⲌⲍƶȥ',
 };
 const LOOK_ALIKES = new Map(Object.entries(SHAPES).flatMap(([latin, shapes]) => [...shapes].map((shape) => [shape, latin])));
 const skeleton = (name) => [...name.normalize('NFD').replace(/\p{M}/gu, '')]
-  .map((char) => LOOK_ALIKES.get(char) || LOOK_ALIKES.get(char.toUpperCase()) || char.toLowerCase()).join('')
+  .map((char) => LOOK_ALIKES.get(char) || LOOK_ALIKES.get(char.toUpperCase()) || LOOK_ALIKES.get(char.toLowerCase()) || char.toLowerCase()).join('')
   // A zero in any script, then x: the start of an address.
   .replace(/\p{Nd}(?=x)/gu, '0');
 const LOOK_ALIKE_SCRIPTS = ['Latin', 'Greek', 'Cyrillic', 'Armenian', 'Cherokee', 'Lisu', 'Coptic', 'Canadian_Aboriginal', 'Tifinagh'].map((script) => new RegExp(`\\p{Script=${script}}`, 'u'));

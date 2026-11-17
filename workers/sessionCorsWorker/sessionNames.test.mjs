@@ -65,6 +65,7 @@ test('a name is stored as typed, tidied, and refused with a reason when it could
     ['Admɩn', 'role'], ['Admǀn', 'role'], ['ҺОЅТ', 'role'], ['ᔕTᗩᖴᖴ', 'mixed_scripts'], ['Hⵔst', 'mixed_scripts'],
     ['HOST\u0f8c', 'mixed_scripts'], ['Ádmin', 'role'], ['ᕼᎾᔕᎢ', 'mixed_scripts'],
     ['ĦØŞŦ', 'role'], ['Høst', 'role'], ['ȺĐMƗN', 'role'], ['ąɗɱįɲ', 'role'], ['ɱoderator', 'role'], ['ꞨŦÆFF', 'role'],
+    ['ŞɎŞŦɆM', 'role'], ['ɌXȻ', 'role'], ['ɧơʂɬ', 'role'], ['ѕуѕтєм', 'role'], ['ᏗᎴᎷᎥᏁ', 'role'],
     ['ᗩᗪᗰᓰᑎ', 'role'], ['ᕼᗝᔕᖶ', 'role'], ['ᏂᎧᏕᏖ', 'role'], ['ᎪᎠᎷᎥᏁ', 'role'],
   ]) assert.equal(normalizeSessionName(typed).reason, reason, String(typed));
   assert.equal(normalizeSessionName('x'.repeat(32)).ok, true);
