@@ -65,7 +65,7 @@ function captureFull(repoDir, coverageFinal) {
   return {
     schemaVersion: 1,
     measuredAt: new Date().toISOString().slice(0, 10),
-    source: 'npm --prefix client run test:coverage:full-universe',
+    source: 'npm run test:client',
     denominator: 'Every tracked executable client/src JS/JSX/TS/TSX production file under the documented exclusion contract.',
     productionFileCount: files.length,
     zeroHitFileCount: result.zeroHitFiles.length,

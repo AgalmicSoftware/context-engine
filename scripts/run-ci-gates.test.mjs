@@ -153,13 +153,20 @@ test('repository manifest keeps CI full-test universes single-pass and release s
     'wiring-and-release',
     'public-text',
     'contracts',
+    'client-tests',
     'client',
     'root-jest',
     'workers',
     'e2e-smoke',
     'cecc-and-node',
   ]);
-  assert.equal(ciCommands.filter((value) => value === 'npm run test:client').length, 1);
+  assert.equal(ciCommands.filter((value) => value === 'npm run test:client:shards').length, 1);
+  assert.equal(ciCommands.filter((value) => value === 'npm run test:client:merge').length, 1);
+  assert.ok(
+    ciCommands.indexOf('npm run test:client:shards') < ciCommands.indexOf('npm run test:client:merge'),
+    'the shards must run before they are merged',
+  );
+  assert.ok(ciCommands.indexOf('npm run test:client:merge') < ciCommands.indexOf('npm run coverage-floor:check'));
   assert.equal(ciCommands.filter((value) => value === 'npm run test:node:tracked').length, 1);
   assert.equal(ciCommands.some((value) => value === 'npm run test:node'), false);
   assert.equal(ciCommands.filter((value) => value === 'npm run verify:release-version').length, 1);

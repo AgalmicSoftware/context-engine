@@ -69,7 +69,10 @@ function writeInventoryFixture(rootDir, overrides = {}) {
       'test:e2e:quick': 'npm run -s test:e2e:smoke',
       'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
       'ai:test-nav:smoke': 'node scripts/vite-navigation-smoke.js',
-      'test:client': 'npm --prefix client run test:coverage:full-universe',
+      'test:client': 'npm run -s test:client:shards && npm run -s test:client:merge',
+      'test:client:shards': 'node scripts/run-client-coverage.mjs --shards',
+      'test:client:shard': 'node scripts/run-client-coverage.mjs --shard',
+      'test:client:merge': 'node scripts/run-client-coverage.mjs --merge',
       'test:release:client': 'cd client && npm test -- --watchAll=false --runInBand',
       'test:cache-guard': 'bash ./scripts/check-managed-cache-localstorage.sh',
       'typecheck:client-tests': 'node scripts/check-client-test-types.mjs',
@@ -92,16 +95,19 @@ function writeInventoryFixture(rootDir, overrides = {}) {
   writeJson(rootDir, 'scripts/ci-gates.json', {
     schemaVersion: 1,
     profiles: {
-      ci: ['wiring-and-release', 'contracts', 'client', 'root-jest', 'workers', 'cecc-and-node'],
-      hosted: ['wiring-and-release', 'contracts', 'client', 'root-jest', 'workers', 'e2e-smoke', 'cecc-and-node'],
+      ci: ['wiring-and-release', 'contracts', 'client-tests', 'client', 'root-jest', 'workers', 'cecc-and-node'],
+      hosted: ['wiring-and-release', 'contracts', 'client-tests', 'client', 'root-jest', 'workers', 'e2e-smoke', 'cecc-and-node'],
     },
     gates: {
       contracts: {
         commands: [{ label: 'contracts', command: 'npm', args: ['run', 'test:contracts'] }],
       },
+      'client-tests': {
+        commands: [{ label: 'shards', command: 'npm', args: ['run', 'test:client:shards'] }],
+      },
       client: {
         commands: [
-          { label: 'client', command: 'npm', args: ['run', 'test:client'] },
+          { label: 'merge', command: 'npm', args: ['run', 'test:client:merge'] },
           { label: 'coverage', command: 'npm', args: ['run', 'coverage-floor:check'] },
         ],
       },
@@ -139,6 +145,7 @@ function writeInventoryFixture(rootDir, overrides = {}) {
   });
   writeFile(rootDir, '.github/workflows/ci.yml', [
     'run: npm run ci:gate -- contracts',
+    'run: npm run test:client:shard -- ${{ matrix.shard }}',
     'run: npm run ci:gate -- client',
     'run: npm run ci:gate -- root-jest',
     'run: npm run ci:gate -- workers',

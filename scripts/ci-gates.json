@@ -4,6 +4,7 @@
     "ci": [
       "wiring-and-release",
       "contracts",
+      "client-tests",
       "client",
       "root-jest",
       "workers",
@@ -13,6 +14,7 @@
       "wiring-and-release",
       "public-text",
       "contracts",
+      "client-tests",
       "client",
       "root-jest",
       "workers",
@@ -225,14 +227,26 @@
         }
       ]
     },
-    "client": {
+    "client-tests": {
       "commands": [
         {
-          "label": "Run client coverage tests",
+          "label": "Run client coverage tests in shards",
           "command": "npm",
           "args": [
             "run",
-            "test:client"
+            "test:client:shards"
+          ]
+        }
+      ]
+    },
+    "client": {
+      "commands": [
+        {
+          "label": "Check and merge the client test shards",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:client:merge"
           ]
         },
         {

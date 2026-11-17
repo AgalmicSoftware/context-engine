@@ -136,6 +136,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/capture-client-coverage-baseline.mjs');
   expectFile('scripts/check-client-coverage-floors.mjs');
   expectFile('scripts/check-client-coverage-floors.test.mjs');
+  expectFile('scripts/run-client-coverage.mjs');
+  expectFile('scripts/run-client-coverage.test.mjs');
+  expectFile('client/scripts/jest/timeBalancedSequencer.cjs');
+  expectFile('client/scripts/jest/shardPartition.cjs');
+  expectFile('client/scripts/jest/shardTimings.json');
   expectFile('scripts/client-coverage-universe.js');
   expectFile('scripts/client-coverage-universe.test.js');
   expectFile('scripts/client-coverage-exclusions.json');
@@ -375,7 +380,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowOmits('--allow-text', 'author-controlled baseline approval option');
   expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
   expectWorkflowContains('uses: actions/upload-artifact@', 'client coverage artifact upload');
-  expectWorkflowContains('path: client/coverage/lcov.info', 'client coverage artifact path');
+  expectWorkflowContains('path: client/coverage/coverage-final.json', 'client coverage artifact path');
   expectWorkflowContains('worker-bundle-candidate-${{ github.sha }}', 'SHA-keyed tested Worker candidate');
   expectWorkflowContains('node scripts/worker-release-artifacts.mjs resolve-source', 'private-to-public provenance resolver');
   expectWorkflowContains('node scripts/worker-release-artifacts.mjs create', 'immutable Worker manifest creation');

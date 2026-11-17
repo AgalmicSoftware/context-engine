@@ -23,7 +23,7 @@ npm test
 
 This runs the canonical root gate (`npm run test:ci`): wiring and ratchets,
 AI Discourse Bench tests, release-surface checks and builds, contract/ABI
-parity, client coverage, public-safe root Jest, both public Worker suites,
+parity, the client coverage shards and their merge, public-safe root Jest, both public Worker suites,
 Context Engine CC, MCP tests, the tracked root Node universe, and the managed-cache guard. The coverage-enabled full client universe and tracked Node
 universe each run exactly once. The wiring lane also verifies that every
 tracked typed client test/support source is in the monotonic test-typecheck
@@ -73,12 +73,30 @@ fails on any new diagnostic signature or count. The raw test project is not
 yet zero-diagnostic, so the ratchet command—not a claim of clean standalone
 `tsc` output—is the current contract.
 
-`npm run test:client` performs one instrumented run with
-`client/jest.full-universe.config.cjs`. Every tracked executable JS, JSX, TS,
-and TSX production file under `client/src` enters the denominator, including
-never-imported files. `npm run coverage-floor:check` reuses that run's
-`coverage-final.json` to enforce the whole-production floor banked in
-`scripts/client-coverage-full-baseline.json`.
+`npm run test:client` runs the instrumented client suite once, split into 12
+shards (`scripts/run-client-coverage.mjs`). Each shard is one Jest process
+under `client/jest.full-universe.config.cjs`; locally the shards run side by
+side (`npm run test:client:shards`), and in GitHub Actions each is its own job
+(`npm run test:client:shard -- <n>`). Shards are filled by recorded run time:
+`client/scripts/jest/shardTimings.json` lists the slow suites, and
+`node scripts/run-client-coverage.mjs --write-timings` refreshes it after a
+run. A stale list only makes the shards uneven.
+
+`npm run test:client:merge` then checks that the shards on disk are one
+complete run of the tree as it is checked out now, including uncommitted
+changes to tracked and untracked files (git-ignored files are not compared),
+and writes their summed coverage to the client's `coverage-final.json`. It
+fails if a shard is missing, failed, or ran before an edit or on another
+commit; if any test file Jest found, or any tracked client test file, was not
+run by exactly one shard; or if two shards instrumented a file differently. Every tracked executable JS, JSX, TS, and TSX production
+file under `client/src` enters the denominator, including never-imported
+files. `npm run coverage-floor:check` reads the merged file to enforce the
+whole-production floor banked in `scripts/client-coverage-full-baseline.json`.
+
+`npm --prefix client run test:coverage` is the same suite in a single process.
+It takes about five times as long and is kept as the reference the shards are
+compared against. Set `CLIENT_TEST_SHARD_CONCURRENCY` to run fewer shards at
+once on a smaller machine.
 
 ### Targeted Root Commands
 
@@ -89,6 +107,7 @@ npm run test:root:jest
 npm run test:worker:session-cors
 npm run test:node
 npm run test:client
+npm run test:client:shard -- 3
 npm run coverage-floor:check
 npm run typecheck:client-tests
 npm run dead-exports:check
