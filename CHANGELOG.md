@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 - A group's member list reads past members who left, instead of saying none were found.
 - A bookmarked user opens in the session it was saved in, with its nickname and Remove control.
 - The fallback report keeps two questions with the same wording apart.
+- On a phone, the interview's **Submit** stays on screen however many questions there are, and with **AI submission info** open.
+- Copy buttons work in browsers that refuse the clipboard, such as in-app browsers. Where copying is refused, the text is selected to copy by hand, and every button shows whether it copied.
+- The interview's AI prompt, if it can't be copied, is shown whole and selected; the formatted view shortens its links.
+- The interview's **Discard** button sits left of the microphone, away from a right thumb.
 - A voice interview's call is sent once. The site puts a sign-in on it only for a private session, so a Worker still on 0.9.10 never receives one, and a refused call shows its own reason. This replaces 0.9.11's second try without the sign-in.
 
 ### Workers — requires redeployment
