@@ -288,9 +288,11 @@ describe('surveyQuestionsSubmitRuntime', () => {
   });
 
   it.each([
-    ['adds to what that Submit reported', false],
-    ['says nothing once a later Submit has started', true],
-  ])('a late AI draft text failure %s', async (_name, laterSubmit) => {
+    ['adds to what that Submit reported', null],
+    ['says nothing while a later Submit runs', 2],
+    ['says nothing once a later Submit has finished', 0],
+  ])('a late AI draft text failure %s', async (_name, activeLaterSubmit) => {
+    const laterSubmit = activeLaterSubmit !== null;
     const context = createContext();
     context.propsRef.current.sessionConfig = { interviewMode: { keepDraftTextForAdmins: true } };
     context.submitSurveyResponse.mockResolvedValueOnce({ __ceQuestionResponses: [{ questionID: 'q1' }] });
@@ -303,7 +305,10 @@ describe('surveyQuestionsSubmitRuntime', () => {
     );
     await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
     context.stateRef.current.submissionError = "Some answers didn't save (busy).";
-    if (laterSubmit) context.inst._activeSubmitAttemptSeq = 999;
+    if (laterSubmit) {
+      context.inst._submitAttemptSeq = 2;
+      context.inst._activeSubmitAttemptSeq = activeLaterSubmit;
+    }
     context.setState.mockClear();
     failSync(new Error('busy'));
     await new Promise((resolve) => setTimeout(resolve, 0));

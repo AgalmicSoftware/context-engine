@@ -916,8 +916,8 @@ export const createSurveyQuestionsSubmitRuntime = (
         },
       });
       void draftTextSynced.then((synced) => {
-        // Only while no later Submit has started, and added to what this one already reported.
-        const laterAttempt = ![0, submitContext.submitAttemptId].includes(inst._activeSubmitAttemptSeq);
+        // Only while no later Submit has started (running or finished), and added to what this one reported.
+        const laterAttempt = inst._submitAttemptSeq !== submitContext.submitAttemptId;
         if (synced || laterAttempt || !isSubmitContextCurrent(submitContext)) return;
         const notice = 'Your answers were saved, but the AI draft text kept for admins could not be updated.';
         setState(buildSubmissionErrorState([stateRef.current.submissionError, notice].filter(Boolean).join(' ')));
