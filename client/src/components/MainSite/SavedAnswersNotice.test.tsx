@@ -26,8 +26,12 @@ const notice = (props: Partial<React.ComponentProps<typeof SavedAnswersNotice>>)
   />
 );
 
-beforeEach(() => jest.useFakeTimers());
-afterEach(() => jest.useRealTimers());
+beforeEach(() => {
+  jest.useFakeTimers();
+});
+afterEach(() => {
+  jest.useRealTimers();
+});
 
 it('says saved answers are loading until they are, and to reload if they stay away', () => {
   const { rerender } = render(notice({}));

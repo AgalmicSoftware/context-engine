@@ -5,7 +5,7 @@ import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 jest.mock('./surveySavedAnswerGate', () => ({
-  ...jest.requireActual('./surveySavedAnswerGate'),
+  ...jest.requireActual<object>('./surveySavedAnswerGate'),
   readOwnAnswersBeforeUpload: jest.fn(() => new Promise(() => {})),
 }));
 

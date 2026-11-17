@@ -1,7 +1,10 @@
 import * as workerHydration from '../../utilities/survey/workerResponseHydration';
 import { buildSurveyLocalCacheSlice, executeSurveyLocalCacheRehydrate } from './surveyToolHydrationController';
 import { buildDraftAwareCacheHydrationState } from './surveyToolUtils';
-import { createSurveyQuestionsResponseStateRuntime } from './surveyQuestionsResponseStateRuntime';
+import {
+  createSurveyQuestionsResponseStateRuntime,
+  type SurveyQuestionsResponseStateDeps,
+} from './surveyQuestionsResponseStateRuntime';
 import type { SurveyQuestionsProps, SurveyQuestionsState } from './surveyQuestionsTypes';
 
 jest.mock('./surveyToolHydrationController', () => ({
@@ -44,7 +47,7 @@ const createDeps = ({
     _rehydrateLocalCacheLastSig: '',
     _savedAnswersLoadedQids: new Set<string>(),
     _userAnswersSliceCache: { source: null, value: null },
-    _viewAllSync: null as { restored: Set<string> } | null,
+    _viewAllSync: null as SurveyQuestionsResponseStateDeps['inst']['_viewAllSync'],
   },
   propsRef: { current: props },
   stateRef: {
@@ -112,7 +115,7 @@ describe('surveyQuestionsResponseStateRuntime', () => {
       loadDraft: jest.fn(() => ({ answers: { q1: { additional: 'Draft comment' } }, baseline: {} })),
       props: { isStandalone: true, isResponsesCacheReady: true, sessionConfig: null } as SurveyQuestionsProps,
     });
-    deps.inst._viewAllSync = { restored: new Set<string>() };
+    deps.inst._viewAllSync = { restored: new Set<string>(), storeReady: false };
     // Minimal appliers: saved answers fill empty fields; the draft writes its comment.
     deps.inst._applyLocalCacheHydrationEntryToSlice = jest.fn(({ targetSlice, questionId, cachedAnswer }: any) => {
       if (!cachedAnswer || targetSlice.answers[questionId]?.value) return false;
@@ -151,7 +154,7 @@ describe('surveyQuestionsResponseStateRuntime', () => {
   it('leaves loaded questions alone while a Submit result holds the form, and forgets questions that left', () => {
     const deps = viewAllDeps({ submissionComplete: true });
     deps.inst._savedAnswersLoadedQids = new Set(['q1', 'q9']);
-    deps.inst._viewAllSync = { restored: new Set(['q1', 'q9']) };
+    deps.inst._viewAllSync = { restored: new Set(['q1', 'q9']), storeReady: false };
 
     createSurveyQuestionsResponseStateRuntime(deps).syncViewAllQuestions();
 
