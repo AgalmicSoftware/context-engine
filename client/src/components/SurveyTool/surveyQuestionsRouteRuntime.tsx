@@ -208,6 +208,7 @@ export const createSurveyQuestionsRouteRuntime = (
         responseUrl: stateRef.current.responseUrl,
         singleQuestionMode: propsRef.current.singleQuestionMode,
         startFresh: stateRef.current.startFresh,
+        submitCountText: stateRef.current.submitCountText,
         submissionComplete: stateRef.current.submissionComplete,
         submittedSinceLastEdit: stateRef.current.submittedSinceLastEdit,
         useHeaderSubmit: propsRef.current.useHeaderSubmit,

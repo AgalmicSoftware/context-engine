@@ -650,6 +650,34 @@ describe('error paths', () => {
     );
   });
 
+  it('reports each stored answer as it is saved, and stops counting at a failure', async () => {
+    window.ethereum = makeRpcProvider();
+    const question2 = `0x${'9'.repeat(64)}`;
+    const question3 = `0x${'8'.repeat(64)}`;
+    const stored = { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' };
+    uploadDataToSessionStorage
+      .mockResolvedValueOnce({ storageRef: stored })
+      .mockResolvedValueOnce({ storageRef: stored })
+      .mockRejectedValueOnce(new Error('Worker storage is unavailable.'));
+    const progress = [];
+
+    await submitResponses(
+      'wagmi',
+      [QUESTION_ID, question2, question3],
+      [
+        { questionID: QUESTION_ID, answer: 'yes' },
+        { questionID: question2, answer: 'no' },
+        { questionID: question3, answer: 'yes' },
+      ],
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+      { onProgress: (saved, total) => progress.push(`${saved} of ${total}`) },
+    ).catch((error) => error);
+
+    expect(progress).toEqual(['1 of 3', '2 of 3']);
+  });
+
   it('reports no stored answers when the first Worker upload fails', async () => {
     window.ethereum = makeRpcProvider();
     uploadDataToSessionStorage.mockRejectedValueOnce(new Error('Worker storage is unavailable.'));

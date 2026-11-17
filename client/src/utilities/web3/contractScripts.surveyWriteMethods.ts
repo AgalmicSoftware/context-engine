@@ -484,6 +484,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       options: {
         operationId?: string;
         uploadRevisions?: Map<string, { revision: number; payloadDigest: string; settled: boolean }>;
+        // Answers stored so far, of all this Submit uploads.
+        onProgress?: (saved: number, total: number) => void;
       } = {},
     ) {
       let cfg = resolveSession(groupKeyOrCfg || '');
@@ -712,6 +714,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             const questionRevision = uploadRevisions.get(hashedQuestionIds[index]);
             if (questionRevision) questionRevision.settled = true;
             questionResponseUploads.push(responseUpload);
+            options.onProgress?.(questionResponseUploads.length, questionResponses.length);
           }
         } catch (error: unknown) {
           // A Worker-stored answer is saved on its own. Report the answers stored

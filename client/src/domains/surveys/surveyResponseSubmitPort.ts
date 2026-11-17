@@ -29,6 +29,7 @@ export type SurveyResponseSubmitPort = {
     options?: {
       operationId?: string;
       uploadRevisions?: Map<string, { revision: number; payloadDigest: string; settled: boolean }>;
+      onProgress?: (saved: number, total: number) => void;
     },
   ) => Promise<SurveyResponseSubmissionResult>;
 };

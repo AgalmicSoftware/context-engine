@@ -2391,7 +2391,13 @@ export const createSurveyQuestionsRuntimeMethods = (
         hashedSurveyId,
         surveyResponse,
         submissionTarget,
-        { operationId: context.operationId, uploadRevisions: context.uploadRevisions },
+        {
+          operationId: context.operationId,
+          uploadRevisions: context.uploadRevisions,
+          onProgress: (saved: number, total: number) => {
+            if (total > 1) setState({ submitCountText: `${saved} of ${total}` });
+          },
+        },
       );
     } catch (error: unknown) {
       // Answers a Worker stored before a later upload failed are saved; the rest keep
