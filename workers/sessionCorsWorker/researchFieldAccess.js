@@ -6,10 +6,13 @@
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const normalizeAddress = (value) => String(value || '').trim().toLowerCase();
 
+// Marked, so a reader can tell this copy from an answer stored without the material, and never treat it as the
+// author withdrawing it.
+export const WITHHELD_FIELD = 'interviewProvenanceWithheld';
 const withoutProvenance = (item) => {
   if (!isObj(item) || !Object.prototype.hasOwnProperty.call(item, 'interviewProvenance')) return item;
   const { interviewProvenance: _withheld, ...rest } = item;
-  return rest;
+  return { ...rest, [WITHHELD_FIELD]: true };
 };
 
 /**

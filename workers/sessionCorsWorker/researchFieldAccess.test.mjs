@@ -86,7 +86,10 @@ for (const bundle of [false, true]) {
           assert.equal(item.answer.value, 'Disagree', reader);
           assert.equal(item.questionID.startsWith('q-'), true, reader);
           if (sees) assert.deepEqual(item.interviewProvenance, provenance, reader);
-          else assert.equal('interviewProvenance' in item, false, `${reader} read the research material`);
+          else {
+            assert.equal('interviewProvenance' in item, false, `${reader} read the research material`);
+            assert.equal(item.interviewProvenanceWithheld, true, reader);
+          }
         }
       }
       // The body depends on who reads it, so no shared cache may keep it.
@@ -106,6 +109,7 @@ test('an Agent HTTP or MCP agent reading through the storage route gets the answ
   const payload = JSON.parse(await response.text());
   assert.equal(payload.answer.value, 'Disagree');
   assert.equal('interviewProvenance' in payload, false);
+  assert.equal(payload.interviewProvenanceWithheld, true);
 });
 
 test('the AI inputs (AI Views, the atlas, the risk matrix, the Session Agent) never carry the material', async () => {
