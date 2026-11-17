@@ -7577,17 +7577,43 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 
   // Choice options stack one per line and scroll up and down inside the answer area, never sideways, from the top
-  // (centring would push the first ones out of reach). The faded bottom edge shows an option cut off when more are
-  // below; the padding, and keyboard scrolling, keep the last one clear of it.
+  // (centring would push the first ones out of reach). When more are below, the area ends partway through an option
+  // (usePileHalfRowCut), and that edge fades a little; once scrolled, the top edge does too. The padding, and
+  // keyboard scrolling, keep the last option clear at the end.
   .pileCardInner .pileCardMainContent:has(.multichoiceQuestionContainer) {
+    --pile-list-fade-top: #000;
+    --pile-list-fade-bottom: #000;
+
     justify-content: flex-start;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-y: contain;
     padding-bottom: 28px;
     scroll-padding-bottom: 28px;
-    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
-    mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      var(--pile-list-fade-top),
+      #000 20px,
+      #000 calc(100% - 20px),
+      var(--pile-list-fade-bottom)
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      var(--pile-list-fade-top),
+      #000 20px,
+      #000 calc(100% - 20px),
+      var(--pile-list-fade-bottom)
+    );
+
+    &[data-list-cue='start'],
+    &[data-list-cue='middle'] {
+      --pile-list-fade-bottom: rgb(0 0 0 / 35%);
+    }
+
+    &[data-list-cue='middle'],
+    &[data-list-cue='end'] {
+      --pile-list-fade-top: rgb(0 0 0 / 35%);
+    }
   }
 
   .pileCardInner .multichoiceQuestionContainer {

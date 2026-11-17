@@ -47,7 +47,7 @@ it('gives every phone question card one height from the steady visible screen', 
   expect(heightsOf('.pileCardInner')).toContain('var(--pile-phone-card-height, 380px)');
   // Choices scroll from the top: centring pushed the first ones out of reach.
   expect(css).toMatch(
-    /\.pileCardInner \.pileCardMainContent:has\(\.multichoiceQuestionContainer\)\s*\{\s*justify-content: flex-start;/,
+    /\.pileCardInner \.pileCardMainContent:has\(\.multichoiceQuestionContainer\)\s*\{[^}]*?justify-content: flex-start;/,
   );
 });
 
@@ -70,4 +70,10 @@ it('lets a phone free-text box fill the card', () => {
   expect(css).toMatch(
     /\.pileCardBody:has\(\.freeformQuestionContainer\) \.pileCardMainContent\s*\{\s*flex: 1 1 0;\s*min-height: 0;/,
   );
+});
+
+// A long choice list fades at whichever end has more; usePileHalfRowCut sets the cue.
+it('fades a phone choice list where more options are', () => {
+  expect(css).toMatch(/\[data-list-cue=start\],[^{]*\[data-list-cue=middle\]\s*\{\s*--pile-list-fade-bottom:/);
+  expect(css).toMatch(/\[data-list-cue=middle\],[^{]*\[data-list-cue=end\]\s*\{\s*--pile-list-fade-top:/);
 });
