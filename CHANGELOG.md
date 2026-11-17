@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.15] - 2026-11-17
 
+No change to the site, the Session Worker or the MCP. Nothing needs redeploying, and nothing is published to npm.
+
+### Local tooling
+
+- CI and the local release gates run the client tests as 12 time-balanced shards, each one process with the same 4,096 MB heap, and check that the shards are one complete run of the tree before merging their coverage. The coverage floor is unchanged.
+- The gate runner runs independent lanes side by side and prints how long each command took; `--serial` gives the old one-at-a-time run. `npm run test:ci` takes about 6 minutes where it took about 29.
+
 ## [0.9.14] - 2026-11-17
 
 ### Client — available when the site deploys
