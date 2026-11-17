@@ -81,6 +81,13 @@ describe('a draft text delete that fails', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('is kept before it is sent, so a page closed while it waits still sends it on the next load', () => {
+    fetchMock.mockImplementation(() => new Promise<Response>(() => undefined));
+    // Its own address: this sync never settles, and syncs queue per address.
+    void syncDraftText({ put: [], remove: ['q1'] }, { ...context, account: '0xclosed' });
+    expect(JSON.parse(localStorage.getItem('ce:draft-text-pending-deletes:v1:demo|0xclosed') || '[]')).toEqual(['q1']);
+  });
+
   it('is kept by address whatever the case or wallet kind', async () => {
     fetchMock.mockResolvedValueOnce(reply({ error: 'Busy.' }, false));
     await expect(syncDraftText({ put: [], remove: ['q1'] }, { ...context, account: '0xABC' })).rejects.toThrow();
@@ -106,7 +113,8 @@ describe('a draft text delete that fails', () => {
 
     fetchMock.mockResolvedValue(reply({ ok: true }));
     await resendPendingDraftTextDeletes(signed);
-    expect(calls().map(([, body]) => body.questionIds)).toEqual([['q1'], ['q1'], ['q2'], ['q2']]);
+    // The submit's delete is kept at once, so the resend under way carries it too; the submit still sends it.
+    expect(calls().map(([, body]) => body.questionIds)).toEqual([['q1'], ['q1', 'q2'], ['q2'], ['q2']]);
   });
 
   it('goes out with the next submit, before its new text', async () => {

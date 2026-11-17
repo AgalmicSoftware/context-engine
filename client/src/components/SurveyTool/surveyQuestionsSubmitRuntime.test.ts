@@ -287,6 +287,34 @@ describe('surveyQuestionsSubmitRuntime', () => {
     });
   });
 
+  it.each([
+    ['adds to what that Submit reported', false],
+    ['says nothing once a later Submit has started', true],
+  ])('a late AI draft text failure %s', async (_name, laterSubmit) => {
+    const context = createContext();
+    context.propsRef.current.sessionConfig = { interviewMode: { keepDraftTextForAdmins: true } };
+    context.submitSurveyResponse.mockResolvedValueOnce({ __ceQuestionResponses: [{ questionID: 'q1' }] });
+    let failSync: (error: Error) => void = () => undefined;
+    jest.mocked(syncDraftText).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failSync = reject;
+        }),
+    );
+    await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    context.stateRef.current.submissionError = "Some answers didn't save (busy).";
+    if (laterSubmit) context.inst._activeSubmitAttemptSeq = 999;
+    context.setState.mockClear();
+    failSync(new Error('busy'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (laterSubmit) expect(context.setState).not.toHaveBeenCalled();
+    else
+      expect(context.setState).toHaveBeenCalledWith({
+        submissionError:
+          "Some answers didn't save (busy). Your answers were saved, but the AI draft text kept for admins could not be updated.",
+      });
+  });
+
   it('resends kept AI draft text deletes for whoever is signed in, and for no one signed out', () => {
     jest.mocked(resendPendingDraftTextDeletes).mockClear();
     const context = createContext();
