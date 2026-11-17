@@ -44,7 +44,8 @@ test('a name is stored as typed, tidied, and refused with a reason when it could
   for (const [typed, stored] of [
     ['  Sam   Rivera ', 'Sam Rivera'], ['José', 'José'], ['José', 'José'], ['李雷', '李雷'], ["O'Brien-Smith", "O'Brien-Smith"],
     ['J.R. Hall', 'J.R. Hall'], ['Hostetler', 'Hostetler'], ["Sam's agent", "Sam's agent"], ['', ''], ['   ', ''],
-    ['Ελένη', 'Ελένη'], ['Олена', 'Олена'], ['ﬁona', 'fiona'],
+    ['Ελένη', 'Ελένη'], ['Олена', 'Олена'], ['ﬁona', 'fiona'], ['ΕΛΕΝΗ', 'ΕΛΕΝΗ'], ['ОЛЕНА', 'ОЛЕНА'], ['Мира Smith', 'Мира Smith'],
+    ['Ἀλέξανδρος', 'Ἀλέξανδρος'], ['Արամ', 'Արամ'], ['Oxford', 'Oxford'],
   ]) assert.deepEqual(normalizeSessionName(typed), { ok: true, name: stored }, typed);
   for (const [typed, reason] of [
     [undefined, 'empty'], ['x'.repeat(33), 'too_long'], ['Sam (agent)', 'agent_mark'], ['Sam 🙂', 'characters'], ['Sam!', 'characters'],
@@ -53,8 +54,11 @@ test('a name is stored as typed, tidied, and refused with a reason when it could
     ['the host', 'role'], ['Session Agent', 'role'], ['session_agent', 'role'], ['RxC', 'role'], ['Context-Engine', 'role'],
     // Drawn like a role or an address, but spelled otherwise: invisible marks, styled, fullwidth or look-alike letters.
     ['Ad\u034fmin', 'characters'], ['Ad\ufe0fmin', 'characters'], ['\u3164', 'characters'], ['deadbeef\u034fdeadbeef', 'characters'],
-    ['\uff21\uff44\uff4d\uff49\uff4e', 'role'], ['\u{1D400}\u{1D41D}\u{1D426}\u{1D422}\u{1D427}', 'role'], ['\u0410dmin', 'role'],
-    ['0\u04451234...abcd', 'address'], ['vitalik.\u0435th', 'ens'],
+    ['\uff21\uff44\uff4d\uff49\uff4e', 'role'], ['\u{1D400}\u{1D41D}\u{1D426}\u{1D422}\u{1D427}', 'role'], ['\u0410dmin', 'mixed_scripts'],
+    ['0\u04451234...abcd', 'address'], ['vitalik.\u0435th', 'mixed_scripts'], ['vitalik.\u0435\u0442\u04bb', 'ens'], ['A\u{16FE4}dmin', 'characters'],
+    // Each case read by its own shape, and one word in one alphabet.
+    ['\u0397ost', 'mixed_scripts'], ['Ad\u039cin', 'mixed_scripts'], ['H\u0585st', 'mixed_scripts'], ['\u041d\u041e\u0405\u0422', 'role'],
+    ['\ua4ee\ua4d3\ua4df\ua4f2\ua4e0', 'role'], ['\u0251dmin', 'role'], ['Adm\u0131n', 'role'], ['\u0966x1234abcd', 'address'],
   ]) assert.equal(normalizeSessionName(typed).reason, reason, String(typed));
   assert.equal(normalizeSessionName('x'.repeat(32)).ok, true);
   assert.match(normalizeSessionName('Admin').error, /role/);

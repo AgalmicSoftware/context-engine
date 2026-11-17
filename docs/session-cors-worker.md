@@ -3508,11 +3508,15 @@ set; the flag stays advertised, and changing the setting signs no one out).
   inner spaces collapsed), or `{ name: null, setAt: null }` after a removal.
   - A name is 1 to 32 characters of letters, marks and digits in any script,
     spaces and `. - _ '`, with nothing drawn as blank (joiners, variation
-    selectors, fillers). The address, ENS, web-address and role checks read
-    Cyrillic and Greek look-alikes as the Latin letters they resemble.
+    selectors, fillers). A word may mix Latin with none of the alphabets
+    whose letters are drawn like it (Greek, Cyrillic, Armenian, Cherokee,
+    Lisu, Coptic), and the address, ENS, web-address and role checks read
+    such letters, each case by its shape, as the Latin ones they resemble.
+    This covers the common look-alikes, not every confusable Unicode lists.
     Refusals are `400` `{ error, reason }`: `empty`,
     `too_long`, `agent_mark` (a typed "(agent)": the site marks agents),
-    `characters`, `address` (`0x` and hex, or 16 hex digits in a row), `ens`
+    `characters`, `mixed_scripts` (one word in two of those alphabets),
+    `address` (`0x` and hex, or 16 hex digits in a row), `ens`
     (`.eth`), `url_or_email`, `secret`, `role` (admin, administrator,
     moderator, host, organiser, organizer, official, staff, system, results
     admin, session agent, group agent, context engine, RadicalxChange, RxC, as

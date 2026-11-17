@@ -12,7 +12,7 @@ import { createParticipant } from './participant.mjs';
 const fixture = JSON.parse(await readFile(new URL('../../tests/fixtures/worker-compat/previous-minor.json', import.meta.url), 'utf8'));
 const question = fixture.records.find(({ metadata }) => metadata.resource === 'questions').payload;
 
-const run = async (t, { features }) => {
+const run = async (t, { features, config = fixture.config }) => {
   const stateDir = await mkdtemp(join(tmpdir(), 'ce-names-'));
   t.after(() => rm(stateDir, { recursive: true, force: true }));
   const names = [];
@@ -23,7 +23,7 @@ const run = async (t, { features }) => {
     config: { stateDir, profile: { displayName: 'Civic bot' }, appOrigin: 'https://contextengine.sh', trustedAppOrigins: ['https://contextengine.sh'] },
     fetchImpl: async (input, init = {}) => {
       const url = new URL(input);
-      if (url.pathname === '/session-config') return Response.json({ config: fixture.config });
+      if (url.pathname === '/session-config') return Response.json({ config });
       if (url.pathname === '/capabilities') return Response.json({ features });
       if (url.pathname === '/auth/nonce') return Response.json({ nonce: 'fixtureNonce12345' });
       if (url.pathname === '/auth/login') return Response.json({ token: 'fixture-token' });
@@ -81,6 +81,13 @@ test('a Worker that keeps names gets the agent’s name on joining and from set_
   await participant.answer({ answers: [{ questionId: question.id, value: 'agree' }] });
   assert.equal(answers.length, 1);
   assert.equal('responderName' in answers[0], false);
+});
+
+test('a session with names turned off gets no name and says so, even with one saved before', async (t) => {
+  const { participant, names } = await run(t, { features: ['session_names_v1'], config: { ...fixture.config, namesEnabled: false } });
+  const joined = await participant.joinSession({ worker: fixture.config.corsWorkerUrl, session: fixture.config.slug });
+  assert.deepEqual(joined.name, { saved: false, error: 'Names are off in this session.' });
+  assert.deepEqual(names, []);
 });
 
 test('a Worker without names keeps the name in each answer, as before', async (t) => {

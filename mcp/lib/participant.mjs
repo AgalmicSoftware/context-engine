@@ -609,6 +609,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   const keepsNames = async (ctx) => !ctx.registry && !!(await ctx.client.readFeatures())?.includes('session_names_v1');
   const saveName = async (ctx) => {
     if (!(await keepsNames(ctx))) return null;
+    // A name saved before the admin turned names off is still readable, so ask the setting.
+    if (ctx.client.config?.namesEnabled === false) return { saved: false, error: 'Names are off in this session.' };
     const wanted = profile().displayName;
     try {
       // Each change counts against a daily limit, so a name already saved is left as it is.

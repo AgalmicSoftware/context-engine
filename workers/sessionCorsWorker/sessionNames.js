@@ -28,6 +28,7 @@ const REFUSALS = Object.freeze({
   too_long: `A name can be at most ${SESSION_NAME_LIMITS.chars} characters.`,
   agent_mark: 'Agents are marked by the site; leave “(agent)” out of a name.',
   characters: 'Use letters, numbers, spaces and . - _ \' only.',
+  mixed_scripts: 'Write each word in one alphabet.',
   address: 'That looks like an address; choose a name.',
   ens: 'That looks like an ENS name; choose a name.',
   url_or_email: 'That looks like a web address; choose a name.',
@@ -36,15 +37,28 @@ const REFUSALS = Object.freeze({
 });
 const refuse = (reason) => ({ ok: false, reason, error: REFUSALS[reason] });
 
-// Cyrillic and Greek letters drawn like Latin ones, read as those Latin
-// letters when checking for an address or a role, so neither can be spelled
-// in look-alikes. NFKC has already folded fullwidth and styled letters.
+// Letters drawn like Latin ones, read as those Latin letters when checking
+// for an address or a role, each case by its own shape (capital Greek Η is an
+// H, small η an n). NFKC has already folded fullwidth and styled letters, and
+// a word mixing these alphabets is refused outright, so this map only has to
+// cover a whole word written in one of them.
 const LOOK_ALIKES = Object.freeze({
+  А: 'a', В: 'b', Е: 'e', К: 'k', М: 'm', Н: 'h', О: 'o', Р: 'p', С: 'c', Т: 't', У: 'y', Х: 'x', І: 'i', Ј: 'j', Ѕ: 's',
   а: 'a', в: 'b', е: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x', і: 'i', ј: 'j', ѕ: 's',
-  ԁ: 'd', һ: 'h', ԛ: 'q', ԝ: 'w', ӏ: 'l', α: 'a', β: 'b', ε: 'e', ζ: 'z', η: 'n', ι: 'i', κ: 'k', μ: 'u', ν: 'v', ο: 'o',
-  ρ: 'p', τ: 't', υ: 'u', χ: 'x', γ: 'y',
+  ԁ: 'd', һ: 'h', ԛ: 'q', ԝ: 'w', ӏ: 'l',
+  Α: 'a', Β: 'b', Ε: 'e', Ζ: 'z', Η: 'h', Ι: 'i', Κ: 'k', Μ: 'm', Ν: 'n', Ο: 'o', Ρ: 'p', Τ: 't', Υ: 'y', Χ: 'x',
+  α: 'a', β: 'b', ε: 'e', ζ: 'z', η: 'n', ι: 'i', κ: 'k', μ: 'u', ν: 'v', ο: 'o', ρ: 'p', τ: 't', υ: 'u', χ: 'x', γ: 'y',
+  ı: 'i', ȷ: 'j', ɑ: 'a', ɡ: 'g', ʜ: 'h', ɪ: 'i', ʟ: 'l', ɴ: 'n', ᴍ: 'm', ᴅ: 'd', ᴀ: 'a',
+  ꓮ: 'a', ꓐ: 'b', ꓚ: 'c', ꓓ: 'd', ꓰ: 'e', ꓝ: 'f', ꓖ: 'g', ꓧ: 'h', ꓲ: 'i', ꓙ: 'j', ꓗ: 'k', ꓡ: 'l', ꓟ: 'm', ꓠ: 'n',
+  ꓳ: 'o', ꓑ: 'p', ꓣ: 'r', ꓢ: 's', ꓔ: 't', ꓴ: 'u', ꓦ: 'v', ꓪ: 'w', ꓫ: 'x', ꓬ: 'y', ꓜ: 'z',
+  օ: 'o', հ: 'h', ո: 'n', ս: 'u', ց: 'g', ք: 'p',
 });
-const skeleton = (name) => [...name.toLowerCase()].map((char) => LOOK_ALIKES[char] || char).join('');
+const skeleton = (name) => [...name].map((char) => LOOK_ALIKES[char] || char.toLowerCase()).join('')
+  // A zero in any script, then x: the start of an address.
+  .replace(/\p{Nd}(?=x)/gu, '0');
+// Alphabets with letters drawn like Latin ones: a word may use only one of them.
+const LOOK_ALIKE_SCRIPTS = ['Latin', 'Greek', 'Cyrillic', 'Armenian', 'Cherokee', 'Lisu', 'Coptic'].map((script) => new RegExp(`\\p{Script=${script}}`, 'u'));
+const mixesAlphabets = (name) => name.split(/[\s._'-]+/u).some((word) => LOOK_ALIKE_SCRIPTS.filter((script) => script.test(word)).length > 1);
 
 /**
  * The name to store for what a person typed: normalised (NFKC, trimmed, inner
@@ -58,9 +72,10 @@ export const normalizeSessionName = (value) => {
   if ([...name].length > SESSION_NAME_LIMITS.chars) return refuse('too_long');
   if (/\(\s*agent\s*\)/iu.test(name)) return refuse('agent_mark');
   // Characters drawn as nothing (joiners, variation selectors, fillers) could hide inside a word or be a whole name.
-  if (!/^[\p{L}\p{M}\p{N} ._'-]+$/u.test(name) || /\p{Default_Ignorable_Code_Point}/u.test(name) || !/[\p{L}\p{N}]/u.test(name)) {
+  if (!/^[\p{L}\p{M}\p{N} ._'-]+$/u.test(name) || /[\p{Default_Ignorable_Code_Point}\u{16FE4}]/u.test(name) || !/[\p{L}\p{N}]/u.test(name)) {
     return refuse('characters');
   }
+  if (mixesAlphabets(name)) return refuse('mixed_scripts');
   const seen = skeleton(name);
   if (/(^|[^\p{L}\p{N}])0x[0-9a-f]/u.test(seen) || /[0-9a-f]{16}/u.test(seen)) return refuse('address');
   if (/\.eth(\s|$)/u.test(seen)) return refuse('ens');
