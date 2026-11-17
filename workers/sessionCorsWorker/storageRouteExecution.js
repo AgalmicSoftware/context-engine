@@ -216,7 +216,13 @@ const readKvPayloadEnvelope = async ({ index, slug, id, strict = false, maxBytes
   if (!index || typeof index.get !== 'function') return null;
   let raw;
   try {
-    raw = prefetched?.has(id) ? prefetched.get(id) : await index.get(buildPayloadKey({ slug, id }));
+    if (prefetched?.has(id)) {
+      // Read once, then let it go, so a batch holds no more than its items being read.
+      raw = prefetched.get(id);
+      prefetched.delete(id);
+    } else {
+      raw = await index.get(buildPayloadKey({ slug, id }));
+    }
   } catch (error) {
     if (strict) throw error;
     return null;

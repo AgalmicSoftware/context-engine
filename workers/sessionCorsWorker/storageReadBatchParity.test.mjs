@@ -1,6 +1,6 @@
 // A batch read gives each reader exactly what single reads give them, item by
-// item (access checks, an answer's own audience, an item's own rule, research
-// material), while reading every payload in one bulk KV get and asking the
+// item (access checks, the session's rule as it is now, an item's own rule,
+// research material), while reading every payload in one bulk KV get and asking the
 // session's gate once.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -97,16 +97,16 @@ const batch = async (env, config, who, ids, extra) => {
   return (await response.json()).items;
 };
 
-// Answers given under a narrower rule, before the session widened to two
-// groups, one with research material; an answer given to everyone; a question;
-// a context item locked to the second group by its uploader; and an id that
-// was never stored.
+// Answers given before the session widened to two groups: one whose author
+// kept it to the first group, one with research material, one given to
+// everyone; a question; a context item locked to the second group by its
+// uploader; and an id that was never stored.
 const seed = async (env) => {
   const first = configFor(groupLockedAccess(['first']));
   const open = configFor(null);
   return [
     await upload(env, first, ADMIN, { resource: 'questions', data: { id: 'q-1', type: 'binary', prompt: 'Continue?', sessionSlug: 's', sessionId: SESSION_ID } }),
-    await upload(env, first, FIRST, { resource: 'responses', data: answer() }),
+    await upload(env, first, FIRST, { resource: 'responses', accessConditions: groupLockedAccess(['first']), data: answer() }),
     await upload(env, first, FIRST, { resource: 'responses', data: answer({ interviewProvenance: { version: 2, researchTier: 'minimal', blindAnswer: 'Disagree' } }) }),
     await upload(env, open, SECOND, { resource: 'responses', data: answer({ interviewProvenance: { version: 2, researchTier: 'minimal', blindAnswer: 'Agree' } }) }),
     await upload(env, open, ADMIN, { resource: 'docsContext', contentType: 'text/markdown', data: '# Plan', tags: docTags, accessConditions: groupLockedAccess(['second']) }),
@@ -138,11 +138,12 @@ for (const refuseBulk of [false, true]) {
     assert.deepEqual(statuses, {
       signedOut: [403, 403, 403, 403, 403, 404],
       first: [200, 200, 200, 200, 403, 404],
-      second: [200, 403, 403, 200, 200, 404],
+      second: [200, 403, 200, 200, 200, 404],
       admin: [200, 200, 200, 200, 200, 404],
     });
     // Research material reaches an answer's author and the admins, and no other reader.
     const research = async (who, id) => JSON.parse((await batch(env, WIDENED, who, [id]))[0].text);
+    assert.equal((await research(SECOND, ids[2])).interviewProvenanceWithheld, true);
     assert.equal('interviewProvenance' in await research(ADMIN, ids[3]), true);
     assert.equal('interviewProvenance' in await research(SECOND, ids[3]), true);
     assert.equal((await research(FIRST, ids[3])).interviewProvenanceWithheld, true);
@@ -174,5 +175,5 @@ test('a batch on an SBT-gated session checks the reader’s tokens once, not per
   checks.length = 0;
   const refused = await batch(env, gated, SECOND, ids, sbt(false));
   assert.deepEqual(refused.map((item) => [item.status, item.error]), ids.map(() => [403, 'Access denied: Cloudflare worker SBT gate failed.']));
-  assert.equal(checks.length >= 1, true);
+  assert.equal(checks.length, ids.length, 'each refusal asks again');
 });
