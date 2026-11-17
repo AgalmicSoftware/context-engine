@@ -1220,17 +1220,20 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
   // does the few pixels a finger drifts during an ordinary tap.
   engine._pileScrollListener = (event: Event) => {
     if (!(event.target instanceof Node && engine.pileContainer?.contains(event.target))) return;
-    const touch = (event as TouchEvent).touches?.[0];
+    // Each finger is measured from where it went down, so a second finger dragging while the first rests counts.
+    const fingers = Array.from((event as TouchEvent).changedTouches ?? []);
     if (event.type === 'touchstart') {
-      engine._pileTouchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
+      engine._pileTouchStarts ??= new Map();
+      fingers.forEach((finger) =>
+        engine._pileTouchStarts.set(finger.identifier, { x: finger.clientX, y: finger.clientY }),
+      );
       return;
     }
-    const start = engine._pileTouchStart;
-    if (
-      event.type === 'touchmove' &&
-      (!touch || !start || Math.hypot(touch.clientX - start.x, touch.clientY - start.y) < SCROLL_MOVE_PX)
-    )
-      return;
+    const dragged = (finger: Touch) => {
+      const start = engine._pileTouchStarts?.get(finger.identifier);
+      return !!start && Math.hypot(finger.clientX - start.x, finger.clientY - start.y) >= SCROLL_MOVE_PX;
+    };
+    if (event.type === 'touchmove' && !fingers.some(dragged)) return;
     engine._pileLastScrollAt = Date.now();
   };
   ['touchstart', 'touchmove', 'wheel'].forEach((type) =>

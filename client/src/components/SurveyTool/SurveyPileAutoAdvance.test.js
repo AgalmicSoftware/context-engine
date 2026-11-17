@@ -130,8 +130,8 @@ it('never moves on from a tap that ended a scroll, or once the person scrolls th
   const pile = await mountPile();
   const drag = (distance) => {
     const target = within(card()).getAllByRole('radio')[0].closest('div');
-    fireEvent.touchStart(target, { touches: [{ clientX: 100, clientY: 300 }] });
-    fireEvent.touchMove(target, { touches: [{ clientX: 100, clientY: 300 - distance }] });
+    fireEvent.touchStart(target, { changedTouches: [{ identifier: 0, clientX: 100, clientY: 300 }] });
+    fireEvent.touchMove(target, { changedTouches: [{ identifier: 0, clientX: 100, clientY: 300 - distance }] });
   };
   const scrollCard = () => drag(30);
   scrollCard();
@@ -150,10 +150,22 @@ it('never moves on from a tap that ended a scroll, or once the person scrolls th
 it('moves on after a tap whose finger drifted a few pixels', async () => {
   await mountPile();
   const target = within(card()).getByRole('radio', { name: 'Agree' }).closest('label');
-  fireEvent.touchStart(target, { touches: [{ clientX: 100, clientY: 300 }] });
-  fireEvent.touchMove(target, { touches: [{ clientX: 103, clientY: 296 }] });
+  fireEvent.touchStart(target, { changedTouches: [{ identifier: 0, clientX: 100, clientY: 300 }] });
+  fireEvent.touchMove(target, { changedTouches: [{ identifier: 0, clientX: 103, clientY: 296 }] });
   choose('radio', 'Agree');
   await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 6'));
+});
+
+it('counts a scroll made by a second finger while the first rests', async () => {
+  const pile = await mountPile();
+  const target = within(card()).getByRole('radio', { name: 'Agree' }).closest('label');
+  fireEvent.touchStart(target, { changedTouches: [{ identifier: 0, clientX: 100, clientY: 300 }] });
+  fireEvent.touchStart(target, { changedTouches: [{ identifier: 1, clientX: 200, clientY: 300 }] });
+  fireEvent.touchMove(target, { changedTouches: [{ identifier: 1, clientX: 200, clientY: 200 }] });
+  choose('radio', 'Agree');
+  await pause(TEST_DELAY_MS * 2);
+  expect(answer(pile, 'q1')).toBe('Agree');
+  expect(card()).toHaveAccessibleName('Question 1 of 6');
 });
 
 it('uses updated session config and leaves multi-select and final questions in place', async () => {
