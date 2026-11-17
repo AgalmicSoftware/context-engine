@@ -187,8 +187,8 @@ export type SurveyQuestionsInstanceFields = {
   _responseHydrationStateUpdateDepth: number;
   // Questions whose saved answers this view loaded into its form; any other question always loads.
   _savedAnswersLoadedQids: Set<string>;
-  // View all only: questions whose draft was restored in this view.
-  _viewAllSync: { restored: Set<string> } | null;
+  // View all only: questions whose draft was restored in this view, and whether drafts could be read.
+  _viewAllSync: { restored: Set<string>; storeReady: boolean } | null;
   _surveyDecryptAttemptSeq: number;
   _activeSurveyDecryptAttemptSeq: number;
   _submitAttemptSeq: number;

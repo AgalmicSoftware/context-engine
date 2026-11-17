@@ -1301,3 +1301,112 @@ it('keeps the interview notice away after Clear discards the unsaved answers', a
   expect(h.engine().getPendingEditStats().total).toBe(1);
   expect(screen.queryByText(/answer on the page/)).not.toBeInTheDocument();
 });
+
+describe('unsent answers in View all', () => {
+  const BINARY_QUESTION = { id: BINARY_QID, type: 'binary', prompt: 'Binary question' };
+  const BOTH = [BINARY_QUESTION, FREEFORM_QUESTION];
+  const SIGNED_OUT = { account: '', loginComplete: false, provider: null };
+  const SIGNED_IN = { account: OWNER, loginComplete: true, provider: { request: jest.fn() } };
+  const form = (h) => {
+    const slice = h.editor().state.surveysResponseState[0];
+    return [slice.answers[BINARY_QID]?.value, slice.answers[FREEFORM_QID]?.value];
+  };
+  const answerBoth = async (h) => {
+    await act(async () => h.editor().handleAnswer(0, BINARY_QID, 'Yes'));
+    await act(async () => h.editor().handleAnswer(0, FREEFORM_QID, 'Unsent words'));
+    await settle();
+  };
+  // A reload starts with no account; a signed-in browser gets it back a moment later.
+  const reload = async (h, signedIn) => {
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    h.unmount();
+    await h.mountEditor({ questionPool: BOTH, ...SIGNED_OUT });
+    if (signedIn) {
+      await act(async () => h.rerender(SIGNED_IN));
+      await settle();
+    }
+  };
+
+  it.each([
+    ['signed in', true],
+    ['signed out', false],
+  ])('keeps every answer through a failed Submit and a reload, %s', async (_label, signedIn) => {
+    const h = await fixture();
+    await h.mountEditor({ questionPool: BOTH, ...(signedIn ? SIGNED_IN : SIGNED_OUT) });
+    await answerBoth(h);
+    h.submitResponses.mockRejectedValueOnce(new Error('Network down'));
+    await h.click();
+    await settle();
+    if (signedIn) expect(h.editor().state.submissionError).toBeTruthy();
+    await reload(h, signedIn);
+    expect(form(h)).toEqual(['Yes', 'Unsent words']);
+  });
+
+  it('keeps answers typed before signing in, after the sign-in and a reload', async () => {
+    const h = await fixture();
+    await h.mountEditor({ questionPool: BOTH, ...SIGNED_OUT });
+    await answerBoth(h);
+    await act(async () => h.rerender(SIGNED_IN));
+    await settle();
+    expect(form(h)).toEqual(['Yes', 'Unsent words']);
+    await reload(h, true);
+    expect(form(h)).toEqual(['Yes', 'Unsent words']);
+  });
+
+  it('restores drafts the list could not read at first, and an edit keeps the others', async () => {
+    const h = await fixture();
+    await h.mountEditor({ questionPool: BOTH });
+    await answerBoth(h);
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    h.unmount();
+    // After the reload the session's draft store is unknown until its config resolves.
+    contractScriptsModule.getSessionConfigBySlug.mockReturnValue(null);
+    await h.mountEditor({ questionPool: BOTH, sessionConfig: null });
+    expect(h.editor().getDraftKey()).toBeNull();
+    contractScriptsModule.getSessionConfigBySlug.mockReturnValue(CONFIG);
+    // A render that changes nothing the list watches.
+    await act(async () => h.rerender({}));
+    await settle();
+    expect(form(h)).toEqual(['Yes', 'Unsent words']);
+    await act(async () => h.editor().handleAnswer(0, FREEFORM_QID, 'Unsent words, more'));
+    await settle();
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    const stored = JSON.parse(sessionStorage.getItem(h.editor().getDraftKey())).answers;
+    expect([stored[BINARY_QID]?.value, stored[FREEFORM_QID]?.value]).toEqual(['Yes', 'Unsent words, more']);
+  });
+
+  it('never drops the stored draft of a question the list has not restored', async () => {
+    const h = await fixture();
+    await h.mountEditor({ questionPool: BOTH });
+    await answerBoth(h);
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    h.unmount();
+    await h.mountEditor({ questionPool: BOTH });
+    // As if the binary question's draft had not been restored: the form shows it blank.
+    h.editor()._viewAllSync.restored.delete(BINARY_QID);
+    act(() =>
+      h.editor().setState((prev) => {
+        const slice = prev.surveysResponseState[0];
+        const answers = { ...slice.answers, [BINARY_QID]: { ...slice.answers[BINARY_QID], value: '' } };
+        return { surveysResponseState: [{ ...slice, answers }], editBaseline: { ...prev.editBaseline, answers } };
+      }),
+    );
+    await settle();
+    expect(form(h)[0]).toBe('');
+    await act(async () => h.editor().handleAnswer(0, FREEFORM_QID, 'Edited'));
+    await settle();
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    const stored = JSON.parse(sessionStorage.getItem(h.editor().getDraftKey())).answers;
+    expect([stored[BINARY_QID]?.value, stored[FREEFORM_QID]?.value]).toEqual(['Yes', 'Edited']);
+  });
+});

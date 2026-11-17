@@ -56,7 +56,7 @@ const createDeps = ({
   },
   setState: jest.fn(),
   setResponseHydrationState: jest.fn(),
-  drafts: { load: loadDraft, persist: jest.fn(), clear: jest.fn() },
+  drafts: { load: loadDraft, persist: jest.fn(), clear: jest.fn(), ready: () => true },
   questionIds: {
     rendered: jest.fn(() => ['q1']),
     editTracking: jest.fn(() => new Set<string>()),

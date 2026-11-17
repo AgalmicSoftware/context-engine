@@ -486,7 +486,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     stateRef,
     setState: setState.bind(engine),
     setResponseHydrationState: setResponseHydrationState.bind(engine),
-    drafts: { load: () => loadDraft(), persist: () => persistDraft(), clear: clearDraft },
+    drafts: { load: () => loadDraft(), persist: () => persistDraft(), clear: clearDraft, ready: () => !!getDraftKey() },
     questionIds: {
       rendered: getCurrentRenderedQuestionIds,
       editTracking: () => getEditTrackingQuestionIds(),
@@ -795,7 +795,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       })();
     } else {
       // Standalone mode (question pool passed as prop): the View all editor.
-      inst._viewAllSync = { restored: new Set() };
+      inst._viewAllSync = { restored: new Set(), storeReady: false };
       const initialSlice: SurveyQuestionsLegacyValue = initializeSurveyResponseState();
       setState(
         buildInitialStandaloneResponseState({
@@ -957,6 +957,10 @@ export const createSurveyQuestionsRuntimeMethods = (
       prevState.autoDecryptEnabled === stateRef.current.autoDecryptEnabled &&
       prevState.showComments === stateRef.current.showComments &&
       prevState.prefillQueuedAfterCache === stateRef.current.prefillQueuedAfterCache;
+    // View all's drafts become readable once the session's config resolves, which can change no
+    // prop at all; until then no question is marked restored.
+    if (inst._viewAllSync && !inst._viewAllSync.storeReady && getDraftKey()) syncViewAllQuestions();
+
     if (shouldShortCircuitUpdate) {
       bumpSurveyPerfCounter('noopSkipCount');
       return;

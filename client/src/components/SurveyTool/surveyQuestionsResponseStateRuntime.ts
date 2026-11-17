@@ -61,7 +61,7 @@ export type SurveyQuestionsResponseStateDeps = {
   stateRef: { current: SurveyQuestionsState };
   setState: SetSurveyQuestionsState;
   setResponseHydrationState: SetSurveyQuestionsState;
-  drafts: { load: () => SurveyQuestionsLegacyValue; persist: () => void; clear: () => void };
+  drafts: { load: () => SurveyQuestionsLegacyValue; persist: () => void; clear: () => void; ready: () => boolean };
   questionIds: { rendered: () => string[]; editTracking: () => Set<string>; hydration: () => string[] };
   getQuestionById: (questionId: string) => { type?: unknown } | null | undefined;
   buildEmptyResponseFieldState: (questionId?: string, fieldKey?: string) => unknown;
@@ -95,7 +95,7 @@ export const createSurveyQuestionsResponseStateRuntime = ({
   stateRef,
   setState,
   setResponseHydrationState,
-  drafts: { load: loadDraft, persist: persistDraft, clear: clearDraft },
+  drafts: { load: loadDraft, persist: persistDraft, clear: clearDraft, ready: isDraftStoreReady },
   questionIds: {
     rendered: getCurrentRenderedQuestionIds,
     editTracking: getEditTrackingQuestionIds,
@@ -450,7 +450,13 @@ export const createSurveyQuestionsResponseStateRuntime = ({
     const loadIds = listed.filter((questionId: string) =>
       savedAnswersKnown ? !loadedIds.has(questionId) || !formHeld : !formHeld,
     );
-    const restoreIds = current.startFresh ? [] : listed.filter((questionId: string) => !sync.restored.has(questionId));
+    // A question counts as restored only once its draft could be read: one marked while the
+    // session's draft store was unknown would never get its draft, and its next save would drop it.
+    sync.storeReady = isDraftStoreReady();
+    const restoreIds =
+      current.startFresh || !sync.storeReady
+        ? []
+        : listed.filter((questionId: string) => !sync.restored.has(questionId));
     if (!loadIds.length && !restoreIds.length) return;
     // Marked from the committed state; the update below skips any question no longer listed.
     if (savedAnswersKnown) loadIds.forEach((questionId: string) => loadedIds.add(questionId));
