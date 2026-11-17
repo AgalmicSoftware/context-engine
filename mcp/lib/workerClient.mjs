@@ -349,32 +349,36 @@ export const createWorkerClient = ({
 
   /**
    * Lists a resource, following cursors (pages can be empty), up to
-   * `maxItems` items and a time budget. `complete` is false when cut short.
+   * `maxItems` items and a time budget. `complete` is false when cut short,
+   * and `stopped` says why: 'max', 'deadline', 'aborted' or 'pages'.
    */
   const listAll = async (
     resource,
-    { mine = false, maxItems = DEFAULT_MAX_LIST_ITEMS, maxPages = MAX_LIST_PAGES, deadlineMs = LIST_DEADLINE_MS, signal = null } = {},
+    { mine = false, maxItems = DEFAULT_MAX_LIST_ITEMS, maxPages = MAX_LIST_PAGES, pageSize = 100, deadlineMs = LIST_DEADLINE_MS, signal = null } = {},
   ) => {
     const items = [];
     const deadline = now() + deadlineMs;
     const seenCursors = new Set();
     let cursor = '';
     for (let page = 0; page < maxPages; page += 1) {
-      const query = new URLSearchParams({ resource, limit: '100' });
+      // A Worker sends at most its own page size, whatever is asked.
+      const query = new URLSearchParams({ resource, limit: String(pageSize) });
       if (mine) query.set('mine', 'true');
       if (cursor) query.set('cursor', cursor);
       const data = await request(`/storage/list?${query}`, { auth: true });
       const pageItems = Array.isArray(data?.items) ? data.items.filter(isRecord) : [];
       const kept = pageItems.slice(0, Math.max(0, maxItems - items.length));
       items.push(...kept);
-      if (kept.length < pageItems.length) return { items, complete: false };
+      if (kept.length < pageItems.length) return { items, complete: false, stopped: 'max' };
       cursor = text(data?.cursor);
       if (!cursor || data?.listComplete === true) return { items, complete: true };
       if (seenCursors.has(cursor)) throw new WorkerRequestError('The Worker repeated a list cursor.');
       seenCursors.add(cursor);
-      if (items.length >= maxItems || now() >= deadline || signal?.aborted) return { items, complete: false };
+      if (items.length >= maxItems) return { items, complete: false, stopped: 'max' };
+      if (now() >= deadline) return { items, complete: false, stopped: 'deadline' };
+      if (signal?.aborted) return { items, complete: false, stopped: 'aborted' };
     }
-    return { items, complete: false };
+    return { items, complete: false, stopped: 'pages' };
   };
 
   const read = async (id) => {

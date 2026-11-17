@@ -214,13 +214,13 @@ export const buildTools = (participant) => [
     name: 'get_results',
     title: 'Get results',
     description:
-      'Summarize everyone’s latest answers per question when the session shows results to everyone or to its signed-in members: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished (it stops after about 40 seconds so the call returns in time), capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
+      'Summarize everyone’s latest answers per question when the session shows results to everyone or to its signed-in members: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished (it stops after about 40 seconds so the call returns in time), capped, or any listed question or answer payload could not be read; then the counts are not the session’s totals, and next says why and how to read the rest. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
     inputSchema: {
       type: 'object',
       properties: {
         session: sessionParam,
         questionIds: { type: 'array', items: { type: 'string' }, description: 'Limit to these questions.' },
-        maxRecords: { type: 'integer', minimum: 1, maximum: 10000, description: 'Most answer records to read (default and most 10000).' },
+        maxRecords: { type: 'integer', minimum: 1, maximum: 10000, description: 'Most answer records to read, newest first (default and most 10000). Fewer than the session holds gives partial counts.' },
       },
       additionalProperties: false,
     },

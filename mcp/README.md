@@ -505,9 +505,13 @@ unknown `CE_MCP_*` name.
   records, newest first (`maxRecords` reads fewer): 100 to a request, two
   requests at a time, from a Worker that offers batch reads, and otherwise
   one to a request, 16 at a time. Questions are read the same way. It lists
-  answers for at most 20 seconds and reads them until 40, then answers with
-  `partial: true`, so it returns within a host's usual 60-second limit. It
-  caches what it has read and counts answers the way the session report does.
+  answers up to 500 a page where the Worker sends that many, for at most 20
+  seconds, and reads them until 40, then answers with `partial: true`, so it
+  returns within a host's usual 60-second limit. A partial result's `next`
+  says the counts are not the session's totals, why (the `maxRecords` cap,
+  the 10,000-record cap, the time limit or unread records) and how to read
+  the rest. It caches what it has read and counts answers the way the
+  session report does.
 - **Large sessions.** The server also remembers what the agent answered. A
   tool call waits at most 2 seconds for the agent's earlier answers from the
   Session Worker; past that, the questions come back with a note, and the

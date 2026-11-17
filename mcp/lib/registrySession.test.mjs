@@ -912,6 +912,7 @@ for (const end of [5, undefined]) test(`public registry handlers apply the confi
   assert.deepEqual(listed.questions.map((question) => question.id), end ? [qid] : [qid, otherId]);
   const results = (await call('get_results')).structuredContent;
   assert.equal(results.partial, false);
+  assert.equal(results.next, undefined);
   assert.deepEqual(results.questions.map((question) => question.questionId), end ? [qid] : [qid, otherId]);
   assert.equal(results.questions[0].counts[end ? 'Agree' : 'Disagree'], 1);
   assert.ok(scans.every((scan) => scan.fromBlock >= 2 && scan.toBlock <= (end || 10)));
@@ -956,6 +957,25 @@ for (const blockLimits of [{ start: 2, end: 1 }, { start: -1 }, { start: 2, end:
   });
 }
 
+test('an on-chain result capped by maxRecords blames maxRecords, not the scan, whatever was kept', async (t) => {
+  const f = fixture({ blockLimits: { start: 2, end: 10 } });
+  const { call } = await serveRegistry(t, f);
+  await call('join_session', { link });
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'First', type: 'binary' }, 3);
+  f.addQuestion(otherId, { sessionSlug: 'town', prompt: 'Second', type: 'binary' }, 3);
+  f.addQuestion(blockedId, { sessionSlug: 'town', prompt: 'Third', type: 'binary' }, 3);
+  f.addResponse(qid, { questionID: qid, answer: { value: 'Agree' } }, 4);
+  f.addResponse(otherId, { questionID: otherId, answer: { value: 'Agree' } }, 5);
+  // The newest answer belongs to another session, so only one of the two read is kept.
+  f.addResponse(blockedId, { questionID: blockedId, sessionSlug: 'elsewhere', answer: { value: 'Agree' } }, 6);
+  const results = (await call('get_results', { maxRecords: 2 })).structuredContent;
+  assert.equal(results.partial, true);
+  assert.match(results.next, /do not report them as the session’s results\. Only the newest 2 answer records were counted, because you passed maxRecords 2\. Call get_results again without maxRecords for the whole session\.$/);
+  const whole = (await call('get_results')).structuredContent;
+  assert.equal(whole.partial, false);
+  assert.equal(whole.next, undefined);
+});
+
 test('a configured end beyond the head is capped for both scans and pointer reads', async (t) => {
   const f = fixture({ blockLimits: { start: 2, end: 20 } });
   const getLogs = f.options.provider.getLogs;
@@ -988,6 +1008,7 @@ test('an unavailable bounded pointer keeps results partial without reading lates
   const results = (await call('get_results')).structuredContent;
   assert.equal(results.partial, true);
   assert.equal(results.unreadAnswers, 1);
+  assert.match(results.next, /^These counts are partial: .* do not report them as the session’s results\. 1 answer record could not be read and was left out\. Call get_results again in a minute to read it\.$/);
   assert.equal(results.questions[0].responses, 0);
   assert.ok(reads.length > 0);
   assert.ok(reads.every((options) => options?.blockTag === 5));
