@@ -1,5 +1,6 @@
 import WorkerResponseHydrationNotice from './WorkerResponseHydrationNotice';
-import SavedAnswersNotice from './SavedAnswersNotice';
+import SavedAnswersNotice, { isSavedAnswersRoute } from './SavedAnswersNotice';
+import { hasRouteCacheInitializationError } from './mainSiteRouteSessionNetwork';
 /** @file AppShell.tsx */
 
 import React, { Component } from 'react';
@@ -4007,15 +4008,14 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           sessionSlug={this.getSessionSlugFromProps()}
           partialRuns={this.state.partialWorkerResponseRuns}
         />
-        {hasActiveSessionRoute && (
+        {hasActiveSessionRoute && isSavedAnswersRoute(effectivePath) && (
           <SavedAnswersNotice
             sessionConfig={activeRouteSessionConfig}
+            sessionSlug={this.getSessionSlugFromProps()}
             signedIn={!!this.props.account && !!this.props.loginComplete}
-            // A partial load has its own notice and never becomes ready.
-            answersLoaded={
-              !!this.state.isResponsesCacheReady ||
-              Object.values(this.state.partialWorkerResponseRuns || {}).some(Boolean)
-            }
+            answersReady={!!this.state.isResponsesCacheReady}
+            answersFailed={hasRouteCacheInitializationError(this)}
+            partialRuns={this.state.partialWorkerResponseRuns}
           />
         )}
         {mainViewDisplay}

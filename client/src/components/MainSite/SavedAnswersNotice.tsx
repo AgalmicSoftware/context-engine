@@ -1,32 +1,71 @@
 import React, { useEffect, useState } from 'react';
 import { isWorkerCanonicalSessionConfig } from '../../utilities/survey/workerResponseHydration';
+import { resolveWorkerResponseHydrationRun } from '../../utilities/survey/workerResponseHydrationRuntime';
 
 export const SAVED_ANSWERS_SLOW_MS = 20_000;
+// A saved sign-in comes back a moment after the page loads; until then the person only looks signed out.
+export const SIGNED_OUT_NOTICE_DELAY_MS = 3_000;
+
+/** The session pages that hold the answer form: the session itself and its questions view, not docs or settings. */
+export const isSavedAnswersRoute = (path: string): boolean => {
+  const [root, , section = '', sub = ''] = String(path || '')
+    .toLowerCase()
+    .split('/')
+    .filter(Boolean);
+  return root === 'session' && (section === '' || (section === 'questions' && ['', 'results'].includes(sub)));
+};
+
+/** True once `active` has held for `ms`; false again as soon as it stops. */
+const useHeldFor = (active: boolean, ms: number): boolean => {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (!active) return undefined;
+    const timer = setTimeout(() => setHeld(true), ms);
+    return () => {
+      clearTimeout(timer);
+      setHeld(false);
+    };
+  }, [active, ms]);
+  return active && held;
+};
 
 /**
  * On a Worker session the form finds a person's saved answers only inside the session's full answer
  * list, so until that list has loaded their answered questions look blank. Says so, instead of
- * letting a returning person think their answers are gone.
+ * letting a returning person think their answers are gone. A failed load has its own message.
  */
 export default function SavedAnswersNotice({
   sessionConfig,
+  sessionSlug,
   signedIn,
-  answersLoaded,
+  answersReady,
+  answersFailed,
+  partialRuns,
 }: {
   sessionConfig: unknown;
+  sessionSlug: string;
   signedIn: boolean;
-  answersLoaded: boolean;
+  answersReady: boolean;
+  answersFailed: boolean;
+  partialRuns?: Record<string, boolean>;
 }) {
-  const loading = signedIn && !answersLoaded;
-  const [slow, setSlow] = useState(false);
-  useEffect(() => {
-    setSlow(false);
-    if (!loading) return undefined;
-    const timer = setTimeout(() => setSlow(true), SAVED_ANSWERS_SLOW_MS);
-    return () => clearTimeout(timer);
-  }, [loading]);
-  if (!isWorkerCanonicalSessionConfig(sessionConfig)) return null;
-  if (!signedIn) {
+  // A private session's shell loads no answers; the page reads the session again once the person is let in.
+  const workerSession =
+    isWorkerCanonicalSessionConfig(sessionConfig) && !(sessionConfig as { privateSession?: unknown })?.privateSession;
+  let partial = false;
+  if (workerSession && partialRuns) {
+    try {
+      const run = resolveWorkerResponseHydrationRun({ sessionConfig, sessionSlug });
+      partial = !!run && !!partialRuns[run.key];
+    } catch {
+      partial = false;
+    }
+  }
+  // A partial load has its own notice and never becomes ready.
+  const loading = workerSession && signedIn && !answersReady && !partial && !answersFailed;
+  const slow = useHeldFor(loading, SAVED_ANSWERS_SLOW_MS);
+  const signedOut = useHeldFor(workerSession && !signedIn, SIGNED_OUT_NOTICE_DELAY_MS);
+  if (signedOut) {
     return (
       <div className="alert alert-info" role="status">
         Answered before? Log in to see your saved answers.
