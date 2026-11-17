@@ -50,6 +50,17 @@ describe('MultichoiceQuestionInput', () => {
     expect(onChange).toHaveBeenCalledWith(['Beta']);
   });
 
+  it('says whether the question takes one option or any number', () => {
+    const { rerender } = render(
+      <MultichoiceQuestionInput questionId="q1" options={['Alpha', 'Beta']} isSingleSelect />,
+    );
+    expect(screen.getByText('Pick one')).toBeInTheDocument();
+
+    rerender(<MultichoiceQuestionInput questionId="q1" options={['Alpha', 'Beta']} />);
+    expect(screen.getByText('Pick any')).toBeInTheDocument();
+    expect(screen.queryByText('Pick one')).not.toBeInTheDocument();
+  });
+
   it('does not emit value changes when disabled', () => {
     const onChange = jest.fn();
     render(
