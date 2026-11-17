@@ -230,6 +230,16 @@ export async function runGates(gates, options = {}) {
   const startedAt = Date.now();
   activeRuns.add(thisRun);
 
+  // Tests that wait on timers fail on a machine that is busy with other work, and the log of such a run
+  // should say so itself: the one-minute load average is printed at both ends, with a warning at the start.
+  const cores = options.cores || os.availableParallelism();
+  const loadAverage = options.loadAverage || (() => os.loadavg()[0]);
+  const loadAtStart = loadAverage();
+  output.write(`CI gates starting: load average ${loadAtStart.toFixed(1)} on ${cores} cores\n`);
+  if (loadAtStart >= cores) {
+    output.write('This machine is already busy. A timeout in this run may be the load and not the code; rerun it alone before believing one.\n');
+  }
+
   const status = await runLanes(gates, laneOf, (gate) => runLanes(gate.commands, laneOf, async (entry) => {
     if (thisRun.stopping) return 1;
     if (!sideBySide) output.write(`\n[ci-gate:${entry.gate}] ${entry.label}\n`);
@@ -260,10 +270,12 @@ export async function runGates(gates, options = {}) {
     const state = { null: 'not run', 0: 'ok' }[exit] || 'FAILED';
     output.write(`${time.padStart(8)} s  ${state.padEnd(7)}  ${gate}: ${label}\n`);
   }
+  const loadAtEnd = loadAverage();
   output.write(`${wallSeconds.toFixed(1).padStart(8)} s  wall time${sideBySide ? ', lanes side by side' : ''}\n`);
+  output.write(`load average ${loadAtStart.toFixed(1)} at the start, ${loadAtEnd.toFixed(1)} at the end, on ${cores} cores\n`);
   if (thisRun.stopping) output.write('CI gate run stopped before it finished\n');
   if (options.timingsPath) {
-    fs.writeFileSync(options.timingsPath, `${JSON.stringify({ wallSeconds, sideBySide, commands: timings }, null, 2)}\n`);
+    fs.writeFileSync(options.timingsPath, `${JSON.stringify({ wallSeconds, sideBySide, cores, loadAtStart, loadAtEnd, commands: timings }, null, 2)}\n`);
   }
   // A stopped run has not run everything, whatever the commands it cut short returned.
   return thisRun.stopping && status === 0 ? 1 : status;

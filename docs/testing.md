@@ -60,7 +60,11 @@ node scripts/run-ci-gates.mjs --profile ci --serial
 Every run ends with the time each command took, and `--timings <file>` also
 writes them as JSON. Run the profile on an otherwise idle machine: side by
 side it uses most of the cores, and tests that wait on real timers can time
-out under other load.
+out under other load. A run prints the machine's one-minute load average when
+it starts and when it ends, and warns if it starts with the load at or above
+the number of cores, so a run spoiled by other work can be told from its own
+log. Where the machine cannot be kept idle, `CLIENT_TEST_SHARD_CONCURRENCY=4`
+together with `--serial` trades time for slack.
 
 To stop a run, stop its process group (Ctrl-C in a terminal does). A stop
 signal sent to the runner alone ends the commands in flight, prints what they

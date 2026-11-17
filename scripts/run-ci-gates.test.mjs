@@ -229,7 +229,49 @@ test('every run reports how long each command took', async () => {
     output: { write(text) { written.push(text); } },
   });
   const report = written.join('');
-  assert.match(report, /CI gate timings\n +\d+\.\d s {2}ok {7}wiring: lint\n +\d+\.\d s {2}FAILED {3}wiring: types\n +\d+\.\d s {2}wall time\n$/);
+  assert.match(report, /CI gate timings\n +\d+\.\d s {2}ok {7}wiring: lint\n +\d+\.\d s {2}FAILED {3}wiring: types\n +\d+\.\d s {2}wall time\nload average /);
+});
+
+test('a run says how busy the machine was, and warns when it starts on a busy one', async () => {
+  const reportWith = async (loads) => {
+    const written = [];
+    await runGates([gate('wiring', [command('lint', 'lint')])], {
+      async run() { return { status: 0 }; },
+      output: { write(text) { written.push(text); } },
+      cores: 8,
+      loadAverage: () => loads.shift(),
+    });
+    return written.join('');
+  };
+  const warning = /This machine is already busy\. A timeout in this run may be the load and not the code/;
+
+  const quiet = await reportWith([2.04, 6.5]);
+  assert.match(quiet, /^CI gates starting: load average 2\.0 on 8 cores\n/);
+  assert.match(quiet, /\nload average 2\.0 at the start, 6\.5 at the end, on 8 cores\n$/);
+  assert.doesNotMatch(quiet, warning);
+
+  assert.doesNotMatch(await reportWith([7.9, 9]), warning);
+  assert.match(await reportWith([8, 9]), warning);
+  assert.match(await reportWith([41.3, 38]), warning);
+});
+
+test('the timings file records the machine load with the commands', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-gate-load-'));
+  const timingsPath = path.join(dir, 'timings.json');
+  const loads = [3.25, 12.5];
+  try {
+    await runGates([gate('wiring', [command('lint', 'lint')])], {
+      async run() { return { status: 0 }; },
+      output: quiet,
+      cores: 8,
+      loadAverage: () => loads.shift(),
+      timingsPath,
+    });
+    const { cores, loadAtStart, loadAtEnd, commands } = JSON.parse(readFileSync(timingsPath, 'utf8'));
+    assert.deepEqual([cores, loadAtStart, loadAtEnd, commands.length], [8, 3.25, 12.5, 1]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('a command a failed lane never reached is reported as not run, and --timings writes the same rows', async () => {
