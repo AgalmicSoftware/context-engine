@@ -396,7 +396,7 @@ by elimination: leaving an address off is not anonymity within a small group.
 | `unreadableContext` | Context items that will never be read: stored text that is missing, larger than 1 MiB, or empty, such as a link whose page gave no text |
 | `resultsNotForEveryone` | 1 when the published results stayed out because not everyone the session admits may see them |
 | `membersWithoutAddress` | Group members with no address |
-| `answersNotRead` | 1 when every question and answer stayed out because the session stores more question and answer versions than the agent can read at once (10,000) |
+| `answersNotRead` | 1 when every question and answer stayed out because the session's stored questions and answers pass a limit on what the agent reads at once, such as 10,000 versions or 8 MiB of answers |
 
 Withheld and locked answers, hidden questions, secrets, keys and Worker
 addresses are never in the file. The `results` items are the text of the
@@ -570,8 +570,8 @@ other signed-in routes.
   someone signed in. `questions` lists up to five `{ id, question }` closest to
   the one asked, and `questionsFrom` says whether they are questions whose
   `answers` the prompt held or ones the published `results` cite. The answer is at most
-  1,500 characters. `note` says what wasn't read: members' answers past the
-  stored-versions limit, or context past the 320,000 characters or 48 items
+  1,500 characters. `note` says what wasn't read: members' answers past a
+  read limit (10,000 versions, 8 MiB of answers or 32 MiB stored), or context past the 320,000 characters or 48 items
   (160,000 on Cloudflare's model; "Some of the session's context wasn't read: …").
 - `POST /session-agent/opt-out` with `{ optedOut: true | false }` returns
   `{ optedOut }`.

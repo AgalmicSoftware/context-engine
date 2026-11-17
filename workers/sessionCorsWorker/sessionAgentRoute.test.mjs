@@ -176,6 +176,17 @@ test('General answers read the context, open files and visible results, never an
 
 const NOT_ALL_READ = 'Some of the session’s context wasn’t read: the Session Agent reads at most 320,000 characters or 48 items of it, and 12,000 characters of any one.';
 
+test('an answer past a build limit and the context limit says both, answers first', async () => {
+  const h = await seeded();
+  for (let index = 0; index < 28; index += 1) {
+    const name = `LONG${String(index).padStart(2, '0')}`;
+    await idOf(await h.uploadFile({ name: `${name}.md`, type: 'text/markdown', bytes: encode(`${name} `.repeat(1800)) }));
+  }
+  const both = await ask(h, { address: MEMBER, deps: { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+    ok: false, status: 503, reason: 'results_analysis_snapshot_limit', limit: 'answerBytes' }) } });
+  assert.equal(both.body.note, `Members’ answers weren’t read: together they hold more text than the Session Agent can read at once. ${NOT_ALL_READ}`);
+});
+
 test('an answer says when some of the session’s context wasn’t read', async () => {
   const h = await seeded();
   const fitted = await ask(h);
@@ -303,9 +314,21 @@ test('Detailed answers add what the asker may read and members’ answers, and n
   assert.match(unread.body.note, /couldn’t be read/);
   // Past the build limit the note says which limit, in plain words.
   const tooMany = await ask(h, { address: MEMBER, deps: { loadWorkerCanonicalResultsAnalysisSource: async () => ({
-    ok: false, status: 503, reason: 'results_analysis_snapshot_limit' }) } });
+    ok: false, status: 503, reason: 'results_analysis_snapshot_limit', limit: 'rows' }) } });
   assert.doesNotMatch(tooMany.prompt, /ANSWER/);
   assert.match(tooMany.body.note, /weren’t read: this session stores more than 10,000 question and answer versions/);
+  for (const [limit, note] of [
+    ['listed', /there are more than the Session Agent can read at once/],
+    ['answerBytes', /together they hold more text than the Session Agent can read at once/],
+    ['payloadBytes', /together they hold more text than the Session Agent can read at once/],
+    ['operations', /there are more than the Session Agent can read at once/],
+    ['metadataBytes', /there are more than the Session Agent can read at once/],
+  ]) {
+    const past = await ask(h, { address: MEMBER, deps: { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+      ok: false, status: 503, reason: 'results_analysis_snapshot_limit', limit }) } });
+    assert.doesNotMatch(past.prompt, /ANSWER/);
+    assert.match(past.body.note, new RegExp(`weren’t read: ${note.source}`));
+  }
 });
 
 test('a signed-in asker is told which context items the answer read, each one theirs to read; a visitor gets the count alone', async () => {

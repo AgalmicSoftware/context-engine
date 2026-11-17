@@ -118,7 +118,7 @@ is described in full in the [Cloudflare worker reference](session-cors-worker.md
 
 | What | Limit | Past it |
 |---|---|---|
-| Answers AI builds read (AI Views, the atlas, the risk matrix and the Session Agent's Detailed answers) | 10,000 stored question and answer versions, and about 8 MiB of answer text; an answer replaced by a newer stamped answer to the same question counts instead toward 50,000 listed | The build stops with a plain message and the last good one stays; the Session Agent leaves members' answers out. `GET /admin/diagnostics` shows the count as `storedVersions`; the admin page shows it and warns from 8,000. |
+| Answers AI builds read (AI Views, the atlas, the risk matrix and the Session Agent's Detailed answers) | 10,000 stored question and answer versions; about 8 MiB of answers as a build keeps them (as JSON, without the research material stored with AI-prefilled and interview answers); and 32 MiB of stored answers with that material. An answer replaced by a newer stamped answer to the same question counts instead toward 50,000 listed | The build stops with a message naming the limit reached and the last good one stays; the Session Agent leaves members' answers out and says which limit. `GET /admin/diagnostics` shows the count as `storedVersions`; the admin page shows it and warns from 8,000. |
 | One AI Views build | About 4.6 million characters of views and the answers they cover | `413`, saying how large it was; the last AI Views stays |
 | One person's versions of one answer | 20 | `422` `response_limit_versions` |
 | One person's answers in all | Five times the session's question count | `422` `response_limit_rows` |

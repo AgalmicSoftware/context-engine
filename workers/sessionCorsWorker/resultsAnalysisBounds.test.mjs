@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
-import { generateResultsAnalysisDraft, loadWorkerCanonicalResultsAnalysisSource, maybeTriggerAutomaticResultsAnalysis, readResultsAnalysisAdminStatus, runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
+import { answerSlices, generateResultsAnalysisDraft, loadWorkerCanonicalResultsAnalysisSource, maybeTriggerAutomaticResultsAnalysis, readResultsAnalysisAdminStatus, runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
 import { buildIndexKey, buildPayloadKey, readStoredCloudflarePayloadsBulk } from './storageRouteExecution.js';
-import { RESULTS_ANALYSIS_SCAN_LIMITS } from './storageScanBudget.js';
+import { RESULTS_ANALYSIS_SCAN_LIMITS, RESULTS_BUILD_PAYLOAD_BYTES } from './storageScanBudget.js';
 import { countResultsScanRows } from './resultsScanRowCount.js';
 import { isStoredVersionsDiagnostics } from '../../shared/sessionDiagnostics.mjs';
 
@@ -79,7 +79,7 @@ test('an oversized canonical source neither calls AI nor replaces the last good 
 
 for (const [label, raw] of [
   ['metadata bytes', JSON.stringify({ id: 'question-1', padding: 'x'.repeat(RESULTS_ANALYSIS_SCAN_LIMITS.metadataBytes) })],
-  ['payload bytes', JSON.stringify({ id: 'question-1', size: RESULTS_ANALYSIS_SCAN_LIMITS.payloadBytes + 1 })],
+  ['payload bytes', JSON.stringify({ id: 'question-1', size: RESULTS_BUILD_PAYLOAD_BYTES + 1 })],
 ]) {
   test(`canonical analysis bounds ${label} before reading a large payload`, async () => {
     let payloadReads = 0;
@@ -89,7 +89,9 @@ for (const [label, raw] of [
     }, CE_STORAGE_R2: { get: async () => { payloadReads += 1; throw new Error('must not read payload'); } } };
     const source = await loadWorkerCanonicalResultsAnalysisSource({ env, config, slug: 'session-a' });
     assert.equal(source.status, 503);
-    assert.match(source.error, /too large for an AI build to read at once/);
+    assert.match(source.error, label === 'payload bytes'
+      ? /research material included, are larger than the 32 MiB an AI build reads at once/
+      : /too large for an AI build to read at once/);
     assert.equal(payloadReads, 0);
   });
 }
@@ -132,6 +134,96 @@ const readableHistory = (count = 3) => {
   };
   return { index, put, identity, get operations() { return operations; } };
 };
+
+// Answers from the AI prefill and interviews carry research material that no
+// build reads. A salon of 2,000 such answers, about 5 KB each stored.
+const researchCarryingHistory = ({ answers, research = 4_500, comment = 0 }) => {
+  const history = readableHistory(0);
+  for (let i = 0; i < answers; i += 1) {
+    history.put('responses', `answer-${String(i).padStart(5, '0')}`, {
+      ...history.identity, questionId: 'q1', answer: `View ${i}`, additional: 'c'.repeat(comment),
+      interviewProvenance: { prediction: 'p'.repeat(research), research: { notes: 'n'.repeat(100) } },
+    }, { responder: `0x${(i + 1).toString(16).padStart(40, '0')}` });
+  }
+  return history;
+};
+
+test('a salon of research-carrying answers builds: research material is not counted', async () => {
+  const history = researchCarryingHistory({ answers: 2_000 });
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a', config });
+  assert.equal(source.ok, true, source.error);
+  assert.equal(source.snapshot.responses.length, 2_000);
+  assert.ok(source.snapshot.responses.every((response) => !('interviewProvenance' in response)));
+  assert.ok(history.operations <= 60, `operations: ${history.operations}`);
+});
+
+test('answers are read in slices of at most 500, or about 4 MiB by their stored size', () => {
+  const rows = (count, size) => Array.from({ length: count }, () => ({ metadata: { size } }));
+  assert.deepEqual(answerSlices(rows(1_200, 1_000)).map((slice) => slice.length), [500, 500, 200]);
+  assert.deepEqual(answerSlices(rows(100, 100 * 1024)).map((slice) => slice.length), [40, 40, 20]);
+  // One answer larger than a slice still gets one of its own.
+  assert.deepEqual(answerSlices(rows(2, 5 * 1024 * 1024)).map((slice) => slice.length), [1, 1]);
+  assert.deepEqual(answerSlices([]), []);
+});
+
+test('with R2 bound, answers spanning several byte-sized slices are read one by one and all kept', async () => {
+  // About 20 KB each, so 300 answers make two slices of at most 4 MiB.
+  const history = researchCarryingHistory({ answers: 300, research: 20_000 });
+  let r2Reads = 0;
+  const r2 = { get: async () => { r2Reads += 1; return null; } };
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: history.index, CE_STORAGE_R2: r2 }, slug: 'session-a', config });
+  assert.equal(source.ok, true, source.error);
+  assert.equal(source.snapshot.responses.length, 300);
+  assert.ok(source.snapshot.responses.every((response) => !('interviewProvenance' in response)));
+  assert.ok(r2Reads >= 300);
+});
+
+test('a build stops reading answers once a slice passes its budget, without reading the rest', async () => {
+  // About 30 KB kept each: slices of about 136, and the budget is passed in the third.
+  const history = researchCarryingHistory({ answers: 1_100, research: 10, comment: 30_000 });
+  const get = history.index.get;
+  const read = new Set();
+  history.index.get = async (key) => {
+    for (const name of [key].flat()) if (name.startsWith('ce-storage-payload:') && name.includes(':answer-')) read.add(name);
+    return get(key);
+  };
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a', config });
+  assert.equal(source.limit, 'answerBytes');
+  assert.ok(read.size < 600, `answer payloads read: ${read.size}`);
+});
+
+test('answers holding more kept text than a build reads fail cleanly, naming that limit', async () => {
+  const history = researchCarryingHistory({ answers: 1_100, research: 10, comment: 8_000 });
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a', config });
+  assert.equal(source.ok, false);
+  assert.equal(source.status, 503);
+  assert.equal(source.reason, 'results_analysis_snapshot_limit');
+  assert.equal(source.limit, 'answerBytes');
+  assert.match(source.error, /The answers an AI build reads for this session hold more than 8 MiB of text, the most it reads at once\. No report was made/);
+  assert.equal(source.snapshot, undefined);
+});
+
+test('queued answers are counted as stored ones are: research material left out, text kept counted', async () => {
+  const history = researchCarryingHistory({ answers: 1 });
+  const env = { CE_STORAGE_INDEX_KV: history.index };
+  const queued = (fields) => [{ metadata: { id: 'queued-1', responder: `0x${'f'.repeat(40)}`, createdAt: '2026-11-24T12:00:00.000Z' },
+    payload: { ...history.identity, questionId: 'q1', answer: 'Queued view', ...fields } }];
+  const research = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config,
+    committedResponses: queued({ interviewProvenance: { prediction: 'p'.repeat(9 * 1024 * 1024) } }) });
+  assert.equal(research.ok, true, research.error);
+  const text = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config,
+    committedResponses: queued({ additional: 'c'.repeat(9 * 1024 * 1024) }) });
+  assert.equal(text.ok, false);
+  assert.equal(text.limit, 'answerBytes');
+});
+
+test('stored answers larger than a build reads fail cleanly, naming that limit', async () => {
+  const history = researchCarryingHistory({ answers: 2_000, research: 17_000 });
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env: { CE_STORAGE_INDEX_KV: history.index }, slug: 'session-a', config });
+  assert.equal(source.ok, false);
+  assert.equal(source.limit, 'payloadBytes');
+  assert.match(source.error, /research material included, are larger than the 32 MiB an AI build reads at once\. No report was made/);
+});
 
 test('automatic analysis reuses one complete source and one scan budget through generation', async () => {
   const history = readableHistory(390);

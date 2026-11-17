@@ -752,7 +752,11 @@ Admin test panel:
   an artifact with no valid requested section fails generation.
 - Worker-canonical analysis scans share a synchronous safety budget: 800 storage
   operations, 10,000 metadata/hidden-marker/committed-response rows, 8 MiB of
-  metadata, and 8 MiB of readable payload data. KV metadata and payloads are
+  metadata, 32 MiB of stored payload bytes (8 MiB when an upload checks its
+  answers), and 8 MiB of the answers a build keeps. A build keeps each answer
+  without its research material (`interviewProvenance`), which no build uses,
+  and reads answers in slices of at most 500 or about 4 MiB, so it never holds
+  all their stored bytes at once (questions are read in one batch). The error names whichever limit was reached. KV metadata and payloads are
   read in bulk gets of up to 100 keys, each one operation, so about 80 people
   answering 30 questions, with some answers changed, read whole in under 100
   operations. R2 has no bulk read, so with R2 bound each payload is one
@@ -767,7 +771,7 @@ Admin test panel:
   processing; they are not a claim about a universal platform request ceiling.
   Past the row limit the error says so in plain words ("AI builds read at most
   10,000 stored question and answer versions at once…"), and the Session Agent's
-  Detailed answers note the same limit; `GET /admin/diagnostics` returns the
+  Detailed answers say which limit left members' answers out; `GET /admin/diagnostics` returns the
   count as `storedVersions`.
   An answer stored with one question and this session's id (not a survey
   bundle, and readable by the Worker) lists that question, the session id and

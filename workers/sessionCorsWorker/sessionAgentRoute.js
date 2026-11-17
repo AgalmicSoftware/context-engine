@@ -198,12 +198,22 @@ const scaleText = ({ scale } = {}) => {
 // author opted out, how many because they have no address to opt out with,
 // and how many questions for having too few answers.
 export const TOO_MANY_STORED = Symbol('too many stored versions');
+// The answers hold more text than a build reads at once.
+export const TOO_LARGE_STORED = Symbol('stored answers too large');
+// More reads than a build makes at once, for another reason.
+export const TOO_MUCH_STORED = Symbol('too much stored to read');
+// Past the 50,000 listed older answers is not past the 10,000 versions.
+const LIMIT_SYMBOLS = { rows: TOO_MANY_STORED, answerBytes: TOO_LARGE_STORED, payloadBytes: TOO_LARGE_STORED };
+const UNAVAILABLE = new Map([[TOO_MANY_STORED, 'too_many'], [TOO_LARGE_STORED, 'too_large'], [TOO_MUCH_STORED, 'too_much']]);
 // With `writers`, each answer also says whose it is (`from`), for an export
 // that shows it; the agent's own answers are never given that. With `ids`,
 // each question says which it is, so an answer can link to it.
 export const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, writers = false, ids = false, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
-  if (!source?.ok) return source?.reason === 'results_analysis_snapshot_limit' ? TOO_MANY_STORED : null;
+  if (!source?.ok) {
+    if (source?.reason !== 'results_analysis_snapshot_limit') return null;
+    return Object.hasOwn(LIMIT_SYMBOLS, source.limit) ? LIMIT_SYMBOLS[source.limit] : TOO_MUCH_STORED;
+  }
   const leftOut = { optedOut: 0, withoutAddress: 0, belowMinAnswers: 0 };
   const questions = source.snapshot.questions.map((question) => ({ ...question, scale: scaleText(question) }));
   const byQuestion = new Map(questions.map((question) => [
@@ -264,7 +274,7 @@ const gatherMaterial = async ({ env, slug, config, setting, address, scopes, ask
       sessionContext: config?.sessionContext, sources: context.sources, results: results.text, resultsQuestions: results.questions,
       answers: answers?.groups || [],
     },
-    answersUnavailable: answers === TOO_MANY_STORED ? 'too_many' : answers === null,
+    answersUnavailable: UNAVAILABLE.get(answers) || answers === null,
     contextLeftOut: context.leftOut,
     // The groups whose locked files this answer may draw on.
     lockedTo: [...new Set(context.sources.filter((source) => !source.everyone).flatMap((source) => source.groupIds))].sort(),
@@ -512,7 +522,11 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   const notes = [
     answersUnavailable === 'too_many'
       ? `Members’ answers weren’t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} question and answer versions, the most the Session Agent can read at once.`
-      : answersUnavailable ? 'Members’ answers couldn’t be read for this answer.' : '',
+      : answersUnavailable === 'too_large'
+        ? 'Members’ answers weren’t read: together they hold more text than the Session Agent can read at once.'
+        : answersUnavailable === 'too_much'
+          ? 'Members’ answers weren’t read: there are more than the Session Agent can read at once.'
+        : answersUnavailable ? 'Members’ answers couldn’t be read for this answer.' : '',
     contextLeftOut > 0 || contextOmitted > 0
       ? `Some of the session’s context wasn’t read: the Session Agent reads at most ${contextLimits.totalChars.toLocaleString('en-US')} characters or ${contextLimits.items} items of it, and ${contextLimits.itemChars.toLocaleString('en-US')} characters of any one.`
       : '',

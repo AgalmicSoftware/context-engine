@@ -6,7 +6,7 @@ import { CONTEXT_ROLE, contextRoleOf, groupLockedIds, isAdminsOnlyAccess } from 
 import { CONTEXT_READ_LIMITS, forEveryone, loadParticipantContextSources } from './contextSourceLoader.js';
 import { PAYLOAD_ACCESS_GATES, PAYLOAD_ENCRYPTION_MODES } from './payloadAccessControl.js';
 import { evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact } from './resultsAnalysisGeneration.js';
-import { TOO_MANY_STORED, callSessionAgentHistoryStore, readMemberAnswers, resultsText } from './sessionAgentRoute.js';
+import { TOO_LARGE_STORED, TOO_MANY_STORED, TOO_MUCH_STORED, callSessionAgentHistoryStore, readMemberAnswers, resultsText } from './sessionAgentRoute.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { resolvePayloadAccessControl } from './storageRouteExecution.js';
@@ -238,7 +238,7 @@ export const exportSessionAgent = async ({ env, slug, config, address, deps = {}
     if (!chats?.ok || !Array.isArray(chats.body?.entries)) return unavailable('its stored chats');
     asked = chats.body.entries;
   }
-  const tooMany = answers === TOO_MANY_STORED;
+  const tooMany = [TOO_MANY_STORED, TOO_LARGE_STORED, TOO_MUCH_STORED].includes(answers);
 
   const sessionId = resolveCanonicalWorkerSessionIdHex(config);
   const budget = { left: LIMITS.members };
@@ -275,7 +275,7 @@ export const exportSessionAgent = async ({ env, slug, config, address, deps = {}
       unreadableContext: context.unreadable,
       resultsNotForEveryone: published.hidden ? 1 : 0,
       membersWithoutAddress: groups.reduce((sum, group) => sum + group.withoutAddress, 0),
-      // 1 when the session stores more question and answer versions than the agent can read at once: then no question or answer is in the file.
+      // 1 when the session's stored questions and answers pass any limit on what the agent reads at once: then no question or answer is in the file.
       answersNotRead: tooMany ? 1 : 0,
     },
   });

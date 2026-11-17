@@ -11,7 +11,15 @@ export const RESULTS_ANALYSIS_SCAN_LIMITS = Object.freeze({
   listed: 50_000,
   metadataBytes: 8 * 1024 * 1024,
   payloadBytes: 8 * 1024 * 1024,
+  // What a results build keeps: each answer as JSON, its identity fields
+  // included, without the research material (interviewProvenance) no build uses.
+  answerBytes: 8 * 1024 * 1024,
 });
+// Stored bytes a results build reads, research material included: a guard on
+// time and memory. It reads answers in slices of a few MiB and keeps only what
+// it uses, so it never holds all their stored bytes at once. Questions are
+// read in one batch.
+export const RESULTS_BUILD_PAYLOAD_BYTES = 32 * 1024 * 1024;
 export const STORAGE_EXPORT_PAGE_LIMITS = Object.freeze({
   operations: 800,
   rows: 100,
@@ -30,10 +38,11 @@ export const isStorageReadLimitError = (error) => error?.code === 'storage_read_
 export const jsonByteLength = (value) => encoder.encode(typeof value === 'string' ? value : JSON.stringify(value)).byteLength;
 
 // `operationsUsed` carries on from an earlier pass in the same invocation.
-export const createResultsAnalysisScanBudget = ({ operationsUsed = 0 } = {}) => {
-  const used = { operations: operationsUsed, rows: 0, listed: 0, metadataBytes: 0, payloadBytes: 0 };
+export const createResultsAnalysisScanBudget = ({ operationsUsed = 0, payloadBytes = RESULTS_ANALYSIS_SCAN_LIMITS.payloadBytes } = {}) => {
+  const limits = { ...RESULTS_ANALYSIS_SCAN_LIMITS, payloadBytes };
+  const used = { operations: operationsUsed, rows: 0, listed: 0, metadataBytes: 0, payloadBytes: 0, answerBytes: 0 };
   const consume = (kind, amount = 1) => {
-    if (used[kind] + amount > RESULTS_ANALYSIS_SCAN_LIMITS[kind]) throw new StorageReadLimitError(kind);
+    if (used[kind] + amount > limits[kind]) throw new StorageReadLimitError(kind);
     used[kind] += amount;
   };
   return {
@@ -42,7 +51,8 @@ export const createResultsAnalysisScanBudget = ({ operationsUsed = 0 } = {}) => 
     listed: (count) => consume('listed', count),
     metadata: (value) => consume('metadataBytes', jsonByteLength(value)),
     payload: (count) => consume('payloadBytes', count),
-    get remainingPayloadBytes() { return RESULTS_ANALYSIS_SCAN_LIMITS.payloadBytes - used.payloadBytes; },
+    answer: (value) => consume('answerBytes', jsonByteLength(value)),
+    get remainingPayloadBytes() { return limits.payloadBytes - used.payloadBytes; },
     get operationsUsed() { return used.operations; },
   };
 };
