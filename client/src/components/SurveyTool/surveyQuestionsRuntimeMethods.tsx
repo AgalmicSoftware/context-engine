@@ -2412,16 +2412,22 @@ export const createSurveyQuestionsRuntimeMethods = (
         !partialReceipt.questionResponseRefs.length
       )
         throw error;
-      const savedCount = partialReceipt.questionResponseRefs.length;
+      // Answers upload a few at a time, so the stored ones are named by question, not by position.
+      const storedIds = new Set(
+        partialReceipt.questionResponseRefs.map((ref: SurveyQuestionsLegacyValue) =>
+          String(ref?.questionId || '').toLowerCase(),
+        ),
+      );
+      const isStored = (index: number) => storedIds.has(String(hashedQuestionIds[index] || '').toLowerCase());
       tx = { ...partialReceipt, retryPending: true };
       const failureMessage = 'message' in error ? error.message : '';
       uploadFailure = `Some answers didn't save (${String(failureMessage || 'upload failed').replace(/\.$/, '')}).`;
-      questionResponses
-        .slice(savedCount)
-        .forEach((response: SurveyQuestionsLegacyValue) =>
-          heldBack.set(normalizeQuestionIdKey(response?.questionID), 'unsaved'),
-        );
-      questionResponses = questionResponses.slice(0, savedCount);
+      questionResponses.forEach((response: SurveyQuestionsLegacyValue, index: number) => {
+        if (!isStored(index)) heldBack.set(normalizeQuestionIdKey(response?.questionID), 'unsaved');
+      });
+      questionResponses = questionResponses.filter((_response: SurveyQuestionsLegacyValue, index: number) =>
+        isStored(index),
+      );
       if (surveyResponse) surveyResponse = { ...surveyResponse, responses: questionResponses };
     }
 

@@ -326,52 +326,58 @@ it('keeps a single-question payload byte-identical after a lost reply', async ()
   expect(JSON.stringify(h.submitResponses.mock.calls[1][2])).toBe(JSON.stringify(h.submitResponses.mock.calls[0][2]));
 });
 
-it('keeps answers the Worker stored before a failed upload saved, and resends only the rest', async () => {
-  const h = await fixture();
-  await act(async () => h.sync());
-  await h.mount();
-  const engine = () => h.engine();
-  await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
-  await act(async () => engine().handleAnswerPile(FREEFORM_QID, 'Free answer'));
-  await settle();
-  // The first answer reaches the Worker; the next upload fails.
-  h.submitResponses.mockImplementationOnce(async (_provider, ids, responses) => {
-    const storageRef = h.add('responses', responses[0]);
-    throw Object.assign(new Error('Worker storage is unavailable.'), {
-      partialReceipt: {
-        workerCanonicalSubmission: true,
-        questionResponseRefs: [{ questionId: ids[0], storageRef }],
-        sessionSlug: SLUG,
-        storageRefs: [storageRef],
-      },
+// Answers upload a few at a time, so the stored one may be either answer, not only the first.
+it.each([0, 1])(
+  'keeps the answer the Worker stored (#%i) before a failed upload saved, and resends only the rest',
+  async (storedIndex) => {
+    const h = await fixture();
+    await act(async () => h.sync());
+    await h.mount();
+    const engine = () => h.engine();
+    await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
+    await act(async () => engine().handleAnswerPile(FREEFORM_QID, 'Free answer'));
+    await settle();
+    // One answer reaches the Worker; the other upload fails.
+    h.submitResponses.mockImplementationOnce(async (_provider, ids, responses) => {
+      const storageRef = h.add('responses', responses[storedIndex]);
+      throw Object.assign(new Error('Worker storage is unavailable.'), {
+        partialReceipt: {
+          workerCanonicalSubmission: true,
+          questionResponseRefs: [{ questionId: ids[storedIndex], storageRef }],
+          sessionSlug: SLUG,
+          storageRefs: [storageRef],
+        },
+      });
     });
-  });
 
-  await h.click();
-  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
-  await settle();
+    await h.click();
+    await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+    await settle();
 
-  const [stored, unsaved] = h.submitResponses.mock.calls[0][2].map((row) => row.questionID);
-  const unsavedPrompt = unsaved === FREEFORM_QID ? 'Freeform question' : 'Binary question';
-  expect(engine().state.submissionError).toBe(
-    `Some answers didn't save (Worker storage is unavailable). “${unsavedPrompt}” wasn't saved yet; submit again to send it.`,
-  );
-  expect(engine().getPendingEditStats().total).toBe(1);
-  expect(draftHolds(unsaved)).toBe(true);
+    const sent = h.submitResponses.mock.calls[0][2].map((row) => row.questionID);
+    const stored = sent[storedIndex];
+    const unsaved = sent[1 - storedIndex];
+    const unsavedPrompt = unsaved === FREEFORM_QID ? 'Freeform question' : 'Binary question';
+    expect(engine().state.submissionError).toBe(
+      `Some answers didn't save (Worker storage is unavailable). “${unsavedPrompt}” wasn't saved yet; submit again to send it.`,
+    );
+    expect(engine().getPendingEditStats().total).toBe(1);
+    expect(draftHolds(unsaved)).toBe(true);
 
-  await h.click();
-  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(2));
-  await settle();
+    await h.click();
+    await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(2));
+    await settle();
 
-  expect(h.submitResponses.mock.calls[1][2].map((row) => row.questionID)).toEqual([unsaved]);
-  const operation = h.submitResponses.mock.calls[0][6]?.operationId;
-  expect(operation).toEqual(expect.any(String));
-  expect(h.submitResponses.mock.calls[1][6]?.operationId).toBe(operation);
-  expect(engine()._submitOperationId).toBeUndefined();
-  expect(h.savedRows(stored)).toHaveLength(1);
-  expect(h.savedRows(unsaved)).toHaveLength(1);
-  expect(engine().getPendingEditStats().total).toBe(0);
-});
+    expect(h.submitResponses.mock.calls[1][2].map((row) => row.questionID)).toEqual([unsaved]);
+    const operation = h.submitResponses.mock.calls[0][6]?.operationId;
+    expect(operation).toEqual(expect.any(String));
+    expect(h.submitResponses.mock.calls[1][6]?.operationId).toBe(operation);
+    expect(engine()._submitOperationId).toBeUndefined();
+    expect(h.savedRows(stored)).toHaveLength(1);
+    expect(h.savedRows(unsaved)).toHaveLength(1);
+    expect(engine().getPendingEditStats().total).toBe(0);
+  },
+);
 
 it('names an interview answer held back from the upload and undoes only its draft', async () => {
   const h = await fixture();

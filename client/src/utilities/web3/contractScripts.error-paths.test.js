@@ -678,6 +678,86 @@ describe('error paths', () => {
     expect(progress).toEqual(['1 of 3', '2 of 3']);
   });
 
+  const questionIds = (count) =>
+    Array.from({ length: count }, (_, index) => `0x${String(index + 1).repeat(64)}`.slice(0, 66));
+  const answersFor = (ids) => ids.map((questionID) => ({ questionID, answer: 'yes' }));
+  const uploadedQuestion = (payload) => JSON.parse(payload).questionID;
+  const later = (ms, value) => new Promise((resolve) => setTimeout(() => resolve(value), ms));
+
+  it('stores four Worker answers at once, and every answer', async () => {
+    window.ethereum = makeRpcProvider();
+    const ids = questionIds(9);
+    let inFlight = 0;
+    let most = 0;
+    uploadDataToSessionStorage.mockImplementation(async () => {
+      inFlight += 1;
+      most = Math.max(most, inFlight);
+      await later(2);
+      inFlight -= 1;
+      return { storageRef: { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' } };
+    });
+    const progress = [];
+    const receipt = await submitResponses(
+      'wagmi',
+      ids,
+      answersFor(ids),
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+      {
+        onProgress: (saved, total) => progress.push(`${saved} of ${total}`),
+      },
+    );
+    expect(most).toBe(4);
+    expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(9);
+    expect(progress).toEqual(Array.from({ length: 9 }, (_, index) => `${index + 1} of 9`));
+    expect(receipt.questionResponseRefs.map((ref) => ref.questionId)).toEqual(ids);
+  });
+
+  it("keeps one question's versions in order while other answers upload alongside", async () => {
+    window.ethereum = makeRpcProvider();
+    const [repeated, ...others] = questionIds(4);
+    const events = [];
+    uploadDataToSessionStorage.mockImplementation(async (payload) => {
+      const qid = uploadedQuestion(payload);
+      events.push(`start ${qid}`);
+      await later(qid === repeated ? 3 : 1);
+      events.push(`end ${qid}`);
+      return { storageRef: { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' } };
+    });
+    const ids = [repeated, others[0], repeated, others[1], others[2]];
+    await submitResponses('wagmi', ids, answersFor(ids), ethers.constants.HashZero, null, WORKER_CANONICAL_GROUP_CFG);
+    const mine = events.filter((event) => event.endsWith(repeated));
+    expect(mine).toEqual([`start ${repeated}`, `end ${repeated}`, `start ${repeated}`, `end ${repeated}`]);
+    expect(events.indexOf(`start ${others[0]}`)).toBeLessThan(events.indexOf(`end ${repeated}`));
+  });
+
+  it('lets answers in flight finish after a failure, starts no more, and names exactly those stored', async () => {
+    window.ethereum = makeRpcProvider();
+    const ids = questionIds(6);
+    let settled = 0;
+    uploadDataToSessionStorage.mockImplementation(async (payload) => {
+      if (uploadedQuestion(payload) === ids[1]) throw new Error('Worker storage is unavailable.');
+      const stored = await later(5, {
+        storageRef: { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' },
+      });
+      settled += 1;
+      return stored;
+    });
+    const failure = await submitResponses(
+      'wagmi',
+      ids,
+      answersFor(ids),
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+    ).catch((error) => error);
+    expect(settled).toBe(3);
+    expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(4);
+    expect(failure.message).toBe('Worker storage is unavailable.');
+    expect(failure.partialReceipt.questionResponseRefs.map((ref) => ref.questionId)).toEqual([ids[0], ids[2], ids[3]]);
+  });
+
   it('reports no stored answers when the first Worker upload fails', async () => {
     window.ethereum = makeRpcProvider();
     uploadDataToSessionStorage.mockRejectedValueOnce(new Error('Worker storage is unavailable.'));

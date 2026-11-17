@@ -17,6 +17,8 @@ type PayloadPointerUpload = {
 const toMetadataPayload = (value: MetadataPayload | null | undefined): MetadataPayload => value || {};
 const ID_PRECHECK_TIMEOUT_MS = 10_000;
 const SURVEY_COPY_RECHECK_LIMIT = 2;
+// Answers a Worker stores at once in one Submit. Each question's versions still go one after another.
+export const WORKER_ANSWER_UPLOAD_CONCURRENCY = 4;
 
 export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRuntimeDeps): ContractScriptsMethodMap => {
   const {
@@ -633,15 +635,18 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         }
       };
       if (mergesStoredCopy) await mergeStoredCopy();
-      const workerSubmissionReceipt = (uploads: PayloadPointerUpload[]) => ({
-        workerCanonicalSubmission: true,
-        questionResponseRefs: uploads.map((upload, index) => ({
-          questionId: hashedQuestionIds[index],
-          storageRef: upload.storageRef,
-        })),
-        sessionSlug: workerResponseIdentity?.sessionSlug || resolveStorageSessionSlug(groupKeyOrCfg, cfg),
-        storageRefs: [surveyResponseUpload?.storageRef, ...uploads.map((upload) => upload.storageRef)].filter(Boolean),
-      });
+      // Uploads sit at their answer's index; a partial Submit leaves gaps, and only stored answers are named.
+      const workerSubmissionReceipt = (uploads: Array<PayloadPointerUpload | undefined>) => {
+        const stored = uploads.flatMap((upload, index) =>
+          upload ? [{ questionId: hashedQuestionIds[index], storageRef: upload.storageRef }] : [],
+        );
+        return {
+          workerCanonicalSubmission: true,
+          questionResponseRefs: stored,
+          sessionSlug: workerResponseIdentity?.sessionSlug || resolveStorageSessionSlug(groupKeyOrCfg, cfg),
+          storageRefs: [surveyResponseUpload?.storageRef, ...stored.map((ref) => ref.storageRef)].filter(Boolean),
+        };
+      };
       let uploadSurveyResponse = async (): Promise<void> => {};
       if (ARWEAVE_ACTIVE || canUseSessionStorage) {
         const uploadContext = {
@@ -690,43 +695,69 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           surveyResponseHashBytes = surveyResponseUpload?.pointerBytes || ethers.constants.HashZero;
         };
         if (surveyResponse) await uploadSurveyResponse();
-        // Upload response objects sequentially to avoid Arweave anchor/signature races
-        // that can appear when multiple uploads are posted in parallel for one wallet.
-        questionResponseUploads = [];
-        try {
-          for (const [index, response] of questionResponses.entries()) {
-            const responsePayload = workerResponseIdentity ? { ...response, ...workerResponseIdentity } : response;
-            validateNoLockedPlaintextInPayload(responsePayload, {
-              family: 'question_response_payload',
-              path: 'question response',
-            });
-
-            const responseUpload = await uploadJsonPayloadForContractPointer({
-              payload: responsePayload,
-              requestId: responseRequestId(hashedQuestionIds[index], responsePayload),
-              resource: STORAGE_RESOURCE_KEYS.RESPONSES,
-              groupKeyOrCfg,
-              cfg,
-              arweaveUploadOpts: arweaveOpts,
-              uploadWithRetry: true,
-              storageContext: uploadContext,
-            });
-            const questionRevision = uploadRevisions.get(hashedQuestionIds[index]);
-            if (questionRevision) questionRevision.settled = true;
-            questionResponseUploads.push(responseUpload);
-            options.onProgress?.(questionResponseUploads.length, questionResponses.length);
+        const uploadAnswer = async (index: number) => {
+          const response = questionResponses[index];
+          const responsePayload = workerResponseIdentity ? { ...response, ...workerResponseIdentity } : response;
+          validateNoLockedPlaintextInPayload(responsePayload, {
+            family: 'question_response_payload',
+            path: 'question response',
+          });
+          const responseUpload = await uploadJsonPayloadForContractPointer({
+            payload: responsePayload,
+            requestId: responseRequestId(hashedQuestionIds[index], responsePayload),
+            resource: STORAGE_RESOURCE_KEYS.RESPONSES,
+            groupKeyOrCfg,
+            cfg,
+            arweaveUploadOpts: arweaveOpts,
+            uploadWithRetry: true,
+            storageContext: uploadContext,
+          });
+          const questionRevision = uploadRevisions.get(hashedQuestionIds[index]);
+          if (questionRevision) questionRevision.settled = true;
+          return responseUpload;
+        };
+        // Arweave uploads go one at a time, to avoid anchor/signature races for one wallet. A Worker
+        // stores each answer on its own, so a few go at once; answers to one question share a lane,
+        // so a later version never lands before an earlier one.
+        const lanes = new Map<string, number[]>();
+        questionResponses.forEach((_response, index) => {
+          const key = String(hashedQuestionIds[index]).toLowerCase();
+          lanes.set(key, [...(lanes.get(key) || []), index]);
+        });
+        const queue = Array.from(lanes.values());
+        const uploads: Array<PayloadPointerUpload | undefined> = new Array(questionResponses.length);
+        const progress: { stored: number; failure?: { error: unknown } } = { stored: 0 };
+        const worker = async () => {
+          for (let lane = queue.shift(); lane && !progress.failure; lane = queue.shift()) {
+            for (const index of lane) {
+              if (progress.failure) return;
+              try {
+                uploads[index] = await uploadAnswer(index);
+              } catch (error: unknown) {
+                progress.failure ||= { error };
+                return;
+              }
+              progress.stored += 1;
+              options.onProgress?.(progress.stored, questionResponses.length);
+            }
           }
-        } catch (error: unknown) {
-          // A Worker-stored answer is saved on its own. Report the answers stored
-          // before the failure, in order, so the caller retries only the rest.
-          if (workerCanonicalStorage && questionResponseUploads.some((upload) => upload?.storageRef)) {
+        };
+        const concurrency = workerCanonicalStorage ? WORKER_ANSWER_UPLOAD_CONCURRENCY : 1;
+        // Every upload in flight settles before this Submit ends, so a retry never races one of them.
+        await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker));
+        if (progress.failure) {
+          const { error } = progress.failure;
+          // A Worker-stored answer is saved on its own. Name the answers stored before the
+          // failure, so the caller retries only the rest.
+          if (workerCanonicalStorage && progress.stored > 0) {
             throw Object.assign(new Error(error instanceof Error ? error.message : String(error)), {
               cause: error,
-              partialReceipt: workerSubmissionReceipt(questionResponseUploads),
+              partialReceipt: workerSubmissionReceipt(uploads),
             });
           }
           throw error;
         }
+        questionResponseUploads = uploads as PayloadPointerUpload[];
       } else {
         return; // no-op when no configured payload storage path is available
       }
