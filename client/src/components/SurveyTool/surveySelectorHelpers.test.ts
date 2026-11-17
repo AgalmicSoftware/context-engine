@@ -138,6 +138,7 @@ describe('surveySelectorHelpers pending submit stats', () => {
       encrypted: 0,
       submittedSinceLastEdit: false,
       isSubmitting: false,
+      submitCountText: '',
     });
     expect(first).not.toBe(second);
   });
@@ -149,6 +150,7 @@ describe('surveySelectorHelpers pending submit stats', () => {
         encrypted: 1,
         submittedSinceLastEdit: 'yes' as any,
         isSubmitting: 0 as any,
+        submitCountText: '3 of 9',
       }),
     ).toEqual({
       pendingSubmitStats: {
@@ -156,6 +158,7 @@ describe('surveySelectorHelpers pending submit stats', () => {
         encrypted: 1,
         submittedSinceLastEdit: true,
         isSubmitting: false,
+        submitCountText: '3 of 9',
       },
     });
     expect(buildSurveySelectorPendingSubmitStatsPatch(null)).toEqual({

@@ -191,7 +191,8 @@ export const createSurveyQuestionsJsonRuntime = (context: SurveyQuestionsLegacyR
       isWorkerCanonicalSessionConfig(props.sessionConfig)
     ) {
       const surveyIndex = props.isStandalone || props.singleQuestionMode ? 0 : Number(props.surveyIndex || 0);
-      setState({ isSubmitting: true, submissionError: '' });
+      // The header shows a Submit's count while it runs; the last Submit's count does not belong to this one.
+      setState({ isSubmitting: true, submissionError: '', submitCountText: '' });
       const outcome = await readOwnAnswersBeforeUpload(
         engine,
         () =>

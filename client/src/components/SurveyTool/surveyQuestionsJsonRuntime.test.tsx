@@ -1,8 +1,44 @@
 import { waitFor } from '@testing-library/react';
 import { createSurveyQuestionsJsonRuntime } from './surveyQuestionsJsonRuntime';
+import { runSurveyQuestionsSubmitController } from './surveyQuestionsSubmitController';
 import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+
+jest.mock('./surveySavedAnswerGate', () => ({
+  ...jest.requireActual('./surveySavedAnswerGate'),
+  readOwnAnswersBeforeUpload: jest.fn(() => new Promise(() => {})),
+}));
 
 describe('surveyQuestionsJsonRuntime', () => {
+  it("clears the last Submit's count while a Submit first reads the person's saved answers", () => {
+    const setState = jest.fn();
+    const runtime = createSurveyQuestionsJsonRuntime({
+      buildSurveyQuestionsPrimarySubmitPlan: () => ({ action: 'submit' }),
+      encryptAndUpload: jest.fn(),
+      resolveSurveyQuestionsSubmitPendingStats: () => ({ total: 1, encrypted: 0 }),
+      runSurveyQuestionsSubmitController,
+      inst: { _isMounted: true, _getEffectiveDraftSlug: () => 'alpha' },
+      propsRef: {
+        current: {
+          account: '0xUser',
+          loginComplete: true,
+          isResponsesCacheReady: false,
+          isStandalone: true,
+          sessionConfig: {
+            slug: 'alpha',
+            sessionId: `0x${'1'.repeat(32)}`,
+            corsWorkerUrl: 'https://worker.example',
+            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          },
+        },
+      },
+      setState,
+      stateRef: { current: { modifiedCount: 1, questionPool: [], submitCountText: '40 of 40' } },
+    });
+    runtime.handlePrimarySubmitClick();
+    expect(setState).toHaveBeenCalledWith(expect.objectContaining({ isSubmitting: true, submitCountText: '' }));
+  });
+
   it('delegates comment toggles through the runtime strategy when present', () => {
     const toggleComments = jest.fn();
     const engine = {};

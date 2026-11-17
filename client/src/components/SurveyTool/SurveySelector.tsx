@@ -950,13 +950,14 @@ export class SurveySelector extends Component<any, any> {
   handlePendingStatsChange = (stats: unknown): void => {
     if (!stats || typeof stats !== 'object') return;
     const patch = buildSurveySelectorPendingSubmitStatsPatch(stats);
-    const { total, encrypted, submittedSinceLastEdit, isSubmitting } = patch.pendingSubmitStats;
+    const { total, encrypted, submittedSinceLastEdit, isSubmitting, submitCountText } = patch.pendingSubmitStats;
     const prev = this.state.pendingSubmitStats || {};
     if (
       prev.total === total &&
       prev.encrypted === encrypted &&
       !!prev.submittedSinceLastEdit === submittedSinceLastEdit &&
-      !!prev.isSubmitting === isSubmitting
+      !!prev.isSubmitting === isSubmitting &&
+      prev.submitCountText === submitCountText
     )
       return;
     this.setState(patch);

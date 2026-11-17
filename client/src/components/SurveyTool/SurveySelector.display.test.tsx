@@ -349,6 +349,26 @@ describe('SurveySelector display guards', () => {
     expect(nodeHasClassName(toolbar, styles.embeddedSessionToolbar)).toBe(true);
     expect(nodeHasClassName(toolbar, styles.toolbarWithoutSubmit)).toBe(false);
   });
+
+  it('counts saved answers on the header Submit while a Submit runs', () => {
+    const subject = new SurveySelector({
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      embeddedSessionToolbar: true,
+    });
+    syncClassSetState(subject);
+    subject.state = { ...subject.state, loading: false, viewMode: 'questions', showLongLoading: false };
+    const submitButton = () =>
+      findElement(subject.render(), (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT);
+    const stats = { total: 40, encrypted: 0, submittedSinceLastEdit: false, isSubmitting: true };
+    subject.handlePendingStatsChange({ ...stats, submitCountText: '12 of 40' });
+    expect(treeHasText(submitButton(), 'Saving 12 of 40...')).toBe(true);
+    subject.handlePendingStatsChange({ ...stats, submitCountText: '13 of 40' });
+    expect(treeHasText(submitButton(), 'Saving 13 of 40...')).toBe(true);
+  });
 });
 
 it.each([{ showSpinner: true }, { showCacheError: true }])(

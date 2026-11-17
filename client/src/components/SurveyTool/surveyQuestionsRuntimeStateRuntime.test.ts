@@ -179,8 +179,17 @@ describe('surveyQuestionsRuntimeStateRuntime', () => {
       isSubmitting: false,
       submittedSinceLastEdit: false,
       total: 2,
+      submitCountText: '',
     });
     expect(runtime.getPendingStatsSnapshot()).toEqual({ encrypted: 1, total: 2 });
+
+    // A Submit's count reaches the header Submit as each answer saves.
+    Object.assign(context.stateRef.current, { isSubmitting: true, submitCountText: '12 of 40' });
+    runtime.emitPendingStats({ encrypted: 2, total: 2 });
+    expect(context.propsRef.current.onPendingStatsChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isSubmitting: true, submitCountText: '12 of 40' }),
+    );
+    expect(context.propsRef.current.onPendingStatsChange).toHaveBeenCalledTimes(3);
   });
 
   it('resolves active survey index and edit-diff invalidation state', () => {

@@ -162,8 +162,11 @@ type PendingStatsState = {
   encryptedModifiedCount?: unknown;
 } & UnknownRecord;
 
+// While a Submit saves several answers, the header carries its count ("12 of 40").
+type SubmitLabelStats = Partial<PendingStatsSnapshot> & { isSubmitting?: boolean; submitCountText?: string };
+
 type SubmitLabelContext = {
-  getPendingEditStats?: (() => Partial<PendingStatsSnapshot> | PendingStatsSnapshot | null | undefined) | null;
+  getPendingEditStats?: (() => SubmitLabelStats | null | undefined) | null;
   state?: PendingStatsState | null;
 } & UnknownRecord;
 
@@ -1302,6 +1305,8 @@ export function computeSubmitLabel(ctx: SubmitLabelContext = {}, opts: SubmitLab
     (typeof ctx.getPendingEditStats === 'function' && ctx.getPendingEditStats()) ||
     getPendingStatsSnapshotFromState(ctx.state);
 
+  const { isSubmitting, submitCountText } = (stats || {}) as SubmitLabelStats;
+  if (isSubmitting && submitCountText) return `Saving ${submitCountText}...`;
   const pendingCount = Number(stats?.total || 0);
   const base = 'Submit';
   const suffix = opts.suffix ? ` ${String(opts.suffix)}` : '';

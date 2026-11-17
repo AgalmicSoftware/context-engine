@@ -24,6 +24,7 @@ type SurveySelectorPendingSubmitStats = {
   encrypted: number;
   submittedSinceLastEdit: boolean;
   isSubmitting: boolean;
+  submitCountText: string;
 };
 
 type SurveySelectorPendingSubmitStatsSource = Partial<SurveySelectorPendingSubmitStats> | null | undefined;
@@ -54,6 +55,7 @@ export const getDefaultSurveySelectorPendingSubmitStats = (): SurveySelectorPend
   encrypted: 0,
   submittedSinceLastEdit: false,
   isSubmitting: false,
+  submitCountText: '',
 });
 
 export const buildSurveySelectorPendingSubmitStatsPatch = (stats: SurveySelectorPendingSubmitStatsSource = {}) => {
@@ -64,6 +66,7 @@ export const buildSurveySelectorPendingSubmitStatsPatch = (stats: SurveySelector
       encrypted: Number(source.encrypted || 0),
       submittedSinceLastEdit: !!source.submittedSinceLastEdit,
       isSubmitting: !!source.isSubmitting,
+      submitCountText: String(source.submitCountText || ''),
     },
   };
 };

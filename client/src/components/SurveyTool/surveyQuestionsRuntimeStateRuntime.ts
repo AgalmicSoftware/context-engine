@@ -192,16 +192,19 @@ export const createSurveyQuestionsRuntimeStateRuntime = (
     const encrypted = Number(stats?.encrypted || 0);
     const submittedSinceLastEdit = !!stateRef.current.submittedSinceLastEdit;
     const isSubmitting = !!stateRef.current.isSubmitting;
+    const submitCountText = String(stateRef.current.submitCountText || '');
     const last = inst._lastPendingStats;
     if (
       last?.total === total &&
       last?.encrypted === encrypted &&
       !!last?.submittedSinceLastEdit === submittedSinceLastEdit &&
-      !!last?.isSubmitting === isSubmitting
+      !!last?.isSubmitting === isSubmitting &&
+      last?.submitCountText === submitCountText
     )
       return;
-    inst._lastPendingStats = { total, encrypted, submittedSinceLastEdit, isSubmitting };
-    propsRef.current.onPendingStatsChange({ total, encrypted, submittedSinceLastEdit, isSubmitting });
+    const next = { total, encrypted, submittedSinceLastEdit, isSubmitting, submitCountText };
+    inst._lastPendingStats = next;
+    propsRef.current.onPendingStatsChange({ ...next });
   };
 
   const getPendingStatsSnapshot = () => getPendingStatsSnapshotFromState(stateRef.current);

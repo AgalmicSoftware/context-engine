@@ -66,6 +66,8 @@ type SurveyQuestionsPendingStatsSnapshot = {
   encrypted: number;
   submittedSinceLastEdit: boolean;
   isSubmitting: boolean;
+  // "12 of 40" while a Submit saves several answers.
+  submitCountText: string;
 };
 export type SurveyQuestionsPendingStatsInput =
   Partial<Pick<SurveyQuestionsPendingStatsSnapshot, 'total' | 'encrypted'>> | null | undefined;
