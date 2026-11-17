@@ -575,7 +575,10 @@
   }
 }
 
-// Portaled to body without Bootstrap's CSS, so it needs the tooltip layer to sit above sticky toolbars.
+// Portaled to body without Bootstrap's CSS, so it needs the tooltip layer to sit above sticky toolbars. The
+// theme recipe paints every popover, and in a dark theme set dark text on a dark panel; this help keeps its own
+// document pair, so its selector (with `body`) outranks that rule without naming a theme.
+:global(:root) :global(body) :global(.popover).explainerPopover,
 .explainerPopover {
   z-index: 1070;
   max-width: min(320px, calc(100vw - 24px));
