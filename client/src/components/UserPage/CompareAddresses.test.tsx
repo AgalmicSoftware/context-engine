@@ -337,13 +337,12 @@ describe('CompareAddresses subject routes', () => {
     ['The AI request was refused.', 'The AI request was refused.'],
   ])('says why the AI summary is missing when the request fails with "%s"', async (failure, reason) => {
     seedWorkerAnswers();
-    mockRunCompareToolkit.mockImplementation(
-      async (task: unknown, _payload: unknown, opts?: { throwOnError?: boolean }) => {
-        // Only a caller that asks for the failure gets it; the map falls back without one.
-        if (task === 'compare' && opts?.throwOnError) throw new Error(failure);
-        return null;
-      },
-    );
+    mockRunCompareToolkit.mockImplementation(async (...args: unknown[]) => {
+      const [task, , opts] = args as [unknown, unknown, { throwOnError?: boolean } | undefined];
+      // Only a caller that asks for the failure gets it; the map falls back without one.
+      if (task === 'compare' && opts?.throwOnError) throw new Error(failure);
+      return null;
+    });
     render(
       <MemoryRouter initialEntries={[comparisonPath]}>
         <CompareAddress activeSessionSlug="alpha" sessionCachesReady />
