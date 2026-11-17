@@ -61,7 +61,7 @@ test("an HTML page's words are the notes, in chunks of whole lines, with its tag
 
 test('an HTML page with no words gives no notes, and a long one leaves room for files', () => {
   const pictures = { title: 'Context', html: '<img src="https://example.org/map.png" alt="">' };
-  assert.deepEqual(buildSessionContextPrompt({ sessionContext: pictures }), { text: '', included: 0, omitted: 0 });
+  assert.deepEqual(buildSessionContextPrompt({ sessionContext: pictures }), { text: '', included: 0, omitted: 0, items: [] });
   // Ten paragraphs of about 1,900 characters: as many notes as typed paragraphs may be, then the file.
   const long = Array.from({ length: 10 }, (_, index) => `<p>${'word '.repeat(380)}${index}</p>`).join('');
   const { text, omitted } = buildSessionContextPrompt({
@@ -122,4 +122,26 @@ test('text that escapes long in JSON (quotes, backslashes, tags) is cut to fit, 
   assert.ok(text.length <= 4000, String(text.length));
   const [source] = dataOf(text).sources;
   assert.ok(source.text.length >= 400 && source.text.endsWith('…'));
+});
+
+test('the block says which link, note and source it holds, so a reader can be told what was read', () => {
+  const sessionContext = { paragraphs: ['First note.', 'Second note.'], links: [{ label: 'Charter', url: 'https://example.org/c' }] };
+  const sources = [
+    { title: 'empty.md', kind: 'file', text: '  ' },
+    { title: 'kept.md', kind: 'file', text: 'Kept text.' },
+    { title: 'big.md', kind: 'file', text: 'B'.repeat(900) },
+    { title: 'small.md', kind: 'file', text: 'Small text.' },
+  ];
+  const all = buildSessionContextPrompt({ sessionContext, sources });
+  assert.deepEqual(all.items, [
+    { part: 'links', index: 0 }, { part: 'notes', index: 0 }, { part: 'notes', index: 1 },
+    // A source with no text is not in the block, and each other keeps its own place in the list given.
+    { part: 'sources', index: 1 }, { part: 'sources', index: 2 }, { part: 'sources', index: 3 },
+  ]);
+  assert.equal(all.items.length, all.included);
+  // With no room for the long file's text it is left out, and a later short one still fits.
+  const tight = buildSessionContextPrompt({ sessionContext, sources, totalChars: 620 });
+  assert.deepEqual(tight.items.filter((item) => item.part === 'sources'), [{ part: 'sources', index: 1 }, { part: 'sources', index: 3 }]);
+  assert.equal(tight.items.length, tight.included);
+  assert.equal(tight.omitted, 1);
 });

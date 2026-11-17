@@ -38,8 +38,10 @@ export type SessionAgentMaterial = {
   sessionContext?: unknown;
   sources?: SessionContextPromptSource[];
   results?: string;
-  /** `scale` says what a rating question's numbers mean. */
-  answers?: Array<{ question: string; scale?: string; answers: SessionAgentMemberAnswer[] }>;
+  /** `scale` says what a rating question's numbers mean; `id` links an answer to its question and is never sent. */
+  answers?: Array<{ id?: string; question: string; scale?: string; answers: SessionAgentMemberAnswer[] }>;
+  /** The questions the published results cite, for linking an answer that read them. */
+  resultsQuestions?: Array<{ id: string; question: string }>;
 };
 
 export const SESSION_AGENT_STYLES: readonly SessionAgentStyle[];
@@ -57,6 +59,7 @@ export const SESSION_AGENT_LIMITS: Readonly<{
   resultsChars: number;
   answersChars: number;
   answerItemChars: number;
+  relatedQuestions: number;
   countedChoices: number;
   choiceChars: number;
   scaleChars: number;
@@ -98,4 +101,10 @@ export function buildSessionAgentMessages(input: {
   read: { context: number; results: boolean; answers: number };
   /** Context items that didn't fit the block. */
   contextOmitted: number;
+  /** Each context item the prompt holds: which link, note or source, by its place in its own list. */
+  contextItems: Array<{ part: 'links' | 'notes' | 'sources'; index: number }>;
+  /** The questions closest to the one asked, closest first. */
+  related: Array<{ id: string; question: string }>;
+  /** Whether `related` are questions whose answers the prompt holds, or ones the published results cite. */
+  relatedFrom: 'answers' | 'results';
 };

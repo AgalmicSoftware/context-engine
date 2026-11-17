@@ -780,6 +780,9 @@ export default function OnePageSessionStandardShell({
                           sessionSlug={effectiveSlug}
                           sessionConfig={resolvedSessionConfig}
                           account={viewerAccount}
+                          onOpenResults={() => {
+                            if (!showResults) onToggleResults();
+                          }}
                           onClose={() => setSessionAgentOpen(false)}
                         />
                       </Suspense>

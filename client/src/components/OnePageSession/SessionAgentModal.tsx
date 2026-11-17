@@ -8,6 +8,8 @@ import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
 import { dictationNeedsSignIn, dictationOffered } from '../../domains/worker/sessionFeedbackPorts';
 import CETooltip from '../Shared/CETooltip';
 import SessionAgentNotice from './SessionAgentNotice';
+import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import SessionDictation from './SessionDictation';
 import { sessionAgentAddressNotice, sessionAgentFullerAnswersNote } from './sessionAgentWording';
 import {
@@ -17,11 +19,16 @@ import {
   setSessionAgentUnattributed,
   type SessionAgentReply,
   type SessionAgentRequestOptions,
+  type SessionAgentSource,
   type SessionAgentStatus,
 } from './sessionAgentRequests';
 import styles from './SessionAgentModal.module.scss';
 
-type Props = SessionAgentRequestOptions & { onClose: () => void };
+type Props = SessionAgentRequestOptions & {
+  onClose: () => void;
+  /** Opens the page's Results; left out where the page has none to open. */
+  onOpenResults?: () => void;
+};
 
 const STYLE_HELP = {
   general:
@@ -62,6 +69,29 @@ const drewOn = ({ context, results, answers }: SessionAgentReply['read']) => {
   return `Drew on ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]}.`;
 };
 
+const SOURCE_KIND = {
+  'session-link': 'link in the session’s context',
+  'session-note': 'the session’s context',
+  link: 'link',
+  file: 'file',
+};
+
+// One item the answer read: a link when it has a web address, and what kind of item it is.
+const Source = ({ source }: { source: SessionAgentSource }) => (
+  <li>
+    {source.url ? (
+      <a href={source.url} target="_blank" rel="noopener noreferrer" className={styles.link}>
+        {source.title}
+      </a>
+    ) : (
+      source.title
+    )}{' '}
+    <span className={styles.hint}>
+      ({source.readByAi ? 'PDF, as the session’s AI read it' : SOURCE_KIND[source.kind]})
+    </span>
+  </li>
+);
+
 type HelpProps = { id: string; label: string; text: string };
 
 // A "?" whose text a screen reader hears as its description and everyone else sees on hover or focus.
@@ -89,7 +119,7 @@ const Help = ({ id, label, text }: HelpProps) => (
 
 // The dialog shows only the latest answer. A chat is kept only where the
 // session stores chats and the asker leaves "Store this chat" ticked.
-export default function SessionAgentModal({ sessionSlug, sessionConfig, account, onClose }: Props) {
+export default function SessionAgentModal({ sessionSlug, sessionConfig, account, onClose, onOpenResults }: Props) {
   const baseId = `ce-session-agent-${useId().replace(/:/g, '')}`;
   const options = { sessionSlug, sessionConfig, account };
   const [attempt, setAttempt] = useState(0);
@@ -446,7 +476,60 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
           {reply ? (
             <div className={styles.answer} data-testid="ce-session-agent-answer">
               <p className={styles.answerText}>{reply.answer}</p>
-              <p className={styles.hint}>{drewOn(reply.read)}</p>
+              {reply.sources?.length ? (
+                <details className={styles.sources} data-testid="ce-session-agent-sources">
+                  <summary className={styles.hint}>{drewOn(reply.read)}</summary>
+                  <p className={styles.hint}>The context it read, which you may read too:</p>
+                  <ul>
+                    {reply.sources.map((source, index) => (
+                      // The same item can be added twice, so its place is its key.
+                      <Source key={index} source={source} />
+                    ))}
+                  </ul>
+                </details>
+              ) : (
+                <p className={styles.hint}>{drewOn(reply.read)}</p>
+              )}
+              {reply.questions.length ? (
+                <div className={styles.sources} data-testid="ce-session-agent-questions">
+                  <p className={styles.hint}>
+                    {reply.questionsFrom === 'results'
+                      ? 'Questions the session’s results cite that are closest to yours:'
+                      : 'Questions whose answers it read that are closest to yours:'}
+                  </p>
+                  <ul>
+                    {reply.questions.map(({ id, question: prompt }) => (
+                      <li key={id}>
+                        <a
+                          // The route helper names the session, and its Worker where a fresh browser needs it.
+                          href={buildPublicRoute(buildQuestionRoutePath(id, { sessionSlug }))}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.link}
+                        >
+                          {prompt}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {reply.read.results && onOpenResults ? (
+                <p>
+                  <button
+                    type="button"
+                    className={styles.link}
+                    data-ce-control-appearance="frameless"
+                    data-testid="ce-session-agent-open-results"
+                    onClick={() => {
+                      onClose();
+                      onOpenResults();
+                    }}
+                  >
+                    Open Results
+                  </button>
+                </p>
+              ) : null}
               {reply.stored ? <p className={styles.hint}>This chat was stored.</p> : null}
               {reply.note ? <p className={styles.hint}>{reply.note}</p> : null}
             </div>

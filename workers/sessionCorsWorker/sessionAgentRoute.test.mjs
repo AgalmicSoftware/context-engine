@@ -7,7 +7,9 @@ import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretAct
 import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, harness, idOf, json } from './contextSourceTestFixture.mjs';
 import { dispatchSessionAgentHistoryStore, listSessionAgentHistory } from './sessionAgentHistory.js';
-import { SESSION_AGENT_SIGNED_OUT, dispatchSessionAgentRoute } from './sessionAgentRoute.js';
+import { SESSION_AGENT_SIGNED_OUT, dispatchSessionAgentRoute, resultsQuestions } from './sessionAgentRoute.js';
+import { getStorageIndexBinding } from './storageKvBindings.js';
+import { hiddenStorageResourcePrefix } from './storageResourceOwnership.js';
 import { createDurableStorage } from './workerGroupTestFixture.mjs';
 
 const MEMBER = `0x${'3'.repeat(40)}`;
@@ -270,6 +272,127 @@ test('Detailed answers add what the asker may read and members’ answers, and n
     ok: false, status: 503, reason: 'results_analysis_snapshot_limit' }) } });
   assert.doesNotMatch(tooMany.prompt, /ANSWER/);
   assert.match(tooMany.body.note, /weren’t read: this session stores more than 10,000 question and answer versions/);
+});
+
+test('a signed-in asker is told which context items the answer read, each one theirs to read; a visitor gets the count alone', async () => {
+  const h = await seeded();
+  h.state.config.sessionContext = {
+    title: 'Context', paragraphs: ['CONTEXT for everyone.'], links: [{ label: 'The charter', url: 'https://example.org/charter' }],
+  };
+  const titles = (reply) => reply.body.sources.map((source) => `${source.kind}: ${source.title}`);
+  // General: the session's own link and note, then the one file open to everyone.
+  const general = await ask(h);
+  assert.deepEqual(titles(general), ['session-link: The charter', 'session-note: CONTEXT for everyone.', 'file: agenda.md']);
+  assert.equal(general.body.read.context, general.body.sources.length);
+  assert.equal(general.body.sources[0].url, 'https://example.org/charter');
+  // A file's name and kind: nothing about who added it or what it says.
+  assert.deepEqual(general.body.sources[2], { kind: 'file', title: 'agenda.md' });
+  // A group's file is listed only for someone the group's rule lets read it, and an admins' file only for an admin.
+  const member = await ask(h, { address: MEMBER });
+  assert.deepEqual(titles(member).slice(2), ['file: agenda.md', 'file: group.txt']);
+  const admin = await ask(h, { address: ADMIN });
+  assert.deepEqual(titles(admin).slice(2).sort(), ['file: agenda.md', 'file: board.txt', 'file: group.txt']);
+  for (const reply of [general, member]) assert.doesNotMatch(JSON.stringify(reply.body), /board\.txt/);
+  assert.doesNotMatch(JSON.stringify(general.body), /group\.txt/);
+  // An item that didn't fit the prompt was not read, so it is not listed.
+  h.state.config.sessionContext = { title: 'Context', paragraphs: ['P'.repeat(900), 'Q'.repeat(900)], links: [] };
+  await idOf(await h.uploadFile({ name: 'long.md', type: 'text/markdown', bytes: encode('L'.repeat(9000)) }));
+  await idOf(await h.uploadFile({ name: 'late.md', type: 'text/markdown', bytes: encode('LATE file') }));
+  const full = await ask(h);
+  assert.equal(full.body.read.context, full.body.sources.length);
+  assert.ok(!titles(full).includes('file: late.md'));
+  assert.match(full.body.note, /wasn’t read/);
+
+  // Each listed item is the one read, whatever was passed over ahead of it: a file with no words, and a
+  // file whose adder keeps theirs out of the agent.
+  const mixed = await seeded();
+  mixed.state.config.sessionContext = { title: 'Context', paragraphs: [], links: [] };
+  await idOf(await mixed.uploadFile({ name: 'blank.md', type: 'text/markdown', bytes: encode('   ') }));
+  await idOf(await mixed.uploadFile({ name: 'theirs.md', type: 'text/markdown', bytes: encode('THEIRS'), address: PARTICIPANT }));
+  await idOf(await mixed.uploadFile({ name: 'last.md', type: 'text/markdown', bytes: encode('LAST words') }));
+  const optedOut = { callSessionAgentOptOutStore: async (env, slug, operation) => (
+    { ok: true, body: operation === 'list' ? { addresses: [PARTICIPANT] } : {} }) };
+  const passedOver = await ask(mixed, { address: ADMIN, deps: optedOut });
+  assert.match(passedOver.prompt, /LAST words/);
+  assert.doesNotMatch(passedOver.prompt, /THEIRS/);
+  assert.deepEqual(titles(passedOver).sort(), ['file: agenda.md', 'file: board.txt', 'file: group.txt', 'file: last.md']);
+
+  // Not signed in, the answer reads what a first sign-in could, which the page may not list to a visitor.
+  const visitor = await askSignedOut(await seeded());
+  assert.equal(visitor.body.read.context, 2);
+  assert.equal('sources' in visitor.body, false);
+  assert.doesNotMatch(JSON.stringify(visitor.body), /agenda\.md/);
+});
+
+test('an answer links the questions it read that are closest to the one asked, never by what a member wrote', async () => {
+  const address = (digit) => `0x${String(digit).repeat(40)}`;
+  const people = [MEMBER, address(7), address(8)];
+  const answered = (questionId, words) => people.map((_, index) => (
+    { questionId, answer: `${words} ${index}`, participantId: `participant_00${index + 1}` }));
+  const source = { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+    ok: true,
+    snapshot: {
+      questions: [
+        { id: '0xAA', prompt: 'Should meetings be shorter?', type: 'text' },
+        { id: '0xBB', prompt: 'Who should chair the budget committee?', type: 'text' },
+        { id: '0xCC', prompt: 'Is parking a problem?', type: 'text' },
+      ],
+      responses: [
+        ...answered('0xAA', 'Dana of Oakland says parking'),
+        ...answered('0xBB', 'someone local'),
+        // Too few answered this one for anyone but an admin to hear from it.
+        { questionId: '0xCC', answer: 'yes', participantId: 'participant_001' },
+      ],
+    },
+    participantAddresses: new Map(people.map((person, index) => [`participant_00${index + 1}`, person])),
+  }) };
+  const h = await seeded();
+  const detailed = await ask(h, { address: MEMBER, deps: source, body: { question: 'How long should meetings be, and who sets the budget?' } });
+  assert.deepEqual(detailed.body.questions, [
+    { id: '0xaa', question: 'Should meetings be shorter?' },
+    { id: '0xbb', question: 'Who should chair the budget committee?' },
+  ]);
+  assert.equal(detailed.body.questionsFrom, 'answers');
+  // The ids are for the page: the model is never given them.
+  assert.doesNotMatch(detailed.prompt, /0xaa|0xbb/i);
+  // A question's own words decide, not its answers: a name or place only an answer holds links nothing.
+  const byAnswer = await ask(h, { address: MEMBER, deps: source, body: { question: 'What did Dana of Oakland say?' } });
+  assert.equal('questions' in byAnswer.body, false);
+  // A thinly answered question is neither read nor linked for a member; an admin reads it.
+  const parking = { question: 'Is parking a problem?' };
+  assert.equal('questions' in (await ask(h, { address: MEMBER, deps: source, body: parking })).body, false);
+  assert.deepEqual((await ask(h, { address: ADMIN, deps: source, body: parking })).body.questions, [{ id: '0xcc', question: 'Is parking a problem?' }]);
+
+  // General answers read no member's answer: they link the questions the published results cite.
+  const published = { readPublishedResultsAnalysisArtifact: async ({ includeSnapshot }) => ({
+    ok: true,
+    artifact: { sections: {
+      overview: { available: true, overview: 'RESULTS: shorter meetings.' },
+      breakdown: { available: true, groups: [{ label: 'Meetings', questionIds: ['0xAA', '0xDD'] }] },
+      atlas: { available: false, nodes: [{ label: 'Hidden', questionIds: ['0xBB'] }] },
+    } },
+    ...(includeSnapshot ? { snapshot: { questions: [
+      { id: '0xAA', prompt: 'Should meetings be shorter?' },
+      { id: '0xBB', prompt: 'Who should chair the budget meetings?' },
+      { id: '0xDD', prompt: 'Should meetings move online?' },
+    ] } } : {}),
+  }) };
+  const question = { question: 'What about meetings?' };
+  const general = await ask(h, { deps: published, body: question });
+  assert.deepEqual(general.body.questions.map((item) => item.id).sort(), ['0xaa', '0xdd']);
+  assert.equal(general.body.questionsFrom, 'results');
+  // Someone not signed in gets the same links: the results are theirs to see.
+  assert.deepEqual((await askSignedOut(h, { deps: published, body: question })).body.questions.map((item) => item.id).sort(), ['0xaa', '0xdd']);
+  // A question an admin has since removed is left out, and so is every link where the asker may not see results.
+  h.state.config.BLOCKED_QUESTION_IDS = ['0xDD'];
+  assert.deepEqual((await ask(h, { deps: published, body: question })).body.questions, [{ id: '0xaa', question: 'Should meetings be shorter?' }]);
+  // So is one hidden from the Storage panel, which the settings don't list.
+  await getStorageIndexBinding(h.env).put(`${hiddenStorageResourcePrefix({ slug: 'salon', resource: 'questions' })}0xaa`, '1');
+  assert.equal('questions' in (await ask(h, { deps: published, body: question })).body, false);
+  assert.match((await ask(h, { deps: published, body: question })).prompt, /RESULTS/);
+  const hidden = { ...published, evaluateResultsAnalysisViewerEligibility: () => ({ ok: false }) };
+  assert.equal('questions' in (await ask(h, { deps: hidden, body: question })).body, false);
+  assert.deepEqual(resultsQuestions({ artifact: null, snapshot: null, config: {} }), []);
 });
 
 test('results reach an answer only where the page shows the asker results', async () => {

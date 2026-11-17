@@ -59,6 +59,9 @@ const reply = (answer: string, read = { context: 0, results: false, answers: 0 }
   answer,
   answers: 'general',
   read,
+  sources: null,
+  questions: [],
+  questionsFrom: 'answers',
   note,
   stored: null,
 });
@@ -85,6 +88,85 @@ describe('SessionAgentModal', () => {
   });
   afterEach(() => {
     jest.resetAllMocks();
+  });
+
+  it('lists the context an answer read for someone the Worker lists it for, and only the count otherwise', async () => {
+    const { dialog } = await renderModal(member);
+    ask.mockResolvedValueOnce({
+      ...reply('An answer.', { context: 3, results: false, answers: 0 }),
+      sources: [
+        { kind: 'session-link', title: 'Charter', url: 'https://example.org/charter', readByAi: false },
+        { kind: 'file', title: 'report.pdf', url: '', readByAi: true },
+        { kind: 'session-note', title: 'Reverse alignment is…', url: '', readByAi: false },
+      ],
+    });
+    askQuestion(dialog, 'Why?');
+    const list = within(await dialog.findByTestId('ce-session-agent-sources'));
+    // The count is what opens the list.
+    expect(list.getByText('Drew on 3 items of context.').tagName).toBe('SUMMARY');
+    expect(list.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Charter (link in the session’s context)',
+      'report.pdf (PDF, as the session’s AI read it)',
+      'Reverse alignment is… (the session’s context)',
+    ]);
+    const link = list.getByRole('link', { name: 'Charter' });
+    expect(link).toHaveAttribute('href', 'https://example.org/charter');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(list.queryByRole('link', { name: 'report.pdf' })).not.toBeInTheDocument();
+
+    // No list from the Worker, as for someone not signed in: the count alone, with nothing to open.
+    ask.mockResolvedValueOnce(reply('Another answer.', { context: 3, results: false, answers: 0 }));
+    fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
+    await dialog.findByText('Another answer.');
+    expect(dialog.queryByTestId('ce-session-agent-sources')).not.toBeInTheDocument();
+    expect(dialog.getByText('Drew on 3 items of context.').tagName).toBe('P');
+  });
+
+  it('links the questions an answer read to their own pages, and opens Results when it read them', async () => {
+    readStatus.mockResolvedValue(member);
+    const onClose = jest.fn();
+    const onOpenResults = jest.fn();
+    render(<SessionAgentModal {...OPTIONS} onOpenResults={onOpenResults} onClose={onClose} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    await dialog.findByLabelText('Your question');
+    ask.mockResolvedValueOnce({
+      ...reply('An answer.', { context: 0, results: true, answers: 0 }),
+      questions: [{ id: '0xq1', question: 'Should meetings be shorter?' }],
+    });
+    askQuestion(dialog, 'Why?');
+    const questions = within(await dialog.findByTestId('ce-session-agent-questions'));
+    expect(questions.getByText('Questions whose answers it read that are closest to yours:')).toBeInTheDocument();
+    const link = questions.getByRole('link', { name: 'Should meetings be shorter?' });
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    const address = new URL(link.getAttribute('href') || '', 'https://site.example');
+    expect(address.pathname).toMatch(/\/question\/0xq1$/);
+    expect(address.searchParams.get('session')).toBe('salon');
+    // A new tab, so the answer, which isn't kept, stays on this one.
+    expect(link).toHaveAttribute('target', '_blank');
+
+    fireEvent.click(dialog.getByRole('button', { name: 'Open Results' }));
+    expect(onOpenResults).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    // Questions the results cite are said to be that, and an answer that read no results offers none to open.
+    ask.mockResolvedValueOnce({
+      ...reply('Another answer.', { context: 1, results: false, answers: 0 }),
+      questions: [{ id: '0xq2', question: 'Should meetings move online?' }],
+      questionsFrom: 'results',
+    });
+    fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
+    await dialog.findByText('Another answer.');
+    expect(dialog.getByText('Questions the session’s results cite that are closest to yours:')).toBeInTheDocument();
+    expect(dialog.queryByRole('button', { name: 'Open Results' })).not.toBeInTheDocument();
+  });
+
+  it('offers no Results button where the page has none to open', async () => {
+    const { dialog } = await renderModal(member);
+    ask.mockResolvedValueOnce(reply('An answer.', { context: 1, results: true, answers: 0 }));
+    askQuestion(dialog, 'Why?');
+    await dialog.findByText('An answer.');
+    expect(dialog.queryByRole('button', { name: 'Open Results' })).not.toBeInTheDocument();
+    expect(dialog.queryByTestId('ce-session-agent-questions')).not.toBeInTheDocument();
   });
 
   it('takes a spoken question where the session writes speech down, up to the question’s limit', async () => {

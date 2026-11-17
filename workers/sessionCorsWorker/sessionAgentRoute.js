@@ -14,6 +14,10 @@ import {
   loadWorkerCanonicalResultsAnalysisSource,
   readPublishedResultsAnalysisArtifact,
 } from './resultsAnalysisGeneration.js';
+import { blockedQuestionIds } from './blockedQuestionIds.js';
+import { getStorageIndexBinding } from './storageKvBindings.js';
+import { listHiddenStorageResourceIds } from './storageResourceOwnership.js';
+import { sessionContextNotes } from '../../shared/sessionContextText.mjs';
 import { canOptOut } from './sessionAgentOptOuts.js';
 import { isListedResultsBuilder } from './resultsBuild.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
@@ -118,26 +122,58 @@ export const resultsText = (artifact) => {
   return lines.join('\n');
 };
 
+// The questions the published results cite, as the Results page shows them to
+// its viewers: each with the text the results were built from. One an admin
+// has since removed, in the session's settings or from the Storage panel
+// (`hidden`), is left out.
+export const resultsQuestions = ({ artifact, snapshot, config, hidden = [] }) => {
+  const cited = new Set();
+  const walk = (value) => {
+    if (Array.isArray(value)) return value.forEach(walk);
+    if (!value || typeof value !== 'object' || value.available === false) return undefined;
+    if (Array.isArray(value.questionIds)) value.questionIds.forEach((id) => cited.add(lower(id)));
+    return Object.values(value).forEach(walk);
+  };
+  walk(artifact?.sections);
+  const removed = new Set([...blockedQuestionIds(config), ...hidden].map(lower));
+  return (Array.isArray(snapshot?.questions) ? snapshot.questions : [])
+    .map((question) => ({ id: lower(question?.id), question: trim(question?.prompt) }))
+    .filter(({ id, question }) => id && question && cited.has(id) && !removed.has(id));
+};
+
+const NO_RESULTS = Object.freeze({ text: '', questions: [] });
+
 // Results reach an answer only for those who may see them on the page:
 // viewers under the rule AI Views follow, and anyone listed to build results
 // (admins and results admins) on any session.
 const readVisibleResults = async ({ env, slug, config, address, scopes, deps }) => {
   if (!isListedResultsBuilder(config, address)) {
-    if (!(deps.evaluateResultsAnalysisViewerEligibility || evaluateResultsAnalysisViewerEligibility)({ config })?.ok) return '';
+    if (!(deps.evaluateResultsAnalysisViewerEligibility || evaluateResultsAnalysisViewerEligibility)({ config })?.ok) return NO_RESULTS;
     for (const resource of ['generatedArtifacts', 'questions', 'responses']) {
       const access = await (deps.authorizeCloudflareStorageResourceRead || authorizeCloudflareStorageResourceRead)({
         env, config, slug, resource, requesterAddress: address, authScopes: scopes, deps,
       });
-      if (!access?.ok) return '';
+      if (!access?.ok) return NO_RESULTS;
     }
   }
   try {
     const published = await (deps.readPublishedResultsAnalysisArtifact || readPublishedResultsAnalysisArtifact)({
-      env, slug, config, includeSnapshot: false, deps,
+      env, slug, config, includeSnapshot: true, deps,
     });
-    return published?.ok ? resultsText(published.artifact) : '';
+    if (!published?.ok) return NO_RESULTS;
+    const text = resultsText(published.artifact);
+    // If what is hidden can't be read, the answer still reads the results and links no question.
+    let questions = [];
+    try {
+      const index = getStorageIndexBinding(env);
+      const hidden = typeof index?.list === 'function' ? await listHiddenStorageResourceIds({ index, slug, resource: 'questions' }) : [];
+      questions = resultsQuestions({ ...published, config, hidden: [...hidden] });
+    } catch {
+      questions = [];
+    }
+    return { text, questions };
   } catch {
-    return '';
+    return NO_RESULTS;
   }
 };
 
@@ -163,14 +199,16 @@ const scaleText = ({ scale } = {}) => {
 // and how many questions for having too few answers.
 export const TOO_MANY_STORED = Symbol('too many stored versions');
 // With `writers`, each answer also says whose it is (`from`), for an export
-// that shows it; the agent's own answers are never given that.
-export const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, writers = false, deps }) => {
+// that shows it; the agent's own answers are never given that. With `ids`,
+// each question says which it is, so an answer can link to it.
+export const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, writers = false, ids = false, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
   if (!source?.ok) return source?.reason === 'results_analysis_snapshot_limit' ? TOO_MANY_STORED : null;
   const leftOut = { optedOut: 0, withoutAddress: 0, belowMinAnswers: 0 };
   const questions = source.snapshot.questions.map((question) => ({ ...question, scale: scaleText(question) }));
   const byQuestion = new Map(questions.map((question) => [
-    question.id, { question: trim(question.prompt), scale: question.scale, counted: COUNTED_TYPES.has(question.type), answers: [] },
+    question.id,
+    { id: lower(question.id), question: trim(question.prompt), scale: question.scale, counted: COUNTED_TYPES.has(question.type), answers: [] },
   ]));
   source.snapshot.responses.forEach((response) => {
     const from = source.participantAddresses?.get(response.participantId);
@@ -195,7 +233,7 @@ export const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswer
   const kept = answered.filter((group) => group.answers.length >= minAnswers);
   leftOut.belowMinAnswers = answered.length - kept.length;
   return {
-    groups: kept.map(({ question, scale, answers }) => ({ question, ...(scale ? { scale } : {}), answers })),
+    groups: kept.map(({ id, question, scale, answers }) => ({ ...(ids ? { id } : {}), question, ...(scale ? { scale } : {}), answers })),
     questions,
     leftOut,
   };
@@ -217,16 +255,40 @@ const gatherMaterial = async ({ env, slug, config, setting, address, scopes, ask
     }),
     readVisibleResults({ env, slug, config, address, scopes, deps }),
     detailed ? readMemberAnswers({
-      env, slug, config, optedOut, deps, minAnswers: asker.audience === 'admin' ? 1 : sessionAgentMinAnswers(setting),
+      env, slug, config, optedOut, deps, ids: true, minAnswers: asker.audience === 'admin' ? 1 : sessionAgentMinAnswers(setting),
     }) : { groups: [] },
   ]);
   return {
-    material: { sessionContext: config?.sessionContext, sources: context.sources, results, answers: answers?.groups || [] },
+    material: {
+      sessionContext: config?.sessionContext, sources: context.sources, results: results.text, resultsQuestions: results.questions,
+      answers: answers?.groups || [],
+    },
     answersUnavailable: answers === TOO_MANY_STORED ? 'too_many' : answers === null,
     contextLeftOut: context.leftOut,
     // The groups whose locked files this answer may draw on.
     lockedTo: [...new Set(context.sources.filter((source) => !source.everyone).flatMap((source) => source.groupIds))].sort(),
   };
+};
+
+// The context items one answer's prompt held, in the order it held them, for
+// the page to list. Every source among them passed this asker's own read
+// check when the material was gathered, group locks included; the session's
+// own links and notes are part of its public settings.
+const TITLE_CHARS = 200;
+const sourcesRead = ({ contextItems, material }) => {
+  const { notes, links } = sessionContextNotes(material.sessionContext);
+  return contextItems.flatMap(({ part, index }) => {
+    if (part === 'links') return links[index] ? [{ kind: 'session-link', title: clip(trim(links[index].label) || trim(links[index].url), TITLE_CHARS), url: trim(links[index].url) }] : [];
+    if (part === 'notes') return notes[index] ? [{ kind: 'session-note', title: clip(trim(notes[index]).replace(/\s+/g, ' '), 80) }] : [];
+    const source = material.sources[index];
+    if (!source) return [];
+    return [{
+      kind: source.kind === 'link' ? 'link' : 'file',
+      title: clip(trim(source.title), TITLE_CHARS) || 'Untitled',
+      ...(trim(source.url) ? { url: trim(source.url) } : {}),
+      ...(source.readByAi ? { readByAi: true } : {}),
+    }];
+  });
 };
 
 // A price for an audience will be checked here, refusing with 402 until it
@@ -432,7 +494,9 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   });
   const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
   if (!payment?.ok) return json({ error: payment?.error || 'This answer needs payment first.', reason: 'session_agent_payment_required' }, 402);
-  const { messages, read, contextOmitted } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
+  const { messages, read, contextOmitted, contextItems, related, relatedFrom } = buildSessionAgentMessages({
+    setting, style: asker.answers, question, material,
+  });
   const reply = await askAi({ messages, config, secrets: secretContext?.ok ? secretContext.secrets : {}, address, scopes: currentScopes, env, headers, deps });
   if (!reply.ok) return json(reply.body, reply.status);
   const kept = storeRequest.keep
@@ -455,6 +519,13 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
     answers: asker.answers,
     audience: asker.audience,
     read,
+    // Which items the count is of, for someone signed in: they may read each
+    // one. Someone not signed in is answered as a first sign-in would be, from
+    // items the page may not list to a visitor, so they get the count alone.
+    ...(signedOut ? {} : { sources: sourcesRead({ contextItems, material }) }),
+    // The questions closest to the one asked, and whether they are ones whose
+    // answers the prompt held or ones the published results cite.
+    ...(related.length ? { questions: related, questionsFrom: relatedFrom } : {}),
     // Said whenever the session stores chats, so an asker knows what became of this one.
     ...(sessionAgentStoresChats(setting) ? { stored: kept?.stored === true } : {}),
     ...(notes.length ? { note: notes.join(' ') } : {}),

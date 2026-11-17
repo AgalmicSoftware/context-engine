@@ -417,3 +417,25 @@ test('each part is cut to its limit, and no material is said plainly', () => {
   assert.match(empty.messages[1].content, /^This session has no material you may read/);
   assert.deepEqual(empty.read, { context: 0, results: false, answers: 0 });
 });
+
+test('the questions an answer read are named closest first, at most five, and their ids never reach the prompt', () => {
+  const answers = ['bus', 'bus lanes', 'bus fares and lanes', 'bus stops', 'bus drivers', 'bus depots', 'parks'].map((topic, index) => ({
+    id: `0xid${index}`, question: `What about ${topic}?`, answers: [{ text: 'An answer.' }],
+  }));
+  const detailed = buildSessionAgentMessages({ style: 'detailed', question: 'Fares and lanes for the bus?', material: { answers } });
+  assert.equal(detailed.related.length, SESSION_AGENT_LIMITS.relatedQuestions);
+  assert.deepEqual(detailed.related[0], { id: '0xid2', question: 'What about bus fares and lanes?' });
+  assert.equal(detailed.relatedFrom, 'answers');
+  assert.ok(!detailed.related.some((item) => item.id === '0xid6'), 'a question sharing no topic word is not linked');
+  assert.doesNotMatch(detailed.messages.map((message) => message.content).join('\n'), /0xid/);
+  // An answer group with no id is read and counted as before, and links nothing.
+  const unnamed = buildSessionAgentMessages({ style: 'detailed', question: 'The bus?', material: { answers: answers.map(({ id, ...rest }) => rest) } });
+  assert.deepEqual(unnamed.related, []);
+  assert.equal(unnamed.read.answers, 7);
+  // General answers read no member's answer: the questions the results cite are linked, and only with results read.
+  const resultsQuestions = [{ id: '0xr1', question: 'Should bus lanes stay?' }, { id: '0xr2', question: 'More parks?' }];
+  const general = buildSessionAgentMessages({ style: 'general', question: 'The bus?', material: { answers, results: 'Results text.', resultsQuestions } });
+  assert.deepEqual(general.related, [{ id: '0xr1', question: 'Should bus lanes stay?' }]);
+  assert.equal(general.relatedFrom, 'results');
+  assert.deepEqual(buildSessionAgentMessages({ style: 'general', question: 'The bus?', material: { resultsQuestions } }).related, []);
+});

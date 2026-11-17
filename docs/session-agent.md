@@ -134,6 +134,30 @@ or, when no audience gives Detailed answers, only its admins. An audience that
 an earlier one already answers is passed over, as the first audience to admit
 a person sets their answers.
 
+## What an answer says it read
+
+Under each answer the dialog says how much it drew on: items of context,
+the results, members' answers.
+
+- **The context items.** Someone signed in can open that line to see which
+  items the answer read: the session's own notes and links, then each added
+  file or link by its name, with a link's address. Every item listed is one
+  that person may read, group locks included, because the answer was only ever
+  given what they may read. Someone not signed in gets the count alone: they are
+  answered from what a first sign-in could read, which the page may not list
+  to a visitor.
+- **Questions.** Up to five questions are linked, each to its own page: those
+  whose answers the agent read (Detailed), or else those the published results
+  cite (General), that share a topic word with the question asked. The dialog
+  says which of the two they are. Only a question's own words are compared,
+  never what members wrote, so a name or detail from an answer links nothing.
+  A question an admin has removed, in the session's settings or from the
+  Storage panel, is not linked.
+- **Results.** An answer that read the results offers **Open Results**.
+
+The list is of what the prompt held, not of what the model used: it does not
+say which item a sentence came from.
+
 ## Asking by voice
 
 The question box has a microphone wherever an answer box would: the session
@@ -508,13 +532,18 @@ other signed-in routes.
   person can still set their switches; `ask` then refuses with `410` or with
   `403` (`ai_disabled`).
 - `POST /session-agent/ask` with `{ question }` (at most 500 characters) returns
-  `{ answer, answers, audience, read, note?, stored? }`. While the session
+  `{ answer, answers, audience, read, sources?, questions?, note?, stored? }`. While the session
   records chats it also takes `store` (true to keep this chat), `attribution`
   (`address` or `anonymous`, the default) and `name` (60 characters at most),
   and `stored` says whether the chat was kept; nothing is kept without
   `store: true`. `read` says how much the answer
   drew on: `{ context, results, answers }`, as a count of context items, whether
-  it read the results, and a count of members' answers. The answer is at most
+  it read the results, and a count of members' answers. `sources` lists the
+  context items counted, each `{ kind, title, url?, readByAi? }` with `kind`
+  one of `session-link`, `session-note`, `link` or `file`, and is sent only to
+  someone signed in. `questions` lists up to five `{ id, question }` closest to
+  the one asked, and `questionsFrom` says whether they are questions whose
+  `answers` the prompt held or ones the published `results` cite. The answer is at most
   1,500 characters. `note` says what wasn't read: members' answers past the
   stored-versions limit, or context past the 8,000 characters or 16 items
   ("Some of the session's context wasn't read: …").

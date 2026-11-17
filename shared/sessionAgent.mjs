@@ -34,6 +34,8 @@ export const SESSION_AGENT_LIMITS = Object.freeze({
   answersChars: 24000,
   answerItemChars: 300,
   // The options one question's counts may list, most chosen first.
+  // The questions an answer is linked to: those closest to the one asked.
+  relatedQuestions: 5,
   countedChoices: 12,
   choiceChars: 80,
   scaleChars: 160,
@@ -305,6 +307,7 @@ const fitAnswers = (groups, question, max, random) => {
       const scale = clip(text(group.scale), L.scaleChars);
       return {
         close,
+        id: text(group.id),
         answered: rows.length,
         entry: {
           question: clip(text(group.question), L.answerItemChars),
@@ -351,14 +354,23 @@ const fitAnswers = (groups, question, max, random) => {
   return {
     answers: kept.map(({ entry, written }) => (written.length ? { ...entry, written } : entry)),
     leftOut: items.length - kept.length,
+    // Closest first, as `items` is: the questions whose answers were read that share a topic word with the one asked.
+    related: kept.filter((item) => item.close > 0 && item.id).map(({ id, entry }) => ({ id, question: entry.question })),
   };
 };
+
+// The questions the published results cite that share a topic word with the one asked, closest first.
+const closestCited = (cited, question) =>
+  byCloseness((Array.isArray(cited) ? cited : []).filter((item) => isRecord(item) && text(item.id) && text(item.question)), question)
+    .filter(({ close }) => close > 0)
+    .map(({ group }) => ({ id: text(group.id), question: clip(text(group.question), L.answerItemChars) }));
 
 /**
  * The messages for one question. `material` must already be only what this
  * person's style may read: { sessionContext, sources, results, answers }, with
- * answers as [{ question, scale?, answers: [{ choices, text }] }], one entry
- * for each member's answer and no names. Instructions change only how the
+ * answers as [{ id?, question, scale?, answers: [{ choices, text }] }], one entry
+ * for each member's answer and no names, and `resultsQuestions` as the
+ * [{ id, question }] the results cite. An `id` never reaches the prompt. Instructions change only how the
  * agent writes; the rules after them always apply. `random` orders what
  * members wrote.
  */
@@ -374,10 +386,10 @@ export const buildSessionAgentMessages = ({ setting, style, question, material =
     totalChars: L.contextChars,
   });
   const results = clip(text(material.results), L.resultsChars);
-  const { answers, leftOut } =
+  const { answers, leftOut, related } =
     style === 'detailed' && Array.isArray(material.answers)
       ? fitAnswers(material.answers, question, L.answersChars, random)
-      : { answers: [], leftOut: 0 };
+      : { answers: [], leftOut: 0, related: [] };
   const parts = [
     context.text,
     results && block('Published results: the session’s results analysis, as JSON between the tags below.', 'session_results', results),
@@ -409,5 +421,12 @@ export const buildSessionAgentMessages = ({ setting, style, question, material =
     },
     // Context items that didn't fit the block, for the reply's note.
     contextOmitted: context.omitted,
+    contextItems: context.items,
+    // The questions closest to the one asked, closest first: those whose members' answers the prompt
+    // holds, or else, when it holds the results, those the results cite. The results text is cut to
+    // its limit, so a cited question may come from a part the prompt does not hold: `relatedFrom`
+    // lets the page say which of the two these are.
+    related: (related.length ? related : results ? closestCited(material.resultsQuestions, question) : []).slice(0, L.relatedQuestions),
+    relatedFrom: related.length ? 'answers' : 'results',
   };
 };
