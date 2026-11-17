@@ -430,7 +430,19 @@ export const buildSessionAgentMessages = ({ setting, style, question, material =
       : { answers: [], leftOut: 0, related: [] };
   const parts = [
     context.text,
-    results && block('Published results: the session’s results analysis, as JSON between the tags below.', 'session_results', results),
+    results &&
+      block(
+        'Published results: the session’s results analysis, as JSON between the tags below.' +
+          // Without members' answers the prompt holds no counts, and a model then says the results have
+          // none, which a reader who has seen the Results page takes for a mistake.
+          (answers.length
+            ? ''
+            : ' It is a summary in words. How many members gave each answer is on the session’s Results page; ' +
+              'you are not given those counts here. Asked for numbers, say that you are not given them and ' +
+              'that the Results page shows them, never that there are none.'),
+        'session_results',
+        results,
+      ),
     answers.length &&
       block(
         'Members’ answers by question, from members who let the Session Agent use them, without names, as JSON between the tags below. ' +

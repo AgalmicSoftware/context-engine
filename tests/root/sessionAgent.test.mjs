@@ -475,3 +475,19 @@ test('a question reads context whole to its limits, and less on Cloudflare’s m
   assert.ok(cloudflare.items >= 26 && cloudflare.items < 30 && cloudflare.chars <= 160000, JSON.stringify(cloudflare));
   assert.ok(cloudflare.item > 5990 && cloudflare.item <= 6001, String(cloudflare.item));
 });
+
+test('without members’ answers the agent is told the counts are on the Results page, not that there are none', () => {
+  const material = { results: 'Two themes.', answers: [{ question: 'Shorter meetings?', answers: [{ choices: ['Agree'] }, { choices: ['Agree'] }] }] };
+  const NOT_GIVEN = /It is a summary in words\. How many members gave each answer is on the session’s Results page; you are not given those counts here\. Asked for numbers, say that you are not given them and that the Results page shows them, never that there are none\./;
+  const promptOf = (style, given = material) => buildSessionAgentMessages({ style, question: 'How many agreed?', material: given }).messages[1].content;
+  // General answers read no member's answer, so they hold no counts.
+  assert.match(promptOf('general'), NOT_GIVEN);
+  // Detailed answers are given the counts, and are told nothing of the kind.
+  assert.doesNotMatch(promptOf('detailed'), NOT_GIVEN);
+  assert.match(promptOf('detailed'), /"counts":\{"Agree":2\}/);
+  // Detailed with no answers to read is as General is; and with no results to read, nothing is said about them.
+  assert.match(promptOf('detailed', { results: 'Two themes.', answers: [] }), NOT_GIVEN);
+  assert.doesNotMatch(promptOf('general', { answers: material.answers }), /Results page/);
+  // The sentence stays outside the tags: the results themselves are unchanged.
+  assert.match(promptOf('general'), /<session_results>\n"Two themes\."\n<\/session_results>/);
+});

@@ -97,6 +97,11 @@ session's own, built from everyone's answers, so they are read as the Results
 page shows them. If members' answers can't be read
 for a question, the answer goes ahead without them and says so.
 
+The published results are a summary in words, without counts. An answer that
+reads no member's answers, as every General answer does, is told so: that how
+many members gave each answer is on the Results page and is not given to it.
+Asked for numbers it then says it is not given them, not that there are none.
+
 Someone who is not an admin gets nothing from a question that fewer than three
 members answered, counting only members who have not kept their answers out:
 a count of one, or the one answer left when the asker keeps their own out,
