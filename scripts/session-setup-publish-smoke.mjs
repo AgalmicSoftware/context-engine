@@ -712,6 +712,12 @@ try {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
       writeText: async (value) => { window.__ceCopiedDraft = value; },
     } });
+    // The page copies with the copy command first, on a hidden field holding the text, and only then the clipboard.
+    document.execCommand = (command) => {
+      if (command !== 'copy') return false;
+      window.__ceCopiedDraft = document.activeElement?.value;
+      return true;
+    };
   });
   await authoring.getByRole('button', { name: 'Add Freeform question', exact: true }).click();
   const draftPrompt = 'Which local draft should survive a storage outage?';
@@ -722,7 +728,10 @@ try {
   const copiedDraft = JSON.parse(await page.evaluate(() => window.__ceCopiedDraft));
   assert.equal(copiedDraft.questions[0].prompt, draftPrompt);
   assert.ok(await draftNotice.isVisible(), 'Copying does not claim the browser save succeeded');
-  await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Synthetic clipboard denial'); }; });
+  await page.evaluate(() => {
+    document.execCommand = () => false;
+    navigator.clipboard.writeText = async () => { throw new Error('Synthetic clipboard denial'); };
+  });
   const draftDownload = page.waitForEvent('download');
   await draftNotice.getByRole('button', { name: 'Copy draft', exact: true }).click();
   const draftPath = `${outputDir}/authoring-draft.json`;
