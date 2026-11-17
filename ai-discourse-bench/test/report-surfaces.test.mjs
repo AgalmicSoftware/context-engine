@@ -1064,6 +1064,8 @@ test('analysis overlay populates risk matrix popups and Debate Atlas generated s
   assert.match(html, /data-ce-atlas-modal-tag="labor"/);
   assert.match(html, /data-ce-atlas-question-link/);
   assert.match(html, /data-ce-atlas-issue-copy-link/);
+  // The copy command goes before the clipboard API, as in the live atlas: in-app browsers refuse the API.
+  assert.match(html, /function copyAtlasIssueDeepLink\(\)[\s\S]*?document\.execCommand\('copy'\)[\s\S]*?navigator\.clipboard\.writeText[\s\S]*?function setRawDemoViewActive/);
   assert.match(html, /atlasIssueModal\.addEventListener\('click'/);
   assert.match(html, /if \(event\.key === 'Tab' && atlasIssueModal && !atlasIssueModal\.hidden\)/);
   assert.match(html, /class="nodeLabel packedNodeLabel alwaysVisible" style="font-size:[^"]+">\s*Labor Transition\s*<\/div>/);
