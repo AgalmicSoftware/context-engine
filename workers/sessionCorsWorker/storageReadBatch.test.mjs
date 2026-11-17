@@ -176,3 +176,35 @@ test('a batch takes 1 to 100 distinct valid ids, and reports a missing one on it
   const capabilities = await call('/capabilities');
   assert.ok(capabilities.body.features.includes('storage_read_batch_v1'));
 });
+
+test('answers list up to 500 a page, in bulk gets sent together; other lists stay at 100', async () => {
+  const { env } = await seed({ people: 5, questions: 120 });
+  const { call } = signedOut(env);
+  const kv = env.CE_STORAGE_INDEX_KV;
+  const get = kv.get.bind(kv);
+  let open = 0;
+  let mostOpen = 0;
+  kv.get = async (key, type) => {
+    if (!Array.isArray(key)) return get(key, type);
+    open += 1;
+    mostOpen = Math.max(mostOpen, open);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return await get(key, type);
+    } finally {
+      open -= 1;
+    }
+  };
+  const first = await call('/storage/list?resource=responses&limit=500');
+  assert.equal(first.body.items.length, 500);
+  assert.equal(mostOpen, 5, 'the page’s five bulk gets go out together');
+  const second = await call(`/storage/list?resource=responses&limit=500&cursor=${encodeURIComponent(first.body.cursor)}`);
+  assert.deepEqual([second.body.items.length, second.body.listComplete], [100, true]);
+  const ids = new Set([...first.body.items, ...second.body.items].map((item) => item.storageRef.id));
+  assert.equal(ids.size, 600);
+  // A larger limit is clamped, never refused: older sites ask for 100, and other resources keep pages of 100.
+  assert.equal((await call('/storage/list?resource=responses&limit=1000')).body.items.length, 500);
+  assert.equal((await call('/storage/list?resource=responses&limit=100')).body.items.length, 100);
+  const questions = await call('/storage/list?resource=questions&limit=500');
+  assert.deepEqual([questions.body.items.length, questions.body.listComplete], [100, false]);
+});

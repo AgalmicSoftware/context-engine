@@ -122,6 +122,11 @@ export const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAG
 export { getStorageIndexBinding };
 const DEFAULT_STORAGE_LIST_PAGE_SIZE = 100;
 const MAX_STORAGE_LIST_PAGE_SIZE = 100;
+// Answers are many and their index rows small, so a page of them may be
+// larger: Results for 2,000 answers lists in 4 requests, not 20. A larger
+// `limit` is clamped, never refused, so a site asking an older Worker for
+// 500 gets 100 and a cursor.
+const MAX_ANSWER_LIST_PAGE_SIZE = 500;
 // KV list calls one context listing may make to fill its page.
 const MAX_CONTEXT_LIST_KV_PAGES = 10;
 // An own-answer listing scans at most 10,000 keys a request, 1,000 a KV call.
@@ -2001,7 +2006,7 @@ const readRequestId = async ({ request, url }) => {
 const normalizeStorageListLimit = (value) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STORAGE_LIST_PAGE_SIZE;
-  return Math.min(MAX_STORAGE_LIST_PAGE_SIZE, Math.max(1, Math.trunc(parsed)));
+  return Math.min(MAX_ANSWER_LIST_PAGE_SIZE, Math.max(1, Math.trunc(parsed)));
 };
 
 const readStorageListOptions = async ({ request, url }) => {
@@ -2273,7 +2278,8 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   const url = new URL(request.url);
   const listOptions = await readStorageListOptions({ request, url });
   if (!listOptions.ok) return responseJson(deps, { error: listOptions.error }, 400, baseHeaders);
-  const { cursor, limit, resource } = listOptions;
+  const { cursor, resource } = listOptions;
+  const limit = Math.min(listOptions.limit, resource === 'responses' ? MAX_ANSWER_LIST_PAGE_SIZE : MAX_STORAGE_LIST_PAGE_SIZE);
   const mine = url.searchParams.get('mine') === 'true';
   const responder = mine ? normalizeAddress(uploaderAddress) : '';
   // ?role=context lists only context sources (a narrower view, never a wider one).
@@ -2337,7 +2343,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     // Hidden markers also cover a version whose own flag a hide has not
     // written yet, such as one uploaded in another region during the hide.
     if (isOwnedStorageResource(resource)) hiddenIds = await listHiddenStorageResourceIds({ index, slug, resource });
-    // Rows are read in bulk gets of 100. An own-answer page may hold up to
+    // Rows are read in bulk gets of 100, a few at once. An own-answer page may hold up to
     // 10,000 older rows with no author, so it keeps only rows that may be the
     // requester's; a row it can't parse is kept, to fail the page below.
     const othersRow = (raw) => {
@@ -2349,11 +2355,15 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
       }
     };
     const names = keys.map((keyEntry) => trim(keyEntry?.name || keyEntry)).filter(Boolean);
-    for (let offset = 0; offset < names.length; offset += KV_BULK_GET_KEYS) {
-      const batch = names.slice(offset, offset + KV_BULK_GET_KEYS);
-      const got = await index.get(batch);
-      rows.push(...batch.map((name) => ({ name, raw: got?.get?.(name) ?? null }))
-        .filter(({ raw }) => !mine || typeof raw !== 'string' || !othersRow(raw)));
+    const wave = KV_BULK_GET_KEYS * LIST_BULK_GETS_AT_ONCE;
+    for (let start = 0; start < names.length; start += wave) {
+      const batches = [];
+      for (let offset = start; offset < Math.min(names.length, start + wave); offset += KV_BULK_GET_KEYS) {
+        batches.push(names.slice(offset, offset + KV_BULK_GET_KEYS));
+      }
+      const gots = await Promise.all(batches.map((batch) => index.get(batch)));
+      batches.forEach((batch, at) => rows.push(...batch.map((name) => ({ name, raw: gots[at]?.get?.(name) ?? null }))
+        .filter(({ raw }) => !mine || typeof raw !== 'string' || !othersRow(raw))));
     }
   } catch {
     return responseJson(deps, { error: 'Cloudflare storage index metadata is unavailable.' }, 503, baseHeaders);
@@ -2451,6 +2461,8 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
 // Cloudflare reads up to 100 KV keys in one bulk get, counted as one
 // operation, and refuses a bulk reply over 25 MB.
 const KV_BULK_GET_KEYS = 100;
+// Within a request's six open storage connections.
+const LIST_BULK_GETS_AT_ONCE = 5;
 const KV_BULK_REPLY_BYTES = 16 * 1024 * 1024;
 
 // An answer key's stamped list entry (storageIndexPutOptions), or null, with
