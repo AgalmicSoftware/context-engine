@@ -8,6 +8,7 @@ import {
   setupUserPageCacheRefreshTestLifecycle,
 } from './UserPage.cacheRefresh.testUtils';
 import { t } from '../../utilities/ui/terminology.js';
+import { NOTHING_TO_ANALYZE_TITLE } from './userPageLoadingStateHelpers';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 describe('UserPage cache refresh render and SBT fallbacks', () => {
@@ -106,8 +107,9 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
         tree,
         (node) => getNodeTypeName(node) === 'UserPageDeepScanStatusIndicator',
       );
-      expect(analyzeButton.props.disabled).toBe(false);
-      expect(analyzeButton.props.title).toBeUndefined();
+      // An empty profile has nothing to send to the AI; comparing other people still works.
+      expect(analyzeButton.props.disabled).toBe(true);
+      expect(analyzeButton.props.title).toBe(NOTHING_TO_ANALYZE_TITLE);
       expect(compareButton.props.disabled).toBe(false);
       expect(compareButton.props.title).toBeUndefined();
       expect(loadingIndicators).toHaveLength(0);

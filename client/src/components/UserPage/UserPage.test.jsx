@@ -313,6 +313,8 @@ describe('UserPage analyze action boundary', () => {
   it('routes header analyze clicks without treating the click event as a force refresh', () => {
     const instance = makeInstance();
     instance.analyzeUser = jest.fn();
+    // Analyze needs something on the profile to read.
+    instance.state = { ...instance.state, questionResponseInfo: [{ id: 'q1' }] };
     const tree = instance.render();
     const [header] = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageHeader');
     const event = { preventDefault: jest.fn(), type: 'click' };

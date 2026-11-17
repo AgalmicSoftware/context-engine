@@ -123,6 +123,8 @@ export type ResolveUserPageAiActionPlanArgs = {
   analyzing?: unknown;
   collapseOpen?: unknown;
   disabledByCache?: unknown;
+  /** The profile shows no answers, questions or groups: an analysis would have nothing to read. */
+  nothingToAnalyze?: unknown;
   walletLabel?: unknown;
 };
 
@@ -267,6 +269,9 @@ export const buildUserPageRenderLoadingState = ({
   };
 };
 
+export const NOTHING_TO_ANALYZE_TITLE =
+  'Nothing to analyze yet: this profile shows no answers, questions or groups in this session.';
+
 export const resolveUserPageAiActionAvailability = ({
   aiAvailable = null,
   disabledByCache = false,
@@ -322,6 +327,7 @@ export const resolveUserPageAiActionPlan = ({
   analyzing = false,
   collapseOpen = false,
   disabledByCache = false,
+  nothingToAnalyze = false,
   walletLabel = 'wallet',
 }: ResolveUserPageAiActionPlanArgs = {}): UserPageAiActionPlan => {
   const aiActionAvailability = resolveUserPageAiActionAvailability({
@@ -332,7 +338,11 @@ export const resolveUserPageAiActionPlan = ({
   return {
     aiActionAvailability,
     analyzeButtonDisplayState: resolveUserPageAnalyzeButtonDisplayState({
-      aiActionAvailability,
+      // An empty profile would still cost an AI request, also while its answers are on their way.
+      aiActionAvailability:
+        nothingToAnalyze && !aiActionAvailability.disabled
+          ? { disabled: true, title: NOTHING_TO_ANALYZE_TITLE }
+          : aiActionAvailability,
       analyzing,
     }),
     compareButtonDisplayState: resolveUserPageCompareButtonDisplayState({
@@ -463,6 +473,7 @@ export const buildUserPageCacheRefreshDisplayState = ({
     // Analysis operates on the visible profile snapshot. Do not leave it blocked by an
     // unrelated cache lane once useful profile data has already been hydrated.
     disabledByCache: loadingState.disabledByCache && !hasVisibleData,
+    nothingToAnalyze: !hasVisibleData,
     walletLabel,
   });
   const sectionLoadingEmptyState = buildUserPageSectionLoadingEmptyState({

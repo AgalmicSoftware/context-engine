@@ -1,5 +1,6 @@
 import {
   buildUserPageCacheRefreshDisplayState,
+  NOTHING_TO_ANALYZE_TITLE,
   buildUserPageCacheRefreshStatePatch,
   buildUserPageRenderLoadingState,
   buildUserPageSectionLoadingEmptyState,
@@ -277,6 +278,35 @@ describe('userPageLoadingStateHelpers', () => {
       shouldRenderClosedIcon: false,
       shouldRenderOpenIcon: true,
     });
+  });
+
+  it('keeps Analyze off, and Compare on, while the profile shows nothing to analyze', () => {
+    const empty = resolveUserPageAiActionPlan({ aiAvailable: true, nothingToAnalyze: true });
+    expect(empty.analyzeButtonDisplayState).toMatchObject({ disabled: true, title: NOTHING_TO_ANALYZE_TITLE });
+    expect(empty.compareButtonDisplayState).toMatchObject({ disabled: false, title: undefined });
+    expect(resolveUserPageAiActionPlan({ aiAvailable: true }).analyzeButtonDisplayState.disabled).toBe(false);
+
+    // A reason that already holds both buttons keeps its own wording.
+    expect(
+      resolveUserPageAiActionPlan({ disabledByCache: true, nothingToAnalyze: true }).analyzeButtonDisplayState.title,
+    ).toBe('Available when the user page fully loads.');
+
+    const ready = {
+      aiAvailable: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+    };
+    // Caches report ready before a Worker-run session's answers arrive: nothing is visible yet.
+    expect(buildUserPageCacheRefreshDisplayState(ready).aiActionPlan.analyzeButtonDisplayState).toMatchObject({
+      disabled: true,
+      title: NOTHING_TO_ANALYZE_TITLE,
+    });
+    expect(
+      buildUserPageCacheRefreshDisplayState({ ...ready, questionResponseInfo: [{ id: 'q1' }] }).aiActionPlan
+        .analyzeButtonDisplayState.disabled,
+    ).toBe(false);
   });
 
   it('plans AI-bound header actions without invoking analysis handlers', () => {
