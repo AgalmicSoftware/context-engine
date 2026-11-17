@@ -7503,10 +7503,24 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     min-height: 0;
   }
 
-  // The arrows always take their own row, so Submit appearing beside the actions never moves them.
-  .pileInteractionUnit .pileControls > .pileNav {
-    flex-basis: 100%;
-    max-width: none;
+  // On a phone the arrows take their own row, so Submit appearing beside the actions never moves them.
+  // Wider screens keep them beside the actions, where there is room for Submit too.
+  @media (max-width: 640px) {
+    .pileInteractionUnit .pileControls > .pileNav {
+      flex-basis: 100%;
+      max-width: none;
+    }
+  }
+
+  // The Submitted check takes Submit's height, and a long unsent-answers notice wraps
+  // rather than widening the row, so neither moves the arrows.
+  .pileInteractionUnit .pileSubmitSuccessBadge {
+    width: 44px;
+    height: 44px;
+  }
+
+  .pileInteractionUnit .pileFooter {
+    min-width: 0;
   }
 
   .pileCardInner .pileCardBody:has(.multichoiceQuestionContainer, .quadraticQuestionContainer) {

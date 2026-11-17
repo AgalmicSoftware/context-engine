@@ -50,3 +50,17 @@ it('gives every phone question card one height from the steady visible screen', 
     /\.pileCardInner \.pileCardMainContent:has\(\.multichoiceQuestionContainer\)\s*\{\s*justify-content: flex-start;/,
   );
 });
+
+// Submit appearing, the Submitted check and a long unsent-answers notice each moved the arrows on a phone.
+it('keeps the phone arrows on their own row, after the wider rule that puts them beside the actions', () => {
+  const ownRow = css.search(
+    /@media \(max-width: 768px\) and \(max-width: 640px\)\s*\{\s*\.pileInteractionUnit \.pileControls > \.pileNav\s*\{\s*flex-basis: 100%;/,
+  );
+  const besideActions = css.search(/\.pileInteractionUnit \.pileControls > \.pileNav\s*\{\s*flex-basis: 180px;/);
+  expect(besideActions).toBeGreaterThan(-1);
+  expect(ownRow).toBeGreaterThan(besideActions);
+  expect(css).toMatch(/\.pileInteractionUnit \.pileSubmitSuccessBadge\s*\{\s*width: 44px;\s*height: 44px;/);
+  expect(css).toMatch(/\.pileInteractionUnit \.pileFooter\s*\{\s*min-width: 0;/);
+  // Choices keep room below the last one for the fade and its focus ring.
+  expect(css).toMatch(/padding-bottom: 28px;\s*scroll-padding-bottom: 28px;/);
+});
