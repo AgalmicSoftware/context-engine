@@ -28,3 +28,11 @@ it.each([
   expect(heights.some((value) => /dvh/.test(value))).toBe(true);
   expect(heights.filter((value) => /\d(vh)\b/.test(value))).toEqual([]);
 });
+
+// The live centring spacer and overlay counted the large viewport, so on an iPhone the review started a fifth of
+// the way down with Submit under the bar; on a phone it now takes the whole visible screen.
+it('gives the interview dialog the whole visible screen on a phone', () => {
+  expect(css).toMatch(
+    /@media \(max-width: 575\.98px\)\s*\{\s*\.sessionVoiceModeModal\s*\{\s*max-height: calc\(100dvh - 1rem\);/,
+  );
+});
