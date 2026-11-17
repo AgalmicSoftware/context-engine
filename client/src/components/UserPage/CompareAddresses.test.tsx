@@ -259,6 +259,52 @@ describe('CompareAddresses subject routes', () => {
     expect(screen.queryByText('Model: example')).not.toBeInTheDocument();
   });
 
+  it('sends the session settings the page holds with both AI requests', async () => {
+    seedWorkerAnswers();
+    // Settings name their session as they were stored; the comparison's own name is tidied.
+    const sessionConfig = { slug: ' alpha ', corsWorkerUrl: 'https://alpha.example.workers.dev' };
+    render(
+      <MemoryRouter initialEntries={[comparisonPath]}>
+        <CompareAddress activeSessionSlug="alpha" sessionConfig={sessionConfig} sessionCachesReady />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(mockRunCompareToolkit.mock.calls.map(([task]) => task).sort()).toEqual(['axes', 'compare']),
+    );
+    mockRunCompareToolkit.mock.calls.forEach(([, payload]) =>
+      expect(payload).toEqual(expect.objectContaining({ sessionSlug: 'alpha', sessionConfig })),
+    );
+  });
+
+  it('keeps settings for another session out of the AI requests', async () => {
+    seedWorkerAnswers();
+    render(
+      <MemoryRouter initialEntries={[`${comparisonPath}&session=beta`]}>
+        <CompareAddress activeSessionSlug="alpha" sessionConfig={{ slug: 'alpha' }} sessionCachesReady />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(mockRunCompareToolkit).toHaveBeenCalledTimes(2));
+    mockRunCompareToolkit.mock.calls.forEach(([, payload]) => {
+      expect(payload).toEqual(expect.objectContaining({ sessionSlug: 'beta' }));
+      expect(payload).not.toHaveProperty('sessionConfig');
+    });
+  });
+
+  it('sends no settings that name no session, on the general session', async () => {
+    seedWorkerAnswers(['']);
+    render(
+      <MemoryRouter initialEntries={[comparisonPath]}>
+        <CompareAddress
+          activeSessionSlug=""
+          sessionConfig={{ corsWorkerUrl: 'https://x.example' }}
+          sessionCachesReady
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(mockRunCompareToolkit).toHaveBeenCalled());
+    mockRunCompareToolkit.mock.calls.forEach(([, payload]) => expect(payload).not.toHaveProperty('sessionConfig'));
+  });
+
   it('ignores a failure from a comparison that was replaced while it ran', async () => {
     seedWorkerAnswers();
     let failFirst: (error: Error) => void = () => {};

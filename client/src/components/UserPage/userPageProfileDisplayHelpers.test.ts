@@ -160,6 +160,18 @@ describe('userPageProfileDisplayHelpers', () => {
       pendingNicknameForThis: 'Pending Nick',
     });
 
+    // The account box's link keeps the session in view; without one it stays a bare profile link.
+    expect(
+      resolveUserPageAddressDisplayState({ minimized: true, propViewAddress: '0xABC', sessionSlug: ' rxc ra/1 ' }),
+    ).toMatchObject({ addressHref: '/u/0xABC?session=rxc%20ra%2F1', profileUrl: '/u/0xABC?session=rxc%20ra%2F1' });
+    expect(
+      resolveUserPageAddressDisplayState({
+        explorerUrl: 'https://explorer.test/a',
+        propViewAddress: '0xABC',
+        sessionSlug: 'alpha',
+      }),
+    ).toMatchObject({ addressHref: 'https://explorer.test/a', profileUrl: '/u/0xABC?session=alpha' });
+
     expect(
       resolveUserPageAddressDisplayState({
         getShortenedAddress: shorten,

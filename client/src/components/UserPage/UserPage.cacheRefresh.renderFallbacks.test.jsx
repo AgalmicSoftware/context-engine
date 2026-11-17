@@ -453,6 +453,45 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       instance.openFullPage();
       expect(openSpy).toHaveBeenCalledWith(`/ce/u/${viewAddress}`);
 
+      // From a session's page, the account box links to the profile on that session and its Worker.
+      const worker = 'https://unlisted.example.workers.dev';
+      const sessionPageUrl = window.location.href;
+      window.history.replaceState({}, '', `/session/unlisted?worker=${encodeURIComponent(worker)}`);
+      try {
+        const inSession = makeInstance({
+          minimized: true,
+          activeSessionSlug: 'unlisted',
+          sessionConfig: { slug: 'unlisted' },
+        });
+        const ownPage = `/ce/u/${viewAddress}?session=unlisted&worker=${encodeURIComponent(worker)}`;
+        inSession.openFullPage();
+        expect(openSpy).toHaveBeenLastCalledWith(ownPage);
+        expect(
+          collectTreeNodes(
+            inSession.render(),
+            (node) => node?.type === 'a' && typeof node?.props?.href === 'string',
+          ).map((node) => node.props.href),
+        ).toContain(ownPage);
+        const compare = collectTreeNodes(inSession.render(), (node) => 'loadSessionData' in (node?.props || {}))[0];
+        expect(compare.props).toMatchObject({ activeSessionSlug: 'unlisted', sessionConfig: { slug: 'unlisted' } });
+        // The box can show another session than the page's; that page's Worker is not its Worker.
+        const elsewhere = makeInstance({
+          minimized: true,
+          activeSessionSlug: 'other',
+          sessionConfig: { slug: 'other' },
+        });
+        elsewhere.openFullPage();
+        expect(openSpy).toHaveBeenLastCalledWith(`/ce/u/${viewAddress}?session=other`);
+        expect(
+          collectTreeNodes(
+            elsewhere.render(),
+            (node) => node?.type === 'a' && typeof node?.props?.href === 'string',
+          ).map((node) => node.props.href),
+        ).toContain(`/ce/u/${viewAddress}?session=other`);
+      } finally {
+        window.history.replaceState({}, '', sessionPageUrl);
+      }
+
       const tree = instance.render();
       const hrefs = collectTreeNodes(tree, (node) => node?.type === 'a' && typeof node?.props?.href === 'string').map(
         (node) => node.props.href,

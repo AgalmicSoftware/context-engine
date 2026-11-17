@@ -46,6 +46,7 @@ import {
   scanCompareAddressesSequentially,
   selectCompareCacheValues,
 } from './compareSessionRuntime';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { buildNicknameByAddressMap, type CompareBookmark } from './compareMembershipPresentation';
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import { useCompareSessionData } from './useCompareSessionData';
@@ -175,6 +176,8 @@ interface CompareCoalescer {
 
 interface CompareAddressProps {
   activeSessionSlug?: string;
+  /** The session settings the page already holds, so AI requests go to that session's Worker. */
+  sessionConfig?: unknown;
   firstAddress?: string;
   account?: string;
   sessionCachesReady?: boolean;
@@ -204,6 +207,7 @@ export const readDgObjectValues = (name: string, scope: CompareSessionScope): Un
 
 const CompareAddress = ({
   activeSessionSlug: activeSessionSlugProp,
+  sessionConfig,
   firstAddress,
   account,
   sessionCachesReady,
@@ -544,7 +548,13 @@ const CompareAddress = ({
     setCurrentUsers(users);
 
     // These sections are independent; let each render as soon as its own result is ready.
-    const aiScope = { sessionSlug: activeSessionScope.slug };
+    // A session's short name alone finds no Worker for a session this browser has not listed, so
+    // the settings the page resolved go with it, when they are that session's.
+    const settingsSlug = normalizeSessionSlug((sessionConfig as { slug?: unknown } | null | undefined)?.slug);
+    const aiScope = {
+      sessionSlug: activeSessionScope.slug,
+      ...(settingsSlug && settingsSlug === activeSessionScope.slug ? { sessionConfig } : {}),
+    };
     const addrOrder = users.map((u) => u.address);
 
     const bulletsTask = async () => {

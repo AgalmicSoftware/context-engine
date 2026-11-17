@@ -318,6 +318,7 @@ jest.mock('../UserPage/CompareAddresses', () => {
         'data-testid': 'mock-compare-addresses',
         'data-first-address': String(props.firstAddress || ''),
         'data-active-session-slug': String(props.activeSessionSlug || ''),
+        'data-session-config-slug': String(props.sessionConfig?.slug || ''),
         'data-cache-ready': String(props.sessionCachesReady),
         'data-profile-scan-enabled': String(typeof props.scanSpecificUserProfile === 'function'),
       });
@@ -2400,6 +2401,9 @@ describe('AppShell route render smoke', () => {
       'data-active-session-slug',
       'worker-session',
     );
+    // Its AI requests need the verified session settings, not only the session's name.
+    expect(mockCompareAddresses).toHaveBeenLastCalledWith(expect.objectContaining({ sessionConfig: workerConfig }));
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-session-config-slug', 'worker-session');
     expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'false');
     expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-cache-ready', 'true');
   });

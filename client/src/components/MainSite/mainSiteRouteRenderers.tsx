@@ -298,6 +298,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         <div data-testid={E2E_TESTIDS.PAGE_COMPARE_ROOT}>
           <CompareAddresses
             activeSessionSlug={sessionSlug}
+            sessionConfig={sessionConfig}
             firstAddress={firstAddress}
             account={host.props.account}
             sessionCachesReady={resolveCompareCachesReady({ ...host.state, onChainProfileEnabled })}
