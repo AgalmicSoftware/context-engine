@@ -69,7 +69,16 @@ it('keeps the phone arrows on their own row, after the wider rule that puts them
 it('lets a phone free-text box fill the card', () => {
   expect(css).toMatch(
     /\.pileCardBody:has\(\.freeformQuestionContainer\) \.pileCardMainContent\s*\{\s*flex: 1 1 0;\s*min-height: 0;/,
+  ); // Only the text box stretches; the microphone beside it keeps its size, and nothing reaches the footer.
+  const fill = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, selectors]) =>
+    /audioInputContainer|inputRow|textareaWrap|audioTextarea/.test(selectors),
   );
+  expect(fill.length).toBeGreaterThan(0);
+  fill.forEach(([selectors, body]) => {
+    selectors.split(',').forEach((selector) => expect(selector).toMatch(/\.pileCardMainContent :global\(/));
+    expect(body).not.toMatch(/align-items: stretch/);
+  });
+  expect(fill.some(([selectors]) => /microphoneButton|topControls/.test(selectors))).toBe(false);
 });
 
 // A long choice list fades at whichever end has more; usePileHalfRowCut sets the cue.

@@ -48,8 +48,12 @@ export const usePileHalfRowCut = (ref: React.RefObject<HTMLElement | null>, rowS
     const frame = area?.parentElement;
     if (!area || !frame || typeof ResizeObserver === 'undefined') return;
     const updateCue = () => {
-      // The bottom padding only keeps the last option clear of the fade; it is not more to see.
-      const end = area.scrollHeight - (parseFloat(getComputedStyle(area).paddingBottom) || 0);
+      // The list ends where its last option does, as the cut measures it: the padding and wrapper space below only
+      // keep that option clear of the fade, and are not more to see.
+      const rows = Array.from(area.querySelectorAll(rowSelector));
+      const end = rows.length
+        ? Math.max(...measurePileListRows(area, rows).map((row) => row.top + row.height))
+        : area.scrollHeight - (parseFloat(getComputedStyle(area).paddingBottom) || 0);
       const scrolls = end > area.clientHeight + 1;
       const atStart = area.scrollTop <= 1;
       const atEnd = area.scrollTop + area.clientHeight >= end - 1;

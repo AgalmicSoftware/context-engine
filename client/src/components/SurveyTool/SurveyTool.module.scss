@@ -7553,26 +7553,30 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
       min-height: 0;
     }
 
-    .freeformQuestionContainer {
-      align-items: stretch;
-      justify-content: flex-start;
-      height: 100%;
-    }
+    // Only the text box grows: the microphone and the rewrite controls keep their size, so a tap beside the box
+    // never starts a recording. The footer's comment box is left alone.
+    .pileCardMainContent {
+      .freeformQuestionContainer {
+        align-items: stretch;
+        justify-content: flex-start;
+        height: 100%;
+      }
 
-    :global([class*='audioInputContainer']),
-    :global([class*='inputRow']) {
-      flex: 1 1 auto;
-      align-items: stretch;
-      min-height: 0;
-    }
+      :global([class*='audioInputContainer']) {
+        flex: 1 1 auto;
+        min-height: 0;
+      }
 
-    :global([class*='textareaWrap']) {
-      display: flex;
-    }
+      :global([class*='inputRow']),
+      :global([class*='textareaWrap']) {
+        display: flex;
+        align-self: stretch;
+      }
 
-    :global([class*='audioTextarea']) {
-      height: auto;
-      resize: none;
+      :global([class*='audioTextarea']) {
+        height: auto;
+        resize: none;
+      }
     }
   }
 

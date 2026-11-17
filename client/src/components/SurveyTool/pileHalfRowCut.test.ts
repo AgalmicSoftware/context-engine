@@ -1,4 +1,6 @@
-import { resolvePileHalfRowCut } from './pileHalfRowCut';
+import React from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { resolvePileHalfRowCut, usePileHalfRowCut } from './pileHalfRowCut';
 
 // Rows shaped like a phone choice list: uneven heights where long options wrap, 8px apart.
 const rowsOf = (heights: number[], gap = 8, start = 5) => {
@@ -46,5 +48,93 @@ describe('resolvePileHalfRowCut', () => {
   it('uses all the space when it already ends in the middle of a row', () => {
     const rows = rowsOf([44, 44, 44, 44]);
     expect(resolvePileHalfRowCut(rows[2].top + 22, rows)).toBe(rows[2].top + 22);
+  });
+});
+
+describe('usePileHalfRowCut', () => {
+  // jsdom has no layout, so the area and its rows report the sizes a phone would.
+  const ROW = 44;
+  const GAP = 8;
+  const rowTops = [0, 1, 2, 3].map((index) => index * (ROW + GAP));
+  const lastRowEnd = rowTops[3] + ROW;
+
+  class StubResizeObserver {
+    observe() {}
+    disconnect() {}
+  }
+
+  const List = ({ overflowY }: { overflowY: string }) => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    usePileHalfRowCut(ref, '.row');
+    return React.createElement(
+      'div',
+      null,
+      React.createElement(
+        'div',
+        { ref, 'data-testid': 'area', style: { overflowY } },
+        rowTops.map((top) => React.createElement('div', { key: top, className: 'row' })),
+      ),
+    );
+  };
+
+  const shape = (area: HTMLElement, height: number, scrollHeight: number) => {
+    Object.defineProperty(area, 'clientHeight', { configurable: true, get: () => height });
+    Object.defineProperty(area, 'offsetHeight', { configurable: true, get: () => height });
+    Object.defineProperty(area, 'scrollHeight', { configurable: true, get: () => scrollHeight });
+    area.getBoundingClientRect = () => ({ top: 0, height }) as DOMRect;
+    Array.from(area.children).forEach((row, index) => {
+      row.getBoundingClientRect = () => ({ top: rowTops[index] - area.scrollTop, height: ROW }) as DOMRect;
+    });
+  };
+
+  // Sizes go on after mount, as layout would; a content change then makes the hook fit again.
+  const renderList = async (overflowY: string, height: number, scrollHeight = lastRowEnd + 28) => {
+    const view = render(React.createElement(List, { overflowY }));
+    const area = screen.getByTestId('area');
+    shape(area, height, scrollHeight);
+    await act(async () => {
+      area.append(document.createElement('span'));
+    });
+    return { area, view };
+  };
+
+  beforeAll(() => {
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = StubResizeObserver;
+  });
+
+  afterAll(() => {
+    delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+  });
+
+  it('ends a scrolling list inside a row and marks which ends have more', async () => {
+    const { area } = await renderList('auto', 120);
+    // The third row runs 104 to 148, too far down for a cut; the second, 52 to 96, is cut at 70%.
+    expect(area.style.maxHeight).toBe('82px');
+    expect(area.dataset.listCue).toBe('start');
+    area.scrollTop = 40;
+    fireEvent.scroll(area);
+    expect(area.dataset.listCue).toBe('middle');
+    area.scrollTop = lastRowEnd - 120;
+    fireEvent.scroll(area);
+    expect(area.dataset.listCue).toBe('end');
+  });
+
+  it('shows no cue when every option fits, whatever space is left below the last', async () => {
+    const { area } = await renderList('auto', lastRowEnd + 4, lastRowEnd + 40);
+    expect(area.style.maxHeight).toBe('');
+    expect(area.dataset.listCue).toBe('none');
+  });
+
+  it('leaves a list that does not scroll its own height', async () => {
+    const { area } = await renderList('hidden', 120);
+    expect(area.style.maxHeight).toBe('');
+  });
+
+  it('clears its cut and cue when it goes', async () => {
+    const { area, view } = await renderList('auto', 120);
+    expect(area.style.maxHeight).not.toBe('');
+    view.unmount();
+    expect(area.dataset.listCue).toBeUndefined();
+    expect(area.style.maxHeight).toBe('');
   });
 });
