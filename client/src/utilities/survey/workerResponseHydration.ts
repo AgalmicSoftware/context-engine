@@ -43,6 +43,7 @@ export type WorkerCanonicalResponseRow = {
 
 const MAX_RESPONSE_LIST_PAGES = 100;
 const RESPONSE_READ_CONCURRENCY = 8;
+export const SIGNED_IN_READ_LIMIT_MS = 15_000;
 const WORKER_RESPONSE_CACHE_VERSION = 1;
 
 const isRecord = (value: unknown): value is UnknownRecord =>
@@ -215,11 +216,21 @@ export const loadWorkerResponses = async (
   // go signed out, and the copies come back marked so a later load reads them again.
   const readWhole = async <T>(read: (auth: { preferAnonymous?: false; prompt?: false }) => Promise<T>) => {
     if (ownResponses) return read({ preferAnonymous: false });
+    // A silent sign-in that never settles (a passkey sheet closed unanswered) must not hold Results: past a limit,
+    // read signed out.
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return await read({ preferAnonymous: false, prompt: false });
+      return await Promise.race([
+        read({ preferAnonymous: false, prompt: false }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('The signed-in read took too long.')), SIGNED_IN_READ_LIMIT_MS);
+        }),
+      ]);
     } catch {
       signal?.throwIfAborted();
       return read({});
+    } finally {
+      clearTimeout(timer);
     }
   };
   const batched =

@@ -151,6 +151,8 @@ type InFlightTokenRequest = {
     signal: AbortSignal | null;
   };
   promise: Promise<string> | null;
+  // Started by the page itself, never asking the person, so another quiet request may wait on it.
+  quiet: boolean;
 };
 const asStoreState = (value: unknown): WorkerAuthStoreState =>
   value && typeof value === 'object' ? (value as WorkerAuthStoreState) : {};
@@ -819,11 +821,10 @@ export const getWorkerSessionToken = async ({
   }
 
   const existingRequest = inFlightTokenRequests.get(storageKey);
-  if (existingRequest?.promise) {
-    return existingRequest.promise;
-  }
-  // Prompts are for what the person does: what the page does by itself signs in only silently.
-  if (!prompt && !signsWithoutPrompt(resolvedRequest)) {
+  // Prompts are for what the person does: what the page does by itself signs in only silently, and never waits on a
+  // sign-in the person was asked for and may never finish.
+  if (existingRequest?.promise && (prompt || existingRequest.quiet)) return existingRequest.promise;
+  if (!prompt && (existingRequest?.promise || !signsWithoutPrompt(resolvedRequest))) {
     throw new WorkerSignInNeededError();
   }
 
@@ -956,7 +957,7 @@ export const getWorkerSessionToken = async ({
     return loginData.token;
   };
 
-  const inFlightRequest: InFlightTokenRequest = { abortController, promise: null };
+  const inFlightRequest: InFlightTokenRequest = { abortController, promise: null, quiet: !prompt };
   const inFlight = requestToken().finally(() => {
     if (inFlightTokenRequests.get(storageKey) === inFlightRequest) {
       inFlightTokenRequests.delete(storageKey);

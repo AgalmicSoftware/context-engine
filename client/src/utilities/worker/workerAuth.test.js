@@ -881,6 +881,29 @@ describe('workerAuth canonical session resolution', () => {
     expect(localStorage.getItem('ce:anonClientId:v1')).toMatch(/^[a-z0-9_-]{8,128}$/);
   });
 
+  it('a quiet request never waits on a sign-in the page started and the person has not finished', async () => {
+    // The sign-in started on load (a passkey or wallet asked to sign) is never completed.
+    global.fetch = jest.fn((url) => {
+      if (String(url).endsWith('/auth/nonce')) return Promise.resolve(jsonResp(200, { nonce: 'nonce-1' }));
+      if (String(url).endsWith('/auth/login')) return new Promise(() => {});
+      throw new Error(`Unexpected fetch url: ${url}`);
+    });
+    const pending = getWorkerSessionToken({ workerUrl: 'https://worker.example', context: authContext });
+    pending.catch(() => {});
+    await flushPromises();
+    await flushPromises();
+    // Results' reads ask without a prompt: they must give up at once, so they can read signed out.
+    const quiet = await Promise.race([
+      getWorkerSessionToken({ workerUrl: 'https://worker.example', context: authContext, prompt: false }).catch(
+        (error) => error,
+      ),
+      new Promise((resolve) => setTimeout(() => resolve('still waiting'), 50)),
+    ]);
+    expect(quiet).toBeInstanceOf(Error);
+    expect(isWorkerSignInNeededError(quiet)).toBe(true);
+    clearAllWorkerSessionTokens();
+  });
+
   it('new request after logout/account-switch with stale context cannot reach /auth/login', async () => {
     const mockStore = require('../../store.js').default;
     const staleAuthContext = {

@@ -5,6 +5,7 @@ import {
   loadWorkerResponses,
   mergeWorkerQuestionResponses,
   mergeWorkerUserResponses,
+  SIGNED_IN_READ_LIMIT_MS,
 } from './workerResponseHydration.js';
 import { hydrateWorkerCanonicalResponses, resolveWorkerResponseHydrationRun } from './workerResponseHydrationRuntime';
 
@@ -686,6 +687,32 @@ describe('answers with research material, which the Worker sends only to their a
     const signedIn = readBlob.mock.calls.filter(([options]) => options.preferAnonymous === false);
     expect(signedIn).toHaveLength(2);
     expect(signedIn.every(([options]) => options.prompt === false)).toBe(true);
+  });
+
+  it('reads signed out when a signed-in read never settles, so Results never wait forever', async () => {
+    jest.useFakeTimers();
+    try {
+      const readBlob = jest.fn((options: Record<string, any>) =>
+        // A silent sign-in that never answers holds the signed-in read open.
+        options.preferAnonymous === false ? new Promise<Response>(() => {}) : workerRead('')(options),
+      );
+      const loading = loadWorkerResponses(
+        { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account: ADMIN },
+        {
+          listSessionStorageRefsPage: listPage,
+          readSessionStorageBlob: readBlob,
+          readWorkerCapabilities: async () => ({ features: [] }) as any,
+        },
+      );
+      // Both signed-in reads have started and hang; only the limit can end them.
+      while (readBlob.mock.calls.length < 2) await jest.advanceTimersByTimeAsync(0);
+      await jest.advanceTimersByTimeAsync(SIGNED_IN_READ_LIMIT_MS);
+      const rows = await loading;
+      expect(whole(rows)).toEqual({ [AUTHOR]: false, [OTHER]: false });
+      expect(readBlob.mock.calls.filter(([options]) => options.preferAnonymous === undefined)).toHaveLength(2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('reads own answers signed in, so ticks restore on a fresh browser', async () => {
