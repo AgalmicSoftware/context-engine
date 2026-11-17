@@ -122,7 +122,7 @@ describe('UserPageHeader', () => {
     );
     expect(screen.getByRole('link', { name: /My Bookmarks/ })).toHaveAttribute('href', '/bookmarks');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit nickname' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit private label' }));
     fireEvent.click(screen.getByRole('button', { name: 'Set username' }));
     fireEvent.click(screen.getByRole('button', { name: 'Bookmark user' }));
     fireEvent.click(screen.getByRole('button', { name: /Compare/ }));
@@ -215,11 +215,13 @@ describe('UserPageHeader', () => {
       />,
     );
 
-    const nicknameInput = screen.getByLabelText('Set nickname');
+    const nicknameInput = screen.getByLabelText('Private label');
     const usernameInput = screen.getByLabelText('Set username');
+    expect(nicknameInput).toHaveAccessibleDescription('Only you see this, on this device');
+    expect(usernameInput).toHaveAccessibleDescription('Saved on this device only');
     expect(nicknameInput).toHaveValue('Ada');
     expect(usernameInput).toHaveValue('owner-name');
-    expect(screen.getByTitle('Nickname entered')).toBeDisabled();
+    expect(screen.getByTitle('Label entered')).toBeDisabled();
     expect(screen.getByTitle('Username entered')).toBeDisabled();
 
     fireEvent.change(nicknameInput, { target: { value: 'New Nick' } });
@@ -235,6 +237,15 @@ describe('UserPageHeader', () => {
     expect(onUsernameChange).toHaveBeenCalledTimes(1);
     expect(onUsernameBlur).toHaveBeenCalled();
     expect(onUsernameKeyDown).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks a label on someone else's account as yours, not their name", () => {
+    const { rerender } = render(<UserPageHeader {...createProps({ addressIsPrivateLabel: true })} />);
+    const tag = screen.getByText('your label');
+    expect(tag).toHaveAttribute('title', expect.stringMatching(/Only you see it, on this device; it isn't their name/));
+
+    rerender(<UserPageHeader {...createProps({ addressIsPrivateLabel: false })} />);
+    expect(screen.queryByText('your label')).toBeNull();
   });
 
   it('keeps minimized header actions limited to the username error display', () => {

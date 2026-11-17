@@ -1464,7 +1464,7 @@ class UserPage extends Component<any, any> {
       // focus the input when it shows (best-effort via microtask)
       setTimeout(() => {
         try {
-          const el = document.querySelector('input[aria-label="Set nickname"]') as HTMLInputElement | null;
+          const el = document.querySelector('input[aria-label="Private label"]') as HTMLInputElement | null;
           if (el) {
             el.focus();
             el.select();
@@ -3339,6 +3339,7 @@ class UserPage extends Component<any, any> {
     const {
       addressHref,
       addressLabel,
+      nicknameToUse,
       pendingNicknameForThis: pendingForThis,
       shouldLinkAddressLabel,
     } = resolveUserPageAddressDisplayState({
@@ -3552,6 +3553,7 @@ class UserPage extends Component<any, any> {
       <div className={rootClassName}>
         <UserPageHeader
           addressDisplay={addressDisplay}
+          addressIsPrivateLabel={!isOwner && !!nicknameToUse}
           analyzeButtonDisplayState={analyzeButtonDisplayState}
           avatarDisplayState={avatarDisplayState}
           bookmarkButtonDisplayState={bookmarkButtonDisplayState}
