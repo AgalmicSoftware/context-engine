@@ -43,5 +43,10 @@ it('gives every phone question card one height from the steady visible screen', 
   const unit = css.match(/\.pileInteractionUnit\s*\{([^{}]*--pile-phone-card-height[^{}]*)\}/)?.[1] || '';
   const values = [...unit.matchAll(/--pile-phone-card-height:\s*([^;]+);/g)].map(([, value]) => value);
   expect(values).toEqual(['max(380px, calc(100vh - 170px))', 'max(380px, calc(100svh - 170px))']);
-  expect(heightsOf('.pileCardInner')).toContain('var(--pile-phone-card-height)');
+  // The agent's question list shows a card outside the pile, where the variable is unset.
+  expect(heightsOf('.pileCardInner')).toContain('var(--pile-phone-card-height, 380px)');
+  // Choices scroll from the top: centring pushed the first ones out of reach.
+  expect(css).toMatch(
+    /\.pileCardInner \.pileCardMainContent:has\(\.multichoiceQuestionContainer\)\s*\{\s*justify-content: flex-start;/,
+  );
 });

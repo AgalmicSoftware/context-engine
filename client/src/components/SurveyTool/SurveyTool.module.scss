@@ -7497,9 +7497,16 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     min-height: var(--pile-phone-card-height);
   }
 
+  // The agent's question list shows a card outside the pile, where the height falls back to the old one.
   .pileCardInner {
-    height: var(--pile-phone-card-height);
+    height: var(--pile-phone-card-height, 380px);
     min-height: 0;
+  }
+
+  // The arrows always take their own row, so Submit appearing beside the actions never moves them.
+  .pileInteractionUnit .pileControls > .pileNav {
+    flex-basis: 100%;
+    max-width: none;
   }
 
   .pileCardInner .pileCardBody:has(.multichoiceQuestionContainer, .quadraticQuestionContainer) {
@@ -7514,18 +7521,22 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     }
   }
 
-  // Choice options stack one per line and scroll up and down inside the answer area, never sideways. The faded
-  // bottom edge shows an option cut off when more are below; the padding clears it once scrolled to the end.
+  // Choice options stack one per line and scroll up and down inside the answer area, never sideways, from the top
+  // (centring would push the first ones out of reach). The faded bottom edge shows an option cut off when more are
+  // below; the padding, and keyboard scrolling, keep the last one clear of it.
   .pileCardInner .pileCardMainContent:has(.multichoiceQuestionContainer) {
+    justify-content: flex-start;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-y: contain;
     padding-bottom: 28px;
+    scroll-padding-bottom: 28px;
     -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
     mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
   }
 
   .pileCardInner .multichoiceQuestionContainer {
+    flex: 0 0 auto;
     height: auto;
     overflow: visible;
     padding: 2px 0;
@@ -7541,7 +7552,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     height: auto;
     min-height: 0;
     margin: 0;
-    padding: 2px;
+    // Room for each option's focus ring, which reaches 5px outside it.
+    padding: 5px;
   }
 
   .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
