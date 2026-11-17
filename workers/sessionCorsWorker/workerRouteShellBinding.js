@@ -689,7 +689,15 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         if (routeSelection.kind === 'names') {
           const result = await readSessionNames({
             env, slug: targetSlug, config, path: routeSelection.path, address,
-            sessionGate: () => createRequesterAccessChecks({ env, config, slug: targetSlug, requesterAddress: address, authScopes: scopes }).sessionGate(),
+            // The gate's chain and secret lookups, as the reads below get them.
+            sessionGate: () => createRequesterAccessChecks({
+              env, config, slug: targetSlug, requesterAddress: address, authScopes: scopes,
+              deps: {
+                checkSbtGate: deps?.checkSbtGate, resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+                readResourceGateOnChain: deps?.readResourceGateOnChain, resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+                toRegistrySessionSlug: deps?.toRegistrySessionSlug, getSessionSecrets: deps?.getSessionSecrets,
+              },
+            }).sessionGate(),
           });
           // Each reader's own map: kept briefly by their browser, never shared.
           const namesHeaders = new Headers(corsContext?.headers || routeBaseHeaders || {});

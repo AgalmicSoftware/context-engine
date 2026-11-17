@@ -44,12 +44,17 @@ test('a name is stored as typed, tidied, and refused with a reason when it could
   for (const [typed, stored] of [
     ['  Sam   Rivera ', 'Sam Rivera'], ['José', 'José'], ['José', 'José'], ['李雷', '李雷'], ["O'Brien-Smith", "O'Brien-Smith"],
     ['J.R. Hall', 'J.R. Hall'], ['Hostetler', 'Hostetler'], ["Sam's agent", "Sam's agent"], ['', ''], ['   ', ''],
+    ['Ελένη', 'Ελένη'], ['Олена', 'Олена'], ['ﬁona', 'fiona'],
   ]) assert.deepEqual(normalizeSessionName(typed), { ok: true, name: stored }, typed);
   for (const [typed, reason] of [
     [undefined, 'empty'], ['x'.repeat(33), 'too_long'], ['Sam (agent)', 'agent_mark'], ['Sam 🙂', 'characters'], ['Sam!', 'characters'],
     ['...', 'characters'], ['0xabc', 'address'], ['me 0x1f', 'address'], ['deadbeefdeadbeef00', 'address'], ['vitalik.eth', 'ens'],
     ['sam.com', 'url_or_email'], ['www.sam', 'url_or_email'], ['sk-abcdefghijklmnopqr', 'secret'], ['Admin', 'role'],
     ['the host', 'role'], ['Session Agent', 'role'], ['session_agent', 'role'], ['RxC', 'role'], ['Context-Engine', 'role'],
+    // Drawn like a role or an address, but spelled otherwise: invisible marks, styled, fullwidth or look-alike letters.
+    ['Ad\u034fmin', 'characters'], ['Ad\ufe0fmin', 'characters'], ['\u3164', 'characters'], ['deadbeef\u034fdeadbeef', 'characters'],
+    ['\uff21\uff44\uff4d\uff49\uff4e', 'role'], ['\u{1D400}\u{1D41D}\u{1D426}\u{1D422}\u{1D427}', 'role'], ['\u0410dmin', 'role'],
+    ['0\u04451234...abcd', 'address'], ['vitalik.\u0435th', 'ens'],
   ]) assert.equal(normalizeSessionName(typed).reason, reason, String(typed));
   assert.equal(normalizeSessionName('x'.repeat(32)).ok, true);
   assert.match(normalizeSessionName('Admin').error, /role/);
@@ -135,9 +140,7 @@ test('GET /names through the Worker: signed in with the session’s gate, cached
     const response = await dispatchSessionNamesStore({ state: { storage } }, new URL(url).pathname.split('/').pop(), JSON.parse(init.body));
     return new Response(await response.text(), { status: response.status });
   } };
-  const shell = createWorkerRouteShellWithWorkerDeps({
-    constants: { missingSlugError: 'Missing sessionSlug.', sessionConfigNotFoundError: 'Session config not found.' },
-    deps: {
+  const shellDeps = {
       toStr: (value) => String(value ?? ''), corsHeaders: () => ({}),
       json: (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }),
       resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 's', explicitSlugProvided: true }),
@@ -146,7 +149,9 @@ test('GET /names through the Worker: signed in with the session’s gate, cached
       getCorsContext: async () => ({ ok: true, headers: {} }),
       requireAuth: async () => ({ ok: true, slug: 's', payload: { sub: SAM, sessionId: SESSION_ID, authzEpoch: 2, scopes: { storage: true } } }),
       computeScopesForLogin: async () => ({ storage: true }), checkRateLimit: async () => true,
-    },
+  };
+  const shell = createWorkerRouteShellWithWorkerDeps({
+    constants: { missingSlugError: 'Missing sessionSlug.', sessionConfigNotFoundError: 'Session config not found.' }, deps: shellDeps,
   });
   const env = { CE_SESSION_COORDINATOR: { idFromName: (name) => name, get: () => coordinator } };
   const get = (path, signedIn) => shell.fetch(new Request(`https://w.test${path}?slug=s`, signedIn ? { headers: { authorization: 'Bearer t' } } : {}), env);
@@ -158,6 +163,18 @@ test('GET /names through the Worker: signed in with the session’s gate, cached
   const own = await get('/names/me', true);
   assert.deepEqual([await own.json(), own.headers.get('Cache-Control')], [{ name: 'Sam', setAt: '1970-01-01T00:00:00.000Z' }, 'private, no-store']);
   assert.equal((await get('/names/me', false)).status, 401);
+  // An SBT rule is checked on chain, with the lookups the Worker gives its reads.
+  const sbtChecks = [];
+  sessionConfig.storageProfile.payloadAccessControl.accessConditions = {
+    match: 'any', conditions: [{ kind: 'sbt_onchain', chainId: 11155420, contract: `0x${'5'.repeat(40)}` }],
+  };
+  const sbtShell = createWorkerRouteShellWithWorkerDeps({ constants: { missingSlugError: 'Missing sessionSlug.', sessionConfigNotFoundError: 'Session config not found.' }, deps: {
+    ...shellDeps, resolveRpcUrlListForGate: () => ['https://rpc.example'], getSessionSecrets: async () => ({}),
+    checkSbtGate: async (args) => { sbtChecks.push(args.address || args.requesterAddress || 'checked'); return true; },
+  } });
+  const holder = await sbtShell.fetch(new Request('https://w.test/names?slug=s', { headers: { authorization: 'Bearer t' } }), env);
+  assert.deepEqual([holder.status, await holder.json(), sbtChecks.length > 0], [200, { names: { [SAM]: 'Sam' } }, true]);
+  delete sessionConfig.storageProfile.payloadAccessControl.accessConditions;
   // A session whose gate admits only its admins shows a signed-in non-admin no names.
   sessionConfig.storageProfile.payloadAccessControl.gate = 'role_gate';
   const refused = await get('/names', true);

@@ -36,22 +36,37 @@ const REFUSALS = Object.freeze({
 });
 const refuse = (reason) => ({ ok: false, reason, error: REFUSALS[reason] });
 
+// Cyrillic and Greek letters drawn like Latin ones, read as those Latin
+// letters when checking for an address or a role, so neither can be spelled
+// in look-alikes. NFKC has already folded fullwidth and styled letters.
+const LOOK_ALIKES = Object.freeze({
+  а: 'a', в: 'b', е: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x', і: 'i', ј: 'j', ѕ: 's',
+  ԁ: 'd', һ: 'h', ԛ: 'q', ԝ: 'w', ӏ: 'l', α: 'a', β: 'b', ε: 'e', ζ: 'z', η: 'n', ι: 'i', κ: 'k', μ: 'u', ν: 'v', ο: 'o',
+  ρ: 'p', τ: 't', υ: 'u', χ: 'x', γ: 'y',
+});
+const skeleton = (name) => [...name.toLowerCase()].map((char) => LOOK_ALIKES[char] || char).join('');
+
 /**
- * The name to store for what a person typed: normalised (NFC, trimmed, inner
+ * The name to store for what a person typed: normalised (NFKC, trimmed, inner
  * spaces collapsed), '' to remove theirs, or the refusal and its reason.
  */
 export const normalizeSessionName = (value) => {
   if (typeof value !== 'string') return refuse('empty');
-  const name = value.normalize('NFC').trim().replace(/\s+/gu, ' ');
+  // NFKC folds fullwidth, styled and compatibility forms into plain ones.
+  const name = value.normalize('NFKC').trim().replace(/\s+/gu, ' ');
   if (!name) return { ok: true, name: '' };
   if ([...name].length > SESSION_NAME_LIMITS.chars) return refuse('too_long');
   if (/\(\s*agent\s*\)/iu.test(name)) return refuse('agent_mark');
-  if (!/^[\p{L}\p{M}\p{N} ._'-]+$/u.test(name) || !/[\p{L}\p{N}]/u.test(name)) return refuse('characters');
-  if (/(^|[^\p{L}\p{N}])0x[0-9a-f]/iu.test(name) || /[0-9a-f]{16}/iu.test(name)) return refuse('address');
-  if (/\.eth(\s|$)/iu.test(name)) return refuse('ens');
-  if (DOMAIN.test(name)) return refuse('url_or_email');
+  // Characters drawn as nothing (joiners, variation selectors, fillers) could hide inside a word or be a whole name.
+  if (!/^[\p{L}\p{M}\p{N} ._'-]+$/u.test(name) || /\p{Default_Ignorable_Code_Point}/u.test(name) || !/[\p{L}\p{N}]/u.test(name)) {
+    return refuse('characters');
+  }
+  const seen = skeleton(name);
+  if (/(^|[^\p{L}\p{N}])0x[0-9a-f]/u.test(seen) || /[0-9a-f]{16}/u.test(seen)) return refuse('address');
+  if (/\.eth(\s|$)/u.test(seen)) return refuse('ens');
+  if (DOMAIN.test(seen)) return refuse('url_or_email');
   if (looksSecret(name)) return refuse('secret');
-  const words = ` ${name.toLowerCase().replace(/[._'-]+/gu, ' ').replace(/\s+/gu, ' ')} `;
+  const words = ` ${seen.replace(/[._'-]+/gu, ' ').replace(/\s+/gu, ' ')} `;
   if (ROLE_WORDS.some((word) => words.includes(` ${word} `))) return refuse('role');
   return { ok: true, name };
 };

@@ -3504,10 +3504,13 @@ set; the flag stays advertised, and changing the setting signs no one out).
 
 - `POST /names/set` with the session token takes `{ name }` and sets the
   token's own address's name; an address in the body is ignored. `""` removes
-  it. It returns `{ name, setAt }` with the name as stored (NFC, trimmed, inner
-  spaces collapsed), or `{ name: null, setAt: null }` after a removal.
+  it. It returns `{ name, setAt }` with the name as stored (NFKC, trimmed,
+  inner spaces collapsed), or `{ name: null, setAt: null }` after a removal.
   - A name is 1 to 32 characters of letters, marks and digits in any script,
-    spaces and `. - _ '`. Refusals are `400` `{ error, reason }`: `empty`,
+    spaces and `. - _ '`, with nothing drawn as blank (joiners, variation
+    selectors, fillers). The address, ENS, web-address and role checks read
+    Cyrillic and Greek look-alikes as the Latin letters they resemble.
+    Refusals are `400` `{ error, reason }`: `empty`,
     `too_long`, `agent_mark` (a typed "(agent)": the site marks agents),
     `characters`, `address` (`0x` and hex, or 16 hex digits in a row), `ens`
     (`.eth`), `url_or_email`, `secret`, `role` (admin, administrator,
