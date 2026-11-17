@@ -4417,6 +4417,22 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+.sessionAgentKickoffManualCopy {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
+  font-family: var(--ce-font-mono);
+  // 16px keeps iOS from zooming in when the field takes focus.
+  font-size: 16px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
 .sessionAgentKickoffCopied {
   border-color: var(--ce-status-info-text);
 

@@ -129,6 +129,61 @@ it('renews the private link quietly before it runs out', async () => {
   }
 });
 
+it('keeps the prompt to copy by hand through a renewal, with the renewed link, without taking focus', async () => {
+  jest.useFakeTimers();
+  try {
+    const start = Date.now();
+    ticketMock
+      .mockResolvedValueOnce({ ticket: 'ic1.first', expiresAtMs: start + 11 * 60 * 1000 })
+      .mockResolvedValueOnce({ ticket: 'ic1.second', expiresAtMs: start + 70 * 60 * 1000 });
+    writeText.mockRejectedValueOnce(new Error('denied'));
+    renderCard();
+    await act(async () => {});
+    await copy();
+    const field = await screen.findByRole<HTMLTextAreaElement>('textbox', {
+      name: 'Memory augmentation prompt to copy',
+    });
+    expect(field.value).toContain('&ticket=ic1.first');
+    expect(document.activeElement).toBe(field);
+    const elsewhere = screen.getByRole('button', { name: 'Prompt' });
+    elsewhere.focus();
+    await act(async () => {
+      jest.advanceTimersByTime(60 * 1000);
+    });
+    await act(async () => {});
+    expect(ticketMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('textbox', { name: 'Memory augmentation prompt to copy' })).toBe(field);
+    expect(field.value).toContain('&ticket=ic1.second');
+    expect(document.activeElement).toBe(elsewhere);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('hides the prompt to copy by hand when its renewal check fails', async () => {
+  jest.useFakeTimers();
+  try {
+    const start = Date.now();
+    ticketMock
+      .mockResolvedValueOnce({ ticket: 'ic1.first', expiresAtMs: start + 11 * 60 * 1000 })
+      .mockResolvedValueOnce({ ticket: 'ic1.second', expiresAtMs: start + 70 * 60 * 1000 });
+    writeText.mockRejectedValueOnce(new Error('denied'));
+    renderCard();
+    await act(async () => {});
+    await copy();
+    expect(await screen.findByRole('textbox', { name: 'Memory augmentation prompt to copy' })).toBeInTheDocument();
+    fetchMock.mockImplementation(async () => signInRequired());
+    await act(async () => {
+      jest.advanceTimersByTime(60 * 1000);
+    });
+    await act(async () => {});
+    expect(screen.getByText(/Could not check this session’s Worker/)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Memory augmentation prompt to copy' })).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 it('renews a ticket cut short by the end of its sign-in only as it runs out', async () => {
   jest.useFakeTimers();
   try {
