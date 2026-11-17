@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.14] - 2026-11-17
 
+### Client — available when the site deploys
+
+- Results on large sessions show answers as they arrive, with "Loaded N of M answers", reading several batches at once. On a test session with about 1,900 answers, the first answers showed in 2 to 8 seconds and all of them in 7 to 18, where it took about 65.
+- If answers fail to load, Results say so and offer **Retry** instead of spinning; a failed batch is tried once more first.
+- Signed-in Results no longer wait on an unfinished sign-in.
+- Questions and surveys no longer wait for a session's answers to load.
+- The page reconnects to its browser cache when iOS drops the connection, instead of failing every later save.
+
 ## [0.9.13] - 2026-11-17
 
 ### Client — available when the site deploys
