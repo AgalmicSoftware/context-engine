@@ -58,6 +58,7 @@ import { RISK_MATRIX_BUILD_ACTION } from './riskMatrixBuild.js';
 import { pressResultsAnalysis, pressResultsBuild } from './resultsJobPress.js';
 import { canBuildResults } from './resultsBuild.js';
 import { callSessionFeedbackStore } from './sessionFeedbackRoute.js';
+import { callSessionNamesStore, isNameHolder } from './sessionNames.js';
 import { SESSION_AGENT_EXPORT_ACTION, exportSessionAgent } from './sessionAgentExport.js';
 import { callSessionAgentHistoryStore } from './sessionAgentRoute.js';
 
@@ -309,6 +310,17 @@ export const dispatchAdminRequest = async ({
     return result?.status === 400
       ? deps?.json?.({ error: 'Name the messages to delete.', reason: result.body?.reason }, 400, privateHeaders)
       : deps?.json?.({ error: 'Feedback couldn’t be reached just now. Try again shortly.', reason: 'feedback_unavailable' }, 503, privateHeaders);
+  }
+
+  // A full admin may clear anyone's name, as for abuse, and never set one.
+  if (action === 'names/clear') {
+    const privateHeaders = withPrivateNoStoreHeaders(headers);
+    // `address` is the signing admin's; `member` is whose name goes.
+    if (!isNameHolder(body?.member)) return deps?.json?.({ error: 'Name the address whose name to clear.', reason: 'names_invalid' }, 400, privateHeaders);
+    const result = await (deps?.callSessionNamesStore || callSessionNamesStore)(env, targetSlug, 'clear', { address: body.member });
+    return result?.ok
+      ? deps?.json?.({ cleared: true }, 200, privateHeaders)
+      : deps?.json?.({ error: 'Names couldn’t be reached just now. Try again shortly.', reason: 'names_unavailable' }, 503, privateHeaders);
   }
 
   // Stored chats are cleared by full admins only, and read with the sign-in

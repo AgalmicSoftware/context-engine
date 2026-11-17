@@ -2749,6 +2749,7 @@ token. The body carries `address`, `signature`, `action`, `slug`, `bodyHash`,
 - `POST /admin/lit-chipotle-status`
 - `POST /admin/storage/set-hidden`
 - `POST /admin/feedback/delete` (see [Session feedback](#session-feedback))
+- `POST /admin/names/clear` (see [Names](#names))
 
 `/admin/storage/set-hidden` notes:
 
@@ -2810,7 +2811,7 @@ Never return secrets in responses.
   `appearance`, `sessionHeaderImg`, `contextAdditionPolicy`,
   `resultsAdminAddresses`, every interview setting (`interviewModeEnabled` and
   all of `interviewMode`, which each interview request reads afresh),
-  `sessionAgent`, `groupMemberCeiling` and `feedbackEnabled` (each read afresh
+  `sessionAgent`, `groupMemberCeiling`, `feedbackEnabled` and `namesEnabled` (each read afresh
   where it applies), and the curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
@@ -3492,6 +3493,44 @@ one out.
   that reads answers, files or results lists it, so it never reaches AI Views,
   the atlas, the risk matrix, the Session Agent, the fidelity report, exports
   or backups.
+
+### Names
+
+A person can give themselves a name in a session, shown to its members in
+place of their address (Workers advertising `session_names_v1`). Names are per
+session and per address, kept in the session's coordinator; only sessions a
+Worker runs have them, and `namesEnabled: false` turns them off (on unless
+set; the flag stays advertised, and changing the setting signs no one out).
+
+- `POST /names/set` with the session token takes `{ name }` and sets the
+  token's own address's name; an address in the body is ignored. `""` removes
+  it. It returns `{ name, setAt }` with the name as stored (NFC, trimmed, inner
+  spaces collapsed), or `{ name: null, setAt: null }` after a removal.
+  - A name is 1 to 32 characters of letters, marks and digits in any script,
+    spaces and `. - _ '`. Refusals are `400` `{ error, reason }`: `empty`,
+    `too_long`, `agent_mark` (a typed "(agent)": the site marks agents),
+    `characters`, `address` (`0x` and hex, or 16 hex digits in a row), `ens`
+    (`.eth`), `url_or_email`, `secret`, `role` (admin, administrator,
+    moderator, host, organiser, organizer, official, staff, system, results
+    admin, session agent, group agent, context engine, RadicalxChange, RxC, as
+    whole words). Names are not unique.
+  - A person changes their name at most 10 times in 24 hours (`429`
+    `rate_limited`). Signed out is `401`; names off, or an on-chain session,
+    is `403` `names_off`.
+- `GET /names?slug=<slug>` returns `{ names: { <lowercased address>: name } }`
+  for the whole session in one read, to a reader signed in whom the session's
+  own rule admits, as a read of its questions would. Anyone else, signed out
+  included, gets `200` `{ names: {} }` and sees addresses as before. It is sent
+  `Cache-Control: private, max-age=30` and `Vary: Authorization`.
+- `GET /names/me?slug=<slug>` with the session token returns
+  `{ name, setAt }` (each `null` when unset); signed out is `401`.
+- `POST /admin/names/clear` is a signed admin action whose body adds
+  `member` (the address whose name goes; `address` stays the signing admin's)
+  and returns `{ cleared: true }`. No one can set another person's name.
+- Only the names routes and session backups read the store, so a name never
+  reaches AI prompts, AI Views, the atlas, the risk matrix, the Session Agent,
+  exports or agent results. Backups carry every name; a restore adds them
+  and keeps any name the person has set on the target since.
 
 ## Self-deploy
 

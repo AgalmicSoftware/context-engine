@@ -27,6 +27,8 @@ export const FEATURES = Object.freeze([
   'session_agent_signed_out',
   'session_backup_v1',
   'session_feedback',
+  // GET /names, GET /names/me, POST /names/set and POST /admin/names/clear; namesEnabled turns them off.
+  'session_names_v1',
   'storage_read_batch_v1',
   'upload_authority_stamps',
   'worker_groups',

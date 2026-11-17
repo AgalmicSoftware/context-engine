@@ -1,9 +1,10 @@
 import { SESSION_AGENT_PATHS } from './sessionAgentRoute.js';
 import { FEEDBACK_PATH } from './sessionFeedbackRoute.js';
+import { SET_NAME_PATH } from './sessionNames.js';
 
 // Paths that answer for their own request, whatever action a body names: a
 // private session opens some of them to people its rule doesn't admit.
-const PATH_OWNED = new Set([...SESSION_AGENT_PATHS, FEEDBACK_PATH]);
+const PATH_OWNED = new Set([...SESSION_AGENT_PATHS, FEEDBACK_PATH, SET_NAME_PATH]);
 
 export const dispatchAuthenticatedRoute = async ({
   path,

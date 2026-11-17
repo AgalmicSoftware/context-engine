@@ -87,6 +87,9 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'results-analysis-artifact' };
   }
 
+  // Names are read signed in or out; signed out, the map is empty.
+  if ((path === '/names' || path === '/names/me') && method === 'GET') return { kind: 'names', path };
+
   if ((path === '/debate-atlas' || path === '/risk-matrix') && method === 'GET') {
     return { kind: path.slice(1) };
   }

@@ -10,6 +10,7 @@ import { isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvel
 import { coordinateWorkerGroupBackup } from './workerGroups.js';
 import { canOptOut, sessionAgentOptOutKey, sessionAgentUnattributedKey } from './sessionAgentOptOuts.js';
 import { isSessionAgentHistoryBackup, restoreSessionAgentHistory } from './sessionAgentHistory.js';
+import { isSessionNamesBackup, restoreSessionNames } from './sessionNames.js';
 import { base64urlToBytes, bytesToBase64url } from './storageEnvelopeEncryption.js';
 import { isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
 import { isStorageResourceId } from './storageUploadValidation.js';
@@ -87,6 +88,7 @@ const validateSnapshot = ({ snapshot, manifest, normalizeConfig, normalizeSessio
   if (snapshot.sessionAgentHistory !== undefined && !isSessionAgentHistoryBackup(snapshot.sessionAgentHistory)) {
     fail('Invalid backup Session Agent chats.');
   }
+  if (snapshot.sessionNames !== undefined && !isSessionNamesBackup(snapshot.sessionNames)) fail('Invalid backup names.');
 };
 
 const validatePage = (page, slug) => {
@@ -451,6 +453,10 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       progress.counts.written += chats.written;
       progress.counts.skipped += chats.skipped;
       chats.conflicts.forEach(conflict);
+      const names = await restoreSessionNames(storage, snapshot.sessionNames || [],
+        (key) => journalBackupImportWrite(storage, page.archiveId, 'durable', key));
+      progress.counts.written += names.written;
+      progress.counts.skipped += names.skipped;
       if (!progress.counts.conflicts) {
         // Commit the verified authority before reclaiming its staged snapshot.
         // The importing actor remains authorized until cleanup and handoff end.

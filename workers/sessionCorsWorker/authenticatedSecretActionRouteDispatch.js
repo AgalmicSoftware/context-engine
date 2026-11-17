@@ -6,6 +6,7 @@ import { executeSessionLitChipotleAction } from './chipotleClient.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { SESSION_AGENT_PATHS, dispatchSessionAgentRoute } from './sessionAgentRoute.js';
 import { FEEDBACK_PATH, sendSessionFeedback } from './sessionFeedbackRoute.js';
+import { SET_NAME_PATH, setOwnSessionName } from './sessionNames.js';
 import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
 
 const resolveDefaultModelForProvider = (provider) => {
@@ -46,6 +47,10 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     const result = await sendSessionFeedback({
       env, slug, config, body, address, identity: String(address || '').toLowerCase(), checkRateLimit: deps?.checkRateLimit,
     });
+    return { handled: true, response: deps?.json?.(result.body, result.status, headers) };
+  }
+  if (path === SET_NAME_PATH) {
+    const result = await setOwnSessionName({ env, slug, config, body, address, checkRateLimit: deps?.checkRateLimit, now: deps?.now });
     return { handled: true, response: deps?.json?.(result.body, result.status, headers) };
   }
   const isFaucetAction = action === 'request_test_eth';

@@ -21,6 +21,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'interviewModeEnabled',
   'pileAutoAdvanceEnabled',
   'feedbackEnabled',
+  'namesEnabled',
   'defaultFilterState',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
@@ -102,6 +103,8 @@ const CONTENT_FIELDS = new Set([
   'groupMemberCeiling',
   // Checked on each feedback send, the same way.
   'feedbackEnabled',
+  // Checked on each name read and change, the same way.
+  'namesEnabled',
   ...CURATED_ID_LIST_KEYS,
 ]);
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);
