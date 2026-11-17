@@ -2413,6 +2413,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       )
         throw error;
       // Answers upload a few at a time, so the stored ones are named by question, not by position.
+      // A Submit carries one answer per question (its question ids are a set), so a name is enough.
       const storedIds = new Set(
         partialReceipt.questionResponseRefs.map((ref: SurveyQuestionsLegacyValue) =>
           String(ref?.questionId || '').toLowerCase(),
