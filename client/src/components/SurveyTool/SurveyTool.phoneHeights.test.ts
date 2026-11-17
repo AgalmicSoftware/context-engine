@@ -36,3 +36,12 @@ it('gives the interview dialog the whole visible screen on a phone', () => {
     /@media \(max-width: 575\.98px\)\s*\{\s*\.sessionVoiceModeModal\s*\{\s*max-height: calc\(100dvh - 1rem\);/,
   );
 });
+
+// Every phone question card shares one height from the small viewport, which stays still while Safari's bars move,
+// so the arrows under the card never shift from card to card.
+it('gives every phone question card one height from the steady visible screen', () => {
+  const unit = css.match(/\.pileInteractionUnit\s*\{([^{}]*--pile-phone-card-height[^{}]*)\}/)?.[1] || '';
+  const values = [...unit.matchAll(/--pile-phone-card-height:\s*([^;]+);/g)].map(([, value]) => value);
+  expect(values).toEqual(['max(380px, calc(100vh - 170px))', 'max(380px, calc(100svh - 170px))']);
+  expect(heightsOf('.pileCardInner')).toContain('var(--pile-phone-card-height)');
+});
