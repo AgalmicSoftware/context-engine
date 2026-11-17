@@ -60,13 +60,7 @@ describe('Navbar logo navigation', () => {
   const renderNavbar = (props: any = {}, storeOverrides: any = {}) =>
     render(
       <Provider store={buildStore(storeOverrides)}>
-        <Navbar
-          demoMode={{ tools: false }}
-          toggleDemoMode={jest.fn()}
-          loginComplete={false}
-          loginInProgress={false}
-          {...props}
-        />
+        <Navbar loginComplete={false} loginInProgress={false} {...props} />
       </Provider>,
     );
 

@@ -180,7 +180,6 @@ type SurveyGeneratorProps = UnknownRecord & {
   activeSessionSlug?: string;
   contracts?: unknown;
   explorerMode?: string;
-  demoSurfaceMode?: unknown;
   sessionOverrideSlug?: string | null;
   sessionOverrideTouched?: boolean;
   hideInternalSessionSelector?: boolean;
@@ -342,7 +341,6 @@ function QueuedPhotoPreview({ file, photoName, sourceId }: QueuedPhotoPreviewPro
   );
 }
 
-const LazyCorpusViewer = React.lazy(() => import('../../DemoViews/CorpusViewer'));
 // CreateQuestionsAndSurveys embeds this generator, so load it lazily instead of
 // importing it back; it is only needed once questions have been generated.
 const LazyCreateQuestionsAndSurveys = React.lazy(() => import('../CreateQuestionsAndSurveys'));
@@ -364,7 +362,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     activeSessionSlug,
     contracts,
     explorerMode = 'add',
-    demoSurfaceMode = null,
     sessionOverrideSlug,
     sessionOverrideTouched,
     hideInternalSessionSelector,
@@ -429,8 +426,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     Object.prototype.hasOwnProperty.call(rawProps, 'sessionOverrideSlug') ||
     Object.prototype.hasOwnProperty.call(rawProps, 'sessionOverrideTouched') ||
     Object.prototype.hasOwnProperty.call(rawProps, 'hideInternalSessionSelector');
-  const demoSurfaceEnabled = demoSurfaceMode !== false;
-  const [showDemoCorpusView, setShowDemoCorpusView] = useState(demoSurfaceEnabled);
 
   // Multi-source State
   const [additionalSources, setAdditionalSources] = useState<SurveyGeneratorAdditionalSource[]>([]);
@@ -1600,13 +1595,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const saveDocAudienceLabel =
     saveDocAudience === 'session' && docSaveSessionAudienceAvailable ? docSaveSessionLabel : 'only me';
   const isExplorerViewMode = !minified && explorerMode === 'view';
-  const showDemoCorpusPanel = demoSurfaceEnabled && showDemoCorpusView;
-  const showViewModeToolbar = demoSurfaceEnabled;
   const showInternalSessionSelector = !minified && !hideInternalSessionSelector && !hasControlledSessionOverride;
-
-  useEffect(() => {
-    if (isExplorerViewMode) setShowDemoCorpusView(demoSurfaceEnabled);
-  }, [isExplorerViewMode, demoSurfaceEnabled]);
 
   useEffect(() => {
     if (!hasTranscriptModeInput && transcriptMode) {
@@ -1617,29 +1606,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
   const renderExplorerViewMode = () => (
     <div className={styles.viewModeShell} data-testid={E2E_TESTIDS.DATABASE_VIEW_PANEL}>
-      {showViewModeToolbar ? (
-        <div className={styles.viewModeToolbar}>
-          {demoSurfaceEnabled ? (
-            <label className={styles.viewModeCheckbox} htmlFor={E2E_TESTIDS.DATABASE_VIEW_DEMO_TOGGLE}>
-              <input
-                id={E2E_TESTIDS.DATABASE_VIEW_DEMO_TOGGLE}
-                type="checkbox"
-                checked={showDemoCorpusView}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => setShowDemoCorpusView(event.target.checked)}
-                data-testid={E2E_TESTIDS.DATABASE_VIEW_DEMO_TOGGLE}
-              />
-              <span>Demo corpus</span>
-            </label>
-          ) : null}
-        </div>
-      ) : null}
-
       <div className={styles.viewModeContent}>
-        {showDemoCorpusPanel ? (
-          <Suspense fallback={<div className={styles.viewModeEmptyState}>Loading demo corpus...</div>}>
-            <LazyCorpusViewer />
-          </Suspense>
-        ) : resolvedSessionIdHex ? (
+        {resolvedSessionIdHex ? (
           <DocumentLibraryPanel
             provider={provider}
             network={network}
@@ -1656,11 +1624,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             litHooks={scopedLitHooks as SurveyGeneratorLitHooks | null | undefined}
           />
         ) : (
-          <div className={styles.viewModeEmptyState}>
-            {demoSurfaceEnabled
-              ? 'Select a session with docs to view the session library here, or leave Demo corpus enabled.'
-              : 'Select a session with docs to view the session library here.'}
-          </div>
+          <div className={styles.viewModeEmptyState}>Select a session with docs to view the session library here.</div>
         )}
       </div>
     </div>

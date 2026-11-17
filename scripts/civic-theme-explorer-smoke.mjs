@@ -91,16 +91,6 @@ export async function inspectCivicExplorerContent(page, { groupLabel = 'e/acc' }
   };
   await assertReadable(body);
 
-  await open('Risks');
-  const cell = page.getByRole('button', { name: /^Capabilities versus Safety,.*Open aggregated notes\.$/ });
-  await cell.waitFor({ state: 'visible' });
-  await assertReadable(body);
-  await cell.click();
-  await assertReadable(page.getByRole('dialog'));
-  await page.getByRole('button', { name: 'Close', exact: true }).last().click();
-  await page.getByRole('dialog').waitFor({ state: 'hidden' });
-  await back.click();
-
   await open('Groups');
   const sessionSelector = page.getByTestId('ce-tool-explorer-active-session');
   await sessionSelector.waitFor({ state: 'visible' });
@@ -133,25 +123,8 @@ export async function inspectCivicExplorerContent(page, { groupLabel = 'e/acc' }
   await page.getByRole('button', { name: 'View', exact: true }).waitFor({ state: 'visible' });
   await assertReadable(body);
   await page.getByRole('button', { name: 'View', exact: true }).click();
-  await page.getByRole('checkbox', { name: 'Demo corpus', exact: true }).check();
-  for (const name of [
-    'Cross-Corpus',
-    'Tweets',
-    'Laws & Policy',
-    'Papers',
-    'LessWrong',
-    'Insider Interviews',
-    'Sci-Fi',
-    'Metrics',
-  ]) {
-    const category = page.getByRole('button', { name, exact: true }).and(page.locator('[aria-pressed]'));
-    // Keyboard activation also covers category tabs beyond the horizontal scroll area.
-    await category.press('Enter');
-    await category.and(page.locator('[aria-pressed="true"]')).waitFor({ state: 'visible' });
-    await page.getByRole('article').first().waitFor({ state: 'visible' });
-    assert.equal(await category.getAttribute('aria-pressed'), 'true');
-    await assertReadable(body);
-  }
+  await page.getByTestId('ce-database-view-panel').waitFor({ state: 'visible' });
+  await assertReadable(body);
   await back.click();
 
   await open('Questions');
@@ -159,7 +132,11 @@ export async function inspectCivicExplorerContent(page, { groupLabel = 'e/acc' }
   await assertReadable(body);
   await back.click();
 
-  await open('Debate Atlas');
+  // The atlas has its own page; ?demo=1 loads the sample debates these checks read.
+  const atlasUrl = new URL(page.url());
+  atlasUrl.pathname = `${atlasUrl.pathname.replace(/\/$/, '')}/atlas`;
+  atlasUrl.search = '?demo=1';
+  await page.goto(atlasUrl.href, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'Debate Atlas', exact: true }).waitFor({ state: 'visible' });
   await assertReadable(body);
   await page.getByRole('button', { name: 'Top Debates', exact: true }).click();
@@ -187,7 +164,6 @@ export async function inspectCivicExplorerContent(page, { groupLabel = 'e/acc' }
   await page.getByRole('button', { name: 'List', exact: true }).click();
   await assertReadable(body);
   await inspectCivicDebateDetails(page);
-  await back.click();
 }
 
 export async function inspectCivicDebateDetails(page) {

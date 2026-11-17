@@ -471,7 +471,6 @@ export async function runSmoke() {
       const page = await context.newPage();
       await page.addInitScript(() => {
         if (!localStorage.getItem('ce:theme')) localStorage.setItem('ce:theme', 'civic');
-        localStorage.setItem('ce:demoSurfaceMode', 'true');
         localStorage.setItem('ce_onboarding_complete', 'true');
         localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
       });

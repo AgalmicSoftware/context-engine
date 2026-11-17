@@ -22,7 +22,6 @@ import { describeCeAgentContract } from './ceAgentContract.js';
 import { E2E_TESTIDS } from './e2eTestIds.js';
 import { toStr } from './shared/primitives.js';
 import { createLogger } from './logging.js';
-import { isDemoModeEnabled } from './demoModeHelpers.js';
 
 export { describeCeAgentContract } from './ceAgentContract.js';
 
@@ -154,7 +153,6 @@ const getState = () => {
   let provider = '';
   let loginComplete = false;
   let activeSessionSlug = '';
-  let demoMode = false;
 
   try {
     const s = store.getState();
@@ -162,7 +160,6 @@ const getState = () => {
     provider = toStr(s?.profile?.provider).trim();
     loginComplete = !!s?.sessionState?.loginComplete;
     activeSessionSlug = toStr(s?.sessionState?.activeSessionSlug).trim();
-    demoMode = isDemoModeEnabled(s?.sessionState?.demoMode);
   } catch (e) {
     log.warn('ceAgent: fallback', e);
   }
@@ -182,7 +179,6 @@ const getState = () => {
     provider,
     loginComplete,
     activeSessionSlug,
-    demoMode,
   };
 };
 

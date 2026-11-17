@@ -1,40 +1,3 @@
-.legendContainer {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 15px; // border: 5px solid color-mix(in srgb, var(--ce-document-surface) 30.2%, transparent);
-  // border-radius: var(--ce-radius-10);
-
-  &.hidden {
-    display: none;
-  }
-}
-
-.legendItem {
-  display: flex;
-  align-items: center;
-  margin-right: 20px;
-}
-
-.legendDot {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--ce-radius-round);
-  margin-right: 5px;
-  &.live {
-    background-color: var(--ce-status-success); // Green dot for live
-  }
-
-  &.future {
-    background-color: var(--ce-status-info); // Blue dot for future
-  }
-}
-
-.legendText {
-  font-size: 1.25rem; // Adjust the font size as needed  font-weight: 600;
-  text-transform: uppercase;
-  opacity: 0.75;
-}
-
 .explorerContainer {
   // max-width: 800px;
   margin: 0 auto;
@@ -66,24 +29,6 @@
 
 .explorerCol {
   padding: 10px;
-
-  &.statusBorderEnabled {
-    &.live {
-      .square {
-        .backgroundImage {
-          border: 4px solid color-mix(in srgb, var(--ce-action-accent) 78%, transparent);
-        }
-      }
-    }
-
-    &.future {
-      .square {
-        .backgroundImage {
-          border: 4px solid color-mix(in srgb, var(--ce-data-series-1) 80%, transparent);
-        }
-      }
-    }
-  }
 
   .square {
     border-radius: var(--ce-radius-10);
@@ -605,10 +550,6 @@
  * Panel thumbnails. The data and click targets stay the same; only their
  * visual grammar changes. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
-  .legendContainer {
-    display: none;
-  }
-
   .explorerContainer,
   .explorerContainerSparse {
     display: flex;
@@ -793,11 +734,6 @@
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
-  .legendText {
-    color: var(--ce-document-text-muted);
-    opacity: 1;
-  }
-
   .squareText,
   .squareSubtext {
     color: var(--ce-document-text);

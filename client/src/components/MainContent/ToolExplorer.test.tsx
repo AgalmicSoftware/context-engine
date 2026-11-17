@@ -21,7 +21,6 @@ const mockGetDemoConfigs = jest.fn(() => []);
 const compiledToolStyles = sass.compile(path.join(__dirname, 'ToolExplorer.module.scss')).css;
 const mockSurveyTool = jest.fn();
 const mockSBTsPage = jest.fn();
-const mockDebateMap = jest.fn();
 const mockAudioSurveyGenerator = jest.fn();
 const mutableEnv = process.env as Record<string, string | undefined>;
 const originalPublicUrl = process.env.PUBLIC_URL;
@@ -49,11 +48,6 @@ jest.mock('../SurveyTool/SurveyTool', () => ({
   },
 }));
 
-jest.mock('../MainContent/RiskMatrix', () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
 jest.mock('../Shared/AudioInput/AudioInput', () => ({
   __esModule: true,
   default: () => null,
@@ -74,19 +68,6 @@ jest.mock('../SBTs/SBTsPage', () => ({
   },
 }));
 
-jest.mock('../DebateMap/DebateMap', () => ({
-  __esModule: true,
-  default: (props: any) => {
-    mockDebateMap(props);
-    return (
-      <div
-        data-testid="mock-debate-map"
-        data-demo-mode={typeof props.demoMode === 'undefined' ? '' : String(props.demoMode)}
-      />
-    );
-  },
-}));
-
 jest.mock('../SurveyTool/SurveyGenerator/SurveyGenerator', () => ({
   __esModule: true,
   default: (props: any) => {
@@ -95,7 +76,6 @@ jest.mock('../SurveyTool/SurveyGenerator/SurveyGenerator', () => ({
       <div
         data-testid="mock-audio-survey-generator"
         data-explorer-mode={props.explorerMode || ''}
-        data-demo-surface-mode={typeof props.demoSurfaceMode === 'undefined' ? '' : String(props.demoSurfaceMode)}
         data-session-override-slug={props.sessionOverrideSlug || ''}
         data-session-override-touched={String(!!props.sessionOverrideTouched)}
         data-hide-internal-session-selector={String(!!props.hideInternalSessionSelector)}
@@ -123,7 +103,6 @@ const renderToolExplorer = (overrides: Record<string, unknown> = {}) =>
       isSBTCacheReady={true}
       isSurveyCacheReady={true}
       isQuestionCacheReady={true}
-      demoSurfaceMode={true}
       {...overrides}
     />,
   );
@@ -150,7 +129,7 @@ describe('ToolExplorer session propagation', () => {
     });
   });
 
-  it.each(['Questions', 'Groups', 'Context', 'Debate Atlas', 'Risks'])(
+  it.each(['Questions', 'Groups', 'Context'])(
     'keeps the %s session control outside Back and disambiguates the selected name and link',
     async (tool) => {
       mockGetSessionConfigBySlug.mockImplementation((slug: string) => ({ slug, sessionName: 'Shared name' }));
@@ -265,7 +244,6 @@ describe('ToolExplorer session propagation', () => {
         <ConnectedToolExplorer
           activeSessionSlug={activeSessionSlug}
           sessionConfig={mockGetSessionConfigBySlug(activeSessionSlug)}
-          demoSurfaceMode={false}
         />
       );
     };
@@ -366,21 +344,6 @@ describe('ToolExplorer session propagation', () => {
       expect.objectContaining({ sessionConfig: { slug: 'rxc', sessionName: 'Debate Session' } }),
     );
     expect(screen.getByRole('button', { name: '← Back' })).toBeInTheDocument();
-  });
-
-  it('keeps the expanded Debate Atlas mounted when its detail modal closes', async () => {
-    renderToolExplorer();
-    fireEvent.click(screen.getByText('Debate Atlas', { exact: true }));
-    await screen.findByTestId('mock-debate-map');
-    const call = mockDebateMap.mock.calls.at(-1);
-    if (!call) throw new Error('Expected the embedded Debate Atlas to render');
-    const { onModalClose } = call[0];
-    expect(onModalClose).toEqual(expect.any(Function));
-    onModalClose();
-    expect(screen.getByTestId('mock-debate-map')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '← Back' }));
-    expect(screen.queryByTestId('mock-debate-map')).not.toBeInTheDocument();
-    expect(screen.getByText('Debate Atlas', { exact: true })).toBeInTheDocument();
   });
 
   it('passes the inherited active session slug into the embedded SurveyTool', async () => {
@@ -516,9 +479,6 @@ describe('ToolExplorer session propagation', () => {
 
     fireEvent.click(screen.getByText('Groups'));
     expect(await screen.findByRole('link', { name: /^View All$/i })).toHaveAttribute('href', `/ce${sbtsListPath()}`);
-    fireEvent.click(screen.getByRole('button', { name: /^← Back$/i }));
-    fireEvent.click(screen.getByText('Debate Atlas'));
-    expect(await screen.findByRole('link', { name: /^Full Screen$/i })).toHaveAttribute('href', '/ce/atlas');
   });
 
   it('shows Add/View controls for Context, defaults to Add, and resets after leaving', async () => {
@@ -693,45 +653,13 @@ describe('ToolExplorer session propagation', () => {
     },
   );
 
-  it('passes demoSurfaceMode through to the expanded Context tool', async () => {
-    renderToolExplorer({ activeSessionSlug: 'edge', demoSurfaceMode: false });
-
-    fireEvent.click(screen.getByText('Context'));
-
-    expect(await screen.findByTestId('mock-audio-survey-generator')).toHaveAttribute('data-demo-surface-mode', 'false');
-    expect(mockAudioSurveyGenerator).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        explorerMode: 'add',
-        demoSurfaceMode: false,
-        activeSessionSlug: 'edge',
-      }),
-    );
-  });
-
-  it.each([
-    { demoSurfaceMode: null, expectedDemoMode: 'true' },
-    { demoSurfaceMode: true, expectedDemoMode: 'true' },
-  ])(
-    'shows demo cards and the legend when demoSurfaceMode is $demoSurfaceMode',
-    async ({ demoSurfaceMode, expectedDemoMode }: { demoSurfaceMode: boolean | null; expectedDemoMode: string }) => {
-      renderToolExplorer({ demoSurfaceMode });
-
-      expect(screen.getByText('Debate Atlas')).toBeInTheDocument();
-      expect(screen.getByText('Risks')).toBeInTheDocument();
-      expect(screen.queryByText('Suggest Tool')).not.toBeInTheDocument();
-      expect(screen.getByText('Live')).toBeInTheDocument();
-      expect(screen.getByText('Demo')).toBeInTheDocument();
-
-      fireEvent.click(screen.getByText('Debate Atlas'));
-
-      expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', expectedDemoMode);
-    },
-  );
-
-  it('hides future demo cards and the entire legend row when demoSurfaceMode is false', () => {
-    const { container } = renderToolExplorer({ demoSurfaceMode: false });
+  it('shows Questions, Groups and Context only, with no demo tiles, legend or status borders', () => {
+    // A Demo Mode setting passed by an older caller changes nothing.
+    const { container } = renderToolExplorer({ demoSurfaceMode: true });
 
     expect(screen.getByText('Questions')).toBeInTheDocument();
+    expect(screen.getByText('Groups')).toBeInTheDocument();
+    expect(screen.getByText('Context')).toBeInTheDocument();
     expect(screen.queryByText('Debate Atlas')).not.toBeInTheDocument();
     expect(screen.queryByText('Risks')).not.toBeInTheDocument();
     expect(screen.queryByText('Suggest Tool')).not.toBeInTheDocument();
@@ -746,14 +674,21 @@ describe('ToolExplorer session propagation', () => {
     expect(explorerContainer).toHaveClass(styles.explorerContainerSparse);
     expect(explorerRow).toHaveClass(styles.explorerRowSparse);
     expect(explorerCols).toHaveLength(3);
-    explorerCols.forEach((col) => {
-      expect(col).toHaveClass(styles.explorerColSparse);
-      expect(col).not.toHaveClass(styles.statusBorderEnabled);
-    });
+    explorerCols.forEach((col) => expect(col).toHaveClass(styles.explorerColSparse));
+    expect(compiledToolStyles).not.toMatch(/statusBorderEnabled|legend/i);
+  });
+
+  it('gives the Context tool no demo setting', async () => {
+    renderToolExplorer({ activeSessionSlug: 'edge', demoSurfaceMode: true });
+
+    fireEvent.click(screen.getByText('Context'));
+
+    await screen.findByTestId('mock-audio-survey-generator');
+    expect(mockAudioSurveyGenerator.mock.calls.at(-1)?.[0]).not.toHaveProperty('demoSurfaceMode');
   });
 
   it('keeps the three live tools identifiable and supplies their bundled artwork for classic mode', () => {
-    const { container } = renderToolExplorer({ demoSurfaceMode: false });
+    const { container } = renderToolExplorer();
 
     expect(screen.getByText('Create and explore questions.')).toBeInTheDocument();
     expect(screen.getByText('Organize and manage groups.')).toBeInTheDocument();
@@ -762,41 +697,5 @@ describe('ToolExplorer session propagation', () => {
     const artwork = Array.from(container.querySelectorAll<HTMLElement>(`.${styles.backgroundImage}`));
     expect(artwork).toHaveLength(3);
     artwork.forEach((image) => expect(image.style.backgroundImage).toContain('url('));
-  });
-
-  it('enables live and future status borders only while demo mode is on', () => {
-    const { container } = renderToolExplorer({ demoSurfaceMode: true });
-    const explorerCols = Array.from(container.querySelectorAll(`.${styles.explorerCol}`));
-
-    expect(explorerCols).toHaveLength(5);
-    explorerCols.forEach((col) => {
-      expect(col).toHaveClass(styles.statusBorderEnabled);
-    });
-  });
-
-  it('collapses an expanded demo card when demoSurfaceMode flips to false', async () => {
-    const { rerender } = renderToolExplorer({ demoSurfaceMode: true });
-
-    fireEvent.click(screen.getByText('Debate Atlas'));
-    expect(await screen.findByTestId('mock-debate-map')).toBeInTheDocument();
-
-    rerender(
-      <ToolExplorer
-        activeSessionSlug="demo"
-        account="0x1111111111111111111111111111111111111111"
-        provider={{}}
-        toggleLoginModal={jest.fn()}
-        loginComplete={false}
-        network={{ id: 84532 }}
-        isSBTCacheReady={true}
-        isSurveyCacheReady={true}
-        isQuestionCacheReady={true}
-        demoSurfaceMode={false}
-      />,
-    );
-
-    expect(screen.queryByTestId('mock-debate-map')).not.toBeInTheDocument();
-    expect(screen.getByText('Questions')).toBeInTheDocument();
-    expect(screen.queryByText('Debate Atlas')).not.toBeInTheDocument();
   });
 });

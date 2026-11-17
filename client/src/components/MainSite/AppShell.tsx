@@ -10,7 +10,6 @@ import {
   changeFocusedTab,
   toggleLoginModal,
   updateLoginInfo,
-  toggleDemoMode,
   changeActiveSessionSlug,
 } from '../../actions/sessionStateActions.js';
 import type { RootState } from '../../reducers/index.js';
@@ -2760,8 +2759,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     // Re-initialize if the *group* chain id changes (independent of wallet)
     const currSlug = this.getActiveSessionSlug();
     const currChainId = this.getSessionChainId(currSlug);
-    const toolsDemoOn = typeof this.props.demoMode === 'object' ? !!this.props.demoMode?.tools : !!this.props.demoMode;
-    if (this._lastGroupChainId !== currChainId && !toolsDemoOn) {
+    if (this._lastGroupChainId !== currChainId) {
       if (getMainSiteRuntimeWindow()?.ENABLE_RPC_DEBUG_LOGGING === true) {
         mainSiteLog.log('[RPC_DEBUG_TRIGGER] MainSite: group chain change detected', {
           old: this._lastGroupChainId,
@@ -3985,8 +3983,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         <Navbar
           toggleLoginModal={this.props.toggleLoginModal}
           updateLoginInfo={this.props.updateLoginInfo}
-          toggleDemoMode={this.props.toggleDemoMode}
-          demoMode={this.props.demoMode}
           account={this.props.account}
           provider={this.props.provider} // <--- provider is a string name; pass through unchanged
           focusedTab={this.props.focusedTab}
@@ -4028,8 +4024,6 @@ const mapStateToProps = (state: RootState) => ({
   focusedTab: state.sessionState.focusedTab,
   loginComplete: state.sessionState.loginComplete,
   loginInProgress: state.sessionState.loginInProgress,
-  demoMode: state.sessionState.demoMode,
-  demoSurfaceMode: state.sessionState.demoSurfaceMode,
   activeSessionSlug: state.sessionState.activeSessionSlug,
 });
 
@@ -4042,7 +4036,6 @@ export const appShellDispatchActions = {
   changeFocusedTab,
   toggleLoginModal,
   updateLoginInfo,
-  toggleDemoMode,
   changeActiveSessionSlug,
 };
 

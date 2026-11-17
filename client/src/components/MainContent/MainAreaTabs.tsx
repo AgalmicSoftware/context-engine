@@ -34,9 +34,6 @@ type MainAreaTabsProps = {
   focusedTab: number;
   changeFocusedTab: (tabIndex: number) => void;
   toggleLoginModal: (loginModalIsOpen: boolean) => void;
-  toggleDemoMode: (demoModeOn: boolean) => void;
-  demoMode?: unknown;
-  demoSurfaceMode?: unknown;
   provider?: unknown;
   network?: unknown;
   networkChainId?: unknown;
@@ -157,7 +154,6 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                 {this.state.mountedTabs[MAIN_AREA_TABS.COMMUNITY] ? (
                   <Suspense fallback={<LazyFallback label="Loading..." />}>
                     <CommunityTab
-                      demoMode={this.props.demoMode}
                       provider={this.props.provider}
                       network={this.props.network}
                       networkChainId={this.props.networkChainId}
@@ -201,8 +197,6 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                       networkChainId={this.props.networkChainId}
                       loginComplete={this.props.loginComplete}
                       loginInProgress={this.props.loginInProgress}
-                      demoMode={this.props.demoMode}
-                      demoSurfaceMode={this.props.demoSurfaceMode}
                       isQuestionCacheReady={this.props.isQuestionCacheReady}
                       isResponsesCacheReady={this.props.isResponsesCacheReady}
                       isSurveyCacheReady={this.props.isSurveyCacheReady}
@@ -216,12 +210,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
               <TabPane tabId={'link' + MAIN_AREA_TABS.WELCOME}>
                 {this.state.mountedTabs[MAIN_AREA_TABS.WELCOME] ? (
                   <Suspense fallback={<LazyFallback label="Loading..." />}>
-                    <OnboardingWalkthrough
-                      changeTabFunction={(newTab: number) => this.changeTabs(newTab)}
-                      //
-                      toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode(demoModeOn)}
-                      demoMode={this.props.demoMode}
-                    />
+                    <OnboardingWalkthrough changeTabFunction={(newTab: number) => this.changeTabs(newTab)} />
                   </Suspense>
                 ) : null}
               </TabPane>

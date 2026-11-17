@@ -215,8 +215,6 @@ const buildProps = (overrides = {}) => ({
   changeAccount: jest.fn(),
   changeActiveSessionSlug: jest.fn(),
   changeFocusedTab: jest.fn(),
-  demoMode: { tools: false },
-  demoSurfaceMode: true,
   loginComplete: false,
   loginInProgress: false,
   loginModalToggled: true,
@@ -225,10 +223,8 @@ const buildProps = (overrides = {}) => ({
   openConnectModal: jest.fn(),
   provider: null,
   primarySessionExplicit: false,
-  setDemoSurfaceMode: jest.fn(),
   selectedSessionScope: 'active',
   selectedSessionSlugs: [],
-  toggleDemoMode: jest.fn(),
   toggleLoginModal: jest.fn(),
   toggleTooltips: jest.fn(),
   tooltipsEnabled: true,
@@ -665,7 +661,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByTestId('ce-settings-quick-controls').children).toHaveLength(4);
+    expect(screen.getByTestId('ce-settings-quick-controls').children).toHaveLength(3);
     expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
     expect(screen.getByTestId('ce-settings-color-blind')).toHaveAccessibleName('Color-blind mode');
     expect(screen.getByText('Appearance')).toBeInTheDocument();
@@ -795,7 +791,6 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
   it('exposes pre-login settings so tooltip preference and custom AI endpoint can be updated before sign-in', async () => {
     const props = buildProps({
-      setDemoSurfaceMode: jest.fn(),
       toggleTooltips: jest.fn(),
       tooltipsEnabled: true,
     });
@@ -1019,68 +1014,41 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('keeps Session outside the logged-out settings drawer and the preferences inside it', async () => {
-    const props = buildProps({
-      demoSurfaceMode: true,
-      setDemoSurfaceMode: jest.fn(),
-    });
+    const props = buildProps({ toggleTooltips: jest.fn(), tooltipsEnabled: true });
 
     render(<LoginAndSettingsModal {...props} />);
 
     const sessionSummary = screen.getByTestId('ce-prelogin-session-select');
-    expect(screen.queryByRole('button', { name: 'Demo Mode On' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Explainers On' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-prelogin-settings-panel')).not.toBeInTheDocument();
     expect(sessionSummary).toBeInTheDocument();
 
     await openPreLoginSettingsDrawer();
 
     const panel = screen.getByTestId('ce-prelogin-settings-panel');
-    const demoToggle = within(panel).getByRole('button', { name: 'Demo Mode On' });
+    const explainersToggle = within(panel).getByRole('button', { name: 'Explainers On' });
 
-    expect(demoToggle).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getAllByRole('button', { name: 'Demo Mode On' })).toHaveLength(1);
-    expect(panel).toContainElement(demoToggle);
+    expect(screen.getAllByRole('button', { name: 'Explainers On' })).toHaveLength(1);
     expect(panel).not.toContainElement(sessionSummary);
     expect(within(panel).queryByText('SESSION')).not.toBeInTheDocument();
+    // Demo Mode is gone: the drawer's switches are Config and Explainers.
+    expect(screen.queryByRole('button', { name: /Demo Mode/ })).not.toBeInTheDocument();
 
-    fireEvent.click(demoToggle);
+    fireEvent.click(explainersToggle);
 
-    expect(props.setDemoSurfaceMode).toHaveBeenCalledTimes(1);
-    expect(props.setDemoSurfaceMode).toHaveBeenCalledWith(false);
+    expect(props.toggleTooltips).toHaveBeenCalledTimes(1);
   });
 
-  it('updates the demo mode toggle label when demoSurfaceMode changes', async () => {
-    const props = buildProps({
-      demoSurfaceMode: true,
-    });
-    const { rerender } = render(<LoginAndSettingsModal {...props} />);
-
-    await openPreLoginSettingsDrawer();
-    expect(screen.getByRole('button', { name: 'Demo Mode On' })).toHaveAttribute('aria-pressed', 'true');
-
-    rerender(<LoginAndSettingsModal {...props} demoSurfaceMode={false} />);
-
-    expect(screen.getByRole('button', { name: 'Demo Mode Off' })).toHaveAttribute('aria-pressed', 'false');
-  });
-
-  it('renders the demo mode toggle in the signed-in top-level settings row without duplicating it in the config body', () => {
-    const setDemoSurfaceMode = jest.fn();
+  it('shows Config, Session and Explainers, and no Demo Mode, in the signed-in quick controls', () => {
     const subject = buildWrongNetworkSubject({ aiSettingsOpen: true });
-    subject.props = {
-      ...subject.props,
-      demoSurfaceMode: true,
-      setDemoSurfaceMode,
-    };
 
     render(subject.getSettingsDisplay());
 
-    const demoToggle = screen.getByRole('button', { name: 'Demo Mode On' });
-    expect(demoToggle).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getAllByRole('button', { name: 'Demo Mode On' })).toHaveLength(1);
-
-    fireEvent.click(demoToggle);
-
-    expect(setDemoSurfaceMode).toHaveBeenCalledTimes(1);
-    expect(setDemoSurfaceMode).toHaveBeenCalledWith(false);
+    const cells = Array.from(screen.getByTestId('ce-settings-quick-controls').children);
+    expect(cells).toHaveLength(3);
+    expect(within(cells[0]).getByRole('button', { name: /Config/ })).toBeInTheDocument();
+    expect(within(cells[2]).getByRole('button', { name: /Explainers/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Demo Mode/ })).not.toBeInTheDocument();
   });
 
   it('renders the pre-login AI settings subsection with both provider key inputs and the Anthropic hint', async () => {

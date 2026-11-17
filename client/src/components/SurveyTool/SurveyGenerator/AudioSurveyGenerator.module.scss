@@ -72,36 +72,6 @@ $input-border: var(--ce-input-border);
     gap: 14px;
   }
 
-  .viewModeToolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-
-  .viewModeCheckbox {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    margin: 0;
-    padding: 9px 12px;
-    border-radius: var(--ce-radius-pill);
-    background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-    color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
-    font-size: 0.95rem;
-    font-weight: 600;
-
-    input {
-      width: 16px;
-      height: 16px;
-      margin: 0;
-      accent-color: var(--ce-action-accent);
-      cursor: pointer;
-    }
-  }
-
   .viewModeContent {
     display: flex;
     flex-direction: column;
@@ -1221,13 +1191,5 @@ $input-border: var(--ce-input-border);
     line-height: 1.2;
     opacity: 1;
     pointer-events: none;
-  }
-}
-
-@container ce-theme style(--ce-layout-profile: minimal-app) {
-  .databaseTool .viewModeCheckbox {
-    background: var(--ce-control-face);
-    color: var(--ce-control-text);
-    border-color: transparent;
   }
 }

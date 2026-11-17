@@ -294,8 +294,8 @@ The runtime theme smoke opens the complete question generator on desktop and
 mobile and checks its visible control/text pairs at 4.5:1.
 
 When the bundled-theme selector is enabled, signed-in Settings exposes it
-directly beneath the equal 2×2 Config, Session, Explainers, and Demo Mode quick
-controls. At phone widths up to 480px, these controls stack into full-width rows
+directly beneath the Config, Session, and Explainers quick controls: Config and
+Session share a row and Explainers takes the row below. At phone widths up to 480px, these controls stack into full-width rows
 so the Session dropdown remains readable. Signed-out Settings keeps it at the
 end of the panel, below Config. This selector changes the complete app theme; it
 is separate from a session's curated color scheme and does not accept arbitrary
@@ -546,11 +546,11 @@ sizes so content, artwork, and the bottom controls cannot overlap or escape the
 frame.
 
 For Minimal Explorer tab labels, session choice-state contrast, clear control, centered title with timed fade, report
-readability, and login-size regression smoke, start a local server with demo surfaces
-enabled and run `BASE_URL=http://127.0.0.1:3000 npm run ai:test-theme:civic`.
-The smoke covers desktop and mobile Explorer cards and all five expanded tools,
-including the eight Context corpus categories, Risk Matrix details, and Debate Atlas
-circle/tree/list views and expanded historical-case briefs with question previews.
+readability, and login-size regression smoke, start a local server with demo sessions
+shown and run `BASE_URL=http://127.0.0.1:3000 npm run ai:test-theme:civic`.
+The smoke covers desktop and mobile Explorer cards and the three expanded tools,
+including the Context tool's session document view, and, on the atlas's own page,
+Debate Atlas circle/tree/list views and expanded historical-case briefs with question previews.
 Stats checks cover the expanded participant list, detail dialogs, group filters,
 session scope labels, session filters and clearing, and session totals, links, and keyboard scrolling through
 the directory. About checks cover the hero title and copy against the rendered panel

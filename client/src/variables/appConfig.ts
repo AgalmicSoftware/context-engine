@@ -25,10 +25,6 @@ export const DEFAULT_AUTO_REQUEST_TESTNET_FUNDS = readPublicBoolEnv(
   'REACT_APP_DEFAULT_AUTO_REQUEST_TESTNET_FUNDS',
   true,
 );
-// Default first-run value of `state.demoSurfaceMode`. If a user has a
-// stored `ce:demoSurfaceMode` preference in localStorage, that wins;
-// fresh installs / no-storage cases honor this env default.
-export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT', false);
 // Bundled runtime theme selected when no explicit user preference is stored.
 // Unknown values fall back to Minimal (`civic`) in the theme registry.
 export const CE_DEFAULT_THEME = readPublicEnv('REACT_APP_CE_DEFAULT_THEME', 'civic');

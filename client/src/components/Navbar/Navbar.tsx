@@ -31,8 +31,6 @@ const getInternalNavigationTarget = (target: string) => {
 };
 
 type NavbarProps = {
-  demoMode?: unknown;
-  toggleDemoMode?: (demoModeOn: boolean) => void;
   loginComplete?: boolean;
   loginInProgress?: boolean;
   provider?: string | null;
@@ -94,8 +92,6 @@ export class Navbar extends Component<NavbarProps> {
           </div>
           <div id={styles.accountSection}>
             <AccountSection
-              demoMode={this.props.demoMode}
-              toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
               loginComplete={this.props.loginComplete}
               loginInProgress={this.props.loginInProgress}
               provider={this.props.provider}
@@ -126,8 +122,6 @@ export class Navbar extends Component<NavbarProps> {
               loginComplete={this.props.loginComplete}
               loginInProgress={this.props.loginInProgress}
               sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
-              demoMode={this.props.demoMode}
-              toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
               sessionConfig={this.props.sessionConfig}
             />
           </div>

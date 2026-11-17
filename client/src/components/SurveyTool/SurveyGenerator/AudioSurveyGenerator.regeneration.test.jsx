@@ -55,7 +55,7 @@ afterEach(() => jest.restoreAllMocks());
 
 const firstGeneration = async (edited = true) => {
   callAI.mockResolvedValueOnce(batch('Original'));
-  render(<SurveyGenerator account="" loginComplete={false} demoSurfaceMode={false} />);
+  render(<SurveyGenerator account="" loginComplete={false} />);
   fireEvent.change(screen.getByLabelText('Source text'), { target: { value: source } });
   generate();
   await screen.findByDisplayValue('Original question 1?');
@@ -142,7 +142,7 @@ it('checks edits made while a replacement request is pending', async () => {
 });
 
 it('requires a selected question type before a request can start', () => {
-  render(<SurveyGenerator account="" loginComplete={false} demoSurfaceMode={false} />);
+  render(<SurveyGenerator account="" loginComplete={false} />);
   fireEvent.change(screen.getByLabelText('Source text'), { target: { value: source } });
   fireEvent.click(screen.getByText('Binary', { exact: true }));
   fireEvent.click(screen.getByText('Multichoice', { exact: true }));
@@ -164,14 +164,7 @@ it('uses the one selected type for both the prompt and the resulting questions',
       ],
     }),
   );
-  render(
-    <SurveyGenerator
-      account=""
-      loginComplete={false}
-      demoSurfaceMode={false}
-      onQuestionsGenerated={onQuestionsGenerated}
-    />,
-  );
+  render(<SurveyGenerator account="" loginComplete={false} onQuestionsGenerated={onQuestionsGenerated} />);
   fireEvent.change(screen.getByLabelText('Source text'), { target: { value: source } });
   fireEvent.click(screen.getByText('Multichoice', { exact: true }));
   generate();
@@ -183,7 +176,7 @@ it('uses the one selected type for both the prompt and the resulting questions',
 
 it('explains when a model response has no usable questions', async () => {
   callAI.mockResolvedValueOnce(JSON.stringify({ questions: [{ prompt: ' ', questionType: 'binary' }] }));
-  render(<SurveyGenerator account="" loginComplete={false} demoSurfaceMode={false} />);
+  render(<SurveyGenerator account="" loginComplete={false} />);
   fireEvent.change(screen.getByLabelText('Source text'), { target: { value: source } });
   generate();
   expect(

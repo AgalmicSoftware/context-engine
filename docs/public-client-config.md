@@ -489,11 +489,6 @@ not returned by these configuration or presence reads.
     (`Group`, `Collect`, `Account`) or crypto-native (`SBT`, `Mint`, `Wallet`) terms.
   - Supported values: `plain` (default), `crypto`
 
-- `REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT=false`
-  - Sets the first-run default for `demoSurfaceMode`, which controls the surface-level demo affordances.
-  - Stored `ce:demoSurfaceMode` localStorage preferences win over this setting.
-  - This only takes effect on fresh installs or when no stored preference exists.
-
 - `REACT_APP_CE_DEMO_SESSION_SLUGS=demo-sh,demo-1,demo-3,demo-2,demo`
   - Sets the ordered list of session slugs that receive public demo-session affordances.
   - The About page's Demo button doesn't use this list: unless a list-scoped session is selected,

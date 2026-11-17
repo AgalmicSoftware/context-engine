@@ -22,10 +22,7 @@ describe('ToolExplorer sparse card layout', () => {
     );
   });
 
-  it('uses UserPage-style neutral depth and scopes status borders to demo mode', () => {
-    expect(scss).toMatch(
-      /\.explorerCol\s*{[\s\S]*?&\.statusBorderEnabled[\s\S]*?border:\s*4px solid color-mix\(in srgb,\s*var\(--ce-action-accent\) 78%,\s*transparent\);/,
-    );
+  it('uses UserPage-style neutral depth', () => {
     expect(scss).toMatch(
       /\.square\s*{[\s\S]*?border-color:\s*var\(--ce-tool-card-border\);[\s\S]*?border-width:\s*var\(--ce-border-control-width\);[\s\S]*?background:\s*var\(--ce-surface-alt\);[\s\S]*?box-shadow:\s*var\(--ce-tool-card-shadow\);/,
     );
