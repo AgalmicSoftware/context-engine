@@ -73,6 +73,65 @@ describe('questionRouting session query helpers', () => {
   });
 });
 
+describe('question links for Worker-run sessions', () => {
+  const remember = (slug: string, origins: string[]) =>
+    localStorage.setItem(
+      'ce:sessionWorkerConfigCache:v1',
+      JSON.stringify({
+        v: 3,
+        bySession: Object.fromEntries(
+          origins.map((workerOrigin, index) => [
+            `record-${index}`,
+            {
+              slug,
+              sessionIdHex: `0x${String(index + 1).repeat(32)}`,
+              registryChainId: 0,
+              authorityMode: 'worker_canonical',
+              workerOrigin,
+              config: { corsWorkerUrl: workerOrigin },
+              canonicalConfig: { slug },
+            },
+          ]),
+        ),
+      }),
+    );
+  const openPage = (search: string) => window.history.replaceState({}, '', `/s/unlisted-room${search}`);
+  const WORKER = 'https://unlisted-room.example';
+  afterEach(() => {
+    localStorage.clear();
+    openPage('');
+  });
+
+  it('keeps the Worker of a page opened with worker= when this browser verified it for the linked session', () => {
+    remember('unlisted-room', [WORKER]);
+    openPage(`?worker=${encodeURIComponent(WORKER)}`);
+    expect(buildQuestionRoutePath('0xABC', { sessionSlug: 'unlisted-room' })).toBe(
+      '/question/0xabc?session=unlisted-room&worker=https%3A%2F%2Funlisted-room.example',
+    );
+  });
+
+  it('adds no Worker from memory alone, so a registry session by the same name keeps a clean link', () => {
+    remember('unlisted-room', [WORKER]);
+    expect(buildQuestionRoutePath('0xABC', { sessionSlug: 'unlisted-room' })).toBe(
+      '/question/0xabc?session=unlisted-room',
+    );
+  });
+
+  it("does not lend the page's Worker to another session's link", () => {
+    remember('unlisted-room', [WORKER]);
+    openPage(`?worker=${encodeURIComponent(WORKER)}`);
+    expect(buildQuestionRoutePath('0xABC', { sessionSlug: 'other-room' })).toBe('/question/0xabc?session=other-room');
+    expect(buildQuestionRoutePath('0xABC', { sessionSlug: '' })).toBe('/question/0xabc?session=general');
+    expect(buildQuestionRoutePath('0xABC')).toBe('/question/0xabc');
+  });
+
+  it('keeps a listed session link clean', () => {
+    remember('eddy26', ['https://elsewhere.example']);
+    openPage(`?worker=${encodeURIComponent('https://elsewhere.example')}`);
+    expect(buildQuestionRoutePath('0xABC', { sessionSlug: 'eddy26' })).toBe('/question/0xabc?session=eddy26');
+  });
+});
+
 describe('questionRouting helper regressions', () => {
   it('retries masked question refresh after login readiness changes', () => {
     const shouldRetry = shouldRetryMaskedQuestionRefresh({

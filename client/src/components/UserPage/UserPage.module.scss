@@ -272,6 +272,38 @@ $icon-size-standard: 1.25rem;
   }
 }
 
+/* Says where a name typed in the header is kept; the address text's colour keeps its contrast. */
+.usernameHint {
+  margin-left: 8px;
+  color: $user-page-text-color;
+  font-size: 0.875rem;
+}
+
+/* Read by screen readers, not shown. */
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Marks a label you gave someone else's account, so it isn't read as their own name. */
+.privateLabelTag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: var(--ce-radius-6);
+  font-size: 0.875rem;
+  font-weight: 600;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 /* General error helper (used next to inline username) */
 .error {
   color: var(--ce-status-error);
@@ -650,8 +682,19 @@ $icon-size-standard: 1.25rem;
     padding: 5px;
   }
 
+  // The name, bookmarks link and username field wrap; the field takes its own line instead of running off the edge.
   .userInfo {
+    flex-wrap: wrap;
+    row-gap: 8px;
     margin-bottom: 6px;
+  }
+  .usernameInline {
+    flex: 1 1 100%;
+    margin-left: 0;
+    input {
+      width: 100%;
+      min-width: 0;
+    }
   }
   #userPageAddress {
     font-size: 1.75rem;

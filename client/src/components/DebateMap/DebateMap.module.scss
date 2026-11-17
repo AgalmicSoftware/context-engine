@@ -1321,6 +1321,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     max-width: 800px;
     width: 95%;
     max-height: calc(100vh - 48px);
+    max-height: calc(100dvh - 48px);
     overflow-y: auto;
     overscroll-behavior: contain;
     position: relative;
@@ -2886,15 +2887,32 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       height: 75vh;
     }
 
+    // Padding that adds up with the panel's height to the screen, so the overlay never scrolls the close away.
+    .modalOverlay {
+      padding: 16px 10px;
+    }
+
     .modalContent {
       width: 90%;
       height: auto;
       max-height: calc(100vh - 32px);
+      // vh counts the screen under a phone browser's bars; dvh is what shows.
+      max-height: calc(100dvh - 32px);
       border-radius: var(--ce-radius-12);
+      // The close button floats at the top right of the visible screen, which
+      // a phone's browser bars never cover, so the panel can always be left.
+      // The title gets its own line, so the vote controls never squeeze it away.
+      .modalHeader {
+        flex-wrap: wrap;
+        padding-right: 44px;
+        .titleSection {
+          flex-basis: 100%;
+        }
+      }
       .modalHeader .closeIcon {
         position: fixed;
-        bottom: 25px;
-        right: 25px;
+        top: calc(env(safe-area-inset-top, 0px) + 10px);
+        right: 10px;
         background: var(--ce-document-text);
         border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
         color: var(--ce-color-white);
@@ -3644,6 +3662,8 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
           z-index: 20;
           gap: 6px;
           margin: 0 -13px 12px;
+          // One line, with the close button at its right, on a phone too.
+          flex-wrap: nowrap;
           padding: 2px 2px 2px 6px;
           border-bottom: 0;
           box-shadow: 0 -3px 0 var(--ce-document-surface);
@@ -3651,6 +3671,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
           color: var(--ce-titlebar-text);
 
           .titleSection {
+            flex-basis: auto;
             gap: 6px;
           }
 

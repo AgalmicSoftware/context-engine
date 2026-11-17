@@ -17,8 +17,10 @@ const rulesOf = (file: string) =>
 const modalRules = rulesOf('assets/css/contextEngine.scss').filter(({ selectors }) =>
   /(^|[\s,])\.modal(-dialog[\w-]*|-content)?(?=$|[\s,.:>[])/.test(selectors),
 );
+const atlasRules = rulesOf('components/DebateMap/DebateMap.module.scss');
 // Modals that size their own overlay or dialog.
 const ownModalRules = [
+  ...atlasRules.filter(({ selectors }) => /\.modalContent$/.test(selectors)),
   ...rulesOf('components/About/AboutPage.module.scss').filter(({ selectors }) =>
     /\.recognitionModalDialog\b/.test(selectors),
   ),
@@ -36,7 +38,7 @@ const heightsOf = (body: string) =>
 it('finds the modal rules', () => {
   expect(modalRules.some(({ selectors }) => selectors === '.modal')).toBe(true);
   expect(modalRules.some(({ selectors }) => selectors === '.modal-dialog-centered')).toBe(true);
-  expect(ownModalRules.length).toBeGreaterThanOrEqual(3);
+  expect(ownModalRules.length).toBeGreaterThanOrEqual(5);
 });
 
 it('gives the modal overlay the visible screen height', () => {
@@ -62,4 +64,15 @@ it('centres a modal by its visible-height overlay, not a spacer that counts the 
   expect(modalRules.filter(({ selectors }) => /::before/.test(selectors)).map(({ selectors }) => selectors)).toEqual(
     [],
   );
+});
+
+it("keeps the atlas panel's phone close at the top of the visible screen, clear of the browser's bottom bar", () => {
+  const fixedClose = atlasRules.filter(
+    ({ selectors, body }) => /\.modalHeader \.closeIcon$/.test(selectors) && /position:\s*fixed/.test(body),
+  );
+  expect(fixedClose.length).toBeGreaterThan(0);
+  fixedClose.forEach(({ body }) => {
+    expect(body).toMatch(/(?<![\w-])top:/);
+    expect(body).not.toMatch(/(?<![\w-])bottom:/);
+  });
 });

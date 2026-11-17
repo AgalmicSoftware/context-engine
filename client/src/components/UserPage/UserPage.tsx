@@ -213,6 +213,10 @@ import { ethers } from 'ethers';
 const accountLog = createLogger('account');
 const CompareAddressSection = React.lazy(() => import('./CompareAddresses'));
 const USERPAGE_GATE_UNKNOWN_RETRY_MS = 30 * 1000;
+// A username is kept on this device. A passkey account on a Worker session has no chain network, so its name is
+// kept per address.
+const usernameStorageKey = (address: string, networkId: unknown): string =>
+  `userPageUsername_${networkId ? `${String(networkId)}_` : ''}${address.toLowerCase()}`;
 const USERPAGE_GATE_TERMINAL_RECHECK_MS = 60 * 1000;
 const USERPAGE_RESPONSE_PARSE_MEMO_LIMIT = 300;
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
@@ -1460,7 +1464,7 @@ class UserPage extends Component<any, any> {
       // focus the input when it shows (best-effort via microtask)
       setTimeout(() => {
         try {
-          const el = document.querySelector('input[aria-label="Set nickname"]') as HTMLInputElement | null;
+          const el = document.querySelector('input[aria-label="Private label"]') as HTMLInputElement | null;
           if (el) {
             el.focus();
             el.select();
@@ -1545,12 +1549,12 @@ class UserPage extends Component<any, any> {
 
   loadPersistedUsername = (): void => {
     const { viewAddress, account, network } = this.props;
-    if (account && viewAddress && network?.id && account.toLowerCase() === viewAddress.toLowerCase()) {
-      const networkID = network.id.toString();
+    if (account && viewAddress && account.toLowerCase() === viewAddress.toLowerCase()) {
       try {
-        const storedUsername = localStorage.getItem(`userPageUsername_${networkID}_${viewAddress.toLowerCase()}`);
-        if (storedUsername && this._isMounted) {
-          this.setState(buildUserPageUsernameLoadedStatePatch({ username: storedUsername }));
+        const storedUsername = localStorage.getItem(usernameStorageKey(viewAddress, network?.id));
+        // With nothing saved this clears the field, so cancelling a first edit drops the typed text.
+        if (this._isMounted) {
+          this.setState(buildUserPageUsernameLoadedStatePatch({ username: storedUsername ?? '' }));
         }
       } catch (error) {
         accountLog.error('Error loading username from localStorage:', error);
@@ -2853,18 +2857,8 @@ class UserPage extends Component<any, any> {
 
     if (account && viewAddress && account.toLowerCase() === viewAddress.toLowerCase()) {
       if (!this._isMounted) return;
-      if (!network?.id) {
-        this.setState({
-          ...buildUserPageUsernameErrorStatePatch({
-            usernameError: 'Cannot persist username: network information is missing.',
-          }),
-          isEditingUsername: true,
-        });
-        return;
-      }
-      const networkID = network.id.toString();
       try {
-        localStorage.setItem(`userPageUsername_${networkID}_${viewAddress.toLowerCase()}`, newUsernameToSet);
+        localStorage.setItem(usernameStorageKey(viewAddress, network?.id), newUsernameToSet);
       } catch (error) {
         accountLog.error('Error saving username to localStorage:', error);
         if (this._isMounted) {
@@ -3345,6 +3339,7 @@ class UserPage extends Component<any, any> {
     const {
       addressHref,
       addressLabel,
+      nicknameToUse,
       pendingNicknameForThis: pendingForThis,
       shouldLinkAddressLabel,
     } = resolveUserPageAddressDisplayState({
@@ -3558,6 +3553,7 @@ class UserPage extends Component<any, any> {
       <div className={rootClassName}>
         <UserPageHeader
           addressDisplay={addressDisplay}
+          addressIsPrivateLabel={!isOwner && !!nicknameToUse}
           analyzeButtonDisplayState={analyzeButtonDisplayState}
           avatarDisplayState={avatarDisplayState}
           bookmarkButtonDisplayState={bookmarkButtonDisplayState}

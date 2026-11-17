@@ -563,6 +563,7 @@ import {
   type SurveyQuestionsState,
 } from './surveyQuestionsTypes.js';
 import { createSurveyQuestionsRuntimeMethods } from './surveyQuestionsRuntimeMethods';
+import { SessionLoadStatus } from './SessionLoadStatus';
 
 const SurveyQuestionsInner = (
   props: SurveyQuestionsProps,
@@ -2180,11 +2181,7 @@ const SurveyQuestionsInner = (
       : renderDefaultSurveyQuestionsRoute();
   // The route can mount before its session config arrives. Keep all editing
   // surfaces (including pile strategies) behind the same draft identity check.
-  return !stateRef.current.displayAnswerMode && getDraftKey() === null ? (
-    <p role="status">Loading session...</p>
-  ) : (
-    route
-  );
+  return !stateRef.current.displayAnswerMode && getDraftKey() === null ? <SessionLoadStatus /> : route;
 };
 
 export const SurveyQuestions = React.forwardRef(SurveyQuestionsInner);

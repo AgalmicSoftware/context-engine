@@ -5,7 +5,10 @@
  *
  * Key exports: buildQuestionRoutePath, parseQuestionSessionSlugFromSearch, isMaskedQuestionPayload, hasQuestionDecryption, litReady
  */
+import { KNOWN_SESSIONS } from '../session/knownSessionsFile';
 import { normalizeSessionSlug as normalizeSlug } from '../session/sessionNaming.js';
+import { listRememberedWorkerCanonicalOrigins } from '../session/sessionWorkerConfigCache.js';
+import { readCurrentWorkerHint } from '../ui/currentWorkerHint';
 import {
   SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
   normalizeSessionStorageConfig,
@@ -183,6 +186,12 @@ export const buildQuestionRoutePath = (questionId: unknown, opts: QuestionRouteO
     params.set('sessionId', sessionId);
   }
   if (responder) params.set('responder', responder);
+  // An unlisted Worker-run session is found only through its Worker. A link built on a page opened with
+  // `worker=` keeps it when this browser verified that Worker for the linked session; listed sessions stay clean.
+  if (opts.sessionSlug != null && sessionSlug && !Object.hasOwn(KNOWN_SESSIONS, sessionSlug)) {
+    const worker = readCurrentWorkerHint();
+    if (worker && listRememberedWorkerCanonicalOrigins(sessionSlug).includes(worker)) params.set('worker', worker);
+  }
   return params.toString() ? `${base}?${params.toString()}` : base;
 };
 

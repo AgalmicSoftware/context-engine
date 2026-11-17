@@ -756,6 +756,8 @@ export const createSessionResponseHydrationController = (
           maybeCheckAllCachesReady();
           notifyBackgroundCompletion();
         },
+        markProgress: () =>
+          setResponseState((prev) => ({ questionResponsesNonce: Number(prev.questionResponsesNonce || 0) + 1 })),
         updateQuestionsCacheAtomic: (updater) =>
           host.updateQuestionsCacheAtomic(slug, (current) => updater(current) as QuestionCache),
         updateUserCacheAtomic: (updater) =>

@@ -70,6 +70,7 @@ type UserPageAvatarDisplayState = {
 
 type UserPageHeaderProps = {
   addressDisplay: React.ReactNode;
+  addressIsPrivateLabel?: boolean;
   analyzeButtonDisplayState: UserPageAnalyzeButtonDisplayState;
   avatarDisplayState: UserPageAvatarDisplayState;
   bookmarkButtonDisplayState: UserPageBookmarkButtonDisplayState;
@@ -104,8 +105,12 @@ type UserPageHeaderProps = {
   usernameErrorDisplayState: UserPageUsernameErrorDisplayState;
 };
 
+// A label set on someone else's account is only this browser's note, never their name.
+const PRIVATE_LABEL_NOTE = "Your private label for this account. Only you see it, on this device; it isn't their name.";
+
 const UserPageHeader = ({
   addressDisplay,
+  addressIsPrivateLabel = false,
   analyzeButtonDisplayState,
   avatarDisplayState,
   bookmarkButtonDisplayState,
@@ -152,13 +157,18 @@ const UserPageHeader = ({
         </div>
         <h1 id={styles.userPageAddress}>
           {addressDisplay}
+          {addressIsPrivateLabel && (
+            <span className={styles.privateLabelTag} title={PRIVATE_LABEL_NOTE}>
+              <span className={styles.visuallyHidden}>, </span>your label
+            </span>
+          )}
           {showPen && (
             <button
               onClick={onNicknameEdit}
               className={styles.copyButton}
               data-ce-control-appearance="frameless"
-              aria-label="Edit nickname"
-              title="Edit nickname"
+              aria-label="Edit private label"
+              title={PRIVATE_LABEL_NOTE}
             >
               <FontAwesomeIcon icon={faPen} />
             </button>
@@ -169,7 +179,7 @@ const UserPageHeader = ({
               className={styles.copyButton}
               data-ce-control-appearance="frameless"
               aria-label="Set username"
-              title="Set username"
+              title="Set username, saved on this device only"
             >
               <FontAwesomeIcon icon={faPen} />
             </button>
@@ -240,8 +250,9 @@ const UserPageHeader = ({
               onChange={onNicknameChange}
               onBlur={onNicknameBlur}
               onKeyDown={onNicknameKeyDown}
-              placeholder="set nickname"
-              aria-label="Set nickname"
+              placeholder="private label"
+              aria-label="Private label"
+              aria-describedby="ce-private-label-note"
               autoFocus
             />
             {nicknameEnteredIndicatorDisplayState.shouldRenderEnteredIndicator && (
@@ -250,13 +261,18 @@ const UserPageHeader = ({
                 className={styles.usernameCheck}
                 tabIndex={-1}
                 aria-hidden="true"
-                title="Nickname entered"
+                title="Label entered"
                 disabled
               >
                 <FontAwesomeIcon icon={faCheck} />
               </button>
             )}
           </div>
+        )}
+        {headerActionVisibility.showNicknameEditor && (
+          <span id="ce-private-label-note" className={styles.usernameHint}>
+            Only you see this, on this device
+          </span>
         )}
 
         {isOwner && isEditingUsername && (
@@ -269,6 +285,7 @@ const UserPageHeader = ({
               onKeyDown={onUsernameKeyDown}
               placeholder="set username"
               aria-label="Set username"
+              aria-describedby="ce-username-note"
               autoFocus
             />
             {usernameEnteredIndicatorDisplayState.shouldRenderEnteredIndicator && (
@@ -284,6 +301,11 @@ const UserPageHeader = ({
               </button>
             )}
           </div>
+        )}
+        {isOwner && isEditingUsername && (
+          <span id="ce-username-note" className={styles.usernameHint}>
+            Saved on this device only
+          </span>
         )}
       </div>
 

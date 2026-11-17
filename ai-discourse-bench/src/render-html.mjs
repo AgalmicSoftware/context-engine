@@ -4167,7 +4167,7 @@ export const renderHtmlReport = (inputReport) => {
     .tagExplorerEmpty { grid-column: 1 / -1; margin: 0; padding: 20px 0; color: rgba(244, 247, 255, 0.7); }
     .atlasIssueModalOverlay { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; overscroll-behavior: contain; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
     .atlasIssueModalOverlay[hidden] { display: none !important; }
-    .atlasIssueModalContent { position: relative; width: min(95%, 800px); max-height: calc(100vh - 48px); margin: 0 auto; padding: 30px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: var(--ce-radius-12); background: #111827; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); color: #f1f5f9; font-family: var(--ce-font-mono); }
+    .atlasIssueModalContent { position: relative; width: min(95%, 800px); max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); margin: 0 auto; padding: 30px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: var(--ce-radius-12); background: #111827; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); color: #f1f5f9; font-family: var(--ce-font-mono); }
     .atlasIssueModalContent:focus { outline: none; }
     .atlasIssueModalContent::-webkit-scrollbar { width: 8px; }
     .atlasIssueModalContent::-webkit-scrollbar-thumb { border-radius: var(--ce-radius-4); background: rgba(255, 255, 255, 0.2); }
@@ -4778,10 +4778,10 @@ export const renderHtmlReport = (inputReport) => {
       .debateMap .atlasViewContainer { height: 75vh; }
       .debateMap .topNodesOverlay { width: calc(100% - 40px); top: 60px; }
       .atlasIssueModalOverlay { padding: 16px 10px; }
-      .atlasIssueModalContent { width: 94%; max-height: calc(100vh - 32px); padding: 20px; }
-      .atlasIssueModalHeader { align-items: flex-start; }
+      .atlasIssueModalContent { width: 94%; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); padding: 20px; }
+      .atlasIssueModalHeader { align-items: flex-start; padding-right: 44px; }
       .atlasIssueModalTitle { font-size: 1.35rem; }
-      .atlasIssueModalClose { position: fixed; right: 25px; bottom: 25px; z-index: 2005; width: 50px; height: 50px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: var(--ce-radius-round); background: #1e293b; color: var(--ce-color-white); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
+      .atlasIssueModalClose { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); right: 10px; z-index: 2005; width: 50px; height: 50px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: var(--ce-radius-round); background: #1e293b; color: var(--ce-color-white); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
       .atlasIssueFindingGrid { grid-template-columns: 1fr; }
     }
     @media only screen and (min-width: 768px) and (max-width: 1024px) {

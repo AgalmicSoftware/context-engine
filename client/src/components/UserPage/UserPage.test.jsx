@@ -222,6 +222,50 @@ describe('UserPage clipboard helpers', () => {
 });
 
 describe('UserPage username editing', () => {
+  it("saves and reloads a passkey account's username without a chain network", () => {
+    const viewAddress = '0x00000000000000000000000000000000000000bb';
+    localStorage.removeItem(`userPageUsername_${viewAddress}`);
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    instance.state = { ...instance.state, username: 'Charlie', usernameError: '', isEditingUsername: true };
+
+    instance.setUsername();
+
+    expect(instance.state.usernameError).toBe('');
+    expect(instance.state.isEditingUsername).toBe(false);
+    expect(localStorage.getItem(`userPageUsername_${viewAddress}`)).toBe('Charlie');
+
+    const reloaded = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    reloaded.loadPersistedUsername();
+    expect(reloaded.state.username).toBe('Charlie');
+    localStorage.removeItem(`userPageUsername_${viewAddress}`);
+  });
+
+  it("keeps a chain account's username under its network", () => {
+    const viewAddress = '0x00000000000000000000000000000000000000CC';
+    const key = 'userPageUsername_84532_0x00000000000000000000000000000000000000cc';
+    localStorage.removeItem(key);
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: { id: 84532 } });
+    instance.state = { ...instance.state, username: 'Charlie', usernameError: '', isEditingUsername: true };
+
+    instance.setUsername();
+
+    expect(localStorage.getItem(key)).toBe('Charlie');
+    expect(localStorage.getItem('userPageUsername_0x00000000000000000000000000000000000000cc')).toBeNull();
+    localStorage.removeItem(key);
+  });
+
+  it('drops the typed text when a first edit is cancelled', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000dd';
+    localStorage.removeItem(`userPageUsername_${viewAddress}`);
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    instance.state = { ...instance.state, username: 'Half typed', isEditingUsername: true };
+
+    instance.cancelUsernameEdit();
+
+    expect(instance.state.isEditingUsername).toBe(false);
+    expect(instance.state.username).toBe('');
+  });
+
   it('keeps username editing open when local persistence fails', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const storageError = new Error('quota exceeded');

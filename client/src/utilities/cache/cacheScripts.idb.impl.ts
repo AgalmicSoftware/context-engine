@@ -23,6 +23,11 @@ const getStoreShape = (store: Partial<CacheIdbStore> = {}): CacheIdbStore => ({
   storeName: String(store.storeName || 'keyval'),
 });
 
+// A failed operation may mean a lost connection, which fails every later one too, so the next one reopens.
+const forgetDatabase = (identity: string, dbPromise: Promise<IDBDatabase>): void => {
+  if (dbPromises.get(identity) === dbPromise) dbPromises.delete(identity);
+};
+
 const getOrOpenDatabase = (store: Partial<CacheIdbStore>): Promise<IDBDatabase> => {
   const normalizedStore = getStoreShape(store);
   const identity = getStoreIdentity(normalizedStore);
@@ -49,6 +54,8 @@ const getOrOpenDatabase = (store: Partial<CacheIdbStore>): Promise<IDBDatabase> 
 
     request.onsuccess = () => {
       const db = request.result;
+      // WebKit can lose a connection, such as after iOS suspends the page: the next operation opens a new one.
+      db.onclose = () => forgetDatabase(identity, dbPromise);
       db.onversionchange = () => {
         try {
           db.close();
@@ -74,7 +81,12 @@ const runTransaction = async <T>(
   executeRequest: (objectStore: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T | undefined> => {
   const normalizedStore = getStoreShape(store);
-  const db = await getOrOpenDatabase(normalizedStore);
+  const dbPromise = getOrOpenDatabase(normalizedStore);
+  const db = await dbPromise;
+  const fail = (reject: (error: unknown) => void, error: unknown) => {
+    forgetDatabase(getStoreIdentity(normalizedStore), dbPromise);
+    reject(error);
+  };
 
   return new Promise((resolve, reject) => {
     let request: IDBRequest<T> | null = null;
@@ -84,10 +96,10 @@ const runTransaction = async <T>(
       request = executeRequest(objectStore);
 
       tx.oncomplete = () => resolve(request ? request.result : undefined);
-      tx.onerror = () => reject(tx.error || request?.error || new Error(`IndexedDB ${mode} failed`));
-      tx.onabort = () => reject(tx.error || request?.error || new Error(`IndexedDB ${mode} aborted`));
+      tx.onerror = () => fail(reject, tx.error || request?.error || new Error(`IndexedDB ${mode} failed`));
+      tx.onabort = () => fail(reject, tx.error || request?.error || new Error(`IndexedDB ${mode} aborted`));
     } catch (error) {
-      reject(error);
+      fail(reject, error);
     }
   });
 };
@@ -108,7 +120,12 @@ export const del = async (key: IDBValidKey, store?: Partial<CacheIdbStore>): Pro
 
 export const entries = async (store?: Partial<CacheIdbStore>): Promise<CacheIdbEntry[]> => {
   const normalizedStore = getStoreShape(store);
-  const db = await getOrOpenDatabase(normalizedStore);
+  const dbPromise = getOrOpenDatabase(normalizedStore);
+  const db = await dbPromise;
+  const fail = (reject: (error: unknown) => void, error: unknown) => {
+    forgetDatabase(getStoreIdentity(normalizedStore), dbPromise);
+    reject(error);
+  };
 
   return new Promise((resolve, reject) => {
     try {
@@ -125,14 +142,14 @@ export const entries = async (store?: Partial<CacheIdbStore>): Promise<CacheIdbE
       };
 
       cursorRequest.onerror = () => {
-        reject(cursorRequest.error || new Error('Failed to read IndexedDB entries'));
+        fail(reject, cursorRequest.error || new Error('Failed to read IndexedDB entries'));
       };
 
       tx.oncomplete = () => resolve(collected);
-      tx.onerror = () => reject(tx.error || cursorRequest.error || new Error('Failed to read IndexedDB entries'));
-      tx.onabort = () => reject(tx.error || cursorRequest.error || new Error('Failed to read IndexedDB entries'));
+      tx.onerror = () => fail(reject, tx.error || cursorRequest.error || new Error('Failed to read IndexedDB entries'));
+      tx.onabort = () => fail(reject, tx.error || cursorRequest.error || new Error('Failed to read IndexedDB entries'));
     } catch (error) {
-      reject(error);
+      fail(reject, error);
     }
   });
 };

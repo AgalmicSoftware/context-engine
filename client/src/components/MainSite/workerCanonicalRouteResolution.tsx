@@ -11,7 +11,7 @@ import {
 } from '../../domains/sessions/sessionConfig.js';
 import {
   getVerifiedWorkerCanonicalSessionBootstrap,
-  readSessionWorkerConfigCache,
+  listRememberedWorkerCanonicalOrigins,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
 import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection.js';
 import { KNOWN_SESSION_CONFIGS } from '../../utilities/session/knownSessionsFile';
@@ -287,17 +287,21 @@ export const resolveMainSiteGroupWorkerRoute = ({
     isRecord(sessionConfig) && normalizeSessionSlug(sessionConfig.slug) === slug ? sessionConfig : null;
   // An exact configured registry session takes precedence over old local hints.
   if (exactConfig && !claimsWorkerCanonicalAuthority(exactConfig)) return emptyWorkerRouteState();
-  const records = Object.values(readSessionWorkerConfigCache().bySession).filter(
-    (record) => record.authorityMode === 'worker_canonical' && normalizeSessionSlug(record.slug) === slug,
-  );
-  if (!exactConfig && records.length > 1) {
+  // A listed session's Worker comes from known-sessions.json, as the session page finds it, so a fresh visitor's
+  // link opens without `worker=`; the route then opens only the listed session ID.
+  const knownWorker =
+    exactConfig || !Object.hasOwn(KNOWN_SESSION_CONFIGS, slug)
+      ? null
+      : resolveTrustedBundledWorker(KNOWN_SESSION_CONFIGS[slug]);
+  const remembered = listRememberedWorkerCanonicalOrigins(slug);
+  if (!exactConfig && !knownWorker && remembered.length > 1) {
     return {
       ...emptyWorkerRouteState(),
       kind: 'error',
       error: 'Several Workers match this session. Open the original session link to choose the correct one.',
     };
   }
-  const origin = exactConfig?.corsWorkerUrl || (records.length === 1 ? records[0].workerOrigin : '');
+  const origin = exactConfig?.corsWorkerUrl || knownWorker?.origin || (remembered.length === 1 ? remembered[0] : '');
   if (!origin && !exactConfig) return emptyWorkerRouteState();
   // Persisted config is only a discovery hint. Every fresh page must fetch and
   // verify the Worker identity before rendering groups or authorizing actions.

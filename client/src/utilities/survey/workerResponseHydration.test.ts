@@ -5,8 +5,11 @@ import {
   loadWorkerResponses,
   mergeWorkerQuestionResponses,
   mergeWorkerUserResponses,
+  RESPONSE_BATCH_CONCURRENCY,
+  SIGNED_IN_READ_LIMIT_MS,
 } from './workerResponseHydration.js';
 import { hydrateWorkerCanonicalResponses, resolveWorkerResponseHydrationRun } from './workerResponseHydrationRuntime';
+import { WorkerSignInNeededError } from '../worker/workerAuth';
 
 const SESSION_ID = `0x${'5'.repeat(32)}`;
 const WORKER_URL = 'https://demo-sh-worker.example.test';
@@ -674,7 +677,7 @@ describe('answers with research material, which the Worker sends only to their a
   it('never asks anyone to sign on Results: without a token, it reads signed out and the answers still load', async () => {
     const readBlob = jest.fn(async (options: Record<string, any>) => {
       // No token held: a signed-in read that may not ask fails, as fetchWorkerWithAuth does.
-      if (options.preferAnonymous === false) throw new Error('Sign in to continue.');
+      if (options.preferAnonymous === false) throw new WorkerSignInNeededError();
       return workerRead(ADMIN)(options);
     });
     const rows = await loadWorkerResponses(
@@ -686,6 +689,91 @@ describe('answers with research material, which the Worker sends only to their a
     const signedIn = readBlob.mock.calls.filter(([options]) => options.preferAnonymous === false);
     expect(signedIn).toHaveLength(2);
     expect(signedIn.every(([options]) => options.prompt === false)).toBe(true);
+  });
+
+  it('retries a busy signed-in read signed in, so an admin still gets the research material', async () => {
+    let busy = true;
+    const readBlob = jest.fn(async (options: Record<string, any>) => {
+      if (options.preferAnonymous === false && busy) {
+        busy = false;
+        throw new Error('Storage read failed (503).');
+      }
+      return workerRead(ADMIN)(options);
+    });
+    const rows = await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account: ADMIN },
+      { listSessionStorageRefsPage: listPage, readSessionStorageBlob: readBlob },
+    );
+    expect(whole(rows)).toEqual({ [AUTHOR]: true, [OTHER]: true });
+    expect(readBlob.mock.calls.every(([options]) => options.preferAnonymous === false)).toBe(true);
+  });
+
+  it('reads signed out when a signed-in read never settles, so Results never wait forever', async () => {
+    jest.useFakeTimers();
+    try {
+      const readBlob = jest.fn((options: Record<string, any>) =>
+        // A silent sign-in that never answers holds the signed-in read open.
+        options.preferAnonymous === false ? new Promise<Response>(() => {}) : workerRead('')(options),
+      );
+      const loading = loadWorkerResponses(
+        { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account: ADMIN },
+        {
+          listSessionStorageRefsPage: listPage,
+          readSessionStorageBlob: readBlob,
+          readWorkerCapabilities: async () => ({ features: [] }) as any,
+        },
+      );
+      // Both signed-in reads have started and hang; only the limit can end them.
+      while (readBlob.mock.calls.length < 2) await jest.advanceTimersByTimeAsync(0);
+      await jest.advanceTimersByTimeAsync(SIGNED_IN_READ_LIMIT_MS);
+      const rows = await loading;
+      expect(whole(rows)).toEqual({ [AUTHOR]: false, [OTHER]: false });
+      expect(readBlob.mock.calls.filter(([options]) => options.preferAnonymous === undefined)).toHaveLength(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('pays the signed-in limit once a load, not once a batch', async () => {
+    jest.useFakeTimers();
+    try {
+      const listMany = async () => ({
+        // More batches than are read at once, so later batches start after the first ones gave up.
+        items: Array.from({ length: (RESPONSE_BATCH_CONCURRENCY + 2) * 100 }, (_, i) => ({
+          storageRef: { id: `ref-${i}` },
+          metadata: { responder: OTHER, createdAt: '2026-01-01T00:00:00Z' },
+        })),
+        cursor: null,
+        listComplete: true,
+      });
+      const readBatch = jest.fn(({ ids, preferAnonymous }: Record<string, any>) =>
+        preferAnonymous === false
+          ? new Promise<unknown[]>(() => {})
+          : Promise.resolve(
+              ids.map(() => ({ sessionSlug: 'demo-sh', sessionId: SESSION_ID, questionID: 'q1', answer: {} })),
+            ),
+      );
+      let settled = false;
+      const loading = loadWorkerResponses(
+        { sessionSlug: 'demo-sh', sessionConfig: adminConfig, account: ADMIN },
+        {
+          listSessionStorageRefsPage: listMany,
+          readSessionStorageBatch: readBatch,
+          readWorkerCapabilities: async () => ({ features: ['storage_read_batch_v1'] }) as any,
+        },
+      ).then((rows) => ((settled = true), rows));
+      while (!readBatch.mock.calls.length) await jest.advanceTimersByTimeAsync(0);
+      await jest.advanceTimersByTimeAsync(SIGNED_IN_READ_LIMIT_MS);
+      // The later batches read signed out at once, without waiting out the limit again.
+      for (let i = 0; i < 50 && !settled; i += 1) await jest.advanceTimersByTimeAsync(0);
+      expect(settled).toBe(true);
+      expect(await loading).toHaveLength((RESPONSE_BATCH_CONCURRENCY + 2) * 100);
+      expect(readBatch.mock.calls.filter(([options]) => options.preferAnonymous === false)).toHaveLength(
+        RESPONSE_BATCH_CONCURRENCY,
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('reads own answers signed in, so ticks restore on a fresh browser', async () => {
@@ -793,5 +881,235 @@ describe('answers with research material, which the Worker sends only to their a
     readBlob.mockClear();
     await refresh();
     expect(readBlob).not.toHaveBeenCalled();
+  });
+});
+
+describe('reading a large listing', () => {
+  const PAGES = RESPONSE_BATCH_CONCURRENCY + 4;
+  const ref = (n: number) => `ref-${n}`;
+  const listPage = async ({ cursor }: any) => {
+    const start = Number(cursor || 0);
+    return {
+      items: Array.from({ length: 100 }, (_, i) => ({
+        storageRef: { id: ref(start + i) },
+        metadata: { responder: `p-${start + i}`, createdAt: '2026-01-01T00:00:00Z' },
+      })),
+      cursor: String(start + 100),
+      listComplete: start + 100 >= PAGES * 100,
+    };
+  };
+  const payload = (id: string) => ({ sessionSlug: 'demo-sh', sessionId: SESSION_ID, questionID: 'q1', answer: id });
+  const batchDeps = (readSessionStorageBatch: any, listSessionStorageRefsPage: any = listPage) => ({
+    listSessionStorageRefsPage,
+    readSessionStorageBatch,
+    readWorkerCapabilities: async () => ({ features: ['storage_read_batch_v1'] }) as any,
+  });
+
+  it('starts reading before the listing ends, a few batches at once, and keeps listing order', async () => {
+    const pending: Array<{ ids: string[]; resolve: (value: unknown[]) => void }> = [];
+    let listed = 0;
+    let readsBeforeListingEnded = 0;
+    const listing = jest.fn(async (options: any) => {
+      const page = await listPage(options);
+      listed += 1;
+      return page;
+    });
+    const readBatch = jest.fn(
+      ({ ids }: any) =>
+        new Promise<unknown[]>((resolve) => {
+          if (listed < PAGES) readsBeforeListingEnded += 1;
+          pending.push({ ids, resolve });
+        }),
+    );
+    const progress: number[] = [];
+    const loading = loadWorkerResponses(
+      {
+        sessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+        onRows: (_rows, { loaded }) => progress.push(loaded),
+      },
+      batchDeps(readBatch, listing),
+    );
+    const settle = async () => {
+      for (let i = 0; i < 200; i += 1) await Promise.resolve();
+    };
+    await settle();
+    // The listing ran on while the first batches were in flight, and never more than the limit at once.
+    expect(listed).toBe(PAGES);
+    expect(readsBeforeListingEnded).toBeGreaterThan(0);
+    expect(pending).toHaveLength(RESPONSE_BATCH_CONCURRENCY);
+    // Finish the batches last first: rows still come back in listing order.
+    while (pending.length) {
+      const batch = pending.pop()!;
+      batch.resolve(batch.ids.map(payload));
+      await settle();
+    }
+    const rows = await loading;
+    expect(rows.map((row) => row.storageRefId)).toEqual(Array.from({ length: PAGES * 100 }, (_, i) => ref(i)));
+    expect(readBatch).toHaveBeenCalledTimes(PAGES);
+    expect(progress).toHaveLength(PAGES);
+    expect(Math.max(...progress)).toBe(PAGES * 100);
+  });
+
+  it('reads a failed batch once more and keeps its rows', async () => {
+    let failed = false;
+    const readBatch = jest.fn(async ({ ids }: any) => {
+      if (ids[0] === ref(300) && !failed) {
+        failed = true;
+        throw new Error('Storage read failed (503).');
+      }
+      return ids.map(payload);
+    });
+    const rows = await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: workerConfig },
+      batchDeps(readBatch),
+    );
+    expect(rows).toHaveLength(PAGES * 100);
+    expect(readBatch).toHaveBeenCalledTimes(PAGES + 1);
+  });
+
+  it('fails the load when a batch fails twice, without waiting on the rest of the listing', async () => {
+    const listing = jest.fn(listPage);
+    const readBatch = jest.fn(async ({ ids }: any) => {
+      if (ids[0] === ref(0)) throw new Error('Storage read failed (503).');
+      return ids.map(payload);
+    });
+    await expect(
+      loadWorkerResponses({ sessionSlug: 'demo-sh', sessionConfig: workerConfig }, batchDeps(readBatch, listing)),
+    ).rejects.toThrow('Storage read failed (503).');
+    expect(readBatch.mock.calls.filter(([options]) => options.ids[0] === ref(0))).toHaveLength(2);
+    expect(listing.mock.calls.length).toBeLessThan(PAGES);
+  });
+});
+
+describe('Results while a load runs', () => {
+  const row = (n: number) => ({
+    questionId: 'q1',
+    responder: `p-${n}`,
+    response: { sessionSlug: 'demo-sh', sessionId: SESSION_ID, questionID: 'q1', answer: n },
+    storageRefId: `ref-${n}`,
+    timestamp: n + 1,
+  });
+  const hydrate = (loadWorkerResponses: any) => {
+    let questions: any = {};
+    const seen: any[] = [];
+    const markProgress = jest.fn(() => seen.push(JSON.parse(JSON.stringify(questions.worker))));
+    const markReady = jest.fn();
+    const run = hydrateWorkerCanonicalResponses({
+      sessionSlug: 'demo-sh',
+      sessionConfig: workerConfig,
+      run: resolveWorkerResponseHydrationRun({ sessionConfig: workerConfig, sessionSlug: 'demo-sh' })!,
+      loadWorkerResponses,
+      getAccount: () => '',
+      getProviderLike: () => null,
+      getCurrentSessionConfig: () => workerConfig,
+      shouldAbort: () => false,
+      markLoading: () => {},
+      markReady,
+      markProgress,
+      createPersistenceError: (message) => new Error(message),
+      updateQuestionsCacheAtomic: async (update) => {
+        questions = update(questions);
+        return true;
+      },
+      updateUserCacheAtomic: async () => true,
+    });
+    return { run, seen, markProgress, markReady, worker: () => questions.worker };
+  };
+  const tick = async () => {
+    for (let i = 0; i < 20; i += 1) await Promise.resolve();
+  };
+
+  it('shows rows as they land, with how many are in hand, before the load ends', async () => {
+    jest.useFakeTimers();
+    try {
+      let finish: (rows: any[]) => void = () => {};
+      const { run, seen, markReady, worker } = hydrate(
+        ({ onRows }: any) =>
+          new Promise((resolve) => {
+            onRows([row(0)], { loaded: 1, listed: 3, listComplete: false });
+            finish = resolve;
+          }),
+      );
+      await jest.advanceTimersByTimeAsync(0);
+      await tick();
+      expect(markReady).not.toHaveBeenCalled();
+      expect(Object.keys(seen[0].questionResponses.q1)).toEqual(['p-0']);
+      expect(seen[0].workerResponseLoadProgress).toEqual({ loaded: 1, listed: 3, listComplete: false });
+      expect(seen[0].workerResponseHydrationStatus).toBe('loading');
+      finish([row(0), row(1), row(2)]);
+      await run;
+      expect(markReady).toHaveBeenCalledWith(false);
+      expect(Object.keys(worker().questionResponses.q1)).toEqual(['p-0', 'p-1', 'p-2']);
+      expect(worker().workerResponseLoadProgress).toBeUndefined();
+      expect(worker().workerResponseHydrationStatus).toBe('complete');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps an older answer first seen mid-load once its newer version is withdrawn', async () => {
+    let stored: Array<{ id: string; value: string; createdAt: string }> = [];
+    let questions: any = {};
+    const listPage = async () => ({
+      items: stored.map(({ id, createdAt }) => ({ storageRef: { id }, metadata: { responder: '0xp', createdAt } })),
+      cursor: null,
+      listComplete: true,
+    });
+    const readBlob = async ({ storageRef }: any) => {
+      // Slow enough that a mid-load merge runs before the load ends.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const found = stored.find(({ id }) => id === storageRef.id)!;
+      return new Response(
+        JSON.stringify({ questionId: 'q', sessionSlug: 'demo-sh', sessionId: SESSION_ID, answer: found.value }),
+      );
+    };
+    const hydrate = () =>
+      hydrateWorkerCanonicalResponses({
+        sessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+        run: resolveWorkerResponseHydrationRun({ sessionConfig: workerConfig, sessionSlug: 'demo-sh' })!,
+        loadWorkerResponses: (options) =>
+          loadWorkerResponses(options, { listSessionStorageRefsPage: listPage, readSessionStorageBlob: readBlob }),
+        getAccount: () => '',
+        getProviderLike: () => null,
+        getCurrentSessionConfig: () => workerConfig,
+        shouldAbort: () => false,
+        markLoading: () => {},
+        markReady: () => {},
+        markProgress: () => {},
+        createPersistenceError: (message) => new Error(message),
+        updateQuestionsCacheAtomic: async (update) => {
+          questions = update(questions);
+          return true;
+        },
+        updateUserCacheAtomic: async () => true,
+      });
+    stored = [{ id: 'r-b', value: 'newer', createdAt: '2026-10-02T00:00:00.000Z' }];
+    await hydrate();
+    expect(questions.worker.questionResponses.q['0xp'].answer).toBe('newer');
+    // The newer version is withdrawn and the older one, never read before, is what this reader can see now.
+    stored = [{ id: 'r-a', value: 'older', createdAt: '2026-10-01T00:00:00.000Z' }];
+    await hydrate();
+    expect(questions.worker.questionResponses.q['0xp'].answer).toBe('older');
+  });
+
+  it('marks a failed load so Results offer a retry, keeping the rows that landed', async () => {
+    jest.useFakeTimers();
+    try {
+      const { run, markProgress, markReady, worker } = hydrate(async ({ onRows }: any) => {
+        onRows([row(0)], { loaded: 1, listed: 3, listComplete: true });
+        await jest.advanceTimersByTimeAsync(0);
+        throw new Error('Storage read failed (503).');
+      });
+      await expect(run).rejects.toThrow('Storage read failed (503).');
+      expect(markReady).not.toHaveBeenCalled();
+      expect(markProgress).toHaveBeenCalled();
+      expect(worker().workerResponseHydrationStatus).toBe('failed');
+      expect(worker().workerResponseLoadProgress).toBeUndefined();
+      expect(Object.keys(worker().questionResponses.q1)).toEqual(['p-0']);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

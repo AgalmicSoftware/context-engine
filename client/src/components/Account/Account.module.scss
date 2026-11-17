@@ -2278,6 +2278,19 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   font-weight: 700;
 }
 
+.agentHandoffToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .agentHandoffChoices {
   display: flex;
   gap: 8px;

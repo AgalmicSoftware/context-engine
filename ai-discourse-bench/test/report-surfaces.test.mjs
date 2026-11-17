@@ -80,6 +80,10 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.doesNotMatch(html, /href="\/tag\//);
   assert.match(html, /body\[data-ce-atlas-modal-open="true"\] \{ overflow: hidden; \}/);
   assert.match(html, /\.atlasIssueModalOverlay \{ position: fixed; inset: 0; z-index: 2000;/);
+  // On a phone the close floats at the top right of the visible screen, clear of the browser's bottom bar.
+  assert.match(html, /\.atlasIssueModalClose \{ position: fixed; top: calc\(env\(safe-area-inset-top, 0px\) \+ 10px\); right: 10px;/);
+  assert.doesNotMatch(html, /\.atlasIssueModalClose \{[^}]*bottom: 25px/);
+  assert.match(html, /\.atlasIssueModalContent \{ width: 94%; max-height: calc\(100vh - 32px\); max-height: calc\(100dvh - 32px\);/);
   assert.match(html, /--topic-mobile-font-size:[0-9.]+px;/);
   assert.match(html, /\.debateMap \.atlasNode\.packedAtlasNode \.packedNodeLabel \{ font-size: var\(--topic-mobile-font-size, 9px\) !important; line-height: 1\.04; letter-spacing: 0; overflow-wrap: normal; word-break: normal; hyphens: none; \}/);
   assert.doesNotMatch(html, /\.debateMap \.atlasNode\.packedAtlasNode \.packedNodeLabel \{ overflow-wrap: anywhere; \}/);

@@ -695,7 +695,7 @@ const CompareAddress = ({
 
     if (walletId) {
       const shortened = String(getShortenedAddress(walletId, false) || '').replace('...', '…');
-      const title = nickname ? `${nickname} (${shortened})` : shortened;
+      const title = nickname ? `${nickname} (${shortened}), your private label` : shortened;
       const blockieUrl = generateBlockieDataUrl(walletId.toLowerCase(), 8, 4);
       return (
         <div className={styles.youPill} title={title} aria-label={title}>
@@ -710,6 +710,7 @@ const CompareAddress = ({
             />
             <span>
               {nickname || shortened} {nickname && <span className={styles.pillAddress}>({shortened})</span>}
+              {nickname && <span className={styles.visuallyHidden}>, your private label</span>}
             </span>
           </span>
           <button

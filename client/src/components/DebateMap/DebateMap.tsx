@@ -1228,6 +1228,16 @@ const Modal = ({
     setQuestionsOpen(false);
   }, [content?.id, hasDefaultArguments]);
 
+  // Escape leaves the panel, as the close button and a tap outside it do.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented && !event.isComposing) onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
   const getUserAvatar = (username: string) =>
     getHistoricalFigureAvatarOrBlockie(username, {
       preferBlockie: false,
@@ -1822,7 +1832,15 @@ const Modal = ({
                     onChange={(e) => setVoteCount(e.target.value)}
                     placeholder="#"
                     min="0"
-                    onKeyDown={(e) => e.key === 'Enter' && handleCastVotes()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCastVotes();
+                      // Escape cancels the vote being typed, not the whole panel.
+                      if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setActiveVoteType(null);
+                        setVoteCount('');
+                      }
+                    }}
                   />
                   <button className={styles.confirmBtn} onClick={handleCastVotes}>
                     <FontAwesomeIcon icon={faCheck} />
@@ -1843,7 +1861,7 @@ const Modal = ({
 
           {/* Right: Close Control Only */}
           <div className={styles.modalControls}>
-            <button className={styles.closeIcon} onClick={onClose} title="Close">
+            <button type="button" className={styles.closeIcon} onClick={onClose} title="Close" aria-label="Close">
               <FontAwesomeIcon icon={faTimes} />
             </button>
           </div>
