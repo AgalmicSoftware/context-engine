@@ -3859,10 +3859,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// The transcript level with the microphone's circle, Discard level with its label.
+// The transcript level with the microphone's circle: the second row is as tall as Discard and its gap.
 .sessionInterviewSideActions {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) 52px;
   align-self: stretch;
   align-items: center;
   justify-items: start;
@@ -4030,12 +4030,15 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   border-radius: 50%;
 }
 
-// Discard sits right of the microphone, level with its label and set apart from it, in the danger tone.
+// Discard sits left of the microphone, level with its label and set apart from it, in the danger tone.
 .sessionInterviewPanel .sessionInterviewDiscard {
   display: inline-flex;
-  grid-row: 2;
+  grid-row: 1;
+  grid-column: 1;
+  align-self: end;
+  justify-self: end;
   // Level with the label, which ends above the microphone's 10px bottom padding.
-  margin: 0 0 8px 16px;
+  margin: 0 16px 8px 0;
   padding: 0;
   border-radius: 50%;
   background: transparent !important;

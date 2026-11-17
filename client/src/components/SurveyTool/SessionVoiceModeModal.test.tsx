@@ -251,14 +251,14 @@ describe('SessionVoiceModeModal', () => {
     view.rerender(<SessionVoiceModeModal {...props} />);
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1);
-    // Discard sits right of the microphone and explains itself on hover, and to screen readers.
+    // Discard sits in the microphone's row, in its left column (SurveyTool.styles.test.ts checks the
+    // placement), and explains itself on hover, and to screen readers.
     const discard = screen.getByRole('button', { name: 'Discard interview' });
     const microphone = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
-    // With no transcript, Discard is alone in the column right of the microphone.
-    expect(discard.parentElement).toHaveClass('sessionInterviewSideActions');
-    expect(discard.parentElement?.children).toHaveLength(1);
-    expect(discard.parentElement?.parentElement).toContainElement(microphone);
-    expect(microphone.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(discard).toHaveClass('sessionInterviewDiscard');
+    expect(discard.parentElement).toHaveClass('sessionInterviewPrimaryAction');
+    expect(discard.parentElement).toBe(microphone.parentElement);
+    expect(document.querySelector('.sessionInterviewSideActions')).toBeNull();
     expect(document.querySelector('.modal-footer')).toBeNull();
     expect(discard).toHaveAccessibleDescription(/Responses you’ve submitted are kept\.$/);
     fireEvent.mouseOver(discard);

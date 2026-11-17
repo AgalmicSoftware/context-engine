@@ -190,12 +190,13 @@ describe('Interview layout', () => {
     return scss.slice(start, scss.indexOf('\n}', start));
   };
 
-  it('sets Discard apart in red, level with the microphone label, with the microphone centered', () => {
+  // Left of the microphone, away from a right thumb, so it is harder to press by accident.
+  it('sets Discard apart in red, left of the microphone and level with its label, with the microphone centered', () => {
     expect(rule('.sessionInterviewPrimaryAction')).toMatch(/grid-template-columns: 1fr minmax\(112px, 132px\) 1fr;/);
     const discard = rule('.sessionInterviewPanel .sessionInterviewDiscard');
-    expect(discard).toMatch(/grid-row: 2;/);
+    expect(discard).toMatch(/grid-row: 1;\s*grid-column: 1;\s*align-self: end;\s*justify-self: end;/);
     expect(discard).toMatch(/color: var\(--ce-status-danger-text\) !important;/);
-    expect(discard).toMatch(/margin: 0 0 8px 16px;/);
+    expect(discard).toMatch(/margin: 0 16px 8px 0;/);
   });
 
   it('keeps Share for research in the green box where it drops below the summary', () => {
