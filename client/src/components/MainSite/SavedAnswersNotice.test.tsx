@@ -57,10 +57,14 @@ it('counts the answers read so far, as Results does, while they load', () => {
     });
   progress(1200, 2000, false);
   const { rerender } = render(notice({}));
-  expect(screen.getByRole('status')).toHaveTextContent('Loading your saved answers... (1,200 of 2,000+ session answers read)');
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Loading your saved answers... (1,200 of 2,000+ session answers read)',
+  );
   progress(2000, 2000, true);
   rerender(notice({ signedIn: true }));
-  expect(screen.getByRole('status')).toHaveTextContent('Loading your saved answers... (2,000 of 2,000 session answers read)');
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Loading your saved answers... (2,000 of 2,000 session answers read)',
+  );
   act(() => {
     jest.advanceTimersByTime(SAVED_ANSWERS_SLOW_MS);
   });

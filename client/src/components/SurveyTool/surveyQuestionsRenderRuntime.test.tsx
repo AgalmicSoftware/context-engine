@@ -81,13 +81,15 @@ describe('surveyQuestionsRenderRuntime', () => {
     ['an unsaved answer', false, false, false],
     ['a single question', true, true, false],
   ])('marks a saved answer on %s', (_name, singleQuestionMode, saved, marked) => {
-    const isAnswerSaved = jest.fn(() => saved);
+    const isAnswerSaved = jest.fn((_questionId: string, _slice: object) => saved);
     const context = createContext({ isAnswerSaved });
     context.propsRef.current.singleQuestionMode = singleQuestionMode;
     const slice = { answers: { q1: { value: 'answer' } } };
     createSurveyQuestionsRenderRuntime(context).renderQuestion({ id: 'q1', type: 'text' }, 0, slice);
     // The card's footer, beside the comment button, carries the mark.
-    const display = jest.mocked(context.renderSurveyQuestionsFullQuestionDisplay).mock.calls[0][0];
+    const [[display]] = jest.mocked(context.renderSurveyQuestionsFullQuestionDisplay).mock.calls as unknown as [
+      [{ renderFullQuestionFooterIcons: (args: object) => unknown }],
+    ];
     display.renderFullQuestionFooterIcons({ surveyIndex: 2 });
     expect(context.renderFullQuestionFooterIcons).toHaveBeenCalledWith({ surveyIndex: 2, answerSaved: marked });
     if (!singleQuestionMode) expect(isAnswerSaved).toHaveBeenCalledWith('q1', slice);

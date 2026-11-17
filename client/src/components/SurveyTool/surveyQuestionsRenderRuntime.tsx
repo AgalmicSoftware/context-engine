@@ -106,8 +106,7 @@ export const createSurveyQuestionsRenderRuntime = (
       renderAdditionalLockControl: renderQuestionAdditionalLockControl,
       renderAnswerDecryptControl: renderQuestionFieldDecryptControl,
       renderFullQuestionCardShell: renderFullQuestionCardShell,
-      renderFullQuestionFooterIcons: (args: SurveyQuestionsLegacyRecord) =>
-        renderFullQuestionFooterIcons({ ...args, answerSaved }),
+      renderFullQuestionFooterIcons: (args: object) => renderFullQuestionFooterIcons({ ...args, answerSaved }),
       renderFullQuestionSliderSection: renderFullQuestionSliderSection,
       renderResponseInput: renderFullQuestionResponseInput,
       sliderOpen,
