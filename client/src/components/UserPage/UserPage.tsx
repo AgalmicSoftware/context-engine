@@ -1552,8 +1552,9 @@ class UserPage extends Component<any, any> {
     if (account && viewAddress && account.toLowerCase() === viewAddress.toLowerCase()) {
       try {
         const storedUsername = localStorage.getItem(usernameStorageKey(viewAddress, network?.id));
-        if (storedUsername && this._isMounted) {
-          this.setState(buildUserPageUsernameLoadedStatePatch({ username: storedUsername }));
+        // With nothing saved this clears the field, so cancelling a first edit drops the typed text.
+        if (this._isMounted) {
+          this.setState(buildUserPageUsernameLoadedStatePatch({ username: storedUsername ?? '' }));
         }
       } catch (error) {
         accountLog.error('Error loading username from localStorage:', error);
