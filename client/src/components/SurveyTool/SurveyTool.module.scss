@@ -6563,15 +6563,16 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
 .multichoiceQuestionContainer #multiChoice {
   font-size: 1rem;
-  flex: 0 0 auto;
+  // The space the pill above leaves, so the wrapped columns are not clipped at the bottom.
+  flex: 1 1 0;
   flex-direction: column;
   flex-wrap: wrap;
   justify-content: flex-start;
   align-content: flex-start;
   align-items: flex-start;
   gap: 14px 18px;
-  height: 100%;
-  min-height: 100%;
+  height: auto;
+  min-height: 0;
   // Leave room for the next wrapped column to peek into view as a scroll cue.
   width: 70%;
   max-width: 70%;
@@ -7608,6 +7609,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   .pileCardInner .multichoiceQuestionContainer #multiChoice {
     display: flex;
+    flex: 0 0 auto;
     flex-direction: column;
     flex-wrap: nowrap;
     gap: 8px;
