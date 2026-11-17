@@ -263,6 +263,8 @@ export const loadWorkerResponses = async (
   const idle = new Promise<void>((resolve) => {
     resolveIdle = resolve;
   });
+  const reportProgress = (rows: WorkerCanonicalResponseRow[]) =>
+    onRows?.(rows, { loaded: items.length - wantedCount + readCount, listed: items.length, listComplete });
   const settleIfIdle = () => {
     if (listingDone && active === 0 && (failure || next >= chunks.length)) resolveIdle();
   };
@@ -278,7 +280,7 @@ export const loadWorkerResponses = async (
     const rows = chunk.flatMap((read, index) => toRow(read, payloads[index]) || []);
     chunkRows[at] = rows;
     readCount += chunk.length;
-    onRows?.(rows, { loaded: items.length - wantedCount + readCount, listed: items.length, listComplete });
+    reportProgress(rows);
   };
   const pump = () => {
     const limit = batched ? RESPONSE_BATCH_CONCURRENCY : 1;
@@ -341,6 +343,8 @@ export const loadWorkerResponses = async (
       const pageItems = Array.isArray(page.items) ? page.items.filter(isRecord) : [];
       items.push(...pageItems);
       await queueReads(pageItems);
+      // Count each listed page too: rows already cached need no read, so a reload could otherwise count nothing.
+      if (!page.listComplete) reportProgress([]);
       if (page.listComplete) {
         listComplete = true;
         if (fromStart) {
