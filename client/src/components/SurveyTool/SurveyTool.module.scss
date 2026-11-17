@@ -7660,6 +7660,18 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   line-height: 1;
 }
 
+// The desktop rail is narrower than the word (64px in Classic 95): there the filled arrow alone marks the step.
+@media (min-width: 769px) {
+  .pileNav .pileNavArrow.pileNavArrowPrimary {
+    width: 44px;
+    padding: 0;
+  }
+
+  .pileNavNextLabel {
+    display: none;
+  }
+}
+
 // The portal keeps the backdrop out of transformed question-card stacking contexts.
 .pileActionBackdrop {
   position: fixed;
