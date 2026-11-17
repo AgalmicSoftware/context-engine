@@ -3,11 +3,17 @@ import {
   buildOneUseInvitesCsv,
   buildWorkerGroupInviteLink,
   buildWorkerGroupJoinCredentials,
+  buildWorkerGroupReadHeader,
   groupPasswordToken,
   makeOneUseInvites,
   workerGroupPasswordSigner,
 } from './workerGroupSecrets';
-import { hashOneUseSecret, workerGroupJoinStatement } from '../../../../shared/workerGroupJoin.mjs';
+import {
+  hashOneUseSecret,
+  parseWorkerGroupReadInvite,
+  workerGroupJoinStatement,
+  workerGroupReadStatement,
+} from '../../../../shared/workerGroupJoin.mjs';
 
 const sessionId = '0x11111111111111111111111111111111';
 const groupId = 'salon-2';
@@ -53,4 +59,21 @@ it('joins with a password’s signature, which only the password’s signer coul
   );
   expect(proof).not.toContain('river');
   await expect(buildWorkerGroupJoinCredentials({ token: 'inv:abc', sessionId, groupId, address })).resolves.toBeNull();
+}, 30_000);
+
+it('reads a private session with the password’s signature over the session and group, naming no one', async () => {
+  const header = await buildWorkerGroupReadHeader({
+    token: groupPasswordToken('river-stone-lamp-oak-tide'),
+    sessionId: sessionId.toUpperCase().replace('0X', '0x'),
+    groupId: groupId.toUpperCase(),
+  });
+  const parsed = parseWorkerGroupReadInvite(header);
+  expect(parsed?.groupId).toBe(groupId);
+  expect(ethers.utils.verifyMessage(workerGroupReadStatement({ sessionId, groupId }), parsed!.proof)).toBe(
+    await workerGroupPasswordSigner('river-stone-lamp-oak-tide', sessionId, groupId),
+  );
+  expect(header).not.toContain('river');
+  // A claim code is spent by joining, so it makes no read proof.
+  const [{ secret }] = await makeOneUseInvites(1);
+  await expect(buildWorkerGroupReadHeader({ token: secret, sessionId, groupId })).resolves.toBeNull();
 }, 30_000);

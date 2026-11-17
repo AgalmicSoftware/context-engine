@@ -14,6 +14,7 @@ import {
   normalizeWorkerUrl,
   noteWorkerAccessChanged,
 } from './workerAuth.js';
+import { forgetGroupReadHeader, saveGroupReadHeader } from './workerGroupReadProof';
 import { getCorsProxyUrlOrThrow } from './corsProxy.js';
 import { invalidateClientAuthGeneration } from '../session/clientAuthGeneration';
 import {
@@ -1306,6 +1307,44 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(global.fetch.mock.calls.map(([url]) => String(url))).not.toContain(
       'https://worker.example/storage/draft-text/delete',
     );
+  });
+
+  it('sends a private session’s invite proof signed out, and beside the bearer once signed in', async () => {
+    const proofHeader = `rxc:0x${'ab'.repeat(65)}`;
+    saveGroupReadHeader({
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'edge',
+      sessionId: '0xabc',
+      header: proofHeader,
+    });
+    try {
+      global.fetch = jest.fn(async () => jsonResp(200, { ok: true }));
+      await fetchWorkerWithAuth(
+        'https://worker.example/storage/list?resource=questions',
+        {},
+        { sessionSlug: 'edge', workerUrl: 'https://worker.example', anonymousOnly: true },
+      );
+      const signedOut = new Headers(global.fetch.mock.calls[0][1].headers);
+      expect(signedOut.get('X-CE-Group-Invite')).toBe(proofHeader);
+      expect(signedOut.get('Authorization')).toBeNull();
+
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+        .mockResolvedValueOnce(jsonResp(200, { token: 'token-a', exp: Math.floor(Date.now() / 1000) + 3600 }))
+        .mockResolvedValue(jsonResp(200, { ok: true }));
+      await fetchWorkerWithAuth(
+        'https://worker.example/storage/draft-text/delete',
+        { method: 'POST', body: '{"questionIds":["q1"]}' },
+        { sessionSlug: 'edge', workerUrl: 'https://worker.example' },
+      );
+      const [, init] = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/storage/draft-text/delete'));
+      const signedIn = new Headers(init.headers);
+      expect(signedIn.get('Authorization')).toMatch(/^Bearer /);
+      expect(signedIn.get('X-CE-Group-Invite')).toBe(proofHeader);
+    } finally {
+      forgetGroupReadHeader('https://worker.example', 'edge');
+    }
   });
 
   it('sends anonymous-first request with X-Group-Slug general for default session', async () => {

@@ -311,7 +311,7 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('"facts":[{"fact":"stated or inferred context"');
     expect(kickoff).toContain('the exact single-line JSON packet');
     expect(kickoff).toContain('Nothing is submitted;');
-    expect(kickoff).toContain('Markdown link labeled "Open prefilled interview"');
+    expect(kickoff).toContain('Markdown link labeled "Review your drafted answers"');
     expect(kickoff).toContain('never visible text or a code block');
     expect(kickoff.length).toBeLessThan(4100);
 

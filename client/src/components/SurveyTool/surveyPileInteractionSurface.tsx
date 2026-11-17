@@ -23,11 +23,19 @@ import {
 import PileQuestionActionMenu from './PileQuestionActionMenu';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { readGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
+
+// A private session's invite proof reads the questions signed out, as a QR guest does before signing in.
+const holdsInviteProof = (config: unknown): boolean => {
+  const { corsWorkerUrl, slug } = (config || {}) as { corsWorkerUrl?: unknown; slug?: unknown };
+  return !!readGroupReadHeader(String(corsWorkerUrl || ''), String(slug || ''));
+};
 
 export const requiresQuestionStorageLogin = (config: unknown, signedIn: boolean): boolean =>
   !signedIn &&
   usesCloudflareSessionStorage(config, { resource: 'questions' }) &&
-  !usesPublicReadCloudflareStorage(config, { resource: 'questions' });
+  !usesPublicReadCloudflareStorage(config, { resource: 'questions' }) &&
+  !holdsInviteProof(config);
 
 const ACTIVE_GREEN = 'var(--ce-status-success)';
 

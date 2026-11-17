@@ -2344,11 +2344,50 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   gap: 4px;
 }
 
+// A "?" here reads as a mark, not a button, so hovering it draws no square behind it.
+.agentHandoffHelp:hover {
+  background: transparent !important;
+  opacity: 0.75;
+}
+
+.agentHandoffCommandBox {
+  position: relative;
+  margin: 6px 0 8px;
+}
+
+// In the box's top corner, over the room the command leaves it.
+.agentHandoffCopy {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: var(--ce-radius-6);
+  box-shadow: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, currentColor 12%, transparent) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+  }
+}
+
 // Bootstrap colours code pink; commands here read as the panel's text.
 .agentHandoffCommand {
   display: block;
-  margin: 6px 0 8px;
-  padding: 8px 10px;
+  margin: 0;
+  padding: 8px 44px 8px 10px;
   border: 1px solid var(--ce-settings-border);
   border-radius: var(--ce-radius-6);
   background: var(--ce-settings-field-bg);

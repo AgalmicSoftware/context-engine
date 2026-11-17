@@ -11,8 +11,11 @@ import {
   parseGroupInviteToken,
   readWorkerGroupMemberCeiling,
   workerOffersGroupJoinChoices,
+  formatWorkerGroupReadInvite,
+  parseWorkerGroupReadInvite,
   workerGroupJoinStatement,
   workerGroupPasswordProblem,
+  workerGroupReadStatement,
 } from '../../shared/workerGroupJoin.mjs';
 
 const sessionId = '0x00112233445566778899AABBCCDDEEFF';
@@ -105,6 +108,30 @@ test('a password signs a join only for its session, group and address', async ()
     `ContextEngine.WorkerGroup.Join:1\nsession:${sessionId.toLowerCase()}\ngroup:${groupId}\naddress:${address}`,
   );
   await assert.rejects(keys.signerOf({ password: 'short', sessionId, groupId }));
+});
+
+test('a read proof names its session and group, no address, and joins no one', async () => {
+  const keys = createWorkerGroupPasswordKeys(ethers);
+  const password = 'river-stone-lamp-oak-tide';
+  const signer = await keys.signerOf({ password, sessionId, groupId });
+  assert.equal(
+    workerGroupReadStatement({ sessionId, groupId }),
+    `ContextEngine.WorkerGroup.Read:1\nsession:${sessionId.toLowerCase()}\ngroup:${groupId}`,
+  );
+  const proof = await keys.signRead({ password, sessionId, groupId });
+  assert.equal(ethers.utils.verifyMessage(workerGroupReadStatement({ sessionId, groupId }), proof), signer);
+  assert.notEqual(ethers.utils.verifyMessage(workerGroupReadStatement({ sessionId, groupId: 'other' }), proof), signer);
+  // It is not a join proof for anyone.
+  assert.notEqual(keys.recoverJoinSigner({ sessionId, groupId, address, proof }), signer);
+
+  const header = formatWorkerGroupReadInvite({ groupId, proof });
+  assert.equal(header, `${groupId}:${proof}`);
+  assert.deepEqual(parseWorkerGroupReadInvite(` ${header} `), { groupId, proof });
+  assert.deepEqual(parseWorkerGroupReadInvite(`Salon.2-a:${proof}`), { groupId: 'salon.2-a', proof });
+  for (const bad of ['', proof, `:${proof}`, `${groupId}:${proof.slice(0, -2)}`, `${groupId}:${proof}00`,
+    `-x:${proof}`, `a b:${proof}`, `${'a'.repeat(200)}:${proof}`, null, 7]) {
+    assert.equal(parseWorkerGroupReadInvite(bad), null, String(bad));
+  }
 });
 
 test('reads the session ceiling and the Worker capability', () => {

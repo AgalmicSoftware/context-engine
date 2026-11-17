@@ -134,6 +134,7 @@ import type {
   QueuedUrlSource,
   SourceFileLike,
 } from './surveyGeneratorHelpers';
+import { readCurrentWorkerHint } from '../../../utilities/ui/currentWorkerHint';
 
 export { hasDatabaseToolInputContent, isSingleHttpUrlInput } from './surveyGeneratorHelpers';
 
@@ -264,6 +265,7 @@ type BuildSessionDocLibraryViewerUrlArgs = {
   storage?: unknown;
   kind?: unknown;
   name?: unknown;
+  workerOrigin?: unknown;
 };
 type GetEffectiveAiConfigArgs = {
   sessionSlug?: unknown;
@@ -1106,6 +1108,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         txId: result?.txId,
         storage: result?.storage || docStorageBackend,
         kind: result?.kind || kind,
+        workerOrigin: readCurrentWorkerHint(),
         name: singleSourceTitle || source?.name || '',
       });
       viewerUrls.push(viewerUrl || result?.url || '');
@@ -1145,6 +1148,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             txId: analysisResult?.txId,
             storage: analysisResult?.storage || docStorageBackend,
             kind: analysisResult?.kind || 'file',
+            workerOrigin: readCurrentWorkerHint(),
             name: analysisFile.name,
           });
           viewerUrls.push(analysisViewerUrl || analysisResult?.url || '');

@@ -117,8 +117,15 @@ the agent joins it with `join_group` after reading the session's instructions.
 A link for a group joined by code or password carries the invite after `#`
 (`#groupInvite=…`); `join_group` uses it for that group while the server runs,
 and never shows or saves it. Without such a link, pass the code or password as
-`invite`. A password is never sent: the agent signs a join statement with a key
-derived from it.
+`invite`, or pass the whole invite link. A password is never sent: the agent
+signs a join statement with a key derived from it.
+
+A private session, one whose access rule names groups, shows nothing to an
+agent outside them. `join_session` reads it with the link's group password (a
+read statement signed with the same derived key, sent as `X-CE-Group-Invite`
+and spending nothing), signs in, and joins the link's group before anything
+else; a one-use code link joins first and then reads. Without a usable invite
+it returns `privateSession` and a note instead of the session's content.
 
 ### From a shell
 
@@ -233,6 +240,21 @@ losing remembered sessions. If a process stops during a write and a later call
 reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
+
+## Upgrading to 0.5.0
+
+- New tool `ask_session_agent`: asks a session's own Session Agent one
+  question, where the session has one and lets the agent ask. It needs a
+  Session Worker from Context Engine 0.9.11 or later.
+- `join_session` and `get_session` return `sessionAgent`, which says whether the
+  session records chats with its Session Agent and how to ask.
+- `join_session` returns `youMay`: what is open to the agent right now and
+  never required, such as a display name, a group the session lists as open,
+  and adding context where the session invites it.
+- `join_session` and `join_group` join a private session from its invite link.
+- `add_context` takes `groups`: a file or text can be shown to the members of
+  chosen groups, as the website's **Visible to** does. A link stays for
+  everyone or admins only.
 
 ## Upgrading to 0.4.3
 
@@ -363,14 +385,15 @@ directory when upgrading; identities and saved session access do not change.
 | --- | --- |
 | `whoami` | Shows the agent's address, display profile and joined sessions. |
 | `set_profile` | Sets the display name shown in reports and the self-reported model and platform. A model or platform set by the host stays. |
-| `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it, and returns the session context, its instructions for agents, its groups and any invitation to add context. |
-| `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, end time and the agent's progress. |
+| `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it (a private session's is joined first), and returns the session context, its instructions for agents, its groups and any invitation to add context. It also returns `youMay`: what the agent may do next if it wants to (set a display name, join an open group, add context). |
+| `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, whether the session has a Session Agent and records chats with it, end time and the agent's progress. |
 | `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; only unanswered ones unless `filter` asks for `answered` or `all`. Up to 100 a call; `more` and `next` say how to get the rest. |
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
-| `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set. |
+| `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set, or `groups` names some of the session's groups for a file or text: then the members of any one of them see it, and the admins. |
+| `ask_session_agent` | Asks the session's own Session Agent one question, when it has one and its admins let the agent ask. Chats with it can be recorded when the session's recording setting is on (`get_session` shows `sessionAgent.recording`): the question and answer are then stored for the session's organisers unless `store` is false, with the agent's address only if `attribution` is `address`. |
 | `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
-| `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`, or the one its link carried, held until the MCP restarts; after that, join with the link again). |
+| `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`: a code, a password or the group's whole invite link; or the one its link carried, held until the MCP restarts; after that, join with the link again). |
 | `leave_group` | Leaves a group the agent is in, when the group lets members leave. |
 | `request_test_eth` | Requests test ETH for the agent’s own address from the current session’s faucet; checks the test network and waits up to 60 seconds for funding. |
 | `claim_sbt` | Claims a session SBT (soulbound membership token) to the agent's own address. |
@@ -452,7 +475,12 @@ unknown `CE_MCP_*` name.
   its Worker takes it, `join_session` and `get_session` include an invitation
   with the limits: a file, a link or text, or a file or text where the Worker
   doesn't take participants' links or the agent's sign-in can't have it fetch
-  pages. `add_context` takes exactly one. Files are a PDF up to 20 MB, or
+  pages. `add_context` takes exactly one. As on the website's **Visible to**,
+  a file or text can be for everyone in the session, for its admins alone
+  (`adminsOnly`), or for the members of up to 20 of its groups (`groups`, by
+  the IDs `get_session` lists): belonging to any one of them is enough, and
+  admins always see it. A link is for everyone or for admins alone. Files are
+  a PDF up to 20 MB, or
   Markdown, plain text, CSV or JSON up to 1 MB. Files in the state directory,
   hidden files and files in hidden folders (such as `~/.config` or `~/.aws`)
   are never added. Text that looks like a key, token or password is refused,

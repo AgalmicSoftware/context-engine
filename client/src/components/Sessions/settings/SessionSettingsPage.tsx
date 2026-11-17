@@ -42,7 +42,10 @@ import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/sessio
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
 import {
   readWorkerCountsAiLimit,
+  readWorkerRunsWorkersAi,
+  readWorkerSessionAgentOptions,
   readWorkerKeepsDraftText,
+  readWorkerTakesDataNote,
   readWorkerReleaseLabel,
   readWorkerTakesFeedback,
 } from '../../../domains/worker/workerRelease';
@@ -227,12 +230,21 @@ const SessionSettingsPage = ({
   const [workerTakesFeedback, setWorkerTakesFeedback] = useState(false);
   // Whether it counts a separate AI daily limit; an older one would store the field and ignore it.
   const [workerCountsAiLimit, setWorkerCountsAiLimit] = useState(false);
+  const [workerRunsWorkersAi, setWorkerRunsWorkersAi] = useState(false);
+  // Whether it accepts the note on where research data goes; an older one would refuse the whole save.
+  // On-chain sessions save to the registry, which takes it.
+  const [workerTakesDataNote, setWorkerTakesDataNote] = useState(false);
+  // Which Session Agent options it accepts; an older one would refuse the whole save, so they aren't offered there.
+  const [workerAgentOptions, setWorkerAgentOptions] = useState({ recordChats: false, anyoneCanAsk: false });
   useEffect(() => {
     let stale = false;
     setWorkerRelease('');
     setWorkerKeepsDraftText(null);
     setWorkerTakesFeedback(false);
     setWorkerCountsAiLimit(false);
+    setWorkerRunsWorkersAi(false);
+    setWorkerTakesDataNote(false);
+    setWorkerAgentOptions({ recordChats: false, anyoneCanAsk: false });
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
       if (!stale) setWorkerRelease(release);
     });
@@ -244,6 +256,15 @@ const SessionSettingsPage = ({
     });
     void readWorkerCountsAiLimit(workerOrigin, sessionSlug, fetchImpl).then((counts) => {
       if (!stale) setWorkerCountsAiLimit(counts);
+    });
+    void readWorkerRunsWorkersAi(workerOrigin, sessionSlug, fetchImpl).then((runs) => {
+      if (!stale) setWorkerRunsWorkersAi(runs);
+    });
+    void readWorkerTakesDataNote(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
+      if (!stale) setWorkerTakesDataNote(takes);
+    });
+    void readWorkerSessionAgentOptions(workerOrigin, sessionSlug, fetchImpl).then((options) => {
+      if (!stale) setWorkerAgentOptions(options);
     });
     return () => {
       stale = true;
@@ -591,6 +612,7 @@ const SessionSettingsPage = ({
           workerHosted={!onChain}
           groupCeilingSupported={workerOffersGroupJoinChoices(saved)}
           draftTextSupported={workerKeepsDraftText !== false}
+          dataNoteSupported={onChain || workerTakesDataNote}
         />
         <SetupResultsSection
           {...section('results')}
@@ -654,6 +676,7 @@ const SessionSettingsPage = ({
           onToggle={() => setOpenSections((prev) => ({ ...prev, ai: !prev.ai }))}
           lockedReason={onChain || workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
           dailyLimit={!onChain && workerCountsAiLimit}
+          workersAi={!onChain && workerRunsWorkersAi}
           sessionAgent={
             onChain ? null : workerAnswersSessionAgent(saved) ? (
               <SetupSessionAgent
@@ -661,6 +684,8 @@ const SessionSettingsPage = ({
                 onChange={(next) => updateDraft(['sessionAgent'], next)}
                 groups={groups}
                 sbtChainId={usesSbtDefaults(draft) ? Number(saved?.networkChainId) || 0 : 0}
+                recordChatsSupported={workerAgentOptions.recordChats}
+                anyoneCanAskSupported={workerAgentOptions.anyoneCanAsk}
               />
             ) : (
               <p className={styles.hint} data-testid="ce-settings-session-agent-locked">

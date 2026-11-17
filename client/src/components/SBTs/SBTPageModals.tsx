@@ -9,6 +9,7 @@ import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { resolveSbtPageCopyIconState } from './sbtPageHelpers';
+import { withCurrentWorkerHint } from '../../utilities/ui/currentWorkerHint';
 
 type SbtPageHolderModalProps = {
   isOpen: boolean;
@@ -167,8 +168,10 @@ export const renderSbtPageHolderModal = ({
                   <div className={styles.userItemLeft}>
                     {blockieUrl ? <img src={blockieUrl} alt="" className={styles.userBlockie} /> : null}
                     <a
-                      href={buildPublicRoute(
-                        `/u/${address}${sessionSlug ? `?session=${encodeURIComponent(sessionSlug)}` : ''}`,
+                      href={withCurrentWorkerHint(
+                        buildPublicRoute(
+                          `/u/${address}${sessionSlug ? `?session=${encodeURIComponent(sessionSlug)}` : ''}`,
+                        ),
                       )}
                       target="_blank"
                       rel="noopener noreferrer"

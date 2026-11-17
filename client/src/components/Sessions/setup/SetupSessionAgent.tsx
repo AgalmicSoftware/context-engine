@@ -37,6 +37,14 @@ const minAnswersHelp = (min: number) =>
   `On: a Detailed answer to someone who isn’t an admin leaves out any question fewer than ${min} members ` +
   'answered. Off: a question only one member answered is used too, so that one person’s answer can come back as ' +
   '“the members’” view. Admins always get every question.';
+const RECORD_HELP =
+  'Adds a Store this chat box to the Session Agent. A chat is kept when the person asking leaves it ticked, from ' +
+  'now on, for this session’s organisers and in exports. Turning this off stops new ones; chats already stored ' +
+  'stay until an admin clears them in Admin.';
+const ANYONE_HELP =
+  'Lets people who haven’t signed in ask the Session Agent, where this session lets anyone sign in and an audience ' +
+  'takes everyone signed in. They get General answers only. At most 10 questions a day from one network address ' +
+  'and 300 a day in all, each using this session’s AI. Off, only signed-in people an audience admits can ask.';
 const MATCH_HELP = 'Any: people who meet at least one rule. All: only people who meet every rule.';
 const instructionsHelp = (style: string) =>
   `How ${STYLE_LABELS[style]} answers are written. Leave it blank for the default. Always added: answer only ` +
@@ -67,16 +75,28 @@ type Props = {
   groups: Array<{ groupId: string; label: string }>;
   /** The chain the session checks SBTs on, or 0 when it checks none. */
   sbtChainId?: number;
+  /** Whether the session's Worker accepts each option; an older one refuses the whole save. */
+  recordChatsSupported?: boolean;
+  anyoneCanAskSupported?: boolean;
 };
 
 // Off is no setting. Turning it on lets everyone signed in ask, with General
 // answers; an admin adds audiences, in order, and may rewrite each style's
 // instructions. The Worker checks who may ask and gathers what each style reads.
-const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): React.ReactElement => {
+const SetupSessionAgent = ({
+  value,
+  onChange,
+  groups,
+  sbtChainId = 0,
+  recordChatsSupported = true,
+  anyoneCanAskSupported = true,
+}: Props): React.ReactElement => {
   const on = !!value && typeof value === 'object';
   const audiences = readAudiences(value);
   const instructions = asRecord(asRecord(value).instructions);
   const { minAnswers } = asRecord(value);
+  const recordsChats = asRecord(value).history === true;
+  const signedOutMayAsk = asRecord(value).anyoneCanAsk !== false;
   // The number the rule holds while on: a stored one below the default, or the default.
   const skipUnder = typeof minAnswers === 'number' && minAnswers > 1 ? minAnswers : L.minAnswers;
   const problem = on ? describeSessionAgentProblem(value) : '';
@@ -84,12 +104,18 @@ const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): 
     next: Audience[],
     nextInstructions: Record<string, unknown> = instructions,
     nextMinAnswers: unknown = minAnswers,
+    nextRecordsChats: boolean = recordsChats,
+    nextSignedOutMayAsk: boolean = signedOutMayAsk,
   ) =>
     onChange({
       audiences: next,
       ...(Object.keys(nextInstructions).length ? { instructions: nextInstructions } : {}),
       // The default is stored as nothing.
       ...(nextMinAnswers === undefined || nextMinAnswers === L.minAnswers ? {} : { minAnswers: nextMinAnswers }),
+      // Off is stored as nothing too.
+      ...(nextRecordsChats ? { history: true } : {}),
+      // On is the default here, so only off is stored.
+      ...(nextSignedOutMayAsk ? {} : { anyoneCanAsk: false }),
     });
   const update = (index: number, change: (audience: Audience) => Audience) =>
     save(audiences.map((audience, at) => (at === index ? change(audience) : audience)));
@@ -323,6 +349,26 @@ const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): 
             testId="ce-setup-session-agent-min-answers"
             onChange={(checked) => save(audiences, instructions, checked ? L.minAnswers : 1)}
           />
+          {anyoneCanAskSupported ? (
+            <SetupCheck
+              id="ce-setup-session-agent-anyone"
+              label="Anyone can ask"
+              checked={signedOutMayAsk}
+              help={ANYONE_HELP}
+              testId="ce-setup-session-agent-anyone"
+              onChange={(checked) => save(audiences, instructions, minAnswers, recordsChats, checked)}
+            />
+          ) : null}
+          {recordChatsSupported ? (
+            <SetupCheck
+              id="ce-setup-session-agent-record-chats"
+              label="Record chats"
+              checked={recordsChats}
+              help={RECORD_HELP}
+              testId="ce-setup-session-agent-record-chats"
+              onChange={(checked) => save(audiences, instructions, minAnswers, checked)}
+            />
+          ) : null}
           {SESSION_AGENT_STYLES.map((style) => {
             const fieldId = `ce-setup-session-agent-${style}`;
             const written = instructions[style];

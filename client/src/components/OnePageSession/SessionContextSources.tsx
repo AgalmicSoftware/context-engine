@@ -1,20 +1,52 @@
-import { useId, useState } from 'react';
+import { Suspense, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faEye, faFileAlt, faPlus, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCaretDown,
+  faCaretRight,
+  faExternalLinkAlt,
+  faEye,
+  faFileAlt,
+  faFileCode,
+  faFileCsv,
+  faFilePdf,
+  faPlus,
+  faQuestionCircle,
+  type IconDefinition,
+} from '@fortawesome/free-solid-svg-icons';
 
 import { contextGroupsLabel } from '../Sessions/setup/ContextAccessPicker';
 import ContextSourcesPanel from '../Sessions/setup/ContextSourcesPanel';
 import SessionContextAddFile from './SessionContextAddFile';
 import SessionContextAddLink from './SessionContextAddLink';
+import SessionContextAddNote from './SessionContextAddNote';
 import setupStyles from '../Sessions/setup/SessionSetup.module.scss';
-import { contextAdderLabel, removeContextSource } from '../../utilities/docLibrary/contextSources';
+import {
+  contextAdderLabel,
+  contextDuplicateIds,
+  contextSourceDisplayTitle,
+  contextSourceKindLabel,
+  formatContextSize,
+  removeContextSource,
+  type ContextSource,
+} from '../../utilities/docLibrary/contextSources';
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth.js';
+import { readCurrentWorkerHint } from '../../utilities/ui/currentWorkerHint';
+import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { buildSessionDocLibraryViewerUrl } from '../../utilities/docLibrary/docUploadContracts';
 import { useContextGroups } from '../../utilities/docLibrary/useContextGroups';
 import type { SessionContextSourcesState } from '../../utilities/docLibrary/useSessionContextSources';
 import styles from './OnePageSession.module.scss';
+import css from './SessionContextSources.module.scss';
+
+// The previews and the viewer load only when someone first opens one.
+const ContextInlinePreview = lazyWithRetry(() =>
+  import('./SessionContextPreview').then((module) => ({ default: module.ContextInlinePreview })),
+);
+const ContextViewerModal = lazyWithRetry(() =>
+  import('./SessionContextPreview').then((module) => ({ default: module.ContextViewerModal })),
+);
 
 type Props = {
   sessionSlug: string;
@@ -26,19 +58,39 @@ type Props = {
   pageLinks: Array<{ label: string; url: string }>;
   /** The section header's spot for Add and View, as the Tool Explorer has them; without it they show here. */
   headerActionsSlot?: HTMLElement | null;
+  /** Opens the login, for someone signed out where they could add once logged in. */
+  onRequestLogin?: () => void;
 };
 
 const MY_GROUPS_HELP = 'Signs you in to this session, so it can show files locked to your groups, and your own.';
+const SIGN_IN_TO_ADD = 'Log in to add a file, a link or a note to this session.';
+
+const KIND_ICONS: Record<string, IconDefinition> = {
+  Link: faExternalLinkAlt,
+  PDF: faFilePdf,
+  CSV: faFileCsv,
+  JSON: faFileCode,
+};
 
 // The Context section's files and links: the ones this reader may open, who
 // added each, and for admins the controls that add, refresh and remove them.
-// Others may add files, and links where their Worker takes them, and remove
-// their own, unless the session limits that or has ended.
-// Add opens the form, or an admin's controls; View shows a signed-out
-// member their groups' files.
-const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, pageLinks, headerActionsSlot }: Props) => {
+// Others may add files and notes, and links where their Worker takes them, and
+// remove their own, unless the session limits that or has ended.
+// A file's caret shows its start in place; its name opens it in a dialog.
+// Add opens the form, an admin's controls, or for someone signed out the
+// login; View shows a signed-out member their groups' files.
+const SessionContextSources = ({
+  sessionSlug,
+  sessionConfig,
+  account,
+  list,
+  pageLinks,
+  headerActionsSlot,
+  onRequestLogin,
+}: Props) => {
   const isAdmin = list.isAdmin && list.supported;
   const canAddFile = !isAdmin && list.participantsCanAdd;
+  const signInToAdd = !isAdmin && list.signInToAdd && !!onRequestLogin;
   const groups = useContextGroups({
     sessionSlug,
     sessionConfig,
@@ -47,6 +99,8 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
   });
   const [removeError, setRemoveError] = useState('');
   const [adding, setAdding] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [viewing, setViewing] = useState<ContextSource | null>(null);
   const idBase = useId().replace(/:/g, '');
   const myGroupsHelpId = `ce-context-my-groups-help-${idBase}`;
   const addPanelId = `ce-context-add-${idBase}`;
@@ -64,6 +118,27 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
           <FontAwesomeIcon icon={faPlus} aria-hidden="true" />
           Add
         </button>
+      ) : null}
+      {signInToAdd ? (
+        <>
+          <button
+            type="button"
+            id={`${addPanelId}-login`}
+            className={`${setupStyles.button} ${styles.contextHeaderButton}`}
+            aria-describedby={`${addPanelId}-login-about`}
+            data-testid="ce-session-context-add"
+            onClick={onRequestLogin}
+          >
+            <FontAwesomeIcon icon={faPlus} aria-hidden="true" />
+            Add
+          </button>
+          <span id={`${addPanelId}-login-about`} hidden>
+            {SIGN_IN_TO_ADD}
+          </span>
+          <UncontrolledTooltip target={`${addPanelId}-login`} trigger="hover focus">
+            {SIGN_IN_TO_ADD}
+          </UncontrolledTooltip>
+        </>
       ) : null}
       {list.groupFilesHidden && groups.length > 0 ? (
         <>
@@ -108,6 +183,24 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
   const shown = list.sources.filter(
     (source) => !(source.kind === 'link' && pageLinks.some((link) => link.url === source.url)),
   );
+  const repeats = contextDuplicateIds(shown);
+  const reader = { sessionSlug, sessionConfig, account };
+  // An unlisted session's page is opened with its Worker, which its own pages need too.
+  const pageHref = (source: ContextSource) =>
+    buildSessionDocLibraryViewerUrl({
+      sessionToken: sessionSlug,
+      storageRef: source.id,
+      storage: 'cloudflare',
+      kind: 'file',
+      name: source.title,
+      workerOrigin: readCurrentWorkerHint(),
+    });
+  const toggle = (id: string) =>
+    setExpanded((open) => {
+      const next = new Set(open);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
   return (
     <>
       {headerActionsSlot ? (
@@ -121,24 +214,48 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
           aria-label="Files and links"
           data-testid="ce-session-context-sources"
         >
-          <div className={styles.sessionContextLinks}>
+          <ul className={css.items}>
             {shown.map((source) => {
-              const href =
-                source.kind === 'link'
-                  ? source.url
-                  : buildSessionDocLibraryViewerUrl({
-                      sessionToken: sessionSlug,
-                      storageRef: source.id,
-                      storage: 'cloudflare',
-                      kind: 'file',
-                      name: source.title,
-                    });
+              const title = contextSourceDisplayTitle(source);
+              const kind = contextSourceKindLabel(source);
+              const size = source.kind === 'file' ? formatContextSize(source.size) : '';
               const adder = contextAdderLabel(source, sessionConfig, account);
+              const isOpen = expanded.has(source.id);
+              const previewId = `ce-context-preview-${idBase}-${source.id}`;
               return (
-                <span key={source.id} className={styles.sessionContextItem}>
-                  <a href={href} target="_blank" rel="noopener noreferrer">
-                    <FontAwesomeIcon icon={source.kind === 'link' ? faExternalLinkAlt : faFileAlt} />
-                    <span>{source.title || source.url}</span>
+                <li key={source.id} className={css.item} data-testid="ce-session-context-item">
+                  <div className={css.itemHead}>
+                    {source.kind === 'file' ? (
+                      <button
+                        type="button"
+                        className={css.caret}
+                        aria-expanded={isOpen}
+                        aria-controls={previewId}
+                        aria-label={`Preview ${title}`}
+                        onClick={() => toggle(source.id)}
+                      >
+                        <FontAwesomeIcon icon={isOpen ? faCaretDown : faCaretRight} fixedWidth />
+                      </button>
+                    ) : (
+                      <span className={css.caretSpace} aria-hidden="true" />
+                    )}
+                    <FontAwesomeIcon icon={KIND_ICONS[kind] || faFileAlt} fixedWidth aria-hidden="true" />
+                    {source.kind === 'link' ? (
+                      <a className={css.title} href={source.url} target="_blank" rel="noopener noreferrer">
+                        {title}
+                      </a>
+                    ) : (
+                      <button type="button" className={css.title} onClick={() => setViewing(source)}>
+                        {title}
+                      </button>
+                    )}
+                  </div>
+                  <div className={css.itemMeta}>
+                    <span>{size ? `${kind}, ${size}` : kind}</span>
+                    {adder ? <span>Added by {adder}</span> : null}
+                    {/* Apart from the name, which an agent chooses. */}
+                    {source.addedByAgent ? <span className={styles.sessionContextBadge}>Agent</span> : null}
+                    {repeats.has(source.id) ? <span className={styles.sessionContextBadge}>Duplicate</span> : null}
                     {isAdmin && source.adminsOnly ? (
                       <span className={styles.sessionContextBadge}>Admins only</span>
                     ) : null}
@@ -147,31 +264,47 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
                         {contextGroupsLabel(source.lockedGroupIds, groups)}
                       </span>
                     ) : null}
-                  </a>
-                  {adder ? <span className={styles.sessionContextAdder}>Added by {adder}</span> : null}
-                  {!isAdmin && account && source.addedBy === account.toLowerCase() ? (
-                    <button
-                      type="button"
-                      className={styles.sessionContextRemove}
-                      aria-label={`Remove ${source.title || 'this file'}`}
-                      onClick={() => {
-                        if (!window.confirm(`Remove ${source.title || 'this file'} from the session?`)) return;
-                        setRemoveError('');
-                        removeContextSource(source, { sessionSlug, sessionConfig, context: { account } }).then(
-                          list.reload,
-                          (failure: unknown) =>
-                            setRemoveError(failure instanceof Error ? failure.message : 'It could not be removed.'),
-                        );
-                      }}
-                    >
-                      Remove
-                    </button>
+                    {!isAdmin && account && source.addedBy === account.toLowerCase() ? (
+                      <button
+                        type="button"
+                        className={styles.sessionContextRemove}
+                        aria-label={`Remove ${title}`}
+                        onClick={() => {
+                          if (!window.confirm(`Remove ${title} from the session?`)) return;
+                          setRemoveError('');
+                          removeContextSource(source, { sessionSlug, sessionConfig, context: { account } }).then(
+                            list.reload,
+                            (failure: unknown) =>
+                              setRemoveError(failure instanceof Error ? failure.message : 'It could not be removed.'),
+                          );
+                        }}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                  {isOpen ? (
+                    <div id={previewId} className={css.preview}>
+                      <Suspense fallback={<p className={css.previewStatus}>Loading…</p>}>
+                        <ContextInlinePreview source={source} {...reader} onOpen={() => setViewing(source)} />
+                      </Suspense>
+                    </div>
                   ) : null}
-                </span>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </section>
+      ) : null}
+      {viewing ? (
+        <Suspense fallback={null}>
+          <ContextViewerModal
+            source={viewing}
+            {...reader}
+            pageHref={pageHref(viewing)}
+            onClose={() => setViewing(null)}
+          />
+        </Suspense>
       ) : null}
       {removeError ? <p role="alert">{removeError}</p> : null}
       {/* Kept mounted while closed, as a disclosure is, so a half-filled form survives closing it. */}
@@ -184,6 +317,14 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
         >
           <h3 className={setupStyles.fieldLabel}>Add a file</h3>
           <SessionContextAddFile
+            sessionSlug={sessionSlug}
+            sessionConfig={sessionConfig}
+            account={account}
+            groups={groups}
+            onAdded={list.reload}
+          />
+          <h3 className={setupStyles.fieldLabel}>Add a note</h3>
+          <SessionContextAddNote
             sessionSlug={sessionSlug}
             sessionConfig={sessionConfig}
             account={account}

@@ -124,6 +124,49 @@ const onlyAddsInvites = (before, after) => {
   return prior.every(row => byHash.has(row.tokenHash) && same(row, byHash.get(row.tokenHash)));
 };
 
+// Adding an alternative to an access rule that admits anyone meeting any one
+// of them only widens it: a condition to an "any" sign-in or read rule, a
+// group to a group read gate, or a group to a group read condition (the last
+// two only in sessions without a capability profile, which refuses both).
+// Every gate is checked afresh on each request and a sign-in under the
+// narrower rule passes the wider one, so a widening needs no new sign-in. A
+// first rule closes an open session, and any removal, reorder or other edit
+// may narrow, so those still sign people out.
+const GROUP_GATES = new Set(['group', 'group_gate', 'worker_group']);
+const keepsAll = (before, after) => Array.isArray(before) && before.length > 0 && Array.isArray(after) &&
+  before.every(item => after.some(next => same(item, next)));
+const widensCondition = (before, after) => same(before, after) || (
+  record(before) && record(after) && before.kind === 'worker_group' && after.kind === 'worker_group' &&
+  keepsAll(before.groupIds, after.groupIds) &&
+  same(without(before, new Set(['groupIds'])), without(after, new Set(['groupIds']))));
+const widensRule = (before, after) => {
+  // Everything but the list stays as it was: `match` included.
+  if (!record(before) || !record(after) ||
+    !same(without(before, new Set(['conditions'])), without(after, new Set(['conditions'])))) return false;
+  const prior = before.conditions;
+  const next = after.conditions;
+  if (!Array.isArray(prior) || !prior.length || !Array.isArray(next) || next.length < prior.length) return false;
+  // The Worker skips entries that are not records or have no kind; a rule of
+  // only those is open, so a first real condition closes it.
+  if (!prior.every(condition => record(condition) && String(condition.kind ?? '').trim())) return false;
+  const anyOf = String(after.match ?? '').trim().toLowerCase() !== 'all';
+  return (anyOf || next.length === prior.length) && prior.every((condition, index) => widensCondition(condition, next[index]));
+};
+const widensGroupGate = (before, after) => record(before) && record(after) && same(before.gate, after.gate) &&
+  GROUP_GATES.has(String(after.gate ?? '').trim().toLowerCase().replace(/-/g, '_')) &&
+  keepsAll(before.groupIds, after.groupIds);
+// `after` with each widened access rule put back as it was, so that comparing
+// it with `before` finds only the edits that may narrow access.
+const withoutWidenings = (before, after) => {
+  if (!record(before) || !record(after)) return after;
+  return Object.fromEntries(Object.entries(after).map(([key, value]) => {
+    const prior = before[key];
+    if ((key === 'loginGate' || key === 'accessConditions') && widensRule(prior, value)) return [key, prior];
+    if (key === 'groupIds' && widensGroupGate(before, after)) return [key, prior];
+    return [key, withoutWidenings(prior, value)];
+  }));
+};
+
 const authorityView = (config, additiveInvites) => {
   const result = without(config, CONTENT_FIELDS);
   if (record(result.agentHttp) && additiveInvites) {
@@ -137,7 +180,7 @@ const authorityView = (config, additiveInvites) => {
 // disappear; newly introduced fields therefore keep revoking by default.
 export const sessionConfigRequiresReauthorization = (before, after) => {
   const additiveInvites = onlyAddsInvites(before?.agentHttp?.invites, after?.agentHttp?.invites);
-  return !same(authorityView(before, additiveInvites), authorityView(after, additiveInvites));
+  return !same(authorityView(before, additiveInvites), authorityView(withoutWidenings(before, after), additiveInvites));
 };
 
 const keysOf = (...values) => [...new Set(values.flatMap(value => Object.keys(value)))];
@@ -163,12 +206,14 @@ export const classifySessionConfigEdits = (before, after) => {
   const next = record(after) ? after : {};
   const additiveInvites = onlyAddsInvites(prior.agentHttp?.invites, next.agentHttp?.invites);
   const priorAuthority = authorityView(prior, additiveInvites);
-  const nextAuthority = authorityView(next, additiveInvites);
+  const nextAuthority = authorityView(withoutWidenings(prior, next), additiveInvites);
   const authority = keysOf(priorAuthority, nextAuthority)
     .filter(key => !same(priorAuthority[key], nextAuthority[key]))
     .flatMap(key => editedPaths(key, priorAuthority[key], nextAuthority[key]));
   const content = keysOf(prior, next).flatMap((key) => {
     if (CONTENT_FIELDS.has(key)) return same(prior[key], next[key]) ? [] : editedPaths(key, prior[key], next[key]);
+    // Only widened access rules changed here: an edit that signs no one out.
+    if (key !== 'agentHttp' && !same(prior[key], next[key]) && same(priorAuthority[key], nextAuthority[key])) return [key];
     return key === 'agentHttp' && additiveInvites && !same(prior.agentHttp?.invites, next.agentHttp?.invites)
       ? ['agentHttp.invites']
       : [];

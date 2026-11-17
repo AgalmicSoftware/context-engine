@@ -11,6 +11,7 @@ import { proxyOpenAI, proxyAnthropic, proxyOpenRouter, proxyCustomRPC } from './
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { buildParticipantContextPrompt } from './contextSourceLoader.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
+import { evaluatePrivateSessionAccess, privateSessionRefusal } from './privateSessionAccess.js';
 import { listHiddenStorageResourceIds } from './storageResourceOwnership.js';
 
 const OPENING_MAX_TOKENS = 2000;
@@ -147,6 +148,11 @@ export const dispatchInterviewStarterRequest = async ({ request, env, slugHint, 
   if (!config) return deps.json({ error: constants.sessionConfigNotFoundError }, 404, baseHeaders);
   const cors = await deps.getCorsContext({ request, config });
   if (!cors.ok) return cors.response;
+  const privateAccess = await evaluatePrivateSessionAccess({
+    env, slug, config, request,
+    resolveRequester: () => deps.resolveOptionalRequester?.({ request, env, slug, config, headers: cors.headers }),
+  });
+  if (!privateAccess.ok) return privateSessionRefusal({ access: privateAccess, json: deps.json, headers: cors.headers });
   const ended = buildSessionEndedResponse({ config, headers: cors.headers, json: deps.json });
   if (ended) return ended;
   const access = await deps.evaluateAnonymousRouteAccess?.({ slug, config, route: 'ai' });

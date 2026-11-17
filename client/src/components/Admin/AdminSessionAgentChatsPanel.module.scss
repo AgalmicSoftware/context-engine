@@ -1,0 +1,33 @@
+/* @file AdminSessionAgentChatsPanel.module.scss: the list of stored Session Agent chats. */
+
+// Text keeps the panel's own colour throughout, so every theme's contrast holds.
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat {
+  padding: 8px 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+
+  p {
+    margin: 0 0 4px;
+    white-space: pre-wrap;
+  }
+}
+
+.meta {
+  font-size: 0.85rem;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

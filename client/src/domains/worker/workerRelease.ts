@@ -36,6 +36,44 @@ export const readWorkerTakesFeedback = async (
   return found.features.includes('session_feedback');
 };
 
+/** Whether the Session Worker accepts a note on where research data goes (0.9.11 on); false when it can't be read. */
+export const readWorkerTakesDataNote = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> => {
+  if (!workerOrigin) return false;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.features.includes('interview_data_note_v1');
+};
+
+/** Which Session Agent options the Session Worker accepts (0.9.11 on); neither when it can't be read. */
+export const readWorkerSessionAgentOptions = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<{ recordChats: boolean; anyoneCanAsk: boolean }> => {
+  if (!workerOrigin) return { recordChats: false, anyoneCanAsk: false };
+  const { features } = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return {
+    recordChats: features.includes('session_agent_chats'),
+    anyoneCanAsk: features.includes('session_agent_signed_out'),
+  };
+};
+
+export const WORKERS_AI_FEATURE = 'workers_ai_v1';
+
+/** Whether the Session Worker can answer the Session Agent on Cloudflare's models: it has the AI binding. */
+export const readWorkerRunsWorkersAi = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> => {
+  if (!workerOrigin) return false;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.features.includes(WORKERS_AI_FEATURE);
+};
+
 export const AI_DAILY_LIMIT_FEATURE = 'ai_daily_limit_v1';
 
 /** Whether the Session Worker counts a separate AI daily limit (0.9.9 on); false when it can't be read. */

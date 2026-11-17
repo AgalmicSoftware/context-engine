@@ -21,6 +21,7 @@ import { getGlobalLitHooks, litStorage } from '../../utilities/crypto/litProtoco
 import { STORAGE_BACKENDS, normalizeStorageRef } from '../../utilities/storage/storageRefs.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { toViewerBlob } from '../../utilities/ui/viewerMime';
+import { contextAdderLabel, type ContextSource } from '../../utilities/docLibrary/contextSources';
 import { notify } from '../../utilities/ui/notify.js';
 import { createLogger } from '../../utilities/logging.js';
 import SBTSelector from '../SBTs/SBTSelector';
@@ -68,7 +69,12 @@ type DocRecord = {
   block: DocBlock | null;
   data: DocData | null;
   storageRef?: StorageRef | null;
+  addedAt?: string;
+  adder?: DocAdder;
 };
+
+/** Who added a Worker-stored item, as its storage records it. */
+export type DocAdder = Pick<ContextSource, 'addedBy' | 'addedByAgent' | 'adderName'>;
 
 type OpenableDoc = Pick<DocRecord, 'txId' | 'tagMap' | 'storageRef'>;
 
@@ -705,6 +711,8 @@ type DocumentLibraryListProps = {
   network?: NetworkLike;
   panelContextKey?: string;
   litHooks?: LitHooks;
+  /** The session's config, which says who its admins are, for "Added by". */
+  sessionConfig?: unknown;
 };
 
 export const DocumentLibraryList = ({
@@ -719,6 +727,7 @@ export const DocumentLibraryList = ({
   network,
   panelContextKey,
   litHooks,
+  sessionConfig,
 }: DocumentLibraryListProps) => (
   <div className={styles.list}>
     {!docs.length && !loading && canList && (
@@ -750,6 +759,11 @@ export const DocumentLibraryList = ({
       const timeLabel = ts ? new Date(ts).toLocaleString() : doc?.block ? 'Unconfirmed' : 'Pending indexing';
       const showPhotoRoleBadge = docRole === DOC_LIBRARY_DOC_ROLES.PHOTO;
       const showPhotoAnalysisRoleBadge = docRole === DOC_LIBRARY_DOC_ROLES.PHOTO_ANALYSIS;
+      // A Worker-stored item has no block to wait for, and where it is kept means nothing to a reader;
+      // when it was added, and by whom, do.
+      const addedAt = isCloudflareStorage && doc?.addedAt ? new Date(doc.addedAt) : null;
+      const addedAtLabel = addedAt && !Number.isNaN(addedAt.getTime()) ? addedAt.toLocaleString() : '';
+      const adder = isCloudflareStorage && doc?.adder ? contextAdderLabel(doc.adder, sessionConfig, account) : '';
 
       return (
         <div
@@ -782,8 +796,18 @@ export const DocumentLibraryList = ({
                 {showPhotoAnalysisRoleBadge && <span className={styles.badge}>photo analysis</span>}
                 {!showPhotoRoleBadge && isImageDoc && <span className={styles.badge}>image</span>}
                 <span className={styles.badge}>{kind || 'file'}</span>
-                <span className={styles.badge}>{storage || 'arweave'}</span>
-                <span className={styles.time}>{timeLabel}</span>
+                {isCloudflareStorage ? (
+                  <>
+                    {addedAtLabel ? <span className={styles.time}>{addedAtLabel}</span> : null}
+                    {adder ? <span className={styles.time}>Added by {adder}</span> : null}
+                    {adder && doc?.adder?.addedByAgent ? <span className={styles.badge}>agent</span> : null}
+                  </>
+                ) : (
+                  <>
+                    <span className={styles.badge}>{storage || 'arweave'}</span>
+                    <span className={styles.time}>{timeLabel}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>

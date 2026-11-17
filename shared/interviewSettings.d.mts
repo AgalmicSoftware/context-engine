@@ -22,8 +22,10 @@ export type InterviewSettings = {
   fidelityMinimumPeople: number;
   recordingQuestionCount: number;
   recordingQuestionTiming: 'chunk' | 'end';
+  dataNote: string;
 };
 export const MAX_RECORDING_QUESTION_COUNT: number;
+export const MAX_DATA_NOTE_CHARS: number;
 export const DEFAULT_INTERVIEW_SETTINGS: Readonly<InterviewSettings>;
 export function normalizeInterviewSettings(value?: unknown): InterviewSettings;
 export function validInterviewSettings(value?: unknown): boolean;

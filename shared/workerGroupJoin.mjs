@@ -105,6 +105,36 @@ export const isOneUseSecretHash = (value) => typeof value === 'string' && SECRET
 export const workerGroupJoinStatement = ({ sessionId, groupId, address }) =>
   `${JOIN_STATEMENT}\nsession:${String(sessionId).toLowerCase()}\ngroup:${String(groupId)}\naddress:${String(address).toLowerCase()}`;
 
+const READ_STATEMENT = 'ContextEngine.WorkerGroup.Read:1';
+// The header that carries a read invite: `<groupId>:<signature>`. Group ids never contain ':'.
+export const WORKER_GROUP_READ_INVITE_HEADER = 'X-CE-Group-Invite';
+// Why a private session refused a request: it carried no invite and isn't a member's, or its invite doesn't hold
+// (wrong or changed password, a group the rule no longer names, a deleted group, or unreadable).
+export const PRIVATE_SESSION_INVITE_REQUIRED = 'private_session_invite_required';
+export const PRIVATE_SESSION_INVITE_INVALID = 'private_session_invite_invalid';
+export const PRIVATE_SESSION_UNAVAILABLE = 'private_session_unavailable';
+const READ_PROOF = /^0x[0-9a-f]{130}$/i;
+
+/**
+ * What a password-derived key signs (EIP-191) to read a private session signed out: the session and group, and no
+ * address, so it proves the password without joining anyone. Reading spends nothing.
+ */
+export const workerGroupReadStatement = ({ sessionId, groupId }) =>
+  `${READ_STATEMENT}\nsession:${String(sessionId).toLowerCase()}\ngroup:${String(groupId)}`;
+
+/** The header value for a read proof. */
+export const formatWorkerGroupReadInvite = ({ groupId, proof }) => `${String(groupId)}:${String(proof)}`;
+
+/** A header value as `{ groupId, proof }`, or null when it isn't one. */
+export const parseWorkerGroupReadInvite = (value) => {
+  const text = typeof value === 'string' ? value.trim() : '';
+  const at = text.lastIndexOf(':');
+  if (at < 1 || text.length > 300) return null;
+  const groupId = text.slice(0, at).toLowerCase();
+  const proof = text.slice(at + 1);
+  return /^[a-z0-9][a-z0-9._-]*$/.test(groupId) && READ_PROOF.test(proof) ? { groupId, proof } : null;
+};
+
 /**
  * The group password's keys, as the SBT group password's (PBKDF2-SHA256, 600,000 iterations) but salted with the
  * session and group, so one password gives different keys in different groups. Pass an ethers v5 instance.
@@ -149,6 +179,11 @@ export const createWorkerGroupPasswordKeys = (ethers) => {
           groupId: input.groupId,
           address,
         }),
+      ),
+    /** The read proof for this session and group, signed with the password's key. */
+    signRead: async (input) =>
+      (await deriveWallet(input)).signMessage(
+        workerGroupReadStatement({ sessionId: input.sessionId, groupId: input.groupId }),
       ),
     /** The signer a proof was made with (the Worker compares it with the stored one). */
     recoverJoinSigner: ({ sessionId, groupId, address, proof }) =>

@@ -166,6 +166,25 @@ test('builds an atlas from a planning call, a call per topic and one per branch,
   assert.deepEqual(stored.body.build, build);
 });
 
+test('keeps the choices a topic question offers, so the atlas can show them', async () => {
+  const source = createSource();
+  const [, multichoice, quadratic] = source.aiSnapshot.questions;
+  Object.assign(multichoice, { type: 'multichoice', options: ['Assemblies', 'Open data'] });
+  Object.assign(quadratic, { type: 'quadratic', options: ['Parks', 'Roads'], voiceCredits: 25 });
+  const { result } = await runBuild({
+    source,
+    provider: async (prompt) => ({ ok: true, value: isPlanPrompt(prompt) ? planFor(['q1', 'q2', 'q3', 'q4']) : topicReply }),
+  });
+
+  assert.equal(result.ok, true, result.error);
+  const questions = result.build.branches.flatMap((branch) => branch.topics.flatMap((topic) => topic.questions));
+  assert.deepEqual(questions.slice(0, 3), [
+    { id: 'q1', prompt: 'Question 1?', type: 'freeform' },
+    { id: 'q2', prompt: 'Question 2?', type: 'multichoice', options: ['Assemblies', 'Open data'] },
+    { id: 'q3', prompt: 'Question 3?', type: 'quadratic', options: ['Parks', 'Roads'], voiceCredits: 25 },
+  ]);
+});
+
 test('a branch of one topic shares its compass and keeps the plan summary, with no call of its own', async () => {
   const plan = {
     title: 'Atlas',

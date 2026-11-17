@@ -1,4 +1,5 @@
 import { resolveCorsProxyUrl } from './corsProxy.js';
+import { sessionReadHeaders } from './workerSessionReadHeaders';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -70,7 +71,7 @@ export const readWorkerResourcePresence = async ({
     try {
       const response = await fetchImpl(`${workerUrl}/resource-presence`, {
         method: 'GET',
-        headers: { 'X-Session-Slug': slug || 'general' },
+        headers: { 'X-Session-Slug': slug || 'general', ...sessionReadHeaders(workerUrl, slug) },
         cache: 'no-store',
         signal: controller.signal,
       });

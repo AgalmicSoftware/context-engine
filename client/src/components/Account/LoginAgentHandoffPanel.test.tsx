@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import LoginAgentHandoffPanel from './LoginAgentHandoffPanel';
 import { AgentDelegateKeyError } from '../../utilities/session/agentHandoff';
 
@@ -23,6 +23,7 @@ const renderPanel = (props: Partial<React.ComponentProps<typeof LoginAgentHandof
     <LoginAgentHandoffPanel
       agentHttpEnabled
       sessionUrl={sessionUrl}
+      sessionName="Salon"
       requestKey={jest.fn(async () => key)}
       {...props}
     />,
@@ -36,6 +37,40 @@ it('sets up the MCP as itself, named after its person', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Copy the prompt' }));
   expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
   expect(writeText).toHaveBeenCalledWith(expect.stringContaining(`${sessionUrl} with join_session`));
+  expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Set your display name to "Audrey\'s Kami".'));
+});
+
+it('copies with an icon in each box, which shows a tick for a moment', async () => {
+  jest.useFakeTimers();
+  try {
+    renderPanel();
+    const copyCommand = screen.getByRole('button', { name: 'Copy the MCP command' });
+    const copyPrompt = screen.getByRole('button', { name: 'Copy the prompt' });
+    expect(copyCommand).toHaveTextContent('');
+    expect(screen.queryByRole('button', { name: /^Copy$/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-agent-handoff-mcp').parentElement).toContainElement(copyCommand);
+    fireEvent.click(copyPrompt);
+    await screen.findByText('Copied the prompt.');
+    expect(copyPrompt).toHaveAttribute('title', 'Copied');
+    expect(copyPrompt.querySelector('[data-icon="check"]')).not.toBeNull();
+    expect(copyCommand.querySelector('[data-icon="copy"]')).not.toBeNull();
+    act(() => jest.advanceTimersByTime(1800));
+    expect(copyPrompt).toHaveAttribute('title', 'Copy the prompt');
+    expect(copyPrompt.querySelector('[data-icon="copy"]')).not.toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('leaves the tick off when copying fails', async () => {
+  writeText.mockImplementation(async () => {
+    throw new Error('denied');
+  });
+  renderPanel();
+  const copyPrompt = screen.getByRole('button', { name: 'Copy the prompt' });
+  fireEvent.click(copyPrompt);
+  await screen.findByText("Couldn't copy the prompt. Select it and copy it yourself.");
+  expect(copyPrompt.querySelector('[data-icon="check"]')).toBeNull();
 });
 
 it('hands over a key on my behalf without showing it or putting it in the prompt', async () => {
@@ -83,6 +118,6 @@ it('announces each copy anew, and a new choice clears the last message', async (
 it('offers no key while the session has Agent HTTP off', () => {
   renderPanel({ agentHttpEnabled: false });
   fireEvent.click(screen.getByRole('button', { name: 'On my behalf' }));
-  expect(screen.getByText(/^Not on in this session/)).toBeInTheDocument();
+  expect(screen.getByText(/^Not on in Salon/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Make a key' })).not.toBeInTheDocument();
 });

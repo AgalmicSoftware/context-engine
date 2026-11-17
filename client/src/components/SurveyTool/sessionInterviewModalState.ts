@@ -191,17 +191,19 @@ export const describeInterviewStatus = ({
                 : idle && openingLoading
                   ? 'Preparing opening'
                   : status;
+  // 'busy' while the interview is working on something, which shows a spinner; 'pending' while it waits.
   const statusTone =
     error || (idle && (!hasQuestions || readiness === 'unavailable'))
       ? 'error'
       : isStarting ||
-          isPaused ||
           isStopping ||
           mapping ||
           applying ||
-          (idle && (readiness !== 'ready' || openingLoading))
-        ? 'pending'
-        : 'ready';
+          (idle && (readiness === 'checking' || (readiness === 'ready' && openingLoading)))
+        ? 'busy'
+        : isPaused || (idle && readiness === 'unknown')
+          ? 'pending'
+          : 'ready';
   return { guidance, idle, statusLabel, statusTone };
 };
 

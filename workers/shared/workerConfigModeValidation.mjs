@@ -30,7 +30,10 @@ const RESULTS_VISIBILITIES = new Set([
 ]);
 const EXPORT_SCOPES = new Set(['admin_raw', 'all_session', 'encrypted_envelopes_only']);
 const ACCESS_MATCHES = new Set(['any', 'all']);
-const ACCESS_KINDS = new Set(['worker_role', 'sbt_onchain', 'agent_grant_scope']);
+const ACCESS_KINDS = new Set(['worker_role', 'sbt_onchain', 'agent_grant_scope', 'worker_group']);
+// A Worker group condition names at most this many groups, each by its stored id.
+const MAX_ACCESS_CONDITION_GROUPS = 20;
+const WORKER_GROUP_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
 const RESOURCE_KEYS = new Set([
   'docsContext',
   'questions',
@@ -193,6 +196,22 @@ const validateAccessConditions = (value, path) => {
       }
       continue;
     }
+    if (condition.kind === 'worker_group') {
+      // Members of any one of the groups, or a request carrying a read invite for one of them.
+      result = validateExactKeys(condition, conditionPath, ['kind', 'groupIds']);
+      if (!result.ok) return result;
+      const { groupIds } = condition;
+      if (
+        !Array.isArray(groupIds) ||
+        !groupIds.length ||
+        groupIds.length > MAX_ACCESS_CONDITION_GROUPS ||
+        !groupIds.every((groupId) => typeof groupId === 'string' && WORKER_GROUP_ID_PATTERN.test(groupId)) ||
+        new Set(groupIds).size !== groupIds.length
+      ) {
+        return invalid(`${conditionPath}.groupIds`);
+      }
+      continue;
+    }
     if (condition.kind === 'agent_grant_scope') {
       result = validateExactKeys(condition, conditionPath, ['kind', 'scope']);
       if (!result.ok) return result;
@@ -220,6 +239,13 @@ const validateAccessConditions = (value, path) => {
     result = validateRequiredEnumField(condition, 'anyOrAll', `${conditionPath}.anyOrAll`, ACCESS_MATCHES);
     if (!result.ok) return result;
     sbtChainIds.push(condition.chainId);
+  }
+  // A rule naming groups makes the session private; its admins must still get in.
+  if (
+    value.conditions.some((condition) => condition.kind === 'worker_group') &&
+    (value.match !== 'any' || !value.conditions.some((condition) => condition.kind === 'worker_role' && condition.role === 'admin'))
+  ) {
+    return invalid(path);
   }
   return { ok: true, sbtChainIds };
 };

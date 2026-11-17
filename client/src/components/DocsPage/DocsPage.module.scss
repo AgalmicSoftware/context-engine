@@ -298,7 +298,8 @@
   margin-top: 12px;
 }
 
-.quickstartStep .docsInlineLink {
+.quickstartStep .docsInlineLink,
+.guideTopic .docsInlineLink {
   display: inline-flex;
   color: var(--docs-document-text);
   font-weight: 700;
@@ -374,6 +375,25 @@
 
 .guideTopic h2 {
   font-weight: 800;
+}
+
+.guideTopicWide {
+  grid-column: 1 / -1;
+
+  strong {
+    color: var(--docs-document-text);
+  }
+}
+
+.agentKindStatus {
+  display: inline-block;
+  padding: 0 0.45em;
+  border: 1px solid currentColor;
+  border-radius: var(--ce-radius-pill);
+  color: var(--docs-document-text);
+  font-size: 0.82em;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .contractSessionExplorer {

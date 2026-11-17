@@ -63,13 +63,12 @@ import {
   useInterviewHiddenDrafts,
 } from './sessionInterviewHiddenDrafts';
 import SessionInterviewFidelityScore, { summarizeOwnInterviewFidelity } from './SessionInterviewFidelityScore';
+import SessionInterviewPrefillStatus from './SessionInterviewPrefillStatus';
 import type { ParticipantFidelitySummary } from '../../../../shared/agentFidelity.mjs';
 import {
   buildResearchPacket,
-  describeInterviewPlatform,
   describeInterviewStatus,
   describeResearchCoverage,
-  displayResponderContext,
   omitConcealedInterviewFacts,
   hasDraftValue,
   responseFieldValue,
@@ -87,6 +86,7 @@ import {
 import { draftsWithUnseenComments, useStartingInterviewComments } from './sessionInterviewComments';
 import { lockEncryptedFields } from './sessionInterviewResearch';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
+import { useKeptInterviewReview } from './sessionInterviewKeptReview';
 
 type UnknownRecord = SessionInterviewModalRecord;
 
@@ -146,9 +146,10 @@ export default function SessionInterviewPanel({
   onReviewStateChange,
   onRequestDiscard,
 }: SessionInterviewPanelProps) {
+  const kept = useKeptInterviewReview(prefillPacket, Boolean(claim));
   const disposedRef = useRef(false);
-  const importedRef = useRef(false);
-  const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(null);
+  const importedRef = useRef(kept.drafts.length > 0);
+  const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(kept.drafts.length ? prefillPacket : null);
   const catalogAbortRef = useRef<AbortController | null>(null);
   const validatedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
   // The question set a prefill link was last checked against.
@@ -173,13 +174,13 @@ export default function SessionInterviewPanel({
     sessionSlug,
     hasQuestions: initialQuestions.length > 0,
   });
-  const [responderContext, setResponderContext] = useState(() => displayResponderContext(prefillPacket));
-  const [status, setStatus] = useState(initialError ? 'Error' : 'Ready');
-  const [transcript, setTranscript] = useState('');
-  const transcriptRef = useRef('');
-  const roundBaseTranscriptRef = useRef('');
+  const [responderContext, setResponderContext] = useState(kept.responderContext);
+  const [status, setStatus] = useState(initialError ? 'Error' : kept.drafts.length ? 'Review drafts' : 'Ready');
+  const [transcript, setTranscript] = useState(kept.transcript);
+  const transcriptRef = useRef(kept.transcript);
+  const roundBaseTranscriptRef = useRef(kept.transcript);
   // The transcript the current drafts came from; a later round that was not mapped can still be.
-  const [mappedTranscript, setMappedTranscript] = useState('');
+  const [mappedTranscript, setMappedTranscript] = useState(kept.mappedTranscript);
   const receiveTranscript = (current: string) => {
     const combined = appendInterviewTranscript(roundBaseTranscriptRef.current, current);
     transcriptRef.current = combined;
@@ -204,14 +205,14 @@ export default function SessionInterviewPanel({
     setError(initialError);
     setStatus('Error');
   }, [initialError]);
-  const [suggestedQuestions, setSuggestedQuestions] = useState<GeneratedSurveyStatement[]>([]);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<GeneratedSurveyStatement[]>(kept.suggestedQuestions);
   const [groupRecommendationRequest, setGroupRecommendationRequest] =
     useState<SessionInterviewGroupRecommendationRequest | null>(null);
-  const [drafts, setDrafts] = useState<InterviewDraftResponse[]>([]);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [drafts, setDrafts] = useState<InterviewDraftResponse[]>(kept.drafts);
+  const [selected, setSelected] = useState<Record<string, boolean>>(kept.selected);
   // Explicitly removed cards stay hidden; saved-answer conflicts still need review.
-  const [removedDraftIds, setRemovedDraftIds] = useState<Record<string, boolean>>({});
-  const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>({});
+  const [removedDraftIds, setRemovedDraftIds] = useState<Record<string, boolean>>(kept.removedDraftIds);
+  const [editedDrafts, setEditedDrafts] = useState<Record<string, InterviewDraftResponse>>(kept.editedDrafts);
   // The latest review, for work that resumes after an await.
   const latestReviewRef = useRef({ drafts, selected, editedDrafts, removedDraftIds });
   latestReviewRef.current = { drafts, selected, editedDrafts, removedDraftIds };
@@ -225,14 +226,14 @@ export default function SessionInterviewPanel({
     [sessionSlug, sessionConfig],
   );
   const researchPacket = buildResearchPacket(prefillPacket, sessionSlug, mappingModelId);
-  const [includeProvenance, setIncludeProvenance] = useState(true);
+  const [includeProvenance, setIncludeProvenance] = useState(kept.includeProvenance);
   const [researchSharingChoice, setResearchSharingChoice] = useState<{
     contextToken: string;
     included: boolean;
-  } | null>(null);
-  const [includeResponderName, setIncludeResponderName] = useState(false);
+  } | null>(kept.researchSharingChoice);
+  const [includeResponderName, setIncludeResponderName] = useState(kept.includeResponderName);
   // Like research sharing, kept across signing in to submit, which resets consentOverrides.
-  const [draftTextKept, setDraftTextKept] = useState<{ contextToken: string; included: boolean } | null>(null);
+  const [draftTextKept, setDraftTextKept] = useState(kept.draftText);
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
   const [submissionInfoOpen, setSubmissionInfoOpen] = useState(false);
   const sessionResearchDetail = normalizeInterviewSettings(sessionConfig?.interviewMode).researchDetail;
@@ -242,7 +243,7 @@ export default function SessionInterviewPanel({
   if (sessionResearchDetail === 'minimal' && shownResearchDetail !== 'minimal') setShownResearchDetail('minimal');
   const [showTranscript, setShowTranscript] = useState(false);
   // The questions an imported AI prefill drafted; its status line counts those still in review.
-  const [prefillDraftIds, setPrefillDraftIds] = useState<string[]>([]);
+  const [prefillDraftIds, setPrefillDraftIds] = useState<string[]>(kept.prefillDraftIds);
   const prefillDraftCount = drafts.filter((draft) => prefillDraftIds.includes(draft.questionId)).length;
   const [contextExpanded, setContextExpanded] = useState(false);
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
@@ -253,7 +254,7 @@ export default function SessionInterviewPanel({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   // joinMatchingGroups is off by default. On, the AI suggests groups; the ones the person ticks join on submit.
-  const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins, suggestQuestions } =
+  const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins, suggestQuestions, dataNote } =
     normalizeInterviewSettings(sessionConfig?.interviewMode);
   const [draftTextShown, setDraftTextShown] = useState(keepDraftTextForAdmins);
   if (draftTextShown && !keepDraftTextForAdmins) setDraftTextShown(false);
@@ -357,7 +358,7 @@ export default function SessionInterviewPanel({
   // Drafts the person changed, or submitted from this review, are theirs to decide on.
   const submittedDraftIdsRef = useRef(new Set<string>());
   // Questions whose drafts last came from the person's own words in this interview.
-  const ownEvidenceIdsRef = useRef(new Set<string>());
+  const ownEvidenceIdsRef = useRef(kept.ownEvidenceIds);
   const participantOwned = useCallback(
     (questionId: string) =>
       Boolean(editedDrafts[questionId]?.userEditedFields?.length) || submittedDraftIdsRef.current.has(questionId),
@@ -1175,6 +1176,9 @@ export default function SessionInterviewPanel({
   useEffect(() => {
     onReviewStateChange(hasUnsavedReview);
   }, [hasUnsavedReview, onReviewStateChange]);
+  const keptText = { transcript, mappedTranscript, responderContext, suggestedQuestions, prefillDraftIds };
+  const keptChoices = { includeProvenance, researchSharingChoice, includeResponderName, draftText: draftTextKept };
+  kept.keep(hasUnsavedReview && { ...latestReviewRef.current, ...keptText, ...keptChoices }, hiddenDrafts.hidden);
   const scoreScreenShown = Boolean(submitSucceeded && fidelityScore);
   useEffect(() => {
     // The submission choices are settled; fold them away so the score has the room.
@@ -1183,7 +1187,6 @@ export default function SessionInterviewPanel({
   const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
   // A prefill link goes straight to its drafts; the interview then talks them through.
   const showPrefillStatus = hasAiPrefill && prefillDraftCount > 0;
-  const prefillPlatform = prefillPacket?.source.platform;
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
     : isStarting
@@ -1323,15 +1326,12 @@ export default function SessionInterviewPanel({
           ) : null}
 
           {showPrefillStatus ? (
-            <p
-              className={styles.sessionInterviewPrefillStatus}
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS}
-            >
-              Your AI drafted {prefillDraftCount} {prefillDraftCount === 1 ? 'answer' : 'answers'}
-              {prefillPlatform && prefillPlatform !== 'other'
-                ? ` · ${describeInterviewPlatform(prefillPlatform)}, self-reported`
-                : ''}
-            </p>
+            <SessionInterviewPrefillStatus
+              draftCount={prefillDraftCount}
+              platform={prefillPacket?.source.platform}
+              hiddenCount={hiddenDrafts.count}
+              dataNote={dataNote}
+            />
           ) : null}
 
           {ownAnswers.error ? (
@@ -1486,6 +1486,7 @@ export default function SessionInterviewPanel({
                       disabled={applying}
                       researchDetail={shownResearchDetail}
                       draftTextOffered={draftTextShown}
+                      dataNote={dataNote}
                       onChange={(included) => {
                         setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
                         setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));

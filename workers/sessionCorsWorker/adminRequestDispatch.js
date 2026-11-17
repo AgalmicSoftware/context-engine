@@ -57,6 +57,8 @@ import { buildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.
 import { buildRiskMatrix, RISK_MATRIX_BUILD_ACTION } from './riskMatrixBuild.js';
 import { canBuildResults } from './resultsBuild.js';
 import { callSessionFeedbackStore } from './sessionFeedbackRoute.js';
+import { SESSION_AGENT_EXPORT_ACTION, exportSessionAgent } from './sessionAgentExport.js';
+import { callSessionAgentHistoryStore } from './sessionAgentRoute.js';
 
 const RESULTS_BUILDER_ACTIONS = new Set([
   DEBATE_ATLAS_BUILD_ACTION,
@@ -303,6 +305,30 @@ export const dispatchAdminRequest = async ({
     return result?.status === 400
       ? deps?.json?.({ error: 'Name the messages to delete.', reason: result.body?.reason }, 400, privateHeaders)
       : deps?.json?.({ error: 'Feedback couldn’t be reached just now. Try again shortly.', reason: 'feedback_unavailable' }, 503, privateHeaders);
+  }
+
+  // Stored chats are cleared by full admins only, and read with the sign-in
+  // token (GET /admin/session-agent/chats).
+  if (action === 'session-agent/chats/delete') {
+    const privateHeaders = withPrivateNoStoreHeaders(headers);
+    const result = await (deps?.callSessionAgentHistoryStore || callSessionAgentHistoryStore)(
+      env, targetSlug, 'delete', { ids: body?.ids, through: body?.through },
+    );
+    if (result?.ok) return deps?.json?.(result.body, 200, privateHeaders);
+    return result?.status === 400
+      ? deps?.json?.({ error: 'Name the chats to delete.', reason: result.body?.reason }, 400, privateHeaders)
+      : deps?.json?.({ error: 'Stored chats couldn’t be reached just now. Try again shortly.', reason: 'session_agent_chats_unavailable' }, 503, privateHeaders);
+  }
+
+  // Full admins only: the file holds what members wrote, and who is in the groups the agent's rules name.
+  if (action === SESSION_AGENT_EXPORT_ACTION) {
+    const privateHeaders = withPrivateNoStoreHeaders(headers);
+    const result = await (deps?.exportSessionAgent || exportSessionAgent)({
+      env, slug: targetSlug, config: existingConfig, address: authorityResult.address || body?.address, deps,
+    });
+    return result.ok
+      ? deps?.json?.({ filename: result.filename, content: result.content, manifest: result.manifest }, 200, privateHeaders)
+      : deps?.json?.(result.body, result.status, privateHeaders);
   }
 
   if (action === 'refresh-interview-opening') {

@@ -2327,14 +2327,8 @@
   }
 }
 
-.generatedResultsPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
 .generatedResultsStatus,
-.generatedResultsEmpty {
+.resultsBuildEmpty {
   // The atlas panel's pair, readable in every theme; the info colour only edges it.
   border: 1px solid var(--ce-card-border);
   border-left: 4px solid var(--ce-status-info);
@@ -2352,7 +2346,7 @@
   justify-content: space-between;
 }
 
-.generatedResultsEmpty p {
+.resultsBuildEmpty {
   margin: 0;
 }
 

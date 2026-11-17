@@ -11,6 +11,7 @@ export const inferAiProviderFromModel = (model) => {
   if (!name) return '';
   if (name.startsWith('claude')) return 'anthropic';
   if (/^(?:gpt-|o[1-9]|chatgpt)/.test(name)) return 'openai';
+  if (name.startsWith('@cf/')) return 'workers-ai';
   return name.includes('/') ? 'openrouter' : '';
 };
 

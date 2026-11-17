@@ -20,6 +20,13 @@ import { useKeptRecording } from '../../utilities/audio/useRecordingChunkQueue';
 import { sortInterviewQuestionPoolNewestFirst } from './sessionInterviewQuestionOrder';
 import { normalizeInterviewQuestions, type InterviewPrefillPacket, type SessionVoiceMode } from './sessionInterview';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
+import {
+  clearKeptReview,
+  keptReviewOwner,
+  readKeptReview,
+  KeptInterviewReviewContext,
+  type RestoredReview,
+} from './sessionInterviewKeptReview';
 import type { SessionVoiceModeModalProps } from './sessionVoiceModeTypes';
 import styles from './SurveyTool.module.scss';
 
@@ -78,9 +85,49 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const [discardedClaim, setDiscardedClaim] = useState<TranscriptClaim | null>(null);
   const claim = props.claim === discardedClaim ? null : props.claim;
   const [scanRequested, setScanRequested] = useState(false);
+  // A review this browser kept through a reload, for whoever is signed in now. It is read only while nothing is
+  // under review here, and a link carrying different evidence starts afresh.
+  const sessionSlug = props.sessionSlug || '';
+  const owner = keptReviewOwner(props.account, Boolean(props.loginComplete));
+  const readKept = () => {
+    if (!sessionSlug) return null;
+    const kept = claim ? null : readKeptReview(sessionSlug, owner);
+    const sameLink = !prefillPacket || JSON.stringify(kept?.review.packet) === JSON.stringify(prefillPacket);
+    if (kept && sameLink) return kept;
+    // A phone may be shared: a new interview from a link or a code ends the one kept signed out on it.
+    if (owner === 'browser' && (claim || prefillPacket)) clearKeptReview(sessionSlug, 'browser');
+    return null;
+  };
+  const [keptReview, setKeptReview] = useState<RestoredReview | null>(readKept);
+  // One kept signed out may be someone else's, so nothing of it shows until they choose to continue it.
+  const [continued, setContinued] = useState<RestoredReview | null>(null);
+  const askFirst = keptReview?.owner === 'browser' && continued !== keptReview;
+  // Whose key holds the review on screen, which the panel updates as it keeps it.
+  const keptForRef = useRef('');
+  useEffect(() => {
+    // One kept for another account is never left on screen; it stays kept for them. Signing in keeps your own.
+    const holder = keptForRef.current || keptReview?.owner || '';
+    // Signing in before choosing leaves the signed-out one unshown, and looks for the account's own.
+    if (askFirst && owner !== 'browser') setKeptReview(readKept());
+    else if (keptReview && holder !== owner && holder !== 'browser') {
+      setKeptReview(null);
+      setInterviewVersion((version) => version + 1);
+    } else if (!keptReview && !hasUnsavedReview) {
+      const found = readKept();
+      if (found) setKeptReview(found);
+    }
+    // Only a change of who is signed in, or of session, looks again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owner, sessionSlug]);
+  // A code scanned, or a link opened, while it asks starts a new interview, which ends the one kept signed out.
+  useEffect(() => {
+    if (askFirst && (claim || prefillPacket)) setKeptReview(readKept());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claim, prefillPacket]);
+  const reviewPacket = prefillPacket || keptReview?.review.packet || null;
   // Closing retains this review, but importing different evidence starts a new
   // review. Equivalent packet objects must not erase the participant's edits.
-  const prefillIdentity = useMemo(() => JSON.stringify(prefillPacket || null), [prefillPacket]);
+  const prefillIdentity = useMemo(() => JSON.stringify(reviewPacket), [reviewPacket]);
   const onInterviewProgressChange = props.onInterviewProgressChange;
   useEffect(() => {
     onInterviewProgressChange?.(interviewUnfinished);
@@ -103,6 +150,10 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   };
   // Leaving the interview drops what fed it, so choosing Interview again starts afresh.
   const leaveInterview = () => {
+    clearKeptReview(sessionSlug, owner);
+    if (keptForRef.current) clearKeptReview(sessionSlug, keptForRef.current);
+    keptForRef.current = '';
+    setKeptReview(null);
     setHasUnsavedReview(false);
     setGroupsUnjoined(false);
     setDiscardedPrefill(props.prefillPacket || null);
@@ -186,24 +237,57 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         {isOpen ? <div id={VOICE_DIALOG_NOTICE_SLOT_ID} /> : null}
         {mode === 'interview' ? (
           <VoiceModeBackContext.Provider value={goBack}>
-            <VoiceModeUnjoinedGroupsContext.Provider value={setGroupsUnjoined}>
-              <SessionInterviewPanel
-                key={`${interviewVersion}:${prefillIdentity}`}
-                {...props}
-                prefillPacket={prefillPacket}
-                claim={claim}
-                onClose={requestClose}
-                questions={questions}
-                onSubmitResponses={submitResponses}
-                onReviewStateChange={setHasUnsavedReview}
-                onRequestDiscard={() => setConfirmDiscard('close')}
-              />
-            </VoiceModeUnjoinedGroupsContext.Provider>
-            <SessionInterviewAgentUse use={agentUse} className={styles.sessionInterviewAgentUse} />
-            {/* Until the interview has something to review. */}
-            {!hasUnsavedReview && !prefillPacket && !claim ? (
-              <ModalBody className={styles.sessionInterviewPrefill}>{prefillCard}</ModalBody>
-            ) : null}
+            {askFirst ? (
+              <>
+                <ModalHeader toggle={requestClose}>
+                  <span className={styles.sessionInterviewHeader}>
+                    <SessionVoiceModeBackButton id="ce-interview-back" onBack={backToChoices} />
+                    <span id="ce-session-voice-mode-title">Interview</span>
+                  </span>
+                </ModalHeader>
+                <ModalBody>
+                  <p>This device has an unsubmitted interview review.</p>
+                  <div className={styles.sessionInterviewActions}>
+                    <Button color="primary" onClick={() => setContinued(keptReview)}>
+                      Continue it
+                    </Button>
+                    <Button
+                      color="secondary"
+                      outline
+                      className={styles.sessionInterviewKeptDiscard}
+                      onClick={leaveInterview}
+                    >
+                      Discard and start fresh
+                    </Button>
+                  </div>
+                </ModalBody>
+              </>
+            ) : (
+              <>
+                <VoiceModeUnjoinedGroupsContext.Provider value={setGroupsUnjoined}>
+                  <KeptInterviewReviewContext.Provider
+                    value={{ sessionSlug, owner, restored: keptReview, keptFor: keptForRef }}
+                  >
+                    <SessionInterviewPanel
+                      key={`${interviewVersion}:${prefillIdentity}:${keptReview ? 'kept' : ''}`}
+                      {...props}
+                      prefillPacket={reviewPacket}
+                      claim={claim}
+                      onClose={requestClose}
+                      questions={questions}
+                      onSubmitResponses={submitResponses}
+                      onReviewStateChange={setHasUnsavedReview}
+                      onRequestDiscard={() => setConfirmDiscard('close')}
+                    />
+                  </KeptInterviewReviewContext.Provider>
+                </VoiceModeUnjoinedGroupsContext.Provider>
+                <SessionInterviewAgentUse use={agentUse} className={styles.sessionInterviewAgentUse} />
+                {/* Until the interview has something to review. */}
+                {!hasUnsavedReview && !reviewPacket && !claim ? (
+                  <ModalBody className={styles.sessionInterviewPrefill}>{prefillCard}</ModalBody>
+                ) : null}
+              </>
+            )}
           </VoiceModeBackContext.Provider>
         ) : (
           <>

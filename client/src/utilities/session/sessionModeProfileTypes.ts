@@ -34,6 +34,7 @@ export type SessionModeAccessConditionDocument = {
     | { kind: 'worker_role'; role: string }
     | { kind: 'sbt_onchain'; chainId: number; contract: string; anyOrAll: 'any' | 'all' }
     | { kind: 'agent_grant_scope'; scope: string }
+    | { kind: 'worker_group'; groupIds: string[] }
   >;
 };
 

@@ -2,6 +2,7 @@ import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdmin
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl';
 import { getWorkerAuthHeaders } from '../../utilities/worker/workerAuth';
 import { buildTokenCacheKey, readScopedTokenCache } from '../../utilities/worker/workerAuthTokenCache';
+import { groupReadHeaders } from '../../utilities/worker/workerGroupReadProof';
 import { normalizeAddress } from '../../utilities/web3/addressNormalization';
 
 export type SessionResultsAnalysisStatusRequest = {
@@ -105,11 +106,15 @@ export const getCachedWorkerAuthHeaders = ({
   const baseUrl = normalizeWorkerUrl(workerUrl);
   const address = normalizeAddress(account);
   const slug = toTrimmedString(sessionSlug);
-  if (!baseUrl || !address) return {};
+  if (!baseUrl) return {};
+  // A private session's invite proof reads its results signed out, and until a join makes the reader a member.
+  const invite = groupReadHeaders(baseUrl, slug);
+  if (!address) return invite;
   const storageKey = buildTokenCacheKey({ workerUrl: baseUrl, slug, sessionId, address });
   const cached = readScopedTokenCache(storageKey, { workerUrl: baseUrl, sessionId, sessionSlug: slug, address });
-  if (!cached?.ok || !cached.token) return {};
+  if (!cached?.ok || !cached.token) return invite;
   return {
+    ...invite,
     Authorization: `Bearer ${cached.token}`,
     ...(slug ? { 'X-Group-Slug': slug } : {}),
   };

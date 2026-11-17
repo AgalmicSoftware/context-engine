@@ -30,10 +30,10 @@ test('each person is in until they opt out, and can opt back in', async () => {
   const coordinator = createCoordinator();
   // Addresses arrive checksummed and are kept in lower case.
   const person = `0x${'aB'.repeat(20)}`;
-  assert.deepEqual((await call(coordinator, 'read', { address: person })).body, { ok: true, optedOut: false });
+  assert.deepEqual((await call(coordinator, 'read', { address: person })).body, { ok: true, optedOut: false, unattributed: false });
   assert.deepEqual((await call(coordinator, 'set', { address: person, optedOut: true })).body, { ok: true, optedOut: true });
-  assert.deepEqual((await call(coordinator, 'read', { address: person.toLowerCase() })).body, { ok: true, optedOut: true });
-  assert.deepEqual((await call(coordinator, 'list')).body, { ok: true, addresses: [person.toLowerCase()] });
+  assert.deepEqual((await call(coordinator, 'read', { address: person.toLowerCase() })).body, { ok: true, optedOut: true, unattributed: false });
+  assert.deepEqual((await call(coordinator, 'list')).body, { ok: true, addresses: [person.toLowerCase()], unattributed: [] });
   await call(coordinator, 'set', { address: person, optedOut: false });
   assert.deepEqual((await call(coordinator, 'list')).body.addresses, []);
   assert.equal(coordinator.state.storage.values.size, 0);
@@ -54,4 +54,19 @@ test('a change needs an address and a yes or no', async () => {
   assert.equal((await call(coordinator, 'set', { address: address(2), optedOut: 'yes' })).status, 400);
   assert.equal((await call(coordinator, 'clear', { address: address(2) })).status, 404);
   assert.equal(coordinator.state.storage.values.size, 0);
+});
+
+test('leaving an address off exports is its own choice, apart from opting out', async () => {
+  const coordinator = createCoordinator();
+  const person = address(7);
+  assert.deepEqual((await call(coordinator, 'set-unattributed', { address: person, unattributed: true })).body, { ok: true, unattributed: true });
+  // Their answers are still used and exported: only the address is left off.
+  assert.deepEqual((await call(coordinator, 'read', { address: person })).body, { ok: true, optedOut: false, unattributed: true });
+  assert.deepEqual((await call(coordinator, 'list')).body, { ok: true, addresses: [], unattributed: [person] });
+  await call(coordinator, 'set', { address: person, optedOut: true });
+  assert.deepEqual((await call(coordinator, 'list')).body, { ok: true, addresses: [person], unattributed: [person] });
+  assert.deepEqual((await call(coordinator, 'set-unattributed', { address: person, unattributed: false })).body, { ok: true, unattributed: false });
+  assert.deepEqual((await call(coordinator, 'list')).body, { ok: true, addresses: [person], unattributed: [] });
+  assert.equal((await call(coordinator, 'set-unattributed', { address: person, unattributed: 'yes' })).status, 400);
+  assert.equal((await call(coordinator, 'set-unattributed', { address: 'tg:12345', unattributed: true })).status, 400);
 });

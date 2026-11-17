@@ -29,7 +29,11 @@ const build: DebateAtlasBuild = {
           id: 'b1t1',
           label: 'Identity',
           summary: 'They split.',
-          questions: [{ id: 'q1', prompt: 'Should agents prove they are human?', type: 'binary' }],
+          questions: [
+            { id: 'q1', prompt: 'Should agents prove they are human?', type: 'binary' },
+            { id: 'q2', prompt: 'Which proof?', type: 'multichoice', options: ['Passkey', 'Group invite'] },
+            { id: 'q3', prompt: 'Spend credits', type: 'quadratic', options: ['Parks', 'Roads'], voiceCredits: 25 },
+          ],
           compass,
           positions: [
             { label: 'Go slow', summary: 'Care first.', participantCount: 2, x: 0.2, y: 0.8 },
@@ -65,8 +69,11 @@ it('nests topics under branches as leaves that open in one click, under ids uniq
   const [identity, privacy] = branch.children || [];
   expect(identity).toMatchObject({ id: 'atlas_k1_00000001:b1t1', name: 'Identity', depth: 1 });
   expect(identity.children).toBeUndefined();
+  // With the choices a question offers, so its card shows them.
   expect(identity.questions).toEqual([
     { id: 'q1', question: 'Should agents prove they are human?', questionType: 'binary' },
+    { id: 'q2', question: 'Which proof?', questionType: 'multichoice', options: ['Passkey', 'Group invite'] },
+    { id: 'q3', question: 'Spend credits', questionType: 'quadratic', options: ['Parks', 'Roads'], voiceCredits: 25 },
   ]);
   expect(identity.comments?.map(({ comment, label, participantCount }) => [label, comment, participantCount])).toEqual([
     [undefined, 'They split.', undefined],

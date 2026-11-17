@@ -39,6 +39,7 @@ import { publishCloudflareOwnedStorageMetadata, scanLegacyStorageOwnerIds, setCl
 import { finishContextPdfReading, removeContextSource } from './contextSourceRoute.js';
 import { dispatchResultsBuildStore } from './resultsBuildStore.js';
 import { dispatchSessionAgentOptOutStore } from './sessionAgentOptOuts.js';
+import { dispatchSessionAgentHistoryStore } from './sessionAgentHistory.js';
 import { dispatchSessionFeedbackStore } from './sessionFeedback.js';
 import {
   applySessionConfigMutation,
@@ -1955,6 +1956,26 @@ export class SessionWriteCoordinator {
     });
   }
 
+  // Whether a read invite's signer is the group password's: a read spends
+  // nothing, and a group being updated, deleted or no longer on a password
+  // refuses, the same way for each.
+  async executeWorkerGroupReadInvite(payload) {
+    const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+    const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+    const groupId = normalizeWorkerGroupId(payload?.groupId);
+    const signer = normalizeWorkerGroupSigner(payload?.signer);
+    if (!slug || !sessionId || !groupId || !signer) {
+      return jsonResponse({ ok: false, status: 400, reason: 'worker_group_read_invite_invalid' }, 400);
+    }
+    const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
+    if (!initialized.ok) return jsonResponse(initialized, initialized.status || 503);
+    const group = await this.getActiveWorkerGroupCapacity(groupId);
+    const admitted = group.ok && group.state.joinMode === 'group_password' && constantTimeEqual(signer, group.state.signer);
+    return admitted
+      ? jsonResponse({ ok: true, status: 200, groupId }, 200)
+      : jsonResponse({ ok: false, status: 403, reason: 'worker_group_read_invite_invalid' }, 403);
+  }
+
   executeWorkerGroupAuthorization(payload) {
     const principalKey = normalizeWorkerGroupPrincipal(payload?.principal).key || '';
     return this.runWorkerGroupMemberOperation(principalKey, async (shared) => {
@@ -3501,6 +3522,9 @@ export class SessionWriteCoordinator {
     if (url.pathname.startsWith('/session-config/session-agent/')) {
       return dispatchSessionAgentOptOutStore(this, url.pathname.split('/').pop(), payload || {});
     }
+    if (url.pathname.startsWith('/session-config/session-agent-history/')) {
+      return dispatchSessionAgentHistoryStore(this, url.pathname.split('/').pop(), payload || {});
+    }
     if (url.pathname.startsWith('/session-config/session-feedback/')) {
       return dispatchSessionFeedbackStore(this, url.pathname.split('/').pop(), payload || {});
     }
@@ -3563,6 +3587,9 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/worker-groups/authorize') {
       return this.executeWorkerGroupAuthorization(payload);
+    }
+    if (url.pathname === '/worker-groups/read-invite') {
+      return this.executeWorkerGroupReadInvite(payload);
     }
     if (url.pathname === '/worker-groups/catalog') {
       return this.executeWorkerGroupCatalog(payload);

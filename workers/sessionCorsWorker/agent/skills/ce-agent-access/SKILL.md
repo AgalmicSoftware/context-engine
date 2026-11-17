@@ -26,6 +26,12 @@ It answers as that person, without their admin powers: submit only the answers
 they approved. It ends with their sign-in, within hours, and cannot make a
 browser login.
 
+A session may have its own Session Agent, which answers questions about the
+session on its page and through the Context Engine MCP's `ask_session_agent`,
+not through this API. Chats with a session's agent can be recorded when the
+session's recording setting is on: the public session config shows it as
+`sessionAgent.history`. Tell the person before a question of theirs is stored.
+
 Read `/api/agent/questions` and follow every `nextCursor` while `hasMore` is
 true. Keep the reported total and reject incomplete or stale pagination. Read
 `answer_schema`, canonical question IDs and availability before drafting. Do

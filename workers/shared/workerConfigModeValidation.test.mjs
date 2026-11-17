@@ -695,3 +695,38 @@ test('registry storage accepts the null Cloudflare side written by the wizard', 
     assert.equal(validate({ storageProfile: { backend: 'cloudflare', cloudflare: null } }).ok, false);
   }
 });
+
+test('a Worker group condition names one to twenty stored group ids, nothing else', () => {
+  const withRule = (condition) => {
+    const profile = fastCloudflareProfile();
+    profile.preset = 'custom';
+    profile.storage.payloadAccessControl.accessConditions = {
+      match: 'any',
+      conditions: [{ kind: 'worker_role', role: 'admin' }, condition],
+    };
+    return completeModeConfig(profile);
+  };
+  const path = 'sessionModeProfile.storage.payloadAccessControl.accessConditions.conditions.1';
+  const members = withRule({ kind: 'worker_group', groupIds: ['rxc', 'cosmos.2', 'fore_sight-3'] });
+  assert.deepEqual(validateWorkerConfigModeValues(members), { ok: true });
+  assert.deepEqual(validateDeploymentModeValues(members), { ok: true });
+  assert.deepEqual(validateWorkerConfigModeValues(withRule({ kind: 'worker_group', groupIds: Array.from({ length: 20 }, (_, i) => `g${i}`) })), { ok: true });
+  for (const groupIds of [[], ['RxC'], ['a b'], ['-a'], ['a', 'a'], [7], 'rxc', Array.from({ length: 21 }, (_, i) => `g${i}`), ['a'.repeat(81)]]) {
+    assert.deepEqual(validateWorkerConfigModeValues(withRule({ kind: 'worker_group', groupIds })), { ok: false, path: `${path}.groupIds` }, JSON.stringify(groupIds));
+  }
+  assert.deepEqual(validateWorkerConfigModeValues(withRule({ kind: 'worker_group', groupId: 'rxc' })), { ok: false, path: `${path}.groupId` });
+  assert.deepEqual(validateWorkerConfigModeValues(withRule({ kind: 'worker_group', groupIds: ['rxc'], role: 'admin' })), { ok: false, path: `${path}.role` });
+  assert.deepEqual(validateWorkerConfigModeValues(withRule({ kind: 'worker_groups', groupIds: ['rxc'] })), { ok: false, path: `${path}.kind` });
+  // A rule naming groups lets admins in too: any-of, with the admin condition.
+  const rulePath = 'sessionModeProfile.storage.payloadAccessControl.accessConditions';
+  const group = { kind: 'worker_group', groupIds: ['rxc'] };
+  for (const accessConditions of [
+    { match: 'any', conditions: [group] },
+    { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }, group] },
+    { match: 'any', conditions: [{ kind: 'worker_role', role: 'host' }, group] },
+  ]) {
+    const config = withRule(group);
+    config.sessionModeProfile.storage.payloadAccessControl.accessConditions = accessConditions;
+    assert.deepEqual(validateWorkerConfigModeValues(config), { ok: false, path: rulePath }, JSON.stringify(accessConditions));
+  }
+});

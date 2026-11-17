@@ -1,0 +1,5 @@
+// Links take the surrounding text color, underlined, so they keep its contrast in tooltips and panels alike.
+.link {
+  color: inherit;
+  text-decoration: underline;
+}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { hashSeed, mulberry32 } from '../../utilities/survey/seededPrng.js';
+import { useRestoredHiddenDrafts } from './sessionInterviewKeptReview';
 import {
   hasDraftValue,
   responseCommentValue,
@@ -17,7 +18,7 @@ import type { InterviewDraftResponse, InterviewPrefillPacket, InterviewQuestion 
 // of a person's AI prefill drafts starts blank, and the AI's guess appears only after
 // they answer. That first answer, given without seeing the guess, is the one scored.
 
-export const HIDDEN_DRAFT_NOTE = "Your AI's answer is hidden until you answer.";
+export const HIDDEN_DRAFT_NOTE = "Your AI's predicted response is hidden until you answer.";
 
 /** A hidden draft's first answer, kept from the moment the AI's guess is revealed. */
 export type HiddenInterviewDraft = { blindAnswer?: unknown; revealedAt?: number };
@@ -137,8 +138,11 @@ type Options = ReviewValues & {
 
 /** Hidden-draft state for one review: which drafts are hidden, and each one's blind answer once revealed. */
 export function useInterviewHiddenDrafts({ questions, editedDrafts, savedResponses, researchOn, onAnswered }: Options) {
-  const [hidden, setHidden] = useState<HiddenDrafts>({});
-  const assignedRef = useRef(false);
+  // A review kept in this browser: which drafts it hid, and what it revealed.
+  const initial = useRestoredHiddenDrafts();
+  const [hidden, setHidden] = useState<HiddenDrafts>(() => initial || {});
+  // A kept review already chose what to hide, so nothing it showed is hidden again.
+  const assignedRef = useRef(Boolean(initial));
   // Read by the stable callbacks below, which the modal's memoized callbacks depend on.
   const latest = useRef<ReviewValues & { hidden: HiddenDrafts }>({ editedDrafts, savedResponses, hidden });
   latest.current = { editedDrafts, savedResponses, hidden };
@@ -266,5 +270,7 @@ export function useInterviewHiddenDrafts({ questions, editedDrafts, savedRespons
     [submittable],
   );
 
-  return { assign, isConcealed, reviewedValues, view, noteEdit, submittable, prepareSubmit };
+  // How many drafts are still hidden: answering one shows its guess, and unticking research sharing shows them all.
+  const count = Object.values(hidden).filter((state) => state.revealedAt === undefined).length;
+  return { assign, isConcealed, reviewedValues, view, noteEdit, submittable, prepareSubmit, count, hidden };
 }

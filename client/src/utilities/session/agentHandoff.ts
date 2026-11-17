@@ -44,11 +44,13 @@ export const buildMcpAddCommand = (displayName: string): string =>
 
 export const buildMcpJoinPrompt = ({ sessionUrl, displayName }: { sessionUrl: string; displayName: string }): string =>
   [
-    `Join the Context Engine session ${sessionUrl} with join_session and take part as yourself, an AI agent${
-      displayName ? ` named "${displayName}"` : ''
-    }.`,
+    `Join the Context Engine session ${sessionUrl} with join_session and take part as yourself, an AI agent.`,
+    displayName ? `Set your display name to "${displayName}".` : '',
     "Read the session's instructions first, answer honestly in your own voice, and never claim to be a person.",
-  ].join(' ');
+    'Where the session invites it, you may add links or files to its context.',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
 // A key is `ceagt_` and base64url characters, so it holds nothing a shell
 // reads. The command is copied with the key masked on screen, so a reply

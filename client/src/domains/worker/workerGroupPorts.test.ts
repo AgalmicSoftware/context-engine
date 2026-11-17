@@ -17,12 +17,15 @@ import {
   workerGroupAdminsMayRemove,
   workerGroupMembersMayLeave,
   addWorkerGroupInvites,
+  isPrivateSessionRefusal,
   isWorkerGroupListed,
   listWorkerGroupInvites,
   revokeWorkerGroupInvites,
   setWorkerGroupPassword,
   workerGroupNeedsSecret,
+  WorkerGroupRequestError,
 } from './workerGroupPorts';
+import { forgetGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
 import * as workerAuth from '../../utilities/worker/workerAuth.js';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../utilities/worker/coordinatorRetry';
 
@@ -1442,4 +1445,56 @@ describe('worker group ports', () => {
       });
     });
   });
+});
+
+it('sends a private session’s invite proof when listing its groups', async () => {
+  const header = `rxc:0x${'ab'.repeat(65)}`;
+  saveGroupReadHeader({ workerUrl: WORKER_URL, sessionSlug: SESSION_SLUG, sessionId: SESSION_ID, header });
+  try {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: SESSION_SLUG, groups: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
+    await loadPublicWorkerGroups({
+      workerUrl: WORKER_URL,
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      fetchImpl,
+    });
+    expect(jest.mocked(fetchImpl as typeof fetch).mock.calls[0][1]?.headers).toEqual({
+      'X-Session-Slug': SESSION_SLUG,
+      'X-CE-Group-Invite': header,
+    });
+  } finally {
+    forgetGroupReadHeader(WORKER_URL, SESSION_SLUG);
+  }
+});
+
+it('sends the invite proof beside a sign-in, and names a private session’s refusal', async () => {
+  const header = `rxc:0x${'ab'.repeat(65)}`;
+  saveGroupReadHeader({ workerUrl: WORKER_URL, sessionSlug: SESSION_SLUG, sessionId: SESSION_ID, header });
+  try {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: false, reason: 'private_session_invite_invalid' }), { status: 403 }),
+    );
+    const refusal = await loadWorkerGroupOverview({
+      workerUrl: WORKER_URL,
+      credentialToken: WORKER_TOKEN,
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      fetchImpl,
+    }).catch((error: unknown) => error);
+    expect(jest.mocked(fetchImpl as typeof fetch).mock.calls[0][1]?.headers).toEqual({
+      Authorization: `Bearer ${WORKER_TOKEN}`,
+      'X-CE-Group-Invite': header,
+    });
+    expect(isPrivateSessionRefusal(refusal)).toBe(true);
+    expect(isPrivateSessionRefusal(new WorkerGroupRequestError('worker_group_request_failed_403', 403))).toBe(false);
+  } finally {
+    forgetGroupReadHeader(WORKER_URL, SESSION_SLUG);
+  }
 });

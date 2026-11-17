@@ -36,8 +36,10 @@ settings** on the setup page or the session's settings page. The boolean
 `interviewMode.shareDraftChangesByDefault` defaults to `true` and sets the
 initial **Share for research** checkbox for new responses, including imported
 and voice-generated drafts. The checkbox sits beside **AI submission info**, so
-the choice is visible before submitting without opening it, and its **?** says
-what sharing keeps. Participants can untick it before submitting. Saved per-question choices
+the choice is visible before submitting without opening it. **What’s this?**
+beside it says, on a tap, hover or focus, what sharing keeps; its tooltip's link,
+and a **How it works** link on the hidden-drafts line, open [research data in interviews](research-data.md)
+on GitHub, a plain-language summary with a diagram. Participants can untick it before submitting. Saved per-question choices
 take precedence over this default; a session-config refresh does not overwrite
 an explicit choice made during review, including while logging in to submit.
 Settings save the key only while it is on: Session Workers before 0.7.0 reject
@@ -130,13 +132,20 @@ questions the person hasn't already answered. Voice and typed-context drafts,
 freeform questions and anything shown with research sharing off are never
 hidden.
 
+On the review page, a line under "Your AI drafted N answers" says how many are
+hidden and why, with a "?" that says untick **Share for research** to see every
+draft. The session's optional `interviewMode.dataNote` (**Where the data
+goes**, up to 300 characters) follows in that tooltip and in the **Share for
+research** one, as text with only `https://` addresses as links.
+
 - **Choice.** When review starts with research sharing on, the drafts are
   ranked by a hash of `sessionSlug|participant|questionId` and the first
   `round(count × share)` are hidden, at least one of three or more.
   Participant is the signed-in account, or this browser's local id before
   login, so a reload hides the same drafts.
-- **Hidden.** A grey answer area says "AI guess hidden", with a keyboard-accessible
-  question-mark tooltip explaining why. Your answer controls remain available
+- **Hidden.** One line says "Your AI's predicted response is hidden until you
+  answer.", with a keyboard-accessible question-mark tooltip explaining why, above
+  a grey answer area. Your answer controls remain available
   below it. The AI answer, comment, ratings and notes are absent from the
   rendered markup and accessible text; the grey area contains only placeholders.
 - **Reveal.** Agree/disagree and single-choice questions show "Your AI guessed:

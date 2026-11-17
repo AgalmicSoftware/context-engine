@@ -23,11 +23,11 @@ type Props = {
   onRequestedNodeClose?: (() => void) | null;
 };
 
-// A built atlas has categories and, under each, topics.
-const LEVEL_LABELS = ['Category', 'Topic'];
+// A built atlas has topics and, under each, subtopics.
+const LEVEL_LABELS = ['Topic', 'Subtopic'];
 
 // A built atlas replaces the demo atlas and the RxC topic circles: read-only
-// circles whose categories and topics each open a compass of positions and participants.
+// circles whose topics and subtopics each open a compass of positions and participants.
 export default function SessionDebateAtlasView({
   build,
   builds,
@@ -38,7 +38,7 @@ export default function SessionDebateAtlasView({
   onRequestedNodeClose = null,
 }: Props) {
   const treeData = useMemo(() => buildDebateAtlasTree(build, { sessionSlug }), [build, sessionSlug]);
-  const title = build.title || 'Debate atlas';
+  const title = build.title || 'Atlas';
   const missing = build.missingTopics || [];
   const requestedBuildId = requestedNodeId ? debateAtlasBuildIdOf(requestedNodeId) : '';
   const requestedBuildKept = builds.some((entry) => entry.id === requestedBuildId);
@@ -63,7 +63,7 @@ export default function SessionDebateAtlasView({
   return (
     <ResultsBuildPanel
       kind="debate-atlas"
-      label="Debate atlas"
+      label="Atlas"
       className={styles.atlas}
       build={build}
       builds={builds}
@@ -72,7 +72,7 @@ export default function SessionDebateAtlasView({
         onRequestedNodeClose?.();
         onSelectBuild(id);
       }}
-      help="The session's AI built this from the responses at that moment. Open a category or topic to see its compass: the positions found and where each participant sits."
+      help="The session's AI built this from the responses at that moment. Open a topic or subtopic to see its compass: the positions found and where each participant sits."
     >
       {missing.length > 0 && (
         <p className={styles.notice} role="status">

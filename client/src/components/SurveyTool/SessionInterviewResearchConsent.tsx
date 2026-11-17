@@ -1,14 +1,15 @@
 import type React from 'react';
 import { Input, Label, UncontrolledTooltip } from 'reactstrap';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { INTERVIEW_PROMPT_VERSION, type InterviewPrefillPacket } from './sessionInterview';
 import { describeInterviewPlatform } from './sessionInterviewModalState';
+import SessionDataNote from './SessionDataNote';
+import { buildPublicRepoBlobUrl } from '../../variables/publicRepoMetadata.js';
 import styles from './SessionInterviewResearchConsent.module.scss';
 
-const RESEARCH_DOC_URL =
-  'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-interview-research.md';
+// The plain-language research data doc on GitHub, led by its diagram: what is kept, how it's measured,
+// who sees it, how to stop. Links open it in a new tab, so the review in progress stays put.
+export const RESEARCH_DOC_URL = buildPublicRepoBlobUrl('docs/research-data.md');
 
 type Props = {
   packet: InterviewPrefillPacket;
@@ -59,6 +60,18 @@ export default function SessionInterviewResearchConsent({
   const keepsText = minimal && !!draftText && (draftText.checked || draftText.mixed);
   const model = packet.source.modelId || 'Unknown model';
   const platform = describeInterviewPlatform(packet.source.platform);
+  const sharesMetadata = preserveSavedProvenance || (showProvenance && includeProvenance) || includeComparison;
+  // Drafts from the session's own AI offer no provenance choice, so with nothing shared there'd be nothing to show.
+  if (!showProvenance && !children && !sharesMetadata) {
+    // A packet from the person's own typed context names no model.
+    const drafter = packet.source.modelId === 'direct-user-context' ? '' : packet.source.modelId;
+    return (
+      <p className={styles.nothingShared} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED}>
+        Drafted by the session’s AI{drafter ? ` (${drafter})` : ''}. Only the answers you submit are saved; Share for
+        research also keeps the AI’s predictions and what you changed.
+      </p>
+    );
+  }
   return (
     <>
       {showProvenance || children ? (
@@ -82,12 +95,12 @@ export default function SessionInterviewResearchConsent({
         </div>
       ) : null}
       {/* An unticked box already says what is left out; with nothing shared there is nothing to describe. */}
-      {preserveSavedProvenance || (showProvenance && includeProvenance) || includeComparison ? (
+      {sharesMetadata ? (
         <details
           className={styles.metadata}
           aria-label={showProvenance ? 'AI prefill metadata' : 'AI research metadata'}
         >
-          <summary>AI prefill metadata</summary>
+          <summary>{showProvenance ? 'AI prefill metadata' : 'AI research metadata'}</summary>
           <div className={styles.metadataBody}>
             {preserveSavedProvenance ? (
               <p>
@@ -210,6 +223,8 @@ type ShareProps = {
   researchDetail?: 'minimal' | 'full';
   // The session keeps the AI's drafted text for admins when the person agrees.
   draftTextOffered?: boolean;
+  // The session's note on where research data goes (interviewMode.dataNote); empty shows none.
+  dataNote?: string;
   className?: string;
   onChange: (included: boolean) => void;
 };
@@ -221,6 +236,7 @@ export function SessionInterviewResearchShare({
   disabled,
   researchDetail = 'minimal',
   draftTextOffered = false,
+  dataNote = '',
   className,
   onChange,
 }: ShareProps) {
@@ -245,21 +261,23 @@ export function SessionInterviewResearchShare({
         />{' '}
         <span>Share for research{mixed ? ' (mixed)' : ''}</span>
       </Label>
+      {/* Says what this is in a tooltip on a tap, hover or focus, which a phone can't do with a link. */}
       <button
         type="button"
         id="ce-interview-research-help"
-        className={styles.researchHelp}
+        className={`${styles.researchLink} ${styles.researchWhat}`}
         data-ce-control-appearance="frameless"
-        aria-label="About sharing for research"
+        aria-label="What’s this? About sharing for research"
         aria-describedby="ce-interview-research-description"
       >
-        <FontAwesomeIcon icon={faQuestionCircle} />
+        What’s this?
       </button>
       <span id="ce-interview-research-description" className={styles.srOnly}>
         {minimal
           ? 'Includes the AI’s predicted answers, ratings and confidence, its revision history, and which fields you changed. It excludes the AI’s notes and drafted text, drafts you did not select, encrypted answers, full interview transcripts, and imported conversation history. Edits are not treated as agreement.'
           : 'Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported conversation history are excluded.'}
         {draftTextNote}
+        {dataNote.trim() ? ` ${dataNote.trim()}` : ''}
         {mixed ? ' Your saved responses have different choices; ticking or unticking sets them all.' : ''}
       </span>
       <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus" autohide={false}>
@@ -267,7 +285,12 @@ export function SessionInterviewResearchShare({
           ? 'Records the AI’s predicted answers and confidence and which ones you changed, not its notes or drafted text.'
           : 'Records draft provenance, revisions, selected status, and changed fields. It excludes encrypted answer text, transcripts, and imported conversation history.'}
         {draftTextNote}{' '}
-        <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
+        {dataNote.trim() ? (
+          <>
+            <SessionDataNote note={dataNote} />{' '}
+          </>
+        ) : null}
+        <a className={styles.tooltipLink} href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
           How research data is handled
         </a>
       </UncontrolledTooltip>

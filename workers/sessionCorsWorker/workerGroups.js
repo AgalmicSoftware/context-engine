@@ -1168,6 +1168,7 @@ export const listWorkerGroups = async ({
 	admin = false,
 	includeMemberCount = false,
 	expectedGroupCount,
+	revealGroupId = '',
 } = {}) => {
 	const store = resolveWorkerGroupStore(env);
 	if (!store) return { ok: false, status: 501, reason: 'worker_group_store_not_configured' };
@@ -1243,8 +1244,10 @@ export const listWorkerGroups = async ({
 			listed: authority.listed,
 		};
 		// Member visibility governs only the member list: an unlisted group shows
-		// to its members and admins, a listed one to everyone this list serves.
-		if (!admin && !authority.listed && !authority.isMember) continue;
+		// to its members and admins, a listed one to everyone this list serves,
+		// and any group to someone holding its read invite.
+		const revealed = !!revealGroupId && normalizeWorkerGroupId(group.groupId) === revealGroupId;
+		if (!admin && !authority.listed && !authority.isMember && !revealed) continue;
 		visible.push({
 			...redactGroupForMember(authoritativeGroup),
 			...(includeMemberCount ? { memberCount: authority.memberCount } : {}),
@@ -1664,6 +1667,16 @@ export const isWorkerGroupMember = async ({ env, slug, sessionId, groupId, princ
 	});
 };
 
+/** Whether a read invite's signer holds the group's current password; a read spends nothing. */
+export const checkWorkerGroupReadInvite = ({ env, slug, sessionId, groupId, signer } = {}) =>
+	callWorkerGroupCoordinator({
+		env,
+		slug,
+		sessionId,
+		path: '/worker-groups/read-invite',
+		payload: { groupId: normalizeWorkerGroupId(groupId), signer },
+	});
+
 export const forwardWorkerGroupMutation = async ({
 	env,
 	slug,
@@ -1744,11 +1757,13 @@ const isSelfJoinableWorkerGroup = (group, nowMs) => {
 /**
  * The groups a signed-out visitor may see: listed groups only. A private session shows them only to
  * someone whose join link names a listed group, so an unlisted group's link reveals nothing.
+ * `invitedOnly`: a visitor to a session whose rule names groups, whose read invite has been checked for
+ * `inviteGroupId`, sees that group and no other, listed or not.
  */
-export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, deps = {} } = {}) => {
+export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, invitedOnly = false, deps = {} } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
 	if (!sessionIdentity.ok) return sessionIdentity;
-	const publicDiscovery = workerConfigAllowsAnonymousGroupDiscovery(config);
+	const publicDiscovery = !invitedOnly && workerConfigAllowsAnonymousGroupDiscovery(config);
 	const invite = publicDiscovery ? '' : normalizeWorkerGroupId(inviteGroupId);
 	if (!publicDiscovery && !invite) return { ok: false, status: 403, reason: 'worker_group_discovery_not_public' };
 	const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
@@ -1766,6 +1781,7 @@ export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGrou
 			admin: false,
 			includeMemberCount: false,
 			expectedGroupCount: ready.meta?.groupCount,
+			...(invitedOnly ? { revealGroupId: invite } : {}),
 		});
 	} catch {
 		result = {
@@ -1781,7 +1797,9 @@ export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGrou
 		return { ok: false, status: 403, reason: 'worker_group_discovery_not_public' };
 	}
 	// A link shows group names, not who runs each group: a participant's group names its creator.
-	const groups = result.groups.map(({ adminAddress: _adminAddress, ...group }) => group);
+	const groups = result.groups
+		.filter((group) => !invitedOnly || group.groupId === invite)
+		.map(({ adminAddress: _adminAddress, ...group }) => group);
 	return { ok: true, sessionIdentity, store: result.store, groups };
 };
 
@@ -1835,7 +1853,7 @@ export const listSelfJoinableWorkerGroupsForMember = async ({ env, config, slug,
 	}
 };
 
-export const dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+export const dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, invitedOnly = false, deps = {} } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
 	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
 	let params = new URLSearchParams();
@@ -1867,7 +1885,7 @@ export const dispatchPublicWorkerGroupListRequest = async ({ request, config, en
 			baseHeaders,
 		);
 	}
-	const result = await listWorkerGroupsForVisitor({ env, config, slug, inviteGroupId, deps });
+	const result = await listWorkerGroupsForVisitor({ env, config, slug, inviteGroupId, invitedOnly, deps });
 	if (!result.ok) return routeError(deps, result, baseHeaders);
 	return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
 };

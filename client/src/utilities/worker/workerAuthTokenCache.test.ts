@@ -1,7 +1,9 @@
 import {
   adoptTokenCaches,
   buildTokenCacheEnvelope,
+  clearAllTokenCaches,
   clearTokenCache,
+  heldSessionToken,
   readScopedTokenCache,
   readTokenCache,
   resetTokenCaches,
@@ -191,5 +193,25 @@ describe('workerAuthTokenCache', () => {
     expect(sessionStorage.getItem(OTHER_KEY)).toBeNull();
     expect(sessionStorage.getItem(CACHE_KEY)).toBeNull();
     expect(page.readTokenCache(CACHE_KEY)).toBeNull();
+  });
+  it('finds this tab’s sign-in for one session, after a reload too, and nothing for another', () => {
+    adoptTokenCaches(ADDRESS);
+    const envelope = (sessionSlug: string, token: string) =>
+      buildTokenCacheEnvelope({
+        token,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        workerUrl: 'https://worker.example/',
+        sessionSlug,
+        address: ADDRESS,
+      });
+    writeTokenCache(SECOND_KEY, envelope('salon', 'salon-token'));
+    try {
+      expect(heldSessionToken('https://worker.example', 'salon')).toBe('salon-token');
+      expect(reload().heldSessionToken('https://worker.example/', 'salon')).toBe('salon-token');
+      expect(heldSessionToken('https://worker.example', 'edge')).toBe('');
+      expect(heldSessionToken('https://other.example', 'salon')).toBe('');
+    } finally {
+      clearAllTokenCaches();
+    }
   });
 });

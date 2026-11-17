@@ -175,13 +175,19 @@
   overflow-wrap: anywhere;
 }
 
+.switches {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ce-card-border);
+}
+
 .switchRow {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  padding-top: 10px;
-  border-top: 1px solid var(--ce-card-border);
 
   label {
     display: inline-flex;
@@ -189,8 +195,58 @@
     gap: 8px;
     margin: 0;
   }
+}
 
-  .error {
-    flex-basis: 100%;
+// What to keep of this chat, set off from the question above it.
+.keep {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+
+  legend {
+    float: left;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    font-size: inherit;
   }
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+  }
+}
+
+// The setup page's field colours, as for the question.
+.name {
+  flex: 1 1 160px;
+  min-width: 0;
+  background: var(--ce-input-bg) !important;
+  border-color: var(--ce-input-border-strong) !important;
+  color: var(--ce-panel-text) !important;
+}
+
+// Read by screen readers as the "?"'s description; the tooltip shows it to everyone else.
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

@@ -350,6 +350,20 @@
   padding-top: 8px;
 }
 
+// The viewer's parts draw in the inverse colour, made for the dark panels the library sits on elsewhere.
+// As a dialog it takes the setup page's surface and text, a pair every theme keeps readable; the theme's
+// `.modal-content` rule outranks a plain class, as for the Session Agent. Its title takes the bar's colour.
+.documentViewer {
+  --ce-text-inverse: var(--ce-panel-text);
+
+  background: var(--ce-surface) !important;
+  color: var(--ce-panel-text) !important;
+
+  :global(.modal-title) {
+    color: inherit;
+  }
+}
+
 .viewerLoading {
   padding: 18px 0;
   opacity: 0.9;

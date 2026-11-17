@@ -38,6 +38,15 @@ const makeWorkerConfig = () => ({
 });
 
 describe('mainSiteWorkerCanonicalCacheRuntime', () => {
+  it('loads nothing from a private session’s shell, where every read would be refused', async () => {
+    const { host, calls } = makeHost();
+    const shell = { ...makeWorkerConfig(), privateSession: 'invite_required' };
+    await expect(
+      initializeMainSiteWorkerCanonicalCaches({ host, sessionConfig: shell, sessionSlug: 'worker-session' }),
+    ).resolves.toBe(true);
+    expect(calls).toEqual([]);
+  });
+
   it('hydrates pure Worker caches without any chain or SBT work', async () => {
     const { host, calls } = makeHost();
 

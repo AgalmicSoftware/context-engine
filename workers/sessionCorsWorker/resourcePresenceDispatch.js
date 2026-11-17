@@ -1,5 +1,6 @@
 import { resolveSessionLifecycle } from '../shared/sessionLifecycle.mjs';
 import { isInterviewModeEnabled } from './realtimeCallExecution.js';
+import { evaluatePrivateSessionAccess, privateSessionRefusal } from './privateSessionAccess.js';
 
 const toPresent = (value) => {
   if (typeof value === 'string') return value.trim().length > 0;
@@ -43,6 +44,11 @@ export const dispatchResourcePresenceRequest = async ({
 
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return corsContext?.response;
+  const access = await evaluatePrivateSessionAccess({
+    env, slug, config, request,
+    resolveRequester: () => deps?.resolveOptionalRequester?.({ request, env, slug, config, headers: corsContext.headers }),
+  });
+  if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers: corsContext.headers });
 
   const secrets = (await deps?.getSessionSecrets?.(env, slug)) || {};
   let interview;

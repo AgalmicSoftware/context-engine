@@ -348,7 +348,7 @@ function SessionInterviewDraftCardContent({
       </button>
       <div className={styles.questionText}>{prompt}</div>
       {concealed ? (
-        <SessionInterviewHiddenAnswer note={blindNote} />
+        <SessionInterviewHiddenAnswer />
       ) : blindNote ? (
         <p className={styles.blindNote} role="status">
           {blindNote}

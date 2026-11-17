@@ -46,6 +46,7 @@ import {
   shouldRetryAnonymousWithoutRateId,
   stripAnonymousRateIdHeader,
 } from './workerAuthAnonymousHeaders.js';
+import { withGroupReadHeader } from './workerGroupReadProof';
 import {
   isTokenScopeDenialResponse,
   readRequestApiKey,
@@ -1078,7 +1079,10 @@ export const fetchWorkerWithAuth = async (
   const slug = resolvedSession.sessionSlug;
   const workerUrl = normalizeWorkerUrl(opts.workerUrl || url);
   const bodyIsStream = isStreamBody(options?.body);
-  const send = withCoordinatorRetry((input, init) => fetch(input, init));
+  // A private session's read proof goes with every request to its Worker, signed in or out.
+  const send = withCoordinatorRetry((input, init) =>
+    fetch(input, { ...init, headers: withGroupReadHeader(new Headers(init?.headers), workerUrl, slug) }),
+  );
   const anonymousOnly = opts.anonymousOnly === true;
   const startedSignedOut = !getCurrentWorkerAuthStoreAddress();
   const startingAuthEpoch = getClientAuthGeneration();

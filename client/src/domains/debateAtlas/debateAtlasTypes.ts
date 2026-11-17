@@ -18,7 +18,7 @@ export type DebateAtlasMapping = {
 export type DebateAtlasTopic = DebateAtlasMapping & {
   id: string;
   label: string;
-  questions?: Array<{ id: string; prompt: string; type?: string }>;
+  questions?: Array<{ id: string; prompt: string; type?: string; options?: string[]; voiceCredits?: number }>;
 };
 export type DebateAtlasBranch = DebateAtlasMapping & { id: string; label: string; topics: DebateAtlasTopic[] };
 export type DebateAtlasBuild = ResultsBuildSummary & { missingTopics?: string[]; branches: DebateAtlasBranch[] };

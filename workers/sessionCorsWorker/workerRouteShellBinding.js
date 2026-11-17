@@ -6,6 +6,9 @@ import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { evaluateAuthenticatedRoutePreflight as evaluateAuthenticatedRoutePreflightBoundary } from './authenticatedRoutePreflight.js';
 import { dispatchInterviewStarterRequest } from './interviewStarter.js';
 import { dispatchAnonymousFeedbackRequest } from './sessionFeedbackRoute.js';
+import { dispatchSignedOutSessionAgentRequest } from './sessionAgentSignedOut.js';
+import { evaluatePrivateSessionAccess, privateSessionRefusal, readGroupReadInviteHeader } from './privateSessionAccess.js';
+import { STORAGE_GROUP_READ_INVITE } from './storageRouteExecution.js';
 import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import {
@@ -135,6 +138,26 @@ export const createWorkerRouteShellWithWorkerDeps = ({
   const log = deps?.log || (() => {});
   const ResponseCtor = deps?.Response || Response;
 
+  // Who a signed-out route's optional bearer names: a route that serves both
+  // the signed out and the signed in reads a missing, failing or other
+  // session's token as signed out.
+  const resolveOptionalRequester = async ({ request, env, slug, config, headers }) => {
+    const signedOut = { address: '', scopes: {} };
+    if (!deps?.toStr?.(request.headers.get('authorization') || '').trim()) return signedOut;
+    const auth = await deps?.requireAuth?.({ request, env, baseHeaders: headers, slugHint: slug });
+    if (!auth?.ok || auth.slug !== slug) return signedOut;
+    const context = await resolveAuthenticatedRouteContext({
+      request, env, auth, baseHeaders: headers,
+      deps: {
+        readCurrentSessionConfig: async () => ({ config }),
+        getCorsContext: deps?.getCorsContext,
+        json: deps?.json, toStr: deps?.toStr,
+        SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
+      },
+    });
+    return context?.ok ? { address: context.address, scopes: context.scopes } : signedOut;
+  };
+
   const handleRequest = async (request, env) => {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -189,6 +212,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             getSessionConfig: deps?.getSessionConfig,
             getCorsContext: deps?.getCorsContext,
             json: deps?.json,
+            resolveOptionalRequester,
           },
           constants: {
             missingSlugError: constants?.missingSlugError,
@@ -218,6 +242,43 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         });
       }
 
+      if (routeSelection.kind === 'session-agent-signed-out') {
+        return await dispatchSignedOutSessionAgentRequest({
+          request,
+          env,
+          path: routeSelection.path,
+          slugHint: envSlug,
+          baseHeaders: routeBaseHeaders,
+          deps: {
+            resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
+            getCorsContext: deps?.getCorsContext,
+            resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
+            checkRateLimit: deps?.checkRateLimit,
+            // As the signed-in route has them: the session's AI, and its gates for who may ask and what they may read.
+            resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+            normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
+            proxyAnthropic: deps?.proxyAnthropic,
+            proxyOpenAI: deps?.proxyOpenAI,
+            proxyOpenRouter: deps?.proxyOpenRouter,
+            proxyCustomRPC: deps?.proxyCustomRPC,
+            getSessionSecrets: deps?.getSessionSecrets,
+            readResourceGateOnChain: deps?.readResourceGateOnChain,
+            resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+            toRegistrySessionSlug: deps?.toRegistrySessionSlug,
+            resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+            checkSbtGate: deps?.checkSbtGate,
+            json: deps?.json,
+            toStr: deps?.toStr,
+            now: deps?.now,
+          },
+          constants: {
+            missingSlugError: constants?.missingSlugError,
+            sessionConfigNotFoundError: constants?.sessionConfigNotFoundError,
+          },
+        });
+      }
+
       if (routeSelection.kind === 'interview-brief' || routeSelection.kind === 'interview-starter') {
         return await (routeSelection.kind === 'interview-starter' ? dispatchInterviewStarterRequest : dispatchInterviewBriefRequest)({
           request,
@@ -234,6 +295,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
               isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
               log: deps?.log,
               evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+              resolveOptionalRequester,
             } : {}),
             resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
             checkRateLimit: deps?.checkRateLimit,
@@ -283,6 +345,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             getCorsContext: deps?.getCorsContext,
             getSessionSecrets: deps?.getSessionSecrets,
             evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+            resolveOptionalRequester,
             json: deps?.json,
           },
           constants: {
@@ -486,10 +549,11 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       });
       }
 
-      if (['admin-results-analysis-status', 'admin-session-diagnostics', 'admin-feedback-list'].includes(routeSelection.kind)) {
+      if (['admin-results-analysis-status', 'admin-session-diagnostics', 'admin-feedback-list', 'admin-session-agent-chats'].includes(routeSelection.kind)) {
         return await dispatchAdminResultsAnalysisStatusRequest({
           diagnostics: routeSelection.kind === 'admin-session-diagnostics',
           feedback: routeSelection.kind === 'admin-feedback-list',
+          chats: routeSelection.kind === 'admin-session-agent-chats',
           request,
           env,
           baseHeaders: routeBaseHeaders,
@@ -621,6 +685,15 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           address = context.address;
           scopes = context.scopes;
         }
+        // A private session's results follow its rule; the reads below see the
+        // invite too, so someone signed out reads what members are shown.
+        const resultsAccess = await evaluatePrivateSessionAccess({
+          env, slug: targetSlug, config, request: withQuerySlugHeader, requesterAddress: address, authScopes: scopes, part: 'results',
+        });
+        if (!resultsAccess.ok) {
+          return privateSessionRefusal({ access: resultsAccess, json: deps?.json, headers: corsContext?.headers || routeBaseHeaders });
+        }
+        const readInvite = { [STORAGE_GROUP_READ_INVITE]: readGroupReadInviteHeader(withQuerySlugHeader) };
         if (routeSelection.kind === 'debate-atlas' || routeSelection.kind === 'risk-matrix') {
           const dispatchBuildRead = routeSelection.kind === 'debate-atlas' ? dispatchDebateAtlasReadRequest : dispatchRiskMatrixReadRequest;
           return await dispatchBuildRead({
@@ -632,6 +705,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             scopes,
             headers: corsContext?.headers || routeBaseHeaders,
             deps: {
+              ...readInvite,
               json: deps?.json,
               validateAdmin: deps?.validateAdmin,
               authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
@@ -654,6 +728,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           scopes,
           headers: corsContext?.headers || routeBaseHeaders,
           deps: {
+            ...readInvite,
             json: deps?.json,
             authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
             readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
@@ -692,6 +767,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
                 storageRoute: deps?.storageRoute,
                 readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
                 evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
+                resolveOptionalRequester,
                 getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
                 transcribe: deps?.transcribe,
                 readAiRequestPayload: deps?.readAiRequestPayload,

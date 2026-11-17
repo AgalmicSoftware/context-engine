@@ -2,7 +2,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds';
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import SessionInterviewResearchConsent, { SessionInterviewResearchShare } from './SessionInterviewResearchConsent';
 import type { InterviewPrefillPacket } from './sessionInterview';
 
@@ -38,6 +38,56 @@ const renderConsent = (props = {}) =>
   );
 
 describe('SessionInterviewResearchConsent', () => {
+  it('says in one line what is kept when it offers no choice and nothing is shared', () => {
+    const { container, rerender } = renderConsent({ showProvenance: false });
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).toHaveTextContent(
+      'Drafted by the session’s AI (gpt-example). Only the answers you submit are saved; Share for research also keeps the AI’s predictions and what you changed.',
+    );
+    expect(container.querySelectorAll('input, details')).toHaveLength(0);
+    // Without a model ID it names no model.
+    rerender(
+      <SessionInterviewResearchConsent
+        packet={{ ...packet, source: { ...packet.source, modelId: '' } }}
+        showProvenance={false}
+        includeProvenance
+        includeComparison={false}
+        onProvenanceChange={jest.fn()}
+        coverageDetails={[]}
+        selectedCount={1}
+        unselectedCount={0}
+        disabled={false}
+      />,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).toHaveTextContent(
+      /^Drafted by the session’s AI\. Only/,
+    );
+    // Nor for the person's own typed context, which isn't a model.
+    rerender(
+      <SessionInterviewResearchConsent
+        packet={{ ...packet, source: { ...packet.source, modelId: 'direct-user-context' } }}
+        showProvenance={false}
+        includeProvenance
+        includeComparison={false}
+        onProvenanceChange={jest.fn()}
+        coverageDetails={[]}
+        selectedCount={1}
+        unselectedCount={0}
+        disabled={false}
+      />,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).toHaveTextContent(
+      /^Drafted by the session’s AI\. Only/,
+    );
+  });
+
+  it('leaves the line out when it has a choice or something to show', () => {
+    renderConsent({ showProvenance: false, children: <label>Name choice</label> });
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).not.toBeInTheDocument();
+    renderConsent({ showProvenance: false, includeComparison: true });
+    renderConsent({ includeProvenance: false });
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).not.toBeInTheDocument();
+  });
+
   it('describes opt-in research metadata without claiming edits are agreement', () => {
     renderConsent({ researchDetail: 'full' });
     render(
@@ -68,7 +118,7 @@ describe('SessionInterviewResearchConsent', () => {
     const link = screen.getByRole('link', { name: 'How research data is handled' });
     expect(link).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-interview-research.md',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/research-data.md',
     );
   });
 
@@ -115,10 +165,44 @@ it('shows mixed saved consent and lets an explicit click choose for all selected
 });
 
 describe('SessionInterviewResearchShare', () => {
-  it('names itself shortly, with what it shares behind its ?', () => {
+  it('links to a doc that exists, led by its diagram, with the section the link names', () => {
+    // The links open these on GitHub; a renamed file or heading would break them silently.
+    const docs = path.join(__dirname, '../../../../docs');
+    const doc = fs.readFileSync(path.join(docs, 'research-data.md'), 'utf8');
+    expect(doc).toMatch(/^## What is kept$/m);
+    const diagram = doc.match(/!\[[^\]]*\]\(([^)]+\.svg)\)/)?.[1];
+    expect(diagram && fs.existsSync(path.join(docs, diagram))).toBe(true);
+  });
+
+  it('says what it is with one “What’s this?”, whose tooltip links to the research data doc in a new tab', async () => {
+    render(
+      <SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} dataNote="Funded by Example." />,
+    );
+    const what = screen.getByRole('button', { name: 'What’s this? About sharing for research' });
+    expect(what).toHaveTextContent(/^What’s this\?$/);
+    // No separate ? or “What’s kept” saying the same thing again.
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.queryByText('What’s kept')).not.toBeInTheDocument();
+    // A tap shows the tooltip with the session's note and the doc's link, whether the browser reports it as
+    // focus or, as iOS Safari does, as a hover.
+    fireEvent.mouseOver(what);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Funded by Example.');
+    const link = within(tooltip).getByRole('link', { name: 'How research data is handled' });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/research-data.md',
+    );
+    expect(link).toHaveAttribute('target', '_blank');
+    fireEvent.mouseOut(what);
+    fireEvent.focus(what);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Funded by Example.');
+  });
+
+  it('names itself shortly, with what it shares behind “What’s this?”', () => {
     render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
     expect(screen.getByLabelText('Share for research')).toBeChecked();
-    expect(screen.getByRole('button', { name: 'About sharing for research' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('button', { name: 'What’s this? About sharing for research' })).toHaveAccessibleDescription(
       /predicted answers, ratings and confidence/,
     );
   });

@@ -307,3 +307,11 @@ export const buildTokenCacheKey = ({
   }
   return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}${identityScope}`;
 };
+
+/** This tab's unexpired sign-in for a session, or '' without one. */
+export const heldSessionToken = (workerUrl: unknown, sessionSlug: unknown): string => {
+  const origin = normalizeWorkerUrl(workerUrl);
+  const slug = normalizeSessionSlug(sessionSlug);
+  if (!origin || !slug) return '';
+  return listHeldTokens().find((held) => held.workerUrl === origin && held.sessionSlug === slug)?.token || '';
+};

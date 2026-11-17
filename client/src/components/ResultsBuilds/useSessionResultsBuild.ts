@@ -24,6 +24,8 @@ export type SessionResultsBuild<TBuild extends ResultsBuildSummary> = {
   canBuild: boolean;
   building: boolean;
   loading: boolean;
+  /** A read for this reader has come back, so an empty list means none is built. */
+  loaded: boolean;
   /** When a build someone started is still running. */
   activeSinceMs: number | null;
   /** When the running build, this reader's or someone else's, started. */
@@ -108,6 +110,7 @@ export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({
   // The build the reader picked; '' follows the newest.
   const [selectedId, setSelectedId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
   if (shownFor !== identity) {
     setShownFor(identity);
@@ -116,6 +119,7 @@ export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({
     setPressedAtMs(null);
     setSelectedId('');
     setLoading(false);
+    setLoaded(false);
     setError('');
   }
   const identityRef = useRef(identity);
@@ -142,6 +146,7 @@ export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({
         // Refused: this reader may not see this kind here, so none stay on screen.
         if (result.status === 401 || result.status === 403) {
           setData(EMPTY);
+          setLoaded(true);
           setError('');
           return;
         }
@@ -149,6 +154,7 @@ export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({
         return;
       }
       setError('');
+      setLoaded(true);
       const activeSinceMs = result.active?.startedAtMs || null;
       setData((previous) => ({
         builds: result.builds || [],
@@ -257,6 +263,7 @@ export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({
     canBuild: supported && (data.serverCanBuild || mayStartResultsBuilds(config, account)),
     building,
     loading,
+    loaded,
     activeSinceMs: data.activeSinceMs,
     buildStartedAtMs: building ? pressedAtMs : data.activeSinceMs,
     nextBuild: data.nextBuild,

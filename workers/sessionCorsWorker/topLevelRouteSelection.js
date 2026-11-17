@@ -40,6 +40,12 @@ export const resolveTopLevelRouteSelection = ({
   // Signed in, feedback is an ordinary signed-in route; signed out, it names its session with ?slug=.
   if (path === '/feedback' && method === 'POST' && !hasTrimmedAuthorization) return { kind: 'feedback' };
 
+  // Signed in, the Session Agent is an ordinary signed-in route; signed out, its status and one question are open
+  // where the session's setting allows, and name their session with ?slug=.
+  if ((path === '/session-agent/status' || path === '/session-agent/ask') && method === 'POST' && !hasTrimmedAuthorization) {
+    return { kind: 'session-agent-signed-out', path };
+  }
+
   if (path === '/session-config' && method === 'GET') {
     return { kind: 'session-config' };
   }
@@ -75,6 +81,7 @@ export const resolveTopLevelRouteSelection = ({
   }
   if (path === '/admin/diagnostics' && method === 'GET') return { kind: 'admin-session-diagnostics' };
   if (path === '/admin/feedback' && method === 'GET') return { kind: 'admin-feedback-list' };
+  if (path === '/admin/session-agent/chats' && method === 'GET') return { kind: 'admin-session-agent-chats' };
 
   if (path === '/results-analysis/artifact' && method === 'GET') {
     return { kind: 'results-analysis-artifact' };
@@ -91,10 +98,10 @@ export const resolveTopLevelRouteSelection = ({
     };
   }
 
+  // A voice call has only this route, signed in or not.
   if (
-    !hasTrimmedAuthorization &&
     method === 'POST' &&
-    (path === '/ai' || path === '/transcribe' || path === '/realtime/call')
+    (path === '/realtime/call' || (!hasTrimmedAuthorization && (path === '/ai' || path === '/transcribe')))
   ) {
     return {
       kind: 'anonymous',

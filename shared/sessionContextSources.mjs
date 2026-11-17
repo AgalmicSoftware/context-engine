@@ -114,6 +114,20 @@ export const groupLockedAccess = (groupIds) => ({
   ],
 });
 
+/** The groups an item is locked to when its rule is exactly groupLockedAccess's, and null for any other rule. */
+export const groupLockedIds = (accessConditions) => {
+  if (!isRecord(accessConditions) || text(accessConditions.match).toLowerCase() !== 'any') return null;
+  const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
+  const [admin, group] = conditions;
+  const groupIds = groupIdList(group?.groupIds);
+  return conditions.length === 2 &&
+    isAdminsOnlyAccess({ match: 'all', conditions: [admin] }) &&
+    isRecord(group) && text(group.kind).toLowerCase() === 'worker_group' &&
+    Object.keys(group).every((key) => key === 'kind' || key === 'groupIds') && groupIds.length
+    ? groupIds
+    : null;
+};
+
 /** A tag's value from a storage tag list ({ name, value }[]), or ''. */
 export const contextTagValue = (tags, name) =>
   text((Array.isArray(tags) ? tags : []).find((tag) => isRecord(tag) && text(tag.name) === name)?.value);

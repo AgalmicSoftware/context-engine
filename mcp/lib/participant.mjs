@@ -8,8 +8,9 @@ import { readAgentState, updateAgentState } from './agentState.mjs';
 import { buildQuestionRecord, buildResponseRecord, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
 import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorageVersions.mjs';
 import { htmlToPlainText, normalizeSessionContext } from '../../shared/sessionContext.mjs';
+import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
 import { MAX_AGENT_INSTRUCTIONS_CHARS } from '../../shared/sessionConfigEdits.mjs';
-import { CONTEXT_AGENT_ADDER, agentAdderName, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { CONTEXT_AGENT_ADDER, CONTEXT_SOURCE_LIMITS, agentAdderName, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { buildNote, checkContextLink, contextInvitation, contextUploadForm, readContextFile, workerReadsContext } from './contextAdditions.mjs';
 import { createKnownSessions } from './knownSessions.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
@@ -17,7 +18,7 @@ import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
-import { createWorkerGroupPasswordKeys, parseGroupInviteToken } from '../../shared/workerGroupJoin.mjs';
+import { createWorkerGroupPasswordKeys, formatWorkerGroupReadInvite, parseGroupInviteToken } from '../../shared/workerGroupJoin.mjs';
 import { ethers } from 'ethers';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
@@ -186,6 +187,23 @@ const sameAuthoringInputs = (stored, record) => {
   return inputs(stored) === inputs(record);
 };
 
+// What join_session and get_session say about the session's own agent, when
+// it has one: whether chats with it are recorded here, said before any is asked.
+const RECORDING_NOTICE = 'Chats with a session’s agent can be recorded when the session’s recording setting is on.';
+const sessionAgentOf = (config) => {
+  if (!isRecord(config?.sessionAgent) || !Array.isArray(config.sessionAgent.audiences)) return null;
+  const recording = config.sessionAgent.history === true;
+  return {
+    recording,
+    // Whether someone not signed in may ask too, where the session would let them sign in.
+    anyoneCanAsk: config.sessionAgent.anyoneCanAsk !== false,
+    note: recording
+      ? `${RECORDING_NOTICE} It is on here: ask_session_agent stores your question and its answer for the session’s organisers, who may export them, unless you pass store false. Your address is stored only if you pass attribution "address".`
+      : `${RECORDING_NOTICE} It is off here: nothing you ask is kept.`,
+    how: 'Call ask_session_agent with a question about the session. It answers only the people its admins let ask.',
+  };
+};
+
 // The session's own instructions for agents: shown in full up to the cap
 // every Worker enforces, marked as the admins' and as adding to the general guidance.
 const instructionsOf = (config) => {
@@ -217,6 +235,22 @@ const nextStep = ({ instructions, linkGroup, groupName = '', member = null }) =>
     ? 'call join_group for the group the instructions ask you to join, if any'
     : 'join it with join_group';
   return `${read}. ${named}${member === false ? ', which you haven’t joined' : ''}: ${join}. Then call list_questions and answer.`;
+};
+
+// What joining invites an agent to do if it wants to, none of it required: a
+// name of its own, a group the session lists as open, something to add. Only
+// what is open to it right now is offered, in the same words wherever it joins.
+const joinInvitations = ({ named, groups = [], addingContext, instructions }) => {
+  const open = groups.filter((group) => !group.member && group.joining === SELF_JOINING.open).length;
+  return [
+    ...(named ? [] : [
+      'If you’d like a display name, set one with set_profile: say you’re an AI agent, and whose if you’re there for someone, for example “Sam’s agent”. Never claim to be a person.',
+    ]),
+    ...(open ? [
+      `If you’d like to join a group, ${open === 1 ? 'one listed here is' : `${open} listed here are`} open: join with join_group.${instructions ? ' The session’s instructions may say which.' : ''}`,
+    ] : []),
+    ...(addingContext ? ['If you have something everyone here should see, add a file, a link or text with add_context.'] : []),
+  ];
 };
 
 // Says plainly what a list_questions call left out and how to get it.
@@ -276,6 +310,18 @@ const groupJoinCredential = async ({ token, sessionId, groupId, address }) => {
   if (invite.kind === 'invite') throw new Error('Invite codes aren’t supported yet; ask for a group password or a one-use link instead.');
   if (invite.kind === 'one_use') return { secret: invite.secret };
   return { proof: await groupPasswordKeys.signJoin({ password: invite.password, sessionId, groupId, address }) };
+};
+
+// What lets a private session's agent read before it joins: a group password
+// signs a read proof for its session and group. A code makes none.
+const groupReadInvite = async ({ token, sessionId, groupId }) => {
+  const invite = parseGroupInviteToken(token);
+  const id = trim(groupId).toLowerCase();
+  if (invite?.kind !== 'password' || !id) return '';
+  return formatWorkerGroupReadInvite({
+    groupId: id,
+    proof: await groupPasswordKeys.signRead({ password: invite.password, sessionId, groupId: id }),
+  });
 };
 
 // `sentInvite` is false when join_group had no invite to send: the link's is
@@ -940,7 +986,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       // Joining always starts a fresh client, so a session that changed identity can be joined again.
       sessions.delete(sessionKey(parsed));
       const ctx = await openSession(parsed);
-      const sessionConfig = await ctx.client.loadConfig();
+      let sessionConfig = await ctx.client.loadConfig();
       // A listed Worker must serve the session the list names, as the browser checks, before any sign-in.
       if (parsed.listedSessionId && ctx.client.sessionId !== parsed.listedSessionId) {
         sessions.delete(sessionKey(parsed));
@@ -952,6 +998,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       ctx.info.appOrigin = ctx.client.loginOrigin;
       // Kept in memory for join_group only; never shown or saved.
       if (groupInvite) ctx.groupInvites = new Map([[parsed.joinGroupId.toLowerCase(), groupInvite]]);
+      // A private session shows only its shell until the link's invite, or a
+      // membership, admits the agent; the invite is held in memory like the link's.
+      const privateSession = !ctx.registry && !!ctx.client.privateSession;
+      if (privateSession) {
+        const readInvite = await groupReadInvite({ token: groupInvite, sessionId: ctx.client.sessionId, groupId: parsed.joinGroupId });
+        if (readInvite) {
+          ctx.client.setGroupReadInvite(readInvite);
+          sessionConfig = await ctx.client.loadConfig();
+        }
+      }
       const outcome = { ...sessionSummary(ctx, sessionConfig), address: wallet.address };
 
       // Like the web app, only SBTs the link marks for automatic claiming are claimed on join.
@@ -978,6 +1034,30 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         loginError = error;
         return {};
       });
+      // A private session is joined through its link's group before anything
+      // else is read, so what follows is read as a member.
+      if (privateSession && parsed.joinGroupId) {
+        checkpoint();
+        const id = parsed.joinGroupId.toLowerCase();
+        try {
+          const credential = groupInvite
+            ? await groupJoinCredential({ token: groupInvite, sessionId: ctx.client.sessionId, groupId: id, address: wallet.address })
+            : {};
+          await ctx.client.joinGroup(id, { signal, ...credential });
+          outcome.joinedGroup = id;
+        } catch (error) {
+          outcome.groupJoinError = describeError(groupRefusal(error, id, 'join_group', { sentInvite: !!groupInvite }));
+        }
+      }
+      // Signed in now, and perhaps joined: read it again, so a member sees it whole from a plain link too.
+      if (privateSession) {
+        sessionConfig = await ctx.client.loadConfig();
+        Object.assign(outcome, sessionSummary(ctx, sessionConfig));
+      }
+      if (ctx.client.privateSession) {
+        outcome.privateSession = ctx.client.privateSession;
+        outcome.note = 'This session is private, and nothing in it can be read yet. Join it from its group invite link: call join_session with the full link, or join_group with the link as invite.';
+      }
       await remember(ctx, outcome.title, parsed.recruitmentSource);
       if (claims.length) {
         outcome.sbtClaims = [];
@@ -1013,9 +1093,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       outcome.context = contextOf(sessionConfig);
       const instructions = instructionsOf(sessionConfig);
       if (instructions) outcome.agentInstructions = instructions;
+      const sessionAgent = ctx.registry ? null : sessionAgentOf(sessionConfig);
+      if (sessionAgent) outcome.sessionAgent = sessionAgent;
       const sessionSbts = listSessionSbts(sessionConfig);
       if (sessionSbts.length) outcome.sessionSbts = sessionSbts;
-      // The link's group is named, not joined, so the agent can read the session's instructions first.
+      // The link's group is named, not joined, so the agent can read the session's instructions first;
+      // a private session's was joined above, since nothing can be read before.
       const linkGroup = ctx.registry ? '' : parsed.joinGroupId;
       if (!ctx.registry) {
         checkpoint();
@@ -1027,6 +1110,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         : null;
       const groupName = outcome.groups?.find((group) => group.groupId.toLowerCase() === linkGroup.toLowerCase())?.name || '';
       outcome.next = nextStep({ instructions, linkGroup, groupName, member });
+      const youMay = joinInvitations({
+        named: !!profile().displayName, groups: outcome.groups, addingContext: outcome.addingContext, instructions,
+      });
+      if (youMay.length) outcome.youMay = youMay;
       return outcome;
     },
 
@@ -1042,12 +1129,14 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const endsAt = text(sessionConfig.sessionEndsAt);
       const sessionSbts = listSessionSbts(sessionConfig);
       const instructions = instructionsOf(sessionConfig);
+      const sessionAgent = ctx.registry ? null : sessionAgentOf(sessionConfig);
       return {
         ...sessionSummary(ctx, sessionConfig),
         testEth: await ctx.client.describeTestEth(),
         description: text(sessionConfig.sessionInfo).slice(0, MAX_DESCRIPTION_LENGTH),
         context: contextOf(sessionConfig),
         ...(instructions ? { agentInstructions: instructions } : {}),
+        ...(sessionAgent ? { sessionAgent } : {}),
         ...(endsAt ? { endsAt } : {}),
         ...(sessionSbts.length ? { sessionSbts } : {}),
         ...(ctx.registry ? {} : await describeGroups(ctx)),
@@ -1342,10 +1431,22 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const ctx = await resolveSession(session);
       if (ctx.registry) throw new Error('Worker groups are not available in on-chain sessions.');
       await ensureReady(ctx);
-      const id = trim(groupId);
-      if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
+      let id = trim(groupId);
+      let pasted = trim(invite);
+      // A pasted invite link names its group and carries its invite after #.
+      if (/^https?:\/\//i.test(pasted)) {
+        const link = parseSessionLink(pasted, { allowLocalWorkers: config.allowLocalWorkers });
+        if (link.slug !== ctx.info.slug) throw new Error('That invite link is for another session; call join_session with it.');
+        if (!link.joinGroupId || !link.groupInvite) throw new Error('That link carries no group invite.');
+        if (id && id.toLowerCase() !== link.joinGroupId.toLowerCase()) {
+          throw new Error(`That invite link is for group "${link.joinGroupId}", not "${id}".`);
+        }
+        id = link.joinGroupId;
+        pasted = link.groupInvite;
+      }
+      if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id, or the group’s invite link as invite.');
       // An invite passed here wins over the one the session link carried.
-      const token = trim(invite) || ctx.groupInvites?.get(id.toLowerCase()) || '';
+      const token = pasted || ctx.groupInvites?.get(id.toLowerCase()) || '';
       const credential = token
         ? await groupJoinCredential({ token, sessionId: ctx.client.sessionId, groupId: id.toLowerCase(), address: wallet.address })
         : {};
@@ -1353,6 +1454,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       await ctx.client.joinGroup(id, { signal, ...credential }).catch((error) => {
         throw groupRefusal(error, id, 'join_group', { sentInvite: !!token });
       });
+      // A private session's config is whole once the agent is a member.
+      if (ctx.client.privateSession) await ctx.client.loadConfig();
       return { session: ctx.info.slug, joinedGroup: id };
     },
 
@@ -1369,13 +1472,25 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       return { session: ctx.info.slug, leftGroup: id };
     },
 
-    async addContext({ session, file, url, text: note, title, adminsOnly = false } = {}) {
+    async addContext({ session, file, url, text: note, title, adminsOnly = false, groups } = {}) {
       const given = { file, url, text: note };
       const chosen = Object.keys(given).filter((key) => given[key] !== undefined && given[key] !== '');
       if (chosen.length !== 1) throw new Error('Pass exactly one of file, url or text.');
       const [kind] = chosen;
       if (kind === 'file' && title !== undefined) throw new Error('A file keeps its own name; pass title only with url or text.');
       if (adminsOnly !== undefined && typeof adminsOnly !== 'boolean') throw new Error('adminsOnly must be true or false.');
+      // The website's "Visible to", for a file or a note: the members of any of these groups, and the admins.
+      if (groups !== undefined && (!Array.isArray(groups) || groups.some((id) => typeof id !== 'string'))) {
+        throw new Error('groups must be a list of group IDs.');
+      }
+      const groupIds = [...new Set((groups || []).map((id) => id.trim().toLowerCase()).filter(Boolean))];
+      if (groupIds.length && adminsOnly) throw new Error('Pass groups or adminsOnly, not both.');
+      if (groupIds.length && kind === 'url') {
+        throw new Error('A link is for everyone in the session or its admins alone. Only a file or text can be for groups.');
+      }
+      if (groupIds.length > CONTEXT_SOURCE_LIMITS.lockedGroups) {
+        throw new Error(`Name at most ${CONTEXT_SOURCE_LIMITS.lockedGroups} groups.`);
+      }
       const ctx = await resolveSession(session);
       if (ctx.registry) throw new Error('Adding context isn’t available in on-chain sessions yet.');
       const sessionConfig = await ensureReady(ctx);
@@ -1397,7 +1512,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       }
       // Cleaned as the Worker requires, for links as for files and notes.
       const adderName = agentAdderName(profile().displayName);
-      const visibleTo = adminsOnly ? 'the session’s admins' : 'everyone in the session';
+      let visibleTo = adminsOnly ? 'the session’s admins' : 'everyone in the session';
+      if (groupIds.length) {
+        // As the website's list does: only a group this agent can see can be named.
+        const listed = await describeGroups(ctx);
+        if (!listed.groups?.length) throw new Error(listed.groupsUnavailable || 'This session lists no groups you can name.');
+        const names = new Map(listed.groups.map((group) => [group.groupId.toLowerCase(), group.name || group.groupId]));
+        const unknown = groupIds.find((id) => !names.has(id));
+        if (unknown) throw new Error(`This session lists no group "${unknown}". get_session lists the groups you can name.`);
+        visibleTo = `members of ${groupIds.map((id) => `“${names.get(id)}”`).join(' or ')}, and the session’s admins`;
+      }
       try {
         if (kind === 'url') {
           const link = checkContextLink({ url, title });
@@ -1415,11 +1539,51 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         }
         const upload = kind === 'file' ? await readContextFile(file, { stateDir: config.stateDir }) : buildNote({ text: note, title });
         checkpoint();
-        const storageRef = await ctx.client.uploadForm(contextUploadForm(upload, { adminsOnly, adderName }), { signal });
+        const storageRef = await ctx.client.uploadForm(contextUploadForm(upload, { adminsOnly, groupIds, adderName }), { signal });
         return { session: ctx.info.slug, added: kind, id: text(storageRef?.id), name: upload.name, visibleTo };
       } catch (error) {
         throw contextRefusal(error, { olderLink: kind === 'url' && featuresUnread });
       }
+    },
+
+    async askSessionAgent({ session, question, store, attribution, name } = {}) {
+      const asked = trim(question);
+      if (!asked) throw new Error('Ask a question.');
+      if (asked.length > SESSION_AGENT_LIMITS.questionChars) {
+        throw new Error(`A question can be at most ${SESSION_AGENT_LIMITS.questionChars} characters.`);
+      }
+      if (store !== undefined && typeof store !== 'boolean') throw new Error('store must be true or false.');
+      if (attribution !== undefined && !['address', 'anonymous'].includes(attribution)) {
+        throw new Error('attribution must be address or anonymous.');
+      }
+      if (name !== undefined && typeof name !== 'string') throw new Error('name must be text.');
+      if (trim(name).length > SESSION_AGENT_LIMITS.nameChars) {
+        throw new Error(`A name can be at most ${SESSION_AGENT_LIMITS.nameChars} characters.`);
+      }
+      const ctx = await resolveSession(session);
+      if (ctx.registry) throw new Error('On-chain sessions have no Session Agent.');
+      const sessionAgent = sessionAgentOf(await ensureReady(ctx));
+      if (!sessionAgent) throw new Error('This session has no Session Agent.');
+      checkpoint();
+      // As the session page's dialog starts: stored while the session records chats, with no address.
+      // Where it records none, nothing about storing is sent, and the Worker keeps nothing.
+      const keep = sessionAgent.recording
+        ? { store: store !== false, attribution: attribution || 'anonymous', ...(trim(name) ? { name: trim(name) } : {}) }
+        : {};
+      const reply = await ctx.client.request('/session-agent/ask', {
+        method: 'POST', auth: true, signal, body: { question: asked, ...keep },
+      });
+      const stored = typeof reply?.stored === 'boolean';
+      return {
+        session: ctx.info.slug,
+        answer: text(reply?.answer),
+        answers: text(reply?.answers),
+        ...(isRecord(reply?.read) ? { read: reply.read } : {}),
+        ...(text(reply?.note) ? { note: text(reply.note) } : {}),
+        // The Worker's own word on both: its setting may have changed since this session was read.
+        recording: stored,
+        stored: reply?.stored === true,
+      };
     },
 
     async claimSbt({ session, sbt: sbtAddress, inviteCode, groupPassword, claimPassword } = {}) {

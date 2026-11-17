@@ -26,6 +26,9 @@
       },
       "CE_SESSION_COORDINATOR": {
         "description": "A Durable Object namespace owned by your account. It serializes signed session writes and safe retries."
+      },
+      "AI": {
+        "description": "Workers AI on your Cloudflare account. A session's Session Agent answers on Cloudflare's open models through it only when the session chooses that, billed to this account."
       }
     }
   }

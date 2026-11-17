@@ -27,7 +27,13 @@ import {
   writeStorageEnvelopeKeyReleaseAudit,
   writeStorageVisibilityAudit,
 } from './storageEnvelopeEncryption.js';
-import { isWorkerGroupMember } from './workerGroups.js';
+import { checkWorkerGroupReadInvite, isWorkerGroupMember } from './workerGroups.js';
+import { readWorkerGroupReadInvite } from './workerGroupInvites.js';
+import {
+  PRIVATE_SESSION_INVITE_INVALID,
+  PRIVATE_SESSION_INVITE_REQUIRED,
+  WORKER_GROUP_READ_INVITE_HEADER,
+} from '../../shared/workerGroupJoin.mjs';
 import {
   MAX_STORAGE_METADATA_BYTES,
   STORAGE_METADATA_TAG_LIMITS,
@@ -83,6 +89,8 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
 const STORAGE_GROUP_MEMBERSHIP_CACHE = Symbol('storage-group-membership-cache');
+// The request's `X-CE-Group-Invite` header, set on a route's deps: a way through a Worker group condition.
+export const STORAGE_GROUP_READ_INVITE = 'groupReadInvite';
 const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -755,6 +763,31 @@ const checkWorkerGroupMembership = async ({
   return pending;
 };
 
+// The request's read invite, checked once per request: whether it admits to
+// `groupId`. A request without one gets null; one whose invite names another
+// group, or doesn't hold the group's password, gets a refusal.
+const checkGroupReadInvite = async ({ env, slug, config, groupId, deps }) => {
+  const header = deps?.[STORAGE_GROUP_READ_INVITE];
+  if (header == null || String(header).trim() === '') return null;
+  const cache = deps?.[STORAGE_GROUP_MEMBERSHIP_CACHE];
+  const key = `read-invite:${groupId}`;
+  if (cache?.has(key)) return cache.get(key);
+  const sessionId = resolveCanonicalWorkerSessionIdHex(config);
+  const invite = readWorkerGroupReadInvite({ header, sessionId });
+  const refused = { ok: false, outcome: 'denied', status: 403, reason: 'worker_group_read_invite_invalid' };
+  const check = typeof deps?.checkWorkerGroupReadInvite === 'function' ? deps.checkWorkerGroupReadInvite : checkWorkerGroupReadInvite;
+  const pending = invite?.groupId !== groupId
+    ? Promise.resolve(refused)
+    : Promise.resolve().then(() => check({ env, slug, sessionId, groupId, signer: invite.signer })).then(
+      (result) => (result?.ok === true ? { ok: true, outcome: 'allowed' }
+        : [400, 403, 404].includes(Number(result?.status)) ? refused
+          : { ok: false, outcome: 'unavailable', status: 503, reason: 'worker_group_membership_unavailable' }),
+      () => ({ ok: false, outcome: 'unavailable', status: 503, reason: 'worker_group_membership_unavailable' }),
+    );
+  cache?.set(key, pending);
+  return pending;
+};
+
 const evaluateWorkerGroupCondition = async ({
   condition,
   env,
@@ -768,6 +801,14 @@ const evaluateWorkerGroupCondition = async ({
   let firstFailure = null;
   let unavailable = null;
   for (const groupId of groupIds) {
+    // An invite that doesn't hold is only remembered, so a member whose browser
+    // still sends an old one is let in by the membership check below.
+    const invite = await checkGroupReadInvite({ env, slug, config, groupId, deps });
+    if (invite?.ok) {
+      return { ok: true, matchedCondition: { kind: 'worker_group', groupId, readInvite: true } };
+    }
+    if (invite?.outcome === 'unavailable') unavailable ||= invite;
+    else if (invite && !firstFailure) firstFailure = invite;
     const result = await checkWorkerGroupMembership({
       env,
       slug,
@@ -1000,6 +1041,9 @@ const hasPrivateResponsePolicy = ({ config, resource }) => {
     !!profile?.results?.visibility && profile.results.visibility !== 'public_full_if_storage_public';
 };
 
+const admittedByReadInvite = (matched) =>
+  [matched?.condition, ...(Array.isArray(matched?.conditions) ? matched.conditions : [])].some((condition) => condition?.readInvite === true);
+
 const membersSeeAllResponses = (config) => config?.sessionModeProfile?.results?.visibility === 'session_member_full';
 
 const canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
@@ -1033,20 +1077,27 @@ const authorizeCloudflareStorageAccess = async ({
   if (!isStorageResource(resource)) {
     return { ok: false, response: responseJson(deps, { error: 'Invalid storage resource.' }, 400, baseHeaders) };
   }
-  if (!canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
-    return {
-      ok: false,
-      response: responseJson(deps, {
-        error: membersSeeAllResponses(config)
-          ? 'Access denied: answers are visible to signed-in session members.'
-          : 'Access denied: individual response access requires its author or a session admin.',
-        reason: 'private_response_owner_required',
-      }, 403, baseHeaders),
-    };
+  const privateResponseRefusal = () => ({
+    ok: false,
+    response: responseJson(deps, {
+      error: membersSeeAllResponses(config)
+        ? 'Access denied: answers are visible to signed-in session members.'
+        : 'Access denied: individual response access requires its author or a session admin.',
+      reason: 'private_response_owner_required',
+    }, 403, baseHeaders),
+  });
+  // Someone signed out with a group read invite reads answers as a member
+  // would where members see every answer, and only if the invite is what the
+  // session gate admits them by.
+  const asInvitee = !normalizeAddress(requesterAddress) && !!deps?.[STORAGE_GROUP_READ_INVITE] &&
+    membersSeeAllResponses(config) && hasPrivateResponsePolicy({ config, resource });
+  if (!asInvitee && !canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
+    return privateResponseRefusal();
   }
   // Payload restrictions are additional to the session gate, never a replacement.
   const args = { env, config, slug, resource, requesterAddress, authScopes, baseHeaders, deps };
   const sessionAccess = await authorizeCloudflareStorageGate(args);
+  if (sessionAccess.ok && asInvitee && !admittedByReadInvite(sessionAccess.conditionMatched)) return privateResponseRefusal();
   if (!sessionAccess.ok || !metadata) return sessionAccess;
   const groups = resolveGroupGateIds({ metadata, access: {} });
   if (groups.length) {
@@ -1093,13 +1144,17 @@ const authorizeCloudflareStorageGate = async ({
         conditionMatched: conditionResult.conditionMatched,
       };
     }
+    // A rule naming Worker groups says whether an invite was missing or didn't hold.
+    const namesGroup = payloadConditions.document.conditions.some((condition) => condition.kind === 'worker_group');
+    const reason = !namesGroup || conditionResult.outcome === 'unavailable' ? conditionResult.reason
+      : deps?.[STORAGE_GROUP_READ_INVITE] ? PRIVATE_SESSION_INVITE_INVALID : PRIVATE_SESSION_INVITE_REQUIRED;
     return {
       ok: false,
       // An SBT rule the chain can't answer, as opposed to a membership outage.
       ...(conditionResult.outcome === 'unavailable' && conditionResult.condition?.kind === 'sbt_onchain' ? { chainUnavailable: true } : {}),
       response: responseJson(deps, {
         error: 'Access denied: Cloudflare storage conditions failed.',
-        reason: conditionResult.reason,
+        reason,
         ...(conditionResult.outcome === 'unavailable' ? { retryable: true } : {}),
       }, conditionResult.status || 403, baseHeaders),
     };
@@ -2955,12 +3010,20 @@ export const listContextSourceRows = async ({ env, slug, budget } = {}) => {
   return rows.map((row) => row.metadata).filter((metadata) => metadata?.contextSource === true);
 };
 
-export const readContextSourceRow = async ({ env, slug, id } = {}) => {
+// With `strict`, a storage error is thrown, so a caller can tell a row that
+// can't be read just now from one that isn't there.
+export const readContextSourceRow = async ({ env, slug, id, strict = false } = {}) => {
   const index = getStorageIndexBinding(env);
   if (!isSafeCloudflareStorageRefId(trim(id)) || typeof index?.get !== 'function') return null;
+  let raw = null;
+  try {
+    raw = await index.get(buildIndexKey({ slug, resource: 'docsContext', id: trim(id) }));
+  } catch (error) {
+    if (strict) throw error;
+    return null;
+  }
   let metadata = null;
   try {
-    const raw = await index.get(buildIndexKey({ slug, resource: 'docsContext', id: trim(id) }));
     metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
   } catch {
     return null;
@@ -2970,9 +3033,10 @@ export const readContextSourceRow = async ({ env, slug, id } = {}) => {
 
 // A context source's stored bytes, decrypted. The Worker reads them for the
 // session's AI, so each worker_envelope read is audited under that principal.
-export const readContextSourceBytes = async ({ env, config, slug, metadata, maxBytes, principal = 'session-ai', deps } = {}) => {
+// With `strict`, a storage error is thrown rather than read as missing bytes.
+export const readContextSourceBytes = async ({ env, config, slug, metadata, maxBytes, principal = 'session-ai', strict = false, deps } = {}) => {
   const index = getStorageIndexBinding(env);
-  let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes });
+  let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes, strict });
   if (!bytes) return null;
   if (isObj(metadata?.envelope)) {
     await writeStorageEnvelopeKeyReleaseAudit({
@@ -3007,6 +3071,10 @@ export const storageRoute = async ({
   path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, checkFetchAccess, deps,
   answersChecked = false,
 } = {}) => {
+  // A read invite opens reads only: never an upload, a context addition or a field key.
+  if (['/storage/read', '/storage/read-batch', '/storage/list'].includes(path)) {
+    deps = { ...(deps || {}), [STORAGE_GROUP_READ_INVITE]: request?.headers?.get?.(WORKER_GROUP_READ_INVITE_HEADER) || '' };
+  }
   if (method === 'POST' && ['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path)) {
     // Field keys use the same lazy private-RPC setup and chain attestation as
     // payload reads; bypassing it denies members of secret-only SBT gates.

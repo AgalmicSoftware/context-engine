@@ -54,6 +54,8 @@ export const describeContextSource = (
         ? contextGroupsLabel(source.lockedGroupIds, groups)
         : 'Everyone in the session',
     ...(adder ? [`Added by ${adder}`] : []),
+    // Apart from the name, which an agent chooses.
+    ...(source.addedByAgent ? ['Agent'] : []),
     source.kind === 'link'
       ? `Read ${formatDate(source.fetchedAt)}`.trim()
       : isContextPdf(source)

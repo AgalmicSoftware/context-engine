@@ -110,9 +110,18 @@ describe('describeInterviewStatus', () => {
     expect(statusOf({ mapping: true, applying: true })).toMatchObject({
       idle: false,
       statusLabel: 'Preparing responses…',
-      statusTone: 'pending',
+      statusTone: 'busy',
     });
-    expect(statusOf({ applying: true })).toMatchObject({ statusLabel: 'Submitting', statusTone: 'pending' });
+    expect(statusOf({ applying: true })).toMatchObject({ statusLabel: 'Submitting', statusTone: 'busy' });
+  });
+
+  it('spins only while the interview is working, not while it waits', () => {
+    expect(statusOf({ recordingState: 'starting', status: 'Connecting…' })).toMatchObject({ statusTone: 'busy' });
+    expect(statusOf({ recordingState: 'stopping', status: 'Stopping' })).toMatchObject({ statusTone: 'busy' });
+    expect(statusOf({ readiness: 'checking' })).toMatchObject({ statusLabel: 'Checking setup', statusTone: 'busy' });
+    expect(statusOf({ recordingState: 'paused', status: 'Paused' })).toMatchObject({ statusTone: 'pending' });
+    expect(statusOf({ readiness: 'unknown' })).toMatchObject({ statusLabel: 'Not checked', statusTone: 'pending' });
+    expect(statusOf({ readiness: 'unknown', openingLoading: true })).toMatchObject({ statusTone: 'pending' });
   });
 
   it('reports setup only while idle, and the interview status otherwise', () => {
@@ -120,7 +129,7 @@ describe('describeInterviewStatus', () => {
     expect(statusOf({ readiness: 'unavailable' })).toMatchObject({ statusLabel: 'Setup needed', statusTone: 'error' });
     expect(statusOf({ openingLoading: true })).toMatchObject({
       statusLabel: 'Preparing opening',
-      statusTone: 'pending',
+      statusTone: 'busy',
     });
     expect(statusOf({ recordingState: 'recording', readiness: 'unavailable', status: 'Listening' })).toMatchObject({
       idle: false,

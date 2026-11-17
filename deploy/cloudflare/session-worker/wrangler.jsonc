@@ -15,6 +15,9 @@
       "invocation_logs": false
     }
   },
+  "ai": {
+    "binding": "AI"
+  },
   "kv_namespaces": [
     {
       "binding": "GROUP_KV"
@@ -43,6 +46,6 @@
     "CE_STORAGE_IN_GROUP_KV": "1",
     "DEPLOY_HELPER_ENABLED": "0",
     "WORKER_DEBUG_LOGS": "0",
-    "CE_BUNDLE_SHA256": "2092f865423759b63df450d8e0f6544b95b718646fa3a38cc704b1a15ceca8d6"
+    "CE_BUNDLE_SHA256": "37efcdc8e03b6474215801a3e882e3e2139cb9d3d0ef4a92cbcdc5598a44a403"
   }
 }

@@ -1,5 +1,6 @@
 import { resolveCorsProxyUrl } from './corsProxy.js';
 import { getCachedWorkerResourcePresence, readWorkerResourcePresence } from './workerResourcePresence';
+import { holdSignInAndProof, TEST_READ_PROOF } from './workerSessionReadHeaders.testUtils';
 
 jest.mock('./corsProxy.js', () => ({
   resolveCorsProxyUrl: jest.fn(),
@@ -58,6 +59,21 @@ describe('workerResourcePresence', () => {
       expect(getCachedWorkerResourcePresence({ sessionSlug: 'demo-1', workerUrl })).toBeNull();
     } finally {
       jest.restoreAllMocks();
+    }
+  });
+
+  it('sends a private session’s sign-in and invite proof held for its Worker', async () => {
+    const release = holdSignInAndProof(workerUrl, 'salon');
+    try {
+      const fetchImpl = jest.fn(async () => new Response('{}', { status: 200 })) as unknown as typeof fetch;
+      await readWorkerResourcePresence({ sessionSlug: 'salon', fetchImpl });
+      expect(jest.mocked(fetchImpl).mock.calls[0][1]?.headers).toEqual({
+        'X-Session-Slug': 'salon',
+        'X-CE-Group-Invite': TEST_READ_PROOF,
+        Authorization: 'Bearer member-token',
+      });
+    } finally {
+      release();
     }
   });
 

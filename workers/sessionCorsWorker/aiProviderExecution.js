@@ -1,4 +1,4 @@
-import { boundSessionAiRequest } from './aiRequestPolicy.js';
+import { AI_MODEL_NOT_ALLOWED, boundSessionAiRequest } from './aiRequestPolicy.js';
 import { STRICT_HTTPS_NO_CREDENTIALS_POLICY } from './outboundUrlSafetyBinding.js';
 import { DEFAULT_AI_MODEL, DEFAULT_ANTHROPIC_MODEL } from '../../shared/aiDefaults.mjs';
 import { fitReasoningEffort, isOpenAiReasoningModel, takesReasoningEffort } from '../../shared/aiModelFamily.mjs';
@@ -12,6 +12,7 @@ import {
   json as jsonResponse,
 } from './responseKvHelpers.js';
 import { toStr } from './stringCoercion.js';
+import { WORKERS_AI_PROVIDER, WORKERS_AI_TASK, workersAiModel } from '../../shared/workersAiModels.mjs';
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
@@ -364,6 +365,78 @@ export const proxyOpenRouter = async ({
 
   const completion = data?.choices?.[0]?.message?.content || '';
   return json({ completion, raw: data }, 200, baseHeaders);
+};
+
+// The answer in a Workers AI reply: { response }, a chat completion, or
+// Responses output. Only parts known to be answer text are read, never a
+// reasoning model's thinking, which can name participants. Some models also
+// write their thinking inline, ending with </think>, with or without the
+// opening tag, so only text after the last </think> counts, and thinking left
+// open is dropped. An answer that itself mentions </think> loses what comes
+// before it; that is the price of never showing thinking.
+const answerText = (parts) => (Array.isArray(parts) ? parts : [])
+  .filter((part) => ['text', 'output_text'].includes(part?.type) && typeof part.text === 'string')
+  .map((part) => part.text).join('');
+const workersAiReply = (data) => {
+  if (typeof data?.response === 'string' && data.response.trim()) return data.response;
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) return answerText(content);
+  if (typeof data?.output_text === 'string') return data.output_text;
+  return (Array.isArray(data?.output) ? data.output : [])
+    .filter((item) => item?.type === 'message').map((item) => answerText(item.content)).join('');
+};
+export const workersAiAnswer = (data) => {
+  const afterThinking = workersAiReply(data).split(/<\/think>/i).pop();
+  return afterThinking.replace(/<think>[\s\S]*$/i, '').trim();
+};
+
+// Cloudflare's messages for a busy or rate-limited model: out of capacity
+// (3040), the account's daily allocation used (3036), or a plain 429.
+const WORKERS_AI_BUSY = /\b(?:3036|3040|429)\b|capacity|rate limit|too many requests/i;
+
+// The Session Agent's answers on Workers AI, through the Worker's own AI
+// binding, billed to the Cloudflare account that hosts it. Only that task may
+// use it. No request key pays for it, so every call takes the session's model,
+// token ceiling and limits. Cloudflare's own error text never reaches the page.
+export const proxyWorkersAi = async ({ payload, config, env, baseHeaders, deps } = {}) => {
+  const json = resolveJson(deps);
+  if (payload?.taskType !== WORKERS_AI_TASK) {
+    return json({ error: 'Cloudflare’s models answer only the Session Agent.', reason: 'workers_ai_task_not_allowed' }, 403, baseHeaders);
+  }
+  const ai = env?.AI;
+  if (typeof ai?.run !== 'function') {
+    return json({
+      error: 'This Session Worker has no Workers AI binding. Redeploy it to use Cloudflare’s models.',
+      reason: 'workers_ai_unbound',
+    }, 503, baseHeaders);
+  }
+  const policy = boundSessionAiRequest({ payload, provider: WORKERS_AI_PROVIDER, config });
+  if (!policy.ok) return json({ error: policy.error, reason: policy.reason }, 403, baseHeaders);
+  const { model, messages, prompt, max_tokens: maxTokens } = policy.payload;
+  const listed = workersAiModel(model);
+  if (!listed) return json({ error: AI_MODEL_NOT_ALLOWED.error, reason: AI_MODEL_NOT_ALLOWED.reason }, 403, baseHeaders);
+  const inputs = {
+    messages: Array.isArray(messages) ? messages : [{ role: 'user', content: String(prompt || '') }],
+    [listed.tokenField]: maxTokens,
+    ...(listed.reasoningEffort ? { reasoning_effort: listed.reasoningEffort } : {}),
+  };
+  let data;
+  try {
+    data = await ai.run(listed.id, inputs);
+  } catch (error) {
+    const busy = WORKERS_AI_BUSY.test(toStr(error?.message));
+    return json(busy
+      ? { error: 'Cloudflare’s AI is busy. Try again shortly.', reason: 'workers_ai_busy' }
+      : { error: 'Cloudflare’s AI couldn’t answer. Try again.', reason: 'workers_ai_failed' },
+    busy ? 429 : 502, baseHeaders);
+  }
+  const completion = workersAiAnswer(data);
+  if (!completion) {
+    return json({ error: 'Cloudflare’s AI returned an empty answer.', reason: 'ai_empty' }, 422, baseHeaders);
+  }
+  // Only the answer leaves: the raw reply can hold the model's thinking.
+  return json({ completion }, 200, baseHeaders);
 };
 
 export const proxyCustomRPC = async ({

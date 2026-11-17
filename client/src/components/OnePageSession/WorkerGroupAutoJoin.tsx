@@ -152,7 +152,7 @@ function AutoJoinIntent({
     setProgress({ phase: 'loading', message: 'Preparing to join group…' });
     void (async () => {
       try {
-        const { getWorkerSessionToken, joinWorkerGroup, loadWorkerGroupOverview } =
+        const { getWorkerSessionToken, isPrivateSessionRefusal, joinWorkerGroup, loadWorkerGroupOverview } =
           await import('../../domains/worker/workerGroupPorts');
         if (!active) return;
         const credentialToken = await getWorkerSessionToken({
@@ -163,16 +163,20 @@ function AutoJoinIntent({
         });
         if (!active) return;
         const request = { workerUrl, credentialToken, sessionId, sessionSlug };
-        const overview = await loadWorkerGroupOverview(request);
+        // A private session lists its groups only to those its rule admits; anyone else joins by the link's id.
+        const overview = await loadWorkerGroupOverview(request).catch((error: unknown) => {
+          if (isPrivateSessionRefusal(error)) return null;
+          throw error;
+        });
         if (!active) return;
-        const membership = overview.memberships.find(({ group }) => group.groupId === groupId);
+        const membership = overview?.memberships.find(({ group }) => group.groupId === groupId);
         if (membership) {
           setGroupLabel(membership.group.label);
           complete('');
           return;
         }
         // An unlisted group shows only to its members, so with an invite it is joined without being listed.
-        const group = overview.groups.find((candidate) => candidate.groupId === groupId);
+        const group = overview?.groups.find((candidate) => candidate.groupId === groupId);
         if (group) setGroupLabel(group.label);
         if (group?.joinMode === 'open') {
           if (!canAutoJoinWorkerGroup(group)) throw new Error('This group is not open for joining.');
@@ -183,8 +187,10 @@ function AutoJoinIntent({
           return;
         }
         if (group?.joinMode === 'admin_add') throw new Error('This group is not open for joining.');
-        // Without join choices every group is listed, so a missing one is gone.
-        if (!group && !workerOffersGroupJoinChoices(configRef.current)) throw new Error('worker_group_not_found');
+        // Without join choices every group is listed, so a missing one is gone, unless the link carries its
+        // credential: a private session shows an unlisted group to no one before they join, so that joins by id.
+        if (!group && !token && overview && !workerOffersGroupJoinChoices(configRef.current))
+          throw new Error('worker_group_not_found');
         if (!token) {
           setProgress({ phase: 'code', message: NEEDS_CODE_MESSAGE });
           return;
@@ -339,7 +345,10 @@ export default function WorkerGroupAutoJoin(props: Props) {
     );
     removeGroupInviteFromAddress();
     if (!incoming) return;
-    setIntent((previous) => {
+    setIntent((current) => {
+      // The host saves a link's invite in a layout effect that a hidden first render can delay past this
+      // component's first read of the tab, so compare with what the tab holds now, not with nothing.
+      const previous = current ?? readPendingAutoJoin();
       if (
         previous &&
         consumedKey.current !== autoJoinIntentKey(previous) &&
@@ -369,7 +378,15 @@ export default function WorkerGroupAutoJoin(props: Props) {
       if (!controller.signal.aborted) {
         // Pin the canonical identity before login; browsing another session must
         // never redirect a remembered invitation to that session's Worker.
-        savePendingAutoJoin({ ...intent, sessionId: context.sessionId });
+        // Pinning never brings back a secret the tab has since dropped, as for a refused invite.
+        const stored = readPendingAutoJoin();
+        const { token: _dropped, ...withoutToken } = intent;
+        const dropped =
+          !!intent.token &&
+          stored?.sessionSlug === intent.sessionSlug &&
+          stored.groupId === intent.groupId &&
+          !stored.token;
+        savePendingAutoJoin({ ...(dropped ? withoutToken : intent), sessionId: context.sessionId });
         setResolved({ key: intentKey, config, context });
       }
     };

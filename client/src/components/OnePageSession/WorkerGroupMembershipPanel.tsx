@@ -10,6 +10,7 @@ import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessio
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { withCurrentWorkerHint } from '../../utilities/ui/currentWorkerHint';
 import { buildWorkerGroupsPath } from '../../utilities/worker/workerGroupRoutes.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import {
@@ -340,7 +341,9 @@ const WorkerGroupDetailView = ({
                 <p>
                   <span className={sbtPageStyles.label}>Admin:</span>
                   <a
-                    href={buildPublicRoute(`/u/${group.adminAddress}?session=${encodeURIComponent(sessionSlug)}`)}
+                    href={withCurrentWorkerHint(
+                      buildPublicRoute(`/u/${group.adminAddress}?session=${encodeURIComponent(sessionSlug)}`),
+                    )}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={styles.workerGroupDetailAddress}

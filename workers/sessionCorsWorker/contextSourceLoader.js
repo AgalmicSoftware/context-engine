@@ -5,13 +5,14 @@ import {
   CONTEXT_TEXT_ROLE,
   contextRoleOf,
   contextTagValue,
+  groupLockedIds,
   isAdminsOnlyAccess,
 } from '../../shared/sessionContextSources.mjs';
 import { buildSessionContextPrompt, SESSION_CONTEXT_TEXT_LIMITS } from '../../shared/sessionContextText.mjs';
 import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
 import { buildIndexPrefix, readContextSourceBytes, readContextSourceRow } from './storageRouteExecution.js';
-import { jsonByteLength } from './storageScanBudget.js';
+import { StorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 
 // How much one AI prompt's reading list may cost: rows looked at (chosen from
 // the key list before any is read), list pages (40,000 keys, after which the
@@ -129,21 +130,28 @@ export const contextReadingOrder = (rows) => {
  * admins-only items never reach them. `readable(row)` narrows or widens that
  * to one person's access; `principal` names who the read is for in the
  * envelope audit; files added by `leaveOutUploaders` (lower-case addresses)
- * are left out, with the AI's readings of them. `leftOut` counts the sources
- * with text not read for lack of room, and the rows not looked at, which may
- * include some this reader could not have read.
+ * are left out, with the AI's readings of them, and counted in `withheld`.
+ * `leftOut` counts the sources with text not read for lack of room, and the
+ * rows not looked at, which may include some this reader could not have read.
+ * Each source also says who may read it (`everyone` the session admits, or
+ * only the `groupIds` it is locked to) and who added it (`uploader`).
+ * `unavailable` says the list couldn't be read, in whole or in part, and
+ * `failed` how many sources' reads threw: a caller that must not go ahead
+ * with less than everything checks both. `unreadable` counts sources this
+ * Worker can't read at all.
  */
 export const loadParticipantContextSources = async ({
   env, slug, config, deps, readable, principal, leaveOutUploaders, totalChars = SESSION_CONTEXT_TEXT_LIMITS.totalChars,
+  maxSources = CONTEXT_READ_LIMITS.sources,
 } = {}) => {
   const warn = typeof deps?.log?.warn === 'function' ? deps.log.warn : console.warn;
-  let listed = { rows: [], leftOut: 0 };
+  let listed = { rows: [], leftOut: 0, stopped: [] };
   try {
     listed = await listContextRowsInOrder({ env, slug });
   } catch {
     // The AI call goes ahead without context, but the operator should know why.
     warn('[context] sources left out of an AI prompt', { slug, reason: 'storage unavailable' });
-    return { sources: [], leftOut: 0 };
+    return { sources: [], leftOut: 0, withheld: 0, unreadable: 0, failed: 0, unavailable: true };
   }
   if (listed.leftOut > 0) {
     warn('[context] sources left out of an AI prompt', { slug, reason: [...new Set(listed.stopped)].join(', '), leftOut: listed.leftOut });
@@ -159,32 +167,41 @@ export const loadParticipantContextSources = async ({
   const readingOf = async (pdf) => {
     if (readings.has(pdf.id)) return readings.get(pdf.id);
     if (!pdf.contextReadingId) return null;
-    const reading = await readContextSourceRow({ env, slug, id: pdf.contextReadingId });
+    const reading = await readContextSourceRow({ env, slug, id: pdf.contextReadingId, strict: true });
     return reading && contextRoleOf(reading.tags) === CONTEXT_TEXT_ROLE &&
       contextTagValue(reading.tags, TAGS.derivedFrom) === pdf.id && await canRead(reading) ? reading : null;
   };
   const sources = [];
-  const ordered = contextReadingOrder(visible.filter((row) => contextRoleOf(row.tags) === CONTEXT_ROLE))
-    .filter((row) => !leaveOutUploaders?.has(lower(row.uploader)));
+  const mine = contextReadingOrder(visible.filter((row) => contextRoleOf(row.tags) === CONTEXT_ROLE));
+  const ordered = mine.filter((row) => !leaveOutUploaders?.has(lower(row.uploader)));
   let chars = 0;
   let leftOut = listed.leftOut;
+  let unreadable = 0;
+  let failed = 0;
   for (const [position, row] of ordered.entries()) {
-    if (sources.length >= CONTEXT_READ_LIMITS.sources || chars >= totalChars) {
+    if (sources.length >= maxSources || chars >= totalChars) {
       // A PDF the AI never read has no text to leave out.
       leftOut += ordered.slice(position)
         .filter((rest) => rest.contentType !== CONTEXT_FILE_TYPES.pdf || readings.has(rest.id) || rest.contextReadingId).length;
       break;
     }
     const isPdf = row.contentType === CONTEXT_FILE_TYPES.pdf;
-    const textRow = isPdf ? await readingOf(row) : row;
-    if (!textRow) continue;
+    // A storage error is a read that failed just now; bytes that are gone, or
+    // too large to read here, will never be read.
     let bytes = null;
     try {
-      bytes = await readContextSourceBytes({ env, config, slug, metadata: textRow, maxBytes: MAX_READ_BYTES, principal, deps });
-    } catch {
-      bytes = null;
+      const textRow = isPdf ? await readingOf(row) : row;
+      if (!textRow) continue;
+      bytes = await readContextSourceBytes({ env, config, slug, metadata: textRow, maxBytes: MAX_READ_BYTES, principal, strict: true, deps });
+    } catch (error) {
+      if (error instanceof StorageReadLimitError) unreadable += 1;
+      else failed += 1;
+      continue;
     }
-    if (!bytes) continue;
+    if (!bytes) {
+      unreadable += 1;
+      continue;
+    }
     const kind = contextTagValue(row.tags, TAGS.kind) === 'link' ? 'link' : 'file';
     let text = decoder.decode(bytes);
     let url = '';
@@ -194,13 +211,20 @@ export const loadParticipantContextSources = async ({
         text = typeof record?.snapshot?.text === 'string' ? record.snapshot.text : '';
         url = typeof record?.url === 'string' ? record.url : '';
       } catch {
+        unreadable += 1;
         continue;
       }
     }
-    sources.push({ title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isPdf });
+    sources.push({
+      title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isPdf,
+      everyone: forEveryone(row, config), groupIds: groupLockedIds(row.accessConditions) || [], uploader: lower(row.uploader),
+    });
     chars += Math.min(text.trim().length, SESSION_CONTEXT_TEXT_LIMITS.itemChars);
   }
-  return { sources, leftOut };
+  return {
+    sources, leftOut, withheld: mine.length - ordered.length, unreadable, failed,
+    unavailable: listed.stopped.includes('storage unavailable'),
+  };
 };
 
 /** The session's context block for an AI acting for any participant; '' when none. */

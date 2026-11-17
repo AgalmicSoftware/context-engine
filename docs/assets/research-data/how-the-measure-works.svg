@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="636" viewBox="0 0 600 636" role="img" aria-labelledby="title desc">
+  <title id="title">How the measure works</title>
+  <desc id="desc">Your AI drafts your answers from what it already knows about you. Shown drafts you keep or change. If a session hides some drafts, you answer those first, then see its guess. Each answer is compared with the AI's guess: a match scores 1, and close ratings, votes and multiple choices score part. The result is the Mirror Score, how well your AI predicts you. The comparison is kept only if Share for research is ticked when you submit.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202b3a"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #202b3a; }
+    .title { font-size: 19px; font-weight: 700; }
+    .body { font-size: 16px; fill: #3d4a5c; }
+    .heading { font-size: 22px; font-weight: 700; }
+    .on-dark { fill: #ffffff; }
+    .note { font-size: 15px; fill: #3d4a5c; }
+    .box { fill: #f6f8fa; stroke: #202b3a; stroke-width: 1.5; }
+    .line { stroke: #202b3a; stroke-width: 1.8; fill: none; }
+  </style>
+
+  <!-- A solid card, so the diagram reads the same on GitHub's light and dark themes. -->
+  <rect x="1" y="1" width="598" height="634" rx="14" fill="#ffffff" stroke="#c8d1dc" stroke-width="2"/>
+  <text class="heading" x="300" y="44" text-anchor="middle">How the measure works</text>
+
+  <rect class="box" x="60" y="70" width="480" height="70" rx="10"/>
+  <text class="title" x="80" y="99">Your AI drafts your answers</text>
+  <text class="body" x="80" y="124">From what it already knows about you.</text>
+
+  <path class="line" d="M190 140 V184" marker-end="url(#arrow)"/>
+  <path class="line" d="M410 140 V184" marker-end="url(#arrow)"/>
+
+  <rect class="box" x="60" y="188" width="230" height="96" rx="10"/>
+  <text class="title" x="78" y="217">Shown drafts</text>
+  <text class="body" x="78" y="242">You keep or change</text>
+  <text class="body" x="78" y="264">each one.</text>
+
+  <rect class="box" x="310" y="188" width="230" height="96" rx="10" stroke-dasharray="7 5"/>
+  <text class="title" x="328" y="217">Hidden, if used</text>
+  <text class="body" x="328" y="242">You answer first, then</text>
+  <text class="body" x="328" y="264">see its guess.</text>
+
+  <path class="line" d="M190 284 V328" marker-end="url(#arrow)"/>
+  <path class="line" d="M410 284 V328" marker-end="url(#arrow)"/>
+
+  <rect class="box" x="60" y="332" width="480" height="96" rx="10"/>
+  <text class="title" x="80" y="361">Compared with its guess</text>
+  <text class="body" x="80" y="386">A match scores 1; close ratings, votes and</text>
+  <text class="body" x="80" y="408">multiple choices score part.</text>
+
+  <path class="line" d="M300 428 V472" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="476" width="480" height="70" rx="10" fill="#202b3a"/>
+  <text class="title on-dark" x="80" y="505">Mirror Score</text>
+  <text class="body on-dark" x="80" y="530">How well your AI predicts you.</text>
+
+  <text class="note" x="300" y="584" text-anchor="middle">Kept only if “Share for research” is ticked</text>
+  <text class="note" x="300" y="606" text-anchor="middle">when you submit.</text>
+</svg>

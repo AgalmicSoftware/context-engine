@@ -1,4 +1,5 @@
 import { inferAiProviderFromModel } from '../../shared/aiModelFamily.mjs';
+import { WORKERS_AI_MODEL_IDS, WORKERS_AI_PROVIDER } from '../../shared/workersAiModels.mjs';
 import { resolveSessionAiModel } from './aiRequestPolicy.js';
 import { toTrimmedString } from './stringCoercion.js';
 
@@ -11,6 +12,7 @@ export const DEFAULT_MODEL_WHITELIST = {
   anthropic: ['claude-*'],
   openai: ['gpt-*', 'o1-*', 'o3-*', 'o4-*', 'chatgpt-*'],
   openrouter: null,
+  [WORKERS_AI_PROVIDER]: WORKERS_AI_MODEL_IDS,
 };
 
 const matchesModelGlob = (model, pattern) => {

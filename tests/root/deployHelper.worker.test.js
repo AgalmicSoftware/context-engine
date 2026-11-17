@@ -797,6 +797,8 @@ describe('deploy-helper worker', () => {
         type: 'durable_object_namespace',
         class_name: 'SessionWriteCoordinator',
       });
+      // Workers AI, for a Session Agent that answers on Cloudflare's models.
+      expect(uploadMetadata.bindings).toContainEqual({ name: 'AI', type: 'ai' });
       expect(uploadMetadata.migrations).toEqual({
         old_tag: '',
         new_tag: 'ce-session-write-coordinator-v1',
@@ -4326,6 +4328,10 @@ describe('deploy-helper worker', () => {
           ? { ...binding, class_name: 'ForeignCoordinator' }
           : binding
       )),
+    },
+    {
+      label: 'Workers AI',
+      mutateBindings: (bindings) => bindings.filter((binding) => binding.name !== 'AI'),
     },
   ])('refuses to resume when the existing worker has a mismatched $label binding', async ({ mutateBindings }) => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});

@@ -116,6 +116,12 @@ test('an upload is a participant’s context file, marked as an agent’s, for a
   assert.equal(form.get('file').name, 'notes.md');
   const open = contextUploadForm({ name: 'n.md', contentType: 'text/markdown', bytes: Buffer.from('n') });
   assert.equal(open.has('accessConditions'), false);
+  // For some groups: the website's rule, the admins and the members of any of them.
+  const grouped = contextUploadForm({ name: 'n.md', contentType: 'text/markdown', bytes: Buffer.from('n') }, { groupIds: ['salon', 'hosts'] });
+  assert.deepEqual(JSON.parse(grouped.get('accessConditions')), {
+    match: 'any',
+    conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupIds: ['hosts', 'salon'] }],
+  });
   assert.deepEqual(JSON.parse(open.get('tags')).at(-1), { name: 'CE-AdderKind', value: 'agent' });
   // A name is one line of plain text, as the Worker accepts it.
   const named = contextUploadForm({ name: 'n.md', contentType: 'text/markdown', bytes: Buffer.from('n') }, { adderName: ' Test\u0007Kami\n\tbot ' });

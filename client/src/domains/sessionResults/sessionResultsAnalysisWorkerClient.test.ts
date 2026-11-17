@@ -12,6 +12,7 @@ import {
   clearAllTokenCaches,
   writeTokenCache,
 } from '../../utilities/worker/workerAuthTokenCache';
+import { forgetGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
 
 describe('sessionResultsAnalysisWorkerClient', () => {
   it('builds status URL with session slug and includeDraft query', () => {
@@ -212,6 +213,21 @@ describe('sessionResultsAnalysisWorkerClient', () => {
         workerUrl: 'https://worker.example',
       }),
     ).toEqual({});
+  });
+
+  it('sends a private session’s invite proof with a results read, beside any sign-in', async () => {
+    clearAllTokenCaches();
+    const header = `rxc:0x${'ab'.repeat(65)}`;
+    const read = { sessionSlug: 'edge', sessionId: `0x${'1'.repeat(32)}`, workerUrl: 'https://worker.example' };
+    saveGroupReadHeader({ ...read, header });
+    try {
+      expect(getCachedWorkerAuthHeaders(read)).toEqual({ 'X-CE-Group-Invite': header });
+      expect(getCachedWorkerAuthHeaders({ ...read, account: '0x0000000000000000000000000000000000000abc' })).toEqual({
+        'X-CE-Group-Invite': header,
+      });
+    } finally {
+      forgetGroupReadHeader('https://worker.example', 'edge');
+    }
   });
 
   it('posts generation through the signed admin request channel', async () => {

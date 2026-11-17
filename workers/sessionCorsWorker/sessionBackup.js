@@ -61,7 +61,12 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
   } catch {
     fail('Invalid backup cursor. Restart the export.', 400, 'backup_cursor_invalid');
   }
-  const position = parsed.continuation || { phase: 0, listCursor: '', lastKey: '', chunk: -1, pageNumber: 0,
+  // The backup holds the chats stored when it began: one stored since waits for
+  // the next backup, so asking the Session Agent never interrupts this one.
+  const chats = Array.isArray(coordinator.sessionAgentHistory) ? coordinator.sessionAgentHistory : [];
+  const historyThrough = parsed.continuation ? String(parsed.continuation.historyThrough || '') : chats.at(-1)?.id || '';
+  coordinator.sessionAgentHistory = chats.filter((chat) => chat.id <= historyThrough);
+  const position = parsed.continuation || { phase: 0, listCursor: '', lastKey: '', chunk: -1, pageNumber: 0, historyThrough,
     exportedAt: new Date().toISOString(), writeRevision: current.body.writeRevision, leaseSince: current.body.leaseSince,
     configDigest: await sha256Hex(JSON.stringify(coordinator)), counts: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 } };
   // A write marked since the start, or the lease lapsed so writes skipped marks.

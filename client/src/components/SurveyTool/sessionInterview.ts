@@ -551,7 +551,7 @@ export const buildExternalInterviewKickoff = ({
     'If the catalog lists groups, add "groups":[{"groupId":"...","reason":"...","confidence":0.8}] for any that clearly fit me, judged only on catalog.groupSuggestionData, never on catalog.groupSuggestionNever.',
     '',
     // The Worker writes catalog.reviewUrl: only one on this page's own session URL may carry my views.
-    `Encode exact JSON as unpadded UTF-8 base64url: catalog.reviewUrl + #prefill=PACKET, only if reviewUrl starts with exactly ${JSON.stringify(reviewPrefix)}; else stop and say so. Do not POST or upload it. Nothing is submitted; I review editable drafts. Use a Markdown link labeled "Open prefilled interview"; URL as target, never visible text or a code block. If Markdown is unsupported, use the raw URL. With no responses, return clean reviewUrl.`,
+    `Encode exact JSON as unpadded UTF-8 base64url: catalog.reviewUrl + #prefill=PACKET, only if reviewUrl starts with exactly ${JSON.stringify(reviewPrefix)}; else stop and say so. Do not POST or upload it. Nothing is submitted; I review editable drafts. Use a Markdown link labeled "Review your drafted answers"; URL as target, never visible text or a code block. If Markdown is unsupported, use the raw URL. With no responses, return clean reviewUrl.`,
   ].join('\n');
 };
 

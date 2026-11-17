@@ -135,6 +135,9 @@ const submit = () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTE
 const reviewed = (props: ReturnType<typeof renderReview>, questionId: string) =>
   props.onRecordProvenance.mock.calls[0][6].find((entry: { questionId: string }) => entry.questionId === questionId);
 
+// A review left unsubmitted is kept in this browser and would open in the next test.
+beforeEach(() => window.localStorage.clear());
+
 it('hides the same share of AI prefill drafts on every load while research sharing is on', async () => {
   const { unmount } = renderReview();
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
@@ -142,12 +145,14 @@ it('hides the same share of AI prefill drafts on every load while research shari
   for (const id of hiddenIds) {
     expect(card(id)).toHaveTextContent(HIDDEN_DRAFT_NOTE);
     expect(answer(id)).toHaveValue('');
-    const concealed = within(card(id)).getByRole('group', { name: 'Hidden AI guess' });
-    expect(concealed).toHaveTextContent('AI guess hidden');
+    const concealed = within(card(id)).getByRole('group', { name: 'Hidden AI prediction' });
+    // One line says it is hidden, once: no heading repeats it.
+    expect(concealed).toHaveTextContent(HIDDEN_DRAFT_NOTE);
+    expect(within(card(id)).getAllByText(/hidden/i)).toHaveLength(1);
     expect(concealed.querySelector('input, textarea')).toBeNull();
     expect(card(id).innerHTML).not.toContain('AI note');
     expect(card(id).innerHTML).not.toContain(`EVIDENCE-${id}`);
-    expect(within(card(id)).getByRole('button', { name: 'Why is the AI guess hidden?' })).toBeEnabled();
+    expect(within(card(id)).getByRole('button', { name: 'Why is the prediction hidden?' })).toBeEnabled();
     // Neither the AI's notes nor its marker give the answer away.
     expect(within(card(id)).queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_BASIS_TOGGLE)).not.toBeInTheDocument();
     expect(within(card(id)).queryByLabelText('AI-proposed response')).not.toBeInTheDocument();
@@ -160,10 +165,67 @@ it('hides the same share of AI prefill drafts on every load while research shari
   for (const id of hiddenIds) expect(card(id)).toHaveTextContent(HIDDEN_DRAFT_NOTE);
 });
 
+it('says how many drafts are hidden and why, with the session note on where the data goes, until sharing stops', async () => {
+  const dataNote = 'Part of a study funded by Example. https://example.test/study';
+  renderReview({ hiddenDraftShare: share, shareDraftChangesByDefault: true, dataNote });
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const status = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS);
+  expect(status).toHaveTextContent(
+    `Your AI drafted 6 answers · Claude, self-reported${hiddenIds.length} are hidden until you answer, to test how well your AI predicts you.`,
+  );
+  expect(within(status).getByRole('link', { name: 'How it works' })).toHaveAttribute(
+    'href',
+    'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/research-data.md',
+  );
+  const help = within(status).getByRole('button', { name: 'About hidden drafts' });
+  expect(help).toHaveAccessibleDescription(/so you answer before you see its guess.*Part of a study funded by Example/);
+  fireEvent.focus(help);
+  const tooltip = await screen.findByRole('tooltip');
+  expect(within(tooltip).getByRole('link', { name: 'https://example.test/study' })).toHaveAttribute(
+    'href',
+    'https://example.test/study',
+  );
+  const sharing = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
+  expect(screen.getByRole('button', { name: 'What’s this? About sharing for research' })).toHaveAccessibleDescription(
+    /Part of a study funded by Example/,
+  );
+  fireEvent.click(sharing);
+  await waitFor(() => expect(status).not.toHaveTextContent('hidden until you answer'));
+  expect(status).toHaveTextContent('Your AI drafted 6 answers');
+});
+
+it('counts only drafts still hidden, so answering them or unticking sharing clears the line', async () => {
+  renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const status = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS);
+  answerWith(hiddenStatement, 'Disagree');
+  await waitFor(() => expect(status).toHaveTextContent(`${hiddenIds.length - 1} `));
+  expect(status).toHaveTextContent(
+    `${hiddenIds.length - 1} ${hiddenIds.length - 1 === 1 ? 'is' : 'are'} hidden until you answer`,
+  );
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
+  await waitFor(() => expect(status).not.toHaveTextContent('hidden until you answer'));
+});
+
+it('names no study when the session has no note on where the data goes', async () => {
+  renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const help = within(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).getByRole('button', {
+    name: 'About hidden drafts',
+  });
+  expect(help).toHaveAccessibleDescription(
+    'Some of your AI’s drafts start blank, so you answer before you see its guess. This measures how well your AI predicts you. Untick “Share for research” to see every draft and keep no research record.',
+  );
+  expect(screen.queryByTestId('session-data-note')).not.toBeInTheDocument();
+});
+
 it('hides nothing when research sharing is off', async () => {
   renderReview({ hiddenDraftShare: share, shareDraftChangesByDefault: false });
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   expect(screen.queryByText(HIDDEN_DRAFT_NOTE)).not.toBeInTheDocument();
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).not.toHaveTextContent(
+    'hidden until you answer',
+  );
   for (const id of statements) expect(answer(id)).toHaveValue('Agree');
 });
 
@@ -171,7 +233,7 @@ it('reveals a statement guess after the answer and records the first answer', as
   const props = renderReview();
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   answerWith(hiddenStatement, 'Disagree');
-  expect(within(card(hiddenStatement)).queryByRole('group', { name: 'Hidden AI guess' })).not.toBeInTheDocument();
+  expect(within(card(hiddenStatement)).queryByRole('group', { name: 'Hidden AI prediction' })).not.toBeInTheDocument();
   expect(card(hiddenStatement)).toHaveTextContent('Your AI guessed: Agree · 80% sure');
   answerWith(hiddenStatement, 'Unsure');
   submit();
@@ -188,6 +250,29 @@ it('reveals a statement guess after the answer and records the first answer', as
     }),
   );
   expect(reviewed(props, shownStatement).predictionCondition).toBeUndefined();
+});
+
+it('keeps hidden drafts hidden, and a revealed one with its first answer, through a reload', async () => {
+  const first = renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  answerWith(hiddenStatement, 'Disagree');
+  await waitFor(() =>
+    expect(window.localStorage.getItem(`ce:interview-review:v1:demo:account:${account}`)).toContain('"blindAnswer"'),
+  );
+  first.unmount();
+  const props = renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  expect(answer(hiddenStatement)).toHaveValue('Disagree');
+  expect(card(hiddenStatement)).toHaveTextContent('Your AI guessed: Agree · 80% sure');
+  for (const id of hiddenIds.filter((hiddenId) => hiddenId !== hiddenStatement)) {
+    expect(card(id)).toHaveTextContent(HIDDEN_DRAFT_NOTE);
+    expect(answer(id)).toHaveValue('');
+  }
+  submit();
+  await waitFor(() => expect(props.onSubmitResponses).toHaveBeenCalled());
+  expect(reviewed(props, hiddenStatement)).toEqual(
+    expect.objectContaining({ predictionCondition: 'blind', blindAnswer: 'Disagree' }),
+  );
 });
 
 it('reveals a rating guess once the person moves to another question', async () => {
@@ -343,10 +428,15 @@ it('keeps a hidden draft the person already answered, as an ordinary draft, when
 it('explains the grey answer area with a keyboard-accessible tooltip', async () => {
   renderReview();
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-  const help = within(card(hiddenStatement)).getByRole('button', { name: 'Why is the AI guess hidden?' });
-  expect(help).toHaveAccessibleDescription(/Give your own answer first/);
+  const help = within(card(hiddenStatement)).getByRole('button', { name: 'Why is the prediction hidden?' });
+  expect(help).toHaveAccessibleDescription(/^Answer first, so the AI’s prediction can’t sway you/);
+  // It says what is saved with the answer, never that only the answer is.
+  expect(help).toHaveAccessibleDescription(
+    /prediction, its confidence and what you changed are saved with your answer/,
+  );
+  expect(help).not.toHaveAccessibleDescription(/Only your own answer/);
   fireEvent.focus(help);
-  expect(await screen.findByRole('tooltip')).toHaveTextContent('Give your own answer first');
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('Answer first, so the AI’s prediction can’t sway you');
   expect(answer(hiddenStatement)).toBeEnabled();
   expect(card(hiddenStatement).innerHTML).not.toContain('EVIDENCE-');
 });

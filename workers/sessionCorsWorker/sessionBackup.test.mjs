@@ -147,15 +147,21 @@ test('feedback is never a storage resource and never enters a backup', async () 
   assert.ok(!leaked(JSON.stringify(pages)));
 });
 
-test('a restore keeps everyone who turned the Session Agent off opted out', async () => {
+test('a restore keeps everyone who turned the Session Agent off opted out, and every address left off exports off', async () => {
   const source = fixture();
   const people = [`0x${'a'.repeat(40)}`, `0x${'b'.repeat(40)}`];
+  const unnamed = [`0x${'b'.repeat(40)}`, `0x${'d'.repeat(40)}`];
   for (const address of people) {
     const set = await callSessionConfigCoordinator({ env: source.env, slug, path: 'session-agent/set', address, optedOut: true });
     assert.equal(set.body.optedOut, true);
   }
+  for (const address of unnamed) {
+    const set = await callSessionConfigCoordinator({ env: source.env, slug, path: 'session-agent/set-unattributed', address, unattributed: true });
+    assert.equal(set.body.unattributed, true);
+  }
   const [page] = await allPages(source.env);
   assert.deepEqual(page.coordinator.sessionAgentOptOuts, people);
+  assert.deepEqual(page.coordinator.sessionAgentUnattributed, unnamed);
   // A restore only adds: someone the target already holds as opted out stays so,
   // and a backup from before backups carried the list restores with none.
   const already = `0x${'c'.repeat(40)}`;
@@ -163,17 +169,92 @@ test('a restore keeps everyone who turned the Session Agent off opted out', asyn
     const target = fixture();
     target.kv.values.delete(`session:${slug}:config`);
     await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/set', address: already, optedOut: true });
+    await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/set-unattributed', address: already, unattributed: true });
     const result = await importPage(target.env, backupPage);
     assert.equal(result.body.complete, true, JSON.stringify(result));
-    return (await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/list' })).body.addresses.sort();
+    const { addresses, unattributed } = (await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent/list' })).body;
+    return [addresses.sort(), unattributed.sort()];
   };
-  assert.deepEqual(await restoreOnto(page), [...people, already]);
+  assert.deepEqual(await restoreOnto(page), [[...people, already], [...unnamed, already].sort()]);
   const older = structuredClone(page);
   delete older.coordinator.sessionAgentOptOuts;
+  delete older.coordinator.sessionAgentUnattributed;
   const sha256 = (text) => createHash('sha256').update(text).digest('hex');
   older.snapshotDigest = sha256(JSON.stringify(older.coordinator));
   older.archiveId = sha256(`${older.manifest.sessionId}:${older.manifest.exportedAt}:${older.snapshotDigest}`);
-  assert.deepEqual(await restoreOnto(await signBackupPage(older, source.env)), [already]);
+  assert.deepEqual(await restoreOnto(await signBackupPage(older, source.env)), [[already], [already]]);
+});
+
+// A session whose Session Agent records chats: its coordinator stores one only while that setting is on.
+const recordingFixture = () => {
+  const made = fixture();
+  const key = `session:${slug}:config`;
+  made.kv.values.set(key, JSON.stringify({ ...JSON.parse(made.kv.values.get(key)), sessionAgent: { audiences: [], history: true } }));
+  return made;
+};
+
+test('a backup carries the stored chats it began with, and a restore puts them back under their ids', async () => {
+  const chat = (question, extra = {}) => ({ day: '2026-11-24', answers: 'general', question, answer: 'Shorter meetings.', ...extra });
+  const store = (env, operation, payload = {}) => callSessionConfigCoordinator({ env, slug, path: `session-agent-history/${operation}`, ...payload });
+  const source = recordingFixture();
+  // Enough stored answers that the backup takes more than one page.
+  for (let n = 0; n < 120; n += 1) {
+    const id = `cf_chat_${String(n).padStart(3, '0')}`;
+    const metadata = { id, resource: 'responses', responder: admin, storageLayer: 'kv', size: 6 };
+    source.kv.values.set(`ce-storage:${slug}:responses:${id}`, JSON.stringify(metadata));
+    source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('answer').toString('base64url') }));
+  }
+  assert.equal((await store(source.env, 'add', { entry: chat('First?', { scope: 'admin' }) })).ok, true);
+  await store(source.env, 'add', { entry: chat('Second?', { by: `0x${'a'.repeat(40)}`, name: 'Sam', groups: ['salon'] }) });
+  const first = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  assert.ok(first.nextCursor);
+  // Whom each answer was fit for goes with it, so a restored session exports no more than this one would.
+  assert.deepEqual(first.coordinator.sessionAgentHistory.map((entry) => [entry.id, entry.question, entry.scope, entry.groups]),
+    [['000000000001', 'First?', 'admin', undefined], ['000000000002', 'Second?', undefined, ['salon']]]);
+  // Someone asks while the backup runs: it carries on, and that chat waits for the next backup.
+  assert.equal((await store(source.env, 'add', { entry: chat('Asked during the backup?') })).ok, true);
+  const pages = [first];
+  for (let cursor = first.nextCursor; cursor;) {
+    const page = await exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor });
+    assert.equal(page.reason, undefined, JSON.stringify(page).slice(0, 200));
+    pages.push(page);
+    cursor = page.nextCursor;
+  }
+  assert.equal(pages.at(-1).manifest.complete, true);
+  assert.ok(!JSON.stringify(pages).includes('Asked during the backup?'));
+  // A chat the backup holds being cleared while it runs does change it: that backup starts again.
+  const again = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
+  assert.equal((await store(source.env, 'delete', { ids: ['000000000001'] })).body.deleted, 1);
+  await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: again.nextCursor }),
+    (error) => error.status === 409 && error.reason === 'backup_session_changed');
+
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  let result;
+  for (const page of pages) result = await importPage(target.env, page);
+  assert.equal(result.body.complete, true, JSON.stringify(result).slice(0, 300));
+  assert.deepEqual((await store(target.env, 'all')).body.entries, first.coordinator.sessionAgentHistory);
+  // The next chat stored on the restored session follows the restored ones.
+  assert.equal((await store(target.env, 'add', { entry: chat('After the restore?') })).body.id, '000000000003');
+});
+
+test('a restore refuses chats that are not whole exchanges', async () => {
+  const source = recordingFixture();
+  const added = await callSessionConfigCoordinator({ env: source.env, slug, path: 'session-agent-history/add',
+    entry: { day: '2026-11-24', answers: 'general', question: 'First?', answer: 'An answer.' } });
+  assert.equal(added.ok, true, JSON.stringify(added));
+  const [page] = await allPages(source.env);
+  const altered = structuredClone(page);
+  altered.coordinator.sessionAgentHistory[0].asker = `0x${'a'.repeat(40)}`;
+  const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+  altered.snapshotDigest = sha256(JSON.stringify(altered.coordinator));
+  altered.archiveId = sha256(`${altered.manifest.sessionId}:${altered.manifest.exportedAt}:${altered.snapshotDigest}`);
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  const refused = await importPage(target.env, await signBackupPage(altered, source.env));
+  assert.notEqual(refused.body.complete, true);
+  assert.match(JSON.stringify(refused.body), /Invalid backup Session Agent chats/);
+  assert.deepEqual((await callSessionConfigCoordinator({ env: target.env, slug, path: 'session-agent-history/all' })).body.entries, []);
 });
 
 test('restore refuses missing or altered pages, foreign keys, and mismatched session ids', async () => {

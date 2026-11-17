@@ -191,6 +191,11 @@ Interview settings for research:
   how much seeing a draft sways answers. It applies only while they share draft
   changes.
 
+- **Where the data goes** (`interviewMode.dataNote`, empty by default) is an
+  optional sentence or two for participants, such as who funds a study, with
+  `https://` links. It shows in the hidden-drafts and **Share for research**
+  tooltips; when empty, no study is named.
+
 - **Show participants how well their AI predicted them**
   (`interviewMode.showFidelityScore`, off by default) shows a private score
   after someone submits AI-prefill drafts.
@@ -221,7 +226,9 @@ view toggles for Circles, Breakdown, and Risk Matrix,
 `autoAfter: { threshold: 10, unit: "distinctParticipants" }`,
 `inputScope: "submitted"`, and `publication: "latest_success_visible"`.
 The threshold counts newly seen distinct submitted participants since the last
-successful run. Circles renders the DebateMap-style argument map and atlas.
+successful run. Results shows no view of its own for the build; the Session
+Agent reads it as its summary of results. Admins build the atlas and risk
+matrix separately, from the open Results menu.
 Risk Matrix axes are generated from the session subject matter rather than a
 fixed likelihood/impact template. Generation inherits the session's configured
 AI provider and model routing, including object-shaped `ai.models.thinking`
@@ -1423,7 +1430,7 @@ also serves the file at `/known-sessions.json`, so agents can find a session's
 Worker from its slug.
 
 The file lists EDDY 2026 (`eddy26`), the demo session (`demo-sh`), the Reverse
-Alignment salon (`rxc-ra-26`) and `rxc-ra-test-5`. The About page's **Demo**
+Alignment salon (`rxc-ra-2`), its public demo (`rxc-ra-26`) and `rxc-ra-test-5`. The About page's **Demo**
 button opens `rxc-ra-test-5`, and the films, stills, promo slides and writeup
 carry its link. Delete its entry only once those links switch to `rxc-ra-26`'s
 and the button opens another listed session. A listed session that also has

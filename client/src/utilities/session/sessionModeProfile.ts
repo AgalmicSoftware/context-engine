@@ -108,7 +108,15 @@ const SESSION_MODE_EXPORT_SCOPES = new Set<string>([
   'encrypted_envelopes_only',
 ]);
 const SESSION_MODE_ACCESS_MATCHES = new Set<string>(['any', 'all']);
-const SESSION_MODE_ACCESS_CONDITION_KINDS = new Set<string>(['worker_role', 'sbt_onchain', 'agent_grant_scope']);
+const SESSION_MODE_ACCESS_CONDITION_KINDS = new Set<string>([
+  'worker_role',
+  'sbt_onchain',
+  'agent_grant_scope',
+  'worker_group',
+]);
+// As the Worker checks it: at most this many groups, each by its stored id, none twice.
+const SESSION_MODE_MAX_CONDITION_GROUPS = 20;
+const SESSION_MODE_WORKER_GROUP_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,79}$/;
 const SESSION_MODE_RESOURCE_STAGES = new Set<string>(['active', 'staged']);
 const SESSION_MODE_LEGACY_PAYLOAD_MODES = new Set<string>(['public_read', 'worker_sbt_gate', 'lit_encrypted']);
 const SESSION_MODE_PRESET_VALUES = new Set<string>(Object.values(SESSION_MODE_PRESET_IDS));
@@ -252,6 +260,7 @@ export const validateSessionModeProfile = (
         'contract',
         'anyOrAll',
         'scope',
+        'groupIds',
       ]);
       if (!condition) return;
       if (!validateEnum(`${conditionPath}.kind`, condition.kind, SESSION_MODE_ACCESS_CONDITION_KINDS)) return;
@@ -259,6 +268,20 @@ export const validateSessionModeProfile = (
         validateKnownKeys(conditionPath, condition, ['kind', 'role']);
         if (!validateTrimmedText(`${conditionPath}.role`, condition.role, 'Worker role')) {
           addIssue(`${conditionPath}.role`, 'worker_role_required', 'Worker role conditions require a role.');
+        }
+        return;
+      }
+      if (condition.kind === 'worker_group') {
+        validateKnownKeys(conditionPath, condition, ['kind', 'groupIds']);
+        const { groupIds } = condition;
+        if (
+          !Array.isArray(groupIds) ||
+          !groupIds.length ||
+          groupIds.length > SESSION_MODE_MAX_CONDITION_GROUPS ||
+          !groupIds.every((id) => typeof id === 'string' && SESSION_MODE_WORKER_GROUP_ID_PATTERN.test(id)) ||
+          new Set(groupIds).size !== groupIds.length
+        ) {
+          addIssue(`${conditionPath}.groupIds`, 'worker_group_ids_required', 'Worker group conditions need group ids.');
         }
         return;
       }

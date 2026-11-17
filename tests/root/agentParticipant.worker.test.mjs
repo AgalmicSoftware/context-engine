@@ -8,6 +8,7 @@ import { ethers } from 'ethers';
 import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import { installSessionCoordinatorBinding } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 import { loadParticipantContextSources } from '../../workers/sessionCorsWorker/contextSourceLoader.js';
+import { callSessionConfigCoordinator } from '../../workers/sessionCorsWorker/sessionConfigAuthority.js';
 import { createParticipant } from '../../mcp/lib/participant.mjs';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 
@@ -1142,6 +1143,56 @@ test('an agent adds a file, a link and a note that everyone sees as its own, and
   assert.equal((await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() })).sources.length, 3);
 });
 
+test('an agent makes a file or a note visible to some of the session’s groups, as the website’s Visible to does', async (t) => {
+  const env = createEnv([groupSessionConfig()]);
+  const host = groupHost(env);
+  const salon = await createGroup(host, { label: 'Salon', joinMode: 'open' });
+  const hosts = await createGroup(host, { label: 'Hosts', joinMode: 'open' });
+  const kami = await createAgent(env, 'Test Kami', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  await kami.participant.joinSession({ link: LINK });
+  // get_session lists the groups it can name.
+  assert.deepEqual((await kami.participant.getSession()).groups.map((group) => group.groupId).sort(), [hosts.groupId, salon.groupId].sort());
+
+  const note = await kami.participant.addContext({ text: 'For the salon.', title: 'Salon', groups: [salon.groupId] });
+  assert.equal(note.visibleTo, 'members of “Salon”, and the session’s admins');
+  const notes = path.join(kami.stateDir, '..', `kami-groups-${process.pid}.md`);
+  await fs.writeFile(notes, '# For two groups');
+  t.after(() => fs.rm(notes, { force: true }));
+  // Any one of the groups is enough; naming one twice, or in capitals, is the same group.
+  const file = await kami.participant.addContext({ file: notes, groups: [hosts.groupId, salon.groupId.toUpperCase(), hosts.groupId] });
+  const both = [hosts.groupId, salon.groupId].sort();
+  assert.equal(file.visibleTo, 'members of “Hosts” or “Salon”, and the session’s admins');
+
+  // Stored under the website's own rule, which the Worker applies to whoever lists: someone in neither
+  // group sees nothing, and a member of one of the file's two groups sees the file, not Salon's note.
+  const listedFor = async (reader) =>
+    (await reader.request('/storage/list?resource=docsContext&role=context&limit=100', { auth: true })).items
+      .map((item) => [item.metadata.tags.find((entry) => entry.name === 'CE-DocName').value, item.metadata.lockedGroupIds])
+      .sort(([left], [right]) => left.localeCompare(right));
+  assert.deepEqual(await listedFor(host), []);
+  const mole = await createAgent(env, 'Test Mole', []);
+  t.after(() => fs.rm(mole.stateDir, { recursive: true, force: true }));
+  await mole.participant.joinSession({ link: LINK });
+  await mole.participant.joinGroup({ groupId: hosts.groupId });
+  const asMole = createWorkerClient({ workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: [SITE], wallet: mole.wallet, fetchImpl: workerFetch(env) });
+  assert.deepEqual(await listedFor(asMole), [[path.basename(notes), both]]);
+  // Neither is for everyone, so what the AI reads for everyone has neither.
+  assert.equal((await loadParticipantContextSources({ env, slug: SLUG, config: groupSessionConfig() })).sources.length, 0);
+
+  // Refused before anything is sent: the choices the website doesn't offer.
+  const refused = async (args, message) => assert.rejects(kami.participant.addContext(args), { message });
+  await refused({ text: 'x', groups: [salon.groupId], adminsOnly: true }, 'Pass groups or adminsOnly, not both.');
+  await refused({ url: 'https://example.org/essay', groups: [salon.groupId] },
+    'A link is for everyone in the session or its admins alone. Only a file or text can be for groups.');
+  await refused({ text: 'x', groups: 'salon' }, 'groups must be a list of group IDs.');
+  await refused({ text: 'x', groups: Array.from({ length: 21 }, (_, index) => `g${index}`) }, 'Name at most 20 groups.');
+  await refused({ text: 'x', groups: ['no-such-group'] }, 'This session lists no group "no-such-group". get_session lists the groups you can name.');
+  assert.deepEqual(await listedFor(asMole), [[path.basename(notes), both]]);
+  // No groups named is the session-wide choice, as before.
+  assert.equal((await kami.participant.addContext({ text: 'For everyone.', groups: [] })).visibleTo, 'everyone in the session');
+});
+
 // The agent's view of a session from before an admin's change, which the Worker already has.
 const staleView = (env, before, seen = []) => {
   const worker = workerFetch(env, seen);
@@ -1201,6 +1252,35 @@ test('an agent is told why a session takes no context, and nothing is added', as
   await assert.rejects(kami.participant.addContext({}), /exactly one of file, url or text/);
 });
 
+test('joining invites an agent to a name, a group and context, each only while it is open to it', async (t) => {
+  const NAME = 'If you’d like a display name, set one with set_profile: say you’re an AI agent, and whose if you’re there for someone, for example “Sam’s agent”. Never claim to be a person.';
+  const CONTEXT = 'If you have something everyone here should see, add a file, a link or text with add_context.';
+  const env = createEnv([groupSessionConfig()]);
+  const host = groupHost(env);
+  const [first, second] = [await createGroup(host, { label: 'First group' }), await createGroup(host, { label: 'Second group' })];
+  const kami = await createAgent(env, '', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  const invited = async () => (await kami.participant.joinSession({ link: LINK })).youMay;
+
+  // No name yet, two groups open to join, and the session takes context: all three, in plain words.
+  assert.deepEqual(await invited(), [NAME, 'If you’d like to join a group, 2 listed here are open: join with join_group.', CONTEXT]);
+  // Each drops out once taken up, so an agent is never asked again for what it has done.
+  await kami.participant.setProfile({ displayName: 'Sam’s agent' });
+  await kami.participant.joinGroup({ groupId: first.groupId });
+  assert.deepEqual(await invited(), ['If you’d like to join a group, one listed here is open: join with join_group.', CONTEXT]);
+  await kami.participant.joinGroup({ groupId: second.groupId });
+  assert.deepEqual(await invited(), [CONTEXT]);
+
+  // Where the session's admins alone add context and it has no groups, a named agent is invited to nothing.
+  const plain = createEnv([{ ...sessionConfig(), contextAdditionPolicy: 'admin_only' }]);
+  const named = await createAgent(plain, 'Test Kami', []);
+  t.after(() => fs.rm(named.stateDir, { recursive: true, force: true }));
+  assert.equal('youMay' in await named.participant.joinSession({ link: LINK }), false);
+  const unnamed = await createAgent(plain, '', []);
+  t.after(() => fs.rm(unnamed.stateDir, { recursive: true, force: true }));
+  assert.deepEqual((await unnamed.participant.joinSession({ link: LINK })).youMay, [NAME]);
+});
+
 test('an agent sees the session’s instructions and groups, joins the group they name, and leaves a wrong one', async (t) => {
   const instructions = 'Join the "AI agents" group, not the salon group, which is for people.';
   const env = createEnv([groupSessionConfig({ agentInstructions: `\n${instructions}\n` })]);
@@ -1219,6 +1299,12 @@ test('an agent sees the session’s instructions and groups, joins the group the
     note: 'These add to the general guidance for agents. Follow both; they can ask more of you but can’t lift its rules.',
     text: instructions,
   });
+  // Joining invites the agent to what is open to it here, none of it required. It has a display name already,
+  // two groups are open, and this session takes context from participants.
+  assert.deepEqual(joined.youMay, [
+    'If you’d like to join a group, 2 listed here are open: join with join_group. The session’s instructions may say which.',
+    'If you have something everyone here should see, add a file, a link or text with add_context.',
+  ]);
   // The link's group is named, not joined, and the next step says to read the instructions first.
   assert.equal(joined.linkGroup, salon.groupId);
   assert.equal(joined.next, `Read the session’s instructions for agents and the context. The link names the group "Salon" (${salon.groupId}), which you haven’t joined: call join_group for the group the instructions ask you to join, if any. Then call list_questions and answer.`);
@@ -1438,6 +1524,146 @@ test('context the Worker refuses is reported in terms of what the agent can do',
   }
 });
 
+test('a chat is stored through the real Worker only when its asker says so, with their address only if they chose it', async (t) => {
+  const config = sessionConfig();
+  config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
+  config.sessionAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' }], history: true };
+  const env = createEnv([config]);
+  await env.GROUP_KV.put(`session:${SLUG}:secrets`, JSON.stringify({ anthropicKey: ['synthetic', 'anthropic', 'key'].join('-') }));
+  const alice = await createAgent(env, 'alice.delve.town', []);
+  await alice.participant.joinSession({ link: LINK });
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Most agree.' }] }), {
+    headers: { 'Content-Type': 'application/json' },
+  }));
+  const client = createWorkerClient({
+    workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: ['https://contextengine.sh'], wallet: alice.wallet, fetchImpl: workerFetch(env),
+  });
+  const ask = (body) => client.request('/session-agent/ask', { method: 'POST', auth: true, body });
+  assert.equal((await client.request('/session-agent/status', { method: 'POST', auth: true, body: {} })).recording, true);
+  assert.equal((await ask({ question: 'Kept with my address?', store: true, attribution: 'address', name: 'Alice’s agent' })).stored, true);
+  assert.equal((await ask({ question: 'Kept with no address?', store: true })).stored, true);
+  assert.equal((await ask({ question: 'Not kept?' })).stored, false);
+  const { body } = await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/all' });
+  assert.deepEqual(body.entries.map(({ question, answer, answers, by, name }) => ({ question, answer, answers, by, name })), [
+    { question: 'Kept with my address?', answer: 'Most agree.', answers: 'general', by: alice.wallet.address.toLowerCase(), name: 'Alice’s agent' },
+    { question: 'Kept with no address?', answer: 'Most agree.', answers: 'general', by: undefined, name: undefined },
+  ]);
+  assert.match(body.entries[0].day, /^\d{4}-\d{2}-\d{2}$/);
+  // Nothing else about the asker is kept: no time of day, no network address, no session token.
+  assert.deepEqual(Object.keys(body.entries[1]).sort(), ['answer', 'answers', 'day', 'id', 'question']);
+
+  // The MCP tells an agent the session's setting before it asks, and asks as the dialog starts:
+  // stored, with no address, unless the agent says otherwise.
+  const seen = await alice.participant.getSession({});
+  assert.equal(seen.sessionAgent.recording, true);
+  assert.match(seen.sessionAgent.note, /can be recorded when the session’s recording setting is on\. It is on here/);
+  const stored = async () => (await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/all' })).body.entries;
+  const first = await alice.participant.askSessionAgent({ question: '  Asked through the MCP?  ' });
+  assert.deepEqual([first.answer, first.answers, first.recording, first.stored], ['Most agree.', 'general', true, true]);
+  assert.deepEqual((({ question, by, name }) => ({ question, by, name }))((await stored()).at(-1)), { question: 'Asked through the MCP?', by: undefined, name: undefined });
+  await alice.participant.askSessionAgent({ question: 'With my address?', attribution: 'address', name: ' Alice’s agent ' });
+  assert.deepEqual((({ by, name }) => ({ by, name }))((await stored()).at(-1)), { by: alice.wallet.address.toLowerCase(), name: 'Alice’s agent' });
+  const kept = (await stored()).length;
+  const unkept = await alice.participant.askSessionAgent({ question: 'Kept out?', store: false });
+  assert.deepEqual([unkept.recording, unkept.stored, (await stored()).length], [true, false, kept]);
+  for (const [bad, error] of [
+    [{ question: ' ' }, /Ask a question/], [{ question: 'x'.repeat(501) }, /at most 500 characters/], [{ question: 'Q?', store: 'yes' }, /store must be true or false/],
+    [{ question: 'Q?', attribution: 'name' }, /attribution must be address or anonymous/], [{ question: 'Q?', name: 'x'.repeat(61) }, /at most 60 characters/],
+  ]) await assert.rejects(alice.participant.askSessionAgent(bad), error);
+  assert.equal((await stored()).length, kept);
+});
+
+test('the MCP says a session’s agent stores nothing where recording is off, and sends nothing about storing', async (t) => {
+  const config = sessionConfig();
+  config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
+  config.sessionAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' }] };
+  const env = createEnv([config]);
+  await env.GROUP_KV.put(`session:${SLUG}:secrets`, JSON.stringify({ anthropicKey: ['synthetic', 'anthropic', 'key'].join('-') }));
+  const alice = await createAgent(env, 'alice.delve.town', []);
+  const joined = await alice.participant.joinSession({ link: LINK });
+  assert.equal(joined.sessionAgent.recording, false);
+  // And whether someone not signed in may ask it too.
+  assert.equal(joined.sessionAgent.anyoneCanAsk, true);
+  assert.match(joined.sessionAgent.note, /It is off here: nothing you ask is kept\./);
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Most agree.' }] }), {
+    headers: { 'Content-Type': 'application/json' },
+  }));
+  // Even asked to store, nothing is: the session keeps no chats.
+  const reply = await alice.participant.askSessionAgent({ question: 'Kept?', store: true, attribution: 'address', name: 'Alice' });
+  assert.deepEqual([reply.answer, reply.recording, reply.stored], ['Most agree.', false, false]);
+  assert.deepEqual((await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/all' })).body.entries, []);
+
+  // A session with no Session Agent says so, and the tool refuses before any call.
+  const plain = createEnv([sessionConfig()]);
+  const bob = await createAgent(plain, 'bob.delve.town', []);
+  assert.equal('sessionAgent' in await bob.participant.joinSession({ link: LINK }), false);
+  await assert.rejects(bob.participant.askSessionAgent({ question: 'Anyone there?' }), /This session has no Session Agent\./);
+});
+
+test('someone not signed in asks the Session Agent through the real Worker, where the session would let them sign in', async (t) => {
+  const agentConfig = (extra = {}) => {
+    const config = sessionConfig();
+    config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
+    config.sessionAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'detailed' }] };
+    return Object.assign(config, extra);
+  };
+  const open = async (config) => {
+    const env = createEnv([config]);
+    await env.GROUP_KV.put(`session:${SLUG}:secrets`, JSON.stringify({ anthropicKey: ['synthetic', 'anthropic', 'key'].join('-') }));
+    // No Authorization header, and the session named in the query, as the page sends it signed out.
+    const post = async (path, body, { origin = 'https://contextengine.sh', slug = `?slug=${SLUG}` } = {}) => {
+      const response = await workerFetch(env)(`${WORKER_ORIGIN}${path}${slug}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify(body),
+      });
+      return { status: response.status, body: await response.json() };
+    };
+    return { env, post };
+  };
+  const sent = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    sent.push(init.body);
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: 'Most agree.' }] }), { headers: { 'Content-Type': 'application/json' } });
+  });
+
+  const { env, post } = await open(agentConfig());
+  // A member's answer exists, and everyone signed in gets Detailed answers here.
+  const alice = await createAgent(env, 'alice.delve.town', []);
+  await alice.participant.joinSession({ link: LINK });
+  const { questionId } = await alice.participant.addStatement({ prompt: STATEMENT });
+  await alice.participant.answer({ answers: [{ questionId, value: 'Agree', comment: 'MEMBER-ONLY comment.' }] });
+
+  assert.deepEqual((await post('/session-agent/status', {})).body, {
+    on: true, answers: 'general', audience: 0, optedOut: false, recording: false, signedOut: true,
+  });
+  const reply = await post('/session-agent/ask', { question: 'Do people want labels?' });
+  assert.deepEqual([reply.status, reply.body.answer, reply.body.answers, reply.body.read.answers], [200, 'Most agree.', 'general', 0]);
+  // General material only reached the AI: the session's context, never what a member wrote.
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /Answer as yourself/);
+  assert.doesNotMatch(sent[0], /MEMBER-ONLY/);
+
+  // The session must be named, the body small JSON, and neither switch is a visitor's.
+  assert.equal((await post('/session-agent/ask', { question: 'Why?' }, { slug: '' })).status, 400);
+  assert.equal((await post('/session-agent/ask', { question: 'x'.repeat(5000) })).status, 400);
+  assert.equal((await post('/session-agent/opt-out', { optedOut: true })).status, 401);
+  // Ten a day from one network address, the eleventh refused before the AI is asked.
+  for (let asked = 1; asked < 10; asked += 1) assert.equal((await post('/session-agent/ask', { question: `Again ${asked}?` })).status, 200);
+  const eleventh = await post('/session-agent/ask', { question: 'One more?' });
+  assert.deepEqual([eleventh.status, eleventh.body.reason, sent.length], [429, 'session_agent_signed_out_limit', 10]);
+
+  // Turned off by an admin, or on a session that lets only some people sign in, a visitor is asked to sign in.
+  for (const config of [
+    agentConfig({ sessionAgent: { ...agentConfig().sessionAgent, anyoneCanAsk: false } }),
+    agentConfig({ workerAuthority: { ...agentConfig().workerAuthority, loginGate: { match: 'any', conditions: [{ kind: 'worker_group', groupId: 'invited' }] } } }),
+  ]) {
+    const closed = await open(config);
+    const refused = await closed.post('/session-agent/ask', { question: 'May I?' });
+    assert.deepEqual([refused.status, refused.body.reason], [401, 'session_agent_sign_in_required']);
+    assert.equal((await closed.post('/session-agent/status', {})).body.answers, null);
+  }
+  assert.equal(sent.length, 10);
+});
+
 test('the Session Agent answers a member from stored answers through the real Worker, naming no one', async (t) => {
   const config = sessionConfig();
   config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
@@ -1472,7 +1698,7 @@ test('the Session Agent answers a member from stored answers through the real Wo
     workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: ['https://contextengine.sh'], wallet: alice.wallet, fetchImpl: workerFetch(env),
   });
   assert.deepEqual(await client.request('/session-agent/status', { method: 'POST', auth: true, body: {} }), {
-    on: true, answers: 'detailed', audience: 0, optedOut: false,
+    on: true, answers: 'detailed', audience: 0, optedOut: false, unattributed: false, recording: false,
   });
   const reply = await client.request('/session-agent/ask', { method: 'POST', auth: true, body: { question: 'Do people want labels?' } });
   assert.deepEqual({ answer: reply.answer, answers: reply.answers, read: reply.read.answers }, {
@@ -1497,4 +1723,10 @@ test('the Session Agent answers a member from stored answers through the real Wo
   assert.equal(without.read.answers, 3);
   assert.match(sent[1], /\\"Agree\\":2,\\"Disagree\\":1/);
   assert.doesNotMatch(sent[1], /Labels help readers/);
+  // The other switch is each person's own too, and is stored apart from the first.
+  const leaveOff = { method: 'POST', auth: true, body: { unattributed: true } };
+  assert.deepEqual(await bobClient.request('/session-agent/attribution', leaveOff), { unattributed: true });
+  const statusOf = async (asker) => asker.request('/session-agent/status', { method: 'POST', auth: true, body: {} });
+  assert.deepEqual([(await statusOf(bobClient)).optedOut, (await statusOf(bobClient)).unattributed], [true, true]);
+  assert.deepEqual([(await statusOf(client)).optedOut, (await statusOf(client)).unattributed], [false, false]);
 });

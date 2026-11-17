@@ -2,6 +2,7 @@ import { normalizeSessionIdHex } from '@ce-shared/auth/siweMessage.mjs';
 type UnknownRecord = Record<string, unknown>;
 
 import { classifySessionModeProfileSupport, type SessionModeProfile } from './sessionModeProfile';
+import { groupReadHeaders } from '../worker/workerGroupReadProof';
 
 export type DiscoveryEnvironment = 'development' | 'production' | 'test' | string;
 
@@ -22,7 +23,12 @@ type FetchBootstrapOptions = WorkerOriginOptions & {
   expectedSessionId?: string;
   signal?: AbortSignal;
   workerQueryValue: unknown;
+  /** This tab's sign-in for the session, sent only when the Worker answers with a private session's shell. */
+  memberToken?: (workerOrigin: string, sessionSlug: string) => string;
 };
+
+/** Why a private session's Worker sent only its shell: no invite proof came, or the one sent doesn't admit. */
+export type PrivateSessionShell = 'invite_required' | 'invite_invalid';
 
 export type WorkerCanonicalSessionBootstrap = {
   config: UnknownRecord;
@@ -30,6 +36,12 @@ export type WorkerCanonicalSessionBootstrap = {
   sessionId: string;
   sessionSlug: string;
   workerOrigin: string;
+};
+
+// Unknown values fail closed: the page shows the private session's way in, never a half-empty session.
+const readPrivateSessionShell = (value: unknown): PrivateSessionShell | null => {
+  if (value === undefined || value === null || value === false) return null;
+  return value === 'invite_invalid' ? 'invite_invalid' : 'invite_required';
 };
 
 // Retry activation/edge-transient client statuses and every server failure.
@@ -486,8 +498,9 @@ export const validateWorkerCanonicalSessionBootstrap = (
   const configRevision = validateConfigRevision(payload.config.configRevision);
   validateRepresentedWorkerOrigins(payload.config, canonicalWorkerOrigin, environment);
 
+  const privateSession = readPrivateSessionShell(payload.privateSession);
   return {
-    config: payload.config,
+    config: privateSession ? { ...payload.config, privateSession } : payload.config,
     configRevision,
     sessionId,
     sessionSlug: canonicalExpectedSlug,
@@ -514,10 +527,36 @@ export const fetchWorkerCanonicalSessionBootstrap = async ({
   signal,
   workerQueryValue,
   environment = runtimeEnvironment(),
+  memberToken,
 }: FetchBootstrapOptions): Promise<WorkerCanonicalSessionBootstrap> => {
   if (typeof fetchImpl !== 'function') throw new Error('Worker bootstrap fetch is unavailable.');
   const workerOrigin = parseSessionWorkerDiscoveryOrigin(workerQueryValue, { environment });
   const canonicalSlug = validateExactSlug(sessionSlug, 'Expected slug');
+  const request = { fetchImpl, workerOrigin, canonicalSlug, expectedSessionId, signal, environment };
+  const bootstrap = await requestWorkerCanonicalSessionBootstrap(request);
+  if (!bootstrap.config.privateSession) return bootstrap;
+  // A private session admits its members and admins by their sign-in; other sessions never see it here.
+  const token = memberToken?.(workerOrigin, canonicalSlug) || '';
+  return token ? requestWorkerCanonicalSessionBootstrap({ ...request, token }) : bootstrap;
+};
+
+const requestWorkerCanonicalSessionBootstrap = async ({
+  fetchImpl,
+  workerOrigin,
+  canonicalSlug,
+  expectedSessionId,
+  signal,
+  environment,
+  token = '',
+}: {
+  fetchImpl: typeof fetch;
+  workerOrigin: string;
+  canonicalSlug: string;
+  expectedSessionId?: string;
+  signal?: AbortSignal;
+  environment: DiscoveryEnvironment;
+  token?: string;
+}): Promise<WorkerCanonicalSessionBootstrap> => {
   const bootstrapUrl = buildSessionWorkerBootstrapUrl(workerOrigin, canonicalSlug, { environment });
   let response: Response;
   try {
@@ -526,6 +565,8 @@ export const fetchWorkerCanonicalSessionBootstrap = async ({
       headers: {
         Accept: 'application/json',
         'X-Session-Slug': canonicalSlug,
+        ...groupReadHeaders(workerOrigin, canonicalSlug),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       credentials: 'omit',
       redirect: 'error',

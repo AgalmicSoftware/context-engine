@@ -10,6 +10,7 @@ import {
   validateWorkerCanonicalSessionBootstrap,
   WorkerSessionBootstrapRequestError,
 } from './sessionWorkerDiscovery';
+import { forgetGroupReadHeader, saveGroupReadHeader } from '../worker/workerGroupReadProof';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from './sessionModeProfile';
 
 const SESSION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -352,6 +353,81 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
       }),
     );
     expect(result.sessionId).toBe(SESSION_ID);
+  });
+
+  it('sends a private session’s invite proof held for that Worker and session, and nothing for another', async () => {
+    const header = `rxc:0x${'ab'.repeat(65)}`;
+    const worker = 'https://session-a.example.workers.dev';
+    saveGroupReadHeader({ workerUrl: worker, sessionSlug: 'session-a', sessionId: SESSION_ID, header });
+    // Proofs for the same session on another Worker, and for another session on this one, are never sent here.
+    const otherWorker = 'https://session-b.example.workers.dev';
+    const decoy = `rxc:0x${'cd'.repeat(65)}`;
+    saveGroupReadHeader({ workerUrl: otherWorker, sessionSlug: 'session-a', sessionId: SESSION_ID, header: decoy });
+    saveGroupReadHeader({ workerUrl: worker, sessionSlug: 'session-b', sessionId: SESSION_ID, header: decoy });
+    const respond = async () =>
+      new Response(JSON.stringify(buildPayload()), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    try {
+      const fetchImpl = jest.fn(respond);
+      await fetchWorkerCanonicalSessionBootstrap({
+        fetchImpl,
+        sessionSlug: 'session-a',
+        workerQueryValue: `${worker}/`,
+        environment: 'production',
+      });
+      expect(jest.mocked(fetchImpl as unknown as typeof fetch).mock.calls[0][1]?.headers).toEqual({
+        Accept: 'application/json',
+        'X-Session-Slug': 'session-a',
+        'X-CE-Group-Invite': header,
+      });
+    } finally {
+      forgetGroupReadHeader(worker, 'session-a');
+      forgetGroupReadHeader(otherWorker, 'session-a');
+      forgetGroupReadHeader(worker, 'session-b');
+    }
+  });
+
+  it('marks a private session’s shell, and asks again with this tab’s sign-in only then', async () => {
+    const worker = 'https://session-a.example.workers.dev';
+    const shell = { ...buildPayload(), privateSession: 'invite_required' };
+    const reply = (payload: unknown) =>
+      new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const load = (fetchImpl: jest.Mock, memberToken?: (origin: string, slug: string) => string) =>
+      fetchWorkerCanonicalSessionBootstrap({
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        sessionSlug: 'session-a',
+        workerQueryValue: worker,
+        environment: 'production',
+        memberToken,
+      });
+
+    // A member: the shell, then the full config for the sign-in.
+    const member = jest.fn().mockResolvedValueOnce(reply(shell)).mockResolvedValueOnce(reply(buildPayload()));
+    const memberToken = jest.fn((_origin: string, _slug: string) => 'member-token');
+    const authorizationOf = (call: number) =>
+      (member.mock.calls[call] as [string, RequestInit])[1].headers as Record<string, string | undefined>;
+    const admitted = await load(member, memberToken);
+    expect(admitted.config.privateSession).toBeUndefined();
+    expect(memberToken).toHaveBeenCalledWith(worker, 'session-a');
+    expect(authorizationOf(0).Authorization).toBeUndefined();
+    expect(authorizationOf(1).Authorization).toBe('Bearer member-token');
+
+    // Signed out: the shell, marked, from one request.
+    const signedOut = jest.fn().mockResolvedValue(reply(shell));
+    expect((await load(signedOut, () => '')).config.privateSession).toBe('invite_required');
+    expect(signedOut).toHaveBeenCalledTimes(1);
+
+    // A refused proof says so; an unknown reason still shows only the way in.
+    const refused = jest.fn().mockResolvedValue(reply({ ...shell, privateSession: 'invite_invalid' }));
+    expect((await load(refused)).config.privateSession).toBe('invite_invalid');
+    const unknown = jest.fn().mockResolvedValue(reply({ ...shell, privateSession: 'something_new' }));
+    expect((await load(unknown)).config.privateSession).toBe('invite_required');
+
+    // Any other session never sends the sign-in to its config.
+    const open = jest.fn().mockResolvedValue(reply(buildPayload()));
+    const unused = jest.fn((_origin: string, _slug: string) => 'member-token');
+    expect((await load(open, unused)).config.privateSession).toBeUndefined();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(unused).not.toHaveBeenCalled();
   });
 
   it('fails before fetch for unsafe origins and rejects HTTP or JSON failures', async () => {

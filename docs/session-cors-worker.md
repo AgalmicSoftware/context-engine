@@ -224,6 +224,15 @@ The flow:
      subdomain calls are also covered by `Workers Scripts: Edit`. Cloudflare only pre-fills the
      form: create the token, copy its generated value, and paste it into the **Cloudflare API
      token** field.
+   - The Worker also gets a Workers AI binding (`AI`). A Worker with that
+     binding has deployed with a token that had no Workers AI permission, but
+     not yet with this two-permission token, so the first deploy proves it. If
+     Cloudflare refuses, the deploy stops at the script upload and setup shows
+     Cloudflare's first error message followed by "Bundle diagnostics: …"; for a
+     missing permission Cloudflare usually says "Authentication error" (code
+     10000). Then add the account permission `Workers AI: Read` to the token in
+     [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens) and
+     deploy again.
    - CLI equivalent for agents/local setup: `npm run -s cloudflare:token-link -- --slug <session-slug>`
      Add `--include-r2-storage` only for an advanced deployment that manages an existing R2 bucket;
      the flag does not create the bucket.
@@ -686,9 +695,8 @@ Admin test panel:
   new build shows at once through the instance that made it.
 - Generated-results AI calls inherit the session's existing AI provider/model
   routing, especially the analysis/thinking assignment. They do not hardcode a
-  separate provider or model. Inputs are submitted responses only; Circles is
-  the DebateMap argument-map plus atlas view, and Risk Matrix axes are generated
-  from the session subject matter.
+  separate provider or model. Inputs are submitted responses only. Results
+  shows no view of its own for the build; the Session Agent reads it.
 - Research CSV exports quote all cells and prefix formula-like text with an apostrophe, matching browser exports. Plain numeric strings remain numeric-looking values; JSONL preserves original text exactly.
 - Agent groups JSON and images share the minimum-size group projection. The JSON participant count includes only kept groups, and images draw only their listed aliases; unmatched participants are omitted.
 - Generated Breakdown `groups` obey `anonymizedGroupsEnabled` and `minGroupSize`.
@@ -805,10 +813,10 @@ BASE_URL=http://127.0.0.1:3100 node scripts/session-generated-results-real-ui-sm
 ```
 
 The fixture uses synthetic submitted questions/responses and synthetic
-generated artifacts. It exercises real OnePageSession refresh success, provider
-timeout with the newer artifact preserved, admin-auth `403` with the allowed
-viewer artifact preserved, a second anonymous viewer plus reload, mobile Risk
-Matrix scroll/detail behavior, and Circles hover/drill interactions.
+generated artifacts. Results shows no AI Views tab; the build feeds the Session
+Agent. The smoke checks that no such tab appears, and exercises real
+OnePageSession refresh success, provider timeout, admin-auth `403` offering the
+check again, and an anonymous viewer without admin controls.
 
 ## Session Storage Routes
 
@@ -2003,10 +2011,84 @@ longer select a principal. Malformed principals fail closed.
 
 Don't use an open group as an access rule, because anyone who can sign in can
 join it. A `group_allowlist`, group gate or `worker_group` condition needs an
-`admin_add` group. Choosing **Admin adds members** in the app's forms also moves
+`admin_add` group, or a group joined by one-use code or group password, whose
+code or password is the invitation. Choosing **Admin adds members** in the app's forms also moves
 the member list back to admins.
 
 Upload policy `group_allowlist` may be supplied on Cloudflare storage uploads with `groupId`/`groupIds`; the uploader must be a member before payload bytes are persisted. Existing SBT upload behavior is unchanged.
+
+### Private sessions
+
+A session whose access rule (`payloadAccessControl.accessConditions`) has a
+`worker_group` condition (`{ "kind": "worker_group", "groupIds": [...] }`, one
+to twenty stored group ids) is private. Such a rule must be any-of (`match:
+"any"`) and include `{ "kind": "worker_role", "role": "admin" }`, so admins are
+never locked out. Its questions, context and results show
+only to its admins, to signed-in members of a named group, and to anyone whose
+request carries a read invite for one, signed in or not. Each request reads the
+rule and the groups afresh, so adding a group signs no one out and removing a
+group, a member or a password refuses on the next request.
+
+- **Read invite.** A group password's derived key signs
+  `ContextEngine.WorkerGroup.Read:1`, `session:<sessionId>` and `group:<groupId>`
+  on three lines (EIP-191). The request sends
+  `X-CE-Group-Invite: <groupId>:<signature>`. The Worker recovers the signer and
+  asks the group's coordinator whether it is that `group_password` group's
+  current signer. A read spends nothing and cannot be used to join. A one-use
+  code makes no read invite: its holder joins first.
+- **Who is refused, and how.** The shell, for `GET /session-config`: `ok`,
+  `sessionSlug`, `privateSession` (`invite_required` or `invite_invalid`),
+  `signedIn` (whether a bearer sent with the request counted, so a client whose
+  sign-in an admin's change ended knows to sign in again) and a
+  `config` cut to what signing in and joining need (`slug`, `sessionId`,
+  `sessionIdHex`, `configRevision`, `authzEpoch`, `corsWorkerUrl`,
+  `allowOrigins`, `appearance`, `sessionModeProfile`, `storageProfile`,
+  `workerAuthority` and the Worker support fields), never the name, the
+  description, the context or the instructions. Elsewhere 403
+  `private_session_invite_required` (no invite) or
+  `private_session_invite_invalid` (an invite that no longer holds), and 503
+  `private_session_unavailable` with `retryable: true` when the groups can't be
+  read. An invite that doesn't hold is ignored for someone the rule admits
+  without it. `/session-config` reads an optional bearer, so members see the
+  whole config; it answers with `Vary: Origin, X-Session-Slug, Authorization,
+  X-CE-Group-Invite`.
+- **Routes.** Signed out: the session config, `/llms.txt`,
+  `/resource-presence`, `/interview/starter`, the interview catalog, the
+  Session Agent, `/ai`, `/transcribe`, `/realtime/call`, `/groups/list`, the
+  results routes and storage reads. The session config, `/llms.txt`,
+  `/resource-presence`, `/interview/starter` and `/realtime/call` also read an
+  optional bearer, so a member who has no invite to send passes; a bearer that
+  doesn't hold counts as signed out. Signed in: every route except storage
+  reads and uploads (which apply the rule to each request themselves),
+  `/groups/my-memberships`, `/groups/join` and `/groups/leave`, so anyone
+  signed in can still join a group by its id, and `/session-agent/opt-out`,
+  `/session-agent/attribution` and `/storage/draft-text/delete`, which stay
+  each person's own after they lose access. Agent HTTP holds agent, participant and
+  wrapped credentials to the rule by their account. Open to all: CORS
+  preflights, `/capabilities`, sign-in, signed-out feedback (a note to the
+  admins), sponsored deploy codes, agent descriptors and `session-meta`
+  (ids and flags only).
+- **Group list.** Signed out, a private session's `/groups/list` needs a read
+  invite for the one group `joinGroup` names, and lists that group alone,
+  listed or not, without its admin. Signed in, it lists as usual to those the
+  rule admits and refuses everyone else; a client joining from an invite link
+  joins by the link's group id rather than looking the group up first.
+- **Interview catalog.** An AI fetching a catalog link sends no header, so a
+  private session's catalog opens only with a ticket from a signed-in member.
+- **Results.** A signed-out invite holder sees results as members do. Where the
+  results setting shows members every answer (`session_member_full`), that
+  includes each answer with its writer's address, so anyone holding a
+  forwarded invite link reads every answer and who wrote it, until the group's
+  password changes. Where members see only their own answers, an invite reads
+  none. Results admins outside the named groups are refused like anyone else.
+- **Groups to use.** Use groups joined by group password for invite links.
+  Membership of an open group the rule names would admit anyone who joins it,
+  and a listed group's name shows to anyone signed in.
+
+Every part of a session follows its one rule for now. Each part's check reads
+its rule in one place (`resolvePrivateSessionPartRule` in
+`privateSessionAccess.js`), so a part with its own rule later changes that
+function and nothing else.
 
 ## Required bindings
 
@@ -2016,6 +2098,15 @@ KV:
 - `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) for all Cloudflare payload storage, unless `CE_STORAGE_IN_GROUP_KV=1` keeps it in `GROUP_KV`. It holds authoritative R2 per-item authorization metadata and the KV-only payload fallback. R2 uploads require both `get` and `put`, and R2 reads never fall back to custom object metadata. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
 - `CE_STORAGE_AUDIT_KV` (optional) for worker-envelope key-release audit events. If omitted, the worker uses the storage index KV for audit rows.
 - `CE_WORKER_GROUPS_KV` (optional) for worker-native group records and membership rows. If omitted, the worker uses `GROUP_KV`, then the storage index KV aliases. Membership rows remain separate from group records. D1-only configuration is not a group store and fails as unconfigured.
+
+Workers AI:
+
+- `AI` lets a session's Session Agent answer on Cloudflare's open models
+  instead of the session's AI provider. Deploys add it to every Session
+  Worker; it costs nothing until a session turns that on, and then Cloudflare
+  bills the account that hosts the Worker (10,000 Neurons a day free, then
+  Workers Paid pricing). A Worker deployed before this release has no `AI`
+  binding until it is redeployed.
 
 R2 / Durable Objects:
 
@@ -2700,8 +2791,20 @@ Never return secrets in responses.
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
   invite records remain unchanged. Removing, disabling, re-enabling or editing
-  an existing invite revokes authorization. Other fields, including permissions,
-  gates, groups, surfaces, visibility, encryption, origins and unknown settings,
+  an existing invite revokes authorization. Adding an alternative to an access
+  rule that admits anyone meeting any one of them also preserves authorization,
+  since every gate is checked afresh on each request: another group in
+  `workerAuthority.loginGate` or an access-condition document whose `match` is
+  not `all`, more `groupIds` in a `worker_group` condition, or more `groupIds`
+  under a group read gate (`payloadAccessControl.gate: group_gate`). Every
+  earlier entry must stay unchanged and in place, the rule must already have
+  one, and nothing else may change. Entries the Worker skips (not an object, or
+  no `kind`) do not count as a rule. The last two group lists apply only to
+  sessions without a capability profile, which refuses group gates. Removing
+  or swapping a group, a first rule on an open session, `any` becoming `all`, a
+  condition added to an `all` rule, or a reorder still raise `authzEpoch`.
+  Other fields, including permissions, gates, groups, surfaces, visibility,
+  encryption, origins and unknown settings,
   remain authority-sensitive. A mixed content/authority edit raises `authzEpoch`.
   Classification compares the normalized configuration that will be stored.
   Config revision and optimistic-write checks still cover every effective edit.
@@ -3056,8 +3159,30 @@ Signed login/bootstrap requests:
 - `POST /session-agent/ask` answers a question to the Session Agent
   through the session's own AI, under the `/ai` scope check and rate limit.
   `POST /session-agent/status` says how the signed-in person would be answered,
-  and `POST /session-agent/opt-out` stores their choice to keep their answers and
-  files out of it. See [session-agent.md](session-agent.md).
+  `POST /session-agent/opt-out` stores their choice to keep their answers and
+  files out of it, and `POST /session-agent/attribution` their choice to leave
+  their address off exported items. While the session records chats, `ask` can
+  store one, and admins read them with `GET /admin/session-agent/chats`. Without
+  a sign-in, `status` and `ask` answer where the session's setting and its own
+  rules allow, named with `?slug=` and bounded by two daily limits. See
+  [session-agent.md](session-agent.md).
+  - A session may have the Session Agent answer on Cloudflare Workers AI by
+    setting `ai.models["session-agent"]` to `{ provider: "workers-ai", model }`
+    with a model from `shared/workersAiModels.mjs`; every other AI task keeps
+    the session's provider, and `/ai` refuses `workers-ai` as an unsupported
+    provider. The call goes through the Worker's `AI` binding, never `fetch`,
+    with the Session Agent's 3,000-token ceiling sent in the field the model
+    takes, so a model's own default never applies. Only the answer is read,
+    never a reasoning model's thinking. No request key pays for it, a session
+    needs no stored AI key for it, and a question counts toward the person's
+    AI calls a day as before. Settings keeps the choice shown on a Worker
+    without the binding when the session already uses it, so it can be
+    switched off.
+    Cloudflare's errors become `429` (busy or out of daily allocation) or
+    `502`, without Cloudflare's text. A Worker with the binding lists
+    `workers_ai_v1` in `/capabilities`; Settings offers the choice only then.
+    Cloudflare says it doesn't train on Workers AI prompts or keep them after
+    the reply.
 - `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>[&ticket=<ticket>]`
   (`/agent/interview-brief` remains a compatibility alias)
   - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or

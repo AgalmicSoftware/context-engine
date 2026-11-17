@@ -53,6 +53,27 @@ test('dispatchAuthenticatedRoute short-circuits secret path routes before authen
   assert.equal(secretActionCalled, false);
 });
 
+test('a path that answers for itself is never routed by an action in its body', async () => {
+  for (const path of ['/session-agent/opt-out', '/session-agent/attribution', '/session-agent/ask', '/feedback']) {
+    const reached = [];
+    const result = await dispatchAuthenticatedRoute({
+      path,
+      method: 'POST',
+      request: { headers: new Headers() },
+      authenticatedContext: createAuthenticatedContext(),
+      deps: {
+        dispatchAuthenticatedSecretPathRoute: async () => ({ handled: false }),
+        readAuthenticatedActionPayload: async () => ({ ok: true, payload: { action: 'fetch_url' }, action: 'fetch_url' }),
+        dispatchAuthenticatedNonSecretActionRoute: async () => { reached.push('body action'); return { handled: true, response: 'fetched' }; },
+        dispatchAuthenticatedSecretActionRoute: async (value) => { reached.push(value.path); return { handled: true, response: 'own' }; },
+        json: () => null,
+      },
+    });
+    assert.equal(result, 'own', path);
+    assert.deepEqual(reached, [path]);
+  }
+});
+
 test('dispatchAuthenticatedRoute preserves authenticated action parse error passthrough', async () => {
   let nonSecretCalled = false;
   let secretActionCalled = false;

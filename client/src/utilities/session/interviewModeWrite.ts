@@ -16,6 +16,7 @@ const NEWER_INTERVIEW_KEYS = [
   'fidelityMinimumPeople',
   'recordingQuestionCount',
   'recordingQuestionTiming',
+  'dataNote',
 ] as const;
 
 export const withoutNewInterviewDefaults = (interviewMode: Record<string, unknown>): Record<string, unknown> => {

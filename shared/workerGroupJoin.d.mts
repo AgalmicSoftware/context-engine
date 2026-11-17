@@ -26,6 +26,13 @@ export function generateOneUseSecret(): string;
 export function hashOneUseSecret(secret: string): Promise<string>;
 export function isOneUseSecretHash(value: unknown): boolean;
 export function workerGroupJoinStatement(input: { sessionId: string; groupId: string; address: string }): string;
+export const WORKER_GROUP_READ_INVITE_HEADER: 'X-CE-Group-Invite';
+export const PRIVATE_SESSION_INVITE_REQUIRED: 'private_session_invite_required';
+export const PRIVATE_SESSION_INVITE_INVALID: 'private_session_invite_invalid';
+export const PRIVATE_SESSION_UNAVAILABLE: 'private_session_unavailable';
+export function workerGroupReadStatement(input: { sessionId: string; groupId: string }): string;
+export function formatWorkerGroupReadInvite(input: { groupId: string; proof: string }): string;
+export function parseWorkerGroupReadInvite(value: unknown): { groupId: string; proof: string } | null;
 
 type PasswordInput = { password: string; sessionId: string; groupId: string };
 export function createWorkerGroupPasswordKeys(ethers: unknown): Readonly<{
@@ -35,5 +42,6 @@ export function createWorkerGroupPasswordKeys(ethers: unknown): Readonly<{
   }>;
   signerOf(input: PasswordInput): Promise<string>;
   signJoin(input: PasswordInput & { address: string }): Promise<string>;
+  signRead(input: PasswordInput): Promise<string>;
   recoverJoinSigner(input: { sessionId: string; groupId: string; address: string; proof: string }): string;
 }>;

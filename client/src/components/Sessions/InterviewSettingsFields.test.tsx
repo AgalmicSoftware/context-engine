@@ -73,6 +73,22 @@ it('edits the research detail, defaulting to minimal', () => {
   expect(screen.getByLabelText(label)).toHaveValue('full');
 });
 
+it('edits the note on where the data goes, empty by default, with its explanation behind its help', () => {
+  const onChange = jest.fn();
+  render(<InterviewSettingsFields value={{ steeringPrompt: 'Listen first.' }} onChange={onChange} />);
+  const note = screen.getByLabelText('Where the data goes');
+  expect(note).toHaveValue('');
+  expect(note).toHaveAttribute('maxLength', '300');
+  expect(note).toHaveAccessibleDescription(/shown to participants beside research sharing and hidden AI drafts/);
+  fireEvent.change(note, { target: { value: 'Funded by Example. https://example.test/study' } });
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      dataNote: 'Funded by Example. https://example.test/study',
+      steeringPrompt: 'Listen first.',
+    }),
+  );
+});
+
 it('edits the share of hidden AI drafts, defaulting to off', () => {
   const onChange = jest.fn();
   const label = 'Hidden AI drafts';

@@ -13,6 +13,7 @@ export {
   isWorkerSignInNeededError,
   subscribeWorkerSessionToken,
 } from '../../utilities/worker/workerAuth.js';
+import { groupReadHeaders } from '../../utilities/worker/workerGroupReadProof';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -170,6 +171,8 @@ const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'invalid_worker_group_id',
   'join_mode_not_implemented',
   'missing_principal',
+  'private_session_invite_invalid',
+  'private_session_invite_required',
   'unsupported_principal_kind',
   'worker_group_authorization_invalid',
   'worker_group_capacity_identity_conflict',
@@ -229,6 +232,11 @@ const SAFE_LOCAL_WORKER_GROUP_REASONS = new Set([
   'worker_group_response_session_slug_missing',
   'worker_group_worker_url_missing',
 ]);
+
+/** A private session refused someone its rule doesn't admit; they may still join a group by its id. */
+export const isPrivateSessionRefusal = (error: unknown): boolean =>
+  error instanceof WorkerGroupRequestError &&
+  (error.message === 'private_session_invite_required' || error.message === 'private_session_invite_invalid');
 
 export class WorkerGroupRequestError extends Error {
   status: number;
@@ -506,6 +514,7 @@ const requestMemberRoute = async ({
     cache: 'no-store',
     headers: {
       Authorization: `Bearer ${token}`,
+      ...groupReadHeaders(base, sessionSlug),
       ...(body ? { 'content-type': 'application/json' } : {}),
     },
     ...(body ? { body: JSON.stringify({ ...body, sessionId: expectedSessionId }) } : {}),
@@ -542,6 +551,7 @@ export const loadPublicWorkerGroups = async ({
     cache: 'no-store',
     headers: {
       'X-Session-Slug': expectedSessionSlug,
+      ...groupReadHeaders(base, expectedSessionSlug),
     },
   });
   const payload = toRecord(await response.json().catch(() => ({})));

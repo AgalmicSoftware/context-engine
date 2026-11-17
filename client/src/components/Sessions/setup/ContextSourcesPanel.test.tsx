@@ -66,6 +66,7 @@ const list = (overrides: Partial<SessionContextSourcesState> = {}): SessionConte
   supported: true,
   isAdmin: true,
   participantsCanAdd: false,
+  signInToAdd: false,
   participantsCanAddLinks: false,
   groupFilesHidden: false,
   reload: jest.fn(),
@@ -112,7 +113,7 @@ describe('context sources panel', () => {
     });
     renderPanel(list({ sources: [agentLink] }));
     const [row] = await screen.findAllByTestId('ce-context-source');
-    expect(row).toHaveTextContent('Everyone in the session · Added by Test Kami (agent) · Read');
+    expect(row).toHaveTextContent('Everyone in the session · Added by Test Kami · Agent · Read');
   });
 
   it('adds a link with its privacy, refreshes one, reads a PDF and removes after asking', async () => {

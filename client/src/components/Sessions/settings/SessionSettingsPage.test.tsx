@@ -44,9 +44,11 @@ jest.mock('../../../domains/sessions/registry/sessionRegistryAdminPorts', () => 
 
 // Whether the Worker counts a separate AI daily limit, as its capabilities say.
 const mockCountsAiLimit = jest.fn();
+const mockRunsWorkersAi = jest.fn();
 jest.mock('../../../domains/worker/workerRelease', () => ({
   ...(jest.requireActual('../../../domains/worker/workerRelease') as object),
   readWorkerCountsAiLimit: (...args: unknown[]) => mockCountsAiLimit(...args),
+  readWorkerRunsWorkersAi: (...args: unknown[]) => mockRunsWorkersAi(...args),
 }));
 
 jest.mock('./sessionSettingsWallet', () => ({
@@ -119,6 +121,7 @@ describe('SessionSettingsPage', () => {
     posted = [];
     mockFetchBootstrap.mockResolvedValue(bootstrapOf(workerConfig()));
     mockCountsAiLimit.mockResolvedValue(true);
+    mockRunsWorkersAi.mockResolvedValue(false);
     global.fetch = jest.fn(async (url: unknown, init: RequestInit = {}) => {
       posted.push({ url: String(url), body: JSON.parse(String(init.body || '{}')) });
       return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
@@ -362,6 +365,73 @@ describe('SessionSettingsPage', () => {
     expect((write?.body as Record<string, unknown>).config).toEqual({
       ai: { reasoningEffort: 'high', taskReasoningEffort: { generate: 'medium', 'interview-map': 'high' } },
     });
+  });
+
+  it('lets the Session Agent answer on Cloudflare only on a Worker with the AI binding', async () => {
+    const models = {
+      fast: { provider: 'openai', model: 'gpt-5.6-terra' },
+      thinking: { provider: 'openai', model: 'gpt-5.6-sol' },
+    };
+    const config = workerConfig({
+      ai: { models },
+      setConfigMergesAi: true,
+      sessionAgentReady: true,
+      sessionAgent: { audiences: [] },
+    });
+    mockFetchBootstrap.mockResolvedValue(bootstrapOf(config));
+    renderPage({ sessionConfig: config });
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
+    });
+    expect(mockRunsWorkersAi).toHaveBeenCalledWith(WORKER, 'edit-salon', undefined);
+    expect(screen.getByTestId('ce-setup-session-agent')).toBeChecked();
+    expect(screen.queryByTestId('ce-ai-session-agent-cloudflare')).not.toBeInTheDocument();
+    cleanup();
+
+    mockUpsertBootstrap.mockClear();
+    mockRunsWorkersAi.mockResolvedValue(true);
+    renderPage({ sessionConfig: config });
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
+    fireEvent.click(await screen.findByTestId('ce-ai-session-agent-cloudflare'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE));
+    });
+    // The Worker merges ai one level deep, so models go whole and unticking later removes the entry.
+    const write = posted.find((entry) => String(entry.url).endsWith('/admin/set-config'));
+    expect((write?.body as Record<string, unknown>).config).toEqual({
+      ai: { models: { ...models, 'session-agent': { provider: 'workers-ai', model: '@cf/zai-org/glm-5.3' } } },
+    });
+  });
+
+  it('keeps a saved Cloudflare choice untickable on a Worker without the binding, and unticking removes it', async () => {
+    const models = {
+      fast: { provider: 'openai', model: 'gpt-5.6-terra' },
+      thinking: { provider: 'openai', model: 'gpt-5.6-sol' },
+    };
+    const config = workerConfig({
+      ai: { models: { ...models, 'session-agent': { provider: 'workers-ai', model: '@cf/zai-org/glm-5.3' } } },
+      setConfigMergesAi: true,
+      sessionAgentReady: true,
+      sessionAgent: { audiences: [] },
+    });
+    mockFetchBootstrap.mockResolvedValue(bootstrapOf(config));
+    renderPage({ sessionConfig: config });
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
+    });
+    const box = screen.getByTestId('ce-ai-session-agent-cloudflare');
+    expect(box).toBeChecked();
+    expect(screen.getByTestId('ce-ai-session-agent-cloudflare-redeploy')).toHaveTextContent('Redeploy the Worker');
+    fireEvent.click(box);
+    expect(screen.queryByTestId('ce-ai-session-agent-cloudflare')).not.toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE));
+    });
+    const write = posted.find((entry) => String(entry.url).endsWith('/admin/set-config'));
+    expect((write?.body as Record<string, unknown>).config).toEqual({ ai: { models } });
   });
 
   it('shows the ID lists read-only, with the reason, on an older Worker', async () => {
@@ -708,6 +778,12 @@ describe('SessionSettingsPage', () => {
       mockUploadMetadata.mockResolvedValue({ metadataUri: 'ar://new-metadata' });
       mockUpdateMetadataOnChain.mockResolvedValue({ ok: true, txHash: '0xmetadatahash' });
       mockReadWallet.mockResolvedValue({ address: ADMIN, chainId: 11155420 });
+    });
+
+    it('offers the note on where the data goes, which the registry keeps without asking a Worker', async () => {
+      renderPage({ sessionConfig: registryConfig(), workerOrigin: '' });
+      fireEvent.click(await screen.findByTestId('ce-setup-more-participation'));
+      expect(screen.getByLabelText('Where the data goes')).toBeInTheDocument();
     });
 
     it('has no AI daily limit, which only a Session Worker counts', async () => {

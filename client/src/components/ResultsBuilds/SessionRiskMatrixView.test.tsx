@@ -29,8 +29,8 @@ const older = { id: 'risk_k1_00000001', builtAt: '2026-11-08T13:00:00.000Z', cou
 it('draws the build read-only as a matrix of its areas, stamped, with its notes', () => {
   render(<SessionRiskMatrixView build={build} builds={[build]} onSelectBuild={jest.fn()} />);
   const view = screen.getByTestId('ce-session-risk-matrix');
-  expect(within(view).getByRole('heading', { name: 'Salon risks' })).toBeVisible();
-  expect(within(view).getByText(/^Built .*500 responses · 40 participants$/)).toBeVisible();
+  expect(within(view).getByRole('combobox', { name: 'Version' })).toBeVisible();
+  expect(within(view).getByText(/500 responses · 40 participants$/)).toBeVisible();
   expect(within(view).getByRole('button', { name: 'About this risk matrix' })).toBeVisible();
   expect(within(view).getByTestId('ce-risk-matrix-header-x-trust')).toBeVisible();
   expect(within(view).getByTestId('ce-risk-matrix-header-y-labor')).toBeVisible();

@@ -43,7 +43,16 @@ const readStatus = jest.mocked(readSessionAgentStatus);
 const setOptOut = jest.mocked(setSessionAgentOptOut);
 const ACCOUNT = '0x0000000000000000000000000000000000000001';
 const AGENT_ON = { sessionAgent: { audiences: [] } };
-const status = (optedOut = false, on = true) => ({ on, answers: null, audience: null, optedOut });
+const status = (optedOut = false, on = true) => ({
+  on,
+  answers: null,
+  audience: null,
+  optedOut,
+  unattributed: false,
+  closed: null,
+  recording: false,
+  signedOut: false,
+});
 
 const renderReview = (sessionConfig: Record<string, unknown>) => {
   const onSubmitResponses = jest.fn(async () => ({ status: 'submitted' as const }));

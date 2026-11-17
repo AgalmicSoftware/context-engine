@@ -84,6 +84,7 @@ import {
   CompareAddresses as CompareAddressesRaw,
   DocsPage as DocsPageRaw,
   OnePageSession as OnePageSessionRaw,
+  PrivateSessionGate as PrivateSessionGateRaw,
   SBTPage as SBTPageRaw,
   SBTsPage as SBTsPageRaw,
   SessionDocumentsPage as SessionDocumentsPageRaw,
@@ -145,6 +146,7 @@ const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
 const SBTPage = asMainSiteRouteComponent(SBTPageRaw);
 const SBTsPage = asMainSiteRouteComponent(SBTsPageRaw);
 const SessionDocumentsPage = asMainSiteRouteComponent(SessionDocumentsPageRaw);
+const PrivateSessionGate = asMainSiteRouteComponent(PrivateSessionGateRaw);
 const SessionSettingsPage = asMainSiteRouteComponent(SessionSettingsPageRaw);
 const SessionWizard = asMainSiteRouteComponent(SessionWizardRaw);
 const SimulatedUserPage = asMainSiteRouteComponent(SimulatedUserPageRaw);
@@ -968,6 +970,23 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         </div>
       );
     }
+    // A link from an unlisted session carries its Worker, as the session page's own link does: the session comes
+    // from that Worker, and the address keeps it.
+    const workerRoute =
+      queryQuestionSlug && urlParams.has('session') && urlParams.has('worker')
+        ? resolveMainSiteGroupWorkerRoute({
+            workerSessionSlug: queryQuestionSlug,
+            sessionConfig: null,
+            searchStr,
+            controller: getWorkerCanonicalRouteController(host),
+          })
+        : null;
+    if (workerRoute) {
+      const interruption =
+        renderWorkerCanonicalRouteError(workerRoute) ||
+        renderWorkerCanonicalRouteBootstrap(workerRoute, getWorkerCanonicalRouteController(host));
+      if (interruption) return interruption;
+    }
     const cachedQuestionSlug = questionSlugPinned
       ? null
       : host.findGroupSlugForQuestion(questionID, { requireCacheHit: true });
@@ -979,11 +998,14 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       effectiveQuestionSlug != null &&
       typeof window !== 'undefined'
     ) {
-      const canonicalQuestionPath = buildQuestionRoutePath(questionID, {
+      const routePath = buildQuestionRoutePath(questionID, {
         responderAddress,
         sessionSlug: effectiveQuestionSlug,
         sessionId: queryQuestionSessionId || undefined,
       });
+      const canonicalQuestionPath = workerRoute
+        ? `${routePath}&worker=${encodeURIComponent(workerRoute.workerOrigin)}`
+        : routePath;
       const currentPath = `${window.location.pathname || ''}${window.location.search || ''}`;
       const canonicalQuestionPublicPath = buildPublicRoute(canonicalQuestionPath);
       if (canonicalQuestionPublicPath !== currentPath) {
@@ -1015,6 +1037,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     return (
       <InitialRouteBoundary fallback={<LazyFallback label="Loading Question..." />} resetKey={fullPath}>
         <div data-testid={E2E_TESTIDS.PAGE_QUESTIONS_ROOT}>
+          {workerRoute ? renderListedWorkerNotice(workerRoute) : null}
           <SurveyTool
             key={`${effectiveQuestionSlug}-${String(questionID || '').toLowerCase()}-${String(responderAddress || '').toLowerCase()}`}
             questionID={questionID}
@@ -1154,6 +1177,28 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     );
     if (slug && sessionConfigSlug !== slug && !sessionConfigHasRegistryIdentity) {
       host.resolveSessionPathSlug(slug);
+    }
+
+    // A private session's Worker sends a shell to a visitor it can't admit: every page of the session shows only
+    // the way in, so nothing loads, or saves, from a config without the session in it.
+    const privateSession = effectiveSessionConfig.privateSession;
+    if (privateSession === 'invite_required' || privateSession === 'invite_invalid') {
+      return (
+        <InitialRouteBoundary fallback={<LazyFallback label="Loading Session..." />} resetKey={fullPath}>
+          <div data-testid={E2E_TESTIDS.PAGE_SESSION_ROOT}>
+            <PrivateSessionGate
+              sessionSlug={normalizeSessionSlug(effectiveSessionConfig.slug || slug)}
+              sessionId={resolveWorkerCanonicalSessionIdHex(effectiveSessionConfig)}
+              workerUrl={workerOrigin || effectiveSessionConfig.corsWorkerUrl || ''}
+              shell={privateSession}
+              sessionConfig={effectiveSessionConfig}
+              account={host.props.account}
+              provider={host.props.provider}
+              toggleLoginModal={(loginModalIsOpen?: boolean) => host.props.toggleLoginModal(loginModalIsOpen)}
+            />
+          </div>
+        </InitialRouteBoundary>
+      );
     }
 
     if (isDocsRoute) {

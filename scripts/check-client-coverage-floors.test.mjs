@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { collectClientCoverageFloorResult } from './check-client-coverage-floors.mjs';
 
@@ -80,3 +82,25 @@ test('coverage checker fails when a current production file is absent from cover
   assert.deepEqual(result.missingCoverageFiles, ['client/src/missing.ts']);
   assert.ok(result.findings.includes('whole-production coverage is missing 1 current production file: client/src/missing.ts'));
 }));
+
+// The whole client suite runs in one process, which holds about 2.1 GB of heap by its end. Node's default
+// heap on a small CI runner is about 2 GB, and the run was killed there, so it is given its own, whatever
+// NODE_OPTIONS says.
+test('the client coverage run gets its own heap, in the process that runs the tests', () => {
+  const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const { scripts } = JSON.parse(fs.readFileSync(path.join(rootDir, 'client/package.json'), 'utf8'));
+  const script = scripts['test:coverage:full-universe'];
+  const match = /^node ((?:--\S+ )+)node_modules\/jest\/bin\/jest\.js /.exec(script);
+  assert.ok(match, `the coverage run must start Jest under node with its own flags: ${script}`);
+  // In band, the process given the heap is the one that holds every suite; Jest's workers would not get it.
+  assert.match(script, / --runInBand /);
+  const result = spawnSync(
+    process.execPath,
+    [...match[1].trim().split(' '), '-p', "require('node:v8').getHeapStatistics().heap_size_limit"],
+    // A small CI runner's default, forced lower still: the run must not inherit it.
+    { encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=256' } },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const heapLimitMb = Number(result.stdout) / (1024 * 1024);
+  assert.ok(heapLimitMb >= 4096, `the coverage run would get a ${Math.round(heapLimitMb)} MB heap`);
+});

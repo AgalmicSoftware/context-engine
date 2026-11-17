@@ -180,6 +180,11 @@ export const createWorkerClient = ({
   let presenceLoadedAt = -Infinity;
   let features = null;
   let featuresLoadedAt = -Infinity;
+  // A private session's read invite, sent with every request until the agent
+  // is a member, and whether the last config was the shell given to someone
+  // its rule doesn't admit.
+  let groupReadInvite = '';
+  let privateSession = '';
 
   // A busy answer the Worker marks safe to send again may follow work already
   // done, so only requests whose repeat does no harm wait and try again, as
@@ -208,6 +213,7 @@ export const createWorkerClient = ({
         headers: {
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
           ...(auth ? { Authorization: `Bearer ${token}`, 'X-Group-Slug': slug } : {}),
+          ...(groupReadInvite ? { 'X-CE-Group-Invite': groupReadInvite } : {}),
           ...headers,
         },
         ...(form ? { body: form } : body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -234,6 +240,8 @@ export const createWorkerClient = ({
     }
     if (response.status === 401 && auth && !retried && (!error || TOKEN_ERROR_RE.test(error))) {
       token = '';
+      // A sign-in ended by an admin's change: the config the agent holds may be out of date too.
+      configLoadedAt = 0;
       return request(path, { method, headers, body, form, auth, retried: true, busyRetries, maxBytes, signal });
     }
     if (response.status === 401 && error && !TOKEN_ERROR_RE.test(error)) {
@@ -249,10 +257,22 @@ export const createWorkerClient = ({
     return data;
   };
 
-  const loadConfig = async () => {
+  const loadConfig = async ({ renewed = false } = {}) => {
+    // Signed in, the config is read as the agent: a private session shows its
+    // members what it shows no one else.
+    if (!registryConfigLoader && token) await ensureToken();
+    const sentToken = !registryConfigLoader && !!token;
     const data = registryConfigLoader
       ? { config: await registryConfigLoader(), sessionSlug: slug }
-      : await request(`/session-config?slug=${encodeURIComponent(slug)}`, { headers: { 'X-Session-Slug': slug } });
+      : await request(`/session-config?slug=${encodeURIComponent(slug)}`, {
+          headers: { 'X-Session-Slug': slug, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        });
+    // A private session that didn't count the sign-in, after an admin's change ended it: sign in again, once.
+    if (sentToken && !renewed && text(data?.privateSession) && data?.signedIn === false) {
+      token = '';
+      await login();
+      return loadConfig({ renewed: true });
+    }
     const loaded = isRecord(data?.config) ? data.config : null;
     const id = resolveSessionIdHex(loaded);
     if (!loaded || (!registryConfigLoader && !id)) throw new WorkerRequestError('The Worker did not return a hosted session config.');
@@ -267,6 +287,7 @@ export const createWorkerClient = ({
     config = loaded;
     configLoadedAt = now();
     sessionId = id;
+    privateSession = text(data.privateSession);
     return config;
   };
 
@@ -466,8 +487,15 @@ export const createWorkerClient = ({
     listMyMemberships,
     readFeatures,
     request,
+    setGroupReadInvite: (value) => {
+      groupReadInvite = text(value);
+    },
     get config() {
       return config;
+    },
+    /** 'invite_required' or 'invite_invalid' while the config is a private session's shell; '' otherwise. */
+    get privateSession() {
+      return privateSession;
     },
     get sessionId() {
       return sessionId;

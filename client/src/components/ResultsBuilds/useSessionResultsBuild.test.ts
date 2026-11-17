@@ -128,6 +128,23 @@ it('starts empty for another reader or session, and shows a refused reader nothi
   expect(result.current.build).toBeNull();
 });
 
+it.each([
+  [{ ok: true, status: 200, builds: [], build: null }, true],
+  [{ ok: false, status: 401, error: 'Sign in again.' }, true],
+  [{ ok: false, status: 403, error: 'Not visible.' }, true],
+  [{ ok: false, status: 500, error: 'Atlases are unavailable.' }, false],
+])('counts a read answered %j as loaded: %s, and starts unloaded for another reader', async (answer, loaded) => {
+  let answerRead: (value: unknown) => void = () => {};
+  read.mockImplementation(() => new Promise((resolve) => (answerRead = resolve)) as never);
+  const { result, rerender } = renderAtlas({ account: address(1) });
+  expect(result.current.loaded).toBe(false);
+  await waitFor(() => expect(read).toHaveBeenCalled());
+  await act(async () => answerRead(answer));
+  expect(result.current.loaded).toBe(loaded);
+  rerender({ account: address(9), enabled: true, sessionConfig: baseConfig, sessionSlug: 'salon' });
+  expect(result.current.loaded).toBe(false);
+});
+
 it('clears the atlas when a later read is refused', async () => {
   const { result } = renderAtlas({ account: address(1) });
   await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));

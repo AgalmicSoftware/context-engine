@@ -9,6 +9,7 @@ import {
 } from './resultsAnalysisGeneration.js';
 import { canBuildResults } from './resultsBuild.js';
 import { callSessionFeedbackStore } from './sessionFeedbackRoute.js';
+import { callSessionAgentHistoryStore } from './sessionAgentRoute.js';
 import { countResultsScanRows } from './resultsScanRowCount.js';
 import { STORED_VERSIONS_FIELD } from '../../shared/sessionDiagnostics.mjs';
 
@@ -61,6 +62,24 @@ const readIncludeDraft = (request) => {
   }
 };
 
+// The two lists only a session's admins read, each a page at a time from its own store.
+const ADMIN_LISTS = {
+  feedback: {
+    call: (deps) => deps?.callSessionFeedbackStore || callSessionFeedbackStore,
+    refused: 'Only the session’s admins can read feedback.',
+    badPage: 'That page of feedback can’t be read.',
+    down: 'Feedback couldn’t be reached just now. Try again shortly.',
+    downReason: 'feedback_unavailable',
+  },
+  chats: {
+    call: (deps) => deps?.callSessionAgentHistoryStore || callSessionAgentHistoryStore,
+    refused: 'Only the session’s admins can read stored chats.',
+    badPage: 'That page of stored chats can’t be read.',
+    down: 'Stored chats couldn’t be reached just now. Try again shortly.',
+    downReason: 'session_agent_chats_unavailable',
+  },
+};
+
 export const dispatchAdminResultsAnalysisStatusRequest = async ({
   request,
   env,
@@ -68,9 +87,11 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
   slug,
   deps,
   diagnostics = false,
-  // Feedback is read with the sign-in token, so paging spends no sign-in nonces.
+  // Feedback and stored chats are read with the sign-in token, so paging spends no sign-in nonces.
   feedback = false,
+  chats = false,
 } = {}) => {
+  const list = feedback ? ADMIN_LISTS.feedback : chats ? ADMIN_LISTS.chats : null;
   request = requestWithQuerySlugHeader(request);
   const auth = await deps?.requireAuth?.({
     request,
@@ -79,10 +100,10 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
     slugHint: slug,
   });
   if (!auth?.ok) return auth?.response;
-  // Feedback is for the session's admins only: an agent key, even one minted
-  // for an admin, does not read it.
-  if (feedback && auth.payload?.agentSource) {
-    return deps?.json?.({ error: 'Only the session’s admins can read feedback.' }, 403, withPrivateNoStoreHeaders(baseHeaders));
+  // These lists are for the session's admins only: an agent key, even one
+  // minted for an admin, does not read them.
+  if (list && auth.payload?.agentSource) {
+    return deps?.json?.({ error: list.refused }, 403, withPrivateNoStoreHeaders(baseHeaders));
   }
 
   const targetSlug = auth.slug || slug;
@@ -105,25 +126,25 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
   const headers = withPrivateNoStoreHeaders(context.headers);
 
   const address = toTrimmedString(auth.payload?.sub, deps).toLowerCase();
-  // Results admins also read AI Views status; diagnostics and feedback stay with admins.
-  const isAdmin = diagnostics || feedback
+  // Results admins also read AI Views status; diagnostics and the lists stay with admins.
+  const isAdmin = diagnostics || list
     ? await deps?.validateAdmin?.({ env, slug: targetSlug, address, config, body: {} })
     : await canBuildResults({ env, slug: targetSlug, config, address, validateAdmin: deps?.validateAdmin });
   if (!isAdmin) {
     await recordAuthFailure({ env, deps });
-    return deps?.json?.({ error: feedback ? 'Only the session’s admins can read feedback.' : 'Admin authorization failed.' }, 403, headers);
+    return deps?.json?.({ error: list ? list.refused : 'Admin authorization failed.' }, 403, headers);
   }
 
-  if (feedback) {
+  if (list) {
     const params = new URL(request.url).searchParams;
-    const result = await (deps?.callSessionFeedbackStore || callSessionFeedbackStore)(env, targetSlug, 'list', {
+    const result = await list.call(deps)(env, targetSlug, 'list', {
       cursor: params.get('cursor'),
       ...(params.has('limit') ? { limit: params.get('limit') } : {}),
     });
     if (result?.ok) return deps?.json?.(result.body, 200, headers);
     return result?.status === 400
-      ? deps?.json?.({ error: 'That page of feedback can’t be read.', reason: result.body?.reason }, 400, headers)
-      : deps?.json?.({ error: 'Feedback couldn’t be reached just now. Try again shortly.', reason: 'feedback_unavailable' }, 503, headers);
+      ? deps?.json?.({ error: list.badPage, reason: result.body?.reason }, 400, headers)
+      : deps?.json?.({ error: list.down, reason: list.downReason }, 503, headers);
   }
 
   if (diagnostics) {

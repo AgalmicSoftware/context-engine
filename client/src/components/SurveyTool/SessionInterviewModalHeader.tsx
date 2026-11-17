@@ -1,7 +1,7 @@
 import React from 'react';
 import { ModalHeader, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faQuestionCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SessionVoiceModeBackButton, { VoiceModeBackContext } from './SessionVoiceModeBack';
 import styles from './SurveyTool.module.scss';
@@ -16,6 +16,15 @@ type SessionInterviewModalHeaderProps = {
   statusTone: string;
   statusRef: React.RefObject<HTMLButtonElement>;
 };
+
+/** A waiting line in the interview: the app's spinner, then what it is waiting on. */
+export function InterviewBusyLabel({ label }: { label: string }) {
+  return (
+    <>
+      <FontAwesomeIcon icon={faSpinner} spin /> {label}
+    </>
+  );
+}
 
 export default function SessionInterviewModalHeader({
   guidance,
@@ -61,7 +70,7 @@ export default function SessionInterviewModalHeader({
             onClick={idle ? readinessRetry : undefined}
             aria-label={`Interview status: ${statusLabel}`}
           >
-            <span>{statusLabel}</span>
+            <span>{statusTone === 'busy' ? <InterviewBusyLabel label={statusLabel} /> : statusLabel}</span>
           </button>
         </span>
         <UncontrolledTooltip

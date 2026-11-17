@@ -1,4 +1,5 @@
 import { withCoordinatorRetry } from '../worker/coordinatorRetry';
+import { sessionReadHeaders } from '../worker/workerSessionReadHeaders';
 
 export type RealtimeInterviewTurn = {
   itemId: string;
@@ -365,14 +366,29 @@ export const startSessionRealtimeInterview = async ({
       controller.signal,
     );
     onStatus('Connecting to the interviewer…');
-    const response = await run(
-      withCoordinatorRetry(fetchImpl)(`${baseUrl}/realtime/call?slug=${encodeURIComponent(sessionSlug)}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-session-slug': sessionSlug },
-        body: JSON.stringify({ sdp: peer.localDescription?.sdp || offer.sdp || '', instructions }),
-        signal: controller.signal,
-      }),
-    );
+    const callHeaders: Record<string, string> = {
+      'content-type': 'application/json',
+      'x-session-slug': sessionSlug,
+      ...sessionReadHeaders(baseUrl, sessionSlug),
+    };
+    const callBody = JSON.stringify({ sdp: peer.localDescription?.sdp || offer.sdp || '', instructions });
+    const call = (headers: Record<string, string>) =>
+      run(
+        withCoordinatorRetry(fetchImpl)(`${baseUrl}/realtime/call?slug=${encodeURIComponent(sessionSlug)}`, {
+          method: 'POST',
+          headers,
+          body: callBody,
+          signal: controller.signal,
+        }),
+      );
+    let response = await call(callHeaders);
+    // A Session Worker from before private sessions takes this call only without a sign-in: with one it
+    // answers 404, or 401 when that sign-in has ended, before anything runs. Such a Worker has no private
+    // sessions, so the call goes once more without it. A current Worker treats an ended sign-in as none.
+    if ((response.status === 404 || response.status === 401) && callHeaders.Authorization) {
+      const { Authorization: _signIn, ...withoutSignIn } = callHeaders;
+      response = await call(withoutSignIn);
+    }
     const answerSdp = await run(response.text());
     if (!response.ok) {
       let message = 'Could not connect to the session Worker. Try again or contact the session owner.';

@@ -115,7 +115,9 @@ leaves browser and MCP participation under the session's existing rules.
    interview link (`mode=interview`), works as it is. A group link
    (`&joinGroup=<id>`) names the group
    without joining it: the agent reads the session's instructions first, then
-   joins with `join_group`.
+   joins with `join_group`. A private session, whose rule names groups, shows
+   an agent nothing until it is in one, so there `join_session` joins the
+   link's group first, reading with the link's group password until it is in.
 3. To admit only some agents, gate the session as you would for people: add
    them to a Worker group used as the sign-in rule (by address), or require an
    SBT for stored data and hand out claim codes.

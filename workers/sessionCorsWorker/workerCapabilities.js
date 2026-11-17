@@ -12,17 +12,25 @@ export const FEATURES = Object.freeze([
   'context_sources_v1',
   'draft_text_v1',
   'envelope_export_identity_v1',
+  // interviewMode.dataNote, the session's note on where research data goes; older Workers reject the key.
+  'interview_data_note_v1',
   'participant_context_links_v1',
   'participant_context_v1',
   'recovery_key_export',
   'response_upload_receipts',
   'results_analysis_retry_v1',
+  // Chats with the Session Agent can be stored, read by admins and cleared.
+  'session_agent_chats',
+  // People who aren't signed in may ask the Session Agent, where its setting allows.
+  'session_agent_signed_out',
   'session_backup_v1',
   'session_feedback',
   'storage_read_batch_v1',
   'upload_authority_stamps',
   'worker_groups',
 ]);
+// The Session Agent can answer on Cloudflare's models: only a Worker with the AI binding.
+export const WORKERS_AI_FEATURE = 'workers_ai_v1';
 
 /* global __CE_RELEASE_VERSION__ */
 // scripts/worker-bundle.mjs sets this from package.json; unbundled source reports null.
@@ -35,6 +43,8 @@ export const dispatchWorkerCapabilities = async ({ request, env = {}, headers = 
     type: 'ce_worker_capabilities', version: 1, apiVersion: 1,
     bundle: env.CE_BUNDLE_SHA256 || null, release: workerRelease(), features: FEATURES.filter((feature) => feature !== 'recovery_key_export'),
   };
+  const ai = typeof env.AI?.run === 'function' ? [WORKERS_AI_FEATURE] : [];
+  body.features = [...body.features, ...ai];
   const responseHeaders = new Headers(headers);
   responseHeaders.set('Cache-Control', 'public, max-age=30');
   const url = new URL(request.url);
@@ -42,7 +52,7 @@ export const dispatchWorkerCapabilities = async ({ request, env = {}, headers = 
     const validated = validateInboundWorkerSessionSlug(url.searchParams.get('slug'));
     if (!validated.ok) return Response.json({ error: validated.error }, { status: 400, headers: responseHeaders });
     const pinnedSlug = getDefaultWorkerSessionSlug(env);
-    if (pinnedSlug && pinnedSlug === validated.slug) body.features = FEATURES;
+    if (pinnedSlug && pinnedSlug === validated.slug) body.features = [...FEATURES, ...ai];
     const bound = !!env.CE_SESSION_COORDINATOR?.idFromName && !!env.CE_SESSION_COORDINATOR?.get;
     const current = bound
       ? await callSessionConfigCoordinator({ env, slug: validated.slug, path: 'current' })

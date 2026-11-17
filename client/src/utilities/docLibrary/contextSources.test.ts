@@ -1,10 +1,16 @@
 import {
   addContextLink,
+  buildContextNote,
   checkContextFile,
   contextAdderLabel,
+  contextDuplicateIds,
+  contextSourceDisplayTitle,
+  contextSourceKindLabel,
+  formatContextSize,
   listContextSources,
   loadContextSourcesForAi,
   readContextPdf,
+  readContextSourceBlob,
   readContextSourceText,
   removeContextSource,
   templateContextFiles,
@@ -244,6 +250,10 @@ describe('context sources on the client', () => {
     expect(contextAdderLabel(source, config, '')).toBe('0xabcd…ef01');
     expect(contextAdderLabel({ addedBy: config.adminAddress }, config, '')).toBe('an admin');
     expect(contextAdderLabel({ addedBy: '' }, config, '')).toBe('');
+    // An agent's name is shown as it gives it; lists mark it as an agent's apart from the name.
+    const agent = { addedBy: source.addedBy, addedByAgent: true };
+    expect(contextAdderLabel({ ...agent, adderName: 'Wren’s agent (trial)' }, config, '')).toBe('Wren’s agent (trial)');
+    expect(contextAdderLabel({ ...agent, adderName: 'an admin' }, config, '')).toBe('an admin');
   });
 
   it('names an agent’s item by the name the agent goes by, marked as an agent’s', async () => {
@@ -271,13 +281,13 @@ describe('context sources on the client', () => {
     ]);
     const config = { adminAddress: `0x${'1'.repeat(40)}` };
     expect(sources.map((source) => contextAdderLabel(source, config, ''))).toEqual([
-      'Test Kami (agent)',
-      '0x2222…2222 (agent)',
+      'Test Kami',
+      '0x2222…2222',
       '0x2222…2222',
       '0x2222…2222',
     ]);
     // Even an admin's agent shows as the agent, and the reader's own item stays "you".
-    expect(contextAdderLabel(sources[0], { adminAddress: agent }, '')).toBe('Test Kami (agent)');
+    expect(contextAdderLabel(sources[0], { adminAddress: agent }, '')).toBe('Test Kami');
     expect(contextAdderLabel(sources[0], config, agent)).toBe('you');
   });
 
@@ -316,5 +326,114 @@ describe('context sources on the client', () => {
       id: 'pdf-1',
       readingIds: ['text-1'],
     });
+  });
+});
+
+const source = (overrides: Partial<ContextSource>): ContextSource => ({
+  id: 'id',
+  kind: 'file',
+  title: 'notes.md',
+  url: '',
+  mime: 'text/markdown',
+  size: 10,
+  createdAt: '',
+  adminsOnly: false,
+  lockedGroupIds: [],
+  addedBy: '',
+  addedByAgent: false,
+  adderName: '',
+  fetchedAt: '',
+  reading: null,
+  ...overrides,
+});
+
+describe('how the Context section names and sizes sources', () => {
+  it('names a file without the extension its kind gives, and a link by its title or address', () => {
+    expect(contextSourceDisplayTitle(source({ title: 'Typed note (test).md' }))).toBe('Typed note (test)');
+    expect(contextSourceDisplayTitle(source({ title: 'deck.PDF' }))).toBe('deck');
+    expect(contextSourceDisplayTitle(source({ title: 'data.tar.json' }))).toBe('data.tar');
+    expect(contextSourceDisplayTitle(source({ title: '.md' }))).toBe('.md');
+    expect(contextSourceDisplayTitle(source({ title: 'report.docx' }))).toBe('report.docx');
+    expect(contextSourceDisplayTitle(source({ kind: 'link', title: 'page.md', url: 'https://a.example' }))).toBe(
+      'page.md',
+    );
+    expect(contextSourceDisplayTitle(source({ kind: 'link', title: '', url: 'https://a.example' }))).toBe(
+      'https://a.example',
+    );
+  });
+
+  it('gives each kind in a word, from its type or else its name', () => {
+    const kinds = [
+      source({ mime: 'application/pdf' }),
+      source({ mime: 'text/markdown' }),
+      source({ mime: 'text/plain' }),
+      source({ mime: 'text/csv' }),
+      source({ mime: 'application/json' }),
+      source({ mime: '', title: 'pilots.csv' }),
+      source({ mime: '', title: 'odd' }),
+      source({ kind: 'link', mime: 'application/json' }),
+    ].map(contextSourceKindLabel);
+    expect(kinds).toEqual(['PDF', 'Markdown', 'Text', 'CSV', 'JSON', 'CSV', 'File', 'Link']);
+  });
+
+  it('gives sizes as the limits do', () => {
+    expect([0, 750, 1023, 1024, 2048, 1536 * 1024, 20 * 1024 * 1024].map(formatContextSize)).toEqual([
+      '',
+      '750 bytes',
+      '1023 bytes',
+      '1 KB',
+      '2 KB',
+      '1.5 MB',
+      '20.0 MB',
+    ]);
+  });
+
+  it('marks a later file of the same name, kind and size, or a later link to the same page, as a repeat', () => {
+    const repeats = contextDuplicateIds([
+      source({ id: 'a', title: 'Why lotteries.md', size: 300 }),
+      source({ id: 'b', title: 'why lotteries.md', size: 300 }),
+      source({ id: 'c', title: 'Why lotteries.md', size: 301 }),
+      source({ id: 'd', title: 'Why lotteries.txt', mime: 'text/plain', size: 300 }),
+      source({ id: 'e', kind: 'link', url: 'https://a.example', title: 'A' }),
+      source({ id: 'f', kind: 'link', url: 'https://a.example', title: 'Another title' }),
+    ]);
+    expect([...repeats]).toEqual(['b', 'f']);
+  });
+});
+
+describe('a typed note', () => {
+  const read = (file: File) =>
+    new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsText(file);
+    });
+
+  it('is a Markdown file named by its title, or else its first line, as an agent’s note is', async () => {
+    const titled = buildContextNote({ text: '  # Evening sessions\n\nResidents asked.  ', title: ' On\nnames.md ' });
+    expect([titled.name, titled.type]).toEqual(['On names.md', 'text/markdown']);
+    expect(await read(titled)).toBe('# Evening sessions\n\nResidents asked.');
+    expect(buildContextNote({ text: '## Evening sessions\nMore' }).name).toBe('Evening sessions.md');
+    expect(buildContextNote({ text: '###' }).name).toBe('Note.md');
+  });
+
+  it('keeps a file’s limits and refuses an empty note or a long title', () => {
+    expect(() => buildContextNote({ text: '   ' })).toThrow('Write the text to add.');
+    expect(() => buildContextNote({ text: 'Body', title: 'x'.repeat(121) })).toThrow('120 characters or fewer');
+    expect(buildContextNote({ text: 'Body', title: 'x'.repeat(120) }).name).toBe(`${'x'.repeat(120)}.md`);
+    expect(() => buildContextNote({ text: 'é'.repeat(512 * 1024 + 1) })).toThrow('larger than 1 MB');
+    expect(buildContextNote({ text: 'a'.repeat(1024 * 1024) }).size).toBe(1024 * 1024);
+  });
+});
+
+describe('a file source’s bytes for a viewer', () => {
+  it('is read from the session’s storage and typed as its list says', async () => {
+    readBlob.mockResolvedValueOnce({ blob: async () => new Blob(['%PDF-1.4']) } as unknown as Response);
+    const blob = await readContextSourceBlob({ id: 'pdf-9', mime: 'application/pdf' }, options);
+    expect(blob.type).toBe('application/pdf');
+    expect(blob.size).toBe(8);
+    expect(readBlob).toHaveBeenLastCalledWith(
+      expect.objectContaining({ storageRef: { backend: 'cloudflare', id: 'pdf-9' }, prompt: false }),
+    );
   });
 });

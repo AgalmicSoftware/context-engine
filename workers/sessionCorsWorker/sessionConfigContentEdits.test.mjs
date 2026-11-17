@@ -22,6 +22,7 @@ const contentEdits = [
   ['interview enablement', { interviewMode: { enabled: true } }],
   ['voice interviews off', { interviewModeEnabled: false }],
   ['group suggestions', { interviewMode: { joinMatchingGroups: true, groupSuggestionData: ['country', 'town'] } }],
+  ['note on where the data goes', { interviewMode: { dataNote: 'Part of a study. https://example.test/study' } }],
   ['appearance', { appearance: { colorSchemeId: 'ocean' } }],
   ['header image', { sessionHeaderImg: 'https://images.example.test/header.png' }],
   ['additional invite', { agentHttp: { invites: [invite, { tokenHash: 'b'.repeat(64), enabled: true }] } }],

@@ -181,3 +181,41 @@ it('gives the new-drafts cue a lane only while it shows and keeps scroll targets
     /scroll-padding-top: 64px;/,
   );
 });
+
+describe('Interview layout', () => {
+  const scss = readSurveyToolScss();
+  const rule = (selector: string) => {
+    const start = scss.indexOf(`${selector} {`);
+    expect(start).toBeGreaterThanOrEqual(0);
+    return scss.slice(start, scss.indexOf('\n}', start));
+  };
+
+  it('sets Discard apart in red, level with the microphone label, with the microphone centered', () => {
+    expect(rule('.sessionInterviewPrimaryAction')).toMatch(/grid-template-columns: 1fr minmax\(112px, 132px\) 1fr;/);
+    const discard = rule('.sessionInterviewPanel .sessionInterviewDiscard');
+    expect(discard).toMatch(/grid-row: 2;/);
+    expect(discard).toMatch(/color: var\(--ce-status-danger-text\) !important;/);
+    expect(discard).toMatch(/margin: 0 0 8px 16px;/);
+  });
+
+  it('keeps Share for research in the green box where it drops below the summary', () => {
+    const query = scss.slice(scss.indexOf('@container (max-width: 640px)'));
+    const share = query.slice(0, query.indexOf('\n  }'));
+    expect(share).toMatch(/grid-area: 2 \/ 1;/);
+    expect(share).toMatch(/border-top: 0;/);
+    expect(share).toMatch(
+      /background: color-mix\(in srgb, var\(--ce-surface-sunken\) 78%, var\(--ce-action-accent\)\);/,
+    );
+    expect(rule('.sessionInterviewConsentOptions')).toMatch(
+      /background: color-mix\(in srgb, var\(--ce-surface-sunken\) 78%, var\(--ce-action-accent\)\);/,
+    );
+    expect(query).toMatch(/&:not\(\[open\]\) > summary \{\s*border-bottom: 0;/);
+  });
+
+  it('fits the header on one row on a phone', () => {
+    const phone = scss.slice(scss.indexOf("// On a phone the header's items share one row"));
+    const block = phone.slice(0, phone.indexOf('\n}\n'));
+    expect(block).toMatch(/\.sessionInterviewHeader \.sessionInterviewHeaderButton \{\s*min-width: 36px;/);
+    expect(block).toMatch(/\.sessionInterviewStatusPill \{[^}]*font-size: 0\.8rem;/);
+  });
+});

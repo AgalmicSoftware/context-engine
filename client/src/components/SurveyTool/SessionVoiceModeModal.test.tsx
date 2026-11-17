@@ -198,6 +198,8 @@ const threeQuestions = [
 
 describe('SessionVoiceModeModal', () => {
   beforeEach(() => {
+    // A review one test leaves unsubmitted is kept in this browser and would open in the next.
+    window.localStorage.clear();
     jest.restoreAllMocks();
     jest.clearAllMocks();
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -249,9 +251,14 @@ describe('SessionVoiceModeModal', () => {
     view.rerender(<SessionVoiceModeModal {...props} />);
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1);
-    // Discard sits beside the microphone and explains itself on hover, and to screen readers.
+    // Discard sits right of the microphone and explains itself on hover, and to screen readers.
     const discard = screen.getByRole('button', { name: 'Discard interview' });
-    expect(discard.parentElement).toContainElement(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    const microphone = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
+    // With no transcript, Discard is alone in the column right of the microphone.
+    expect(discard.parentElement).toHaveClass('sessionInterviewSideActions');
+    expect(discard.parentElement?.children).toHaveLength(1);
+    expect(discard.parentElement?.parentElement).toContainElement(microphone);
+    expect(microphone.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.querySelector('.modal-footer')).toBeNull();
     expect(discard).toHaveAccessibleDescription(/Responses you’ve submitted are kept\.$/);
     fireEvent.mouseOver(discard);
@@ -350,7 +357,7 @@ describe('SessionVoiceModeModal', () => {
   });
 
   it.each([
-    ['checking', 'Checking setup', 'pending'],
+    ['checking', 'Checking setup', 'busy'],
     ['unavailable', 'Setup needed', 'error'],
     ['unknown', 'Not checked', 'pending'],
   ] as const)('shows %s readiness without a misleading green pill', (state, label, tone) => {
@@ -542,7 +549,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeChecked();
     fireEvent.click(choices.querySelector('summary')!);
     expect(choices).toHaveAttribute('open');
-    expect(screen.getByRole('button', { name: 'About sharing for research' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('button', { name: 'What’s this? About sharing for research' })).toHaveAccessibleDescription(
       /drafts you did not select/,
     );
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
@@ -2661,6 +2668,7 @@ describe('SessionVoiceModeModal', () => {
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
     const startControl = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
     expect(startControl.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(toggle.closest('.sessionInterviewSideActions')).not.toBeNull();
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
     // Sharing for research starts on, so its metadata is there to read.
@@ -3697,7 +3705,12 @@ describe('Interview cancellation and recovery', () => {
       h.options().onTranscript?.('Stale evidence', []);
     });
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Preparing responses…');
+    // The app's spinner shows while it works, beside the words that are read out.
+    const pill = screen.getByRole('button', { name: 'Interview status: Preparing responses…' });
+    expect(pill).toHaveAttribute('data-tone', 'busy');
+    expect(pill.querySelector('svg.fa-spinner.fa-spin')).toHaveAttribute('aria-hidden', 'true');
     await act(async () => finish([{ questionId: 'q1', answer: 'New evidence' }]));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS).querySelector('svg.fa-spinner')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Review proposed responses' }).closest('summary')).toHaveFocus();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts');
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();

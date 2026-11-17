@@ -196,7 +196,7 @@ it('shows research sharing ticked on the submission bar, beside the closed submi
   expect(panel).toHaveProperty('open', false);
   expect(panel).not.toContainElement(share);
   expect(screen.getByRole('group', { name: 'Response submission' })).toContainElement(share);
-  expect(screen.getByRole('button', { name: 'About sharing for research' })).toHaveAccessibleDescription(
+  expect(screen.getByRole('button', { name: 'What’s this? About sharing for research' })).toHaveAccessibleDescription(
     /predicted answers/,
   );
   // Choosing doesn't open the panel.

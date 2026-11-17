@@ -12,6 +12,13 @@ import {
 } from './sessionSlugResolution.js';
 import { getStorageAuditBinding } from './storageKvBindings.js';
 import { resolveResponseFieldPolicy } from '../../shared/encryption/responseFieldPolicy.mjs';
+import {
+  PRIVATE_SESSION_INVITE_INVALID,
+  evaluatePrivateSessionAccess,
+  isPrivateSession,
+  privateSessionRefusal,
+  projectPrivateSessionShell,
+} from './privateSessionAccess.js';
 
 export { projectPublicWorkerSessionConfig };
 
@@ -25,6 +32,9 @@ const buildBootstrapHeaders = (headers) => {
   );
   vary.add('Origin');
   vary.add('X-Session-Slug');
+  // A private session answers by who is asking and what invite they carry.
+  vary.add('Authorization');
+  vary.add('X-CE-Group-Invite');
   next.set('Vary', [...vary].join(', '));
   next.set('Cache-Control', 'no-store');
   return next;
@@ -77,6 +87,24 @@ const readWorkerSessionConfig = async ({ request, env, slugHint, headers, deps, 
   return { slug, config, headers: buildBootstrapHeaders(corsContext.headers) };
 };
 
+// For a private session: whether the request sees the config, its shell, or
+// a refusal when access can't be checked.
+const readPrivateSessionAccess = async ({ request, env, slug, config, headers, deps }) => {
+  if (!isPrivateSession(config)) return {};
+  const requester = (await deps?.resolveOptionalRequester?.({ request, env, slug, config, headers })) || {};
+  const questions = await evaluatePrivateSessionAccess({
+    env, slug, config, request, requesterAddress: requester.address || '', authScopes: requester.scopes, part: 'questions',
+  });
+  if (!questions.ok) {
+    return questions.status === 403
+      ? { shell: questions.reason, signedIn: !!requester.address }
+      : { refusal: privateSessionRefusal({ access: questions, json: deps?.json, headers }) };
+  }
+  // Every part follows one rule for now. When the context gets its own, the
+  // context text is withheld here from those its rule refuses.
+  return {};
+};
+
 export const dispatchSessionConfigBootstrapRequest = async ({
   request,
   env,
@@ -90,6 +118,19 @@ export const dispatchSessionConfigBootstrapRequest = async ({
   });
   if ('response' in read) return read.response;
   const { slug, config } = read;
+  const access = await readPrivateSessionAccess({ request, env, slug, config, headers: read.headers, deps });
+  if (access.refusal) return access.refusal;
+  if (access.shell) {
+    // What signing in and joining need, and why the rest is withheld.
+    return deps?.json?.({
+      ok: true,
+      sessionSlug: slug,
+      privateSession: access.shell === PRIVATE_SESSION_INVITE_INVALID ? 'invite_invalid' : 'invite_required',
+      // Whether a sign-in counted, so a client whose bearer didn't can sign in again.
+      signedIn: access.signedIn,
+      config: projectPrivateSessionShell(projectPublicWorkerSessionConfig(config)),
+    }, 200, read.headers);
+  }
 
   return deps?.json?.({
     ok: true,
@@ -121,6 +162,13 @@ export const dispatchSessionAgentInstructionsRequest = async ({
     request, env, slugHint, headers: buildBootstrapHeaders(baseHeaders), deps, constants,
   });
   if ('response' in read) return read.response;
+  if (isPrivateSession(read.config)) {
+    const access = await evaluatePrivateSessionAccess({
+      env, slug: read.slug, config: read.config, request, part: 'questions',
+      resolveRequester: () => deps?.resolveOptionalRequester?.({ request, env, slug: read.slug, config: read.config, headers: read.headers }),
+    });
+    if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers: read.headers });
+  }
   const { agentInstructions } = projectPublicWorkerSessionConfig(read.config);
   if (typeof agentInstructions !== 'string' || !agentInstructions.trim()) {
     return deps?.json?.({ error: 'This session has no instructions for AI agents.' }, 404, read.headers);

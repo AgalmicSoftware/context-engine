@@ -39,8 +39,13 @@ describe('agent hand-off texts', () => {
       displayName: "Audrey's Kami",
     });
     expect(prompt).toContain('https://site.example/session/salon with join_session');
-    expect(prompt).toContain('named "Audrey\'s Kami"');
+    expect(prompt).toContain('Set your display name to "Audrey\'s Kami".');
     expect(prompt).toContain('never claim to be a person');
+    expect(prompt).toContain('Where the session invites it, you may add links or files to its context.');
+    // Without a name, nothing asks for one.
+    const unnamed = buildMcpJoinPrompt({ sessionUrl: 'https://site.example/session/salon', displayName: '' });
+    expect(unnamed).not.toContain('display name');
+    expect(unnamed).toContain('add links or files');
   });
 
   it('keeps the key out of the prompt that goes into the chat', () => {

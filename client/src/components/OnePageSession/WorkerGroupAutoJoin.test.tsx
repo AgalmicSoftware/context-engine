@@ -3,7 +3,11 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 import WorkerGroupAutoJoin from './WorkerGroupAutoJoin';
-import { AUTO_JOIN_STORAGE_KEY, readPendingAutoJoin } from '../../domains/worker/workerGroupAutoJoinIntent';
+import {
+  AUTO_JOIN_STORAGE_KEY,
+  readPendingAutoJoin,
+  savePendingAutoJoin,
+} from '../../domains/worker/workerGroupAutoJoinIntent';
 import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
 import { AUTO_JOIN_CLAIM_ATTRIBUTE, VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
 import { rememberWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
@@ -106,6 +110,24 @@ describe('WorkerGroupAutoJoin', () => {
     global.fetch = originalFetch;
   });
   const joins = () => fetchMock.mock.calls.filter(([url]) => String(url).includes('/groups/join'));
+
+  it('keeps the invite a link brought when the host saves it after this first read the tab', async () => {
+    const token = 'gp:river-stone-lamp-oak';
+    // As on a fresh tab whose first render was hidden: the host's layout effect saves the link's invite after this
+    // component read the tab and before its own effect reads the link, whose fragment is already gone.
+    const SaveLate = () => {
+      React.useLayoutEffect(() => savePendingAutoJoin({ ...readPendingAutoJoinFixture(), version: 1, token }), []);
+      return null;
+    };
+    render(
+      <>
+        <WorkerGroupAutoJoin {...props} account="" loginComplete={false} />
+        <SaveLate />
+      </>,
+    );
+    await settle();
+    expect(readPendingAutoJoin()?.token).toBe(token);
+  });
 
   it('retains the link through sign-in, joins once immediately after login and cleans only its parameter', async () => {
     const changed = jest.fn();
@@ -466,6 +488,33 @@ describe('WorkerGroupAutoJoin', () => {
       expect(readPendingAutoJoin()).toBeNull();
     });
 
+    it('joins by the link’s group id when a private session keeps its group list from outsiders', async () => {
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/groups/list')) return response({ reason: 'private_session_invite_required' }, 403);
+        if (String(input).includes('/groups/my-memberships')) return response({ memberships: [] });
+        if (String(input).includes('/groups/join')) return response({ group: secretGroup, memberCount: 1 });
+        throw new Error(`Unexpected request: ${input}`);
+      });
+      window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026#groupInvite=gp%3Ariver-stone');
+      const proof = `0x${'ab'.repeat(65)}`;
+      credentials.mockResolvedValueOnce({ proof });
+      // Without join choices a missing group would read as gone; a refused list says nothing either way.
+      render(<WorkerGroupAutoJoin {...props} sessionConfig={{ ...config, groupJoinChoices: undefined }} />);
+      await settle();
+      expect(JSON.parse(String(joins()[0][1]?.body))).toEqual({ groupId: group.groupId, proof, sessionId });
+      expect(screen.getByText('Joined Participants 2026.')).toBeInTheDocument();
+    });
+
+    it('joins an unlisted group by the link’s id when its credential is in the link, even without join choices', async () => {
+      listing([]);
+      window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026#groupInvite=gp%3Ariver-stone');
+      const proof = `0x${'ab'.repeat(65)}`;
+      credentials.mockResolvedValueOnce({ proof });
+      render(<WorkerGroupAutoJoin {...props} sessionConfig={{ ...config, groupJoinChoices: undefined }} />);
+      await settle();
+      expect(JSON.parse(String(joins()[0][1]?.body))).toEqual({ groupId: group.groupId, proof, sessionId });
+    });
+
     it('asks for a code without one, and sends a typed claim code as the secret', async () => {
       listing([secretGroup]);
       render(<WorkerGroupAutoJoin {...props} />);
@@ -633,6 +682,25 @@ describe('WorkerGroupAutoJoin', () => {
     expect(joins()[0][0]).toBe('https://worker.example/groups/join');
     expect(readPendingAutoJoin()).toBeNull();
     expect(window.location.pathname).toBe('/session/beta');
+  });
+
+  it('never brings back a link’s secret the tab dropped while the session loaded', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/session/alpha?joinGroup=participants-2026&worker=https%3A%2F%2Fworker.example#groupInvite=gp%3Ariver-stone',
+    );
+    let load: (value: Awaited<ReturnType<typeof fetchWorkerCanonicalSessionBootstrap>>) => void = () => {};
+    bootstrap.mockImplementationOnce(() => new Promise((resolve) => (load = resolve)));
+    render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} sessionConfig={null} />);
+    expect(readPendingAutoJoin()?.token).toBe('gp:river-stone');
+    // A private session refused the proof this secret made, and the page forgot it.
+    const { token: _refused, ...withoutToken } = readPendingAutoJoin()!;
+    savePendingAutoJoin(withoutToken);
+    load({ config, sessionId, sessionSlug: 'alpha', workerOrigin: 'https://worker.example', configRevision: 'v1' });
+    await flush();
+    expect(readPendingAutoJoin()).toMatchObject({ groupId: group.groupId, sessionId });
+    expect(readPendingAutoJoin()?.token).toBeUndefined();
   });
 
   it('captures a link before session config loads and preserves it across a refresh elsewhere', async () => {

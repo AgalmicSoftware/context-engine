@@ -27,6 +27,22 @@ const chunkLines = (value, max) =>
   }, []);
 
 /**
+ * The session's own context as an AI reads it: its title, its notes (its
+ * paragraphs, or its HTML page's words in paragraph-sized chunks) and its
+ * links. `omitted` counts the chunks of a long page that are not read.
+ */
+export const sessionContextNotes = (sessionContext) => {
+  const { title, html, paragraphs, links } = normalizeSessionContext(sessionContext);
+  // An HTML page replaces the paragraphs, so its words are the notes, in no
+  // more room than typed paragraphs get, which leaves the rest for files.
+  const pageNotes = html
+    ? chunkLines(sessionContextHtmlText(sessionContext), SESSION_CONTEXT_LIMITS.paragraphChars).filter((chunk) => chunk.trim())
+    : null;
+  const notes = pageNotes ? pageNotes.slice(0, SESSION_CONTEXT_LIMITS.paragraphs) : paragraphs;
+  return { title, notes, links, omitted: pageNotes ? pageNotes.length - notes.length : 0 };
+};
+
+/**
  * The session's notes (its paragraphs, or its HTML's words) and links, then
  * its sources, as one delimited block of untrusted data for a prompt.
  * `sources` must already be only the items the person the AI acts for may
@@ -40,16 +56,11 @@ export const buildSessionContextPrompt = ({
   itemChars = SESSION_CONTEXT_TEXT_LIMITS.itemChars,
   totalChars = SESSION_CONTEXT_TEXT_LIMITS.totalChars,
 } = {}) => {
-  const { title, html, paragraphs, links } = normalizeSessionContext(sessionContext);
-  // An HTML page replaces the paragraphs, so its words are the notes, in no
-  // more room than typed paragraphs get, which leaves the rest for files.
-  const pageNotes = html
-    ? chunkLines(sessionContextHtmlText(sessionContext), SESSION_CONTEXT_LIMITS.paragraphChars).filter((chunk) => chunk.trim())
-    : null;
-  const notes = pageNotes ? pageNotes.slice(0, SESSION_CONTEXT_LIMITS.paragraphs) : paragraphs;
+  const context = sessionContextNotes(sessionContext);
+  const { title, notes, links } = context;
   const data = title ? { title } : {};
   let included = 0;
-  let omitted = pageNotes ? pageNotes.length - notes.length : 0;
+  let { omitted } = context;
   const tryAdd = (key, entry) => {
     const next = { ...data, [key]: [...(data[key] || []), entry] };
     if (blockLength(next) > totalChars) return false;
