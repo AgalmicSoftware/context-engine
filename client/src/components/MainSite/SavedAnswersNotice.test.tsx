@@ -7,6 +7,12 @@ import SavedAnswersNotice, {
 } from './SavedAnswersNotice';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { resolveWorkerResponseHydrationRun } from '../../utilities/survey/workerResponseHydrationRuntime';
+import { readSurveyToolScopedCacheNode } from '../SurveyTool/surveyToolWorkerCacheIsolation';
+
+jest.mock('../SurveyTool/surveyToolWorkerCacheIsolation', () => ({
+  ...jest.requireActual<object>('../SurveyTool/surveyToolWorkerCacheIsolation'),
+  readSurveyToolScopedCacheNode: jest.fn(() => null),
+}));
 
 const sessionConfig = {
   slug: 'example',
@@ -42,6 +48,24 @@ it('says saved answers are loading until they are, and to reload if they stay aw
   expect(screen.getByRole('status')).toHaveTextContent('if they do not appear, reload the page');
   rerender(notice({ answersReady: true }));
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+it('counts the answers read so far, as Results does, while they load', () => {
+  const progress = (loaded: number, listed: number, listComplete: boolean) =>
+    jest.mocked(readSurveyToolScopedCacheNode).mockReturnValue({
+      workerResponseLoadProgress: { loaded, listed, listComplete },
+    });
+  progress(1200, 2000, false);
+  const { rerender } = render(notice({}));
+  expect(screen.getByRole('status')).toHaveTextContent('Loading your saved answers... (1,200 of 2,000+)');
+  progress(2000, 2000, true);
+  rerender(notice({ signedIn: true }));
+  expect(screen.getByRole('status')).toHaveTextContent('Loading your saved answers... (2,000 of 2,000)');
+  act(() => {
+    jest.advanceTimersByTime(SAVED_ANSWERS_SLOW_MS);
+  });
+  expect(screen.getByRole('status')).toHaveTextContent('still loading (2,000 of 2,000)');
+  jest.mocked(readSurveyToolScopedCacheNode).mockReturnValue(null);
 });
 
 it('leaves a failed load, or a partial load of this session, to their own messages', () => {

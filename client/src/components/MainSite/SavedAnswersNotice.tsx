@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { isWorkerCanonicalSessionConfig } from '../../utilities/survey/workerResponseHydration';
 import { resolveWorkerResponseHydrationRun } from '../../utilities/survey/workerResponseHydrationRuntime';
+import type { WorkerResponseLoadProgress } from '../../utilities/survey/workerResponseHydration';
+import { WORKER_CANONICAL_CACHE_SCOPE_KEY } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
+import { readSurveyToolScopedCacheNode } from '../SurveyTool/surveyToolWorkerCacheIsolation';
 
 export const SAVED_ANSWERS_SLOW_MS = 20_000;
 // A saved sign-in comes back a moment after the page loads; until then the person only looks signed out.
@@ -14,6 +18,27 @@ export const isSavedAnswersRoute = (path: string): boolean => {
     .filter(Boolean);
   return root === 'session' && (section === '' || (section === 'questions' && ['', 'results'].includes(sub)));
 };
+
+/** How much of the session's answer list has been read, as Results counts it; null before the first rows land. */
+export const readSavedAnswersProgress = (
+  sessionConfig: unknown,
+  sessionSlug: string,
+): WorkerResponseLoadProgress | null => {
+  const node = readSurveyToolScopedCacheNode({
+    cache: peekCacheSync('questionsCache', sessionSlug, { clone: false }),
+    cacheScope: WORKER_CANONICAL_CACHE_SCOPE_KEY,
+    sessionConfig,
+    sessionSlug,
+  });
+  const progress = node?.workerResponseLoadProgress as WorkerResponseLoadProgress | undefined;
+  return progress && Number.isFinite(progress.loaded) && Number.isFinite(progress.listed) ? progress : null;
+};
+
+/** " (1,200 of 2,000+)": the "+" while the list is still being read. */
+export const savedAnswersProgressText = (progress: WorkerResponseLoadProgress | null): string =>
+  progress
+    ? ` (${progress.loaded.toLocaleString()} of ${progress.listed.toLocaleString()}${progress.listComplete ? '' : '+'})`
+    : '';
 
 /** True once `active` has held for `ms`; false again as soon as it stops. */
 const useHeldFor = (active: boolean, ms: number): boolean => {
@@ -73,11 +98,13 @@ export default function SavedAnswersNotice({
     );
   }
   if (!loading) return null;
+  // Read on each render: the page renders again as each batch of answers lands.
+  const count = savedAnswersProgressText(readSavedAnswersProgress(sessionConfig, sessionSlug));
   return (
     <div className="alert alert-info" role="status">
       {slow
-        ? 'Your saved answers are still loading. They are kept by the session: if they do not appear, reload the page.'
-        : 'Loading your saved answers...'}
+        ? `Your saved answers are still loading${count}. They are kept by the session: if they do not appear, reload the page.`
+        : `Loading your saved answers...${count}`}
     </div>
   );
 }
