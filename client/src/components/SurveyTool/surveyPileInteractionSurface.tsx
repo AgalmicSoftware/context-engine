@@ -89,6 +89,8 @@ type PileFooterControlsProps = {
   finalSubmitText: string;
   showClearPendingButton: boolean;
   handleRevertPendingChanges: VoidHandler;
+  /** The end card has its own Submit, so Submit and Clear here step aside, keeping their place. */
+  endOfSetShown?: boolean;
 };
 
 type PileDeckWindowProps = {
@@ -260,7 +262,8 @@ const renderPileNavControls = ({
     <div className={styles.pileNav}>
       <button
         onClick={handlePrev}
-        disabled={pileQuestions.length === 0 || activePileIndex === 0}
+        // From the end of the set, Back returns to the last question, even when it is the first.
+        disabled={pileQuestions.length === 0 || (activePileIndex === 0 && !endOfSetShown)}
         className={styles.pileNavArrow}
         aria-label="Previous Question"
         data-ce-control-appearance="frameless"
@@ -423,6 +426,7 @@ const renderPileFooterControls = ({
   finalSubmitText,
   showClearPendingButton,
   handleRevertPendingChanges,
+  endOfSetShown = false,
 }: PileFooterControlsProps): React.ReactElement => (
   <div className={buildPileFooterClassName(styles, pileTopRailVisible)}>
     {/* Always present, so screen readers hear the text that arrives in it. */}
@@ -436,7 +440,9 @@ const renderPileFooterControls = ({
         <Button
           onClick={handlePileSubmitClick}
           data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-          className={buildPileSubmitButtonClassName(styles, hasPendingPileChanges, shouldHidePileSubmitButton)}
+          className={`${buildPileSubmitButtonClassName(styles, hasPendingPileChanges, shouldHidePileSubmitButton)}${
+            endOfSetShown ? ` ${styles.pileFooterControlAway}` : ''
+          }`}
           disabled={isSubmitting || activePromptMasked}
         >
           {isSubmitting ? (
@@ -466,7 +472,7 @@ const renderPileFooterControls = ({
     {showClearPendingButton && (
       <button
         type="button"
-        className={styles.pileIconButton}
+        className={`${styles.pileIconButton}${endOfSetShown ? ` ${styles.pileFooterControlAway}` : ''}`}
         onClick={handleRevertPendingChanges}
         title="Clear changes"
         aria-label="Clear pending changes"
@@ -750,6 +756,7 @@ export const renderPileInteractionSurface = ({
         finalSubmitText,
         showClearPendingButton,
         handleRevertPendingChanges,
+        endOfSetShown: !!endOfSetCard,
       })}
       {renderPileNavControls({
         pileQuestions,

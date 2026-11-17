@@ -564,6 +564,69 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(screen.queryByTestId('ce-pile-end-of-set')).not.toBeInTheDocument();
   });
 
+  // The real pile view with a handle on its engine, at the end of a one-question set with an unsent answer.
+  const openEndWithUnsentAnswer = async () => {
+    let engine = null;
+    const strategy = createPileViewRuntimeStrategy();
+    const renderView = strategy.render;
+    strategy.render = (current) => {
+      engine = current;
+      return renderView(current);
+    };
+    renderPile({
+      questionPool: [
+        {
+          id: 'quadratic-q',
+          type: 'quadratic',
+          prompt: 'Allocate support',
+          options: ['Parks', 'Transit'],
+          voiceCredits: 25,
+        },
+      ],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+      runtimeStrategy: strategy,
+    });
+    fireEvent.change(await screen.findByLabelText('Parks'), { target: { value: '2' } });
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    expect(await screen.findByTestId('ce-pile-end-of-set')).toHaveTextContent('You answered 1 of 1.');
+    return engine;
+  };
+
+  it('keeps focus on the end of the set when its Submit goes after a submit', async () => {
+    const engine = await openEndWithUnsentAnswer();
+    const submit = screen.getByRole('button', { name: 'Submit 1 answer' });
+    // Once nothing is unsent the button goes, which drops focus to the page.
+    let submits = 0;
+    engine.handlePileSubmitClick = async () => {
+      submits += 1;
+      submit.blur();
+      return { status: 'submitted' };
+    };
+    submit.focus();
+    fireEvent.click(submit);
+    await waitFor(() => expect(screen.getByTestId('ce-pile-end-of-set')).toHaveFocus());
+    expect(submits).toBe(1);
+  });
+
+  it('hides the rail Submit while the end of the set shows, and Back returns to a lone question', async () => {
+    await openEndWithUnsentAnswer();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('pileFooterControlAway');
+    fireEvent.click(screen.getByLabelText('Previous Question'));
+    expect(await screen.findByLabelText('Parks')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).not.toHaveClass('pileFooterControlAway');
+  });
+
+  it('ends the end of the set when the filter changes', async () => {
+    const engine = await openEndWithUnsentAnswer();
+    act(() => engine.setState({ filterState: { ...engine.state.filterState } }));
+    await waitFor(() => expect(screen.queryByTestId('ce-pile-end-of-set')).not.toBeInTheDocument());
+    expect(screen.getByLabelText('Parks')).toBeInTheDocument();
+  });
+
   it('renders triple trailing arrows inside the pile submit button', () => {
     const tree = renderPileInteractionSurface(buildSurfaceProps());
     const submitButton = findElement(

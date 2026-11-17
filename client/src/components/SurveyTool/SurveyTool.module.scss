@@ -6508,6 +6508,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   width: 0;
 }
 
+// Hidden, not removed, so the arrows beside and below it stay put.
+.pileFooterControlAway {
+  visibility: hidden;
+}
+
 .ratingContainer {
   display: flex;
   align-items: center;

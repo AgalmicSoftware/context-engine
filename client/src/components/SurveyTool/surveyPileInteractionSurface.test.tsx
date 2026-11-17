@@ -525,7 +525,9 @@ it('shows the end of the set in place of the cards and stops Next there', () => 
     renderPileInteractionSurface({
       ...buildBaseProps(),
       pileQuestions: [{ id: 'q1' }],
+      activePileIndex: 0,
       nextIsPrimary: true,
+      showClearPendingButton: true,
       endOfSetCard: <div data-testid="end-of-set">End</div>,
     }),
   );
@@ -534,6 +536,10 @@ it('shows the end of the set in place of the cards and stops Next there', () => 
   const next = screen.getByRole('button', { name: 'Next Question' });
   expect(next).toBeDisabled();
   expect(next).not.toHaveClass('pileNavArrowPrimary');
+  // Back returns to a lone question.
+  expect(screen.getByRole('button', { name: 'Previous Question' })).toBeEnabled();
+  // The card has its own Submit, so the rail's Submit and Clear step aside without moving anything.
+  expect(screen.getByRole('button', { name: 'Clear pending changes' })).toHaveClass('pileFooterControlAway');
 });
 
 it('announces a draft storage failure without hiding the submit error', () => {

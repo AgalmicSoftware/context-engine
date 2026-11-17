@@ -61,7 +61,7 @@ const PileEndOfSetCard = ({
         </button>
       )}
       {answersHref && (
-        <a className={styles.pileEndAction} href={answersHref}>
+        <a className={styles.pileEndAction} href={answersHref} data-ce-control-appearance="raised">
           See your answers
         </a>
       )}
