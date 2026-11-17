@@ -241,6 +241,17 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.5.1
+
+- `answer` tells a mistyped question id from a locked one. An id that matches
+  nothing is no longer reported as locked; when it looks mistyped, the reply
+  names the nearest listed id. When some answers are refused, the rest are
+  still stored and `next` says which went through.
+- `add_context` takes `groups` with a `url` as well as with a file or text,
+  where the session's Worker advertises `context_link_groups_v1` (Context
+  Engine 0.9.12 or later). On an older Worker the call is refused in a plain
+  sentence; nothing is added.
+
 ## Upgrading to 0.5.0
 
 - New tool `ask_session_agent`: asks a session's own Session Agent one
