@@ -61,6 +61,28 @@ describe('SessionAgentModal', () => {
     jest.resetAllMocks();
   });
 
+  it('says behind the General "?" who the session gives Detailed answers', async () => {
+    const group = { match: 'any', conditions: [{ kind: 'worker_group', groupIds: ['salon'] }] };
+    const everyone = { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] };
+    const sessionConfig = {
+      slug: 'salon',
+      sessionAgent: {
+        audiences: [
+          { who: group, answers: 'detailed' },
+          { who: everyone, answers: 'general' },
+        ],
+      },
+    };
+    readStatus.mockResolvedValue({ ...member, unattributed: null, signedOut: true });
+    render(<SessionAgentModal {...OPTIONS} sessionConfig={sessionConfig} account="" onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    expect(await dialog.findByRole('button', { name: 'What General answers draw on' })).toHaveAccessibleDescription(
+      'General answers draw on the session’s context, the files everyone may see and the results you may see. ' +
+        'They never use members’ answers or files locked to a group. In this session members of some of its ' +
+        'groups may get Detailed answers, which also draw on members’ answers. Sign in to see which you get.',
+    );
+  });
+
   it('says it is a preview and asks for the person’s own status', async () => {
     const { dialog } = await renderModal(member);
     expect(dialog.getByText('Preview')).toBeInTheDocument();

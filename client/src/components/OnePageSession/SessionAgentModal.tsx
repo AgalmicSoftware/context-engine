@@ -7,7 +7,7 @@ import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
 import CETooltip from '../Shared/CETooltip';
 import SessionAgentNotice from './SessionAgentNotice';
-import { sessionAgentAddressNotice } from './sessionAgentWording';
+import { sessionAgentAddressNotice, sessionAgentFullerAnswersNote } from './sessionAgentWording';
 import {
   askSessionAgent,
   readSessionAgentStatus,
@@ -282,19 +282,14 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             : status.signedOut
               ? 'Not signed in, you get General answers.'
               : `You get ${style === 'detailed' ? 'Detailed' : 'General'} answers.`}
-          <button
-            type="button"
+          <Help
             id={`${baseId}-style`}
-            className={styles.helpLink}
-            data-ce-control-appearance="frameless"
-            aria-label={`What ${style === 'detailed' ? 'Detailed' : 'General'} answers draw on`}
-            onClick={(event) => event.currentTarget.focus()}
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
-          </button>
-          <CETooltip target={`${baseId}-style`} placement="bottom" trigger="hover focus" autohide={false}>
-            {STYLE_HELP[style]}
-          </CETooltip>
+            label={`What ${style === 'detailed' ? 'Detailed' : 'General'} answers draw on`}
+            text={
+              STYLE_HELP[style] +
+              (style === 'general' ? ` ${sessionAgentFullerAnswersNote(sessionConfig, status.signedOut)}` : '')
+            }
+          />
         </p>
         <form className={styles.form} onSubmit={ask}>
           <label htmlFor={`${baseId}-question`} className={styles.label}>

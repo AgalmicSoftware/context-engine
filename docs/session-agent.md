@@ -124,6 +124,16 @@ not fit, the agent is told how many were left out. In a session of 50 people
 and about 50 questions that is every count, the written answers to the closest
 questions, and a few from each of the others.
 
+## Who the dialog says gets Detailed answers
+
+Above the question box the dialog says which answers the person gets. For
+General answers its "?" also says who the session gives Detailed ones, read
+from the session's own audiences as the Worker judges them: members of some of
+its groups, people holding certain digital credentials, people who sign in,
+or, when no audience gives Detailed answers, only its admins. An audience that
+an earlier one already answers is passed over, as the first audience to admit
+a person sets their answers.
+
 ## Instructions and rules
 
 Each style has default instructions, which an admin may replace with up to
