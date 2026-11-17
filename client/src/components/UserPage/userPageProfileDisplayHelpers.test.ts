@@ -7,6 +7,20 @@ import {
 } from './userPageProfileDisplayHelpers';
 
 describe('userPageProfileDisplayHelpers', () => {
+  it('lets the owner set a username from the minimized page in the account dialog', () => {
+    expect(
+      buildUserPageProfileEditVisibility({ account: '0xABC', minimized: true, viewAddress: '0xabc' }),
+    ).toMatchObject({ isOwner: true, showUsernamePen: true, showPen: false });
+    expect(
+      buildUserPageProfileEditVisibility({
+        account: '0xABC',
+        isEditingUsername: true,
+        minimized: true,
+        viewAddress: '0xabc',
+      }),
+    ).toMatchObject({ showUsernamePen: false });
+  });
+
   it('resolves owner and nickname editor visibility', () => {
     expect(
       buildUserPageProfileEditVisibility({

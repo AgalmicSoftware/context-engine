@@ -92,7 +92,8 @@ export const buildUserPageProfileEditVisibility = ({
     isOwner,
     notOwnPage,
     showPen: !minimized && notOwnPage && !isEditingNickname,
-    showUsernamePen: !minimized && isOwner && !isEditingUsername,
+    // The account dialog shows the page minimized; its owner can still set a username there.
+    showUsernamePen: isOwner && !isEditingUsername,
   };
 };
 
