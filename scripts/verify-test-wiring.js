@@ -287,7 +287,12 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectSyncPublicHistoryContains('CE-Private-Source:', 'private-to-public source mapping trailer');
 
   expectWorkflowContains('wiring-and-release:', 'the wiring-and-release job');
-  expectWorkflowContains('run: npm run ci:gate -- wiring-and-release', 'the manifest-backed wiring-and-release gate');
+  // The hosted job runs this gate one command at a time: its lanes have not been measured against the
+  // hosted runner's memory. Once they have, change this pin and docs/testing.md together.
+  expectWorkflowContains(
+    'run: npm run ci:gate -- wiring-and-release --serial\n',
+    'the manifest-backed wiring-and-release gate, run with --serial',
+  );
   expectWorkflowContains(
     'CLIENT_LARGE_FILE_BASE_REF: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}',
     'public baseline for the large-file inventory gate',

@@ -348,7 +348,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '        run: node scripts/check-baseline-monotonicity.mjs --require-base-sha',
         '      - env:',
         '          CLIENT_LARGE_FILE_BASE_REF: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}',
-        '        run: npm run ci:gate -- wiring-and-release',
+        '        run: npm run ci:gate -- wiring-and-release --serial',
         '      - run: npm run ci:gate -- public-text',
         '      - run: node scripts/worker-release-artifacts.mjs stage',
         '      - env:',
