@@ -34,6 +34,7 @@ import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuest
 import {
   buildNoPendingPileSubmitFeedbackPlan,
   buildPileSubmitRailViewState,
+  pileAnswerIsGiven,
   buildPileSubmitViewState,
   buildPileWorkspaceViewState,
   buildPileFilterActivePatch,
@@ -3400,11 +3401,9 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     hasPendingPileChanges,
     shouldHidePileSubmitButton,
     finalSubmitText,
-    pileSubmitResponderHref,
     pileTopRailVisible,
     showSubmitButton,
-    showSuccessBadgeLink,
-    showSuccessBadgeStatus,
+    showSuccessBadge,
     showClearPendingButton,
   } = buildPileSubmitRailViewState({
     pendingStats: _pileStats,
@@ -3513,9 +3512,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             onViewAllClick: engine.props.onViewAllClick,
             handleViewAllFromPile: engine.handleViewAllFromPile,
             pileTopRailVisible,
-            showSuccessBadgeLink,
-            pileSubmitResponderHref,
-            showSuccessBadgeStatus,
+            showSuccessBadge,
             showSubmitButton,
             handlePileSubmitClick: async () => {
               const context = buildSessionInterviewSubmitContextToken(engine.props);
@@ -3545,6 +3542,13 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
               engine.setState({ interviewPendingNoticeContext: '' });
             },
             navCounterVisible,
+            nextIsPrimary: pileAnswerIsGiven(
+              readPlainRecord(
+                engine.state.surveysResponseState?.[0]?.answers?.[
+                  normalizeQuestionIdKey(pileQuestions[effectiveActivePileIndex]?.id)
+                ],
+              ).value,
+            ),
             handlePrev: engine.handlePrev,
             handleNext: engine.handleNext,
           })}

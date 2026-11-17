@@ -56,6 +56,8 @@ type PileNavControlsProps = {
   pileQuestions: PileQuestionLike[];
   activePileIndex: number;
   navCounterVisible: boolean;
+  /** The card has an answer, so Next is the step to take. */
+  nextIsPrimary?: boolean;
   handlePrev: VoidHandler;
   handleNext: VoidHandler;
 };
@@ -75,9 +77,7 @@ type PileActionControlsProps = {
 
 type PileFooterControlsProps = {
   pileTopRailVisible: boolean;
-  showSuccessBadgeLink: boolean;
-  pileSubmitResponderHref: string;
-  showSuccessBadgeStatus: boolean;
+  showSuccessBadge: boolean;
   showSubmitButton: boolean;
   handlePileSubmitClick: VoidHandler;
   hasPendingPileChanges: boolean;
@@ -152,9 +152,7 @@ export type PileInteractionSurfaceProps = {
   onViewAllClick?: VoidHandler | null;
   handleViewAllFromPile: VoidHandler;
   pileTopRailVisible: boolean;
-  showSuccessBadgeLink: boolean;
-  pileSubmitResponderHref: string;
-  showSuccessBadgeStatus: boolean;
+  showSuccessBadge: boolean;
   showSubmitButton: boolean;
   handlePileSubmitClick: VoidHandler;
   hasPendingPileChanges: boolean;
@@ -166,6 +164,7 @@ export type PileInteractionSurfaceProps = {
   showClearPendingButton: boolean;
   handleRevertPendingChanges: VoidHandler;
   navCounterVisible: boolean;
+  nextIsPrimary?: boolean;
   handlePrev: VoidHandler;
   handleNext: VoidHandler;
 };
@@ -245,6 +244,7 @@ const renderPileNavControls = ({
   pileQuestions,
   activePileIndex,
   navCounterVisible,
+  nextIsPrimary = false,
   handlePrev,
   handleNext,
 }: PileNavControlsProps): React.ReactElement => (
@@ -266,10 +266,15 @@ const renderPileNavControls = ({
     <button
       onClick={handleNext}
       disabled={pileQuestions.length === 0 || activePileIndex === pileQuestions.length - 1}
-      className={styles.pileNavArrow}
+      className={`${styles.pileNavArrow}${nextIsPrimary ? ` ${styles.pileNavArrowPrimary}` : ''}`}
       aria-label="Next Question"
       data-ce-control-appearance="frameless"
     >
+      {nextIsPrimary && (
+        <span className={styles.pileNavNextLabel} aria-hidden="true">
+          Next
+        </span>
+      )}
       <FontAwesomeIcon icon={faChevronRight} />
     </button>
   </div>
@@ -359,58 +364,32 @@ const renderPileActionControls = ({
   );
 };
 
-// The check after a submit goes away after ten seconds, keeping its place so nothing below it moves. It waits
-// while pointed at or focused, so it never goes from under someone about to use it.
+// The check after a submit goes away after ten seconds, keeping its place so nothing below it moves. It only
+// reports the submit: as a link to the profile it read as the way on, and took people out of the questions.
 const SUBMITTED_CHECK_MS = 10_000;
 
-/** The check after a submit: a link to the responder's profile, or a status when there's no address to open. */
-export const PileSubmittedCheck = ({ href }: { href: string }): React.ReactElement => {
-  const [expired, setExpired] = React.useState(false);
-  const [hovered, setHovered] = React.useState(false);
-  const [focused, setFocused] = React.useState(false);
+/** The check after a submit. */
+export const PileSubmittedCheck = (): React.ReactElement => {
+  const [gone, setGone] = React.useState(false);
   React.useEffect(() => {
-    const timer = setTimeout(() => setExpired(true), SUBMITTED_CHECK_MS);
+    const timer = setTimeout(() => setGone(true), SUBMITTED_CHECK_MS);
     return () => clearTimeout(timer);
   }, []);
-  const gone = expired && !hovered && !focused;
-  const className = `${styles.pileSubmitSuccessBadge}${gone ? ` ${styles.pileSubmitSuccessBadgeGone}` : ''}`;
-  const hold = {
-    onMouseEnter: () => setHovered(true),
-    onMouseLeave: () => setHovered(false),
-    onFocus: () => setFocused(true),
-    onBlur: () => setFocused(false),
-  };
-  const icon = <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />;
-  return href ? (
-    <a
-      href={href}
-      {...hold}
-      className={className}
-      data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-      aria-label="View your submitted responses"
-      title="View your submitted responses"
-    >
-      {icon}
-    </a>
-  ) : (
+  return (
     <div
-      {...hold}
-      className={className}
+      className={`${styles.pileSubmitSuccessBadge}${gone ? ` ${styles.pileSubmitSuccessBadgeGone}` : ''}`}
       data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
       role="status"
-      aria-label="Submitted"
-      title="Submitted"
     >
-      {icon}
+      <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
+      <span>Submitted</span>
     </div>
   );
 };
 
 const renderPileFooterControls = ({
   pileTopRailVisible,
-  showSuccessBadgeLink,
-  pileSubmitResponderHref,
-  showSuccessBadgeStatus,
+  showSuccessBadge,
   showSubmitButton,
   handlePileSubmitClick,
   hasPendingPileChanges,
@@ -423,8 +402,8 @@ const renderPileFooterControls = ({
   handleRevertPendingChanges,
 }: PileFooterControlsProps): React.ReactElement => (
   <div className={buildPileFooterClassName(styles, pileTopRailVisible)}>
-    {showSuccessBadgeLink || showSuccessBadgeStatus ? (
-      <PileSubmittedCheck href={showSuccessBadgeLink ? pileSubmitResponderHref : ''} />
+    {showSuccessBadge ? (
+      <PileSubmittedCheck />
     ) : showSubmitButton ? (
       <>
         <Button
@@ -635,9 +614,7 @@ export const renderPileInteractionSurface = ({
   onViewAllClick,
   handleViewAllFromPile,
   pileTopRailVisible,
-  showSuccessBadgeLink,
-  pileSubmitResponderHref,
-  showSuccessBadgeStatus,
+  showSuccessBadge,
   showSubmitButton,
   handlePileSubmitClick,
   hasPendingPileChanges,
@@ -649,6 +626,7 @@ export const renderPileInteractionSurface = ({
   showClearPendingButton,
   handleRevertPendingChanges,
   navCounterVisible,
+  nextIsPrimary,
   handlePrev,
   handleNext,
 }: PileInteractionSurfaceProps): React.ReactElement => (
@@ -732,9 +710,7 @@ export const renderPileInteractionSurface = ({
       })}
       {renderPileFooterControls({
         pileTopRailVisible,
-        showSuccessBadgeLink,
-        pileSubmitResponderHref,
-        showSuccessBadgeStatus,
+        showSuccessBadge,
         showSubmitButton,
         handlePileSubmitClick,
         hasPendingPileChanges,
@@ -750,6 +726,7 @@ export const renderPileInteractionSurface = ({
         pileQuestions,
         activePileIndex,
         navCounterVisible,
+        nextIsPrimary,
         handlePrev,
         handleNext,
       })}

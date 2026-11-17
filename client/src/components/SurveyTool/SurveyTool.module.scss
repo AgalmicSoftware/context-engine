@@ -6379,11 +6379,12 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  height: 60px;
-  border-radius: var(--ce-radius-round);
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--ce-radius-pill);
   color: var(--ce-color-white);
-  text-decoration: none;
+  font-weight: 700;
   background:
     radial-gradient(
       circle at 30% 28%,
@@ -6395,17 +6396,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     0 14px 30px color-mix(in srgb, var(--ce-overlay-base) 28%, transparent),
     0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
   animation: pileSubmitSuccessPop 220ms ease-out;
-
-  &:hover,
-  &:focus {
-    color: var(--ce-color-white);
-    text-decoration: none;
-  }
-
-  &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--ce-text-inverse) 86%, transparent);
-    outline-offset: 3px;
-  }
 }
 
 // Ten seconds after a submit (see PileSubmittedCheck): hidden, still holding its place.
@@ -6498,11 +6488,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     min-height: 44px;
     padding: 10px 6px;
     border-radius: var(--ce-radius-8);
-  }
-
-  .pileSubmitSuccessBadge {
-    width: 54px;
-    height: 54px;
   }
 
   .pileSubmitSuccessIcon {
@@ -7663,6 +7648,34 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     overflow: visible;
     padding: 10px 14px;
   }
+}
+
+// Once the card has an answer, Next reads as the step to take, in every theme.
+.pileNav .pileNavArrow.pileNavArrowPrimary {
+  gap: 6px;
+  width: auto;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: var(--ce-radius-pill);
+  background: var(--ce-action-primary) !important;
+  color: var(--ce-action-primary-text) !important;
+  font-size: 1.1rem;
+  opacity: 1 !important;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: var(--ce-action-primary) !important;
+    color: var(--ce-action-primary-text) !important;
+    transform: none;
+    filter: none;
+  }
+}
+
+.pileNavNextLabel {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 // The portal keeps the backdrop out of transformed question-card stacking contexts.

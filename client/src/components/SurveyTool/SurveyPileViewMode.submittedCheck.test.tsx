@@ -48,9 +48,10 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-it('links the check after a submit to your profile in this session', () => {
+it('says the answers were submitted, without a link out of the questions', () => {
   submitted();
-  expect(check()).toHaveAttribute('href', `/u/${account}?session=rxc-ra-test-5`);
+  expect(check()).toHaveTextContent('Submitted');
+  expect(check()).not.toHaveAttribute('href');
 });
 
 it('shows the check for ten seconds after each submit', () => {

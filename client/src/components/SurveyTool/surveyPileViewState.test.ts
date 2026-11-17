@@ -10,6 +10,7 @@ import {
   buildPileWorkspaceViewState,
   buildNoPendingPileSubmitFeedbackPlan,
   buildPileSubmitRailViewState,
+  pileAnswerIsGiven,
   buildPileSubmitViewState,
   resolveEarlyVisiblePileQuestions,
   shouldPreferPileGatedEmptyState,
@@ -99,8 +100,7 @@ describe('surveyPileViewState', () => {
       }),
     ).toMatchObject({
       showSubmitButton: true,
-      showSuccessBadgeLink: false,
-      showSuccessBadgeStatus: false,
+      showSuccessBadge: false,
       showClearPendingButton: true,
     });
   });
@@ -159,8 +159,7 @@ describe('surveyPileViewState', () => {
       pileSubmitResponderHref: '',
       pileTopRailVisible: true,
       showSubmitButton: true,
-      showSuccessBadgeLink: false,
-      showSuccessBadgeStatus: false,
+      showSuccessBadge: false,
       showClearPendingButton: true,
     });
 
@@ -184,10 +183,17 @@ describe('surveyPileViewState', () => {
       pileSubmitResponderHref: '/u/0xabcd',
       pileTopRailVisible: true,
       showSubmitButton: false,
-      showSuccessBadgeLink: true,
-      showSuccessBadgeStatus: false,
+      showSuccessBadge: true,
       showClearPendingButton: false,
     });
+  });
+
+  it('counts a card as answered once it holds a choice', () => {
+    expect(pileAnswerIsGiven('Agree')).toBe(true);
+    expect(pileAnswerIsGiven(['The courts'])).toBe(true);
+    expect(pileAnswerIsGiven([0, 2, 0])).toBe(true);
+    expect(pileAnswerIsGiven(3)).toBe(true);
+    [undefined, null, '', '  ', [], [0, 0], NaN, {}].forEach((value) => expect(pileAnswerIsGiven(value)).toBe(false));
   });
 
   it('prefers gated pile empty state only after load settles and hidden questions remain', () => {

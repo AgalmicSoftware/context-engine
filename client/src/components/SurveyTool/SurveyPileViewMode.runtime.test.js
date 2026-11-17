@@ -1515,32 +1515,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(hiddenFooter).toBeNull();
   });
 
-  it('links the pile success checkmark to the submitted responder user page after submit', () => {
-    const responderAddress = '0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD';
-    const tree = renderPileInteractionSurface(
-      buildSurfaceProps({
-        rail: baseRail({
-          pendingStats: { total: 0 },
-          submittedSinceLastEdit: true,
-          account: responderAddress,
-          isAddress: (value) => value === responderAddress,
-          sessionSlug: 'alpha',
-        }),
-      }),
-    );
-    const submitButton = findElement(
-      tree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
-    );
-    const successCheck = findElement(tree, (node) => isElementNode(node) && node.type === PileSubmittedCheck);
-    const hiddenFooter = findNodeByClassName(tree, 'pileFooterHidden');
-
-    expect(submitButton).toBeNull();
-    expect(successCheck.props.href).toBe(`/u/${responderAddress.toLowerCase()}?session=alpha`);
-    expect(hiddenFooter).toBeNull();
-  });
-
-  it('keeps the pile success checkmark non-clickable when no responder address is available', () => {
+  it('shows the pile success check in place of Submit after a submit', () => {
     const tree = renderPileInteractionSurface(
       buildSurfaceProps({
         rail: baseRail({
@@ -1550,9 +1525,15 @@ describe('SurveyPileViewMode runtime surface', () => {
         }),
       }),
     );
+    const submitButton = findElement(
+      tree,
+      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
+    );
     const successCheck = findElement(tree, (node) => isElementNode(node) && node.type === PileSubmittedCheck);
 
-    expect(successCheck.props.href).toBe('');
+    expect(submitButton).toBeNull();
+    expect(successCheck).not.toBeNull();
+    expect(findNodeByClassName(tree, 'pileFooterHidden')).toBeNull();
   });
 
   it('does not call getPendingEditStats during PileViewMode.render', () => {

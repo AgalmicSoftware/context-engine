@@ -142,9 +142,7 @@ const buildBaseProps = (): PileInteractionSurfaceProps => ({
   onViewAllClick: jest.fn(),
   handleViewAllFromPile: jest.fn(),
   pileTopRailVisible: true,
-  showSuccessBadgeLink: false,
-  pileSubmitResponderHref: '',
-  showSuccessBadgeStatus: false,
+  showSuccessBadge: false,
   showSubmitButton: true,
   handlePileSubmitClick: jest.fn(),
   hasPendingPileChanges: true,
@@ -475,12 +473,13 @@ describe('the check after a submit', () => {
     jest.useRealTimers();
   });
 
-  it('links to the responder’s profile for ten seconds, then hides in its place', () => {
+  it('says the answers were submitted for ten seconds, then hides in its place, and leads nowhere', () => {
     jest.useFakeTimers();
-    render(<PileSubmittedCheck href="/u/0xabc?session=alpha" />);
-    const check = screen.getByRole('link', { name: 'View your submitted responses' });
-    expect(check).toHaveAttribute('href', '/u/0xabc?session=alpha');
+    render(<PileSubmittedCheck />);
+    const check = screen.getByRole('status');
+    expect(check).toHaveTextContent('Submitted');
     expect(check).toHaveAttribute('data-testid', E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
+    expect(screen.queryByRole('link')).toBeNull();
     act(() => {
       jest.advanceTimersByTime(9_999);
     });
@@ -490,35 +489,16 @@ describe('the check after a submit', () => {
     });
     expect(check).toHaveClass('pileSubmitSuccessBadge', 'pileSubmitSuccessBadgeGone');
   });
+});
 
-  it.each([
-    [
-      'pointed at',
-      (check: HTMLElement) => fireEvent.mouseEnter(check),
-      (check: HTMLElement) => fireEvent.mouseLeave(check),
-    ],
-    ['focused', (check: HTMLElement) => act(() => check.focus()), (check: HTMLElement) => act(() => check.blur())],
-  ])('stays while it is %s, and goes once left after its ten seconds', (_how, hold, release) => {
-    jest.useFakeTimers();
-    render(<PileSubmittedCheck href="/u/0xabc?session=alpha" />);
-    const check = screen.getByRole('link', { name: 'View your submitted responses' });
-    hold(check);
-    act(() => {
-      jest.advanceTimersByTime(10_000);
-    });
-    expect(check).not.toHaveClass('pileSubmitSuccessBadgeGone');
-    release(check);
-    expect(check).toHaveClass('pileSubmitSuccessBadgeGone');
-  });
-
-  it('is a status without an address to open', () => {
-    render(<PileSubmittedCheck href="" />);
-    expect(screen.getByRole('status', { name: 'Submitted' })).toHaveAttribute(
-      'data-testid',
-      E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR,
-    );
-    expect(screen.queryByRole('link')).toBeNull();
-  });
+it('makes Next the step to take once the card has an answer', () => {
+  const { rerender } = render(renderPileInteractionSurface(buildBaseProps()));
+  const next = screen.getByRole('button', { name: 'Next Question' });
+  expect(next).not.toHaveClass('pileNavArrowPrimary');
+  expect(next).not.toHaveTextContent('Next');
+  rerender(renderPileInteractionSurface({ ...buildBaseProps(), nextIsPrimary: true }));
+  expect(screen.getByRole('button', { name: 'Next Question' })).toHaveClass('pileNavArrowPrimary');
+  expect(screen.getByRole('button', { name: 'Next Question' })).toHaveTextContent('Next');
 });
 
 it('announces a draft storage failure without hiding the submit error', () => {

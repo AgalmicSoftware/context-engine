@@ -21,8 +21,7 @@ export type PileSubmitViewState = {
 export type PileSubmitRailViewState = PileSubmitViewState & {
   pileTopRailVisible: boolean;
   showSubmitButton: boolean;
-  showSuccessBadgeLink: boolean;
-  showSuccessBadgeStatus: boolean;
+  showSuccessBadge: boolean;
   showClearPendingButton: boolean;
 };
 
@@ -307,6 +306,13 @@ export const buildPileSubmitViewState = ({
   };
 };
 
+/** Whether a card's answer holds a choice, which makes Next the step to take. */
+export const pileAnswerIsGiven = (value: unknown): boolean => {
+  if (Array.isArray(value)) return value.some((entry) => entry !== 0 && entry !== '' && entry != null);
+  if (typeof value === 'string') return value.trim() !== '';
+  return typeof value === 'number' && Number.isFinite(value);
+};
+
 export const buildPileSubmitRailViewState = ({
   isSubmitting = false,
   ...rest
@@ -329,8 +335,6 @@ export const buildPileSubmitRailViewState = ({
   const pileTopRailVisible =
     !!isSubmitting || submitViewState.hasPendingPileChanges || submitViewState.pileSubmittedStateActive;
   const showSubmitButton = !submitViewState.showPileSubmitSuccessBadge;
-  const showSuccessBadgeLink = submitViewState.showPileSubmitSuccessBadge && !!submitViewState.pileSubmitResponderHref;
-  const showSuccessBadgeStatus = submitViewState.showPileSubmitSuccessBadge && !submitViewState.pileSubmitResponderHref;
   const showClearPendingButton =
     submitViewState.hasPendingPileChanges && !isSubmitting && !submitViewState.pileSubmittedStateActive;
 
@@ -338,8 +342,7 @@ export const buildPileSubmitRailViewState = ({
     ...submitViewState,
     pileTopRailVisible,
     showSubmitButton,
-    showSuccessBadgeLink,
-    showSuccessBadgeStatus,
+    showSuccessBadge: submitViewState.showPileSubmitSuccessBadge,
     showClearPendingButton,
   };
 };
