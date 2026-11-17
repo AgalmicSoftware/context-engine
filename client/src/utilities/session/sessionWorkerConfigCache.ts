@@ -910,3 +910,24 @@ export const getVerifiedWorkerCanonicalSessionBootstrap = ({
   });
   return verifiedKey && verifiedWorkerCanonicalBootstrapKeys.has(verifiedKey) ? cached : null;
 };
+
+// Links are built many to a page, so the origins are parsed once per stored value.
+let rememberedOrigins: { raw: string | null; bySlug: Map<string, string[]> } | null = null;
+
+/** The Workers this browser has verified for a Worker-run session by this name; more than one means the name alone is ambiguous. */
+export const listRememberedWorkerCanonicalOrigins = (slug: unknown): string[] => {
+  let raw: string | null = null;
+  try {
+    raw = typeof window === 'undefined' ? null : localStorage.getItem(WORKER_CONFIG_CACHE_KEY);
+  } catch (_) {}
+  if (!rememberedOrigins || rememberedOrigins.raw !== raw) {
+    const bySlug = new Map<string, string[]>();
+    Object.values(readSessionWorkerConfigCache().bySession).forEach((record) => {
+      if (record.authorityMode !== 'worker_canonical') return;
+      const key = canonicalizeSessionSlug(record.slug);
+      bySlug.set(key, [...(bySlug.get(key) || []), String(record.workerOrigin || '')]);
+    });
+    rememberedOrigins = { raw, bySlug };
+  }
+  return [...(rememberedOrigins.bySlug.get(canonicalizeSessionSlug(slug)) || [])];
+};

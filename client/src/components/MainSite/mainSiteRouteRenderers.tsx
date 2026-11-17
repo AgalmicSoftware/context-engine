@@ -14,6 +14,7 @@ import { resolveCompareCachesReady, resolveCompareSessionScope } from '../UserPa
 import { t } from '../../utilities/ui/terminology.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
+import { KNOWN_SESSIONS } from '../../utilities/session/knownSessionsFile';
 import { isRouteResponderAddress } from '../../utilities/session/mainSiteUtils.js';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeSessionSlug } from '../../domains/sessions/sessionConfig.js';
@@ -970,18 +971,21 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         </div>
       );
     }
-    // A link from an unlisted session carries its Worker, as the session page's own link does: the session comes
-    // from that Worker, and the address keeps it.
+    // A Worker-run session comes from its Worker: the link's `worker=` for an unlisted session, or, for a listed
+    // one, its Worker from known-sessions.json, which opens only the listed session ID and flags any other Worker's
+    // config the page holds. Nothing else names a Worker here.
+    const questionDisplayCfg = queryQuestionSlug ? host.getDisplaySessionCfg(queryQuestionSlug) : null;
+    const awaitsListedWorker = !!queryQuestionSlug && Object.hasOwn(KNOWN_SESSIONS, queryQuestionSlug);
     const workerRoute =
-      queryQuestionSlug && urlParams.has('session') && urlParams.has('worker')
+      queryQuestionSlug && urlParams.has('session') && (urlParams.has('worker') || awaitsListedWorker)
         ? resolveMainSiteGroupWorkerRoute({
             workerSessionSlug: queryQuestionSlug,
-            sessionConfig: null,
+            sessionConfig: questionDisplayCfg,
             searchStr,
             controller: getWorkerCanonicalRouteController(host),
           })
         : null;
-    if (workerRoute) {
+    if (workerRoute && workerRoute.kind !== 'standard') {
       const interruption =
         renderWorkerCanonicalRouteError(workerRoute) ||
         renderWorkerCanonicalRouteBootstrap(workerRoute, getWorkerCanonicalRouteController(host));
@@ -1003,9 +1007,15 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         sessionSlug: effectiveQuestionSlug,
         sessionId: queryQuestionSessionId || undefined,
       });
-      const canonicalQuestionPath = workerRoute
-        ? `${routePath}&worker=${encodeURIComponent(workerRoute.workerOrigin)}`
-        : routePath;
+      // Only a Worker route opened with `worker=` keeps it: a listed session's address stays clean, and a
+      // registry session's never gains one.
+      const [routePathname, routeQuery = ''] = routePath.split('?');
+      const routeParams = new URLSearchParams(routeQuery);
+      routeParams.delete('worker');
+      if (urlParams.has('worker') && workerRoute && workerRoute.kind !== 'standard' && workerRoute.workerOrigin) {
+        routeParams.set('worker', workerRoute.workerOrigin);
+      }
+      const canonicalQuestionPath = routeParams.toString() ? `${routePathname}?${routeParams}` : routePathname;
       const currentPath = `${window.location.pathname || ''}${window.location.search || ''}`;
       const canonicalQuestionPublicPath = buildPublicRoute(canonicalQuestionPath);
       if (canonicalQuestionPublicPath !== currentPath) {

@@ -1,4 +1,5 @@
 import { buildQuestionBookmarkHref } from '../Bookmarks/BookmarksPage';
+import { KNOWN_SESSIONS } from '../../utilities/session/knownSessionsFile';
 import React from 'react';
 import fs from 'fs';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -2305,6 +2306,71 @@ describe('AppShell route render smoke', () => {
     },
   );
 
+  it("opens a listed Worker session's question link without worker=", async () => {
+    const listed = KNOWN_SESSIONS['rxc-ra-2'];
+    const config = {
+      slug: 'rxc-ra-2',
+      sessionId: listed.sessionId,
+      configRevision: 'revision-1',
+      corsWorkerUrl: listed.worker,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, sessionSlug: config.slug, config }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const subject = createSubject({ path: '/question/0xabc', search: '?session=rxc-ra-2', sessionConfig: null });
+
+    const view = render(subject.render());
+
+    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${listed.worker}/session-config?slug=rxc-ra-2`,
+        expect.objectContaining({ method: 'GET' }),
+      ),
+    );
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+    view.rerender(subject.render());
+    expect(await screen.findByTestId('mock-survey-tool')).toHaveAttribute('data-session-slug', 'rxc-ra-2');
+    // The listed session's address stays clean once its Worker is verified.
+    expect(window.location.search).toBe('?session=rxc-ra-2');
+  });
+
+  it('does not open a clean question link through a Worker this browser only remembers', async () => {
+    const workerOrigin = 'https://remembered-worker.example';
+    localStorage.setItem(
+      'ce:sessionWorkerConfigCache:v1',
+      JSON.stringify({
+        v: 3,
+        bySession: {
+          remembered: {
+            slug: 'unlisted-room',
+            sessionIdHex: '0x11111111111111111111111111111111',
+            registryChainId: 0,
+            authorityMode: 'worker_canonical',
+            workerOrigin,
+            config: { corsWorkerUrl: workerOrigin },
+            canonicalConfig: { slug: 'unlisted-room' },
+          },
+        },
+      }),
+    );
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    const subject = createSubject({ path: '/question/0xabc', search: '?session=unlisted-room', sessionConfig: null });
+
+    render(subject.render());
+
+    expect(screen.queryByTestId('ce-worker-canonical-bootstrap-status')).toBeNull();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).startsWith(workerOrigin))).toBe(false);
+    expect(window.location.search).not.toContain('worker=');
+  });
+
   it('keeps pure Worker comparison session-scoped without invoking the on-chain profile scanner', async () => {
     const workerConfig = buildSessionConfig({
       slug: 'worker-session',
@@ -3681,10 +3747,12 @@ describe('AppShell route render smoke', () => {
 
   it('keeps an exact pure Worker question route free of registry and wallet-chain context', async () => {
     const questionId = `0x${'12'.repeat(32)}`;
+    // demo-sh is listed, so its question route verifies the config with the listed Worker first.
     const workerConfig = buildSessionConfig({
       slug: 'demo-sh',
-      sessionId: '0x12121212121212121212121212121212',
-      corsWorkerUrl: 'https://demo-sh.example.workers.dev',
+      sessionId: KNOWN_SESSIONS['demo-sh'].sessionId,
+      corsWorkerUrl: KNOWN_SESSIONS['demo-sh'].worker,
+      configRevision: 'revision-1',
       networkChainId: DEFAULT_NETWORK.id,
       __registry: undefined,
       sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
@@ -3698,10 +3766,18 @@ describe('AppShell route render smoke', () => {
       }),
     );
 
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, sessionSlug: 'demo-sh', config: workerConfig }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
     await act(async () => {
       await subject.componentDidMount();
     });
-    render(subject.render());
+    const view = render(subject.render());
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+    view.rerender(subject.render());
 
     expect(loadGroupRegistryCache).not.toHaveBeenCalled();
     expect(await screen.findByTestId('mock-survey-tool')).toHaveAttribute('data-session-slug', 'demo-sh');

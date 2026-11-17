@@ -97,6 +97,62 @@ describe('workerCanonicalRouteResolution', () => {
     ).toMatchObject({ kind: 'error', sessionConfig: null });
   });
 
+  it('finds a listed session from known-sessions.json for a link without worker=', () => {
+    const route = resolveMainSiteGroupWorkerRoute({
+      searchStr: '',
+      workerSessionSlug: FIXTURE_SLUG,
+      sessionConfig: null,
+      controller,
+    });
+    expect(route).toMatchObject({ kind: 'bootstrap', workerOrigin: FIXTURE_WORKER });
+    expect(String(route.expectedSessionId || '').toLowerCase()).toBe(FIXTURE_SESSION_ID);
+  });
+
+  it("flags another Worker's config held for a listed session", () => {
+    const route = resolveMainSiteGroupWorkerRoute({
+      searchStr: '',
+      workerSessionSlug: FIXTURE_SLUG,
+      sessionConfig: {
+        slug: FIXTURE_SLUG,
+        sessionId: '0x99999999999999999999999999999999',
+        corsWorkerUrl: 'https://lookalike.example',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+      controller,
+    });
+    expect(route).toMatchObject({ workerOrigin: 'https://lookalike.example', listedWorkerOrigin: FIXTURE_WORKER });
+  });
+
+  it('keeps the listed Worker even when this browser remembers others by the same name', () => {
+    const makeRecord = (sessionIdHex: string, workerOrigin: string) => ({
+      slug: FIXTURE_SLUG,
+      sessionIdHex,
+      registryChainId: 0,
+      authorityMode: 'worker_canonical',
+      workerOrigin,
+      config: { corsWorkerUrl: workerOrigin },
+      canonicalConfig: { slug: FIXTURE_SLUG },
+    });
+    localStorage.setItem(
+      'ce:sessionWorkerConfigCache:v1',
+      JSON.stringify({
+        v: 3,
+        bySession: {
+          first: makeRecord('0x11111111111111111111111111111111', 'https://first.example'),
+          second: makeRecord('0x22222222222222222222222222222222', 'https://second.example'),
+        },
+      }),
+    );
+    expect(
+      resolveMainSiteGroupWorkerRoute({
+        searchStr: '',
+        workerSessionSlug: FIXTURE_SLUG,
+        sessionConfig: null,
+        controller,
+      }),
+    ).toMatchObject({ kind: 'bootstrap', workerOrigin: FIXTURE_WORKER });
+  });
+
   it('treats an explicit empty Worker discovery record as a Worker error', () => {
     const resolveStandardSessionRoute = jest.fn();
 
