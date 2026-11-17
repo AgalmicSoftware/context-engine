@@ -246,38 +246,43 @@ const renderPileNavControls = ({
   nextIsPrimary = false,
   handlePrev,
   handleNext,
-}: PileNavControlsProps): React.ReactElement => (
-  <div className={styles.pileNav}>
-    <button
-      onClick={handlePrev}
-      disabled={pileQuestions.length === 0 || activePileIndex === 0}
-      className={styles.pileNavArrow}
-      aria-label="Previous Question"
-      data-ce-control-appearance="frameless"
-    >
-      <FontAwesomeIcon icon={faChevronLeft} />
-    </button>
-    <span className={styles.pileNavCounterText} style={resolvePileNavCounterStyle(navCounterVisible)}>
-      <span>{pileQuestions.length === 0 ? 0 : activePileIndex + 1}</span>
-      <span className={styles.pileNavCounterSeparator}> / </span>
-      <span>{pileQuestions.length}</span>
-    </span>
-    <button
-      onClick={handleNext}
-      disabled={pileQuestions.length === 0 || activePileIndex === pileQuestions.length - 1}
-      className={`${styles.pileNavArrow}${nextIsPrimary ? ` ${styles.pileNavArrowPrimary}` : ''}`}
-      aria-label="Next Question"
-      data-ce-control-appearance="frameless"
-    >
-      {nextIsPrimary && (
-        <span className={styles.pileNavNextLabel} aria-hidden="true">
-          Next
-        </span>
-      )}
-      <FontAwesomeIcon icon={faChevronRight} />
-    </button>
-  </div>
-);
+}: PileNavControlsProps): React.ReactElement => {
+  const nextDisabled = pileQuestions.length === 0 || activePileIndex === pileQuestions.length - 1;
+  // A disabled Next is never the step to take, answered or not.
+  const nextStands = nextIsPrimary && !nextDisabled;
+  return (
+    <div className={styles.pileNav}>
+      <button
+        onClick={handlePrev}
+        disabled={pileQuestions.length === 0 || activePileIndex === 0}
+        className={styles.pileNavArrow}
+        aria-label="Previous Question"
+        data-ce-control-appearance="frameless"
+      >
+        <FontAwesomeIcon icon={faChevronLeft} />
+      </button>
+      <span className={styles.pileNavCounterText} style={resolvePileNavCounterStyle(navCounterVisible)}>
+        <span>{pileQuestions.length === 0 ? 0 : activePileIndex + 1}</span>
+        <span className={styles.pileNavCounterSeparator}> / </span>
+        <span>{pileQuestions.length}</span>
+      </span>
+      <button
+        onClick={handleNext}
+        disabled={nextDisabled}
+        className={`${styles.pileNavArrow}${nextStands ? ` ${styles.pileNavArrowPrimary}` : ''}`}
+        aria-label="Next Question"
+        data-ce-control-appearance="frameless"
+      >
+        {nextStands && (
+          <span className={styles.pileNavNextLabel} aria-hidden="true">
+            Next
+          </span>
+        )}
+        <FontAwesomeIcon icon={faChevronRight} />
+      </button>
+    </div>
+  );
+};
 
 const renderPileActionControls = ({
   isFilterActive,
@@ -370,15 +375,20 @@ const SUBMITTED_CHECK_MS = 10_000;
 /** What Submit becomes after a submit. */
 export const PileSubmittedCheck = (): React.ReactElement => {
   const [gone, setGone] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
+    // Submit, which may have had focus, is gone: keep focus here rather than on the page.
+    if (!document.activeElement || document.activeElement === document.body)
+      ref.current?.focus({ preventScroll: true });
     const timer = setTimeout(() => setGone(true), SUBMITTED_CHECK_MS);
     return () => clearTimeout(timer);
   }, []);
   return (
     <div
+      ref={ref}
       className={`${styles.pileSubmitButton} ${styles.pileSubmitDone}${gone ? ` ${styles.pileSubmitDoneGone}` : ''}`}
       data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-      role="status"
+      tabIndex={-1}
     >
       Submitted
     </div>
@@ -400,6 +410,10 @@ const renderPileFooterControls = ({
   handleRevertPendingChanges,
 }: PileFooterControlsProps): React.ReactElement => (
   <div className={buildPileFooterClassName(styles, pileTopRailVisible)}>
+    {/* Always present, so screen readers hear the text that arrives in it. */}
+    <span className={styles.pileSubmitStatusText} role="status">
+      {showSuccessBadge ? 'Your answers are submitted.' : ''}
+    </span>
     {showSuccessBadge ? (
       <PileSubmittedCheck />
     ) : showSubmitButton ? (

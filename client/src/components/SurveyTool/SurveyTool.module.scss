@@ -6377,13 +6377,32 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
 // Submit after a submit: the same button shape turned green, reading "Submitted". Its shell sets colours with
 // !important, so this does too.
-.pileSubmitButton.pileSubmitDone {
+// It is a div, so the shell's hover and focus rules (which only skip :disabled) match it too.
+.pileSubmitButton.pileSubmitDone,
+.pileSubmitButton.pileSubmitDone:hover:not(:disabled),
+.pileSubmitButton.pileSubmitDone:focus:not(:disabled) {
   justify-content: center;
+  border-color: var(--ce-status-success) !important;
   color: var(--ce-status-success-contrast) !important;
   background-color: var(--ce-status-success) !important;
+  box-shadow: none !important;
+  transform: none;
   font-weight: 700;
   cursor: default;
+}
+
+.pileSubmitButton.pileSubmitDone {
   animation: pileSubmitSuccessPop 220ms ease-out;
+}
+
+// Read out, not shown: the green Submitted shows it.
+.pileSubmitStatusText {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 // Ten seconds after a submit (see PileSubmittedCheck): hidden, still holding its place.
@@ -7497,13 +7516,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     }
   }
 
-  // The Submitted check takes Submit's height, and a long unsent-answers notice wraps
-  // rather than widening the row, so neither moves the arrows.
-  .pileInteractionUnit .pileSubmitSuccessBadge {
-    width: 44px;
-    height: 44px;
-  }
-
+  // A long unsent-answers notice wraps rather than widening the row.
   .pileInteractionUnit .pileFooter {
     min-width: 0;
   }

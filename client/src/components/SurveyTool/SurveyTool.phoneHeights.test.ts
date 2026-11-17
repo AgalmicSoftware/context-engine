@@ -59,7 +59,6 @@ it('keeps the phone arrows on their own row, after the wider rule that puts them
   const besideActions = css.search(/\.pileInteractionUnit \.pileControls > \.pileNav\s*\{\s*flex-basis: 180px;/);
   expect(besideActions).toBeGreaterThan(-1);
   expect(ownRow).toBeGreaterThan(besideActions);
-  expect(css).toMatch(/\.pileInteractionUnit \.pileSubmitSuccessBadge\s*\{\s*width: 44px;\s*height: 44px;/);
   expect(css).toMatch(/\.pileInteractionUnit \.pileFooter\s*\{\s*min-width: 0;/);
   // Choices keep room below the last one for the fade and its focus ring.
   expect(css).toMatch(/padding-bottom: 28px;\s*scroll-padding-bottom: 28px;/);
