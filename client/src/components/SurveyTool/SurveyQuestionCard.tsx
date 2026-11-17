@@ -41,8 +41,10 @@ export type SurveyQuestionCardEpoch = { props: object | null; state: object | nu
 const ANSWER_STATE_KEY = 'surveysResponseState';
 
 /**
- * Advances unless the only change since the last render is the answer state. Anything else (a
- * prop, any other state, or a render with nothing changed) re-renders every card.
+ * Advances on any change to a prop or to state other than the answers, which re-renders every
+ * card. Typing changes only the answers. A parent's render with the same props and state changes
+ * nothing a card shows: what cards read from shared caches comes with a prop (the session's config,
+ * the cache nonces). Those renders came several times a second while answers loaded.
  */
 export const advanceSurveyQuestionCardEpoch = (
   tracker: SurveyQuestionCardEpoch,
@@ -58,8 +60,7 @@ export const advanceSurveyQuestionCardEpoch = (
   const onlyAnswersChanged =
     !!lastProps &&
     !!lastState &&
-    lastState !== nextState &&
-    !Object.is(lastState[ANSWER_STATE_KEY], nextState[ANSWER_STATE_KEY]) &&
+    (lastState === nextState || !Object.is(lastState[ANSWER_STATE_KEY], nextState[ANSWER_STATE_KEY])) &&
     sameOtherwise(lastProps, nextProps) &&
     sameOtherwise(lastState, nextState, ANSWER_STATE_KEY);
   if (!onlyAnswersChanged) tracker.epoch += 1;

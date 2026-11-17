@@ -16,7 +16,7 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-it('renders only the edited card on a keystroke, and every card on any other change', async () => {
+it('renders only the edited card on a keystroke, none on an empty render, and every card on any other change', async () => {
   const rendered = [];
   const display = fullQuestionDisplay.renderSurveyQuestionsFullQuestionDisplay;
   jest.spyOn(fullQuestionDisplay, 'renderSurveyQuestionsFullQuestionDisplay').mockImplementation((args) => {
@@ -49,20 +49,26 @@ it('renders only the edited card on a keystroke, and every card on any other cha
   expect(engine.state.surveysResponseState[0].answers.q1.value).toBe('typed');
   expect([...new Set(rendered)]).toEqual(['Q1']);
 
+  // A parent's render that changes nothing, as while answers load.
+  rendered.length = 0;
+  act(() => view.rerenderSurveyQuestions({}));
+  expect(rendered).toEqual([]);
+
   rendered.length = 0;
   act(() => view.rerenderSurveyQuestions({ questionResponsesNonce: 7 }));
   expect([...new Set(rendered)].sort()).toEqual(['Q1', 'q2', 'q3']);
 });
 
-it('advances the epoch on everything but an answer-only change', () => {
+it('advances the epoch on any change but the answers', () => {
   const tracker = { props: null, state: null, epoch: 0 };
   const props = { a: 1 };
   const state = { surveysResponseState: [{}], other: 1 };
   const first = advanceSurveyQuestionCardEpoch(tracker, props, state);
   const typed = { ...state, surveysResponseState: [{ answers: { q: 'x' } }] };
   expect(advanceSurveyQuestionCardEpoch(tracker, props, typed)).toBe(first);
-  expect(advanceSurveyQuestionCardEpoch(tracker, props, typed)).toBe(first + 1);
-  expect(advanceSurveyQuestionCardEpoch(tracker, { a: 2 }, typed)).toBe(first + 2);
+  expect(advanceSurveyQuestionCardEpoch(tracker, { a: 1 }, typed)).toBe(first);
+  expect(advanceSurveyQuestionCardEpoch(tracker, { a: 2 }, typed)).toBe(first + 1);
+  expect(advanceSurveyQuestionCardEpoch(tracker, { a: 2 }, { ...typed, other: 2 })).toBe(first + 2);
   expect(advanceSurveyQuestionCardEpoch(tracker, { a: 2 }, { ...typed, other: 2 })).toBe(first + 3);
 });
 
