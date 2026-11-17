@@ -1,4 +1,5 @@
 /* @file PolisReport.module.scss */
+@use 'scss/loadingState' as loadingState;
 
 .polisReportContainer {
   --report-control-blue: color-mix(in srgb, var(--ce-status-info) 76%, var(--ce-document-text));
@@ -83,14 +84,7 @@
 }
 
 .loadingState {
-  width: 100%;
-  min-height: 200px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  color: var(--ce-text-muted);
+  @include loadingState.loading-state;
 }
 
 .loadingSpinner {

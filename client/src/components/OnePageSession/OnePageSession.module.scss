@@ -1,4 +1,5 @@
 /* @file OnePageSession.module.scss */
+@use 'scss/loadingState' as loadingState;
 
 .onePageDemoContainer {
   font-family: var(--ce-font-body);
@@ -228,12 +229,9 @@
 }
 
 .workerGroupsLoadingState {
+  // A shorter box than the report's, so a short list doesn't collapse far when it arrives.
+  @include loadingState.loading-state($min-height: 112px);
   margin: 0 0 24px;
-  color: var(--ce-loading-text);
-  font-family: var(--ce-font-body);
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.4;
 }
 
 .agentListError {
@@ -2487,7 +2485,7 @@
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
-  .agentListEmpty:not(.workerGroupsLoadingState) {
+  .agentListEmpty {
     color: var(--ce-panel-text-muted);
   }
 }

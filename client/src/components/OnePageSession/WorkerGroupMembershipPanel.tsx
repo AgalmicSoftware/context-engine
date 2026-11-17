@@ -34,6 +34,7 @@ import SbtPageRelevantInfo from '../SBTs/SbtPageRelevantInfo';
 import sbtsPageStyles from '../SBTs/SBTsPage.module.scss';
 import WorkerGroupAutoJoinLink from './WorkerGroupAutoJoinLink';
 import WorkerGroupCard from './WorkerGroupCard';
+import WorkerGroupsLoading from './WorkerGroupsLoading';
 import WorkerGroupMembersModal, { workerGroupPrincipalIdentity } from './WorkerGroupMembersModal';
 import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
 import { reconcileConfirmedWorkerGroupMembership } from './workerGroupMembershipProjection';
@@ -967,9 +968,7 @@ const WorkerGroupMembershipPanel = ({
   if (selectedGroupId) {
     return (
       <section ref={panelRef} className={styles.workerGroupsListPanel} data-testid="ce-session-worker-groups">
-        {status === 'loading' ? (
-          <div className={`${styles.agentListEmpty} ${styles.workerGroupsLoadingState}`}>Loading group…</div>
-        ) : null}
+        {status === 'loading' ? <WorkerGroupsLoading label="Loading group" /> : null}
         {error ? <div className={styles.agentListEmpty}>{error}</div> : null}
         {membershipStatus ? (
           <div className={styles.agentReportApprox} role="status">
@@ -1037,9 +1036,7 @@ const WorkerGroupMembershipPanel = ({
           <div className={`${styles.agentListHeader} ${styles.workerGroupsListActions}`}>{refreshControl}</div>
         )
       ) : null}
-      {showLoadingState && status === 'loading' ? (
-        <div className={`${styles.agentListEmpty} ${styles.workerGroupsLoadingState}`}>Loading groups…</div>
-      ) : null}
+      {showLoadingState && status === 'loading' ? <WorkerGroupsLoading /> : null}
       {error ? <div className={styles.agentListEmpty}>{error}</div> : null}
       {membershipStatus ? (
         <div className={styles.agentReportApprox} role="status">
