@@ -51,7 +51,7 @@ jest.mock('html2canvas', () => ({
 }));
 jest.mock('jspdf', () => ({ __esModule: true, jsPDF: function JsPdfStub() {} }));
 jest.mock('../../utilities/session/useSessionNames', () => ({
-  useSessionNames: jest.fn(() => ({ source: null, names: {} })),
+  useSessionNames: jest.fn(() => ({ source: null, names: {}, answerNamesShown: true })),
 }));
 jest.mock('../../utilities/ui/browserPdfExport', () => ({
   ...jest.requireActual('../../utilities/ui/browserPdfExport'),
@@ -297,6 +297,7 @@ describe('PolisReport participant profile links', () => {
     jest.mocked(useSessionNames).mockReturnValue({
       source: { enabled: true, readAll: jest.fn(), setOwn: jest.fn() },
       names: { [addresses[1]]: 'Sam', [addresses[2]]: 'Sam' },
+      answerNamesShown: false,
     });
 
     try {
@@ -308,7 +309,35 @@ describe('PolisReport participant profile links', () => {
       expect(screen.queryByText(/Franklin/)).not.toBeInTheDocument();
       expect(screen.getByRole('link', { name: new RegExp(`^${addresses[0]}`) })).toBeInTheDocument();
     } finally {
-      jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {} });
+      jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: true });
+    }
+  });
+
+  it("shows no name an answer carried while a Worker session's names are unknown", async () => {
+    const responder = `0x${'4'.repeat(40)}`;
+    const responses = {
+      q1: [
+        {
+          responder,
+          questionId: 'q1',
+          response: JSON.stringify({
+            type: 'binary',
+            prompt: 'Agree?',
+            responderName: 'Franklin',
+            answer: { value: 'Agree' },
+          }),
+        },
+      ],
+    };
+    jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: false });
+
+    try {
+      render(<PolisReport {...baseReportProps} slug="rxc-ra-test" questionResponses={responses} />);
+
+      expect(await screen.findByRole('link', { name: new RegExp(`^${responder}`) })).toBeInTheDocument();
+      expect(screen.queryByText(/Franklin/)).not.toBeInTheDocument();
+    } finally {
+      jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: true });
     }
   });
 

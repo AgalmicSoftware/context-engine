@@ -211,6 +211,7 @@ import { t } from '../../utilities/ui/terminology.js';
 import { buildExplorerAddressUrl } from '../../variables/chains.js';
 import { ethers } from 'ethers';
 import {
+  normalizeSessionName,
   resolveSessionNamesSource,
   subscribeSessionNames,
   type SessionNamesSource,
@@ -1566,7 +1567,11 @@ class UserPage extends Component<any, any> {
   // --- Names people set in the session (its Session Worker keeps them); without one, a username stays here ---
   _stopSessionNames: Array<() => void> = [];
   _sessionNamesKey = '';
+  // The key whose names have arrived; until then a Worker session's own name isn't read from this device.
+  _sessionNamesLoadedKey: string | null = null;
   _pendingSessionName: string | null = null;
+  // Reads can finish out of order (one started before a sign-in came back): only the latest one counts.
+  _sessionNamesLoadSeq = 0;
 
   sessionNamesOptions = () => ({
     sessionSlug: normalizeSessionSlug(this.props.sessionSlug ?? this.props.activeSessionSlug ?? ''),
@@ -1583,24 +1588,30 @@ class UserPage extends Component<any, any> {
           requireExactWorkerSession: true,
         })
       : '';
-    return workerUrl ? `${workerUrl}|${options.sessionSlug}|${options.account.toLowerCase()}` : '';
+    const namesOff = (options.sessionConfig as { namesEnabled?: unknown } | null)?.namesEnabled === false;
+    return workerUrl ? `${workerUrl}|${options.sessionSlug}|${options.account.toLowerCase()}|${namesOff}` : '';
   };
 
   loadSessionNames = async (): Promise<void> => {
     const key = this.sessionNamesKey();
+    const seq = ++this._sessionNamesLoadSeq;
     this._sessionNamesKey = key;
-    const source = key ? await resolveSessionNamesSource(this.sessionNamesOptions()) : null;
+    // Unreachable names are shown as none, and your own name stays on this device until the Worker answers.
+    const source = key ? await resolveSessionNamesSource(this.sessionNamesOptions()).catch(() => null) : null;
     const names = source ? await source.readAll() : {};
-    if (!this._isMounted || this._sessionNamesKey !== key) return;
-    const changed = this.state.sessionNamesSource !== source;
+    if (!this._isMounted || this._sessionNamesKey !== key || seq !== this._sessionNamesLoadSeq) return;
+    this._sessionNamesLoadedKey = key;
     this.setState({ sessionNamesSource: source, sessionNames: names }, () => {
-      if (changed || !this.state.isEditingUsername) this.loadPersistedUsername();
+      // A name being typed is never overwritten by a reload.
+      if (!this.state.isEditingUsername) this.loadPersistedUsername();
     });
   };
 
   loadPersistedUsername = (): void => {
     const { viewAddress, account, network } = this.props;
     if (account && viewAddress && account.toLowerCase() === viewAddress.toLowerCase()) {
+      // A Worker session's names are still on their way: wait, rather than flash this device's name first.
+      if (this.sessionNamesKey() && this._sessionNamesLoadedKey !== this.sessionNamesKey()) return;
       if (this.state.sessionNamesSource?.enabled) {
         if (this._isMounted) {
           const stored = this.state.sessionNames?.[viewAddress.toLowerCase()] || '';
@@ -2922,7 +2933,7 @@ class UserPage extends Component<any, any> {
       if (!this._isMounted) return;
       const source = this.state.sessionNamesSource;
       if (source?.enabled) {
-        this.saveSessionName(source, String(newUsernameToSet || '').trim());
+        this.saveSessionName(source, normalizeSessionName(newUsernameToSet));
         return;
       }
       try {
@@ -2952,7 +2963,7 @@ class UserPage extends Component<any, any> {
   // The Worker counts each save against a daily limit, so an unchanged name, or one already on its way, isn't sent.
   saveSessionName = (source: SessionNamesSource, name: string): void => {
     const viewAddress = String(this.props.viewAddress || '').toLowerCase();
-    const stored = this.state.sessionNames?.[viewAddress] || '';
+    const stored = normalizeSessionName(this.state.sessionNames?.[viewAddress]);
     this.setState(buildUserPageUsernameSaveStatePatch({ username: name }));
     if (name === stored || name === this._pendingSessionName) return;
     this._pendingSessionName = name;

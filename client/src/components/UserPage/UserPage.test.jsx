@@ -8,6 +8,7 @@ import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
 import { ethers } from 'ethers';
 import { notify } from '../../utilities/ui/notify.js';
+import { resolveSessionNamesSource } from '../../utilities/session/sessionNames';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   getGlobalLitHooks: jest.fn(() => null),
@@ -17,6 +18,11 @@ jest.mock('../../utilities/crypto/cryptography.js', () => ({
   cryptoUtils: {
     decryptSingleField: jest.fn(),
   },
+}));
+
+jest.mock('../../utilities/session/sessionNames', () => ({
+  ...jest.requireActual('../../utilities/session/sessionNames'),
+  resolveSessionNamesSource: jest.fn(async () => null),
 }));
 
 jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
@@ -276,7 +282,7 @@ describe('UserPage username editing', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(setOwn).toHaveBeenCalledTimes(1);
-    expect(setOwn).toHaveBeenCalledWith('Sam  Lee');
+    expect(setOwn).toHaveBeenCalledWith('Sam Lee');
     expect(instance.state.username).toBe('Sam Lee');
     expect(instance.state.sessionNames[viewAddress]).toBe('Sam Lee');
     expect(localStorage.getItem(`userPageUsername_${viewAddress}`)).toBeNull();
@@ -300,6 +306,82 @@ describe('UserPage username editing', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(instance.state.usernameError).toBe("Names can't claim a role");
     expect(instance.state.isEditingUsername).toBe(true);
+  });
+
+  it('sends no save for a name the Worker would store unchanged', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000e1';
+    const setOwn = jest.fn(async (name) => name);
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    instance.state = {
+      ...instance.state,
+      sessionNamesSource: { enabled: true, setOwn, readAll: jest.fn() },
+      sessionNames: { [viewAddress]: 'fiona' },
+      username: '\uFB01ona ',
+      isEditingUsername: true,
+    };
+
+    instance.setUsername();
+
+    expect(setOwn).not.toHaveBeenCalled();
+    expect(instance.state.isEditingUsername).toBe(false);
+  });
+
+  it("waits for a Worker session's names rather than showing this device's name first", () => {
+    const viewAddress = '0x00000000000000000000000000000000000000e2';
+    localStorage.setItem(`userPageUsername_${viewAddress}`, 'Device name');
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    instance.sessionNamesKey = () => 'worker-key';
+
+    instance.loadPersistedUsername();
+    expect(instance.state.username).toBe('');
+
+    instance._sessionNamesLoadedKey = 'worker-key';
+    instance.state = {
+      ...instance.state,
+      sessionNamesSource: { enabled: true, setOwn: jest.fn(), readAll: jest.fn() },
+      sessionNames: { [viewAddress]: 'Sam' },
+    };
+    instance.loadPersistedUsername();
+    expect(instance.state.username).toBe('Sam');
+    localStorage.removeItem(`userPageUsername_${viewAddress}`);
+  });
+
+  it('never overwrites a name being typed when the names reload', async () => {
+    const viewAddress = '0x00000000000000000000000000000000000000e3';
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    instance.state = {
+      ...instance.state,
+      sessionNamesSource: { enabled: true, setOwn: jest.fn(), readAll: jest.fn() },
+      sessionNames: { [viewAddress]: 'Stored' },
+      username: 'Half typed',
+      isEditingUsername: true,
+    };
+
+    await instance.loadSessionNames();
+
+    expect(instance.state.username).toBe('Half typed');
+    expect(instance.state.isEditingUsername).toBe(true);
+  });
+
+  it('keeps the newest names when an older read finishes after it', async () => {
+    const viewAddress = '0x00000000000000000000000000000000000000e4';
+    let finishOld = () => undefined;
+    const readAll = jest
+      .fn()
+      .mockImplementationOnce(() => new Promise((resolve) => (finishOld = resolve)))
+      .mockResolvedValueOnce({ [viewAddress]: 'Sam' });
+    resolveSessionNamesSource.mockResolvedValue({ enabled: true, setOwn: jest.fn(), readAll });
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    instance.sessionNamesKey = () => 'worker-key';
+
+    const older = instance.loadSessionNames();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await instance.loadSessionNames();
+    finishOld({});
+    await older;
+
+    expect(instance.state.sessionNames).toEqual({ [viewAddress]: 'Sam' });
+    expect(instance.state.username).toBe('Sam');
   });
 
   it('drops the typed text when a first edit is cancelled', () => {

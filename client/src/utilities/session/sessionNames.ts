@@ -23,6 +23,13 @@ export type SessionNamesSource = {
 
 export type SessionNamesOptions = { sessionSlug: string; sessionConfig: unknown; account: string };
 
+/** A name as the Worker stores and compares it, so an unchanged name isn't sent again. */
+export const normalizeSessionName = (name: unknown): string =>
+  String(name ?? '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/gu, ' ');
+
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
@@ -77,14 +84,25 @@ const workerSource = (base: string, options: SessionNamesOptions): SessionNamesS
           ...groupReadHeaders(base, options.sessionSlug),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        // The Worker lets a browser keep the answer for 30s; a save here must show at once.
+        cache: 'no-cache',
         credentials: 'omit',
         referrerPolicy: 'no-referrer',
       })
-        .then(async (response) => (response.ok ? readNames(await response.json().catch(() => ({}))) : {}))
+        .then(async (response) => {
+          if (response.ok) return readNames(await response.json().catch(() => ({})));
+          // A refusal, such as an expired sign-in, is asked again next time rather than kept.
+          forget();
+          return {};
+        })
         .catch(() => {
-          reads.delete(key);
+          forget();
           return {};
         });
+      // Only this read is dropped, never a newer one kept under the same key.
+      const forget = () => {
+        if (reads.get(key)?.names === names) reads.delete(key);
+      };
       reads.set(key, { at: Date.now(), names });
       return names;
     },
@@ -106,9 +124,13 @@ const workerSource = (base: string, options: SessionNamesOptions): SessionNamesS
   };
 };
 
+// One source per session, reader and setting, so views can tell a reload from a change.
+const sources = new Map<string, SessionNamesSource>();
+
 /**
  * The session's place for names, or null where it has none: an on-chain session, or a Session Worker from
- * before names. Without one, a person's own name stays on this device.
+ * before names. Without one, a person's own name stays on this device. Throws when the Worker can't be asked,
+ * since a Worker that keeps names must not be taken for one that doesn't.
  */
 export const resolveSessionNamesSource = async (options: SessionNamesOptions): Promise<SessionNamesSource | null> => {
   const base = getUsableSessionWorkerUrl({
@@ -117,13 +139,14 @@ export const resolveSessionNamesSource = async (options: SessionNamesOptions): P
     requireExactWorkerSession: true,
   }).replace(/\/+$/, '');
   if (!base) return null;
-  try {
-    const capabilities = await readWorkerCapabilities(base, options.sessionSlug);
-    if (!capabilities.features.includes(SESSION_NAMES_FEATURE)) return null;
-    return asRecord(options.sessionConfig).namesEnabled === false ? NAMES_OFF : workerSource(base, options);
-  } catch {
-    return null;
-  }
+  const capabilities = await readWorkerCapabilities(base, options.sessionSlug);
+  if (capabilities.unavailable) throw new Error("The session's Worker didn't say whether it keeps names.");
+  if (!capabilities.features.includes(SESSION_NAMES_FEATURE)) return null;
+  if (asRecord(options.sessionConfig).namesEnabled === false) return NAMES_OFF;
+  const key = `${base}|${options.sessionSlug}|${options.account.toLowerCase()}`;
+  const kept = sources.get(key) || workerSource(base, options);
+  sources.set(key, kept);
+  return kept;
 };
 
 /**

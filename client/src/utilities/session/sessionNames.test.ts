@@ -1,4 +1,5 @@
 import {
+  normalizeSessionName,
   resolveSessionNamesSource,
   sessionNameLabels,
   subscribeSessionNames,
@@ -95,4 +96,55 @@ it("saves your own name, tells every view, and passes on the Worker's refusal as
   await expect(source?.setOwn('Admin')).rejects.toThrow("Names can't claim a role");
   expect(heard).toHaveBeenCalledTimes(1);
   stop();
+});
+
+it('compares names as the Worker stores them', () => {
+  expect(normalizeSessionName('  \uFB01ona \u00A0 Lee ')).toBe('fiona Lee');
+  expect(normalizeSessionName(undefined)).toBe('');
+});
+
+it('keeps one source per session and reader, so a reload is not taken for a change', async () => {
+  const first = await resolveSessionNamesSource({ ...options(A), sessionSlug: 'same-source' });
+  expect(
+    await resolveSessionNamesSource({ ...options(A.toUpperCase().replace('0X', '0x')), sessionSlug: 'same-source' }),
+  ).toBe(first);
+  expect(await resolveSessionNamesSource({ ...options(B), sessionSlug: 'same-source' })).not.toBe(first);
+});
+
+it("throws when the Worker can't say whether it keeps names, rather than passing for an older Worker", async () => {
+  jest.mocked(readWorkerCapabilities).mockResolvedValueOnce({ legacy: false, features: [], unavailable: true });
+  await expect(resolveSessionNamesSource(options())).rejects.toThrow();
+});
+
+it("reads past the browser's cache and asks again after a refusal", async () => {
+  fetchMock
+    .mockResolvedValueOnce(json({ error: 'expired' }, 401))
+    .mockResolvedValueOnce(json({ names: { [A]: 'Sam' } }));
+  const source = await resolveSessionNamesSource({ ...options(), sessionSlug: 'refused-once' });
+
+  expect(await source?.readAll()).toEqual({});
+  expect(await source?.readAll()).toEqual({ [A]: 'Sam' });
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(fetchMock.mock.calls[0][1].cache).toBe('no-cache');
+});
+
+it('drops only its own failed read, never a newer one kept under the same key', async () => {
+  jest.useFakeTimers({ now: 0, doNotFake: ['nextTick', 'setImmediate'] });
+  try {
+    let failOld: (response: Response) => void = () => undefined;
+    fetchMock
+      .mockImplementationOnce(() => new Promise((resolve) => (failOld = resolve)))
+      .mockResolvedValueOnce(json({ names: { [A]: 'Sam' } }));
+    const source = await resolveSessionNamesSource({ ...options(), sessionSlug: 'slow-refusal' });
+    const old = source?.readAll();
+    jest.setSystemTime(31_000);
+    expect(await source?.readAll()).toEqual({ [A]: 'Sam' });
+
+    failOld(json({ error: 'expired' }, 401));
+    expect(await old).toEqual({});
+    expect(await source?.readAll()).toEqual({ [A]: 'Sam' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  } finally {
+    jest.useRealTimers();
+  }
 });

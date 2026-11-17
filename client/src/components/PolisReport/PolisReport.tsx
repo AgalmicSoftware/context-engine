@@ -295,7 +295,8 @@ export default function PolisReport({
   // Toggling between demo data or real data
   const [useDemoData, setUseDemoData] = useState<boolean>(() => autoUseDemoData);
   const effectiveUseDemoData = useDemoData;
-  // Where the session keeps names, they replace any name an answer carried; elsewhere answers' names stay.
+  // Where the session keeps names, they replace any name an answer carried; answers' own names show only where
+  // the session has no place for names, never while that's still unknown.
   const sessionNames = useSessionNames({
     sessionSlug: activeReportSlug,
     sessionConfig,
@@ -303,9 +304,9 @@ export default function PolisReport({
   });
   const participantNames = useMemo(
     () =>
-      sessionNames.source && !effectiveUseDemoData
-        ? markPolisAgents(sessionNameLabels(sessionNames.names), agentResponders)
-        : demoDisplayNames,
+      effectiveUseDemoData || sessionNames.answerNamesShown
+        ? demoDisplayNames
+        : markPolisAgents(sessionNameLabels(sessionNames.names), agentResponders),
     [sessionNames, effectiveUseDemoData, agentResponders, demoDisplayNames],
   );
   const usesSimulatedProfiles = effectiveUseDemoData && isBuiltInPolisDemoDataset(activeDemoData);
