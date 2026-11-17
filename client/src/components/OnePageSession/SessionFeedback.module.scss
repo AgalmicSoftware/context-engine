@@ -81,41 +81,6 @@
   }
 }
 
-.dictation {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-// As the answer field's microphone, at full strength so it reads against the panel.
-.mic {
-  min-width: 44px;
-  min-height: 44px;
-  padding: 6px 10px;
-  border: 0;
-  background: transparent;
-  color: var(--ce-panel-text-muted);
-  font-size: 1.4rem;
-  line-height: 1;
-  cursor: pointer;
-
-  &:hover:not(:disabled),
-  &:focus-visible {
-    color: var(--ce-panel-text);
-  }
-
-  &[aria-disabled='true'] {
-    cursor: progress;
-  }
-}
-
-.recording,
-.recording:hover:not(:disabled),
-.recording:focus-visible {
-  color: var(--ce-status-danger-text);
-}
-
 // The accent pair, which every theme keeps readable, in each state.
 .send {
   padding: 6px 18px;

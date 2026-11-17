@@ -2,8 +2,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircle, faMicrophone } from '@fortawesome/free-solid-svg-icons';
 
 import {
   FEEDBACK_TEXT_MAX,
@@ -16,12 +14,11 @@ import {
   type FeedbackDraft,
   type FeedbackOptions,
 } from '../../domains/worker/sessionFeedbackPorts';
-import { RECORDING_STATUS, useWhisper } from '../../utilities/useWhisper';
 import { getResolvedTheme } from '../../utilities/ui/themeRuntime';
-import CETooltip from '../Shared/CETooltip';
 import { FOOTER_SESSION_ACTIONS_IDS } from '../Footer/Footer';
 import footer from '../Footer/Footer.module.scss';
 import dialog from './SessionAgentModal.module.scss';
+import SessionDictation from './SessionDictation';
 import styles from './SessionFeedback.module.scss';
 
 const ABOUT = 'Tell this session’s admins what worked in the app and what didn’t. It never says who you are.';
@@ -34,77 +31,6 @@ const screenClass = (): FeedbackDraft['screen'] => {
   if (width < 640) return 'phone';
   return width < 1024 ? 'tablet' : 'desktop';
 };
-
-/**
- * The answer field's dictation: the same recorder, written down by the session's Worker on the session's AI
- * allowance. Mounted only while the form shows, so closing the dialog stops it and keeps no audio.
- */
-function Dictation({
-  options,
-  onWords,
-  onBusy,
-}: {
-  options: FeedbackOptions;
-  onWords: (words: string) => void;
-  /** Recording or writing down, during which Send would lose the words. */
-  onBusy: (busy: boolean) => void;
-}) {
-  const mic = useRef<HTMLButtonElement>(null);
-  const { status, isRecording, isProcessing, errorMessage, startRecording, stopRecording } = useWhisper({
-    apiKey: '',
-    silenceDetection: false,
-    timeSlice: 0,
-    sessionSlug: options.sessionSlug,
-    sessionConfig: options.sessionConfig,
-    context: { account: options.account },
-    // Like Send, speaking never asks for a signature or passkey.
-    signInPrompt: false,
-    onTranscriptionComplete: onWords,
-  });
-  const writing = isProcessing || status === RECORDING_STATUS.PROCESSING;
-  const busy = isRecording || writing;
-  useEffect(() => {
-    onBusy(busy);
-  }, [busy, onBusy]);
-  useEffect(() => () => onBusy(false), [onBusy]);
-  return (
-    <>
-      <span className={styles.dictation}>
-        {isRecording || writing ? (
-          <span className={styles.hint} role="status">
-            {isRecording ? 'Recording…' : 'Processing audio…'}
-          </span>
-        ) : null}
-        <button
-          ref={mic}
-          type="button"
-          className={`${styles.mic} ${isRecording ? styles.recording : ''}`}
-          aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-          aria-pressed={isRecording}
-          // Not disabled, which would drop keyboard focus out of the dialog: a press while writing does nothing.
-          aria-disabled={writing}
-          data-ce-control-appearance="frameless"
-          data-testid="ce-session-feedback-mic"
-          onClick={() => {
-            if (!writing) void (isRecording ? stopRecording() : startRecording());
-          }}
-        >
-          <FontAwesomeIcon icon={isRecording ? faCircle : faMicrophone} />
-        </button>
-        <CETooltip target={mic} placement="top" trigger="hover focus">
-          {isRecording
-            ? 'Stop recording and add the transcript to this text.'
-            : 'Record speech and add its transcript to this text.'}
-        </CETooltip>
-      </span>
-      {errorMessage ? (
-        <p className={styles.error} role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
-    </>
-  );
-}
 
 type Props = {
   sessionSlug: string;
@@ -311,7 +237,12 @@ function Feedback({ sessionSlug, sessionConfig, account, view }: Props) {
                 </p>
                 {/* Gone once the session ends while the page is open. */}
                 {speech && !sessionEnded(sessionConfig) ? (
-                  <Dictation options={options.current} onWords={addWords} onBusy={setListening} />
+                  <SessionDictation
+                    options={options.current}
+                    onWords={addWords}
+                    onBusy={setListening}
+                    testId="ce-session-feedback-mic"
+                  />
                 ) : null}
               </div>
               {cut ? (
