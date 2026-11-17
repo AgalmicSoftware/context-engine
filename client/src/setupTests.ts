@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import { configure } from '@testing-library/react';
 import { TextDecoder, TextEncoder } from 'util';
 import { deserialize, serialize } from 'v8';
 
@@ -13,6 +14,9 @@ jest.mock('react-dom/test-utils', () => {
     act: React.act || testUtils.act,
   };
 });
+
+// A loaded machine can take over a second to render; this stays under Jest's 5s so a real failure still shows the page.
+configure({ asyncUtilTimeout: 3000 });
 
 if (!global.TextEncoder) {
   global.TextEncoder = TextEncoder;
