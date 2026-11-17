@@ -224,6 +224,17 @@ export const loadSessionInterviewOwnAnswers = async (
 export type OwnAnswerReadOutcome =
   { status: 'ready' } | { status: 'pending' | 'failed'; message: string } | { status: 'stale' };
 
+/** A sign-in that never settles must not hold Submit: past this, the person can try again. */
+export const OWN_ANSWER_READ_LIMIT_MS = 60_000;
+
+const untilAborted = <T>(work: Promise<T>, signal: AbortSignal): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    if (signal.aborted) return onAbort();
+    signal.addEventListener('abort', onAbort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
+
 /**
  * The pre-upload gate shared by the pile and the full editor. While a session's
  * response listing is incomplete, an upload must first read the responder's own
@@ -238,10 +249,18 @@ export const readOwnAnswersBeforeUpload = async (
   const isCurrent = () =>
     engine._isMounted !== false && !signal.aborted && token === readActiveSubmitContextToken(engine);
   const questionIds = listQuestionIds();
+  const limit = new AbortController();
+  const stop = () => limit.abort(signal.reason);
+  signal.addEventListener('abort', stop, { once: true });
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    limit.abort();
+  }, OWN_ANSWER_READ_LIMIT_MS);
   try {
     // A capped public listing cannot prove that a blank answer is new. The
     // strict own read covers all submitted fields and preserves edits.
-    const saved = await loadSessionInterviewOwnAnswers(engine, questionIds, signal);
+    const saved = await untilAborted(loadSessionInterviewOwnAnswers(engine, questionIds, limit.signal), limit.signal);
     if (!isCurrent()) return { status: 'stale' };
     if (saved === null || listQuestionIds().some((id) => !questionIds.includes(id))) {
       return {
@@ -252,7 +271,15 @@ export const readOwnAnswersBeforeUpload = async (
     return { status: 'ready' };
   } catch {
     if (!isCurrent()) return { status: 'stale' };
-    return { status: 'failed', message: 'Could not load your saved answers. Try Submit again to retry.' };
+    return {
+      status: 'failed',
+      message: timedOut
+        ? 'Your saved answers took too long to load. Nothing was sent and your answers are still here: try Submit again.'
+        : 'Could not load your saved answers. Try Submit again to retry.',
+    };
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', stop);
   }
 };
 
