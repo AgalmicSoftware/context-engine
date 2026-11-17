@@ -58,5 +58,8 @@ module.exports = {
     '^ox\\/([A-Z].*)$': `${oxCjsBase}/core/$1.js`,
   },
   watchPathIgnorePatterns: ['<rootDir>/build', '<rootDir>/coverage'],
+  // Jest's 5 s default leaves a test that takes 2 s on a developer's machine almost no room on a CI runner
+  // twice as slow. A test that hangs still fails, after 15 s. A file with slower tests sets its own limit.
+  testTimeout: 15000,
   resetMocks: false,
 };

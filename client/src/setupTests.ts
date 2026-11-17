@@ -15,7 +15,8 @@ jest.mock('react-dom/test-utils', () => {
   };
 });
 
-// A loaded machine can take over a second to render; this stays under Jest's 5s so a real failure still shows the page.
+// A loaded machine or a CI runner can take over a second to render. This stays well under the per-test limit
+// in jest.config.cjs, so a wait that fails still reports the page it saw and not a bare timeout.
 configure({ asyncUtilTimeout: 3000 });
 
 if (!global.TextEncoder) {

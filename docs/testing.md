@@ -128,6 +128,20 @@ file under `client/src` enters the denominator, including never-imported
 files. `npm run coverage-floor:check` reads the merged file to enforce the
 whole-production floor banked in `scripts/client-coverage-full-baseline.json`.
 
+Client tests get room for a slow machine. Each test may take 15 seconds
+(`testTimeout` in `client/jest.config.cjs`), not Jest's 5, and a Testing
+Library wait (`findBy...`, `waitFor`) lasts 3 seconds by default
+(`client/src/setupTests.ts`), not 1. A hosted runner runs these tests about
+twice as slowly as a developer's machine, and a test near a limit fails there
+for no fault of the code. Neither limit can make a failing test pass, and
+both are room, not a target: a test that takes seconds is still worth making
+faster.
+
+Shards make this matter more. A suite's first test runs about one and a half
+times slower in the first forty suites of a Jest process than after the
+hundredth, measured on this suite, and twelve short processes have about 480
+such early suites where one long process has a few dozen.
+
 `npm --prefix client run test:coverage` is the same suite in a single process.
 It takes several times as long and is kept as the reference the shards are
 compared against. Set `CLIENT_TEST_SHARD_CONCURRENCY` to run fewer shards at
