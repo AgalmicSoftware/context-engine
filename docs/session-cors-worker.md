@@ -1334,7 +1334,13 @@ hidden rows, plaintext rows, payloads, owner records and hidden markers. Empty
 documents are preserved in both KV and R2, including envelope-encrypted documents. Payload
 headers carry size, SHA-256 and chunk count; 256 KiB chunks span bounded 4 MiB
 pages. Export and import use an 800-operation budget, leaving headroom below
-the 1,000 KV operations per request limit. Wrapped DEKs and stored metadata remain unchanged. Auth nonces, rate
+the 1,000 KV operations per request limit. Export reads each listed page of KV
+values in bulk gets of up to 100 keys. A payload's size is read from its record
+first, so payloads are read in groups no larger than the page has room for; a
+payload whose record is missing or gives no size is read on its own. Without
+R2, a payload is read once. With bulk reads, a 4,000-item session took about
+1,100 KV operations in tests, against about 12,500 before, with the same
+archive. Wrapped DEKs and stored metadata remain unchanged. Auth nonces, rate
 counters, upload retry receipts and transient analysis jobs are not recovery
 data and are excluded. Legacy plaintext session secrets must first be saved
 through the encrypted secret workflow.

@@ -5,9 +5,11 @@ import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
-import { bytesToBase64url } from './storageEnvelopeEncryption.js';
+import { base64urlToBytes, bytesToBase64url } from './storageEnvelopeEncryption.js';
+import { BACKUP_RESOURCES } from './sessionBackupImport.js';
+import { toStr } from './stringCoercion.js';
 import {
-  getStorageIndexBinding, getStorageR2Binding, buildPayloadKey, readStoredCloudflarePayloadBytes,
+  getStorageIndexBinding, getStorageR2Binding, buildIndexKey, buildPayloadKey, readStoredCloudflarePayloadBytes,
 } from './storageRouteExecution.js';
 import { BACKUP_EXPORT_SETTLE_MS } from './storageBackupRevision.js';
 import { STORAGE_EXPORT_PAGE_LIMITS, createStorageExportBudget, jsonByteLength, storageExportCursor, parseStorageExportCursor } from './storageScanBudget.js';
@@ -16,12 +18,82 @@ const encoder = new TextEncoder();
 const CHUNK_BYTES = 256 * 1024;
 const fail = (message, status = 409, reason) => { throw Object.assign(new Error(message), { status, ...(reason ? { reason } : {}) }); };
 const digestBytes = async (bytes) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((v) => v.toString(16).padStart(2, '0')).join('');
+// Cloudflare reads up to 100 KV keys in one bulk get, one operation.
+const BULK_KEYS = 100;
 const prefixes = (slug) => [null, `ce-storage-hidden:${slug}:`, `ce-storage-owner:${slug}:`, `ce-storage-payload:${slug}:`, `ce-storage:${slug}:`, `sessions/${slug}/storage/`];
 
 // The first page waits after taking the export lease so that every write that
 // skipped its marks (markStorageBackupWrite) has finished before it reads the
 // revision it starts from.
 const settleAfterLease = () => new Promise((resolve) => setTimeout(resolve, BACKUP_EXPORT_SETTLE_MS));
+
+// The bytes of a KV payload value, or null where a strict payload read finds
+// none: no value, no metadata, or a payload that does not decode.
+const kvPayloadBytes = (raw) => {
+  let envelope;
+  try { envelope = JSON.parse(raw || 'null'); } catch { return null; }
+  if (!envelope || typeof envelope !== 'object' || !envelope.metadata || typeof envelope.metadata !== 'object' ||
+      Array.isArray(envelope.metadata) || !toStr(envelope.metadata.id).trim() || typeof envelope.payloadBase64url !== 'string') return null;
+  try { return base64urlToBytes(envelope.payloadBase64url); } catch { return null; }
+};
+
+// Reads the values of one listed page in bulk gets instead of one get each.
+// Hidden, owner and record values are small (stored metadata is capped at
+// 64 KiB), so all of a page's are read at once. A payload can be 25 MiB, so
+// its size is taken from its record first, and payloads are read in groups of
+// at most what the page has room for; a payload without a record of known size
+// is read on its own. A value not read in bulk is read singly, as before, as
+// are all of a bulk get Cloudflare refuses (say, more than 25 MB in all where a
+// record understates its size).
+const bulkReader = async ({ index, slug, phase, prefix, keys, room }) => {
+  const values = new Map();
+  // A refused bulk get leaves its keys to single reads, which still fail on an outage.
+  const bulkGet = (names) => index.get(names).catch((error) => {
+    console.warn(`Backup bulk read of ${names.length} keys failed; reading them one by one: ${error?.message || error}`);
+    return null;
+  });
+  const getMany = async (names) => {
+    for (let i = 0; i < names.length; i += BULK_KEYS) {
+      const part = names.slice(i, i + BULK_KEYS);
+      const got = await bulkGet(part);
+      if (got) for (const name of part) values.set(name, got.get(name) ?? null);
+    }
+  };
+  // Payload keys of known size not yet read, in listed order, with their sizes.
+  const sizes = new Map();
+  if (phase !== 3) await getMany(keys);
+  else if (keys.length) {
+    const ids = keys.map((key) => key.slice(prefix.length));
+    // One bulk get per resource, side by side, since a payload key does not say
+    // which resource its record is filed under.
+    await Promise.all([...BACKUP_RESOURCES].map(async (resource) => {
+      const names = ids.map((id) => buildIndexKey({ slug, resource, id }));
+      const got = await bulkGet(names);
+      if (got) ids.forEach((id, n) => {
+        let metadata = null;
+        try { metadata = JSON.parse(got.get(names[n]) ?? 'null'); } catch { metadata = null; }
+        const size = Number(metadata?.size);
+        if (metadata?.id === id && Number.isSafeInteger(size) && size >= 0) sizes.set(keys[n], Math.ceil(size * 4 / 3) + 65_536);
+      });
+    }));
+  }
+  const queue = keys.filter((key) => sizes.has(key));
+  return async (key) => {
+    const at = values.has(key) ? -1 : queue.indexOf(key);
+    if (at >= 0) {
+      let end = at;
+      for (let bytes = 0; end < queue.length && end - at < BULK_KEYS; end += 1) {
+        bytes += sizes.get(queue[end]);
+        if (end > at && bytes > room()) break;
+      }
+      await getMany(queue.splice(at, end - at));
+    }
+    if (!values.has(key)) return index.get(key);
+    const value = values.get(key);
+    values.delete(key);
+    return value;
+  };
+};
 
 // Access state is pinned across pages. Storage writes must be quiescent during
 // export: KV and R2 do not offer a joint, point-in-time snapshot.
@@ -161,16 +233,23 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
     const keys = (r2 ? listed.objects?.map(({ key }) => key) : listed.keys?.map(({ name }) => name));
     if (!Array.isArray(keys)) fail('Backup storage listing is unavailable.', 503);
     keys.sort();
+    const read = r2 ? null : await bulkReader({ index, slug, phase: position.phase, prefix: paths[position.phase],
+      keys: keys.filter((key) => key > position.lastKey || (key === position.lastKey && position.chunk !== -1))
+        .slice(0, STORAGE_EXPORT_PAGE_LIMITS.rows - rows),
+      room: () => STORAGE_EXPORT_PAGE_LIMITS.encodedBytes - used });
     for (const key of keys) {
       if (!key.startsWith(paths[position.phase])) fail('Invalid backup storage key.', 503);
       if (key < position.lastKey || (key === position.lastKey && position.chunk === -1)) continue;
       if (rows >= STORAGE_EXPORT_PAGE_LIMITS.rows || budget.remaining < 16) break outer;
       if (position.phase === 3 || position.phase === 5) {
         const id = key.slice(paths[position.phase].length);
-        const raw = await index.get(buildPayloadKey({ slug, id }));
+        const raw = read ? await read(key) : await index.get(buildPayloadKey({ slug, id }));
         if (r2 && raw != null) { position.lastKey = key; continue; }
         const metadata = raw != null ? JSON.parse(raw).metadata : { id };
-        const bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
+        // Without R2 the KV value just read is the payload, so it is not read
+        // again, unless its metadata names another id, which the payload read uses.
+        const bytes = r2 || getStorageR2Binding(env) || toStr(metadata?.id).trim() !== id
+          ? await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true }) : kvPayloadBytes(raw);
         if (!bytes) fail('A backup payload is missing or unreadable.', 503);
         // A partial payload resumes this same listed key, without skipping it.
         const priorKey = position.lastKey;
@@ -180,7 +259,7 @@ export const exportSessionBackup = async ({ env, slug, expectedAuthority, cursor
           break outer;
         }
       } else {
-        const value = await index.get(key);
+        const value = read ? await read(key) : await index.get(key);
         if (value == null) fail('A storage record changed during backup. Restart the export.', 409, 'backup_session_changed');
         const metadata = position.phase === 4 ? JSON.parse(value) : null;
         const entry = metadata ? { kind: 'record', key, id: metadata.id, resource: metadata.resource, metadata }
