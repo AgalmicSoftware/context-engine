@@ -882,7 +882,11 @@ Authenticated clients can use the worker as the session storage boundary:
     readable value its question doesn't accept (an option it lacks, a rating
     off its scale or step) is `422` `response_answer_invalid`. Encrypted
     values, blank answers (a comment alone) and locked or encrypted questions
-    aren't checked.
+    aren't checked. A Worker isolate keeps the session's questions it read
+    for 5 seconds, so a Submit's answers share one read. An answer naming a
+    question it lacks reads them again before it's refused, and a question
+    written through that isolate is seen at once. A question edited through
+    another may be checked as it was for up to 5 seconds.
   - In those sessions, each signed-in person may store at most 20 versions of
     one question's answer, the latest included (`422`
     `response_limit_versions`), and at most five times as many answers as the

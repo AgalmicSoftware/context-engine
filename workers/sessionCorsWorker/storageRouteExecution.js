@@ -58,7 +58,7 @@ import {
   readStoragePayloadResourceId,
   validateStorageUploadPayload,
 } from './storageUploadValidation.js';
-import { checkUploadedAnswers, countSessionQuestions, listUploadedAnswers } from './responseAnswerValidation.js';
+import { checkUploadedAnswers, countSessionQuestions, forgetSessionQuestions, listUploadedAnswers } from './responseAnswerValidation.js';
 import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
 import {
   isAdminStorageVersion,
@@ -1986,6 +1986,8 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     }
     // Unsettled, the same bytes stay free to add again for an hour.
     if (contextCount) await settle(contextCount).catch(() => {});
+    // Answers checked in this isolate see a new or changed question at once.
+    if (resource === 'questions') forgetSessionQuestions(index, slug);
   } else if (index && typeof index.put === 'function') {
     await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata, storageIndexPutOptions(metadata));
   }
