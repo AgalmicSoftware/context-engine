@@ -256,6 +256,37 @@ describe('surveyQuestionsSubmitRuntime', () => {
     );
   });
 
+  it('shows Submitted without waiting on AI draft text, which never asks for a sign-in', async () => {
+    const context = createContext();
+    context.propsRef.current.sessionConfig = { interviewMode: { keepDraftTextForAdmins: true } };
+    context.submitSurveyResponse.mockResolvedValueOnce({ __ceQuestionResponses: [{ questionID: 'q1' }] });
+    let failSync: (error: Error) => void = () => undefined;
+    jest
+      .mocked(syncDraftText)
+      .mockClear()
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failSync = reject;
+          }),
+      );
+    const outcome = await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    expect(outcome).toEqual({ status: 'submitted' });
+    expect(context.runSurveyQuestionsSubmitSuccessController).toHaveBeenCalled();
+    expect(jest.mocked(syncDraftText)).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ prompt: false }),
+    );
+    expect(context.setState).not.toHaveBeenCalledWith(
+      expect.objectContaining({ submissionError: expect.stringContaining('AI draft text') }),
+    );
+    failSync(new Error('sign-in needed'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(context.setState).toHaveBeenCalledWith({
+      submissionError: 'Your answers were saved, but the AI draft text kept for admins could not be updated.',
+    });
+  });
+
   it('resends kept AI draft text deletes for whoever is signed in, and for no one signed out', () => {
     jest.mocked(resendPendingDraftTextDeletes).mockClear();
     const context = createContext();
