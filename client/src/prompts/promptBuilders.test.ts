@@ -70,11 +70,12 @@ describe('prompt builders', () => {
     expect(prompt).toContain(QUADRATIC_READING_RULE);
   });
 
-  it('asks for the best-fitting dead figure, not the best-known name for the subject', () => {
+  it('asks for the one dead figure that fits this person, not the best-known name for the subject', () => {
     const prompt = buildUserAnalysisPrompt({ questions: [] });
-    expect(prompt).toContain('Aim for the best fit, not the best-known name');
-    expect(prompt).toContain('Match on where THIS user landed');
-    expect(prompt).toContain('consider at least five candidates who differ in era, region and tradition');
+    expect(prompt).toContain('ONE historical figure for this user');
+    expect(prompt).toContain('Match on the particular combination of positions THIS user took');
+    expect(prompt).toContain('Two people with the same combination of positions should get the same figure');
+    expect(prompt).toContain('never choose a\n  figure for being famous or for being obscure');
     expect(prompt).toContain('never a living person');
     expect(prompt).toContain('End with one position where the two differ.');
     expect(prompt).not.toContain('widely known historical figure');

@@ -45,21 +45,27 @@ Discuss the most meaningful patterns rather than listing every option. Distingui
 from missing or encrypted answers; do not invent conviction or compare raw values across different scales.
 Relevant dates or factual numbers in a respondent's own example may remain when they explain the theme.
 
-Additionally, include a "Historical Alignment" comparison. Aim for the best fit, not the best-known name:
+Additionally, include a "Historical Alignment" comparison: ONE historical figure for this user. Choose the
+figure that fits this user in particular, not the best-known name for the subject:
 - The subject of the questions is shared by everyone who answered them, so a match made on the subject gives
-  every respondent the same figure. Match on where THIS user landed: their less common or more strongly held
-  positions, the trade-offs they accept, and their own comments.
-- Before choosing, consider at least five candidates who differ in era, region and tradition, including
-  practitioners, organisers and builders as well as theorists, and people outside the modern English-speaking canon.
-- Choose the ONE whose documented positions match the most of this user's distinctive positions. A lesser-known
-  figure is better than a famous one when the fit is closer.
+  every respondent the same figure. Match on the particular combination of positions THIS user took: where
+  they agree and disagree, the trade-offs they accept, what they hold most strongly, their own comments, and
+  above all where they would part from most people who answer these questions.
+- Two people with the same combination of positions should get the same figure; two people whose positions
+  differ should not.
+- Work this out silently: consider at least five candidates who differ in era, region and tradition,
+  practitioners and builders as well as theorists, and ask of each which of this user's positions it fits
+  and which it does not. Only the chosen figure appears in the result.
+- Choose the ONE whose documented positions match the most of this user's combination. A famous figure is
+  right when it is the closest fit, and a lesser-known one is welcome when it fits better; never choose a
+  figure for being famous or for being obscure.
 - Test the choice: if the figure would suit most people who answered these questions about equally well, it is
   too generic; choose again.
 - The figure must be a real person who has died: never a living person, a fictional character or a group.
 - "figure": the person's name and years, for example "Name (1868–1933)".
 - "reasoning" (3–4 sentences): first say in one sentence who the figure was, for a reader who has not heard of
-  them. Then name two or three specific positions of the user that match documented positions of the figure.
-  End with one position where the two differ.
+  them. Then name the two or three positions of the user that decided the choice, with the figure's matching
+  documented positions. End with one position where the two differ.
 - If the provided data is too sparse for a defensible comparison, use empty strings for figure and reasoning.
 - Do not base the comparison on demographics, identity guesses, or private affiliations.
 
