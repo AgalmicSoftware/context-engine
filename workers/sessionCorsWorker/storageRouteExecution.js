@@ -90,6 +90,8 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
 const STORAGE_GROUP_MEMBERSHIP_CACHE = Symbol('storage-group-membership-cache');
+// The session gate's yes for this request's reader, by resource (sessionGateOnce).
+const STORAGE_SESSION_GATE_YES = Symbol('storage-session-gate-yes');
 // The request's `X-CE-Group-Invite` header, set on a route's deps: a way through a Worker group condition.
 export const STORAGE_GROUP_READ_INVITE = 'groupReadInvite';
 const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
@@ -205,11 +207,11 @@ const normalizeGroupIdList = (value) => {
 };
 // A storage error reads as a missing payload unless strict, which lets it
 // propagate so a caller can retry instead of treating the payload as gone.
-const readKvPayloadEnvelope = async ({ index, slug, id, strict = false, maxBytes = Infinity }) => {
+const readKvPayloadEnvelope = async ({ index, slug, id, strict = false, maxBytes = Infinity, prefetched }) => {
   if (!index || typeof index.get !== 'function') return null;
   let raw;
   try {
-    raw = await index.get(buildPayloadKey({ slug, id }));
+    raw = prefetched?.has(id) ? prefetched.get(id) : await index.get(buildPayloadKey({ slug, id }));
   } catch (error) {
     if (strict) throw error;
     return null;
@@ -1097,7 +1099,7 @@ const authorizeCloudflareStorageAccess = async ({
   }
   // Payload restrictions are additional to the session gate, never a replacement.
   const args = { env, config, slug, resource, requesterAddress, authScopes, baseHeaders, deps };
-  const sessionAccess = await authorizeCloudflareStorageGate(args);
+  const sessionAccess = await sessionGateOnce(args);
   if (sessionAccess.ok && asInvitee && !admittedByReadInvite(sessionAccess.conditionMatched)) return privateResponseRefusal();
   if (!sessionAccess.ok || !metadata) return sessionAccess;
   const groups = resolveGroupGateIds({ metadata, access: {} });
@@ -1111,6 +1113,25 @@ const authorizeCloudflareStorageAccess = async ({
   // The row's own rule, which its uploader wrote: a list tells it apart from the session's gate.
   const ownAccess = await authorizeCloudflareStorageGate({ ...args, metadata });
   return ownAccess.ok ? ownAccess : { ...ownAccess, ownRule: true };
+};
+
+// The session's own gate depends only on the reader, the config and the
+// resource, all fixed for one request, so a list or batch asks it once, not
+// per item (an SBT gate is a chain read). Only a yes is kept: each refusal
+// builds its own response, whose body its item reads.
+const sessionGateOnce = async (args) => {
+  const memo = args.deps?.[STORAGE_SESSION_GATE_YES];
+  if (!memo) return authorizeCloudflareStorageGate(args);
+  const shared = memo.get(args.resource);
+  if (shared) {
+    const result = await shared;
+    if (result.ok) return result;
+  }
+  const own = authorizeCloudflareStorageGate(args);
+  if (!shared) memo.set(args.resource, own);
+  const result = await own;
+  if (!result.ok && memo.get(args.resource) === own) memo.delete(args.resource);
+  return result;
 };
 
 const authorizeCloudflareStorageGate = async ({
@@ -1443,7 +1464,7 @@ const resolveStorageGateRuntimeConfig = async ({ config, deps }) => {
 
 const createStorageRouteGateDeps = ({ config, env, slug, deps }) => {
   let runtimeConfigPromise = null;
-  const routeDeps = { ...(deps || {}), [STORAGE_GROUP_MEMBERSHIP_CACHE]: new Map() };
+  const routeDeps = { ...(deps || {}), [STORAGE_GROUP_MEMBERSHIP_CACHE]: new Map(), [STORAGE_SESSION_GATE_YES]: new Map() };
   Object.defineProperty(routeDeps, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, {
     configurable: false,
     enumerable: false,
@@ -2026,7 +2047,7 @@ const readStorageListOptions = async ({ request, url }) => {
   };
 };
 
-const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps }) => {
+const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, prefetched }) => {
   const url = new URL(request.url);
   const id = await readRequestId({ request, url });
   if (!isSafeCloudflareStorageRefId(id)) return responseJson(deps, { error: 'Invalid storage id.' }, 400, baseHeaders);
@@ -2086,7 +2107,7 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
     }
   }
   if (!object && canReadKvPayload) {
-    const envelope = await readKvPayloadEnvelope({ index, slug, id });
+    const envelope = await readKvPayloadEnvelope({ index, slug, id, prefetched });
     if (!envelope || !isObj(envelope?.metadata)) {
       return responseJson(deps, { error: 'Storage object not found.' }, 404, baseHeaders);
     }
@@ -2184,6 +2205,22 @@ export const MAX_READ_BATCH_IDS = 100;
 export const MAX_READ_BATCH_BYTES = 8 * 1024 * 1024;
 const READ_BATCH_CONCURRENCY = 5;
 
+// Where payloads live in KV (no R2 bound, as deployed), one bulk get reads a
+// whole batch's in one storage round trip instead of one per item. KV refuses
+// a bulk reply over 25 MB, which also bounds its memory; then, or on any
+// error, each item is read on its own as before.
+const prefetchKvPayloads = async ({ env, slug, ids }) => {
+  const index = getStorageIndexBinding(env);
+  if (getStorageR2Binding(env) || typeof index?.get !== 'function' || ids.length > KV_BULK_GET_KEYS) return null;
+  try {
+    const got = await index.get(ids.map((id) => buildPayloadKey({ slug, id })));
+    if (typeof got?.get !== 'function') return null;
+    return new Map(ids.map((id) => [id, got.get(buildPayloadKey({ slug, id })) ?? null]));
+  } catch {
+    return null;
+  }
+};
+
 // Up to one list page of payloads in one request. Each id is read exactly as
 // /storage/read reads it, with its own access check, so a batch never shows
 // more than single reads would; an item that fails carries its own status.
@@ -2197,10 +2234,11 @@ const handleCloudflareReadBatch = async ({ request, baseHeaders, deps, ...read }
     return responseJson(deps, { error: `Send 1 to ${MAX_READ_BATCH_IDS} distinct storage ids.` }, 400, baseHeaders);
   }
   const origin = new URL(request.url).origin;
+  const prefetched = await prefetchKvPayloads({ ...read, ids });
   let privateItem = false;
   const readItem = async (id) => {
     const response = await handleCloudflareRead({
-      ...read, baseHeaders: {}, deps, request: new Request(`${origin}/storage/read?id=${encodeURIComponent(id)}`),
+      ...read, baseHeaders: {}, deps, prefetched, request: new Request(`${origin}/storage/read?id=${encodeURIComponent(id)}`),
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
