@@ -7,6 +7,7 @@ import {
   readSessionStorageBlob,
 } from '../storage/storageClient.js';
 import { type WorkerCapabilities, readWorkerCapabilities } from '../worker/workerCapabilities';
+import { isWorkerSignInNeededError } from '../worker/workerAuth';
 import { resolveSessionCapabilityProjection } from '../session/sessionCapabilityProjection';
 import { canonicalizeSessionSlug } from '../session/canonicalSessionContext';
 import { normalizeWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
@@ -33,6 +34,8 @@ type WorkerCanonicalResponseHydrationDeps = {
   readWorkerCapabilities?: (workerUrl: string, slug: string) => Promise<WorkerCapabilities>;
 };
 
+export type WorkerResponseLoadProgress = { loaded: number; listed: number; listComplete: boolean };
+
 export type WorkerCanonicalResponseRow = {
   questionId: string;
   responder: string;
@@ -43,6 +46,8 @@ export type WorkerCanonicalResponseRow = {
 
 const MAX_RESPONSE_LIST_PAGES = 100;
 const RESPONSE_READ_CONCURRENCY = 8;
+// Batch reads in flight at once while the listing continues: each costs the Worker a few seconds cold.
+export const RESPONSE_BATCH_CONCURRENCY = 6;
 export const SIGNED_IN_READ_LIMIT_MS = 15_000;
 const WORKER_RESPONSE_CACHE_VERSION = 1;
 
@@ -67,6 +72,11 @@ export const isWorkerCanonicalSessionConfig = (value: unknown): boolean => {
 export const readsResearchMaterial = (sessionConfig: unknown, account: unknown): boolean =>
   isConfiguredAdmin(sessionConfig, { account });
 
+// A signed-in read the page cannot make without asking, or one the Worker refuses: reading signed out is all that's left.
+const cannotSignInQuietly = (error: unknown): boolean =>
+  isWorkerSignInNeededError(error) ||
+  /authenticate with the worker|\((401|403)\)/i.test(error instanceof Error ? error.message : String(error));
+
 export const loadWorkerResponses = async (
   {
     account,
@@ -77,6 +87,7 @@ export const loadWorkerResponses = async (
     startCursor,
     onPartial,
     onListed,
+    onRows,
     ownResponses = false,
     signal,
   }: {
@@ -92,6 +103,8 @@ export const loadWorkerResponses = async (
     // Receives every listed storage ref, read or reused, once a listing that
     // began at the first page is complete.
     onListed?: (storageRefIds: ReadonlySet<string>) => void;
+    // Receives each batch's rows as they land, with how many listed answers are in hand (read or reused).
+    onRows?: (rows: WorkerCanonicalResponseRow[], progress: WorkerResponseLoadProgress) => void;
     ownResponses?: boolean;
     signal?: AbortSignal;
   },
@@ -110,55 +123,7 @@ export const loadWorkerResponses = async (
   let cursor: string | null = (!ownResponses && readString(startCursor)) || null;
   const fromStart = !cursor;
 
-  for (let pageIndex = 0; ownResponses || pageIndex < MAX_RESPONSE_LIST_PAGES; pageIndex += 1) {
-    signal?.throwIfAborted();
-    const page = await listPage({
-      sessionSlug: target.sessionSlug,
-      sessionConfig: target.sessionConfig,
-      context,
-      workerUrl: target.workerUrl,
-      resource: 'responses',
-      ...(ownResponses
-        ? { ownResponses: { account: readString(account).toLowerCase(), sessionId: target.sessionId }, signal }
-        : {}),
-      cursor,
-      limit: 100,
-    });
-    items.push(...(Array.isArray(page.items) ? page.items.filter(isRecord) : []));
-    if (page.listComplete) {
-      if (fromStart) {
-        onListed?.(
-          new Set(items.map((item) => readString(isRecord(item.storageRef) ? item.storageRef.id : '')).filter(Boolean)),
-        );
-      }
-      break;
-    }
-    const nextCursor = readString(page.cursor);
-    if (!nextCursor || seenCursors.has(nextCursor)) {
-      throw new Error('Worker response storage pagination returned an invalid cursor.');
-    }
-    seenCursors.add(nextCursor);
-    cursor = nextCursor;
-    if (!ownResponses && pageIndex === MAX_RESPONSE_LIST_PAGES - 1) {
-      onPartial?.(nextCursor);
-    }
-  }
-
   type WantedRead = { metadata: UnknownRecord; storageRef: UnknownRecord; storageRefId: string };
-  const wanted: WantedRead[] = [];
-  for (const item of items) {
-    const storageRef = isRecord(item.storageRef) ? item.storageRef : {};
-    const metadata = isRecord(item.metadata) ? item.metadata : {};
-    const storageRefId = readString(storageRef.id);
-    if (
-      ownResponses &&
-      (!storageRefId || readString(metadata.responder).toLowerCase() !== readString(account).toLowerCase())
-    )
-      throw new Error('The Worker returned an invalid own-response reference.');
-    // Response payloads are immutable; an edit receives a new storage reference.
-    if (storageRefId && !cachedStorageRefIds?.has(storageRefId)) wanted.push({ metadata, storageRef, storageRefId });
-  }
-
   const toRow = ({ metadata, storageRefId }: WantedRead, payload: unknown): WorkerCanonicalResponseRow | null => {
     if (!isRecord(payload)) {
       if (ownResponses) throw new Error('A saved answer could not be read.');
@@ -214,40 +179,46 @@ export const loadWorkerResponses = async (
     readsAllWhole || (!!reader && readString(metadata.responder).toLowerCase() === reader);
   // Own answers are read signed in as before. Results never ask anyone to sign: without a token held, these reads
   // go signed out, and the copies come back marked so a later load reads them again.
-  // Once one signed-in read fails or times out, the rest of this load go signed out, so the limit is paid once.
+  // Once the page can't sign in quietly, or a signed-in read outlasts the limit, the rest of this load go signed out,
+  // so the limit is paid once. Any other failure (a busy Worker) is the batch's to retry, signed in.
   let signedInGaveUp = false;
-  const readWhole = async <T>(read: (auth: { preferAnonymous?: false; prompt?: false }) => Promise<T>) => {
+  const readWhole = async <T>(
+    read: (auth: { preferAnonymous?: false; prompt?: false; signal?: AbortSignal }) => Promise<T>,
+  ) => {
+    signal?.throwIfAborted();
     if (ownResponses) return read({ preferAnonymous: false });
     if (signedInGaveUp) return read({});
     // A silent sign-in that never settles (a passkey sheet closed unanswered) must not hold Results: past a limit,
-    // read signed out.
+    // the signed-in read is dropped and read signed out.
+    const limit = new AbortController();
+    const stop = () => limit.abort(signal?.reason);
+    signal?.addEventListener('abort', stop, { once: true });
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     try {
       return await Promise.race([
-        read({ preferAnonymous: false, prompt: false }),
+        read({ preferAnonymous: false, prompt: false, signal: limit.signal }),
         new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error('The signed-in read took too long.')), SIGNED_IN_READ_LIMIT_MS);
+          timer = setTimeout(() => {
+            timedOut = true;
+            limit.abort();
+            reject(new Error('The signed-in read took too long.'));
+          }, SIGNED_IN_READ_LIMIT_MS);
         }),
       ]);
-    } catch {
+    } catch (error) {
       signal?.throwIfAborted();
+      if (!timedOut && !cannotSignInQuietly(error)) throw error;
       signedInGaveUp = true;
       return read({});
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', stop);
     }
   };
-  const batched =
-    !!wanted.length &&
-    (
-      await (deps.readWorkerCapabilities || readWorkerCapabilities)(readString(target.workerUrl), target.sessionSlug)
-    ).features.includes('storage_read_batch_v1');
+  let batched: boolean | null = null;
   const readBatch = deps.readSessionStorageBatch || readSessionStorageBatch;
-  const step = batched ? STORAGE_READ_BATCH_MAX_IDS : RESPONSE_READ_CONCURRENCY;
-  const rows: WorkerCanonicalResponseRow[] = [];
-  for (let offset = 0; offset < wanted.length; offset += step) {
-    signal?.throwIfAborted();
-    const chunk = wanted.slice(offset, offset + step);
+  const readPayloads = async (chunk: WantedRead[]): Promise<unknown[]> => {
     const payloads: unknown[] = [];
     if (batched) {
       // At most two requests a chunk: the reader's own answers (or all, for an admin) signed in, the rest as before.
@@ -262,27 +233,146 @@ export const loadWorkerResponses = async (
           payloads[index] = read[at];
         });
       }
-    } else {
-      payloads.push(
-        ...(await Promise.all(
-          chunk.map(async (read) =>
-            (signedIn(read)
-              ? await readWhole((auth) => readBlob({ ...readTarget, ...auth, storageRef: read.storageRef }))
-              : await readBlob({ ...readTarget, storageRef: read.storageRef })
-            )
-              .json()
-              .catch(() => null),
-          ),
-        )),
-      );
+      return payloads;
     }
-    chunk.forEach((read, index) => {
-      const row = toRow(read, payloads[index]);
-      if (row) rows.push(row);
-    });
-  }
+    return Promise.all(
+      chunk.map(async (read) =>
+        (signedIn(read)
+          ? await readWhole((auth) => readBlob({ ...readTarget, ...auth, storageRef: read.storageRef }))
+          : await readBlob({ ...readTarget, storageRef: read.storageRef })
+        )
+          .json()
+          .catch(() => null),
+      ),
+    );
+  };
 
-  return rows;
+  // Each page's reads start as it is listed, a few batches at once, so reading overlaps the listing. Rows keep
+  // listing order. A batch that fails is read once more; if that fails too, the load fails, never hangs.
+  const chunks: WantedRead[][] = [];
+  const chunkRows: WorkerCanonicalResponseRow[][] = [];
+  let queued: WantedRead[] = [];
+  let wantedCount = 0;
+  let readCount = 0;
+  let listComplete = false;
+  let listingDone = false;
+  let failure: { error: unknown } | null = null;
+  let next = 0;
+  let active = 0;
+  let resolveIdle: () => void = () => {};
+  const idle = new Promise<void>((resolve) => {
+    resolveIdle = resolve;
+  });
+  const settleIfIdle = () => {
+    if (listingDone && active === 0 && (failure || next >= chunks.length)) resolveIdle();
+  };
+  const runChunk = async (chunk: WantedRead[], at: number) => {
+    let payloads: unknown[];
+    try {
+      payloads = await readPayloads(chunk);
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      payloads = await readPayloads(chunk);
+    }
+    if (failure) return;
+    const rows = chunk.flatMap((read, index) => toRow(read, payloads[index]) || []);
+    chunkRows[at] = rows;
+    readCount += chunk.length;
+    onRows?.(rows, { loaded: items.length - wantedCount + readCount, listed: items.length, listComplete });
+  };
+  const pump = () => {
+    const limit = batched ? RESPONSE_BATCH_CONCURRENCY : 1;
+    while (!failure && active < limit && next < chunks.length) {
+      const at = next++;
+      active += 1;
+      void runChunk(chunks[at], at)
+        .catch((error: unknown) => {
+          failure = failure || { error };
+        })
+        .finally(() => {
+          active -= 1;
+          pump();
+          settleIfIdle();
+        });
+    }
+  };
+  const queueReads = async (pageItems: UnknownRecord[]) => {
+    for (const item of pageItems) {
+      const storageRef = isRecord(item.storageRef) ? item.storageRef : {};
+      const metadata = isRecord(item.metadata) ? item.metadata : {};
+      const storageRefId = readString(storageRef.id);
+      if (
+        ownResponses &&
+        (!storageRefId || readString(metadata.responder).toLowerCase() !== readString(account).toLowerCase())
+      )
+        throw new Error('The Worker returned an invalid own-response reference.');
+      // Response payloads are immutable; an edit receives a new storage reference.
+      if (storageRefId && !cachedStorageRefIds?.has(storageRefId)) {
+        queued.push({ metadata, storageRef, storageRefId });
+        wantedCount += 1;
+      }
+    }
+    if (queued.length && batched === null) {
+      batched = (
+        await (deps.readWorkerCapabilities || readWorkerCapabilities)(readString(target.workerUrl), target.sessionSlug)
+      ).features.includes('storage_read_batch_v1');
+    }
+    const step = batched ? STORAGE_READ_BATCH_MAX_IDS : RESPONSE_READ_CONCURRENCY;
+    while (queued.length >= step) chunks.push(queued.splice(0, step));
+    pump();
+  };
+
+  try {
+    for (let pageIndex = 0; ownResponses || pageIndex < MAX_RESPONSE_LIST_PAGES; pageIndex += 1) {
+      signal?.throwIfAborted();
+      if (failure) break;
+      const page = await listPage({
+        sessionSlug: target.sessionSlug,
+        sessionConfig: target.sessionConfig,
+        context,
+        workerUrl: target.workerUrl,
+        resource: 'responses',
+        ...(ownResponses
+          ? { ownResponses: { account: readString(account).toLowerCase(), sessionId: target.sessionId }, signal }
+          : {}),
+        cursor,
+        limit: 100,
+      });
+      const pageItems = Array.isArray(page.items) ? page.items.filter(isRecord) : [];
+      items.push(...pageItems);
+      await queueReads(pageItems);
+      if (page.listComplete) {
+        listComplete = true;
+        if (fromStart) {
+          onListed?.(
+            new Set(
+              items.map((item) => readString(isRecord(item.storageRef) ? item.storageRef.id : '')).filter(Boolean),
+            ),
+          );
+        }
+        break;
+      }
+      const nextCursor = readString(page.cursor);
+      if (!nextCursor || seenCursors.has(nextCursor)) {
+        throw new Error('Worker response storage pagination returned an invalid cursor.');
+      }
+      seenCursors.add(nextCursor);
+      cursor = nextCursor;
+      if (!ownResponses && pageIndex === MAX_RESPONSE_LIST_PAGES - 1) {
+        onPartial?.(nextCursor);
+      }
+    }
+    if (queued.length) chunks.push(queued);
+    queued = [];
+    pump();
+  } catch (error) {
+    failure = failure || { error };
+  }
+  listingDone = true;
+  settleIfIdle();
+  await idle;
+  if (failure) throw (failure as { error: unknown }).error;
+  return chunkRows.flat();
 };
 
 const createWorkerQuestionCacheNode = (): UnknownRecord => ({
@@ -335,6 +425,9 @@ export const mergeWorkerQuestionResponses = (
   slug: string,
   identity: WorkerCanonicalCacheIdentity,
   staleRefIds?: ReadonlySet<string>,
+  // Refs merged earlier in this same load, judged again here: a row a mid-load merge saw but ranked below a copy
+  // since dropped as stale must not be skipped as already seen.
+  rejudgedRefIds?: ReadonlySet<string>,
 ): UnknownRecord => {
   const next = isRecord(current) ? { ...current } : {};
   const cachedNetwork = isRecord(next[WORKER_CANONICAL_CACHE_SCOPE_KEY])
@@ -368,6 +461,7 @@ export const mergeWorkerQuestionResponses = (
     responseMeta = dropStaleResponses(meta, staleRefIds, refOf);
     staleRefIds.forEach((refId) => delete seenRefs[refId]);
   }
+  rejudgedRefIds?.forEach((refId) => delete seenRefs[refId]);
 
   rows.forEach((row) => {
     const storageRefId = readString(row.storageRefId);

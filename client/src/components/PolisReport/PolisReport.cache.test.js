@@ -1099,6 +1099,116 @@ describe('PolisReport cache read options', () => {
     },
   );
 
+  it('shows answers as they load, says how many are in, and offers a retry if the load fails', async () => {
+    const sessionConfig = {
+      slug: 'large-worker',
+      sessionId: `0x${'3'.repeat(32)}`,
+      corsWorkerUrl: 'https://large-worker.example.test',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: sessionConfig.slug });
+    let node = { workerResponseHydrationStatus: 'loading' };
+    cacheScripts.peekCacheSync.mockImplementation((namespace, slug) =>
+      namespace === 'questionsCache' && slug === sessionConfig.slug
+        ? { worker: withWorkerCanonicalCacheIdentity({ questions: {}, ...node }, identity) }
+        : {},
+    );
+    const onRetryLoad = jest.fn(async () => {});
+    const props = {
+      ...baseReportProps,
+      slug: sessionConfig.slug,
+      sessionConfig,
+      isResponsesCacheReady: false,
+      onRetryLoad,
+    };
+    const questionsShown = () =>
+      within(screen.getByText(/^Questions/, { selector: 'span' }).closest('div')).getByText(/^\d+$/).textContent;
+
+    // Nothing has landed yet: the spinner says how many answers are in.
+    node = {
+      workerResponseHydrationStatus: 'loading',
+      workerResponseLoadProgress: { loaded: 0, listed: 300, listComplete: false },
+    };
+    const { rerender } = render(<PolisReport {...props} questionResponses={{}} />);
+    expect(screen.getByLabelText('Loading report')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loaded 0 of 300+ answers');
+
+    // The first rows land: the report shows them, with the count beside it.
+    node = {
+      workerResponseHydrationStatus: 'loading',
+      workerResponseLoadProgress: { loaded: 100, listed: 1900, listComplete: true },
+    };
+    rerender(<PolisReport {...props} questionResponses={seededQuestionResponses} questionResponsesNonce={1} />);
+    await screen.findByText('Summary and Statistics');
+    expect(screen.getByLabelText('Refreshing report')).toHaveTextContent('Loaded 100 of 1,900 answers');
+    expect(questionsShown()).toBe('1');
+
+    // More land: the report grows rather than holding the first rows.
+    const updated = {
+      ...seededQuestionResponses,
+      secondQuestion: [
+        {
+          ...seededQuestionResponses.seedQuestion[0],
+          questionId: 'secondQuestion',
+          response: JSON.stringify({ type: 'binary', prompt: 'Newly loaded prompt', answer: { value: 'Disagree' } }),
+        },
+      ],
+    };
+    node = {
+      workerResponseHydrationStatus: 'loading',
+      workerResponseLoadProgress: { loaded: 200, listed: 1900, listComplete: true },
+    };
+    rerender(<PolisReport {...props} questionResponses={updated} questionResponsesNonce={2} />);
+    await waitFor(() => expect(questionsShown()).toBe('2'));
+
+    // The load fails: what landed stays, with a retry instead of a spinner that never ends.
+    node = { workerResponseHydrationStatus: 'failed' };
+    rerender(<PolisReport {...props} questionResponses={updated} questionResponsesNonce={3} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Not all answers loaded');
+    expect(questionsShown()).toBe('2');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(onRetryLoad).toHaveBeenCalledTimes(1));
+  });
+
+  it('offers a retry when the answers failed to load before any arrived', async () => {
+    const sessionConfig = {
+      slug: 'large-worker',
+      sessionId: `0x${'3'.repeat(32)}`,
+      corsWorkerUrl: 'https://large-worker.example.test',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: sessionConfig.slug });
+    cacheScripts.peekCacheSync.mockImplementation((namespace, slug) =>
+      namespace === 'questionsCache' && slug === sessionConfig.slug
+        ? {
+            worker: withWorkerCanonicalCacheIdentity(
+              { questions: {}, workerResponseHydrationStatus: 'failed' },
+              identity,
+            ),
+          }
+        : {},
+    );
+    const onRetryLoad = jest.fn(async () => {});
+    render(
+      <PolisReport
+        {...baseReportProps}
+        slug={sessionConfig.slug}
+        sessionConfig={sessionConfig}
+        account="0xabc"
+        loginComplete
+        isResponsesCacheReady={false}
+        questionResponses={{}}
+        onRetryLoad={onRetryLoad}
+      />,
+    );
+    expect(screen.queryByLabelText('Loading report')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Responses could not be loaded, so the report can't be shown yet.",
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(onRetryLoad).toHaveBeenCalledTimes(1));
+  });
+
   it('offers a retry instead of loading forever when the session load failed', async () => {
     const onRetryLoad = jest.fn(async () => {});
     render(

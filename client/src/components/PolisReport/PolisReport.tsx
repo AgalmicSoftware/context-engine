@@ -815,6 +815,7 @@ export default function PolisReport({
       metadata,
       workerResponseHydrationStatus: cacheContext.workerResponseHydrationStatus,
       workerResponseOverReadLimit: cacheContext.workerResponseOverReadLimit,
+      workerResponseLoadProgress: cacheContext.workerResponseLoadProgress,
       responseStats: buildReportResponseStats(filtered, metadata, {
         sessionSlug: activeReportSlug,
         allowDemo: effectiveUseDemoData,
@@ -861,8 +862,14 @@ export default function PolisReport({
   const partialWorkerSnapshotSettled = pendingReportData.workerResponseHydrationStatus === 'partial';
   const cacheRefreshPending =
     !effectiveUseDemoData && (!isQuestionCacheReady || (!isResponsesCacheReady && !partialWorkerSnapshotSettled));
+  // Answers merged in while a load runs, or before it failed, only add to what is shown: show them as they arrive.
+  const responsesLoadFailed = pendingReportData.workerResponseHydrationStatus === 'failed';
+  const showsArrivedAnswers =
+    (!!pendingReportData.workerResponseLoadProgress || responsesLoadFailed) &&
+    Object.keys(pendingReportData.filtered || {}).length > 0;
   const reportData =
     cacheRefreshPending &&
+    !showsArrivedAnswers &&
     retainedReport.current?.scope === reportScope &&
     Object.keys(retainedReport.current.data.filtered || {}).length > 0
       ? retainedReport.current.data
@@ -871,12 +878,13 @@ export default function PolisReport({
     if (retainedReport.current?.scope !== reportScope) retainedReport.current = null;
     if (
       !cacheRefreshPending ||
+      showsArrivedAnswers ||
       (!Object.keys(retainedReport.current?.data.filtered || {}).length &&
         Object.keys(pendingReportData.filtered || {}).length > 0)
     ) {
       retainedReport.current = { scope: reportScope, data: pendingReportData };
     }
-  }, [cacheRefreshPending, pendingReportData, reportScope]);
+  }, [cacheRefreshPending, showsArrivedAnswers, pendingReportData, reportScope]);
 
   /***************************************************************
    * Build rating matrix from real or demo
@@ -2448,7 +2456,12 @@ export default function PolisReport({
   const isRefreshing = !hasCompletedScopedBlockScan && cacheRefreshPending;
   const isLoading = isRefreshing && !hasRenderableReport;
   // A failed session load never settles on its own; say so and offer a retry instead of spinning.
-  const loadFailed = isLoading && !!cacheInitializationError && typeof onRetryLoad === 'function';
+  const loadFailed =
+    isLoading && (!!cacheInitializationError || responsesLoadFailed) && typeof onRetryLoad === 'function';
+  const loadProgress = pendingReportData.workerResponseLoadProgress;
+  const loadProgressText = loadProgress
+    ? `Loaded ${loadProgress.loaded.toLocaleString()} of ${loadProgress.listed.toLocaleString()}${loadProgress.listComplete ? '' : '+'} answers`
+    : '';
   // Retrying can't help someone the Worker refuses until they log in, so ask for that instead.
   const loginRequired = loadFailed && !(loginComplete && account) && sessionAnswersRequireLogin(sessionConfig);
   // A session holding more answers than one load reads loads in parts, slowly; say so, and that a retry may take minutes.
@@ -2505,21 +2518,31 @@ export default function PolisReport({
       <div
         style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px' }}
       >
-        {isRefreshing && hasRenderableReport && (
-          <div
-            aria-label="Refreshing report"
-            title="Refreshing report"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: 'var(--ce-panel-text-muted)',
-              fontSize: '0.9rem',
-            }}
-          >
-            <FontAwesomeIcon icon={faSpinner} spin />
-            <span>Refreshing</span>
+        {isRefreshing && hasRenderableReport && responsesLoadFailed && typeof onRetryLoad === 'function' ? (
+          <div role="alert" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem' }}>
+            <span>Not all answers loaded</span>
+            <button type="button" className={styles.downloadButton} onClick={retryLoad} disabled={retryingLoad}>
+              {retryingLoad ? 'Retrying…' : 'Retry'}
+            </button>
           </div>
+        ) : (
+          isRefreshing &&
+          hasRenderableReport && (
+            <div
+              aria-label="Refreshing report"
+              title="Refreshing report"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: 'var(--ce-panel-text-muted)',
+                fontSize: '0.9rem',
+              }}
+            >
+              <FontAwesomeIcon icon={faSpinner} spin />
+              <span>{loadProgressText || 'Refreshing'}</span>
+            </div>
+          )
         )}
         <button
           type="button"
@@ -2674,6 +2697,11 @@ export default function PolisReport({
               aria-label="Loading report"
               className={styles.loadingSpinner}
             />
+            {loadProgressText && !showLoadingProgress && (
+              <div className={styles.loadingProgressLabel} role="status">
+                {loadProgressText}
+              </div>
+            )}
             {showLoadingProgress && (
               <div className={styles.loadingProgressWrap}>
                 <div className={styles.loadingProgressLabel}>{loadingProgressStatusText}</div>

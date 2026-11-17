@@ -30,6 +30,7 @@ import {
   getHistoricalFigureBlockie,
 } from 'utilities/ui/historicalFigureAvatars.js';
 import { createLogger } from 'utilities/logging.js';
+import type { WorkerResponseLoadProgress } from '../../utilities/survey/workerResponseHydration';
 
 export { normalizePolisBinaryVote } from './polisReportAnswers';
 
@@ -581,6 +582,7 @@ export function readPolisReportCacheContext(
   const qMap: Record<string, PolisQuestionMeta> = {};
   let workerResponseHydrationStatus = '';
   let workerResponseOverReadLimit = false;
+  let workerResponseLoadProgress: WorkerResponseLoadProgress | null = null;
   const sbtList: Record<string, PolisSbtEntry> = {};
   readSlugs.forEach((readSlug) => {
     const qParsed = peekCacheSync('questionsCache', readSlug, { clone: false });
@@ -608,6 +610,9 @@ export function readPolisReportCacheContext(
     if (workerTarget.isWorkerCanonical && readSlug === slug) {
       workerResponseHydrationStatus = String(questionNode?.workerResponseHydrationStatus || '');
       workerResponseOverReadLimit = questionNode?.workerResponseOverReadLimit === true;
+      const progress = questionNode?.workerResponseLoadProgress as WorkerResponseLoadProgress | undefined;
+      workerResponseLoadProgress =
+        progress && Number.isFinite(progress.loaded) && Number.isFinite(progress.listed) ? progress : null;
     }
     const scopedQuestions =
       questionNode?.questions && typeof questionNode.questions === 'object'
@@ -624,7 +629,14 @@ export function readPolisReportCacheContext(
     Object.assign(sbtList, scopedSbtList);
   });
 
-  return { qMap, sbtList, workerResponseHydrationStatus, workerResponseOverReadLimit };
+  return {
+    qMap,
+    sbtList,
+    workerResponseHydrationStatus,
+    workerResponseOverReadLimit,
+    // Assigned inside the forEach above, which narrowing does not see.
+    workerResponseLoadProgress: workerResponseLoadProgress as WorkerResponseLoadProgress | null,
+  };
 }
 
 export function applyFilterStateToAggregator(
