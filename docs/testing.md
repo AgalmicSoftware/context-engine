@@ -31,8 +31,43 @@ universe. Build-owning gates immediately run the manifest-backed bundle budget
 against the bytes they just produced, without a second build.
 
 `scripts/ci-gates.json` is the explicit command manifest. Local CI consumes
-its serial `ci` profile; GitHub Actions consumes the same named gates as split
-jobs so slow lanes remain visible. The final hosted `test` job compares all
+its `ci` profile; GitHub Actions consumes the same named gates as split
+jobs so slow lanes remain visible.
+
+A gate, or a command inside a gate, may name a `lane`. Entries that name the
+same lane run one after another in manifest order; different lanes run side by
+side; entries that name none share one lane. A command's lane is counted
+within its own gate. Give two commands the same lane when one reads what the
+other writes, as the client build and its bundle budget do. A lane stops at
+its first failure and the other lanes still finish, so one run reports every
+lane that fails; the timings list what a stopped lane never ran as `not run`.
+Side by side, a line says when each command starts and where its output is
+held, and the output is printed whole when it ends.
+
+Today the `ci` profile runs three gate lanes (the client shards and their
+merge; wiring, contracts, root Jest and Workers; the Node group), and
+`wiring-and-release` runs its lint, type and build commands in three lanes of
+their own. That gate is the only one with command lanes. Its GitHub job passes
+`--serial` until those lanes have been measured against the hosted runner's
+memory; every other job, and the `release` profile, has no lanes and runs one
+command at a time. `--serial` runs everything one at a time, in manifest
+order, with live output:
+
+```bash
+node scripts/run-ci-gates.mjs --profile ci --serial
+```
+
+Every run ends with the time each command took, and `--timings <file>` also
+writes them as JSON. Run the profile on an otherwise idle machine: side by
+side it uses most of the cores, and tests that wait on real timers can time
+out under other load.
+
+To stop a run, stop its process group (Ctrl-C in a terminal does). A stop
+signal sent to the runner alone ends the commands in flight, prints what they
+had written and fails the run, but a process a command started through a shell
+can run on to its own end. A timeout placed around a run must kill the group.
+
+The final hosted `test` job compares all
 reported results with the manifest's `hosted` profile and fails for missing,
 extra, failed, canceled, or skipped lanes. Event-specific baseline-growth
 authorization remains a protected workflow step beside the manifest-backed
@@ -94,7 +129,7 @@ files. `npm run coverage-floor:check` reads the merged file to enforce the
 whole-production floor banked in `scripts/client-coverage-full-baseline.json`.
 
 `npm --prefix client run test:coverage` is the same suite in a single process.
-It takes about five times as long and is kept as the reference the shards are
+It takes several times as long and is kept as the reference the shards are
 compared against. Set `CLIENT_TEST_SHARD_CONCURRENCY` to run fewer shards at
 once on a smaller machine.
 

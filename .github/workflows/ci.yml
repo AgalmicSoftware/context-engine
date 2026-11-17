@@ -97,7 +97,8 @@ jobs:
       - name: Run wiring and release gate
         env:
           CLIENT_LARGE_FILE_BASE_REF: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}
-        run: npm run ci:gate -- wiring-and-release
+        # One command at a time: the gate's lanes are not yet measured against this runner's memory.
+        run: npm run ci:gate -- wiring-and-release --serial
 
       - name: Run public text gate
         run: npm run ci:gate -- public-text

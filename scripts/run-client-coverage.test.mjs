@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   CLIENT_TEST_SHARD_COUNT,
@@ -265,5 +266,19 @@ test('the tree fingerprint changes with any edit, tracked or not, and is the sam
     assert.notEqual(treeFingerprint(repoDir), withOddEntries);
   } finally {
     fs.rmSync(repoDir, { recursive: true, force: true });
+  }
+});
+
+test('files that a build or a test writes and removes inside the tree are git-ignored', () => {
+  // A gate lane running beside them fingerprints the tree, or lists untracked files: it must not see these.
+  const repoDir = fileURLToPath(new URL('..', import.meta.url));
+  const transient = [
+    'client/vite.config.mjs.timestamp-1700000000000-0123456789abc.mjs',
+    'client/.tmp-chain-gateway-barrel-AbC123/index.js',
+    'client/coverage/shards/1/coverage-final.json',
+  ];
+  for (const relativePath of transient) {
+    const ignored = spawnSync('git', ['check-ignore', '-q', relativePath], { cwd: repoDir }).status === 0;
+    assert.ok(ignored, `${relativePath} must be ignored`);
   }
 });

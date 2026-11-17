@@ -160,7 +160,7 @@ The tracked checks work together:
   unavailable npm commands, and broken local links.
 - `npm run test:wiring` verifies test inventory, boundary checks, and text
   hygiene.
-- `scripts/ci-gates.json` defines the serial local CI profile, the split hosted
+- `scripts/ci-gates.json` defines the local CI profile and its lanes, the split hosted
   gate set, and the standalone release profile. `test:ci` and GitHub Actions
   consume the same named gates; `verify:release` runs its own release profile.
 

@@ -27,3 +27,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Written and removed while a build or a test runs. Checks that list untracked
+# files run beside them and must not see these come and go.
+/vite.config.mjs.timestamp-*
+/.tmp-chain-gateway-barrel-*
