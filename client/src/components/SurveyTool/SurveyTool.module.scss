@@ -6375,36 +6375,20 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   opacity: 0.96;
 }
 
-.pileSubmitSuccessBadge {
-  display: inline-flex;
-  align-items: center;
+// Submit after a submit: the same button shape turned green, reading "Submitted". Its shell sets colours with
+// !important, so this does too.
+.pileSubmitButton.pileSubmitDone {
   justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: var(--ce-radius-pill);
-  color: var(--ce-color-white);
+  color: var(--ce-color-white) !important;
+  background-color: var(--ce-status-success) !important;
   font-weight: 700;
-  background:
-    radial-gradient(
-      circle at 30% 28%,
-      color-mix(in srgb, var(--ce-text-inverse) 26%, transparent),
-      color-mix(in srgb, var(--ce-text-inverse) 3%, transparent) 48%
-    ),
-    linear-gradient(135deg, var(--ce-status-success) 0%, var(--ce-status-success) 100%);
-  box-shadow:
-    0 14px 30px color-mix(in srgb, var(--ce-overlay-base) 28%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+  cursor: default;
   animation: pileSubmitSuccessPop 220ms ease-out;
 }
 
 // Ten seconds after a submit (see PileSubmittedCheck): hidden, still holding its place.
-.pileSubmitSuccessBadgeGone {
+.pileSubmitDoneGone {
   visibility: hidden;
-}
-
-.pileSubmitSuccessIcon {
-  font-size: 1.35rem;
 }
 
 @media (min-width: 769px) {
@@ -6488,10 +6472,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     min-height: 44px;
     padding: 10px 6px;
     border-radius: var(--ce-radius-8);
-  }
-
-  .pileSubmitSuccessIcon {
-    font-size: 1.2rem;
   }
 }
 
@@ -6771,7 +6751,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pileSubmitSuccessBadge,
+  .pileSubmitDone,
   .pileFooter .pileSubmitButton.submitGlow::before,
   .headerSubmitButton.submitGlow::before,
   .submitGlow {

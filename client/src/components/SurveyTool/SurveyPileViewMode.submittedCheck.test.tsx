@@ -60,10 +60,10 @@ it('shows the check for ten seconds after each submit', () => {
   act(() => {
     jest.advanceTimersByTime(10_000);
   });
-  expect(check()).toHaveClass('pileSubmitSuccessBadgeGone');
+  expect(check()).toHaveClass('pileSubmitDoneGone');
   // An edit brings back Submit, and the next submit its own check.
   act(() => engine.setState({ submittedSinceLastEdit: false }));
   expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeNull();
   act(() => engine.setState({ submittedSinceLastEdit: true }));
-  expect(check()).not.toHaveClass('pileSubmitSuccessBadgeGone');
+  expect(check()).not.toHaveClass('pileSubmitDoneGone');
 });

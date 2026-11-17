@@ -2,7 +2,6 @@ import React from 'react';
 import { Button } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faCheck,
   faTimes,
   faSpinner,
   faFilter,
@@ -364,11 +363,11 @@ const renderPileActionControls = ({
   );
 };
 
-// The check after a submit goes away after ten seconds, keeping its place so nothing below it moves. It only
-// reports the submit: as a link to the profile it read as the way on, and took people out of the questions.
+// After a submit, Submit turns into a green "Submitted" in its place for ten seconds, then hides, keeping its
+// place so nothing below it moves. It only reports the submit; it is no link.
 const SUBMITTED_CHECK_MS = 10_000;
 
-/** The check after a submit. */
+/** What Submit becomes after a submit. */
 export const PileSubmittedCheck = (): React.ReactElement => {
   const [gone, setGone] = React.useState(false);
   React.useEffect(() => {
@@ -377,12 +376,11 @@ export const PileSubmittedCheck = (): React.ReactElement => {
   }, []);
   return (
     <div
-      className={`${styles.pileSubmitSuccessBadge}${gone ? ` ${styles.pileSubmitSuccessBadgeGone}` : ''}`}
+      className={`${styles.pileSubmitButton} ${styles.pileSubmitDone}${gone ? ` ${styles.pileSubmitDoneGone}` : ''}`}
       data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
       role="status"
     >
-      <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
-      <span>Submitted</span>
+      Submitted
     </div>
   );
 };

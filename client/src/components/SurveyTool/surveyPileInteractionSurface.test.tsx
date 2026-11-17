@@ -473,21 +473,23 @@ describe('the check after a submit', () => {
     jest.useRealTimers();
   });
 
-  it('says the answers were submitted for ten seconds, then hides in its place, and leads nowhere', () => {
+  it('is Submit turned green reading Submitted for ten seconds, then hides in its place, and leads nowhere', () => {
     jest.useFakeTimers();
     render(<PileSubmittedCheck />);
     const check = screen.getByRole('status');
-    expect(check).toHaveTextContent('Submitted');
+    expect(check).toHaveTextContent(/^Submitted$/);
+    expect(check).toHaveClass('pileSubmitButton', 'pileSubmitDone');
+    expect(check.querySelector('svg')).toBeNull();
     expect(check).toHaveAttribute('data-testid', E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
     expect(screen.queryByRole('link')).toBeNull();
     act(() => {
       jest.advanceTimersByTime(9_999);
     });
-    expect(check).not.toHaveClass('pileSubmitSuccessBadgeGone');
+    expect(check).not.toHaveClass('pileSubmitDoneGone');
     act(() => {
       jest.advanceTimersByTime(1);
     });
-    expect(check).toHaveClass('pileSubmitSuccessBadge', 'pileSubmitSuccessBadgeGone');
+    expect(check).toHaveClass('pileSubmitDone', 'pileSubmitDoneGone');
   });
 });
 
