@@ -39,7 +39,7 @@ describe('Onboarding overlay welcome slide styles', () => {
       /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.onboardingControls\s*\{[\s\S]*?width:\s*auto;[\s\S]*?height:\s*76px;[\s\S]*?gap:\s*0;/,
     );
     expect(scss).toMatch(
-      /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.takeSurveyButton\s*\{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-success\) 42%,\s*transparent\);[\s\S]*?color:\s*color-mix\(in srgb,\s*var\(--ce-overlay-base\) 82%,\s*transparent\);/,
+      /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.takeSurveyButton\s*\{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-success\) 42%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-welcome-control-text\);/,
     );
     expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.skipButton\s*\{[\s\S]*?bottom:\s*98px;/);
     expect(scss).toMatch(
@@ -130,5 +130,7 @@ describe('Onboarding overlay welcome slide styles', () => {
   it('keeps the skip button subdued until hovered', () => {
     expect(scss).toMatch(/\.skipButton\s*\{[\s\S]*?opacity:\s*0\.7;/);
     expect(scss).toMatch(/\.skipButton:hover,\s*\.skipButton:focus\s*\{[\s\S]*?opacity:\s*0\.84;/);
+    // The pill stays dark on hover, so its text must stay light in every theme.
+    expect(scss).toMatch(/\.skipButton:hover,\s*\.skipButton:focus\s*\{[^}]*color:\s*var\(--ce-text-inverse\);/);
   });
 });

@@ -227,6 +227,7 @@ $theme: (
       #5ff281,
       #5ff2f0
     ),
+  welcome-control-text: color-mix(in srgb, var(--ce-overlay-base) 82%, transparent),
   selection-bg: #b52da3,
   selection-text: #ffffff,
   session-accent: #4dffa4,

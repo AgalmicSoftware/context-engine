@@ -47,6 +47,44 @@ describe('runtime SCSS theme contract', () => {
       return entry.isDirectory() ? findScssFiles(entryPath) : entry.name.endsWith('.scss') ? [entryPath] : [];
     });
 
+  // The welcome slides put this token in background-image, where a plain colour is invalid and leaves the
+  // slide with no backdrop at all; civic shipped that way. Its white text and arrows must also read on it.
+  test('gives every theme a welcome backdrop that is an image, and civic one its white text reads on', () => {
+    const css = sass.compile(path.resolve(scssDir, 'assets/css/contextEngine.scss'), {
+      loadPaths: [scssDir],
+      style: 'expanded',
+      logger: sass.Logger.silent,
+    }).css;
+    const tokens = Object.fromEntries(
+      [...css.matchAll(/:root\[data-ce-theme=([\w-]+)\]\s*\{([^}]*)\}/g)].map(([, theme, body]) => [
+        theme,
+        Object.fromEntries([...body.matchAll(/--ce-([\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value])),
+      ]),
+    );
+    expect(Object.keys(tokens).sort()).toEqual(['civic', 'classic-95', 'context-engine']);
+    for (const theme of Object.values(tokens)) {
+      expect(theme['welcome-artwork-backdrop']).toMatch(
+        /^(?:(?:repeating-)?(?:linear|radial|conic)-gradient|url|image-set)\(/,
+      );
+    }
+    const luminance = (hex: string) => {
+      const channels = hex.match(/[0-9a-f]{2}/gi)!.map((part) => parseInt(part, 16) / 255);
+      const [r, g, b] = channels.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const contrast = (a: string, b: string) => {
+      const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+      return (light + 0.05) / (dark + 0.05);
+    };
+    const civic = tokens.civic;
+    const stops = civic['welcome-artwork-backdrop'].match(/#[0-9a-f]{6}\b/gi) || [];
+    expect(stops.length).toBeGreaterThan(0);
+    for (const stop of stops) {
+      expect(contrast(civic['text-inverse'], stop)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(civic['welcome-control-text'], stop)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   test('compiles all bundled themes through the exact contract', () => {
     const result = sass.compile(path.resolve(scssDir, 'assets/css/contextEngine.scss'), {
       loadPaths: [scssDir],
