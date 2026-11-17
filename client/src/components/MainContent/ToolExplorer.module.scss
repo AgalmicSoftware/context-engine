@@ -575,7 +575,9 @@
   }
 }
 
+// Portaled to body without Bootstrap's CSS, so it needs the tooltip layer to sit above sticky toolbars.
 .explainerPopover {
+  z-index: 1070;
   max-width: min(320px, calc(100vw - 24px));
   background: var(--ce-document-surface);
   color: var(--ce-document-text);
