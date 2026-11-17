@@ -9,6 +9,14 @@ import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionListeningPanel', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionVoiceModeModal', () => ({ __esModule: true, default: () => null }));
+// The owner's switch for single choices: null stays on the card; a delay moves on after it.
+let mockSingleChoiceDelay = null;
+jest.mock('./surveyPileNavigation', () => ({
+  ...jest.requireActual('./surveyPileNavigation'),
+  get SINGLE_CHOICE_ADVANCE_DELAY_MS() {
+    return mockSingleChoiceDelay;
+  },
+}));
 
 const SESSION_CONFIG = {
   slug: 'edge',
@@ -78,17 +86,18 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-it('saves binary and single-choice answers, advances exactly once, focuses the next card, and keeps answers on Back', async () => {
+it('saves binary and single-choice answers, advances once on a binary choice, focuses the next card, and keeps answers on Back', async () => {
   localStorage.setItem('ce:pileAutoAdvanceEnabled', 'false');
   const pile = await mountPile();
   choose('radio', 'Agree');
   await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 6'));
   expect(answer(pile, 'q1')).toBe('Agree');
   expect(card()).toHaveFocus();
+  // A single choice stays ticked on its card until Next, so it never looks lost.
   choose('checkbox', 'Beta');
-  await waitFor(() => expect(card()).toHaveAccessibleName('Question 3 of 6'));
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 50)));
   expect(answer(pile, 'q2')).toEqual(['Beta']);
-  await act(async () => pile.engine().handlePrev());
+  expect(card()).toHaveAccessibleName('Question 2 of 6');
   expect(within(card()).getByRole('checkbox', { name: 'Beta' })).toBeChecked();
   choose('checkbox', 'Beta');
   expect(answer(pile, 'q2')).toEqual([]);
@@ -222,4 +231,26 @@ it('keeps an open comment editor mounted while choosing an answer so pending dic
   expect(card()).toHaveAccessibleName('Question 2 of 6');
   await act(async () => pile.engine().handlePrev());
   expect(within(card()).getByRole('textbox')).toHaveValue('Partial comment with final dictated words');
+});
+
+it('moves on from a single choice after the set delay, and not if the choice changes in the meantime', async () => {
+  mockSingleChoiceDelay = 200;
+  try {
+    const pile = await mountPile();
+    await act(async () => pile.engine().handleNext());
+    choose('checkbox', 'Alpha');
+    expect(card()).toHaveAccessibleName('Question 2 of 6');
+    choose('checkbox', 'Alpha');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+    expect(answer(pile, 'q2')).toEqual([]);
+    expect(card()).toHaveAccessibleName('Question 2 of 6');
+
+    choose('checkbox', 'Beta');
+    expect(within(card()).getByRole('checkbox', { name: 'Beta' })).toBeChecked();
+    expect(card()).toHaveAccessibleName('Question 2 of 6');
+    await waitFor(() => expect(card()).toHaveAccessibleName('Question 3 of 6'));
+    expect(answer(pile, 'q2')).toEqual(['Beta']);
+  } finally {
+    mockSingleChoiceDelay = null;
+  }
 });

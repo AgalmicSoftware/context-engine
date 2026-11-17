@@ -18,7 +18,7 @@ import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
 import React from 'react';
-import { resolvePileAutoAdvanceEnabled } from './surveyPileNavigation';
+import { resolvePileAutoAdvanceEnabled, SINGLE_CHOICE_ADVANCE_DELAY_MS } from './surveyPileNavigation';
 // Styles
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
@@ -1459,6 +1459,7 @@ const runPileComponentWillUnmount = (engine: PileViewModeEngine) => {
     clearTimeout(engine._navFadeTimer);
     engine._navFadeTimer = null;
   }
+  clearTimeout(engine._pileChoiceAdvanceTimer);
   if (engine.loadingTimeout) {
     clearTimeout(engine.loadingTimeout);
   }
@@ -2827,52 +2828,55 @@ const renderPileResponseInput = (
       const repeatedPress = engine._pileAnswerClickCount > 1;
       engine._pileAnswerClickCount = 0;
       if (repeatedPress && engine._pileAdvancedIntoQuestionId === questionId) return;
+      // A new choice replaces any move a single choice was waiting to make.
+      clearTimeout(engine._pileChoiceAdvanceTimer);
       // An accepted interaction starts a new gesture on this card. Retaining the
       // transition marker would reject later quadratic steps in that gesture.
       engine._pileAdvancedIntoQuestionId = null;
       const inputType = normalizePileQuestionInputType(question);
       const canAdvance =
         inputType === 'binary' ||
-        (inputType === 'multichoice' && (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question)));
+        (SINGLE_CHOICE_ADVANCE_DELAY_MS !== null &&
+          inputType === 'multichoice' &&
+          (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question)));
       const arrowSelection = engine._pileAnswerArrowKeyDown === true;
+      // Moves on only while this card is still showing one committed answer and nothing is being written on it.
+      const advance = () => {
+        if (!engine._isMounted || engine.state.showComments?.[question.id]) return;
+        if (!resolvePileAutoAdvanceEnabled(engine.getEffectivePileSessionConfig())) return;
+        // Inspect the committed answer: clicking a selected binary option clears it.
+        // Only direct card edits reach this callback; interview drafts and hydration do not.
+        const savedValue = readPlainRecord(engine.state.surveysResponseState?.[0]?.answers?.[questionId]).value;
+        if (
+          inputType === 'binary'
+            ? typeof savedValue !== 'string' || !['Agree', 'Unsure', 'Disagree'].includes(savedValue)
+            : normalizeMultichoiceValue(savedValue).length !== 1
+        )
+          return;
+        const visibleQuestions = resolveEarlyVisiblePileQuestions({
+          pileQuestions: engine.state.pileQuestions,
+          questionPool: (engine.state.questionPool?.length
+            ? engine.state.questionPool
+            : engine.props.questionPool) as EarlyVisiblePileQuestion[],
+          isFilterActive: !!engine.state.isFilterActive || isSurveyToolFilterStateActive(engine.state.filterState),
+        });
+        const index = Math.min(
+          Math.max(0, Number(engine.state.activePileIndex || 0)),
+          Math.max(visibleQuestions.length - 1, 0),
+        );
+        if (normalizeQuestionIdKey(visibleQuestions[index]?.id) !== questionId || index >= visibleQuestions.length - 1)
+          return;
+        engine._pileAdvancedIntoQuestionId = normalizeQuestionIdKey(visibleQuestions[index + 1]?.id);
+        engine.handleNext(true);
+      };
       engine.handleAnswerPile(question.id, value, {
         afterUpdate: () => {
           // Radio arrows select within the group. An open comment editor may still
           // be receiving dictation, so leave both on this card until explicit Next.
-          if (
-            !canAdvance ||
-            arrowSelection ||
-            engine.state.showComments?.[question.id] ||
-            !resolvePileAutoAdvanceEnabled(engine.getEffectivePileSessionConfig())
-          )
-            return;
-          // Inspect the committed answer: clicking a selected binary option clears it.
-          // Only direct card edits reach this callback; interview drafts and hydration do not.
-          const savedValue = readPlainRecord(engine.state.surveysResponseState?.[0]?.answers?.[questionId]).value;
-          if (
-            inputType === 'binary'
-              ? typeof savedValue !== 'string' || !['Agree', 'Unsure', 'Disagree'].includes(savedValue)
-              : normalizeMultichoiceValue(savedValue).length !== 1
-          )
-            return;
-          const visibleQuestions = resolveEarlyVisiblePileQuestions({
-            pileQuestions: engine.state.pileQuestions,
-            questionPool: (engine.state.questionPool?.length
-              ? engine.state.questionPool
-              : engine.props.questionPool) as EarlyVisiblePileQuestion[],
-            isFilterActive: !!engine.state.isFilterActive || isSurveyToolFilterStateActive(engine.state.filterState),
-          });
-          const index = Math.min(
-            Math.max(0, Number(engine.state.activePileIndex || 0)),
-            Math.max(visibleQuestions.length - 1, 0),
-          );
-          if (
-            normalizeQuestionIdKey(visibleQuestions[index]?.id) !== questionId ||
-            index >= visibleQuestions.length - 1
-          )
-            return;
-          engine._pileAdvancedIntoQuestionId = normalizeQuestionIdKey(visibleQuestions[index + 1]?.id);
-          engine.handleNext(true);
+          if (!canAdvance || arrowSelection) return;
+          // A single choice stays ticked on the card for a moment, so it reads as kept before the card moves on.
+          if (inputType === 'binary') advance();
+          else engine._pileChoiceAdvanceTimer = setTimeout(advance, SINGLE_CHOICE_ADVANCE_DELAY_MS ?? 0);
         },
       });
     });
