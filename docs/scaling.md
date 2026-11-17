@@ -125,7 +125,7 @@ is described in full in the [Cloudflare worker reference](session-cors-worker.md
 | One batch read (`/storage/read-batch`) | 100 records, about 8 MiB of text | Records past 8 MiB come back `413`, to be read on their own |
 | Members of one group | 1,000, or the session's `groupMemberCeiling` (at most 10,000) | Joins are refused; lowering it removes no one |
 | One-use codes added at once | 500 | Add them in more than one batch |
-| Context the session's AI reads | Looks at 300 context rows, admins' first, and reads at most 16 sources | The rest are left out; only the Session Agent says so |
+| Context the session's AI reads | Looks at 300 context rows, admins' first, and reads at most 16 sources; the Session Agent reads up to 48, to 320,000 characters in all (160,000 on Cloudflare's model) | The rest are left out; only the Session Agent says so |
 | Context one person adds | 20 files and links; admins aren't limited | Refused |
 | Signed-in requests a day (`limits.perWalletPerDay`) | Per address per 24 hours, counted for each kind of route; saving, listing and reading answers share one count. Empty or `0` sets no limit | `429` |
 | Signed-in AI calls a day (`limits.aiPerWalletPerDay`) | When set, the `/ai` route, Session Agent questions and Agent HTTP's AI together, per address per 24 hours | `429`; when unset, AI calls count under `perWalletPerDay` |

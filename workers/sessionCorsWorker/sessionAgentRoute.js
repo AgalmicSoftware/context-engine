@@ -1,6 +1,6 @@
 import {
-  SESSION_AGENT_LIMITS, buildSessionAgentMessages, sessionAgentMinAnswers, sessionAgentOpenToAnyone, sessionAgentSettingOf,
-  sessionAgentStoresChats,
+  SESSION_AGENT_LIMITS, buildSessionAgentMessages, sessionAgentContextLimits, sessionAgentMinAnswers, sessionAgentOpenToAnyone,
+  sessionAgentSettingOf, sessionAgentStoresChats,
 } from '../../shared/sessionAgent.mjs';
 import { namesSomeone } from '../../shared/sessionAgentExport.mjs';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
@@ -8,7 +8,7 @@ import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 import { proxyWorkersAi } from './aiProviderExecution.js';
 import { WORKERS_AI_PROVIDER } from '../../shared/workersAiModels.mjs';
 import { isModelAllowed, normalizeAiRequestPayload } from './aiRequestNormalization.js';
-import { CONTEXT_READ_LIMITS, forEveryone, loadParticipantContextSources } from './contextSourceLoader.js';
+import { forEveryone, loadParticipantContextSources } from './contextSourceLoader.js';
 import {
   evaluateResultsAnalysisViewerEligibility,
   loadWorkerCanonicalResultsAnalysisSource,
@@ -244,11 +244,12 @@ export const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswer
 // see. Detailed: every file they may read, and members' answers as well.
 // Neither reads the answers or files of anyone who opted out; the published
 // results, built from everyone's answers, are read as the Results page shows them.
-const gatherMaterial = async ({ env, slug, config, setting, address, scopes, asker, access, optedOut, deps }) => {
+const gatherMaterial = async ({ env, slug, config, setting, address, scopes, asker, access, optedOut, contextLimits, deps }) => {
   const detailed = asker.answers === 'detailed';
   const [context, results, answers] = await Promise.all([
     loadParticipantContextSources({
-      env, slug, config, deps, principal: lower(address), leaveOutUploaders: optedOut, totalChars: SESSION_AGENT_LIMITS.contextChars,
+      env, slug, config, deps, principal: lower(address), leaveOutUploaders: optedOut,
+      totalChars: contextLimits.totalChars, itemChars: contextLimits.itemChars, maxSources: contextLimits.items,
       // A General asker reads the files open to everyone the session admits;
       // each read checks the session's own gate again, as a file read does.
       readable: detailed ? access.canRead : async (row) => forEveryone(row, config) && access.canRead(row),
@@ -480,7 +481,10 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   });
   // Missing secrets come back as a 401, which the page would take for its sign-in.
   // Cloudflare's models need no key, so a session answering on them needs none stored.
-  const keyless = sessionAgentRequest({ messages: [], config, deps }).provider === WORKERS_AI_PROVIDER;
+  const { provider } = sessionAgentRequest({ messages: [], config, deps });
+  const keyless = provider === WORKERS_AI_PROVIDER;
+  // How much context this question reads: less on Cloudflare's model than on the session's own.
+  const contextLimits = sessionAgentContextLimits(provider);
   if (!secretContext?.ok && !keyless) return json({ error: 'The session’s AI isn’t set up.' }, 503);
 
   // Who opted out is read on every question, so no answer goes ahead without it.
@@ -490,12 +494,12 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   if (refused) return refused;
   const optedOut = new Set(optOuts.body.addresses);
   const { material, answersUnavailable, contextLeftOut, lockedTo } = await gatherMaterial({
-    env, slug, config, setting, address, scopes: currentScopes, asker, access, optedOut, deps,
+    env, slug, config, setting, address, scopes: currentScopes, asker, access, optedOut, contextLimits, deps,
   });
   const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
   if (!payment?.ok) return json({ error: payment?.error || 'This answer needs payment first.', reason: 'session_agent_payment_required' }, 402);
   const { messages, read, contextOmitted, contextItems, related, relatedFrom } = buildSessionAgentMessages({
-    setting, style: asker.answers, question, material,
+    setting, style: asker.answers, question, material, context: contextLimits,
   });
   const reply = await askAi({ messages, config, secrets: secretContext?.ok ? secretContext.secrets : {}, address, scopes: currentScopes, env, headers, deps });
   if (!reply.ok) return json(reply.body, reply.status);
@@ -510,7 +514,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
       ? `Members’ answers weren’t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} question and answer versions, the most the Session Agent can read at once.`
       : answersUnavailable ? 'Members’ answers couldn’t be read for this answer.' : '',
     contextLeftOut > 0 || contextOmitted > 0
-      ? `Some of the session’s context wasn’t read: the Session Agent reads at most ${SESSION_AGENT_LIMITS.contextChars.toLocaleString('en-US')} characters or ${CONTEXT_READ_LIMITS.sources} items of it.`
+      ? `Some of the session’s context wasn’t read: the Session Agent reads at most ${contextLimits.totalChars.toLocaleString('en-US')} characters or ${contextLimits.items} items of it, and ${contextLimits.itemChars.toLocaleString('en-US')} characters of any one.`
       : '',
     kept?.why || '',
   ].filter(Boolean);

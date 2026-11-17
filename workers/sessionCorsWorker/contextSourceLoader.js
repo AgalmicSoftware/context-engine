@@ -131,7 +131,8 @@ export const contextReadingOrder = (rows) => {
  * The context sources every participant may read, as texts for the shared
  * prompt block: link snapshots, text files, and the AI's reading of each PDF
  * (an unread PDF gives no text), in contextReadingOrder, until they fill
- * `totalChars`. The Worker's own AI features act for participants, so
+ * `totalChars`, each counted to `itemChars`, the most of it the caller's
+ * block takes. The Worker's own AI features act for participants, so
  * admins-only items never reach them. `readable(row)` narrows or widens that
  * to one person's access; `principal` names who the read is for in the
  * envelope audit; files added by `leaveOutUploaders` (lower-case addresses)
@@ -147,7 +148,7 @@ export const contextReadingOrder = (rows) => {
  */
 export const loadParticipantContextSources = async ({
   env, slug, config, deps, readable, principal, leaveOutUploaders, totalChars = SESSION_CONTEXT_TEXT_LIMITS.totalChars,
-  maxSources = CONTEXT_READ_LIMITS.sources,
+  maxSources = CONTEXT_READ_LIMITS.sources, itemChars = SESSION_CONTEXT_TEXT_LIMITS.itemChars,
 } = {}) => {
   const warn = typeof deps?.log?.warn === 'function' ? deps.log.warn : console.warn;
   let listed = { rows: [], leftOut: 0, stopped: [] };
@@ -250,7 +251,7 @@ export const loadParticipantContextSources = async ({
       title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isPdf,
       everyone: forEveryone(row, config), groupIds: groupLockedIds(row.accessConditions) || [], uploader: lower(row.uploader),
     });
-    chars += Math.min(text.trim().length, SESSION_CONTEXT_TEXT_LIMITS.itemChars);
+    chars += Math.min(text.trim().length, itemChars);
   }
   return {
     sources, leftOut, withheld: mine.length - ordered.length, unreadable, failed,

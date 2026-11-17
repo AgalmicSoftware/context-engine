@@ -174,34 +174,68 @@ test('General answers read the context, open files and visible results, never an
   for (const piece of ['GROUP notes', 'ANSWER']) assert.doesNotMatch(member.prompt, new RegExp(piece));
 });
 
+const NOT_ALL_READ = 'Some of the session’s context wasn’t read: the Session Agent reads at most 320,000 characters or 48 items of it, and 12,000 characters of any one.';
+
 test('an answer says when some of the session’s context wasn’t read', async () => {
   const h = await seeded();
   const fitted = await ask(h);
   assert.equal(fitted.body.note, undefined, 'all of it fitted');
-  // Three long notes: the Session Agent reads at most 8,000 characters of context.
-  for (const name of ['one', 'two', 'three']) {
-    await idOf(await h.uploadFile({ name: `${name}.md`, type: 'text/markdown', bytes: encode(`${name.toUpperCase()} `.repeat(1500)) }));
+  // Long notes: the Session Agent reads each to 12,000 characters, and 320,000 in all.
+  const names = Array.from({ length: 28 }, (_, index) => `LONG${String(index).padStart(2, '0')}`);
+  for (const name of names) {
+    await idOf(await h.uploadFile({ name: `${name}.md`, type: 'text/markdown', bytes: encode(`${name} `.repeat(1800)) }));
   }
-  // What isn't needed isn't read: the third note's bytes are never fetched.
+  // What isn't needed isn't read: the last note's bytes are never fetched.
   const read = [];
   const get = h.r2.get;
   h.r2.get = async (key) => {
     const object = await get(key);
-    if (object) read.push(new TextDecoder().decode(await object.arrayBuffer()).slice(0, 5));
+    if (object) read.push(new TextDecoder().decode(await object.arrayBuffer()).slice(0, 6));
     return object;
   };
   const crowded = await ask(h);
   h.r2.get = get;
   assert.equal(crowded.status, 200);
-  assert.equal(crowded.body.note, 'Some of the session’s context wasn’t read: the Session Agent reads at most 8,000 characters or 16 items of it.');
-  assert.doesNotMatch(crowded.prompt, /THREE/);
-  assert.ok(read.includes('ONE O') && !read.includes('THREE'), JSON.stringify(read));
-  // Everything read, but the session's own notes leave no room for a source.
-  const notes = await seeded();
-  notes.state.config.sessionContext.paragraphs = Array.from({ length: 4 }, (_, i) => `NOTE ${i} `.repeat(300).slice(0, 1990));
-  const full = await ask(notes);
-  assert.equal(full.body.note, 'Some of the session’s context wasn’t read: the Session Agent reads at most 8,000 characters or 16 items of it.');
-  assert.doesNotMatch(full.prompt, /OPEN agenda/);
+  assert.equal(crowded.body.note, NOT_ALL_READ);
+  assert.match(crowded.prompt, /LONG00/);
+  assert.doesNotMatch(crowded.prompt, /LONG27/);
+  assert.ok(read.includes('LONG00') && !read.includes('LONG27'), JSON.stringify(read));
+  // A long item is read to 12,000 characters, not all 12,600 of it: that many of its words, and its name.
+  assert.equal(crowded.prompt.match(/LONG00/g).length, Math.floor(12000 / 'LONG00 '.length) + 1);
+
+  // More items than it reads at once: the first 48, and the note says so.
+  const many = await seeded();
+  for (let index = 0; index < 50; index += 1) {
+    await idOf(await many.uploadFile({ name: `note-${index}.md`, type: 'text/markdown', bytes: encode(`SHORT${String(index).padStart(2, '0')}`) }));
+  }
+  const capped = await ask(many, { address: ADMIN });
+  assert.equal(capped.body.note, NOT_ALL_READ);
+  assert.equal(capped.body.sources.filter((source) => source.kind === 'file').length, 48);
+  assert.doesNotMatch(capped.prompt, /SHORT49/);
+});
+
+test('a session answering on Cloudflare’s model reads less context: the most that model was tried at', async () => {
+  const h = await seeded();
+  await idOf(await h.uploadFile({ name: 'long.md', type: 'text/markdown', bytes: encode('Z'.repeat(10000)) }));
+  const own = await ask(h);
+  assert.equal(own.prompt.match(/Z/g).length, 10000);
+  // The same file, cut at 6,000 characters for Cloudflare's model.
+  const ownAi = h.state.config.ai;
+  h.state.config.ai = { ...ownAi, models: { ...ownAi.models, 'session-agent': { provider: 'workers-ai', model: '@cf/zai-org/glm-5.3' } } };
+  const calls = [];
+  const cloudflare = await ask(h, { deps: { proxyWorkersAi: async ({ payload }) => { calls.push(payload); return json({ completion: 'An answer.' }); } } });
+  assert.equal(cloudflare.status, 200, JSON.stringify(cloudflare.body));
+  assert.equal(calls.length, 1);
+  const prompt = calls[0].messages.map((message) => message.content).join('\n');
+  assert.equal(prompt.match(/Z/g).length, 5999);
+  // 27 such files pass 160,000 characters, which the note then names.
+  for (let index = 0; index < 27; index += 1) {
+    await idOf(await h.uploadFile({ name: `fill-${index}.md`, type: 'text/markdown', bytes: encode('Y'.repeat(7000)) }));
+  }
+  const filled = await ask(h, { deps: { proxyWorkersAi: async () => json({ completion: 'An answer.' }) } });
+  assert.equal(filled.body.note, 'Some of the session’s context wasn’t read: the Session Agent reads at most 160,000 characters or 48 items of it, and 6,000 characters of any one.');
+  h.state.config.ai = ownAi;
+  assert.equal((await ask(h)).body.note, undefined, 'on the session’s own model all of it fits');
 });
 
 test('the session’s own gate comes first: someone it keeps out may not ask, whatever the audiences say', async () => {
@@ -295,12 +329,13 @@ test('a signed-in asker is told which context items the answer read, each one th
   for (const reply of [general, member]) assert.doesNotMatch(JSON.stringify(reply.body), /board\.txt/);
   assert.doesNotMatch(JSON.stringify(general.body), /group\.txt/);
   // An item that didn't fit the prompt was not read, so it is not listed.
-  h.state.config.sessionContext = { title: 'Context', paragraphs: ['P'.repeat(900), 'Q'.repeat(900)], links: [] };
-  await idOf(await h.uploadFile({ name: 'long.md', type: 'text/markdown', bytes: encode('L'.repeat(9000)) }));
+  for (let index = 0; index < 27; index += 1) {
+    await idOf(await h.uploadFile({ name: `long-${index}.md`, type: 'text/markdown', bytes: encode('L'.repeat(12500)) }));
+  }
   await idOf(await h.uploadFile({ name: 'late.md', type: 'text/markdown', bytes: encode('LATE file') }));
   const full = await ask(h);
   assert.equal(full.body.read.context, full.body.sources.length);
-  assert.ok(!titles(full).includes('file: late.md'));
+  assert.ok(titles(full).includes('file: long-0.md') && !titles(full).includes('file: late.md'));
   assert.match(full.body.note, /wasn’t read/);
 
   // Each listed item is the one read, whatever was passed over ahead of it: a file with no words, and a

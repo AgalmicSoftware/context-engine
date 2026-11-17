@@ -217,6 +217,11 @@ test('sources are read until their texts fill the caller’s block, and the rest
   assert.deepEqual([small.sources.map((source) => source.title), small.leftOut], [['first.md', 'second.md'], 3]);
   const roomy = await load(20000);
   assert.deepEqual([roomy.sources.map((source) => source.title), roomy.leftOut], [['first.md', 'second.md', 'third.md', 'deck.pdf', 'old-deck.pdf'], 0]);
+  // A caller whose block takes more of each item counts more of each, so it stops sooner.
+  const deep = await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, totalChars: 4000, itemChars: 2000 });
+  assert.deepEqual(deep.sources.map((source) => source.title), ['first.md', 'second.md']);
+  const shallow = await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, totalChars: 4000, itemChars: 1500 });
+  assert.deepEqual(shallow.sources.map((source) => source.title), ['first.md', 'second.md', 'third.md']);
   // The prompt block reads to the size its caller gives.
   const prompt = await buildParticipantContextPrompt({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, totalChars: 20000 });
   assert.match(prompt, /third\.md/);

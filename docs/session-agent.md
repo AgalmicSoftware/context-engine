@@ -106,8 +106,14 @@ admin can lower the three with the setting's `minAnswers` (a whole number from
 sets to 1 when turned off. At 1 the rule is off: a question only one member
 answered is used, so that person's answer can come back as the members' view.
 
-One question reads at most 8,000 characters of context, 2,000 of results and
-24,000 of answers. For each question members answered, a Detailed answer is
+One question reads at most 320,000 characters of context, 2,000 of results and
+24,000 of answers. The context is read whole where it fits: each added file or
+link to 12,000 characters, from up to 48 of them, the admins' first and then
+each adder's in turn. A session whose Session Agent answers on Cloudflare's
+model reads less, 160,000 characters and 6,000 of each item, the most that
+model was tried at. A full question is about 60,000 tokens of input, so the
+AI provider's rate limit, not this number, decides how many people can ask at
+once. For each question members answered, a Detailed answer is
 given how many answered and, where the question has set options (agree or
 disagree, a rating, a choice), how many chose each, with what a rating's
 numbers mean. These counts cover every member's answer, however large the
@@ -198,9 +204,12 @@ them:
 
 The rules are instructions to an AI model, not a filter: nothing removes what
 a member wrote about themselves before the model reads it, and nothing checks
-the reply. In trials with made-up data the agent never named a participant,
-but asked what a participant described by their role had said, it still passed
-on that person's view, unnamed, in most replies. A session that needs stronger
+the reply. In trials with made-up data the agent never named a participant on
+an OpenAI model, with up to 320,000 characters of context. On Cloudflare's
+model it did once in 24 questions about that participant, quoting what they
+wrote about themselves, with 160,000 characters of context; and asked what a
+participant described by their role had said, it still passed on that
+person's view, unnamed, in most replies. A session that needs stronger
 protection should give every audience General answers: that style reads no
 member's written answers, only the shared context, files and published
 results. Admins always get Detailed answers.
@@ -283,7 +292,7 @@ diff, and a changed one shows what changed.
   "agent": {
     "instructions": { "general": "…", "detailed": "…" },
     "rules": ["…"],
-    "limits": { "questionChars": 500, "answerWords": 150, "contextChars": 8000, "resultsChars": 2000, "answersChars": 24000, "answerItemChars": 300 },
+    "limits": { "questionChars": 500, "answerWords": 150, "contextChars": 320000, "resultsChars": 2000, "answersChars": 24000, "answerItemChars": 300 },
     "audiences": [{ "who": { "match": "any", "conditions": [{ "kind": "worker_group", "groupIds": ["salon"] }] }, "answers": "detailed" }],
     "minAnswers": 3
   },
@@ -545,8 +554,8 @@ other signed-in routes.
   the one asked, and `questionsFrom` says whether they are questions whose
   `answers` the prompt held or ones the published `results` cite. The answer is at most
   1,500 characters. `note` says what wasn't read: members' answers past the
-  stored-versions limit, or context past the 8,000 characters or 16 items
-  ("Some of the session's context wasn't read: …").
+  stored-versions limit, or context past the 320,000 characters or 48 items
+  (160,000 on Cloudflare's model; "Some of the session's context wasn't read: …").
 - `POST /session-agent/opt-out` with `{ optedOut: true | false }` returns
   `{ optedOut }`.
 - `POST /session-agent/attribution` with `{ unattributed: true | false }`

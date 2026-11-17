@@ -1,5 +1,6 @@
 import { looksSecret } from './secretText.mjs';
 import { buildSessionContextPrompt } from './sessionContextText.mjs';
+import { WORKERS_AI_PROVIDER } from './workersAiModels.mjs';
 
 // The Session Agent answers questions about the session for the people
 // an admin lets ask. The setting is { audiences: [{ who, answers }],
@@ -28,8 +29,14 @@ export const SESSION_AGENT_LIMITS = Object.freeze({
   nameChars: 60,
   answerWords: 150,
   answerChars: 1500,
-  // What one question may read, in characters of prompt.
-  contextChars: 8000,
+  // What one question may read, in characters of prompt. Context is read
+  // whole where it fits: each item to `contextItemChars`, from at most
+  // `contextItems` added files and links, up to `contextChars` in all. The
+  // session's own model kept every rule and found every planted fact at this
+  // size in a trial on made-up data.
+  contextChars: 320000,
+  contextItemChars: 12000,
+  contextItems: 48,
   resultsChars: 2000,
   answersChars: 24000,
   answerItemChars: 300,
@@ -42,6 +49,15 @@ export const SESSION_AGENT_LIMITS = Object.freeze({
 });
 
 const L = SESSION_AGENT_LIMITS;
+
+// A session answering on Cloudflare's model reads less context: the most that
+// model was tried at. There it once quoted a member's self-description whole,
+// name included, which it never did with less; it was not tried with more.
+const WORKERS_AI_CONTEXT = Object.freeze({ totalChars: 160000, itemChars: 6000, items: L.contextItems });
+const CONTEXT = Object.freeze({ totalChars: L.contextChars, itemChars: L.contextItemChars, items: L.contextItems });
+
+/** How much context one question reads, by the provider that answers it: characters in all, per item, and items. */
+export const sessionAgentContextLimits = (provider) => (provider === WORKERS_AI_PROVIDER ? WORKERS_AI_CONTEXT : CONTEXT);
 
 /** What each style is told before the rules; an admin may replace either. */
 export const SESSION_AGENT_DEFAULT_INSTRUCTIONS = Object.freeze({
@@ -372,9 +388,10 @@ const closestCited = (cited, question) =>
  * for each member's answer and no names, and `resultsQuestions` as the
  * [{ id, question }] the results cite. An `id` never reaches the prompt. Instructions change only how the
  * agent writes; the rules after them always apply. `random` orders what
- * members wrote.
+ * members wrote, and `context` is sessionAgentContextLimits for the provider
+ * that will answer.
  */
-export const buildSessionAgentMessages = ({ setting, style, question, material = {}, random = Math.random }) => {
+export const buildSessionAgentMessages = ({ setting, style, question, material = {}, random = Math.random, context: limits = CONTEXT }) => {
   const system = [
     `You are the Session Agent for this session, giving ${STYLE_NAMES[style]} answers.`,
     sessionAgentInstructions(setting, style),
@@ -383,7 +400,8 @@ export const buildSessionAgentMessages = ({ setting, style, question, material =
   const context = buildSessionContextPrompt({
     sessionContext: material.sessionContext,
     sources: material.sources,
-    totalChars: L.contextChars,
+    totalChars: limits.totalChars,
+    itemChars: limits.itemChars,
   });
   const results = clip(text(material.results), L.resultsChars);
   const { answers, leftOut, related } =

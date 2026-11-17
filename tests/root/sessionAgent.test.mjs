@@ -5,6 +5,7 @@ import {
   SESSION_AGENT_LIMITS,
   SESSION_AGENT_RULES,
   buildSessionAgentMessages,
+  sessionAgentContextLimits,
   sessionAgentInstructions,
   sessionAgentMinAnswers,
   sessionAgentOpenToAnyone,
@@ -438,4 +439,28 @@ test('the questions an answer read are named closest first, at most five, and th
   assert.deepEqual(general.related, [{ id: '0xr1', question: 'Should bus lanes stay?' }]);
   assert.equal(general.relatedFrom, 'results');
   assert.deepEqual(buildSessionAgentMessages({ style: 'general', question: 'The bus?', material: { resultsQuestions } }).related, []);
+});
+
+test('a question reads context whole to its limits, and less on Cloudflare’s model', () => {
+  assert.deepEqual(sessionAgentContextLimits('openai'), { totalChars: 320000, itemChars: 12000, items: 48 });
+  assert.deepEqual(sessionAgentContextLimits(), sessionAgentContextLimits('anthropic'));
+  assert.deepEqual(sessionAgentContextLimits('workers-ai'), { totalChars: 160000, itemChars: 6000, items: 48 });
+  assert.deepEqual(
+    [SESSION_AGENT_LIMITS.contextChars, SESSION_AGENT_LIMITS.contextItemChars, SESSION_AGENT_LIMITS.contextItems],
+    [320000, 12000, 48],
+  );
+  const sources = Array.from({ length: 30 }, (_, index) => ({ title: `page ${index}`, kind: 'file', text: `${index}:`.padEnd(13000, 'w') }));
+  const held = (context) => {
+    const { messages, read } = buildSessionAgentMessages({ style: 'general', question: 'Hi', material: { sources }, ...(context ? { context } : {}) });
+    const block = messages[1].content;
+    return { items: read.context, chars: block.slice(0, block.indexOf('</session_context>')).length, item: block.match(/"0:w+/)[0].length };
+  };
+  // Each page to 12,000 characters, and as many as fit in 320,000.
+  const own = held();
+  assert.ok(own.items >= 26 && own.items < 30 && own.chars <= 320000, JSON.stringify(own));
+  assert.ok(own.item > 11990 && own.item <= 12001, String(own.item));
+  // Cloudflare's model: each to 6,000, up to 160,000.
+  const cloudflare = held(sessionAgentContextLimits('workers-ai'));
+  assert.ok(cloudflare.items >= 26 && cloudflare.items < 30 && cloudflare.chars <= 160000, JSON.stringify(cloudflare));
+  assert.ok(cloudflare.item > 5990 && cloudflare.item <= 6001, String(cloudflare.item));
 });
