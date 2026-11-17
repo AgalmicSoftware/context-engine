@@ -39,26 +39,29 @@ const refuse = (reason) => ({ ok: false, reason, error: REFUSALS[reason] });
 
 // Letters drawn like Latin ones, read as those Latin letters when checking
 // for an address or a role, each case by its own shape (capital Greek Η is an
-// H, small η an n). NFKC has already folded fullwidth and styled letters, and
-// a word mixing these alphabets is refused outright, so this map only has to
-// cover a whole word written in one of them.
-const LOOK_ALIKES = Object.freeze({
-  А: 'a', В: 'b', Е: 'e', К: 'k', М: 'm', Н: 'h', О: 'o', Р: 'p', С: 'c', Т: 't', У: 'y', Х: 'x', І: 'i', Ј: 'j', Ѕ: 's',
-  а: 'a', в: 'b', е: 'e', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x', і: 'i', ј: 'j', ѕ: 's',
-  ԁ: 'd', һ: 'h', ԛ: 'q', ԝ: 'w', ӏ: 'l',
-  Α: 'a', Β: 'b', Ε: 'e', Ζ: 'z', Η: 'h', Ι: 'i', Κ: 'k', Μ: 'm', Ν: 'n', Ο: 'o', Ρ: 'p', Τ: 't', Υ: 'y', Χ: 'x',
-  α: 'a', β: 'b', ε: 'e', ζ: 'z', η: 'n', ι: 'i', κ: 'k', μ: 'u', ν: 'v', ο: 'o', ρ: 'p', τ: 't', υ: 'u', χ: 'x', γ: 'y',
-  ı: 'i', ȷ: 'j', ɑ: 'a', ɡ: 'g', ʜ: 'h', ɪ: 'i', ʟ: 'l', ɴ: 'n', ᴍ: 'm', ᴅ: 'd', ᴀ: 'a',
-  ꓮ: 'a', ꓐ: 'b', ꓚ: 'c', ꓓ: 'd', ꓰ: 'e', ꓝ: 'f', ꓖ: 'g', ꓧ: 'h', ꓲ: 'i', ꓙ: 'j', ꓗ: 'k', ꓡ: 'l', ꓟ: 'm', ꓠ: 'n',
-  ꓳ: 'o', ꓑ: 'p', ꓣ: 'r', ꓢ: 's', ꓔ: 't', ꓴ: 'u', ꓦ: 'v', ꓪ: 'w', ꓫ: 'x', ꓬ: 'y', ꓜ: 'z',
-  օ: 'o', հ: 'h', ո: 'n', ս: 'u', ց: 'g', ք: 'p',
-});
-const skeleton = (name) => [...name].map((char) => LOOK_ALIKES[char] || char.toLowerCase()).join('')
+// H, small η an n); a small letter not listed is read by its capital. NFKC has
+// already folded fullwidth and styled letters, and a word mixing these
+// alphabets is refused outright, so this only has to cover a whole word
+// written in one of them: Greek, Cyrillic, Armenian, Cherokee, Lisu, Coptic,
+// Canadian syllabics, Tifinagh, and Latin small capitals and IPA letters.
+const SHAPES = {
+  a: 'АаΑαɑꓮᎪᗩᴀⲀⲁ', b: 'ВвΒβꓐᏴᗷʙⲂⲃ', c: 'СсϹϲꓚᏟᑕᴄⲤⲥ', d: 'ԀԁꓓᎠᗪᴅ', e: 'ЕеΕεꓰᎬᴇⲈⲉᕮ', f: 'ꓝᖴꜰ',
+  g: 'ɡꓖᏀɢց', h: 'НнҺһΗꓧᎻᕼʜհⲎ', i: 'ІіΙιıɩƖǀꓲɪⲒⲓⵏ', j: 'ЈјȷꓙᎫᒍᴊ', k: 'КкΚκꓗᏦᴋⲔⲕ', l: 'ӀӏꓡᏞᒪʟ',
+  m: 'МмΜꓟᎷᗰᴍⲘⲙ', n: 'ΝηꓠᑎɴոⲚⲛ', o: 'ОоΟοօꓳᎾᗝᴏⲞⲟⵔ', p: 'РрΡρꓑᏢᑭᴘքⲢⲣ', q: 'Ԛԛᑫ', r: 'ꓣᎡᖇʀ',
+  s: 'ЅѕꓢᏚᔕꜱ', t: 'ТтΤτꓔᎢᴛⲦⲧ', u: 'μυսꓴᑌᴜ', v: 'νꓦᏙᐯᴠ', w: 'ԜԝꓪᏔᗯᴡᎳ', x: 'ХхΧχꓫ᙭Ⲭⲭⵝⵅ',
+  y: 'УуΥγꓬᎩʏⲨⲩᎽ', z: 'ΖζꓜᏃᘔᴢⲌⲍ',
+};
+const LOOK_ALIKES = new Map(Object.entries(SHAPES).flatMap(([latin, shapes]) => [...shapes].map((shape) => [shape, latin])));
+const skeleton = (name) => [...name.normalize('NFD').replace(/\p{M}/gu, '')]
+  .map((char) => LOOK_ALIKES.get(char) || LOOK_ALIKES.get(char.toUpperCase()) || char.toLowerCase()).join('')
   // A zero in any script, then x: the start of an address.
   .replace(/\p{Nd}(?=x)/gu, '0');
-// Alphabets with letters drawn like Latin ones: a word may use only one of them.
-const LOOK_ALIKE_SCRIPTS = ['Latin', 'Greek', 'Cyrillic', 'Armenian', 'Cherokee', 'Lisu', 'Coptic'].map((script) => new RegExp(`\\p{Script=${script}}`, 'u'));
-const mixesAlphabets = (name) => name.split(/[\s._'-]+/u).some((word) => LOOK_ALIKE_SCRIPTS.filter((script) => script.test(word)).length > 1);
+const LOOK_ALIKE_SCRIPTS = ['Latin', 'Greek', 'Cyrillic', 'Armenian', 'Cherokee', 'Lisu', 'Coptic', 'Canadian_Aboriginal', 'Tifinagh'].map((script) => new RegExp(`\\p{Script=${script}}`, 'u'));
+// A letter outside Latin (and outside the shared modifier letters, such as ʻ).
+const NOT_LATIN = /(?![\p{Script=Latin}\p{Script=Common}])\p{L}/u;
+const LATIN = /\p{Script=Latin}/u;
+const mixesAlphabets = (name) => name.split(/[\s._'-]+/u).some((word) =>
+  (LATIN.test(word) && NOT_LATIN.test(word)) || LOOK_ALIKE_SCRIPTS.filter((script) => script.test(word)).length > 1);
 
 /**
  * The name to store for what a person typed: normalised (NFKC, trimmed, inner

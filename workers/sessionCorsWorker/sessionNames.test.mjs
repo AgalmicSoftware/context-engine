@@ -45,7 +45,8 @@ test('a name is stored as typed, tidied, and refused with a reason when it could
     ['  Sam   Rivera ', 'Sam Rivera'], ['José', 'José'], ['José', 'José'], ['李雷', '李雷'], ["O'Brien-Smith", "O'Brien-Smith"],
     ['J.R. Hall', 'J.R. Hall'], ['Hostetler', 'Hostetler'], ["Sam's agent", "Sam's agent"], ['', ''], ['   ', ''],
     ['Ελένη', 'Ελένη'], ['Олена', 'Олена'], ['ﬁona', 'fiona'], ['ΕΛΕΝΗ', 'ΕΛΕΝΗ'], ['ОЛЕНА', 'ОЛЕНА'], ['Мира Smith', 'Мира Smith'],
-    ['Ἀλέξανδρος', 'Ἀλέξανδρος'], ['Արամ', 'Արամ'], ['Oxford', 'Oxford'],
+    ['Ἀλέξανδρος', 'Ἀλέξανδρος'], ['Արամ', 'Արամ'], ['Oxford', 'Oxford'], ['ΧΡΗΣΤΟΣ', 'ΧΡΗΣΤΟΣ'], ['ᏣᎳᎩ', 'ᏣᎳᎩ'],
+    ['Kɔfi', 'Kɔfi'], ['Keʻala', 'Keʻala'], ['ᐃᓄᒃ', 'ᐃᓄᒃ'], ['Sam 山田', 'Sam 山田'], ['Hosts', 'Hosts'],
   ]) assert.deepEqual(normalizeSessionName(typed), { ok: true, name: stored }, typed);
   for (const [typed, reason] of [
     [undefined, 'empty'], ['x'.repeat(33), 'too_long'], ['Sam (agent)', 'agent_mark'], ['Sam 🙂', 'characters'], ['Sam!', 'characters'],
@@ -59,6 +60,9 @@ test('a name is stored as typed, tidied, and refused with a reason when it could
     // Each case read by its own shape, and one word in one alphabet.
     ['\u0397ost', 'mixed_scripts'], ['Ad\u039cin', 'mixed_scripts'], ['H\u0585st', 'mixed_scripts'], ['\u041d\u041e\u0405\u0422', 'role'],
     ['\ua4ee\ua4d3\ua4df\ua4f2\ua4e0', 'role'], ['\u0251dmin', 'role'], ['Adm\u0131n', 'role'], ['\u0966x1234abcd', 'address'],
+    ['ᎻᎾᏚᎢ', 'role'], ['ᏚᎽᏚᎢᎬᎷ', 'role'], ['ꮋꮎꮪꭲ', 'role'], ['1234ᎪᏴᏟᎠ5678ᎬᎪᏴ1', 'address'], ['ʜᴏꜱᴛ', 'role'], ['ʀxᴄ', 'role'],
+    ['Admɩn', 'role'], ['Admǀn', 'role'], ['ҺОЅТ', 'role'], ['ᔕTᗩᖴᖴ', 'mixed_scripts'], ['Hⵔst', 'mixed_scripts'],
+    ['HOST\u0f8c', 'mixed_scripts'], ['Ádmin', 'role'], ['ᕼᎾᔕᎢ', 'mixed_scripts'],
   ]) assert.equal(normalizeSessionName(typed).reason, reason, String(typed));
   assert.equal(normalizeSessionName('x'.repeat(32)).ok, true);
   assert.match(normalizeSessionName('Admin').error, /role/);
