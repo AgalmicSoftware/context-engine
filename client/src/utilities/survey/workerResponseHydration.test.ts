@@ -620,3 +620,73 @@ describe('hidden Worker questions', () => {
     expect(cache.worker.questionResponses.q1.participant).toBeDefined();
   });
 });
+
+describe('answers with research material, which the Worker sends only to their author and the admins', () => {
+  const ADMIN = `0x${'a'.repeat(40)}`;
+  const adminConfig = { ...workerConfig, adminAddress: ADMIN };
+  const listPage = async () => ({
+    items: [{ storageRef: { id: 'r1' }, metadata: { responder: '0xabc', createdAt: '2026-01-01T00:00:00Z' } }],
+    cursor: null,
+    listComplete: true,
+  });
+  const payload = (withMaterial: boolean) => ({
+    sessionSlug: 'demo-sh',
+    sessionId: SESSION_ID,
+    questionID: 'q1',
+    answer: { value: 'Agree' },
+    ...(withMaterial ? { interviewProvenance: { originalPrediction: { answer: 'Agree' } } } : {}),
+  });
+
+  it.each([
+    ['a session admin', { account: ADMIN }, false],
+    ['the author reading their own answers', { account: '0xabc', ownResponses: true }, false],
+    ['anyone else', { account: '0xdef' }, true],
+  ])('%s reads signed in only when the Worker would send them the material', async (_who, options, anonymous) => {
+    const readBlob = jest.fn(async (_options: Record<string, unknown>) => new Response(JSON.stringify(payload(false))));
+    await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: adminConfig, ...options },
+      { listSessionStorageRefsPage: listPage, readSessionStorageBlob: readBlob },
+    );
+    expect(readBlob).toHaveBeenCalledTimes(1);
+    expect(readBlob.mock.calls[0][0].preferAnonymous === false).toBe(!anonymous);
+  });
+
+  it("rereads an admin's cached answers once, since copies read signed out lack the material", async () => {
+    let withMaterial = false;
+    const readBlob = jest.fn(async () => new Response(JSON.stringify(payload(withMaterial))));
+    let questions: any = {};
+    const refresh = () =>
+      hydrateWorkerCanonicalResponses({
+        sessionSlug: 'demo-sh',
+        sessionConfig: adminConfig,
+        run: resolveWorkerResponseHydrationRun({ sessionConfig: adminConfig, sessionSlug: 'demo-sh', reader: ADMIN })!,
+        loadWorkerResponses: (options) =>
+          loadWorkerResponses(options, { listSessionStorageRefsPage: listPage, readSessionStorageBlob: readBlob }),
+        getAccount: () => ADMIN,
+        getProviderLike: () => null,
+        getCurrentSessionConfig: () => adminConfig,
+        shouldAbort: () => false,
+        markLoading: () => {},
+        markReady: () => {},
+        createPersistenceError: (message) => new Error(message),
+        updateQuestionsCacheAtomic: async (update) => {
+          questions = update(questions);
+          return true;
+        },
+        updateUserCacheAtomic: async () => true,
+      });
+    const cached = () => questions.worker.questionResponses.q1['0xabc'];
+    await refresh();
+    // A cache from before this release: read signed out, without the mark.
+    delete questions.worker.workerResponseReadsResearch;
+    expect(cached().interviewProvenance).toBeUndefined();
+    withMaterial = true;
+    await refresh();
+    expect(readBlob).toHaveBeenCalledTimes(2);
+    expect(cached().interviewProvenance).toEqual({ originalPrediction: { answer: 'Agree' } });
+    expect(questions.worker.workerResponseReadsResearch).toBe(true);
+    // Marked, the copy is reused as before.
+    await refresh();
+    expect(readBlob).toHaveBeenCalledTimes(2);
+  });
+});

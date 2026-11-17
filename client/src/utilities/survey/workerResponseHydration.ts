@@ -1,6 +1,7 @@
 import { isWorkerResponseNewer } from './workerResponseRecency';
 import {
   STORAGE_READ_BATCH_MAX_IDS,
+  isConfiguredAdmin,
   listSessionStorageRefsPage,
   readSessionStorageBatch,
   readSessionStorageBlob,
@@ -60,6 +61,10 @@ export const isWorkerCanonicalSessionConfig = (value: unknown): boolean => {
   const projection = resolveSessionCapabilityProjection(value);
   return projection.profileValid && projection.isWorkerCanonical;
 };
+
+/** Whether this reader gets answers' research material from the Worker: a session admin (authors get their own). */
+export const readsResearchMaterial = (sessionConfig: unknown, account: unknown): boolean =>
+  isConfiguredAdmin(sessionConfig, { account });
 
 export const loadWorkerResponses = async (
   {
@@ -197,6 +202,9 @@ export const loadWorkerResponses = async (
     sessionConfig: target.sessionConfig,
     context,
     workerUrl: target.workerUrl,
+    // The Worker sends an answer's research material only to its author and the session's admins, so their
+    // reads go signed in: a signed-out copy would drop it from Results, the export, and a resubmitted answer.
+    ...(ownResponses || readsResearchMaterial(target.sessionConfig, account) ? { preferAnonymous: false } : {}),
     ...(signal ? { signal } : {}),
   };
   const batched =

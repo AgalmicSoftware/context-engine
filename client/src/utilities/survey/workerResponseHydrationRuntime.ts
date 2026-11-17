@@ -98,6 +98,10 @@ export const hydrateWorkerCanonicalResponses = async ({
   let cachedStorageRefIds = new Set<string>();
   let cachedRows: WorkerCanonicalResponseRow[] = [];
   let startCursor = '';
+  // An admin's answers read signed out before 0.9.12 lack their research material, so an admin's cache is read
+  // again once, signed in (readsResearchMaterial), and marked as holding it.
+  const readsResearch = workerHydration.readsResearchMaterial(sessionConfig, getAccount());
+  let rereadForResearch = false;
   const initializedQuestions = await updateQuestionsCacheAtomic((current) => {
     const merged = targetIsCurrent()
       ? workerHydration.mergeWorkerQuestionResponses(current, [], sessionSlug, run.identity)
@@ -112,6 +116,8 @@ export const hydrateWorkerCanonicalResponses = async ({
       delete worker.workerResponseListCursor;
     }
     cachedStorageRefIds = new Set(Object.keys((worker?.workerResponseStorageRefs as CacheRecord) || {}));
+    rereadForResearch = readsResearch && worker?.workerResponseReadsResearch !== true;
+    if (rereadForResearch) startCursor = '';
     const responses = (worker?.questionResponses || {}) as Record<string, Record<string, CacheRecord>>;
     const metadata = (worker?.questionResponsesMeta || {}) as Record<string, Record<string, CacheRecord>>;
     cachedRows = Object.entries(responses).flatMap(([questionId, byResponder]) =>
@@ -157,12 +163,17 @@ export const hydrateWorkerCanonicalResponses = async ({
         listedStorageRefIds = storageRefIds;
       },
     });
-  let rows = await load(cachedStorageRefIds, startCursor);
+  let rows = await load(rereadForResearch ? new Set() : cachedStorageRefIds, startCursor);
   if (shouldStop()) return;
   // A complete listing is authoritative for this reader.
   const listed = listedStorageRefIds as ReadonlySet<string> | null;
   let staleRefIds = listed ? new Set([...cachedStorageRefIds].filter((refId) => !listed.has(refId))) : undefined;
-  if (staleRefIds?.size) {
+  // A full reread replaces every cached copy; one that stopped short leaves the mark off, to try again.
+  let researchComplete = readsResearch && !rereadForResearch;
+  if (rereadForResearch && listed) {
+    staleRefIds = cachedStorageRefIds;
+    researchComplete = true;
+  } else if (staleRefIds?.size) {
     // An answer this reader could read is gone, so a responder's older version may
     // be what it can read now. Rebuild from a full read, as a fresh client would.
     listedStorageRefIds = null;
@@ -186,6 +197,7 @@ export const hydrateWorkerCanonicalResponses = async ({
     worker.workerResponseOverReadLimit = partial;
     // The next refresh continues from here instead of rereading the same prefix.
     if (resumeCursor) worker.workerResponseListCursor = resumeCursor;
+    if (researchComplete) worker.workerResponseReadsResearch = true;
     return merged;
   });
   if (!questionsPersisted) {
