@@ -162,6 +162,10 @@ type PendingStatsState = {
   encryptedModifiedCount?: unknown;
 } & UnknownRecord;
 
+/** A running Submit's label: "Saving 12 of 40" once answers are storing, else "Saving". Shown with elapsed seconds. */
+export const submittingLabel = (submitCountText?: string): string =>
+  submitCountText ? `Saving ${submitCountText}` : 'Saving';
+
 // While a Submit saves several answers, the header carries its count ("12 of 40").
 type SubmitLabelStats = Partial<PendingStatsSnapshot> & { isSubmitting?: boolean; submitCountText?: string };
 
@@ -1306,7 +1310,7 @@ export function computeSubmitLabel(ctx: SubmitLabelContext = {}, opts: SubmitLab
     getPendingStatsSnapshotFromState(ctx.state);
 
   const { isSubmitting, submitCountText } = (stats || {}) as SubmitLabelStats;
-  if (isSubmitting && submitCountText) return `Saving ${submitCountText}...`;
+  if (isSubmitting) return submittingLabel(submitCountText);
   const pendingCount = Number(stats?.total || 0);
   const base = 'Submit';
   const suffix = opts.suffix ? ` ${String(opts.suffix)}` : '';

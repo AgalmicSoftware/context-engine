@@ -2101,7 +2101,7 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
     isSubmitting && Number(currentStep || 0) === 1 && !!hasEncryptedAnswers
       ? 'Encrypting...'
       : submitCountText
-        ? `Saving ${String(submitCountText)}...`
+        ? `Saving ${String(submitCountText)}`
         : 'Uploading...';
   const submitDisabled = !!(isSubmitting || (singleQuestionMode && hasMaskedCurrentQuestionPayload));
   const canEditQuestions = !userHasResponse || !!startFresh || !!isEditing;

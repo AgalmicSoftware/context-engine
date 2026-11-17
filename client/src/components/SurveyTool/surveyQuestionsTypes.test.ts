@@ -2053,7 +2053,7 @@ it('counts a Submit that saves several answers', () => {
   expect(
     buildSurveyQuestionsSubmitFooterDisplayState({ isSubmitting: true, currentStep: 2, submitCountText: '12 of 40' })
       .uploadStatusText,
-  ).toBe('Saving 12 of 40...');
+  ).toBe('Saving 12 of 40');
   expect(buildSurveyQuestionsSubmitFooterDisplayState({ isSubmitting: true, currentStep: 2 }).uploadStatusText).toBe(
     'Uploading...',
   );

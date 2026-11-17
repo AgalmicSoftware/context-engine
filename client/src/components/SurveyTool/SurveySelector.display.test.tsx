@@ -11,7 +11,7 @@ import {
 } from './SurveySelector';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 const syncClassSetState = (subject: any) => {
   subject.setState = jest.fn((next: any, cb?: () => void) => {
@@ -364,10 +364,24 @@ describe('SurveySelector display guards', () => {
     const submitButton = () =>
       findElement(subject.render(), (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT);
     const stats = { total: 40, encrypted: 0, submittedSinceLastEdit: false, isSubmitting: true };
-    subject.handlePendingStatsChange({ ...stats, submitCountText: '12 of 40' });
-    expect(treeHasText(submitButton(), 'Saving 12 of 40...')).toBe(true);
-    subject.handlePendingStatsChange({ ...stats, submitCountText: '13 of 40' });
-    expect(treeHasText(submitButton(), 'Saving 13 of 40...')).toBe(true);
+    jest.useFakeTimers();
+    try {
+      subject.handlePendingStatsChange({ ...stats, submitCountText: '12 of 40' });
+      const view = render(submitButton());
+      expect(view.container).toHaveTextContent('Saving 12 of 40 · 0s');
+      act(() => {
+        jest.advanceTimersByTime(3000);
+      });
+      subject.handlePendingStatsChange({ ...stats, submitCountText: '13 of 40' });
+      view.rerender(submitButton());
+      // The seconds keep counting from the Submit's start as the count moves on.
+      expect(view.container).toHaveTextContent('Saving 13 of 40 · 3s');
+      subject.handlePendingStatsChange({ ...stats, isSubmitting: false, submitCountText: '13 of 40' });
+      view.rerender(submitButton());
+      expect(view.container).toHaveTextContent(/^Submit \(40\)$/);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

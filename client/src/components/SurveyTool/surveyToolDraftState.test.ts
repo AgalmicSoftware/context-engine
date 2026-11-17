@@ -90,9 +90,10 @@ describe('surveyToolDraftState', () => {
 
   it('counts the answers a Submit has saved, only while it runs', () => {
     const stats = { total: 40, encrypted: 0, isSubmitting: true, submitCountText: '12 of 40' };
-    expect(computeSubmitLabel({ getPendingEditStats: () => stats })).toBe('Saving 12 of 40...');
+    expect(computeSubmitLabel({ getPendingEditStats: () => stats })).toBe('Saving 12 of 40');
     expect(computeSubmitLabel({ getPendingEditStats: () => ({ ...stats, isSubmitting: false }) })).toBe('Submit (40)');
-    expect(computeSubmitLabel({ getPendingEditStats: () => ({ ...stats, submitCountText: '' }) })).toBe('Submit (40)');
+    // Before the first answer stores (reading saved answers, encrypting), or for a single answer.
+    expect(computeSubmitLabel({ getPendingEditStats: () => ({ ...stats, submitCountText: '' }) })).toBe('Saving');
   });
 
   it('does not auto-encrypt empty additional comments when answer audience changes', () => {

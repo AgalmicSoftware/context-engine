@@ -23,6 +23,7 @@ import {
 import QuestionFilter from './QuestionFilter';
 import type { QuestionFilterHandle } from './QuestionFilter';
 import LazyFallback from '../Shared/LazyFallback';
+import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 
 // Crypto and contract utilities
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -1361,7 +1362,8 @@ export class SurveySelector extends Component<any, any> {
               data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
               disabled={!!pendingSubmitStats.isSubmitting}
             >
-              {headerSubmitLabel}
+              {/* Counts seconds from the Submit's start, as the AI flows' progress labels do. */}
+              {pendingSubmitStats.isSubmitting ? <ElapsedLoadingLabel label={headerSubmitLabel} /> : headerSubmitLabel}
               {pendingSubmitStats.isSubmitting && (
                 <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE} />
               )}
