@@ -7482,6 +7482,39 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// On a phone every question card has one height, most of the screen under the session title, so the arrows below
+// it stay put from card to card. The small viewport unit keeps that height still while Safari's toolbars move.
+// Choice and quadratic prompts take what they need up to 40% of the card, then scroll; the answers get the rest.
+@media (max-width: 768px) {
+  .pileInteractionUnit {
+    --pile-phone-card-height: max(380px, calc(100vh - 170px));
+    --pile-phone-card-height: max(380px, calc(100svh - 170px));
+  }
+
+  .pileCardContainer,
+  .pileEmptyState {
+    height: auto;
+    min-height: var(--pile-phone-card-height);
+  }
+
+  .pileCardInner {
+    height: var(--pile-phone-card-height);
+    min-height: 0;
+  }
+
+  .pileCardInner .pileCardBody:has(.multichoiceQuestionContainer, .quadraticQuestionContainer) {
+    .pileCardHeader {
+      flex: 0 1 auto;
+      max-height: 40%;
+    }
+
+    .pileCardMainContent {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+  }
+}
+
 // The portal keeps the backdrop out of transformed question-card stacking contexts.
 .pileActionBackdrop {
   position: fixed;
