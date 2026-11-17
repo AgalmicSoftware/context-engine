@@ -159,19 +159,22 @@ export async function loadAgentQuestionAnswerState({ env = {}, context = {}, que
   }
   const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
   // The permanent index keeps answers past the 30-day submission index, which
-  // still holds answers saved before the permanent one existed.
+  // still holds answers saved before the permanent one existed. A queued answer
+  // counts only while its 30-day record lasts, so one that never finishes
+  // does not stay answered for good.
+  const indexes = [
+    [canonicalAnswerUserKvPrefix, new Set(['direct_submitted'])],
+    [submitRequestUserKvPrefix, submittedStatuses],
+  ];
   const indexedRecordGroups = await Promise.all(
-    [...sessionSlugs].flatMap((sessionSlug) => [canonicalAnswerUserKvPrefix, submitRequestUserKvPrefix].map((prefixOf) => {
+    [...sessionSlugs].flatMap((sessionSlug) => indexes.map(async ([prefixOf, statuses]) => {
       const prefix = prefixOf({ sessionSlug, telegramUserId });
-      return prefix
-        ? listHandoffKvRecordsByPrefix(env, prefix, {
-            limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT,
-          })
-        : [];
+      const listed = prefix ? await listHandoffKvRecordsByPrefix(env, prefix, { limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT }) : [];
+      return listed.filter(record => statuses.has(safeString(record.status)));
     })),
   );
   const records = selectCurrentSubmittedAnswers(indexedRecordGroups.flat().filter(record =>
-    safeString(record.telegramUserId) === telegramUserId && submittedStatuses.has(safeString(record.status))));
+    safeString(record.telegramUserId) === telegramUserId));
   const answeredByRef = new Map();
   records.forEach((record) => {
     if (safeString(record.telegramUserId) !== telegramUserId) return;

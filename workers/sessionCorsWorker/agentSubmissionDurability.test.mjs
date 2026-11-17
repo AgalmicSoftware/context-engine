@@ -622,6 +622,18 @@ test('an answered question stays answered on the agent route after its 30-day re
   assert.deepEqual(after.questions[0].myAnswer, before.questions[0].myAnswer);
 });
 
+test('a queued answer that never finishes stops counting when its 30-day receipts lapse', async () => {
+  const { f, submit, listQuestions } = await submissionFixture({ registry: true, queued: true });
+  assert.equal((await submit()).status, 200);
+  assert.equal((await (await listQuestions()).json()).answerState.answeredCount, 1);
+  const lapsed = [...f.records.keys()].filter(key => key.includes(':telegram:submit-request'));
+  assert.ok(lapsed.length > 0);
+  for (const key of lapsed) f.records.delete(key);
+  const after = await (await listQuestions()).json();
+  assert.deepEqual([after.answerState.answeredCount, after.answerState.unansweredCount], [0, 1]);
+  assert.equal(after.questions[0].answeredByUser, false);
+});
+
 test('concurrent answer claims serialize different content and retain retries at the current head', async () => {
   const { coordinated, qid } = await submissionFixture();
   const claim = contentDigest => coordinated.coordinator.fetch(new Request('https://session-coordinator.internal/session-config/agent-submit/claim', {
