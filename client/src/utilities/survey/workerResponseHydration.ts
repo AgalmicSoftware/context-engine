@@ -303,6 +303,17 @@ const dropStaleResponses = (
     ]),
   );
 
+// The Worker sends an answer's research material only to its author and the admins, so one stored answer can be
+// cached stripped (read signed out) or whole. Whatever lands first, the whole copy is kept: it replaces a stripped
+// copy of the same stored answer, and a stripped copy never replaces it.
+const fillsWithheldCopy = (cached: unknown, cachedMeta: unknown, row: WorkerCanonicalResponseRow): boolean =>
+  isRecord(cached) &&
+  cached.interviewProvenanceWithheld === true &&
+  row.response?.interviewProvenanceWithheld !== true &&
+  !!readString(row.storageRefId) &&
+  isRecord(cachedMeta) &&
+  readString(cachedMeta.storageRefId) === readString(row.storageRefId);
+
 export const mergeWorkerQuestionResponses = (
   current: unknown,
   rows: WorkerCanonicalResponseRow[],
@@ -345,16 +356,17 @@ export const mergeWorkerQuestionResponses = (
 
   rows.forEach((row) => {
     const storageRefId = readString(row.storageRefId);
-    if (storageRefId && seenRefs[storageRefId] != null) return;
-    if (storageRefId) seenRefs[storageRefId] = Number(row.timestamp || 0);
     const questionId = readString(row.questionId).toLowerCase();
     const responder = readString(row.responder).toLowerCase();
-    if (!questionId || !responder) return;
     const byResponder = isRecord(responses[questionId]) ? { ...(responses[questionId] as UnknownRecord) } : {};
     const metaByResponder = isRecord(responseMeta[questionId])
       ? { ...(responseMeta[questionId] as UnknownRecord) }
       : {};
-    if (!isWorkerResponseNewer(row.timestamp, storageRefId, metaByResponder[responder])) return;
+    const fills = fillsWithheldCopy(byResponder[responder], metaByResponder[responder], row);
+    if (storageRefId && seenRefs[storageRefId] != null && !fills) return;
+    if (storageRefId) seenRefs[storageRefId] = Number(row.timestamp || 0);
+    if (!questionId || !responder) return;
+    if (!fills && !isWorkerResponseNewer(row.timestamp, storageRefId, metaByResponder[responder])) return;
     const incoming = { ts: row.timestamp, storageRefId };
     byResponder[responder] = row.response;
     metaByResponder[responder] = incoming;
@@ -475,7 +487,10 @@ export const mergeWorkerUserResponses = (
     };
     if (existingIndex < 0) {
       entries.push(incoming);
-    } else if (isWorkerResponseNewer(incoming.timestamp, incoming.storageRefId, entries[existingIndex])) {
+    } else if (
+      isWorkerResponseNewer(incoming.timestamp, incoming.storageRefId, entries[existingIndex]) ||
+      fillsWithheldCopy(entries[existingIndex].response, entries[existingIndex], row)
+    ) {
       entries[existingIndex] = incoming;
     }
     network.data = data;

@@ -726,6 +726,33 @@ describe('answers with research material, which the Worker sends only to their a
     ]);
   });
 
+  it.each([
+    ['the signed-out copy lands first', ['stripped', 'whole']],
+    ['the signed-in copy lands first', ['whole', 'stripped']],
+  ])('both caches keep the whole copy of an answer when %s', (_order, order) => {
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: adminConfig, sessionSlug: 'demo-sh' });
+    // One stored answer as the survey page's full listing (signed out) and the own-answer pass (signed in) read it.
+    const copies: Record<string, any> = {
+      stripped: { questionID: 'q1', answer: { value: 'Agree' }, interviewProvenanceWithheld: true },
+      whole: { questionID: 'q1', answer: { value: 'Agree' }, interviewProvenance: { originalPrediction: {} } },
+    };
+    const row = (copy: string) => ({
+      questionId: 'q1',
+      responder: AUTHOR,
+      response: copies[copy],
+      storageRefId: 'ref-1',
+      timestamp: 100,
+    });
+    let questions: any = {};
+    let users: any = {};
+    for (const copy of order) {
+      questions = mergeWorkerQuestionResponses(questions, [row(copy)], 'demo-sh', identity);
+      users = mergeWorkerUserResponses(users, [row(copy)], identity);
+    }
+    expect(questions.worker.questionResponses.q1[AUTHOR]).toEqual(copies.whole);
+    expect(users[AUTHOR].worker.data.questionResponses).toEqual([expect.objectContaining({ response: copies.whole })]);
+  });
+
   it('rereads a stripped copy the reader now gets whole, such as one read before they signed in', async () => {
     let reader = '';
     const readBlob = jest.fn(async (options: Record<string, any>) => workerRead(reader)(options));
