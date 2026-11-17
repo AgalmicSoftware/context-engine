@@ -58,7 +58,7 @@ describe('mainSiteWorkerCanonicalCacheRuntime', () => {
       }),
     ).resolves.toBe(true);
 
-    expect(calls).toEqual(['questions', 'sbt-ready', 'responses', 'surveys', 'surveys-ready']);
+    expect(calls).toEqual(['questions', 'sbt-ready', 'surveys', 'surveys-ready', 'responses']);
     expect(host.initializeSbtCacheForGroup).not.toHaveBeenCalled();
     expect(host.startSbtEventListenerForGroup).not.toHaveBeenCalled();
   });
@@ -141,7 +141,7 @@ describe('mainSiteWorkerCanonicalCacheRuntime', () => {
       }),
     ).resolves.toBe(true);
 
-    expect(calls).toEqual(['questions', 'sbt', 'sbt-ready', 'sbt-listener', 'responses', 'surveys', 'surveys-ready']);
+    expect(calls).toEqual(['questions', 'sbt', 'sbt-ready', 'sbt-listener', 'surveys', 'surveys-ready', 'responses']);
     expect(host.initializeSbtCacheForGroup).toHaveBeenCalledWith('worker-session', { mode: 'partial' });
   });
 
@@ -166,12 +166,12 @@ describe('mainSiteWorkerCanonicalCacheRuntime', () => {
       }),
     ).resolves.toBe(true);
 
-    expect(calls).toEqual(['questions', 'sbt-ready', 'responses', 'surveys', 'surveys-ready']);
+    expect(calls).toEqual(['questions', 'sbt-ready', 'surveys', 'surveys-ready', 'responses']);
     expect(host.initializeSbtCacheForGroup).not.toHaveBeenCalled();
     expect(host.startSbtEventListenerForGroup).not.toHaveBeenCalled();
   });
 
-  it('carries on to surveys when others’ answers are refused, leaving response readiness alone', async () => {
+  it('loads surveys when others’ answers are refused, leaving response readiness alone', async () => {
     const { host, calls } = makeHost();
     jest.mocked(host.fetchQuestionResponsesChunkedForGroup).mockRejectedValueOnce(new Error('Access denied'));
     await expect(
@@ -186,6 +186,36 @@ describe('mainSiteWorkerCanonicalCacheRuntime', () => {
       expect.objectContaining({ isResponsesCacheReady: true }),
       expect.anything(),
     );
+  });
+
+  it('marks surveys ready while the answers are still loading', async () => {
+    const { host, calls } = makeHost();
+    jest.mocked(host.fetchQuestionResponsesChunkedForGroup).mockReturnValueOnce(new Promise<void>(() => {}));
+    void initializeMainSiteWorkerCanonicalCaches({
+      host,
+      sessionConfig: makeWorkerConfig(),
+      sessionSlug: 'worker-session',
+    });
+    for (let i = 0; i < 20; i += 1) await Promise.resolve();
+    expect(calls).toEqual(['questions', 'sbt-ready', 'surveys', 'surveys-ready']);
+  });
+
+  it('still loads answers when the surveys fail to load', async () => {
+    const { host, calls } = makeHost();
+    jest.mocked(host.initializeSurveyCacheForGroup).mockRejectedValueOnce(new Error('Failed to persist surveys'));
+    // The answers take long: the survey error must not wait for them.
+    jest.mocked(host.fetchQuestionResponsesChunkedForGroup).mockImplementationOnce(() => {
+      calls.push('responses');
+      return new Promise<void>(() => {});
+    });
+    await expect(
+      initializeMainSiteWorkerCanonicalCaches({
+        host,
+        sessionConfig: makeWorkerConfig(),
+        sessionSlug: 'worker-session',
+      }),
+    ).rejects.toThrow('Failed to persist surveys');
+    expect(calls).toEqual(['questions', 'sbt-ready', 'responses']);
   });
 
   it('does not run cache work for invalid or non-Worker profiles', async () => {

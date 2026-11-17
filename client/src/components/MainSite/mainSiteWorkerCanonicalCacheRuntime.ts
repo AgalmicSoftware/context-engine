@@ -46,18 +46,25 @@ export const initializeMainSiteWorkerCanonicalCaches = async ({
   }
   if (!isCurrent()) return true;
 
-  // Others' answers can be refused, as on a private session before sign-in. That says nothing about the questions
-  // or surveys, so it doesn't stop them loading or show as their error; response readiness stays with its own controller.
-  await host.fetchQuestionResponsesChunkedForGroup(sessionSlug).catch((error: unknown) => {
-    log.warn('Responses did not load:', error);
-  });
-  if (!isCurrent()) return true;
-
-  await host.initializeSurveyCacheForGroup(sessionSlug);
+  // Surveys load before answers: a large session's answers take a while, and the questions never wait on them.
+  // Others' answers can be refused, as on a private session before sign-in; that says nothing about the questions
+  // or surveys, and response readiness stays with its own controller.
+  const loadAnswers = () =>
+    host.fetchQuestionResponsesChunkedForGroup(sessionSlug).catch((error: unknown) => {
+      log.warn('Responses did not load:', error);
+    });
+  try {
+    await host.initializeSurveyCacheForGroup(sessionSlug);
+  } catch (error) {
+    // Answers still load, but the survey error is reported now, not after them.
+    if (isCurrent()) void loadAnswers();
+    throw error;
+  }
   if (!isCurrent()) return true;
   host.setReadinessStateIfChanged({ isSurveyCacheReady: true }, () => {
     if (isCurrent()) host.checkAllCachesReady();
   });
+  await loadAnswers();
 
   return true;
 };
