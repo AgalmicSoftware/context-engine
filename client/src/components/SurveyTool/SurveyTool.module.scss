@@ -5918,6 +5918,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     outline: 2px dotted var(--ce-control-text);
     outline-offset: 2px;
   }
+
+  // Choice text is white for dark cards; this card is light grey. A chosen option keeps its green and white.
+  .multichoiceQuestionContainer #multiChoice .checkboxOptionText:not(.selected) {
+    color: var(--ce-control-text);
+  }
 }
 
 /* Compact Classic 95 shares the default mobile action menu.
