@@ -532,6 +532,8 @@ it('shows the end of the set in place of the cards and stops Next there', () => 
     }),
   );
   expect(screen.getByTestId('end-of-set')).toBeInTheDocument();
+  // In the same frame as a question card, so nothing below it moves.
+  expect(screen.getByTestId('end-of-set').parentElement).toHaveClass('pileCard', 'pileCardActive');
   expect(screen.queryByTestId('active-question')).not.toBeInTheDocument();
   const next = screen.getByRole('button', { name: 'Next Question' });
   expect(next).toBeDisabled();

@@ -92,3 +92,15 @@ it('leaves focus alone when the person is somewhere else', () => {
   expect(elsewhere).toHaveFocus();
   elsewhere.remove();
 });
+
+it('hands focus to the end of the set when the check hides there', () => {
+  jest.useFakeTimers();
+  const engine = submitted();
+  act(() => engine.setState({ pileSetEndQuestionId: 'q1' }));
+  expect(screen.getByTestId('ce-pile-end-of-set')).toBeInTheDocument();
+  check().focus();
+  act(() => {
+    jest.advanceTimersByTime(10_000);
+  });
+  expect(screen.getByTestId('ce-pile-end-of-set')).toHaveFocus();
+});

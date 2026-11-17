@@ -1636,6 +1636,10 @@ const handlePrev = (engine: PileViewModeEngine) => {
         : { activePileIndex: Math.max(prev.activePileIndex - 1, 0), pileSetEndQuestionId: null },
     () => {
       engine.ensureVisiblePileResponseState();
+      // Back from the end of a one-question set lands on the first card, where Back is off: focus would be stuck.
+      const focused = document.activeElement;
+      if (!focused || focused === document.body || focused.matches(':disabled'))
+        engine.pileContainer?.querySelector('[data-testid="ce-pile-active-question"]')?.focus({ preventScroll: true });
     },
   );
   engine.triggerNavFade();

@@ -615,8 +615,13 @@ describe('SurveyPileViewMode runtime surface', () => {
   it('hides the rail Submit while the end of the set shows, and Back returns to a lone question', async () => {
     await openEndWithUnsentAnswer();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('pileFooterControlAway');
-    fireEvent.click(screen.getByLabelText('Previous Question'));
+    const back = screen.getByLabelText('Previous Question');
+    back.focus();
+    fireEvent.click(back);
     expect(await screen.findByLabelText('Parks')).toBeInTheDocument();
+    // Back is off on the first card, so focus goes to the question rather than staying stuck on it.
+    expect(back).toBeDisabled();
+    expect(screen.getByTestId('ce-pile-active-question')).toHaveFocus();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).not.toHaveClass('pileFooterControlAway');
   });
 

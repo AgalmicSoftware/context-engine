@@ -395,7 +395,7 @@ export const PileSubmittedCheck = (): React.ReactElement => {
       if (check && check === document.activeElement)
         check
           .closest(`.${styles.pileViewContainer}`)
-          ?.querySelector<HTMLElement>('[data-testid="ce-pile-active-question"]')
+          ?.querySelector<HTMLElement>('[data-testid="ce-pile-active-question"], [data-testid="ce-pile-end-of-set"]')
           ?.focus({ preventScroll: true });
       setGone(true);
     }, SUBMITTED_CHECK_MS);
@@ -721,7 +721,8 @@ export const renderPileInteractionSurface = ({
           })}
         </div>
       ) : (
-        endOfSetCard ||
+        // The end card sits where a question card does, so the arrows below stay put.
+        (endOfSetCard && <div className={buildPileCardClassName(styles, styles.pileCardActive)}>{endOfSetCard}</div>) ||
         renderPileDeckWindow({
           pileQuestions,
           activePileIndex,
