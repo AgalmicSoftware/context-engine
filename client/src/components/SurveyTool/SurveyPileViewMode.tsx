@@ -1554,11 +1554,23 @@ const triggerNavFade = (engine: PileViewModeEngine) => {
 };
 
 /** Whether Next has passed the last question: it still is the active one, and the last. */
-const isPileSetEndShown = (state: any, props: any): boolean => {
+/** The parts of the pile's state that say where in the set it stands. */
+type PileSetPosition = {
+  pileQuestions?: unknown;
+  questionPool?: unknown;
+  isFilterActive?: unknown;
+  filterState?: unknown;
+  activePileIndex?: unknown;
+  pileSetEndQuestionId?: unknown;
+};
+type PileQuestionPoolProps = { questionPool?: unknown };
+
+const isPileSetEndShown = (state: PileSetPosition, props: PileQuestionPoolProps): boolean => {
   if (!state.pileSetEndQuestionId) return false;
+  const pool = Array.isArray(state.questionPool) && state.questionPool.length ? state.questionPool : props.questionPool;
   const questions = resolveEarlyVisiblePileQuestions({
-    pileQuestions: state.pileQuestions,
-    questionPool: state.questionPool?.length ? state.questionPool : props.questionPool || [],
+    pileQuestions: state.pileQuestions as EarlyVisiblePileQuestion[] | null | undefined,
+    questionPool: (Array.isArray(pool) ? pool : []) as EarlyVisiblePileQuestion[],
     isFilterActive: !!state.isFilterActive || isSurveyToolFilterStateActive(state.filterState),
   });
   const last = questions.length - 1;
@@ -1579,7 +1591,7 @@ const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
     engine.persistDraft();
   }
   engine.setState(
-    (prev: any, props: any = engine.props) => {
+    (prev: any, props: PileQuestionPoolProps = engine.props) => {
       const fallbackQuestionPool =
         Array.isArray(prev.questionPool) && prev.questionPool.length > 0
           ? prev.questionPool
@@ -1626,7 +1638,7 @@ const handlePrev = (engine: PileViewModeEngine) => {
     engine.persistDraft();
   }
   engine.setState(
-    (prev: any, props: any = engine.props) =>
+    (prev: any, props: PileQuestionPoolProps = engine.props) =>
       // Back from the end of the set returns to the last question.
       isPileSetEndShown(prev, props)
         ? { pileSetEndQuestionId: null }

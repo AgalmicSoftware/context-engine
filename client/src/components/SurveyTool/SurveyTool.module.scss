@@ -7666,8 +7666,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   // (usePileHalfRowCut), and that edge fades a little; once scrolled, the top edge does too. The padding, and
   // keyboard scrolling, keep the last option clear at the end.
   .pileCardInner .pileCardMainContent:has(.multichoiceQuestionContainer) {
-    --pile-list-fade-top: #000;
-    --pile-list-fade-bottom: #000;
+    --pile-list-fade-top: black;
+    --pile-list-fade-bottom: black;
 
     justify-content: flex-start;
     overflow-x: hidden;
@@ -7678,26 +7678,26 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     -webkit-mask-image: linear-gradient(
       to bottom,
       var(--pile-list-fade-top),
-      #000 20px,
-      #000 calc(100% - 20px),
+      black 20px,
+      black calc(100% - 20px),
       var(--pile-list-fade-bottom)
     );
     mask-image: linear-gradient(
       to bottom,
       var(--pile-list-fade-top),
-      #000 20px,
-      #000 calc(100% - 20px),
+      black 20px,
+      black calc(100% - 20px),
       var(--pile-list-fade-bottom)
     );
 
     &[data-list-cue='start'],
     &[data-list-cue='middle'] {
-      --pile-list-fade-bottom: rgb(0 0 0 / 35%);
+      --pile-list-fade-bottom: color-mix(in srgb, black 35%, transparent);
     }
 
     &[data-list-cue='middle'],
     &[data-list-cue='end'] {
-      --pile-list-fade-top: rgb(0 0 0 / 35%);
+      --pile-list-fade-top: color-mix(in srgb, black 35%, transparent);
     }
   }
 
