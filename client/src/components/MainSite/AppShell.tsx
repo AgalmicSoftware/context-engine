@@ -1,4 +1,5 @@
 import WorkerResponseHydrationNotice from './WorkerResponseHydrationNotice';
+import SavedAnswersNotice from './SavedAnswersNotice';
 /** @file AppShell.tsx */
 
 import React, { Component } from 'react';
@@ -4006,6 +4007,17 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           sessionSlug={this.getSessionSlugFromProps()}
           partialRuns={this.state.partialWorkerResponseRuns}
         />
+        {hasActiveSessionRoute && (
+          <SavedAnswersNotice
+            sessionConfig={activeRouteSessionConfig}
+            signedIn={!!this.props.account && !!this.props.loginComplete}
+            // A partial load has its own notice and never becomes ready.
+            answersLoaded={
+              !!this.state.isResponsesCacheReady ||
+              Object.values(this.state.partialWorkerResponseRuns || {}).some(Boolean)
+            }
+          />
+        )}
         {mainViewDisplay}
 
         <Footer toggleLoginModal={this.props.toggleLoginModal} flowAtDocumentEnd={hasActiveSessionRoute} />
