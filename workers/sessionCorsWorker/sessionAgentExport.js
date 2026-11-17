@@ -21,9 +21,8 @@ import { MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, listWorkerGroupMembers, normalizeWor
 // export refuses instead.
 export const SESSION_AGENT_EXPORT_ACTION = 'session-agent/export';
 
-// One export reads more context than one answer does, since whoever uses the
-// file picks from it: as many sources as two answers' worth, each cut as an
-// answer cuts it. Listing a group reads each member, so one export lists this
+// One export's context has its own bounds, apart from an answer's: this many
+// sources and characters, each source cut at the shared block's item limit. Listing a group reads each member, so one export lists this
 // many members in all, across this many groups; past either, a group's list
 // says it is not complete.
 const LIMITS = Object.freeze({

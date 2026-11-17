@@ -285,9 +285,35 @@ test('sources are read ahead in one bulk get, and give what one read each gives'
   assert.deepEqual([capped.sources.map((source) => source.title), reads.bulk, reads.single], [['one.md', 'two.md'], [2], 0]);
   reads.bulk = [];
   const full = await load(h, { totalChars: 500 });
-  assert.deepEqual([full.sources.map((source) => source.title), full.leftOut, reads.bulk, reads.single], [['one.md'], 4, [4], 0]);
+  assert.deepEqual([full.sources.map((source) => source.title), full.leftOut, reads.bulk, reads.single], [['one.md'], 4, [], 1]);
+  // Room for two: two are read ahead, not all four.
+  reads.bulk = [];
+  reads.single = 0;
+  const two = await load(h, { totalChars: 1200 });
+  assert.deepEqual([two.sources.map((source) => source.title), reads.bulk, reads.single], [['one.md', 'two.md'], [2], 0]);
+
+  // A file whose adder keeps theirs out of the agent is never read, ahead or singly, and one whose
+  // bytes are gone reads as it does one at a time.
+  const theirs = await idOf(await h.uploadFile({ name: 'theirs.md', type: 'text/markdown', bytes: encode('THEIRS'), address: PARTICIPANT }));
+  const requested = [];
+  const getNow = h.kv.get;
+  h.kv.get = async (key) => {
+    requested.push(...[key].flat());
+    return getNow(key);
+  };
+  const without = await load(h, { leaveOutUploaders: new Set([PARTICIPANT]) });
+  assert.deepEqual([without.sources.length, without.withheld], [5, 1]);
+  assert.ok(!requested.includes(buildPayloadKey({ slug: 'salon', id: theirs })), 'their file’s bytes are never asked for');
+  h.kv.get = getNow;
+  h.kv.store.delete(buildPayloadKey({ slug: 'salon', id: h.ids.three }));
+  const gone = await load(h);
+  reads.refuseBulk = true;
+  assert.deepEqual(await load(h), gone);
+  reads.refuseBulk = false;
+  assert.deepEqual([gone.sources.map((source) => source.title), gone.unreadable], [['one.md', 'two.md', 'four.md', 'deck.pdf', 'theirs.md'], 1]);
 
   // A row too large to read is left to its own read, which refuses it; the rest are still read ahead.
+  // (From here `three.md` is gone and a participant's file has joined.)
   const key = buildIndexKey({ slug: 'salon', resource: 'docsContext', id: h.ids.two });
   h.kv.store.set(key, JSON.stringify({ ...JSON.parse(h.kv.store.get(key)), size: 2 * 1024 * 1024 }));
   reads.bulk = [];
@@ -295,8 +321,53 @@ test('sources are read ahead in one bulk get, and give what one read each gives'
   const oversized = await load(h);
   assert.deepEqual(
     [oversized.sources.map((source) => source.title), oversized.unreadable, reads.bulk, reads.single],
-    [['one.md', 'three.md', 'four.md', 'deck.pdf'], 1, [3], 1],
+    [['one.md', 'four.md', 'deck.pdf', 'theirs.md'], 2, [4], 1],
   );
+});
+
+test('a PDF read on its own still takes a place, so no more is read ahead than the cap on sources allows', async () => {
+  const h = harness({ provider: async () => json({ content: [{ type: 'text', text: 'Deck text.' }] }), r2: false });
+  ticking(h);
+  for (const name of ['a.pdf', 'b.pdf', 'c.pdf']) await idOf(await h.context({ action: 'read-pdf', id: await idOf(await h.uploadFile({ name })) }));
+  for (const name of ['one', 'two', 'three', 'four']) {
+    await idOf(await h.uploadFile({ name: `${name}.md`, type: 'text/markdown', bytes: encode(`${name} words`) }));
+  }
+  const reads = countPayloadReads(h);
+  const capped = await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, maxSources: 4 });
+  assert.deepEqual(capped.sources.map((source) => source.title), ['a.pdf', 'b.pdf', 'c.pdf', 'one.md']);
+  // The three PDFs' readings and the one file that fits: nothing in bulk, since one file is no batch.
+  assert.deepEqual([reads.bulk, reads.single], [[], 4]);
+});
+
+test('encrypted sources read ahead are each still decrypted and audited, as one read each', async () => {
+  const seed = async (h) => {
+    ticking(h);
+    for (const name of ['one', 'two', 'three']) {
+      await idOf(await h.uploadFile({ name: `${name}.md`, type: 'text/markdown', bytes: encode(`${name} SECRET words`) }));
+    }
+    return h;
+  };
+  const audits = (h) => [...h.kv.store.keys()].filter((key) => /audit/i.test(key)).length;
+  const h = await seed(harness({ encryption: 'worker_envelope', r2: false }));
+  const reads = countPayloadReads(h);
+  const before = audits(h);
+  const ahead = await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps });
+  assert.deepEqual(ahead.sources.map((source) => source.text), ['one SECRET words', 'two SECRET words', 'three SECRET words']);
+  assert.deepEqual([reads.bulk, reads.single], [[3], 0]);
+  const perPass = audits(h) - before;
+  assert.ok(perPass >= 3, `an audit record for each: ${perPass}`);
+  reads.refuseBulk = true;
+  assert.deepEqual(await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps }), ahead);
+  assert.equal(audits(h) - before, perPass * 2);
+});
+
+test('no more of a source’s text is kept than its caller’s block takes', async () => {
+  const h = harness();
+  await idOf(await h.uploadFile({ name: 'long.md', type: 'text/markdown', bytes: encode(`  ${'w'.repeat(50000)}`) }));
+  const load = (itemChars) => loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, ...(itemChars ? { itemChars } : {}) });
+  // One character over the cut, which tells the block the text was longer.
+  assert.equal((await load()).sources[0].text.length, 6001);
+  assert.equal((await load(12000)).sources[0].text.length, 12001);
 });
 
 test('rows stored before list entries said who added them read as they did', async () => {

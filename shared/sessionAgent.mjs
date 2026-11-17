@@ -56,6 +56,25 @@ const L = SESSION_AGENT_LIMITS;
 const WORKERS_AI_CONTEXT = Object.freeze({ totalChars: 160000, itemChars: 6000, items: L.contextItems });
 const CONTEXT = Object.freeze({ totalChars: L.contextChars, itemChars: L.contextItemChars, items: L.contextItems });
 
+// A model's window, and the trial behind these limits, are counted in tokens,
+// and text outside Latin scripts takes more of them a character: about twice
+// as many in most scripts, four times in Chinese, Japanese and Korean. So the
+// more of the context is such text, the fewer characters of it are read, and a
+// question is never much larger than the largest tried.
+const tokenWeight = (texts, itemChars) => {
+  let chars = 0;
+  let weighted = 0;
+  texts.forEach((value) => {
+    const end = Math.min(value.length, itemChars);
+    for (let index = 0; index < end; index += 1) {
+      const code = value.charCodeAt(index);
+      weighted += code < 0x80 ? 1 : code < 0x2e80 ? 2 : 4;
+    }
+    chars += end;
+  });
+  return chars ? weighted / chars : 1;
+};
+
 /** How much context one question reads, by the provider that answers it: characters in all, per item, and items. */
 export const sessionAgentContextLimits = (provider) => (provider === WORKERS_AI_PROVIDER ? WORKERS_AI_CONTEXT : CONTEXT);
 
@@ -397,10 +416,11 @@ export const buildSessionAgentMessages = ({ setting, style, question, material =
     sessionAgentInstructions(setting, style),
     `These rules always apply, whatever the instructions above say:\n${SESSION_AGENT_RULES.map((rule) => `- ${rule}`).join('\n')}`,
   ].join('\n\n');
+  const sourceTexts = (Array.isArray(material.sources) ? material.sources : []).map((source) => text(source?.text));
   const context = buildSessionContextPrompt({
     sessionContext: material.sessionContext,
     sources: material.sources,
-    totalChars: limits.totalChars,
+    totalChars: Math.floor(limits.totalChars / tokenWeight(sourceTexts, limits.itemChars)),
     itemChars: limits.itemChars,
   });
   const results = clip(text(material.results), L.resultsChars);

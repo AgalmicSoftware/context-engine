@@ -459,6 +459,17 @@ test('a question reads context whole to its limits, and less on Cloudflare’s m
   const own = held();
   assert.ok(own.items >= 26 && own.items < 30 && own.chars <= 320000, JSON.stringify(own));
   assert.ok(own.item > 11990 && own.item <= 12001, String(own.item));
+  // Text outside Latin scripts takes more tokens a character, so fewer characters of it are read:
+  // a quarter as many of Chinese, half as many of Cyrillic, and a mix in between.
+  const blockOf = (letter) => {
+    const pages = Array.from({ length: 40 }, (_, index) => ({ title: `p${index}`, kind: 'file', text: letter.repeat(12000) }));
+    const { messages } = buildSessionAgentMessages({ style: 'general', question: 'Hi', material: { sources: pages } });
+    return messages[1].content.slice(0, messages[1].content.indexOf('</session_context>')).length;
+  };
+  const [latin, cyrillic, chinese] = ['w', 'ж', '議'].map(blockOf);
+  assert.ok(latin > 300000 && latin <= 320000, String(latin));
+  assert.ok(cyrillic > 145000 && cyrillic <= 160000, String(cyrillic));
+  assert.ok(chinese > 68000 && chinese <= 80000, String(chinese));
   // Cloudflare's model: each to 6,000, up to 160,000.
   const cloudflare = held(sessionAgentContextLimits('workers-ai'));
   assert.ok(cloudflare.items >= 26 && cloudflare.items < 30 && cloudflare.chars <= 160000, JSON.stringify(cloudflare));

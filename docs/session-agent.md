@@ -111,9 +111,12 @@ One question reads at most 320,000 characters of context, 2,000 of results and
 link to 12,000 characters, from up to 48 of them, the admins' first and then
 each adder's in turn. A session whose Session Agent answers on Cloudflare's
 model reads less, 160,000 characters and 6,000 of each item, the most that
-model was tried at. A full question is about 60,000 tokens of input, so the
-AI provider's rate limit, not this number, decides how many people can ask at
-once. For each question members answered, a Detailed answer is
+model was tried at. These are characters of English-like text: text in other
+scripts takes more tokens a character, so fewer characters of it are read,
+about half as many in most scripts and a quarter as many in Chinese, Japanese
+and Korean. A full question is then about 60,000 tokens of input whatever the
+language, the largest size tried, so the AI provider's rate limit, not this
+number, decides how many people can ask at once. For each question members answered, a Detailed answer is
 given how many answered and, where the question has set options (agree or
 disagree, a rating, a choice), how many chose each, with what a rating's
 numbers mean. These counts cover every member's answer, however large the

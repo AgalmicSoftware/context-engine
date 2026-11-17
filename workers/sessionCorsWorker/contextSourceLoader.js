@@ -196,13 +196,25 @@ export const loadParticipantContextSources = async ({
     const ids = [];
     let bytes = 0;
     let next = start;
-    for (const room = Math.min(PREFETCH_SOURCES, maxSources - sources.length); next < ordered.length && ids.length < room; next += 1) {
-      const textRow = ordered[next].contentType === CONTEXT_FILE_TYPES.pdf ? readings.get(ordered[next].id) : ordered[next];
+    // Each row that will be a source takes a place, read ahead or not, and
+    // the window ends where the block would be full: a row's stored size is
+    // at least its text's length, so no more is read ahead than may be used.
+    let places = Math.min(PREFETCH_SOURCES, maxSources - sources.length);
+    let room = totalChars - chars;
+    for (; next < ordered.length && places > 0 && room > 0; next += 1) {
+      const isPdf = ordered[next].contentType === CONTEXT_FILE_TYPES.pdf;
+      const textRow = isPdf ? readings.get(ordered[next].id) : ordered[next];
       const size = Number(textRow?.size);
-      if (!textRow?.id || !(size <= MAX_READ_BYTES)) continue;
+      if (!textRow?.id || !(size <= MAX_READ_BYTES)) {
+        // A PDF that names its reading is read on its own and still becomes a source.
+        if (isPdf && ordered[next].contextReadingId) places -= 1;
+        continue;
+      }
       if (bytes + size > PREFETCH_BYTES) break;
       ids.push(textRow.id);
       bytes += size;
+      places -= 1;
+      room -= Math.min(size, itemChars);
     }
     prefetchedTo = Math.max(next, start + 1);
     prefetched = (ids.length > 1 && await prefetchKvPayloads({ env, slug, ids })) || new Map();
@@ -247,11 +259,14 @@ export const loadParticipantContextSources = async ({
         continue;
       }
     }
+    // No caller's block takes more of a text than `itemChars`, so no more is kept: one character
+    // over says it was longer. A session's largest files are then never all held at once.
+    text = text.trim().slice(0, itemChars + 1);
     sources.push({
       title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isPdf,
       everyone: forEveryone(row, config), groupIds: groupLockedIds(row.accessConditions) || [], uploader: lower(row.uploader),
     });
-    chars += Math.min(text.trim().length, itemChars);
+    chars += Math.min(text.length, itemChars);
   }
   return {
     sources, leftOut, withheld: mine.length - ordered.length, unreadable, failed,
