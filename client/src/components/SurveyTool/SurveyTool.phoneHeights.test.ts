@@ -64,3 +64,10 @@ it('keeps the phone arrows on their own row, after the wider rule that puts them
   // Choices keep room below the last one for the fade and its focus ring.
   expect(css).toMatch(/padding-bottom: 28px;\s*scroll-padding-bottom: 28px;/);
 });
+
+// A free-text box fills the room under its prompt: a small box under a tall gap read as broken.
+it('lets a phone free-text box fill the card', () => {
+  expect(css).toMatch(
+    /\.pileCardBody:has\(\.freeformQuestionContainer\) \.pileCardMainContent\s*\{\s*flex: 1 1 0;\s*min-height: 0;/,
+  );
+});

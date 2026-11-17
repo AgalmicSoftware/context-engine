@@ -7540,6 +7540,42 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     }
   }
 
+  // A free-text card gives its text box the room under the prompt: a small box under a tall gap read as broken.
+  // The box's own parts come from the shared audio input, so they are named by class fragment.
+  .pileCardInner .pileCardBody:has(.freeformQuestionContainer) {
+    .pileCardHeader {
+      flex: 0 1 auto;
+      max-height: 40%;
+    }
+
+    .pileCardMainContent {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+
+    .freeformQuestionContainer {
+      align-items: stretch;
+      justify-content: flex-start;
+      height: 100%;
+    }
+
+    :global([class*='audioInputContainer']),
+    :global([class*='inputRow']) {
+      flex: 1 1 auto;
+      align-items: stretch;
+      min-height: 0;
+    }
+
+    :global([class*='textareaWrap']) {
+      display: flex;
+    }
+
+    :global([class*='audioTextarea']) {
+      height: auto;
+      resize: none;
+    }
+  }
+
   // Choice options stack one per line and scroll up and down inside the answer area, never sideways, from the top
   // (centring would push the first ones out of reach). The faded bottom edge shows an option cut off when more are
   // below; the padding, and keyboard scrolling, keep the last one clear of it.
