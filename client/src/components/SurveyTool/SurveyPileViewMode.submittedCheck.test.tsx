@@ -67,3 +67,28 @@ it('shows the check for ten seconds after each submit', () => {
   act(() => engine.setState({ submittedSinceLastEdit: true }));
   expect(check()).not.toHaveClass('pileSubmitDoneGone');
 });
+
+it('hands focus to the question card when the check hides', () => {
+  jest.useFakeTimers();
+  submitted();
+  // Submit had focus, so the check took it.
+  expect(check()).toHaveFocus();
+  act(() => {
+    jest.advanceTimersByTime(10_000);
+  });
+  expect(screen.getByTestId('ce-pile-active-question')).toHaveFocus();
+});
+
+it('leaves focus alone when the person is somewhere else', () => {
+  jest.useFakeTimers();
+  const elsewhere = document.createElement('button');
+  document.body.append(elsewhere);
+  elsewhere.focus();
+  submitted();
+  expect(elsewhere).toHaveFocus();
+  act(() => {
+    jest.advanceTimersByTime(10_000);
+  });
+  expect(elsewhere).toHaveFocus();
+  elsewhere.remove();
+});

@@ -55,8 +55,8 @@ describe('MultichoiceQuestionInput', () => {
       <MultichoiceQuestionInput questionId="q1" options={['Alpha', 'Beta']} isSingleSelect />,
     );
     expect(screen.getByText('Pick one')).toBeInTheDocument();
-    // Screen readers hear it with the options, which are checkboxes either way.
-    expect(screen.getByRole('group')).toHaveAccessibleDescription('Pick one');
+    // It names the options for screen readers, which hear checkboxes either way.
+    expect(screen.getByRole('group', { name: 'Pick one' })).toBeInTheDocument();
 
     rerender(<MultichoiceQuestionInput questionId="q1" options={['Alpha', 'Beta']} />);
     expect(screen.getByText('Pick any')).toBeInTheDocument();

@@ -66,7 +66,7 @@ const MultichoiceQuestionInput = ({
       <span className={styles.choiceKindPill} id={kindId}>
         {choiceKindLabel(isSingleSelect)}
       </span>
-      <FormGroup id={styles.multiChoice} role="group" aria-describedby={kindId}>
+      <FormGroup id={styles.multiChoice} role="group" aria-labelledby={kindId}>
         {normalizedOptions.map((option, optionIndex) => {
           const optionLabel = option;
           const isSelected = normalizedSelectedValues.includes(option);

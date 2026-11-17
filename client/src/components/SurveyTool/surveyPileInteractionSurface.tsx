@@ -380,7 +380,16 @@ export const PileSubmittedCheck = (): React.ReactElement => {
     // Submit, which may have had focus, is gone: keep focus here rather than on the page.
     if (!document.activeElement || document.activeElement === document.body)
       ref.current?.focus({ preventScroll: true });
-    const timer = setTimeout(() => setGone(true), SUBMITTED_CHECK_MS);
+    const timer = setTimeout(() => {
+      // A hidden element drops focus to the page, so hand it to the question card first.
+      const check = ref.current;
+      if (check && check === document.activeElement)
+        check
+          .closest(`.${styles.pileViewContainer}`)
+          ?.querySelector<HTMLElement>('[data-testid="ce-pile-active-question"]')
+          ?.focus({ preventScroll: true });
+      setGone(true);
+    }, SUBMITTED_CHECK_MS);
     return () => clearTimeout(timer);
   }, []);
   return (
