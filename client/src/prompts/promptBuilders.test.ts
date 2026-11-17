@@ -70,6 +70,17 @@ describe('prompt builders', () => {
     expect(prompt).toContain(QUADRATIC_READING_RULE);
   });
 
+  it('asks for the best-fitting dead figure, not the best-known name for the subject', () => {
+    const prompt = buildUserAnalysisPrompt({ questions: [] });
+    expect(prompt).toContain('Aim for the best fit, not the best-known name');
+    expect(prompt).toContain('Match on where THIS user landed');
+    expect(prompt).toContain('consider at least five candidates who differ in era, region and tradition');
+    expect(prompt).toContain('never a living person');
+    expect(prompt).toContain('End with one position where the two differ.');
+    expect(prompt).not.toContain('widely known historical figure');
+    expect(prompt).toContain('"historicalAlignment": { "figure": "string", "reasoning": "string" }');
+  });
+
   it('builds cluster prompts from guarded cluster records and fallback context', () => {
     const prompt = buildClusterAnalysisPrompt(
       {

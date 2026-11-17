@@ -12,8 +12,10 @@
  * - Be neutral, avoid value-laden or pejorative language.
  * - Refer only to data provided (SBTs, survey/question responses).
  * - Do not guess identity; keep privacy in mind.
- * - For "historicalAlignment", pick a broadly known historical thinker/leader
- *   whose documented views reasonably resemble the user's themes. Keep it high-level.
+ * - For "historicalAlignment", pick the dead historical figure whose documented
+ *   positions best fit this user's distinctive answers, not the best-known name
+ *   for the session's subject. The reasoning says who they were, what matches
+ *   and one thing that differs.
  * - Inputs may include response types (binary, rating, multichoice, quadratic, freeform),
  *   optional "importance" and "additionalComment" fields, and created content:
  *   "questionsCreated", "surveysCreated", plus "createdCounts".
@@ -43,9 +45,21 @@ Discuss the most meaningful patterns rather than listing every option. Distingui
 from missing or encrypted answers; do not invent conviction or compare raw values across different scales.
 Relevant dates or factual numbers in a respondent's own example may remain when they explain the theme.
 
-Additionally, include a brief "Historical Alignment" section:
-- Choose ONE widely known historical figure whose views broadly align with the user's themes.
-- Provide a concise justification (1–2 sentences) grounded in the provided data.
+Additionally, include a "Historical Alignment" comparison. Aim for the best fit, not the best-known name:
+- The subject of the questions is shared by everyone who answered them, so a match made on the subject gives
+  every respondent the same figure. Match on where THIS user landed: their less common or more strongly held
+  positions, the trade-offs they accept, and their own comments.
+- Before choosing, consider at least five candidates who differ in era, region and tradition, including
+  practitioners, organisers and builders as well as theorists, and people outside the modern English-speaking canon.
+- Choose the ONE whose documented positions match the most of this user's distinctive positions. A lesser-known
+  figure is better than a famous one when the fit is closer.
+- Test the choice: if the figure would suit most people who answered these questions about equally well, it is
+  too generic; choose again.
+- The figure must be a real person who has died: never a living person, a fictional character or a group.
+- "figure": the person's name and years, for example "Name (1868–1933)".
+- "reasoning" (3–4 sentences): first say in one sentence who the figure was, for a reader who has not heard of
+  them. Then name two or three specific positions of the user that match documented positions of the figure.
+  End with one position where the two differ.
 - If the provided data is too sparse for a defensible comparison, use empty strings for figure and reasoning.
 - Do not base the comparison on demographics, identity guesses, or private affiliations.
 
