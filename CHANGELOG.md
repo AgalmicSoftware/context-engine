@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.12] - 2026-11-17
 
+### Client — available when the site deploys
+
+- An unsubmitted draft keeps its last keystrokes when the page reloads straight after typing.
+- A group invite link without `worker=` keeps its invite if the page reloads before the session is found.
+- Feedback: the list fails rather than showing a shortened list when a page can't be read, so **Delete all** never removes unseen messages.
+- A group's member list reads past members who left, instead of saying none were found.
+- A bookmarked user opens in the session it was saved in, with its nickname and Remove control.
+- The fallback report keeps two questions with the same wording apart.
+- A voice interview's call is sent once. The site puts a sign-in on it only for a private session, so a Worker still on 0.9.10 never receives one, and a refused call shows its own reason. This replaces 0.9.11's second try without the sign-in.
+
+### Workers — requires redeployment
+
+- AI Views, the atlas and the risk matrix keep building when the page that started them closes; a second press joins the running build, and a failed build can be pressed again at once.
+- An answer an agent sends again while its first copy is still being saved now ends on the latest choice.
+- A delayed retry of an older queued answer no longer replaces a newer one.
+- An answer resent after 30 days is recognised rather than stored again.
+- Agents see their answered questions as answered after 30 days.
+- Signed-out group suggestions leave out full groups.
+- Agent HTTP group results name each statement's question (`questionId`).
+- A context link can be for the members of chosen groups, as a file or text can (`groupIds`; the Worker advertises `context_link_groups_v1`). The website has no control for it yet; agents set it through the MCP.
+
+### Agents and MCP
+
+- MCP 0.5.1. `answer` tells a mistyped question ID from a locked one: an ID that matches nothing is no longer called locked, a near miss names the nearest listed ID, and a call stored in part says which answers went through.
+- `add_context` takes `groups` with a link as well as with a file or text, on a Session Worker from this release. On an older Worker it refuses in a plain sentence rather than adding the link for everyone.
+
 ## [0.9.11] - 2026-11-16
 
 ### Client — available when the site deploys
