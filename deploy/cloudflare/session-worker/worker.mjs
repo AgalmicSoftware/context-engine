@@ -72488,8 +72488,45 @@ var init_answerVersionStamp = __esm({
   }
 });
 
+// workers/sessionCorsWorker/researchFieldAccess.js
+var isObj20, normalizeAddress, WITHHELD_FIELD, withoutProvenance, readsResearchFields, answerPayloadForReader;
+var init_researchFieldAccess = __esm({
+  "workers/sessionCorsWorker/researchFieldAccess.js"() {
+    isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    normalizeAddress = (value) => String(value || "").trim().toLowerCase();
+    WITHHELD_FIELD = "interviewProvenanceWithheld";
+    withoutProvenance = (item) => {
+      if (!isObj20(item) || !Object.prototype.hasOwnProperty.call(item, "interviewProvenance")) return item;
+      const { interviewProvenance: _withheld, ...rest } = item;
+      return { ...rest, [WITHHELD_FIELD]: true };
+    };
+    readsResearchFields = ({ metadata, requesterAddress, authScopes, adminAddresses }) => {
+      if (isObj20(authScopes) && authScopes.admin === true) return true;
+      const address3 = normalizeAddress(requesterAddress);
+      if (!address3) return false;
+      if (adminAddresses?.has?.(address3)) return true;
+      return !!normalizeAddress(metadata?.responder) && normalizeAddress(metadata.responder) === address3;
+    };
+    answerPayloadForReader = (text9, { reads }) => {
+      let parsed;
+      try {
+        parsed = JSON.parse(text9);
+      } catch {
+        return null;
+      }
+      if (!isObj20(parsed)) return null;
+      const items = Array.isArray(parsed.responses) ? parsed.responses : null;
+      const carries = items ? items.some((item) => isObj20(item) && "interviewProvenance" in item) : "interviewProvenance" in parsed;
+      if (!carries) return null;
+      if (reads) return { text: text9, withheld: false, carries };
+      const next = items ? { ...parsed, responses: items.map(withoutProvenance) } : withoutProvenance(parsed);
+      return { text: JSON.stringify(next), withheld: true, carries };
+    };
+  }
+});
+
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_GROUP_READ_INVITE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim15, isObj20, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, MINE_LIST_KV_KEYS, MINE_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, CONTEXT_ADD_WINDOW_MS, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, checkGroupReadInvite, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, admittedByReadInvite, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, AUTOMATIC_ANALYSIS_MODES, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, KV_BULK_REPLY_BYTES, listedAnswerVersions, listLatestResponseRows, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
+var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_GROUP_READ_INVITE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim15, isObj21, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, MINE_LIST_KV_KEYS, MINE_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, CONTEXT_ADD_WINDOW_MS, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress2, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, checkGroupReadInvite, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, admittedByReadInvite, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, AUTOMATIC_ANALYSIS_MODES, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, KV_BULK_REPLY_BYTES, listedAnswerVersions, listLatestResponseRows, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_sessionContextSources();
@@ -72520,6 +72557,7 @@ var init_storageRouteExecution = __esm({
     init_contextSourceRoute();
     init_stringCoercion();
     init_answerVersionStamp();
+    init_researchFieldAccess();
     init_storageScanBudget();
     encoder7 = new TextEncoder();
     decoder6 = new TextDecoder();
@@ -72528,7 +72566,7 @@ var init_storageRouteExecution = __esm({
     STORAGE_GROUP_READ_INVITE = "groupReadInvite";
     STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol("storage-rpc-chain-attestation-cache");
     trim15 = (value) => toStr6(value).trim();
-    isObj20 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj21 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     isJsonContentType = (contentType) => {
       const mediaType = trim15(contentType).split(";", 1)[0].trim().toLowerCase();
       return mediaType === "application/json" || mediaType.endsWith("+json");
@@ -72629,7 +72667,7 @@ var init_storageRouteExecution = __esm({
       }
       try {
         const envelope = JSON.parse(raw || "null");
-        return envelope && isObj20(envelope?.metadata) ? envelope : null;
+        return envelope && isObj21(envelope?.metadata) ? envelope : null;
       } catch {
         return null;
       }
@@ -72654,9 +72692,9 @@ var init_storageRouteExecution = __esm({
           raw = null;
         }
       }
-      if (!isObj20(raw)) return null;
+      if (!isObj21(raw)) return null;
       const match = trim15(raw.match).toLowerCase() === "all" ? "all" : "any";
-      const conditions = (Array.isArray(raw.conditions) ? raw.conditions : []).filter(isObj20).map((condition) => ({ ...condition, kind: trim15(condition.kind).toLowerCase() })).filter((condition) => condition.kind);
+      const conditions = (Array.isArray(raw.conditions) ? raw.conditions : []).filter(isObj21).map((condition) => ({ ...condition, kind: trim15(condition.kind).toLowerCase() })).filter((condition) => condition.kind);
       return { match, conditions };
     };
     invalidUploadPolicy = (field, detail) => {
@@ -72702,7 +72740,7 @@ var init_storageRouteExecution = __esm({
         }
       }
       if (raw === null) return null;
-      if (!isObj20(raw)) return invalidUploadPolicy("accessConditions", "expected an object");
+      if (!isObj21(raw)) return invalidUploadPolicy("accessConditions", "expected an object");
       if (raw.match !== void 0 && (typeof raw.match !== "string" || !["any", "all"].includes(raw.match.trim().toLowerCase()))) {
         return invalidUploadPolicy("accessConditions.match", "expected any or all");
       }
@@ -72718,7 +72756,7 @@ var init_storageRouteExecution = __esm({
         return fields2.some((field) => typeof condition[field] === "string" && condition[field].trim());
       };
       const conditions = raw.conditions.map((condition) => {
-        if (!isObj20(condition) || typeof condition.kind !== "string") {
+        if (!isObj21(condition) || typeof condition.kind !== "string") {
           return invalidUploadPolicy("accessConditions.conditions", "expected a rule with a kind");
         }
         const kind = condition.kind.trim().toLowerCase();
@@ -72766,7 +72804,7 @@ var init_storageRouteExecution = __esm({
           raw = { mode: raw };
         }
       }
-      if (!isObj20(raw)) return null;
+      if (!isObj21(raw)) return null;
       const mode = trim15(raw.mode || raw.kind || raw.type).toLowerCase();
       if (!mode) return null;
       return {
@@ -72805,7 +72843,7 @@ var init_storageRouteExecution = __esm({
             }
           }
           if (raw === null) return null;
-          if (!isObj20(raw)) return invalidUploadPolicy("uploadPolicy", "expected an object");
+          if (!isObj21(raw)) return invalidUploadPolicy("uploadPolicy", "expected an object");
           for (const field of ["mode", "kind", "type"]) {
             if (raw[field] !== void 0 && (typeof raw[field] !== "string" || !["group_allowlist", "sbt_allowlist"].includes(raw[field].trim().toLowerCase()))) {
               return invalidUploadPolicy(`uploadPolicy.${field}`, "expected group_allowlist or sbt_allowlist");
@@ -72831,7 +72869,7 @@ var init_storageRouteExecution = __esm({
       } catch {
         return { ok: false, error: "Invalid JSON." };
       }
-      if (!isObj20(raw)) return { ok: false, error: "Invalid JSON." };
+      if (!isObj21(raw)) return { ok: false, error: "Invalid JSON." };
       const data = Object.prototype.hasOwnProperty.call(raw, "data") ? raw.data : "";
       const contentType = trim15(raw.contentType) || (typeof data === "string" ? "text/plain" : "application/json");
       const serialized = isJsonContentType(contentType) && typeof data !== "string" ? JSON.stringify(data) : toStr6(data);
@@ -72910,8 +72948,8 @@ var init_storageRouteExecution = __esm({
       return { ok: false, error: "Unsupported Content-Type." };
     };
     readConfiguredStorageBackendCandidate = (config = {}) => {
-      const storageProfile = isObj20(config?.storageProfile) ? config.storageProfile : {};
-      const docLibrary = isObj20(config?.docLibrary) ? config.docLibrary : {};
+      const storageProfile = isObj21(config?.storageProfile) ? config.storageProfile : {};
+      const docLibrary = isObj21(config?.docLibrary) ? config.docLibrary : {};
       return storageProfile.backend || config?.storageBackend || docLibrary.provider || docLibrary.backend || docLibrary.storageBackend;
     };
     resolveConfiguredStorageBackend = ({ config, requestedBackend, payloadEncrypted } = {}) => {
@@ -72921,14 +72959,14 @@ var init_storageRouteExecution = __esm({
       return normalizeStorageBackend(requestedBackend, configured);
     };
     resolvePayloadAccessControl = (config = {}) => {
-      const profile = isObj20(config?.storageProfile) ? config.storageProfile : {};
-      const cloudflare = isObj20(profile.cloudflare) ? profile.cloudflare : {};
-      const payloadAccessControl = isObj20(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
+      const profile = isObj21(config?.storageProfile) ? config.storageProfile : {};
+      const cloudflare = isObj21(profile.cloudflare) ? profile.cloudflare : {};
+      const payloadAccessControl = isObj21(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
       const legacyMode = normalizeLegacyPayloadAccessMode(
         payloadAccessControl.mode || cloudflare.payloadAccessMode || profile.payloadAccessMode || profile.accessControlMode
       );
       const accessControl = Object.prototype.hasOwnProperty.call(payloadAccessControl, "gate") || Object.prototype.hasOwnProperty.call(payloadAccessControl, "encryption") ? normalizePayloadAccessControl2(payloadAccessControl, legacyMode) : normalizePayloadAccessControl2(legacyMode);
-      const resourceGates = isObj20(payloadAccessControl.resources) ? payloadAccessControl.resources : {};
+      const resourceGates = isObj21(payloadAccessControl.resources) ? payloadAccessControl.resources : {};
       const conditions = normalizeAccessConditionDocument(
         payloadAccessControl.accessConditions || payloadAccessControl.conditions || cloudflare.accessConditions || profile.accessConditions
       );
@@ -72946,7 +72984,7 @@ var init_storageRouteExecution = __esm({
     };
     normalizeGateMode2 = (mode) => mode === 1 || trim15(mode).toLowerCase() === "1" || trim15(mode).toLowerCase() === "all" ? "all" : "any";
     normalizeDirectGate = (gate) => {
-      if (!isObj20(gate)) return null;
+      if (!isObj21(gate)) return null;
       const sbtAddresses = Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses.filter(Boolean) : [];
       return {
         sbtAddresses,
@@ -72982,14 +73020,14 @@ var init_storageRouteExecution = __esm({
       }
       return { ok: true, gate: normalizeDirectGate(result.gate), resourceKey, source: "onchain" };
     };
-    normalizeAddress = (value) => trim15(value).toLowerCase();
+    normalizeAddress2 = (value) => trim15(value).toLowerCase();
     listRoleAddresses = (value) => {
-      if (Array.isArray(value)) return value.map(normalizeAddress).filter(Boolean);
-      if (isObj20(value)) {
-        if (Array.isArray(value.addresses)) return value.addresses.map(normalizeAddress).filter(Boolean);
-        if (Array.isArray(value.members)) return value.members.map(normalizeAddress).filter(Boolean);
+      if (Array.isArray(value)) return value.map(normalizeAddress2).filter(Boolean);
+      if (isObj21(value)) {
+        if (Array.isArray(value.addresses)) return value.addresses.map(normalizeAddress2).filter(Boolean);
+        if (Array.isArray(value.members)) return value.members.map(normalizeAddress2).filter(Boolean);
       }
-      const address3 = normalizeAddress(value);
+      const address3 = normalizeAddress2(value);
       return address3 ? [address3] : [];
     };
     resolveRoleAddressSet2 = ({ config = {}, role }) => {
@@ -73000,7 +73038,7 @@ var init_storageRouteExecution = __esm({
         listRoleAddresses(config.adminAddresses).forEach((address3) => addresses.add(address3));
         listRoleAddresses(config.admin?.addresses).forEach((address3) => addresses.add(address3));
       }
-      const roleMaps = [config.workerRoles, config.roles, config.authorization?.roles].filter(isObj20);
+      const roleMaps = [config.workerRoles, config.roles, config.authorization?.roles].filter(isObj21);
       roleMaps.forEach((roles) => {
         listRoleAddresses(roles[normalizedRole]).forEach((address3) => addresses.add(address3));
       });
@@ -73008,14 +73046,14 @@ var init_storageRouteExecution = __esm({
     };
     resolveSessionAdminAddresses = (config = {}) => resolveRoleAddressSet2({ config, role: "admin" });
     isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
-      if (isObj20(authScopes) && authScopes.admin === true) return true;
-      const address3 = normalizeAddress(requesterAddress);
+      if (isObj21(authScopes) && authScopes.admin === true) return true;
+      const address3 = normalizeAddress2(requesterAddress);
       if (!address3) return false;
       return resolveSessionAdminAddresses(config).has(address3);
     };
     evaluateWorkerRoleCondition = ({ condition, config, requesterAddress }) => {
       const role = trim15(condition.role || condition.name || "admin").toLowerCase();
-      const address3 = normalizeAddress(requesterAddress);
+      const address3 = normalizeAddress2(requesterAddress);
       if (!address3) return { ok: false, reason: "missing_principal" };
       const roleAddresses = resolveRoleAddressSet2({ config, role });
       if (roleAddresses.has(address3)) {
@@ -73026,12 +73064,12 @@ var init_storageRouteExecution = __esm({
     evaluateAgentGrantScopeCondition = ({ condition, authScopes }) => {
       const scope = trim15(condition.scope || condition.value);
       if (!scope) return { ok: false, reason: "missing_agent_grant_scope" };
-      const scopes = isObj20(authScopes) ? authScopes : {};
+      const scopes = isObj21(authScopes) ? authScopes : {};
       return scopes[scope] === true ? { ok: true, matchedCondition: { kind: "agent_grant_scope", scope } } : { ok: false, reason: "agent_grant_scope_denied", condition: { kind: "agent_grant_scope", scope } };
     };
     sbtUnavailable = (reason, condition) => ({ ok: false, outcome: "unavailable", status: 503, reason, condition });
     evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress, deps }) => {
-      const address3 = normalizeAddress(requesterAddress);
+      const address3 = normalizeAddress2(requesterAddress);
       if (!address3) return { ok: false, reason: "missing_principal" };
       const sbtAddresses = [
         ...Array.isArray(condition.sbtAddresses) ? condition.sbtAddresses : [],
@@ -73331,9 +73369,9 @@ var init_storageRouteExecution = __esm({
       };
     };
     resolveBareRoleGateCondition = (config = {}) => {
-      const profile = isObj20(config?.storageProfile) ? config.storageProfile : {};
-      const cloudflare = isObj20(profile.cloudflare) ? profile.cloudflare : {};
-      const payloadAccessControl = isObj20(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
+      const profile = isObj21(config?.storageProfile) ? config.storageProfile : {};
+      const cloudflare = isObj21(profile.cloudflare) ? profile.cloudflare : {};
+      const payloadAccessControl = isObj21(profile.payloadAccessControl) ? profile.payloadAccessControl : {};
       return {
         kind: "worker_role",
         role: trim15(
@@ -73372,12 +73410,12 @@ var init_storageRouteExecution = __esm({
     membersSeeAllResponses = (config) => config?.sessionModeProfile?.results?.visibility === "session_member_full";
     canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
       if (operation === "upload" || !hasPrivateResponsePolicy({ config, resource })) return true;
-      const scopes = isObj20(authScopes) ? authScopes : {};
-      const address3 = normalizeAddress(requesterAddress);
+      const scopes = isObj21(authScopes) ? authScopes : {};
+      const address3 = normalizeAddress2(requesterAddress);
       if (address3 && resolveRoleAddressSet2({ config, role: "admin" }).has(address3)) return true;
       if (!address3 || scopes.storage !== true && scopes.arweave !== true) return false;
       if (operation === "list" || membersSeeAllResponses(config)) return true;
-      return !!trim15(metadata?.responder) && normalizeAddress(metadata.responder) === address3;
+      return !!trim15(metadata?.responder) && normalizeAddress2(metadata.responder) === address3;
     };
     authorizeCloudflareStorageAccess = async ({
       env,
@@ -73401,7 +73439,7 @@ var init_storageRouteExecution = __esm({
           reason: "private_response_owner_required"
         }, 403, baseHeaders)
       });
-      const asInvitee = !normalizeAddress(requesterAddress) && !!deps?.[STORAGE_GROUP_READ_INVITE] && membersSeeAllResponses(config) && hasPrivateResponsePolicy({ config, resource });
+      const asInvitee = !normalizeAddress2(requesterAddress) && !!deps?.[STORAGE_GROUP_READ_INVITE] && membersSeeAllResponses(config) && hasPrivateResponsePolicy({ config, resource });
       if (!asInvitee && !canReadPrivateResponse({ config, resource, metadata, requesterAddress, authScopes, operation })) {
         return privateResponseRefusal();
       }
@@ -73666,7 +73704,7 @@ var init_storageRouteExecution = __esm({
         return { ok: true, conditionMatched: groupAccess.conditionMatched, groupIds };
       }
       if (policy.mode === "sbt_allowlist") {
-        const address3 = normalizeAddress(requesterAddress);
+        const address3 = normalizeAddress2(requesterAddress);
         if (!address3) {
           return {
             ok: false,
@@ -73806,19 +73844,19 @@ var init_storageRouteExecution = __esm({
       }, 200, baseHeaders);
     };
     publishCloudflareOwnedStorageMetadata = async ({ env, config, slug, actor, metadata, createOwner }) => {
-      const uploader = normalizeAddress(actor);
+      const uploader = normalizeAddress2(actor);
       const resource = metadata?.resource;
       const admins = resolveSessionAdminAddresses(config);
       const isAdmin = admins.has(uploader);
       const context = metadata?.contextSource === true && resource === "docsContext";
-      const adder = context && isAdmin && metadata.contextOrigin === "worker" ? normalizeAddress(metadata.uploader) : uploader;
+      const adder = context && isAdmin && metadata.contextOrigin === "worker" ? normalizeAddress2(metadata.uploader) : uploader;
       if (!(context ? isAdmin || participantsMayAddContext(config) : isOwnedStorageResource(resource) && isStorageResourceId(metadata?.resourceId)) || !isSafeCloudflareStorageRefId(metadata?.id) || !uploader || !adder || metadata.uploader !== adder || metadata.uploadAuthority !== (admins.has(adder) ? "admin" : "author")) {
         throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
       }
       const index = getStorageIndexBinding(env);
       if (typeof index?.get !== "function" || typeof index?.put !== "function") throw new Error("Cloudflare storage index binding not configured.");
       const owner = context ? null : await readStorageResourceOwner({ index, slug, resource, resourceId: metadata.resourceId });
-      if (owner && normalizeAddress(owner.uploader) !== uploader && metadata.uploadAuthority !== "admin") {
+      if (owner && normalizeAddress2(owner.uploader) !== uploader && metadata.uploadAuthority !== "admin") {
         throw Object.assign(new Error("This id already belongs to another author."), { status: 409 });
       }
       if (createOwner && !owner) {
@@ -73837,7 +73875,7 @@ var init_storageRouteExecution = __esm({
     RESPONSE_ROWS_PER_QUESTION = 5;
     AUTOMATIC_ANALYSIS_MODES = /* @__PURE__ */ new Set(["automatic", "both"]);
     countQuestionsOnce = async (memo, count2) => {
-      if (!isObj20(memo)) return count2();
+      if (!isObj21(memo)) return count2();
       memo.questionCount ?? (memo.questionCount = await count2());
       return memo.questionCount;
     };
@@ -73885,7 +73923,7 @@ var init_storageRouteExecution = __esm({
         return responseJson(deps, { error: "Cloudflare lit_encrypted storage requires payloadEncrypted=true." }, 400, baseHeaders);
       }
       const resource = trim15(payload.resource) || "docsContext";
-      const uploader = normalizeAddress(uploaderAddress);
+      const uploader = normalizeAddress2(uploaderAddress);
       const canonicalAnswers = resource === "responses" && isWorkerCanonicalSessionConfig(config);
       if (canonicalAnswers && !parsedPayload && payloadAccess.encryption !== PAYLOAD_ENCRYPTION_MODES3.LIT) {
         return responseJson(deps, {
@@ -73910,7 +73948,7 @@ var init_storageRouteExecution = __esm({
       if (!contextCheck.ok) {
         return responseJson(deps, { error: contextCheck.error, reason: contextCheck.reason }, contextCheck.status, baseHeaders);
       }
-      const contextAdder = payload.contextOrigin === "worker" && normalizeAddress(payload.contextUploader) || uploader;
+      const contextAdder = payload.contextOrigin === "worker" && normalizeAddress2(payload.contextUploader) || uploader;
       let owner = null;
       let hidden = false;
       if (owned) {
@@ -73926,7 +73964,7 @@ var init_storageRouteExecution = __esm({
           if (!legacy.ok) return responseJson(deps, { error: legacy.error }, legacy.status || 503, baseHeaders);
           owner = legacy.owner;
         }
-        if (owner && normalizeAddress(owner.uploader) !== uploader && !uploaderIsAdmin) {
+        if (owner && normalizeAddress2(owner.uploader) !== uploader && !uploaderIsAdmin) {
           const noun = resource === "questions" ? "question" : "survey";
           return responseJson(deps, {
             error: owner.uploader === LEGACY_STORAGE_OWNER ? `This ${noun} id was stored before authors were recorded, so only a session admin can upload it again.` : `This ${noun} id already belongs to another author. Only its first author or a session admin can upload it again.`,
@@ -74271,7 +74309,7 @@ var init_storageRouteExecution = __esm({
       } catch {
         return { ok: false, error: "Invalid JSON." };
       }
-      if (!isObj20(body)) return { ok: false, error: "Invalid JSON." };
+      if (!isObj21(body)) return { ok: false, error: "Invalid JSON." };
       return {
         ok: true,
         resource: queryResource || trim15(body.resource) || "docsContext",
@@ -74324,7 +74362,7 @@ var init_storageRouteExecution = __esm({
               baseHeaders
             );
           }
-          if (!isObj20(metadata) || trim15(metadata.id) !== id2 || (trim15(metadata.resource) || "docsContext") !== indexedResource) {
+          if (!isObj21(metadata) || trim15(metadata.id) !== id2 || (trim15(metadata.resource) || "docsContext") !== indexedResource) {
             return responseJson(
               deps,
               { error: "Cloudflare storage index metadata is unavailable." },
@@ -74336,7 +74374,7 @@ var init_storageRouteExecution = __esm({
       }
       if (!object4 && canReadKvPayload) {
         const envelope = await readKvPayloadEnvelope({ index, slug, id: id2 });
-        if (!envelope || !isObj20(envelope?.metadata)) {
+        if (!envelope || !isObj21(envelope?.metadata)) {
           return responseJson(deps, { error: "Storage object not found." }, 404, baseHeaders);
         }
         metadata = envelope.metadata;
@@ -74392,6 +74430,20 @@ var init_storageRouteExecution = __esm({
           return responseJson(deps, { error: error?.message || "Cloudflare worker envelope decrypt failed." }, 403, baseHeaders);
         }
       }
+      let researchPrivate = false;
+      if (resource === "responses") {
+        const bytes3 = new Uint8Array(await new Response(responseBody).arrayBuffer());
+        const forReader = answerPayloadForReader(decoder6.decode(bytes3), {
+          reads: readsResearchFields({
+            metadata,
+            requesterAddress: uploaderAddress,
+            authScopes,
+            adminAddresses: resolveSessionAdminAddresses(config)
+          })
+        });
+        responseBody = forReader?.withheld ? forReader.text : bytes3;
+        researchPrivate = !!forReader?.carries;
+      }
       const { contentType, inline } = resolveStorageReadContentType(metadata?.contentType);
       const responseHeaders = new Headers(baseHeaders || {});
       responseHeaders.set("Content-Type", contentType);
@@ -74401,7 +74453,7 @@ var init_storageRouteExecution = __esm({
       responseHeaders.set("X-CE-Storage-Backend", STORAGE_BACKENDS.CLOUDFLARE);
       responseHeaders.set("X-CE-Storage-Ref", id2);
       responseHeaders.set("X-CE-Payload-Access-Mode", deriveLegacyPayloadAccessMode2(resolvedAccess));
-      if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE || hasPrivateResponsePolicy({ config, resource })) {
+      if (researchPrivate || resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.WORKER_ENVELOPE || hasPrivateResponsePolicy({ config, resource })) {
         responseHeaders.set("Cache-Control", "private, no-store");
       }
       return new Response(responseBody, {
@@ -74461,7 +74513,7 @@ var init_storageRouteExecution = __esm({
       if (!listOptions.ok) return responseJson(deps, { error: listOptions.error }, 400, baseHeaders);
       const { cursor, limit, resource } = listOptions;
       const mine = url.searchParams.get("mine") === "true";
-      const responder = mine ? normalizeAddress(uploaderAddress) : "";
+      const responder = mine ? normalizeAddress2(uploaderAddress) : "";
       const contextOnly = resource === "docsContext" && url.searchParams.get("role") === "context";
       if (mine && (resource !== "responses" || !responder)) {
         return responseJson(deps, { error: "Own responses require authentication and the responses resource." }, 403, baseHeaders);
@@ -74515,7 +74567,7 @@ var init_storageRouteExecution = __esm({
         const othersRow = (raw) => {
           try {
             const author = trim15(JSON.parse(raw)?.responder);
-            return !!author && normalizeAddress(author) !== responder;
+            return !!author && normalizeAddress2(author) !== responder;
           } catch {
             return false;
           }
@@ -74548,7 +74600,7 @@ var init_storageRouteExecution = __esm({
           return responseJson(deps, { error: "Response ownership is unavailable." }, 503, baseHeaders);
         }
         if (contextOnly && metadata?.contextSource !== true) continue;
-        if (mine && normalizeAddress(metadata.responder) !== responder) continue;
+        if (mine && normalizeAddress2(metadata.responder) !== responder) continue;
         const itemAccess = await authorizeCloudflareStorageAccess({
           env,
           config,
@@ -74566,7 +74618,7 @@ var init_storageRouteExecution = __esm({
           continue;
         }
         const owned = isOwnedStorageResource(storageRef.resource);
-        const resourceId = owned ? normalizeAddress(metadata?.resourceId) : "";
+        const resourceId = owned ? normalizeAddress2(metadata?.resourceId) : "";
         if (owned && (metadata?.hidden === true || hiddenIds?.has(resourceId))) {
           if (resourceId) items.push({ hidden: true, metadata: { resource: storageRef.resource, resourceId, hidden: true } });
           continue;
@@ -74585,7 +74637,7 @@ var init_storageRouteExecution = __esm({
             createdAt: trim15(metadata?.createdAt),
             ...storageRef.resource === "responses" && trim15(metadata?.responder) ? { responder: trim15(metadata.responder).toLowerCase() } : {},
             ...resourceId ? { resourceId } : {},
-            ...owned && trim15(metadata?.uploader) ? { uploader: normalizeAddress(metadata.uploader) } : {},
+            ...owned && trim15(metadata?.uploader) ? { uploader: normalizeAddress2(metadata.uploader) } : {},
             ...owned ? {
               ...metadata?.uploadAuthority != null ? { uploadAuthority: metadata.uploadAuthority } : {},
               uploaderIsAdmin: isAdminStorageVersion(metadata)
@@ -74661,7 +74713,7 @@ ${version2.responder}`;
           const raw = got?.get?.(key) ?? null;
           if (raw != null) budget.metadata(raw);
           const metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
-          if (!isObj20(metadata) || !trim15(metadata.id)) throw new Error("Storage metadata is missing or invalid.");
+          if (!isObj21(metadata) || !trim15(metadata.id)) throw new Error("Storage metadata is missing or invalid.");
           read.set(key, metadata);
         }
       }
@@ -74691,7 +74743,7 @@ ${version2.responder}`;
             const raw = bulk ? (await bulk).get(key) : await index.get(key);
             if (raw != null) budget?.metadata(raw);
             const metadata = typeof raw === "string" ? JSON.parse(raw) : raw;
-            if (isObj20(metadata) && trim15(metadata.id)) rows.push({ key, metadata });
+            if (isObj21(metadata) && trim15(metadata.id)) rows.push({ key, metadata });
             else if (strict) throw new Error("Storage metadata is missing or invalid.");
           } catch (error) {
             if (strict || isStorageReadLimitError(error)) throw error;
@@ -74711,7 +74763,7 @@ ${version2.responder}`;
       } catch {
         return null;
       }
-      if (!isObj20(envelope?.metadata) || typeof envelope.payloadBase64url !== "string") return null;
+      if (!isObj21(envelope?.metadata) || typeof envelope.payloadBase64url !== "string") return null;
       const limit = budget?.remainingPayloadBytes ?? Infinity;
       if (Math.floor(envelope.payloadBase64url.length * 3 / 4) > limit) throw new StorageReadLimitError("payloadBytes");
       const bytes3 = base64urlToBytes2(envelope.payloadBase64url);
@@ -74779,7 +74831,7 @@ ${version2.responder}`;
       try {
         let bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata });
         if (!bytes3) return null;
-        if (isObj20(metadata?.envelope)) {
+        if (isObj21(metadata?.envelope)) {
           bytes3 = await decryptPayloadWithStorageEnvelope({
             env,
             config,
@@ -74791,13 +74843,13 @@ ${version2.responder}`;
           });
         }
         const payload = JSON.parse(decoder6.decode(await toUint8Array(bytes3)));
-        return isObj20(payload) ? payload : null;
+        return isObj21(payload) ? payload : null;
       } catch {
         return null;
       }
     };
     readIndexRowResourceId = async ({ env, index, slug, config, resource, row, deps }) => {
-      const recorded = normalizeAddress(row.metadata?.resourceId);
+      const recorded = normalizeAddress2(row.metadata?.resourceId);
       if (recorded) return recorded;
       const payload = await readStoredPayloadJson({ env, index, slug, config, metadata: row.metadata, deps });
       if (!payload) return null;
@@ -74805,13 +74857,13 @@ ${version2.responder}`;
       return isStorageResourceId(resourceId) ? resourceId : "";
     };
     readLegacyRowResourceId = async ({ env, index, slug, config, resource, metadata, deps }) => {
-      const recorded = normalizeAddress(metadata.resourceId);
+      const recorded = normalizeAddress2(metadata.resourceId);
       if (recorded) return recorded;
-      if (metadata.encrypted === true && !isObj20(metadata.envelope)) return "";
+      if (metadata.encrypted === true && !isObj21(metadata.envelope)) return "";
       let bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true });
       if (!bytes3) return "";
       try {
-        if (isObj20(metadata.envelope)) {
+        if (isObj21(metadata.envelope)) {
           bytes3 = await decryptPayloadWithStorageEnvelope({
             env,
             config,
@@ -74823,7 +74875,7 @@ ${version2.responder}`;
           });
         }
         const payload = JSON.parse(decoder6.decode(await toUint8Array(bytes3)));
-        const resourceId = isObj20(payload) ? readStoragePayloadResourceId(resource, payload) : "";
+        const resourceId = isObj21(payload) ? readStoragePayloadResourceId(resource, payload) : "";
         return isStorageResourceId(resourceId) ? resourceId : "";
       } catch {
         return "";
@@ -74865,7 +74917,7 @@ ${version2.responder}`;
           } catch {
             continue;
           }
-          if (!isObj20(metadata) || !trim15(metadata.id) || normalizeAddress(metadata.uploader)) continue;
+          if (!isObj21(metadata) || !trim15(metadata.id) || normalizeAddress2(metadata.uploader)) continue;
           const resourceId = await readLegacyRowResourceId({ env, index, slug, config, resource, metadata, deps });
           if (resourceId) ids.add(resourceId);
           else skippedRows += 1;
@@ -74905,7 +74957,7 @@ ${version2.responder}`;
             } catch {
               metadata = null;
             }
-            rows.push({ key, metadata: isObj20(metadata) && trim15(metadata.id) ? metadata : null });
+            rows.push({ key, metadata: isObj21(metadata) && trim15(metadata.id) ? metadata : null });
           }
           yield rows;
         }
@@ -74916,7 +74968,7 @@ ${version2.responder}`;
     };
     setCloudflareStorageResourceHidden = async ({ env, config, slug, body, actor = "", deps = {} } = {}) => {
       const resource = trim15(body?.resource);
-      const resourceId = normalizeAddress(body?.id);
+      const resourceId = normalizeAddress2(body?.id);
       if (!isOwnedStorageResource(resource)) {
         return { ok: false, status: 400, error: "Only questions and surveys can be hidden." };
       }
@@ -74967,7 +75019,7 @@ ${version2.responder}`;
               continue;
             }
             const matched = rowResourceId === resourceId;
-            const recordsId = !!rowResourceId && !normalizeAddress(row.metadata.resourceId);
+            const recordsId = !!rowResourceId && !normalizeAddress2(row.metadata.resourceId);
             if (!matched && !recordsId) continue;
             const next = { ...row.metadata, resourceId: rowResourceId };
             if (matched) {
@@ -75086,7 +75138,7 @@ ${version2.responder}`;
             metadata = null;
           }
           let deferred = false;
-          if (!isObj20(metadata) || !trim15(metadata.id)) {
+          if (!isObj21(metadata) || !trim15(metadata.id)) {
             readErrors.push({ key, error: "invalid_metadata" });
           } else {
             const metadataAccess = normalizePayloadAccessControl2(metadata.payloadAccessControl || metadata.payloadAccessMode || resolvePayloadAccessControl(config));
@@ -75121,7 +75173,7 @@ ${version2.responder}`;
                       payloadAccessMode: deriveLegacyPayloadAccessMode2(metadataAccess),
                       ...metadata.accessConditions ? { accessConditions: metadata.accessConditions } : {}
                     },
-                    envelope: isObj20(metadata.envelope) ? metadata.envelope : null,
+                    envelope: isObj21(metadata.envelope) ? metadata.envelope : null,
                     ciphertextBase64url: bytesToBase64url2(ciphertextBytes),
                     keyProvider: keyProvider2,
                     wrappedKeysIncluded: !!trim15(metadata.envelope?.dek?.wrappedKey)
@@ -75158,7 +75210,7 @@ ${version2.responder}`;
         storageListError = { reason: trim15(error?.message || "storage_list_failed").slice(0, 500) };
         nextCursor || (nextCursor = resume(position.pageCursor, position.lastKey));
       }
-      const sessionEnvelope = includeSessionEnvelope && isObj20(config?.storageEnvelope) ? JSON.parse(JSON.stringify(config.storageEnvelope)) : null;
+      const sessionEnvelope = includeSessionEnvelope && isObj21(config?.storageEnvelope) ? JSON.parse(JSON.stringify(config.storageEnvelope)) : null;
       const keyProvider = resolveEnvelopeExportManifestKeyProvider({ sessionEnvelope, payloads });
       const deploymentKekContinuityRequired = !!trim15(sessionEnvelope?.sessionKey?.wrappedKey) || payloads.some((entry2) => entry2.keyProvider === "worker_secret" || entry2.keyProvider === "mixed");
       const manifest = {
@@ -75221,13 +75273,13 @@ ${version2.responder}`;
       } catch {
         return null;
       }
-      return isObj20(metadata) && metadata.contextSource === true && trim15(metadata.id) === trim15(id2) ? metadata : null;
+      return isObj21(metadata) && metadata.contextSource === true && trim15(metadata.id) === trim15(id2) ? metadata : null;
     };
     readContextSourceBytes = async ({ env, config, slug, metadata, maxBytes, principal = "session-ai", strict = false, deps } = {}) => {
       const index = getStorageIndexBinding(env);
       let bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes, strict });
       if (!bytes3) return null;
-      if (isObj20(metadata?.envelope)) {
+      if (isObj21(metadata?.envelope)) {
         await writeStorageEnvelopeKeyReleaseAudit({
           env,
           slug,
@@ -77337,7 +77389,7 @@ ${contextText}` : ""}`;
 });
 
 // workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js
-var ARTIFACT_KIND, ARTIFACT_VERSION, SECTION_ORDER, SEVERITY_LEVELS, WALLET_TEXT_RE, WALLET_ID_RE, LIMITS, isObj21, toArray, hasOwn5, toPrimitiveStr, compactWhitespace, cleanText, cleanId, slugId, unique, sectionRecord, normalizeSections, unavailable2, defaultSection, buildAllowedSourceIds, normalizeParticipants, normalizeIdRefs, normalizeSourceFields, normalizeSummaryRecord, normalizeArgumentMap, hasCycle, normalizeAtlas, normalizeBreakdown, normalizeSeverity, DEFAULT_RISK_AXES, normalizeRiskAxis, normalizeRiskAxes, normalizeRiskAssessments, normalizeDynamicRiskMatrix, normalizeLegacyRiskMatrix, normalizeRiskMatrix, normalizeGeneratedAt, normalizeModel, normalizeSection, normalizeResultsAnalysisArtifact, applyResultsAnalysisExposurePolicy;
+var ARTIFACT_KIND, ARTIFACT_VERSION, SECTION_ORDER, SEVERITY_LEVELS, WALLET_TEXT_RE, WALLET_ID_RE, LIMITS, isObj22, toArray, hasOwn5, toPrimitiveStr, compactWhitespace, cleanText, cleanId, slugId, unique, sectionRecord, normalizeSections, unavailable2, defaultSection, buildAllowedSourceIds, normalizeParticipants, normalizeIdRefs, normalizeSourceFields, normalizeSummaryRecord, normalizeArgumentMap, hasCycle, normalizeAtlas, normalizeBreakdown, normalizeSeverity, DEFAULT_RISK_AXES, normalizeRiskAxis, normalizeRiskAxes, normalizeRiskAssessments, normalizeDynamicRiskMatrix, normalizeLegacyRiskMatrix, normalizeRiskMatrix, normalizeGeneratedAt, normalizeModel, normalizeSection, normalizeResultsAnalysisArtifact, applyResultsAnalysisExposurePolicy;
 var init_resultsAnalysisArtifactValidation = __esm({
   "workers/sessionCorsWorker/resultsAnalysisArtifactValidation.js"() {
     ARTIFACT_KIND = "ce_session_results_analysis_artifact";
@@ -77366,7 +77418,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       summaryChars: 900,
       modelChars: 180
     });
-    isObj21 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     toArray = (value) => Array.isArray(value) ? value : [];
     hasOwn5 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     toPrimitiveStr = (value) => {
@@ -77396,8 +77448,8 @@ var init_resultsAnalysisArtifactValidation = __esm({
     };
     unique = (values) => [...new Set(values.filter(Boolean))];
     sectionRecord = (value) => {
-      const raw = isObj21(value?.sections) ? value.sections : value;
-      return isObj21(raw) ? raw : {};
+      const raw = isObj22(value?.sections) ? value.sections : value;
+      return isObj22(raw) ? raw : {};
     };
     normalizeSections = (sections) => {
       const requested = /* @__PURE__ */ new Set();
@@ -77483,10 +77535,10 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeSummaryRecord = (value) => {
-      const record4 = isObj21(value) ? value : {};
+      const record4 = isObj22(value) ? value : {};
       const overview = cleanText(record4.overview || record4.summary || record4.interpretation || record4.narrative);
       const themes = toArray(record4.themes || record4.keyFindings || record4.findings).slice(0, LIMITS.breakdownThemes).map((entry2, index) => {
-        const item = isObj21(entry2) ? entry2 : { summary: entry2 };
+        const item = isObj22(entry2) ? entry2 : { summary: entry2 };
         const label = cleanText(item.label || item.name || item.title || `Theme ${index + 1}`, LIMITS.labelChars);
         const summary = cleanText(item.summary || item.description || item.finding || item.body);
         if (!label && !summary) return null;
@@ -77502,14 +77554,14 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeArgumentMap = (rawSection, allowed) => {
-      if (!isObj21(rawSection)) return defaultSection("argumentMap", "AI generation did not return argument-map data.");
+      if (!isObj22(rawSection)) return defaultSection("argumentMap", "AI generation did not return argument-map data.");
       const errors = [];
       const debates = toArray(rawSection.debates).slice(0, LIMITS.debates).map((debate, debateIndex) => {
-        if (!isObj21(debate)) return null;
+        if (!isObj22(debate)) return null;
         const title = cleanText(debate.title || debate.label || debate.question || debate.summary, LIMITS.labelChars);
         if (!title) return null;
         const claims = toArray(debate.claims).slice(0, LIMITS.claimsPerDebate).map((claim, claimIndex) => {
-          if (!isObj21(claim)) return null;
+          if (!isObj22(claim)) return null;
           const label = cleanText(claim.label || claim.claim || claim.title || claim.summary, LIMITS.labelChars);
           if (!label) return null;
           const summary2 = cleanText(claim.summary || claim.description || claim.evidence);
@@ -77558,11 +77610,11 @@ var init_resultsAnalysisArtifactValidation = __esm({
       return nodes.some((node) => visit(node.id));
     };
     normalizeAtlas = (rawSection, allowed) => {
-      if (!isObj21(rawSection)) return defaultSection("atlas", "AI generation did not return atlas data.");
+      if (!isObj22(rawSection)) return defaultSection("atlas", "AI generation did not return atlas data.");
       const errors = [];
       const seenIds = /* @__PURE__ */ new Set();
       const nodes = toArray(rawSection.nodes).slice(0, LIMITS.atlasNodes).map((node, index) => {
-        if (!isObj21(node)) return null;
+        if (!isObj22(node)) return null;
         const label = cleanText(node.label || node.name || node.title || node.summary, LIMITS.labelChars);
         if (!label) return null;
         let id2 = slugId(node.id || label, `atlas_${index + 1}`);
@@ -77578,7 +77630,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       }).filter(Boolean);
       const nodeIds = new Set(nodes.map((node) => node.id));
       const edges = toArray(rawSection.edges).slice(0, LIMITS.atlasEdges).map((edge, index) => {
-        if (!isObj21(edge)) return null;
+        if (!isObj22(edge)) return null;
         const source = slugId(edge.source || edge.sourceId, "");
         const target = slugId(edge.target || edge.targetId, "");
         if (!source || !target || source === target || !nodeIds.has(source) || !nodeIds.has(target)) {
@@ -77598,16 +77650,16 @@ var init_resultsAnalysisArtifactValidation = __esm({
       return { available: true, nodes, edges };
     };
     normalizeBreakdown = (rawSection, allowed) => {
-      if (!isObj21(rawSection)) return defaultSection("breakdown", "AI generation did not return breakdown data.");
+      if (!isObj22(rawSection)) return defaultSection("breakdown", "AI generation did not return breakdown data.");
       const errors = [];
       const summary = normalizeSummaryRecord(rawSection.summary);
       const dimensions = toArray(rawSection.dimensions).slice(0, LIMITS.breakdownDimensions).map((dimension, index) => {
-        if (!isObj21(dimension)) return null;
+        if (!isObj22(dimension)) return null;
         const label = cleanText(dimension.label || dimension.name || dimension.dimension, LIMITS.labelChars);
         if (!label) return null;
         const description = cleanText(dimension.summary || dimension.description || dimension.interpretation);
         const values = toArray(dimension.values).slice(0, LIMITS.breakdownDimensionValues).map((value, valueIndex) => {
-          const item = isObj21(value) ? value : { label: value };
+          const item = isObj22(value) ? value : { label: value };
           const valueLabel = cleanText(item.label || item.value || item.name, LIMITS.labelChars);
           if (!valueLabel) return null;
           const valueSummary = cleanText(item.summary || item.description || item.interpretation);
@@ -77625,7 +77677,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
         };
       }).filter(Boolean);
       const groups = toArray(rawSection.groups).slice(0, LIMITS.breakdownGroups).map((group, index) => {
-        if (!isObj21(group)) return null;
+        if (!isObj22(group)) return null;
         const label = cleanText(group.label || group.name || group.title || group.group, LIMITS.labelChars);
         const summaryText = cleanText(group.summary || group.description || group.interpretation || group.insight);
         if (!label && !summaryText) return null;
@@ -77668,7 +77720,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       }
     });
     normalizeRiskAxis = (axis, fallback) => {
-      if (!isObj21(axis)) return null;
+      if (!isObj22(axis)) return null;
       const record4 = axis;
       const label = cleanText(record4.label || record4.name, LIMITS.labelChars);
       if (!label) return null;
@@ -77676,7 +77728,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       const rawLevels = toArray(record4.levels);
       const seen = /* @__PURE__ */ new Set();
       const levels = rawLevels.slice(0, LIMITS.riskAxisLevels).map((level, index) => {
-        const levelRecord = isObj21(level) ? level : { label: level, id: level };
+        const levelRecord = isObj22(level) ? level : { label: level, id: level };
         const levelLabel = cleanText(levelRecord.label || levelRecord.name || levelRecord.id, LIMITS.labelChars);
         if (!levelLabel) return null;
         let levelId = slugId(levelRecord.id || levelLabel, `level_${index + 1}`);
@@ -77689,7 +77741,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       return { id: id2, label, levels };
     };
     normalizeRiskAxes = (rawAxes) => {
-      const axes = isObj21(rawAxes) ? rawAxes : {};
+      const axes = isObj22(rawAxes) ? rawAxes : {};
       const x = normalizeRiskAxis(axes.x || axes.columns || axes.horizontal, DEFAULT_RISK_AXES.x);
       const y = normalizeRiskAxis(axes.y || axes.rows || axes.vertical, DEFAULT_RISK_AXES.y);
       return x && y ? { x, y } : null;
@@ -77698,7 +77750,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       const xLevelIds = new Set(axes.x.levels.map((level) => level.id));
       const yLevelIds = new Set(axes.y.levels.map((level) => level.id));
       return toArray(rawAssessments).slice(0, LIMITS.riskAssessments).map((assessment, index) => {
-        if (!isObj21(assessment)) return null;
+        if (!isObj22(assessment)) return null;
         const label = cleanText(assessment.label || assessment.category || assessment.name || assessment.title, LIMITS.labelChars);
         const summary = cleanText(assessment.summary || assessment.description || assessment.rationale || assessment.evidence);
         const xLevelId = slugId(assessment.xLevelId || assessment.x || assessment.columnLevelId || assessment.likelihood, "");
@@ -77741,16 +77793,16 @@ var init_resultsAnalysisArtifactValidation = __esm({
     };
     normalizeLegacyRiskMatrix = (rawSection, allowed) => {
       const errors = [];
-      const rawHeatmap = isObj21(rawSection.heatmap) ? rawSection.heatmap : {};
+      const rawHeatmap = isObj22(rawSection.heatmap) ? rawSection.heatmap : {};
       const categoryEntries = [];
       const heatmap = {};
       const assessments = [];
       toArray(rawSection.categories).slice(0, LIMITS.riskCategories).forEach((category, index) => {
-        if (!isObj21(category)) return;
+        if (!isObj22(category)) return;
         const label = cleanText(category.label || category.name || category.title, LIMITS.labelChars);
         if (!label) return;
         const id2 = slugId(category.id || label, `risk_${index + 1}`);
-        const heat = isObj21(rawHeatmap[id2]) ? rawHeatmap[id2] : {};
+        const heat = isObj22(rawHeatmap[id2]) ? rawHeatmap[id2] : {};
         const likelihood = normalizeSeverity(category.likelihood || heat.likelihood);
         const impact = normalizeSeverity(category.impact || heat.impact);
         if (!likelihood || !impact) {
@@ -77777,7 +77829,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
       });
       const categoryIds = new Set(categoryEntries.map((category) => category.id));
       const comments = toArray(rawSection.comments).slice(0, LIMITS.riskComments).map((comment, index) => {
-        if (!isObj21(comment)) return null;
+        if (!isObj22(comment)) return null;
         const categoryId = slugId(comment.categoryId || comment.category || comment.id, "");
         if (!categoryId || !categoryIds.has(categoryId)) {
           errors.push(`unknown risk category for comment ${index + 1}`);
@@ -77805,8 +77857,8 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeRiskMatrix = (rawSection, allowed) => {
-      if (!isObj21(rawSection)) return defaultSection("riskMatrix", "AI generation did not return risk matrix data.");
-      if (isObj21(rawSection.axes) || Array.isArray(rawSection.assessments)) return normalizeDynamicRiskMatrix(rawSection, allowed);
+      if (!isObj22(rawSection)) return defaultSection("riskMatrix", "AI generation did not return risk matrix data.");
+      if (isObj22(rawSection.axes) || Array.isArray(rawSection.assessments)) return normalizeDynamicRiskMatrix(rawSection, allowed);
       return normalizeLegacyRiskMatrix(rawSection, allowed);
     };
     normalizeGeneratedAt = (value) => {
@@ -77849,9 +77901,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     applyResultsAnalysisExposurePolicy = ({ artifact, exposure, sections = SECTION_ORDER } = {}) => {
-      if (!isObj21(artifact?.sections)) return artifact;
+      if (!isObj22(artifact?.sections)) return artifact;
       const enabled = new Set(sections);
-      const groupPolicy = isObj21(exposure) && (hasOwn5(exposure, "anonymizedGroupsEnabled") || hasOwn5(exposure, "minGroupSize"));
+      const groupPolicy = isObj22(exposure) && (hasOwn5(exposure, "anonymizedGroupsEnabled") || hasOwn5(exposure, "minGroupSize"));
       const minGroupSize = Number.isSafeInteger(exposure?.minGroupSize) && exposure.minGroupSize >= 2 ? exposure.minGroupSize : 2;
       const participants = new Set(toArray(artifact.participants).map((participant) => participant.syntheticId));
       const projected = {};
@@ -77859,7 +77911,7 @@ var init_resultsAnalysisArtifactValidation = __esm({
         const section = artifact.sections[key];
         if (!enabled.has(key)) {
           projected[key] = defaultSection(key, "This generated view is disabled for the session.");
-        } else if (key === "breakdown" && isObj21(section) && section.available !== false && groupPolicy) {
+        } else if (key === "breakdown" && isObj22(section) && section.available !== false && groupPolicy) {
           projected[key] = { ...section, groups: toArray(section.groups).filter((group) => exposure.anonymizedGroupsEnabled !== false && unique(toArray(group?.participantIds).filter((id2) => participants.has(id2))).length >= minGroupSize) };
         } else {
           projected[key] = section;
@@ -77971,21 +78023,21 @@ var init_aiRequestNormalization = __esm({
 });
 
 // workers/sessionCorsWorker/storageAudience.js
-var isObj22, trim16, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience;
+var isObj23, trim16, parseAccessRecord, resolveConfiguredPayloadAccessValue, normalizeAccessGroupIds, normalizeAccessAudienceExtras, metadataAccessMatchesPublishedAudience;
 var init_storageAudience = __esm({
   "workers/sessionCorsWorker/storageAudience.js"() {
     init_deployHelperCore();
     init_payloadAccessControl();
     init_stringCoercion();
-    isObj22 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj23 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     trim16 = (value) => toStr6(value).trim();
     parseAccessRecord = (value) => {
-      if (isObj22(value)) return value;
+      if (isObj23(value)) return value;
       const raw = trim16(value);
       if (!raw || raw[0] !== "{") return {};
       try {
         const parsed = JSON.parse(raw);
-        return isObj22(parsed) ? parsed : {};
+        return isObj23(parsed) ? parsed : {};
       } catch {
         return {};
       }
@@ -78004,7 +78056,7 @@ var init_storageAudience = __esm({
       };
     };
     metadataAccessMatchesPublishedAudience = (metadata = {}, config = {}) => {
-      if (!isObj22(metadata?.payloadAccessControl) && !trim16(metadata?.payloadAccessMode) && !metadata?.accessConditions) return true;
+      if (!isObj23(metadata?.payloadAccessControl) && !trim16(metadata?.payloadAccessMode) && !metadata?.accessConditions) return true;
       const expectedValue = resolveConfiguredPayloadAccessValue(config);
       const actualValue = metadata.payloadAccessControl || metadata.payloadAccessMode;
       const expected = normalizePayloadAccessControl2(expectedValue);
@@ -78281,7 +78333,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder8, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj23, hasOwn6, trim17, lower8, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, snapshotLimitText, SNAPSHOT_CHANGED, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, readKeptResultsAnalysisDraft, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder8, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj24, hasOwn6, trim17, lower8, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, snapshotLimitText, SNAPSHOT_CHANGED, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, readKeptResultsAnalysisDraft, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_aiRequestPolicy();
@@ -78329,7 +78381,7 @@ var init_resultsAnalysisGeneration = __esm({
     RESULT_SECTION_ORDER = ["argumentMap", "atlas", "breakdown", "riskMatrix"];
     DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS = 8 * 60 * 1e3;
     RESULTS_CONTEXT_CHARS = 12e3;
-    isObj23 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj24 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     hasOwn6 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     trim17 = (value) => toStr6(value).trim();
     lower8 = (value) => trim17(value).toLowerCase();
@@ -78338,7 +78390,7 @@ var init_resultsAnalysisGeneration = __esm({
     );
     getCanonicalSessionId = (config = {}) => normalizeSessionIdHex2(resolveCanonicalWorkerSessionIdHex(config));
     publicDraft = (draft, config) => {
-      if (!isObj23(draft)) return null;
+      if (!isObj24(draft)) return null;
       const {
         participantWatermark,
         participantDigests,
@@ -78376,14 +78428,14 @@ var init_resultsAnalysisGeneration = __esm({
       if (value == null || value === false) return false;
       if (typeof value === "string") return trim17(value) !== "";
       if (Array.isArray(value)) return value.length > 0;
-      if (isObj23(value)) return Object.keys(value).length > 0;
+      if (isObj24(value)) return Object.keys(value).length > 0;
       return true;
     };
-    isBlankFieldValue = (value) => value == null || typeof value === "string" && !trim17(value) || Array.isArray(value) && value.length === 0 || isObj23(value) && Object.keys(value).length === 0;
+    isBlankFieldValue = (value) => value == null || typeof value === "string" && !trim17(value) || Array.isArray(value) && value.length === 0 || isObj24(value) && Object.keys(value).length === 0;
     isClearedFieldWithLockFlag = (value) => hasOwn6(value, "value") && isBlankFieldValue(value.value) && !["envelope", ...ENCRYPTED_ENVELOPE_KEYS].some((key) => encryptedEnvelopeValueHasContent(value[key]));
     valueLooksEncrypted = (value, depth = 0) => {
       if (depth > 5) return false;
-      if (!isObj23(value)) return false;
+      if (!isObj24(value)) return false;
       if (value.locked === true || value.payloadEncrypted === true) return true;
       if (value.encrypted === true && !isClearedFieldWithLockFlag(value)) return true;
       if (Object.entries(value).some(([key, entry2]) => ENCRYPTED_ENVELOPE_KEYS.has(key) && encryptedEnvelopeValueHasContent(entry2))) return true;
@@ -78393,16 +78445,16 @@ var init_resultsAnalysisGeneration = __esm({
       if (value == null) return "";
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return trim17(value);
       if (Array.isArray(value)) return value.map(valueFromAnswerLike).filter((entry2) => entry2 !== "").join("; ");
-      if (isObj23(value) && hasOwn6(value, "value")) return valueFromAnswerLike(value.value);
+      if (isObj24(value) && hasOwn6(value, "value")) return valueFromAnswerLike(value.value);
       return "";
     };
     FIELD_MASKS = /* @__PURE__ */ new Set(["*", "[encrypted]"]);
     withoutFieldMask = (value) => {
-      const raw = isObj23(value) && hasOwn6(value, "value") ? value.value : value;
+      const raw = isObj24(value) && hasOwn6(value, "value") ? value.value : value;
       return typeof raw === "string" && FIELD_MASKS.has(raw.trim()) ? "" : value;
     };
     rowLooksLocked = (row) => {
-      if (!isObj23(row)) return true;
+      if (!isObj24(row)) return true;
       if (row.encrypted === true || row.payloadEncrypted === true || row.locked === true) return true;
       return valueLooksEncrypted(hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response);
     };
@@ -78470,7 +78522,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     participantDigest = async (sourceKey) => sha256Hex(`participant:${trim17(sourceKey).toLowerCase()}`);
     normalizeQuestionRecord = (question) => {
-      if (!isObj23(question)) return null;
+      if (!isObj24(question)) return null;
       const questionId4 = normalizeQuestionId2(question.questionId || question.questionID || question.id);
       if (!questionId4) return null;
       const type = normalizeQuestionType5(question.type || question.questionType);
@@ -78524,7 +78576,7 @@ var init_resultsAnalysisGeneration = __esm({
       let excludedCount = 0;
       let lockedCount = 0;
       for (const row of Array.isArray(rows) ? rows : []) {
-        if (!isObj23(row)) {
+        if (!isObj24(row)) {
           excludedCount += 1;
           continue;
         }
@@ -78715,12 +78767,12 @@ var init_resultsAnalysisGeneration = __esm({
       };
       const questionRows = await listCloudflareMetadataRows({ index, slug, resource: "questions", budget, strict: true });
       const hiddenQuestionIds = await listHiddenStorageResourceIds({ index, slug, resource: "questions", budget });
-      const readableQuestion = (metadata) => isObj23(metadata) && metadata.hidden !== true && !isEncrypted(metadata) && metadataAccessMatchesPublishedAudience(metadata, config);
+      const readableQuestion = (metadata) => isObj24(metadata) && metadata.hidden !== true && !isEncrypted(metadata) && metadataAccessMatchesPublishedAudience(metadata, config);
       const readQuestionPayload = await readPayloads(questionRows.map((row) => row?.metadata).filter(readableQuestion));
       const candidates = [];
       for (const row of questionRows) {
         const metadata = row?.metadata;
-        if (!isObj23(metadata) || metadata.hidden === true) continue;
+        if (!isObj24(metadata) || metadata.hidden === true) continue;
         const version2 = {
           createdAtMs: Date.parse(trim17(metadata.createdAt)) || 0,
           storageRefId: trim17(metadata.id),
@@ -78733,7 +78785,7 @@ var init_resultsAnalysisGeneration = __esm({
           continue;
         }
         const payload = parseJsonBytes(await readQuestionPayload(metadata));
-        if (!isObj23(payload)) continue;
+        if (!isObj24(payload)) continue;
         if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
         const payloadId = trim17(payload.id || payload.questionId || payload.questionID);
         const normalized2 = normalizeQuestionRecord({
@@ -78746,7 +78798,7 @@ var init_resultsAnalysisGeneration = __esm({
       const questions = selectCanonicalStorageVersions(candidates).filter((candidate) => !candidate.withheld).map((candidate) => candidate.question);
       const listedVersions = latestOnly ? /* @__PURE__ */ new WeakSet() : null;
       const rows = latestOnly ? await listLatestResponseRows({ index, slug, sessionId: buildSessionIdOf(config), budget }) : await listCloudflareMetadataRows({ index, slug, resource: "responses", budget, strict: true });
-      const readResponsePayload = await readPayloads(rows.map((row) => row?.metadata).filter((metadata) => isObj23(metadata) && trim17(metadata.responder) && !isEncrypted(metadata)));
+      const readResponsePayload = await readPayloads(rows.map((row) => row?.metadata).filter((metadata) => isObj24(metadata) && trim17(metadata.responder) && !isEncrypted(metadata)));
       const responseRows = [];
       let excludedCount = 0;
       let lockedCount = 0;
@@ -78767,7 +78819,7 @@ var init_resultsAnalysisGeneration = __esm({
           continue;
         }
         const metadata = row?.metadata;
-        if (!isObj23(metadata) || !trim17(metadata.responder)) {
+        if (!isObj24(metadata) || !trim17(metadata.responder)) {
           excludedCount += 1;
           continue;
         }
@@ -78777,7 +78829,7 @@ var init_resultsAnalysisGeneration = __esm({
           continue;
         }
         const payload = parseJsonBytes(await readResponsePayload(metadata));
-        if (!isObj23(payload)) {
+        if (!isObj24(payload)) {
           excludedCount += 1;
           continue;
         }
@@ -78788,7 +78840,7 @@ var init_resultsAnalysisGeneration = __esm({
         budget.payload(jsonByteLength(committed));
         const metadata = committed?.metadata;
         const payload = committed?.payload;
-        if (!isObj23(metadata) || !isObj23(payload) || !trim17(metadata.responder)) {
+        if (!isObj24(metadata) || !isObj24(payload) || !trim17(metadata.responder)) {
           excludedCount += 1;
           continue;
         }
@@ -78845,7 +78897,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     loadAdminSnapshotResultsAnalysisSource = async ({ body, slug, config } = {}) => {
       const snapshot = body?.source?.snapshot;
-      if (!isObj23(snapshot)) return { ok: false, status: 400, error: "Missing admin results-analysis snapshot." };
+      if (!isObj24(snapshot)) return { ok: false, status: 400, error: "Missing admin results-analysis snapshot." };
       if (!compareIdentity({ slug, config, suppliedSlug: snapshot.sessionSlug, suppliedSessionId: snapshot.sessionId || snapshot.sessionIdHex })) {
         return { ok: false, status: 400, error: "Snapshot session identity does not match the target session." };
       }
@@ -78886,20 +78938,20 @@ var init_resultsAnalysisGeneration = __esm({
       for (const candidate of [raw, raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)]) {
         try {
           const value = JSON.parse(candidate);
-          if (isObj23(value)) return { ok: true, value };
+          if (isObj24(value)) return { ok: true, value };
         } catch {
         }
       }
       return { ok: false, status: 502, retryable: false, error: "AI provider returned invalid JSON." };
     };
     resolveAnalysisAiPayload = ({ config, prompt }) => {
-      const ai = isObj23(config?.ai) ? config.ai : {};
-      const providers = isObj23(ai.providers) ? ai.providers : {};
+      const ai = isObj24(config?.ai) ? config.ai : {};
+      const providers = isObj24(ai.providers) ? ai.providers : {};
       const { provider, model } = resolveSessionAiModel(config, { taskType: "analysis", modelType: "thinking" });
       const reasoningEffort = trim17(
         ai?.taskReasoningEffort?.analysis || ai?.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low"
       );
-      const providerEntry = isObj23(providers[provider]) ? providers[provider] : {};
+      const providerEntry = isObj24(providers[provider]) ? providers[provider] : {};
       return {
         provider,
         model,
@@ -78981,12 +79033,12 @@ var init_resultsAnalysisGeneration = __esm({
     filterDraftForStatus = (draft, includeDraft, config) => {
       const safe = publicDraft(draft, config);
       if (includeDraft) return safe;
-      if (!isObj23(safe)) return null;
+      if (!isObj24(safe)) return null;
       const { artifact, snapshot, ...rest } = safe;
       return rest;
     };
     summarizeReservation = (reservation, requestId = "") => {
-      if (!isObj23(reservation)) return null;
+      if (!isObj24(reservation)) return null;
       return {
         kind: trim17(reservation.kind),
         ...requestId ? { requestId } : {}
@@ -79001,7 +79053,7 @@ var init_resultsAnalysisGeneration = __esm({
       return { eligible: reasons.length === 0, reasons };
     };
     summarizeActiveState = (active) => {
-      if (!isObj23(active)) return null;
+      if (!isObj24(active)) return null;
       return {
         ...trim17(active.requestId) ? { requestId: trim17(active.requestId) } : {},
         ...trim17(active.trigger) ? { trigger: trim17(active.trigger) } : {},
@@ -79009,7 +79061,7 @@ var init_resultsAnalysisGeneration = __esm({
       };
     };
     summarizeFailureState = (failure4) => {
-      if (!isObj23(failure4)) return null;
+      if (!isObj24(failure4)) return null;
       return {
         ok: false,
         error: trim17(failure4.error) || "Results analysis generation failed.",
@@ -79263,7 +79315,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     normalizedResultsProfile = (config = {}) => {
       const normalizedConfig = normalizeWorkerConfigRecord(config || {}, { slug: normalizeWorkerSessionSlug(config?.slug) });
-      return isObj23(normalizedConfig?.sessionModeProfile?.results) ? normalizedConfig.sessionModeProfile.results : {};
+      return isObj24(normalizedConfig?.sessionModeProfile?.results) ? normalizedConfig.sessionModeProfile.results : {};
     };
     resolveResultsVisibility = (config = {}) => lower8(normalizedResultsProfile(config).visibility);
     aggregateResultsEnabled = (config = {}) => normalizedResultsProfile(config)?.exposure?.aggregateResultsEnabled === true;
@@ -79310,7 +79362,7 @@ var init_resultsAnalysisGeneration = __esm({
 });
 
 // workers/sessionCorsWorker/resultsBuildStore.js
-var CHUNK_CHARS, MAX_CHUNKS, MAX_RESULTS_BUILDS, RESULTS_BUILD_LEASE_MS, RESULTS_BUILD_KINDS, json6, isObj24, trim18, isFresh, randomHex2, chunkBuild, listedBuild, dispatchResultsBuildStore;
+var CHUNK_CHARS, MAX_CHUNKS, MAX_RESULTS_BUILDS, RESULTS_BUILD_LEASE_MS, RESULTS_BUILD_KINDS, json6, isObj25, trim18, isFresh, randomHex2, chunkBuild, listedBuild, dispatchResultsBuildStore;
 var init_resultsBuildStore = __esm({
   "workers/sessionCorsWorker/resultsBuildStore.js"() {
     CHUNK_CHARS = 24e3;
@@ -79338,9 +79390,9 @@ var init_resultsBuildStore = __esm({
       }
     });
     json6 = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-    isObj24 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj25 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     trim18 = (value) => typeof value === "string" ? value.trim() : "";
-    isFresh = (active, nowMs) => isObj24(active) && nowMs - Number(active.startedAtMs || 0) < RESULTS_BUILD_LEASE_MS;
+    isFresh = (active, nowMs) => isObj25(active) && nowMs - Number(active.startedAtMs || 0) < RESULTS_BUILD_LEASE_MS;
     randomHex2 = (coordinator, bytes3) => [...(coordinator.crypto || globalThis.crypto).getRandomValues(new Uint8Array(bytes3))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
     chunkBuild = (build) => {
       const serialized = JSON.stringify(build);
@@ -79358,7 +79410,7 @@ var init_resultsBuildStore = __esm({
       const chunkKey = (id2, index) => `${kind.key}:build:${id2}:${index}`;
       const readIndex = async (store) => {
         const value = await store.get(kind.key);
-        return isObj24(value) && Array.isArray(value.builds) ? value : { version: 1, active: null, builds: [] };
+        return isObj25(value) && Array.isArray(value.builds) ? value : { version: 1, active: null, builds: [] };
       };
       const readBuild = async (entry2) => {
         const chunks = [];
@@ -79369,7 +79421,7 @@ var init_resultsBuildStore = __esm({
         }
         try {
           const build = JSON.parse(chunks.join(""));
-          return isObj24(build) && build.id === entry2.id ? build : null;
+          return isObj25(build) && build.id === entry2.id ? build : null;
         } catch {
           return null;
         }
@@ -79403,7 +79455,7 @@ var init_resultsBuildStore = __esm({
         });
       }
       if (operation === "finalize") {
-        const build = isObj24(payload.build) ? payload.build : null;
+        const build = isObj25(payload.build) ? payload.build : null;
         const invalid4 = !!build && !idPattern.test(trim18(build.id));
         const chunks = build && !invalid4 ? chunkBuild(build) : [];
         const refusal2 = invalid4 ? json6({ ok: false, error: `Invalid ${kind.name} build.` }, 400) : chunks.length > MAX_CHUNKS ? json6({ ok: false, error: `This ${kind.name} is too large to keep.` }, 413) : null;
@@ -80986,7 +81038,7 @@ var init_litWorkerAuthorization = __esm({
 });
 
 // workers/sessionCorsWorker/chipotleClient.js
-var import_rpcDefaults4, LIT_PROVISIONING_CREDENTIALS_CONFLICT, DEFAULT_LIT_API_BASE, CHIPOTLE_API_PREFIX, APPROVED_LIT_CHIPOTLE_API_HOSTS, LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, DEFAULT_PAGE_NUMBER, DEFAULT_PAGE_SIZE, getPathRpcUrl2, getPublicRpcUrls2, ethersUtils2, toTrimmedString9, isObj25, normalizeChipotleRpcCandidateList, normalizeValidChipotlePkpId, normalizeChipotleMembershipValue, normalizeHostname, parseIpv4Octets2, isPrivateOrLocalIpv4, isPrivateOrLocalIpv6, isPrivateOrLocalHostname, isApprovedLocalChipotleApiHost, isTruthyFlag, isLitChipotleLocalApiBaseAllowed, normalizeLitChipotleApiBase, normalizeChipotleRequestPath, buildChipotleUrl, parseJsonIfPossible, extractChipotleErrorMessage, fetchChipotleJson, resolveLitChipotleRuntime, resolveLitChipotleProvisioningRuntime, ensureChipotleApiKey, ensureChipotleManagementApiKey, buildPagedPath, runtimeAllowsLocalApiBase, listGroupWallets, listActions, listGroupActions, listWallets, MAX_GONE_CHECK_PAGES, GONE_CHECK_STATUSES, listAllIds, mayMeanLitSetupGone, confirmLitSetupGone, resolveActionCidMembership, createStatusWarning, readLitChipotleStatus, deriveLitActionCid, normalizeSessionScopedNameSegment, normalizeGateMode3, isPrivateHostname, validateChipotleRpcUrl, resolveConfigMappedChipotleRpcUrls, resolveDefaultChipotleRpcUrls, resolveSessionChipotleRpcUrl, buildSessionBootstrapMetadata, createLitChipotleAccount, createLitChipotleGroup, createLitChipotleWallet, createLitChipotleUsageKey, readChipotleBillingBalance, ensureActionMetadata, ensureActionInGroup, ensurePkpInGroup, provisionLitChipotleAction, bootstrapLitChipotleSession, bootstrapLitChipotleSessionCore, executeLitChipotleAction, executeSessionLitChipotleAction;
+var import_rpcDefaults4, LIT_PROVISIONING_CREDENTIALS_CONFLICT, DEFAULT_LIT_API_BASE, CHIPOTLE_API_PREFIX, APPROVED_LIT_CHIPOTLE_API_HOSTS, LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG, DEFAULT_PAGE_NUMBER, DEFAULT_PAGE_SIZE, getPathRpcUrl2, getPublicRpcUrls2, ethersUtils2, toTrimmedString9, isObj26, normalizeChipotleRpcCandidateList, normalizeValidChipotlePkpId, normalizeChipotleMembershipValue, normalizeHostname, parseIpv4Octets2, isPrivateOrLocalIpv4, isPrivateOrLocalIpv6, isPrivateOrLocalHostname, isApprovedLocalChipotleApiHost, isTruthyFlag, isLitChipotleLocalApiBaseAllowed, normalizeLitChipotleApiBase, normalizeChipotleRequestPath, buildChipotleUrl, parseJsonIfPossible, extractChipotleErrorMessage, fetchChipotleJson, resolveLitChipotleRuntime, resolveLitChipotleProvisioningRuntime, ensureChipotleApiKey, ensureChipotleManagementApiKey, buildPagedPath, runtimeAllowsLocalApiBase, listGroupWallets, listActions, listGroupActions, listWallets, MAX_GONE_CHECK_PAGES, GONE_CHECK_STATUSES, listAllIds, mayMeanLitSetupGone, confirmLitSetupGone, resolveActionCidMembership, createStatusWarning, readLitChipotleStatus, deriveLitActionCid, normalizeSessionScopedNameSegment, normalizeGateMode3, isPrivateHostname, validateChipotleRpcUrl, resolveConfigMappedChipotleRpcUrls, resolveDefaultChipotleRpcUrls, resolveSessionChipotleRpcUrl, buildSessionBootstrapMetadata, createLitChipotleAccount, createLitChipotleGroup, createLitChipotleWallet, createLitChipotleUsageKey, readChipotleBillingBalance, ensureActionMetadata, ensureActionInGroup, ensurePkpInGroup, provisionLitChipotleAction, bootstrapLitChipotleSession, bootstrapLitChipotleSessionCore, executeLitChipotleAction, executeSessionLitChipotleAction;
 var init_chipotleClient = __esm({
   "workers/sessionCorsWorker/chipotleClient.js"() {
     init_litChipotleAction();
@@ -81006,7 +81058,7 @@ var init_chipotleClient = __esm({
     ({ getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default);
     ethersUtils2 = ethers_exports?.utils || ethers_exports;
     toTrimmedString9 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-    isObj25 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    isObj26 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     normalizeChipotleRpcCandidateList = (value = []) => {
       const out = [];
       const seen = /* @__PURE__ */ new Set();
@@ -81145,7 +81197,7 @@ var init_chipotleClient = __esm({
     };
     extractChipotleErrorMessage = (status, body, fallback) => {
       if (typeof body === "string" && body.trim()) return body.trim();
-      if (isObj25(body)) {
+      if (isObj26(body)) {
         const nestedError = toTrimmedString9(body.error || body.message || body.detail);
         if (nestedError) return nestedError;
       }
@@ -81197,7 +81249,7 @@ var init_chipotleClient = __esm({
           { litStatus: response3.status }
         );
       }
-      if (isObj25(parsed) && toTrimmedString9(parsed.error || "").trim()) {
+      if (isObj26(parsed) && toTrimmedString9(parsed.error || "").trim()) {
         throw new Error(extractChipotleErrorMessage(response3.status, parsed, "Chipotle request failed"));
       }
       return parsed;
@@ -81208,8 +81260,8 @@ var init_chipotleClient = __esm({
       secrets = {},
       body = {}
     } = {}) => {
-      const litCredentials = isObj25(config?.litCredentials) ? config.litCredentials : {};
-      const requestBody = isObj25(body) ? body : {};
+      const litCredentials = isObj26(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj26(body) ? body : {};
       const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
       const envApiKey = toTrimmedString9(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
       const requestApiKey = toTrimmedString9(requestBody.litUsageApiKey || requestBody.apiKey);
@@ -81241,8 +81293,8 @@ var init_chipotleClient = __esm({
       secrets = {},
       body = {}
     } = {}) => {
-      const litCredentials = isObj25(config?.litCredentials) ? config.litCredentials : {};
-      const requestBody = isObj25(body) ? body : {};
+      const litCredentials = isObj26(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj26(body) ? body : {};
       const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
       const secretManagementApiKey = toTrimmedString9(secrets?.litAccountApiKey);
       const envManagementApiKey = toTrimmedString9(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
@@ -81530,7 +81582,7 @@ var init_chipotleClient = __esm({
     } = {}) => {
       const normalizedChainId = toChainId(chainId);
       if (!normalizedChainId) return [];
-      const map = isObj25(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
+      const map = isObj26(config?.rpcUrlsByChainId) ? config.rpcUrlsByChainId : {};
       const mapped = normalizeChipotleRpcCandidateList(
         map[normalizedChainId] || map[String(normalizedChainId)] || []
       );
@@ -81553,7 +81605,7 @@ var init_chipotleClient = __esm({
       chainId = 0,
       op = ""
     } = {}) => {
-      const requestBody = isObj25(request) ? request : {};
+      const requestBody = isObj26(request) ? request : {};
       const normalizedChainId = toChainId(chainId);
       const requestRpcUrl = toTrimmedString9(requestBody.rpcUrl || requestBody.customRpcUrl);
       const candidates = normalizeChipotleRpcCandidateList([
@@ -81594,7 +81646,7 @@ var init_chipotleClient = __esm({
       request = {},
       sessionSlug = ""
     } = {}) => {
-      const requestBody = isObj25(request) ? request : {};
+      const requestBody = isObj26(request) ? request : {};
       const slugSegment = normalizeSessionScopedNameSegment(
         requestBody.sessionSlug || requestBody.slug || sessionSlug,
         "session"
@@ -81621,7 +81673,7 @@ var init_chipotleClient = __esm({
       fetchImpl = globalThis.fetch
     } = {}) => {
       const metadata = buildSessionBootstrapMetadata({ request, sessionSlug });
-      const requestBody = isObj25(request) ? request : {};
+      const requestBody = isObj26(request) ? request : {};
       const response3 = await fetchChipotleJson({
         apiBase,
         allowLocalApiBase,
@@ -81905,8 +81957,8 @@ var init_chipotleClient = __esm({
         Object.assign(progress, values);
         await checkpointProvisioning?.({ ...progress });
       };
-      const litCredentials = isObj25(config?.litCredentials) ? config.litCredentials : {};
-      const requestBody = isObj25(request) ? request : {};
+      const litCredentials = isObj26(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj26(request) ? request : {};
       const secretAccountApiKey = toTrimmedString9(secrets?.litAccountApiKey);
       const requestAccountApiKey = toTrimmedString9(requestBody.litAccountApiKey);
       const envAccountApiKey = toTrimmedString9(env?.LIT_ACCOUNT_API_KEY);
@@ -82049,7 +82101,7 @@ var init_chipotleClient = __esm({
       fetchImpl = globalThis.fetch
     } = {}) => {
       ensureChipotleApiKey(runtime);
-      const actionRequest = isObj25(request) ? request : {};
+      const actionRequest = isObj26(request) ? request : {};
       const code = toTrimmedString9(actionRequest.code);
       const ipfsId = toTrimmedString9(
         actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
@@ -82099,8 +82151,8 @@ var init_chipotleClient = __esm({
       sessionSlug = "",
       fetchImpl = globalThis.fetch
     } = {}) => {
-      const litCredentials = isObj25(config?.litCredentials) ? config.litCredentials : {};
-      const requestBody = isObj25(request) ? request : {};
+      const litCredentials = isObj26(config?.litCredentials) ? config.litCredentials : {};
+      const requestBody = isObj26(request) ? request : {};
       const runtime = resolveLitChipotleRuntime({
         env,
         config,
@@ -101157,13 +101209,13 @@ function membershipKey({ sessionSlug = "", telegramUserId = "" } = {}) {
   const userId = safeString(telegramUserId);
   return slug && userId ? `${AGENT_LIGHTWEIGHT_GROUP_MEMBERSHIP_KV_PREFIX}${slug}:${userId}` : "";
 }
-function normalizeAddress2(value = "") {
+function normalizeAddress3(value = "") {
   const text9 = lower2(value);
   return /^0x[0-9a-f]{40}$/.test(text9) ? text9 : "";
 }
 function bucketMembershipKey({ sessionSlug = "", accountAddress = "" } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
-  const address3 = normalizeAddress2(accountAddress);
+  const address3 = normalizeAddress3(accountAddress);
   return slug && address3 ? `${AGENT_BUCKET_MEMBERSHIP_KV_PREFIX}${slug}:${address3}` : "";
 }
 function proposalPrefix(sessionSlug = "") {
@@ -101447,7 +101499,7 @@ async function saveAgentLightweightGroupMembership({
       version: 1,
       type: "telegram_kv_bucket_membership",
       sessionSlug,
-      accountAddress: normalizeAddress2(accountAddress),
+      accountAddress: normalizeAddress3(accountAddress),
       selections: normalizedSelections,
       details: normalizedDetails,
       updatedAt: record4.updatedAt
@@ -105869,10 +105921,10 @@ init_sessionConfigAuthority();
 init_outboundUrlSafetyBinding();
 
 // workers/sessionCorsWorker/anonymousRateLimitPolicy.js
-var isObj26 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj27 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0;
 var resolveAnonymousIpDailyLimit = (config = {}) => {
-  const limits = isObj26(config?.limits) ? config.limits : {};
+  const limits = isObj27(config?.limits) ? config.limits : {};
   return isNonNegativeInteger(limits.perAnonymousIpPerDay) ? limits.perAnonymousIpPerDay : 0;
 };
 
@@ -105887,7 +105939,7 @@ init_ratingScale();
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
 var trim22 = (value) => String(value == null ? "" : value).trim();
 var lower10 = (value) => trim22(value).toLowerCase();
-var isObj27 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj28 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower10(question.visibility || question.access || question.questionVisibility);
   return Boolean(
@@ -105895,7 +105947,7 @@ var hasRestrictedPrompt = (question = {}) => {
   );
 };
 var normalizeQuestion = (value = {}) => {
-  const question = isObj27(value) ? value : {};
+  const question = isObj28(value) ? value : {};
   const id2 = lower10(question.id || question.questionId);
   const prompt = trim22(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /^(?:\[encrypted\]|encrypted prompt[.!]?(?:\s*connect.+decrypt[.!]?)?|connect(?: wallet)? to decrypt(?: encrypted prompt)?[.!]?)$/i.test(
@@ -105904,7 +105956,7 @@ var normalizeQuestion = (value = {}) => {
     return null;
   const type = lower10(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
-  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim22(isObj27(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim22(isObj28(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
   const ratingScale = type === "rating" ? normalizeRatingScale(question) : null;
   const ratingStep = ratingStepFor(question);
   return {
@@ -105948,7 +106000,7 @@ var catalog = (questions = [], incomplete = false, refused = false) => ({ questi
 var retryableReadStatus = (status) => !status || status === 408 || status === 429 || status >= 500;
 var trim23 = (value) => String(value == null ? "" : value).trim();
 var lower11 = (value) => trim23(value).toLowerCase();
-var isObj28 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj29 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 var payloadQuestionId = (payload) => lower11(payload?.id || payload?.questionId);
 var readJsonResponse = async (response3) => {
@@ -106014,7 +106066,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
       const response3 = await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`);
       if (retryableReadStatus(response3?.status)) incomplete = true;
       const payload = await readJsonResponse(response3);
-      return isObj28(payload) ? payload : null;
+      return isObj29(payload) ? payload : null;
     } catch {
       incomplete = true;
       return null;
@@ -106056,15 +106108,15 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   );
 };
 var pickContractAddress = (config = {}) => {
-  const contracts = isObj28(config.contracts) ? config.contracts : {};
-  const surveys = isObj28(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
+  const contracts = isObj29(config.contracts) ? config.contracts : {};
+  const surveys = isObj29(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
   return trim23(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
   const chainId = trim23(config.networkChainId || config.registryChainId || config.chainId || "11155420");
-  const rpcConfig = isObj28(config.rpc) ? config.rpc : {};
-  const pathProvider = isObj28(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj28(rpcConfig.path) ? rpcConfig.path : {};
-  const byChainMap = isObj28(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj28(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
+  const rpcConfig = isObj29(config.rpc) ? config.rpc : {};
+  const pathProvider = isObj29(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj29(rpcConfig.path) ? rpcConfig.path : {};
+  const byChainMap = isObj29(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj29(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
   const byChain = byChainMap[chainId];
   const source = [
     ...Array.isArray(byChain) ? byChain : [byChain],
@@ -106116,7 +106168,7 @@ var base64urlFromHex = (hex2 = "") => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 var payloadSessionSlug = (payload = {}) => {
-  const session = isObj28(payload.session) ? payload.session : {};
+  const session = isObj29(payload.session) ? payload.session : {};
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
@@ -106147,7 +106199,7 @@ var fetchArweaveQuestion = async (pointer, fetchImpl) => {
       continue;
     }
     const payload = await response3.json().catch(() => null);
-    if (isObj28(payload)) return { payload, retryable: false };
+    if (isObj29(payload)) return { payload, retryable: false };
   }
   return { payload: null, retryable };
 };
@@ -107388,9 +107440,9 @@ init_realtimeInterviewConfig();
 var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 var trim25 = (value) => String(value == null ? "" : value).trim();
-var isObj29 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj30 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewModeEnabled = (config = {}) => {
-  const interview = isObj29(config?.interviewMode || config?.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj30(config?.interviewMode || config?.interview) ? config.interviewMode || config.interview : {};
   return config?.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var buildRealtimeMultipartBody = ({ sdp, session }) => {
@@ -107420,7 +107472,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   } catch {
     return { ok: false, status: 400, error: "Invalid JSON." };
   }
-  if (!isObj29(body)) return { ok: false, status: 400, error: "Invalid JSON." };
+  if (!isObj30(body)) return { ok: false, status: 400, error: "Invalid JSON." };
   const sdp = String(body.sdp == null ? "" : body.sdp);
   const instructions = trim25(body.instructions);
   if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
@@ -107431,7 +107483,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   return { ok: true, payload: { sdp, instructions } };
 };
 var resolveRealtimeConfig = (config = {}) => {
-  const interview = isObj29(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj30(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   const provider = trim25(interview.provider || "openai").toLowerCase();
   const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
@@ -108213,7 +108265,7 @@ var LIMITS2 = Object.freeze({
   members: 500,
   groups: 40
 });
-var isObj30 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj31 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var trim27 = (value) => typeof value === "string" ? value.trim() : "";
 var lower14 = (value) => trim27(value).toLowerCase();
 var refuse3 = (status, error, reason) => ({ ok: false, status, body: { error, reason } });
@@ -108247,15 +108299,15 @@ var readConditionOf = (rule) => {
 };
 var signInRuleOf = (rule) => ({
   match: lower14(rule?.match) === "all" ? "all" : "any",
-  conditions: (Array.isArray(rule?.conditions) ? rule.conditions : []).filter(isObj30).map(signInConditionOf)
+  conditions: (Array.isArray(rule?.conditions) ? rule.conditions : []).filter(isObj31).map(signInConditionOf)
 });
 var readRuleOf = (rule) => ({
   match: lower14(rule?.match) === "all" ? "all" : "any",
-  conditions: (Array.isArray(rule?.conditions) ? rule.conditions : []).map((entry2) => isObj30(entry2) ? readConditionOf(entry2) : { ...UNKNOWN })
+  conditions: (Array.isArray(rule?.conditions) ? rule.conditions : []).map((entry2) => isObj31(entry2) ? readConditionOf(entry2) : { ...UNKNOWN })
 });
 var sessionAgentExportGate = (config) => {
-  const policy = isObj30(config?.workerAuthority) && Number(config.workerAuthority.version) === 1 ? config.workerAuthority : null;
-  const signIn = isWorkerCanonicalSessionConfig(config) && policy ? isObj30(policy.loginGate) ? signInRuleOf(policy.loginGate) : OPEN_RULE2 : UNKNOWN_RULE;
+  const policy = isObj31(config?.workerAuthority) && Number(config.workerAuthority.version) === 1 ? config.workerAuthority : null;
+  const signIn = isWorkerCanonicalSessionConfig(config) && policy ? isObj31(policy.loginGate) ? signInRuleOf(policy.loginGate) : OPEN_RULE2 : UNKNOWN_RULE;
   const access = resolvePayloadAccessControl(config);
   let read = UNKNOWN_RULE;
   if (access.conditions?.conditions?.length) read = readRuleOf(access.conditions);
@@ -110758,9 +110810,9 @@ init_workerGroups();
 init_interviewSettings();
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v6";
 var trim29 = (value) => String(value == null ? "" : value).trim();
-var isObj31 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var isObj32 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
-  const interview = isObj31(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
+  const interview = isObj32(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
   return config.interviewModeEnabled !== false && interview.enabled !== false;
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry2) => {
