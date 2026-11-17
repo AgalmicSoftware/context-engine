@@ -359,8 +359,7 @@ describe('session interview protocol', () => {
       openingPrompt: 'What is your uncommon AI view?',
     });
     expect(instructions).toContain('What is your uncommon AI view?');
-    expect(instructions).toContain('Ask useful follow-ups');
-    expect(instructions).toContain('one question at a time');
+    expect(instructions).toContain('one short question at a time, built on what the responder just said');
     expect(instructions).not.toContain('important insight');
   });
 
@@ -411,13 +410,23 @@ describe('session interview protocol', () => {
     });
     expect(instructions).toContain(steeringPrompt);
     expect(instructions.indexOf(steeringPrompt)).toBeGreaterThan(
-      instructions.indexOf('Ask one question at a time. Listen, ask useful follow-ups, and adapt the order naturally.'),
+      instructions.indexOf('Ask one short question at a time, built on what the responder just said'),
     );
     expect(instructions.indexOf(steeringPrompt)).toBeLessThan(
       instructions.indexOf('Ask this opening question immediately:'),
     );
     const withoutSteering = buildRealtimeInterviewInstructions({ questions });
     expect(buildRealtimeInterviewInstructions({ questions, steeringPrompt: '  ' })).toEqual(withoutSteering);
+  });
+
+  it('has the interviewer follow the last reply, not the question bank order', () => {
+    const instructions = buildRealtimeInterviewInstructions({
+      questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
+    });
+    expect(instructions).toContain('bridging in a few words from their own words');
+    expect(instructions).toContain('Never recap or list their answers');
+    expect(instructions).toContain('Use that order only when nothing the responder said points to a question.');
+    expect(instructions).not.toContain('Start there');
   });
 
   it('adds bounded untrusted prefill context and predictions to realtime instructions', () => {
