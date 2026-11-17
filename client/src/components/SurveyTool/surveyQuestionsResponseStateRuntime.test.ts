@@ -89,6 +89,27 @@ describe('surveyQuestionsResponseStateRuntime', () => {
     expect(runtime.valuesEqual(['a', 'b'], ['b', 'a'])).toBe(false);
   });
 
+  it('marks a question saved only while its stored answer is unchanged, and counts it pending once it changes', () => {
+    const runtime = createSurveyQuestionsResponseStateRuntime(createDeps());
+    const slice = (answer: unknown, comment = '') => ({
+      answers: { q1: { value: answer, encrypted: false } },
+      additionalComments: { q1: { value: comment, encrypted: false } },
+      importance: {},
+      conviction: {},
+    });
+    const stored = slice('Agree');
+    expect(runtime.isQuestionSaved(stored, slice('Agree'), 'q1')).toBe(true);
+    expect(runtime.computeModifiedQuestionsCount(stored, slice('Agree'))).toBe(0);
+    // A changed answer or comment is pending, not saved.
+    for (const changed of [slice('Disagree'), slice('Agree', 'a comment')]) {
+      expect(runtime.isQuestionSaved(stored, changed, 'q1')).toBe(false);
+      expect(runtime.computeModifiedQuestionsCount(stored, changed)).toBe(1);
+    }
+    // Nothing stored: an answer on the page is not saved yet, nor is an empty one.
+    expect(runtime.isQuestionSaved(slice(''), slice('Agree'), 'q1')).toBe(false);
+    expect(runtime.isQuestionSaved(slice(''), slice(''), 'q1')).toBe(false);
+  });
+
   it('builds local-cache slices with rendered ids and memo updates', () => {
     const deps = createDeps();
     const runtime = createSurveyQuestionsResponseStateRuntime(deps);

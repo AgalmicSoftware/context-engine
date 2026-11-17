@@ -14,6 +14,7 @@ export const createSurveyQuestionsRenderRuntime = (
     handleDecryptQuestionAnswer,
     handleReloadMaskedPrompt,
     inst,
+    isAnswerSaved,
     isQuestionFieldBusy,
     isQuestionPromptMasked,
     propsRef,
@@ -71,6 +72,9 @@ export const createSurveyQuestionsRenderRuntime = (
     });
     const isQuestionBookmarked: SurveyQuestionsLegacyValue = stateRef.current.bookmarkedQuestions.has(question.id);
 
+    // The all-questions view marks each answer that is stored and unchanged.
+    const answerSaved =
+      !propsRef.current.singleQuestionMode && !!isAnswerSaved?.(question.id, currentSurveyResponseState);
     const cardIcons: SurveyQuestionsLegacyValue = renderFullQuestionCardIcons({
       question,
       showResponseLookupSpinner,
@@ -102,7 +106,8 @@ export const createSurveyQuestionsRenderRuntime = (
       renderAdditionalLockControl: renderQuestionAdditionalLockControl,
       renderAnswerDecryptControl: renderQuestionFieldDecryptControl,
       renderFullQuestionCardShell: renderFullQuestionCardShell,
-      renderFullQuestionFooterIcons: renderFullQuestionFooterIcons,
+      renderFullQuestionFooterIcons: (args: SurveyQuestionsLegacyRecord) =>
+        renderFullQuestionFooterIcons({ ...args, answerSaved }),
       renderFullQuestionSliderSection: renderFullQuestionSliderSection,
       renderResponseInput: renderFullQuestionResponseInput,
       sliderOpen,

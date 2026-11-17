@@ -24,6 +24,7 @@ import QuestionFilter from './QuestionFilter';
 import type { QuestionFilterHandle } from './QuestionFilter';
 import LazyFallback from '../Shared/LazyFallback';
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
+import { HeaderSubmittedCheck } from './SubmittedMarks';
 
 // Crypto and contract utilities
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -961,7 +962,11 @@ export class SurveySelector extends Component<any, any> {
       prev.submitCountText === submitCountText
     )
       return;
-    this.setState(patch);
+    // A submit that stored every answer: Submit turns into a green "Submitted", as on the phone card.
+    // Any edit ends it, so clearing the edit later doesn't bring it back without a submit.
+    const justSubmitted = !!prev.isSubmitting && !isSubmitting && submittedSinceLastEdit;
+    const stillSubmitted = submittedSinceLastEdit && !isSubmitting && this.state.submittedAt;
+    this.setState({ ...patch, submittedAt: justSubmitted ? Date.now() : stillSubmitted || 0 });
   };
 
   handleFilterChangeForUrl = (newFilterStateFromResults: unknown): void => {
@@ -1211,6 +1216,11 @@ export class SurveySelector extends Component<any, any> {
       pendingSubmitStats.total > 0 &&
       !pendingSubmitStats.submittedSinceLastEdit &&
       (viewMode === 'questions' || !!selectedSurvey);
+    const showHeaderSubmitted =
+      !this.props.displayAnswerMode &&
+      !!this.state.submittedAt &&
+      !!pendingSubmitStats.submittedSinceLastEdit &&
+      !pendingSubmitStats.isSubmitting;
     const isEmbeddedSessionToolbar = Boolean(this.props.embeddedSessionToolbar);
     // Keep the live filtered count in the session heading only after surveys are known to be empty.
     const showQuestionCountInHeading = Boolean(
@@ -1352,7 +1362,7 @@ export class SurveySelector extends Component<any, any> {
           <FontAwesomeIcon icon={createSurveyIcon} />
         </button>
 
-        {showHeaderSubmitButton && (
+        {showHeaderSubmitButton ? (
           <div className={styles.headerSubmitActions}>
             <button
               type="button"
@@ -1380,7 +1390,9 @@ export class SurveySelector extends Component<any, any> {
               <FontAwesomeIcon icon={faTimes} />
             </button>
           </div>
-        )}
+        ) : showHeaderSubmitted ? (
+          <HeaderSubmittedCheck key={this.state.submittedAt} />
+        ) : null}
       </div>
     );
 

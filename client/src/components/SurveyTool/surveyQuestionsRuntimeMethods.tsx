@@ -474,6 +474,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     computeModifiedQuestionsCount,
     deepClone,
     handleRevertPendingChanges,
+    isQuestionSaved,
     prefillSurveyResponses,
     rehydrateLocalCacheAnswersForRenderedIds,
     resetFormStateForAccountChange,
@@ -634,6 +635,9 @@ export const createSurveyQuestionsRuntimeMethods = (
       responseOverride?: SurveyQuestionsLegacyValue,
     ) => handleDecryptQuestionAnswer(questionId, fieldToDecrypt, responseOverride),
     handleReloadMaskedPrompt,
+    // Against the same baseline as the pending count, so a card is never both saved and pending.
+    isAnswerSaved: (questionId: string, currentSlice: unknown) =>
+      isQuestionSaved(resolveDiffBaselineSlice(true), currentSlice, questionId),
     isQuestionFieldBusy,
     isQuestionPromptMasked,
     renderFullQuestionAdditionalInput,

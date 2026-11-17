@@ -1179,6 +1179,31 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding-top: 10px;
 }
 
+// After a submit the header Submit becomes the phone card's green "Submitted" (same colours).
+.headerSubmitButton.headerSubmitDone {
+  border-color: var(--ce-status-success);
+  color: var(--ce-status-success-contrast);
+  background-color: var(--ce-status-success);
+  cursor: default;
+  animation: pileSubmitSuccessPop 220ms ease-out;
+}
+
+// An all-questions card whose answer is stored and unchanged, in the same green.
+.answerSavedMark {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: var(--ce-radius-10);
+  background-color: var(--ce-status-success);
+  color: var(--ce-status-success-contrast);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .fullQuestionHeader .cardLinksContainer {
   flex: 0 0 auto;
   margin-left: auto;
