@@ -102,6 +102,30 @@ it('says a declined sign-in in one plain sentence, never the wallet’s text', a
   expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 });
 
+it('joins a password group with the code typed before signing in, once the sign-in completes', async () => {
+  const secretGroup = { ...GROUP, joinMode: 'one_use' };
+  jest.mocked(loadPublicWorkerGroups).mockResolvedValue([secretGroup] as never);
+  jest.mocked(loadWorkerGroupOverview).mockResolvedValue({ groups: [secretGroup], memberships: [] } as never);
+  jest.mocked(joinWorkerGroup).mockResolvedValue({ group: secretGroup, memberCount: 1 } as never);
+  jest
+    .mocked(getWorkerSessionToken)
+    .mockRejectedValueOnce(Object.assign(new Error('user rejected signing'), { code: 'ACTION_REJECTED' }))
+    .mockResolvedValueOnce('token-a');
+  render(<WorkerSessionGroupsPanel {...panelProps()} account={A} />);
+  fireEvent.change(await screen.findByLabelText('Invite link or password for Community'), {
+    target: { value: 'd'.repeat(32) },
+  });
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Join Community' })));
+  await waitFor(() => expect(joinWorkerGroup).toHaveBeenCalledTimes(1));
+  expect(jest.mocked(joinWorkerGroup).mock.calls[0][0]).toMatchObject({
+    credentialToken: 'token-a',
+    groupId: 'community',
+    secret: 'd'.repeat(32),
+  });
+  await tick(80);
+  expect(joinWorkerGroup).toHaveBeenCalledTimes(1);
+});
+
 it('joins exactly once after a rejected sign-in and a fresh Join click', async () => {
   jest
     .mocked(getWorkerSessionToken)

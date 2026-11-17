@@ -18,15 +18,14 @@ import {
   rememberWorkerGroupAutoJoinCancellation,
 } from '../../domains/worker/workerGroupAutoJoinPreference';
 import {
-  BUSY_WORKER_GROUP_JOIN_MESSAGE,
-  isBusyWorkerGroupError,
   isRefusedWorkerGroupError,
   REFUSED_WORKER_GROUP_JOIN_MESSAGE,
+  workerGroupJoinErrorMessage,
 } from '../../domains/worker/workerGroupBusy';
 import { workerOffersGroupJoinChoices } from '@ce-shared/workerGroupJoin.mjs';
 import { isKnownPrivateSession } from '../../utilities/worker/workerGroupReadProof';
 import WorkerGroupAutoJoinNotice from './WorkerGroupAutoJoinNotice';
-import WorkerGroupCodeField from './WorkerGroupCodeField';
+import WorkerGroupCodeField, { WORKER_GROUP_INVITE_NEEDED } from './WorkerGroupCodeField';
 import styles from './WorkerGroupAutoJoinNotice.module.scss';
 
 export type WorkerGroupAutoJoinProps = {
@@ -44,26 +43,13 @@ type Progress = { phase: 'loading' | 'joining' | 'done' | 'cancelled' | 'error' 
 // What public discovery said of the group before sign-in: an unlisted group isn't there.
 type PublicGroup = 'unknown' | 'open' | 'secret' | 'absent';
 
-const NEEDS_CODE_MESSAGE = 'Enter the group password or claim code from your invitation.';
+const NEEDS_CODE_MESSAGE = WORKER_GROUP_INVITE_NEEDED;
 
 const subscribeLocation = (notify: () => void) => {
   window.addEventListener('popstate', notify);
   return () => window.removeEventListener('popstate', notify);
 };
 const readLocation = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
-const autoJoinErrorMessage = (error: unknown): string => {
-  if (isBusyWorkerGroupError(error)) return BUSY_WORKER_GROUP_JOIN_MESSAGE;
-  const reason = error instanceof Error ? error.message : '';
-  if (reason === 'worker_group_member_cap_exceeded' || reason === 'worker_group_session_cap_exceeded')
-    return 'This group has reached its member limit.';
-  if (reason === 'worker_group_join_ended') return 'The joining deadline for this group has passed.';
-  if (reason === 'worker_group_join_refused') return REFUSED_WORKER_GROUP_JOIN_MESSAGE;
-  if (reason === 'worker_group_join_denied') return 'This group is not open for joining.';
-  if (reason === 'worker_group_not_found') return 'This group is unavailable in this session.';
-  return reason.startsWith('worker_group_') || !reason
-    ? 'Could not join this group. Please retry or contact the session host.'
-    : reason;
-};
 
 function AutoJoinIntent({
   context,
@@ -140,7 +126,7 @@ function AutoJoinIntent({
         const { token: _refused, ...withoutToken } = intent;
         savePendingAutoJoin({ ...withoutToken, sessionId });
       }
-      setProgress({ phase: 'error', message: autoJoinErrorMessage(error) });
+      setProgress({ phase: 'error', message: workerGroupJoinErrorMessage(error) });
     };
     const complete = (message: string) => {
       if (!active) return;
@@ -289,6 +275,8 @@ function AutoJoinIntent({
     >
       {asksCode && !done ? (
         <WorkerGroupCodeField
+          groupId={groupId}
+          sessionSlug={sessionSlug}
           groupLabel={groupLabel}
           formClassName={styles.codeForm}
           inputClassName={styles.codeInput}
@@ -400,13 +388,13 @@ export default function WorkerGroupAutoJoin(props: Props) {
       try {
         accept(configRef.current);
       } catch (failure) {
-        setError(autoJoinErrorMessage(failure));
+        setError(workerGroupJoinErrorMessage(failure));
       }
     } else {
       void loadAutoJoinSessionConfig(intent, controller.signal)
         .then(accept)
         .catch((failure) => {
-          if (!controller.signal.aborted) setError(autoJoinErrorMessage(failure));
+          if (!controller.signal.aborted) setError(workerGroupJoinErrorMessage(failure));
         });
     }
     return () => controller.abort();

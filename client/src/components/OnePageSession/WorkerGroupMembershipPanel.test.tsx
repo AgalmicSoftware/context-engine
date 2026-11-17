@@ -2026,10 +2026,13 @@ describe('WorkerGroupMembershipPanel', () => {
       );
       render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
 
-      const field = await screen.findByLabelText('Group password or claim code for Salon');
-      // The only Join is the code field's, which waits for a code.
-      expect(screen.getByRole('button', { name: 'Join Salon' })).toBeDisabled();
+      const field = await screen.findByLabelText('Invite link or password for Salon');
+      // The only Join is the code field's: without a code it says what to give, and sends nothing.
+      fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
+      expect(screen.getByRole('alert')).toHaveTextContent('Paste the invite link, or type the group password.');
+      expect(fetchImpl.mock.calls.some(([input]) => String(input).endsWith('/groups/join'))).toBe(false);
       fireEvent.change(field, { target: { value: 'A'.repeat(32) } });
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
 
       expect(await screen.findByRole('status')).toHaveTextContent('Joined Salon.');
@@ -2043,17 +2046,43 @@ describe('WorkerGroupMembershipPanel', () => {
       );
       render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
 
-      fireEvent.change(await screen.findByLabelText('Group password or claim code for Salon'), {
+      fireEvent.change(await screen.findByLabelText('Invite link or password for Salon'), {
         target: { value: 'b'.repeat(32) },
       });
       fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
       expect(
         await screen.findByText('That link, invite or password didn’t work. Ask whoever invited you for a new one.'),
       ).toBeInTheDocument();
-      expect(screen.getByLabelText('Group password or claim code for Salon')).toBeInTheDocument();
+      // Beside the field it is about, not at the top of the list.
+      expect(screen.getByLabelText('Invite link or password for Salon').closest('form')).toContainElement(
+        screen.getByRole('alert'),
+      );
+      // Typing a new code puts it away.
+      fireEvent.change(screen.getByLabelText('Invite link or password for Salon'), { target: { value: 'c' } });
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      // The next refusal shows again, even with the same words.
+      fireEvent.change(screen.getByLabelText('Invite link or password for Salon'), {
+        target: { value: 'c'.repeat(32) },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('That link, invite or password didn’t work.');
     });
 
-    it('asks a signed-out person to sign in before typing a code', async () => {
+    it('says a plain sentence for a join failure the page has no words for', async () => {
+      const fetchImpl = workerWith(() =>
+        json({ error: 'Worker group request failed.', reason: 'worker_group_x' }, 400),
+      );
+      render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+      fireEvent.change(await screen.findByLabelText('Invite link or password for Salon'), {
+        target: { value: 'b'.repeat(32) },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Could not join this group. Please retry or contact the session host.',
+      );
+    });
+
+    it('shows a signed-out person what the group needs, and signs in with what they typed', async () => {
       const onSignIn = jest.fn();
       const fetchImpl = workerWith(() => json({}, 500));
       render(
@@ -2067,8 +2096,52 @@ describe('WorkerGroupMembershipPanel', () => {
           fetchImpl={fetchImpl as typeof fetch}
         />,
       );
-      fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Salon' }));
-      expect(onSignIn).toHaveBeenCalledWith('salon');
+      const field = await screen.findByLabelText('Invite link or password for Salon');
+      expect(field).toHaveAccessibleDescription('Needs an invite link or password from the group’s host.');
+      expect(screen.queryByRole('button', { name: 'Sign in to join Salon' })).not.toBeInTheDocument();
+      fireEvent.change(field, { target: { value: 'river-stone-lamp' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
+      expect(onSignIn).toHaveBeenCalledWith('salon', 'river-stone-lamp');
+      expect(fetchImpl.mock.calls.some(([input]) => String(input).endsWith('/groups/join'))).toBe(false);
+    });
+
+    it('takes the code out of a pasted invite link', async () => {
+      const fetchImpl = workerWith(() =>
+        json({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', group: secretGroup }),
+      );
+      render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+      fireEvent.change(await screen.findByLabelText('Invite link or password for Salon'), {
+        target: { value: ` https://contextengine.sh/session/alpha?joinGroup=salon#groupInvite=${'c'.repeat(32)} ` },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
+      expect(await screen.findByRole('status')).toHaveTextContent('Joined Salon.');
+      const join = fetchImpl.mock.calls.find(([input]) => String(input).endsWith('/groups/join'));
+      expect(JSON.parse(String(join?.[1]?.body))).toMatchObject({ groupId: 'salon', secret: 'c'.repeat(32) });
+    });
+
+    it.each([
+      [
+        'another group’s link',
+        `https://contextengine.sh/session/alpha?joinGroup=other#groupInvite=${'c'.repeat(32)}`,
+        'That invite link is for another group.',
+      ],
+      [
+        'another session’s link',
+        `https://contextengine.sh/session/beta?joinGroup=salon#groupInvite=${'c'.repeat(32)}`,
+        'That invite link is for another session.',
+      ],
+      [
+        'a link with no invite in it',
+        'https://contextengine.sh/session/alpha?joinGroup=salon',
+        'That link has no invite in it. Ask for the invite link or the group password.',
+      ],
+    ])('says what is wrong with %s and sends nothing', async (_name, value, problem) => {
+      const fetchImpl = workerWith(() => json({}, 500));
+      render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+      fireEvent.change(await screen.findByLabelText('Invite link or password for Salon'), { target: { value } });
+      fireEvent.click(screen.getByRole('button', { name: 'Join Salon' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(problem);
+      expect(fetchImpl.mock.calls.some(([input]) => String(input).endsWith('/groups/join'))).toBe(false);
     });
   });
 });

@@ -133,7 +133,8 @@ const WorkerSessionGroupsPanel = ({
   const targetKey = `${canonicalSessionId}\n${canonicalSessionSlug}\n${workerUrl}\n${normalizedAccount.toLowerCase()}`;
   const [authState, setAuthState] = useState<WorkerGroupsAuthState>(() => emptyAuthState(targetKey));
   const [groupsRevision, setGroupsRevision] = useState(0);
-  const [pendingJoin, setPendingJoin] = useState<{ targetKey: string; groupId: string }>();
+  // A Join clicked before sign-in, with the invite typed for it; kept in this page only.
+  const [pendingJoin, setPendingJoin] = useState<{ targetKey: string; groupId: string; token?: string }>();
   const [preserveSignedOutParticipantDraft, setPreserveSignedOutParticipantDraft] = useState(false);
   const authRequestIdRef = useRef(0);
   const suppressOwnGroupsChangedEventRef = useRef(false);
@@ -273,8 +274,8 @@ const WorkerSessionGroupsPanel = ({
   }, [authStatus, authenticate, normalizedAccount, toggleLoginModal]);
 
   const requestJoinAuthentication = useCallback(
-    (groupId = '') => {
-      if (groupId) setPendingJoin({ targetKey, groupId });
+    (groupId = '', token = '') => {
+      if (groupId) setPendingJoin({ targetKey, groupId, ...(token ? { token } : {}) });
       requestActionAuthentication();
     },
     [targetKey, requestActionAuthentication],
@@ -509,6 +510,7 @@ const WorkerSessionGroupsPanel = ({
           participantAddress={normalizedAccount}
           onSignIn={requestJoinAuthentication}
           joinAfterSignInGroupId={pendingJoin?.targetKey === targetKey ? pendingJoin.groupId : ''}
+          joinAfterSignInToken={pendingJoin?.targetKey === targetKey ? pendingJoin.token : ''}
           onJoinAfterSignInHandled={clearPendingJoin}
           onGroupsChanged={broadcastGroupsChanged}
         />

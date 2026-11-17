@@ -607,6 +607,14 @@
   width: 100%;
 }
 
+.workerGroupCardCodeHint {
+  color: var(--ce-control-text);
+  font-family: var(--ce-font-body);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .workerGroupCardCodeInput {
   box-sizing: border-box;
   width: 100%;
@@ -614,13 +622,13 @@
   padding: 8px 10px;
   border: 1px solid var(--ce-authoring-input-border);
   border-radius: var(--ce-radius-6);
-  background: var(--ce-document-canvas);
-  color: var(--ce-document-text);
+  background: var(--ce-authoring-input-bg);
+  color: var(--ce-authoring-input-text);
   font-family: var(--ce-font-body);
   font-size: 0.9rem;
 
   &::placeholder {
-    color: var(--ce-document-text-muted);
+    color: var(--ce-authoring-input-placeholder);
     opacity: 1;
   }
 

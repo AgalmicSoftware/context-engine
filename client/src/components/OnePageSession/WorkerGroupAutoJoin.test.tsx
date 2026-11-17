@@ -434,7 +434,7 @@ describe('WorkerGroupAutoJoin', () => {
     render(<WorkerGroupAutoJoin {...props} />);
     await tick();
     // A group missing from the list may be unlisted, so it asks for the invitation's code; the id never joins.
-    if (variant === 'missing') expect(screen.getByRole('status')).toHaveTextContent('Enter the group password');
+    if (variant === 'missing') expect(screen.getByRole('status')).toHaveTextContent('Needs an invite link or password');
     else expect(screen.getByRole('alert')).toHaveTextContent('not open');
     expect(joins()).toHaveLength(0);
   });
@@ -446,7 +446,7 @@ describe('WorkerGroupAutoJoin', () => {
     render(<WorkerGroupAutoJoin {...props} sessionConfig={{ ...config, groupJoinChoices: undefined }} />);
     await tick();
     expect(screen.getByRole('alert')).toHaveTextContent('This group is unavailable in this session.');
-    expect(screen.queryByLabelText(/Group password or claim code for/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Invite link or password for/)).not.toBeInTheDocument();
     expect(joins()).toHaveLength(0);
   });
 
@@ -536,8 +536,8 @@ describe('WorkerGroupAutoJoin', () => {
       render(<WorkerGroupAutoJoin {...props} />);
       await settle();
       expect(joins()).toHaveLength(0);
-      expect(screen.getByRole('status')).toHaveTextContent('Enter the group password or claim code');
-      fireEvent.change(screen.getByLabelText(/Group password or claim code for/), {
+      expect(screen.getByRole('status')).toHaveTextContent('Needs an invite link or password from the group’s host.');
+      fireEvent.change(screen.getByLabelText(/Invite link or password for/), {
         target: { value: 'ABCDEF0123456789abcdef0123456789' },
       });
       fireEvent.click(screen.getByRole('button', { name: /^Join / }));
@@ -547,6 +547,22 @@ describe('WorkerGroupAutoJoin', () => {
         secret: 'abcdef0123456789abcdef0123456789',
         sessionId,
       });
+    });
+
+    it.each([
+      ['another group’s', `/session/alpha?joinGroup=other`, 'That invite link is for another group.'],
+      ['another session’s', `/session/beta?joinGroup=participants-2026`, 'That invite link is for another session.'],
+    ])('refuses %s pasted link without sending its code', async (_name, path, problem) => {
+      listing([secretGroup]);
+      render(<WorkerGroupAutoJoin {...props} />);
+      await settle();
+      fireEvent.change(screen.getByLabelText(/Invite link or password for/), {
+        target: { value: `https://contextengine.sh${path}#groupInvite=${'c'.repeat(32)}` },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /^Join / }));
+      await settle();
+      expect(screen.getByRole('alert')).toHaveTextContent(problem);
+      expect(joins()).toHaveLength(0);
     });
 
     it('says one sentence for a refused join, and lets another code be tried', async () => {
@@ -570,7 +586,7 @@ describe('WorkerGroupAutoJoin', () => {
       await settle();
       expect(joins()).toHaveLength(1);
       expect(screen.getByRole('alert')).toHaveTextContent('That link, invite or password didn’t work.');
-      expect(screen.getByLabelText(/Group password or claim code for/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Invite link or password for/)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
       // The refused code leaves the tab, so a reload doesn't send it again.
       const kept = JSON.parse(sessionStorage.getItem(AUTO_JOIN_STORAGE_KEY) || '{}');

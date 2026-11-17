@@ -39,14 +39,9 @@ import WorkerGroupMembersModal, { workerGroupPrincipalIdentity } from './WorkerG
 import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
 import { reconcileConfirmedWorkerGroupMembership } from './workerGroupMembershipProjection';
 import { useWorkerGroupMembershipMutations } from './useWorkerGroupMembershipMutations';
-import {
-  BUSY_WORKER_GROUP_JOIN_MESSAGE,
-  isBusyWorkerGroupError,
-  isRefusedWorkerGroupError,
-  REFUSED_WORKER_GROUP_JOIN_MESSAGE,
-} from '../../domains/worker/workerGroupBusy';
+import { workerGroupJoinErrorMessage } from '../../domains/worker/workerGroupBusy';
 import { WORKER_GROUP_JOIN_LABELS } from '../Shared/WorkerGroupJoinChoiceHelp';
-import WorkerGroupCodeField from './WorkerGroupCodeField';
+import WorkerGroupCodeField, { WORKER_GROUP_INVITE_NEEDED } from './WorkerGroupCodeField';
 import {
   buildWorkerGroupMembershipIdentity,
   projectWorkerGroupMembership,
@@ -68,8 +63,10 @@ export type WorkerGroupMembershipPanelProps = {
   sessionSlug?: string;
   sessionName?: string;
   allowAnonymousGroupDiscovery?: boolean;
-  onSignIn?: (groupId?: string) => void;
+  /** Sign in for a Join, with the invite link or password typed for it. */
+  onSignIn?: (groupId?: string, token?: string) => void;
   joinAfterSignInGroupId?: string;
+  joinAfterSignInToken?: string;
   onJoinAfterSignInHandled?: () => void;
   onGroupsChanged?: () => void;
   selectedGroupId?: string;
@@ -439,6 +436,7 @@ const WorkerGroupMembershipPanel = ({
   allowAnonymousGroupDiscovery = false,
   onSignIn,
   joinAfterSignInGroupId = '',
+  joinAfterSignInToken = '',
   onJoinAfterSignInHandled,
   onGroupsChanged,
   selectedGroupId: selectedGroupIdProp = '',
@@ -486,6 +484,8 @@ const WorkerGroupMembershipPanel = ({
     useWorkerGroupMembershipMutations(targetKey);
   const [membershipStatusState, setMembershipStatusState] = useState({ targetKey, status: '' });
   const [shareState, setShareState] = useState({ targetKey, status: '' });
+  // A failed join shows beside that group's Join, where the person is looking, not at the top of the list.
+  const [joinProblemState, setJoinProblemState] = useState({ targetKey, groupId: '', message: '' });
   const activeViewState = viewState.targetKey === targetKey ? viewState : emptyViewState(targetKey);
   const overview = activeViewState.overview;
   const status = activeViewState.status;
@@ -504,6 +504,8 @@ const WorkerGroupMembershipPanel = ({
   const error = activeViewState.error;
   const membershipStatus = membershipStatusState.targetKey === targetKey ? membershipStatusState.status : '';
   const shareStatus = shareState.targetKey === targetKey ? shareState.status : '';
+  const joinProblemFor = (groupId: string) =>
+    joinProblemState.targetKey === targetKey && joinProblemState.groupId === groupId ? joinProblemState.message : '';
   const activeMemberListState =
     memberListState.targetKey === targetKey ? memberListState : emptyMemberListState(targetKey, selectedGroupId);
 
@@ -739,6 +741,7 @@ const WorkerGroupMembershipPanel = ({
       const mutationTargetKey = targetKey;
       const mutation = beginMembershipMutation(group.groupId, 'join');
       setMembershipStatusState({ targetKey: mutationTargetKey, status: '' });
+      setJoinProblemState({ targetKey: mutationTargetKey, groupId: '', message: '' });
       setViewState((current) => ({
         ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
         error: '',
@@ -781,17 +784,11 @@ const WorkerGroupMembershipPanel = ({
         onGroupsChanged?.();
       } catch (joinError) {
         if (!isMembershipMutationCurrent(mutation)) return;
-        setViewState((current) => ({
-          ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
-          status: 'error',
-          error: isBusyWorkerGroupError(joinError)
-            ? BUSY_WORKER_GROUP_JOIN_MESSAGE
-            : isRefusedWorkerGroupError(joinError)
-              ? REFUSED_WORKER_GROUP_JOIN_MESSAGE
-              : joinError instanceof Error
-                ? joinError.message
-                : 'worker_group_join_failed',
-        }));
+        setJoinProblemState({
+          targetKey: mutationTargetKey,
+          groupId: group.groupId,
+          message: workerGroupJoinErrorMessage(joinError),
+        });
       } finally {
         finishMembershipMutation(mutation);
       }
@@ -821,8 +818,19 @@ const WorkerGroupMembershipPanel = ({
     // Wait for the authenticated membership read, so existing members are never
     // joined again and the intent cannot migrate to another account or Worker.
     const group = availableGroups.find((entry) => entry.groupId === joinAfterSignInGroupId);
-    if (group?.joinMode === 'open' && !groupJoinHasEnded(group)) void handleJoin(group);
-  }, [availableGroups, handleJoin, joinAfterSignInGroupId, onJoinAfterSignInHandled, status, targetKey, workerToken]);
+    if (!group || groupJoinHasEnded(group)) return;
+    if (group.joinMode === 'open') void handleJoin(group);
+    else if (joinAfterSignInToken && workerGroupNeedsSecret(group)) void handleJoin(group, joinAfterSignInToken);
+  }, [
+    availableGroups,
+    handleJoin,
+    joinAfterSignInGroupId,
+    joinAfterSignInToken,
+    onJoinAfterSignInHandled,
+    status,
+    targetKey,
+    workerToken,
+  ]);
 
   const handleLeave = async (group: WorkerGroup) => {
     const mutationTargetKey = targetKey;
@@ -916,30 +924,44 @@ const WorkerGroupMembershipPanel = ({
     if (joinEnded) {
       return <span className={styles.workerGroupCardInactiveStatus}>Join period ended</span>;
     }
-    if (workerGroupNeedsSecret(group) && workerToken) {
+    // Signed out, the typed invite waits in the page through sign-in, then joins.
+    if (workerGroupNeedsSecret(group)) {
       return (
         <WorkerGroupCodeField
+          groupId={group.groupId}
+          sessionSlug={sessionSlug}
           groupLabel={group.label}
           disabled={membershipAction === 'join'}
+          hint={WORKER_GROUP_INVITE_NEEDED}
+          problem={joinProblemFor(group.groupId)}
           formClassName={styles.workerGroupCardCodeForm}
+          hintClassName={styles.workerGroupCardCodeHint}
           inputClassName={styles.workerGroupCardCodeInput}
           buttonClassName={styles.workerGroupCardPrimaryButton}
-          onSubmit={(token) => void handleJoin(group, token)}
+          onSubmit={(token) => (workerToken ? void handleJoin(group, token) : onSignIn?.(group.groupId, token))}
         />
       );
     }
     if (group.joinMode === 'open' && workerToken) {
       const isJoining = membershipAction === 'join';
+      const problem = joinProblemFor(group.groupId);
       return (
-        <button
-          type="button"
-          className={styles.workerGroupCardPrimaryButton}
-          disabled={isJoining}
-          aria-label={`Join ${group.label}`}
-          onClick={() => void handleJoin(group)}
-        >
-          {isJoining ? 'Joining…' : 'Join'}
-        </button>
+        <>
+          <button
+            type="button"
+            className={styles.workerGroupCardPrimaryButton}
+            disabled={isJoining}
+            aria-label={`Join ${group.label}`}
+            onClick={() => void handleJoin(group)}
+          >
+            {isJoining ? 'Joining…' : 'Join'}
+          </button>
+          {problem ? (
+            <span className={styles.workerGroupCardCodeHint} role="alert">
+              {problem}
+            </span>
+          ) : null}
+        </>
       );
     }
     if (group.joinMode !== 'admin_add') {
