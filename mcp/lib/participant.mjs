@@ -609,8 +609,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   const keepsNames = async (ctx) => !ctx.registry && !!(await ctx.client.readFeatures())?.includes('session_names_v1');
   const saveName = async (ctx) => {
     if (!(await keepsNames(ctx))) return null;
+    const wanted = profile().displayName;
     try {
-      const saved = await ctx.client.request('/names/set', { method: 'POST', auth: true, body: { name: profile().displayName } });
+      // Each change counts against a daily limit, so a name already saved is left as it is.
+      const current = await ctx.client.request(`/names/me?slug=${encodeURIComponent(ctx.info.slug)}`, { auth: true }).catch(() => null);
+      if (current && (current.name || '') === wanted.normalize('NFKC').trim().replace(/\s+/gu, ' ')) return { saved: true, name: current.name };
+      const saved = await ctx.client.request('/names/set', { method: 'POST', auth: true, body: { name: wanted } });
       return { saved: true, name: saved?.name ?? null };
     } catch (error) {
       return { saved: false, error: text(error?.message) || 'The session didn’t save your name.' };

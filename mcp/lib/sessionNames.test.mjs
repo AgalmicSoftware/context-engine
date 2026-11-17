@@ -17,6 +17,7 @@ const run = async (t, { features }) => {
   t.after(() => rm(stateDir, { recursive: true, force: true }));
   const names = [];
   const answers = [];
+  let stored = null;
   const participant = createParticipant({
     wallet: ethers.Wallet.createRandom(),
     config: { stateDir, profile: { displayName: 'Civic bot' }, appOrigin: 'https://contextengine.sh', trustedAppOrigins: ['https://contextengine.sh'] },
@@ -29,9 +30,14 @@ const run = async (t, { features }) => {
       if (url.pathname === '/resource-presence') return Response.json({});
       if (url.pathname === '/groups/list') return Response.json({ groups: [] });
       if (url.pathname === '/groups/my-memberships') return Response.json({ memberships: [] });
+      if (url.pathname === '/names/me') {
+        assert.equal(url.searchParams.get('slug'), fixture.config.slug);
+        return Response.json({ name: stored, setAt: stored ? '2026-11-17T00:00:00.000Z' : null });
+      }
       if (url.pathname === '/names/set') {
         const { name } = JSON.parse(init.body);
         names.push(name);
+        if (name !== 'Admin') stored = name || null;
         return name === 'Admin'
           ? Response.json({ error: 'Names can’t claim a role, such as admin or host.', reason: 'role' }, { status: 400 })
           : Response.json({ name: name || null, setAt: '2026-11-17T00:00:00.000Z' });
@@ -60,6 +66,9 @@ test('a Worker that keeps names gets the agent’s name on joining and from set_
   const { participant, names, answers } = await run(t, { features: ['session_names_v1'] });
   const joined = await participant.joinSession({ worker: fixture.config.corsWorkerUrl, session: fixture.config.slug });
   assert.deepEqual(joined.name, { saved: true, name: 'Civic bot' });
+  // Joining again leaves a name already saved alone: each change counts against a daily limit.
+  const rejoined = await participant.joinSession({ worker: fixture.config.corsWorkerUrl, session: fixture.config.slug });
+  assert.deepEqual(rejoined.name, { saved: true, name: 'Civic bot' });
   const renamed = await participant.setProfile({ displayName: 'Sam’s agent' });
   assert.deepEqual(renamed.names, [{ session: fixture.config.slug, saved: true, name: 'Sam’s agent' }]);
   // A refusal is said, per session, in the session's words.
