@@ -11,7 +11,7 @@ import {
 import { buildSessionContextPrompt, SESSION_CONTEXT_TEXT_LIMITS } from '../../shared/sessionContextText.mjs';
 import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
-import { buildIndexPrefix, readContextSourceBytes, readContextSourceRow } from './storageRouteExecution.js';
+import { buildIndexPrefix, prefetchKvPayloads, readContextSourceBytes, readContextSourceRow } from './storageRouteExecution.js';
 import { StorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 
 // How much one AI prompt's reading list may cost: rows looked at (chosen from
@@ -21,6 +21,11 @@ import { StorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 // source can be a 1 MB read and a decryption, and the block holds far less.
 export const CONTEXT_READ_LIMITS = Object.freeze({ rows: 300, listPages: 40, metadataBytes: 1024 * 1024, sources: 16 });
 const MAX_READ_BYTES = 1024 * 1024;
+// The next sources' stored bytes are read ahead in one KV bulk get: this many
+// at most, so little is read in vain when the block fills early, and of this
+// many stored bytes together, which keeps the reply well under KV's 25 MB.
+const PREFETCH_SOURCES = 16;
+const PREFETCH_BYTES = 8 * 1024 * 1024;
 const LIST_PAGE = 1000;
 const BULK_GET = 100;
 const decoder = new TextDecoder();
@@ -178,6 +183,29 @@ export const loadParticipantContextSources = async ({
   let leftOut = listed.leftOut;
   let unreadable = 0;
   let failed = 0;
+  // Reads the next few sources' bytes in one storage round trip in place of
+  // one each. Only rows this reader may read reach here, and each read below
+  // still checks its own size and takes its bytes from the Map. A row too
+  // large to read is left to its own read, which refuses it. So is a PDF
+  // whose reading isn't listed beside it (found through the PDF's row, one
+  // read more), and every row when the bulk get is refused.
+  let prefetched = new Map();
+  let prefetchedTo = 0;
+  const prefetchFrom = async (start) => {
+    const ids = [];
+    let bytes = 0;
+    let next = start;
+    for (const room = Math.min(PREFETCH_SOURCES, maxSources - sources.length); next < ordered.length && ids.length < room; next += 1) {
+      const textRow = ordered[next].contentType === CONTEXT_FILE_TYPES.pdf ? readings.get(ordered[next].id) : ordered[next];
+      const size = Number(textRow?.size);
+      if (!textRow?.id || !(size <= MAX_READ_BYTES)) continue;
+      if (bytes + size > PREFETCH_BYTES) break;
+      ids.push(textRow.id);
+      bytes += size;
+    }
+    prefetchedTo = Math.max(next, start + 1);
+    prefetched = (ids.length > 1 && await prefetchKvPayloads({ env, slug, ids })) || new Map();
+  };
   for (const [position, row] of ordered.entries()) {
     if (sources.length >= maxSources || chars >= totalChars) {
       // A PDF the AI never read has no text to leave out.
@@ -192,7 +220,10 @@ export const loadParticipantContextSources = async ({
     try {
       const textRow = isPdf ? await readingOf(row) : row;
       if (!textRow) continue;
-      bytes = await readContextSourceBytes({ env, config, slug, metadata: textRow, maxBytes: MAX_READ_BYTES, principal, strict: true, deps });
+      if (position >= prefetchedTo) await prefetchFrom(position);
+      bytes = await readContextSourceBytes({
+        env, config, slug, metadata: textRow, maxBytes: MAX_READ_BYTES, principal, strict: true, deps, prefetched,
+      });
     } catch (error) {
       if (error instanceof StorageReadLimitError) unreadable += 1;
       else failed += 1;

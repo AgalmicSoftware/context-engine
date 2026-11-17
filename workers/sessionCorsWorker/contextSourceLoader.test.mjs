@@ -222,6 +222,78 @@ test('sources are read until their texts fill the caller’s block, and the rest
   assert.match(prompt, /third\.md/);
 });
 
+// Counts reads of stored bytes, one at a time and in bulk, and can refuse the bulk ones as KV does a reply over 25 MB.
+const countPayloadReads = (h) => {
+  const reads = { single: 0, bulk: [], refuseBulk: false };
+  const isPayload = (key) => key.startsWith(buildPayloadKey({ slug: 'salon', id: '' }));
+  const get = h.kv.get.bind(h.kv);
+  h.kv.get = async (key) => {
+    if (Array.isArray(key) && key.every(isPayload)) {
+      reads.bulk.push(key.length);
+      if (reads.refuseBulk) throw new Error('KV GET_BULK failed: 413 Payload Too Large');
+    } else if (!Array.isArray(key) && isPayload(key)) reads.single += 1;
+    return get(key);
+  };
+  return reads;
+};
+
+test('sources are read ahead in one bulk get, and give what one read each gives', async () => {
+  const seed = async (h) => {
+    ticking(h);
+    h.state.config.sessionContext = sessionContext;
+    h.ids = {};
+    for (const name of ['one', 'two', 'three', 'four']) {
+      h.ids[name] = await idOf(await h.uploadFile({ name: `${name}.md`, type: 'text/markdown', bytes: encode(`${name} `.repeat(200)) }));
+    }
+    await idOf(await h.context({ action: 'read-pdf', id: await idOf(await h.uploadFile({ name: 'deck.pdf' })) }));
+    await idOf(await h.uploadFile({ name: 'board.md', type: 'text/markdown', bytes: encode('ADMINS only'), adminsOnly: true }));
+    return h;
+  };
+  const provider = async () => json({ content: [{ type: 'text', text: 'Deck: coalition goals.' }] });
+  const load = (h, options = {}) => loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, ...options });
+  // As deployed, with no R2: every item's bytes are a KV key.
+  const h = await seed(harness({ provider, r2: false }));
+  const reads = countPayloadReads(h);
+  const ahead = await load(h);
+  assert.deepEqual(ahead.sources.map((source) => source.title), ['one.md', 'two.md', 'three.md', 'four.md', 'deck.pdf']);
+  // One round trip for the four files and never the admins' one. The PDF names its reading, which is
+  // found through the PDF's own row and read on its own.
+  assert.deepEqual([reads.bulk, reads.single], [[4], 1]);
+
+  // A refused bulk get falls back to one read each, with the same result.
+  reads.bulk = [];
+  reads.refuseBulk = true;
+  const single = await load(h);
+  assert.deepEqual(single, ahead);
+  assert.deepEqual([reads.bulk, reads.single], [[4], 6]);
+  reads.refuseBulk = false;
+
+  // The same uploads where bytes live in R2, which is never read ahead, read the same.
+  const withR2 = await seed(harness({ provider }));
+  const strip = (result) => ({ ...result, sources: result.sources.map(({ title, kind, text, readByAi, everyone }) => ({ title, kind, text, readByAi, everyone })) });
+  assert.deepEqual(strip(await load(withR2)), strip(ahead));
+
+  // No more is read ahead than the caller's cap on sources, and nothing once the block is full.
+  reads.bulk = [];
+  reads.single = 0;
+  const capped = await load(h, { maxSources: 2 });
+  assert.deepEqual([capped.sources.map((source) => source.title), reads.bulk, reads.single], [['one.md', 'two.md'], [2], 0]);
+  reads.bulk = [];
+  const full = await load(h, { totalChars: 500 });
+  assert.deepEqual([full.sources.map((source) => source.title), full.leftOut, reads.bulk, reads.single], [['one.md'], 4, [4], 0]);
+
+  // A row too large to read is left to its own read, which refuses it; the rest are still read ahead.
+  const key = buildIndexKey({ slug: 'salon', resource: 'docsContext', id: h.ids.two });
+  h.kv.store.set(key, JSON.stringify({ ...JSON.parse(h.kv.store.get(key)), size: 2 * 1024 * 1024 }));
+  reads.bulk = [];
+  reads.single = 0;
+  const oversized = await load(h);
+  assert.deepEqual(
+    [oversized.sources.map((source) => source.title), oversized.unreadable, reads.bulk, reads.single],
+    [['one.md', 'three.md', 'four.md', 'deck.pdf'], 1, [3], 1],
+  );
+});
+
 test('rows stored before list entries said who added them read as they did', async () => {
   const h = await seeded();
   const expected = ['agenda.md', 'example.org', 'deck.pdf'];

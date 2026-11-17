@@ -2221,8 +2221,9 @@ const READ_BATCH_CONCURRENCY = 5;
 // Where payloads live in KV (no R2 bound, as deployed), one bulk get reads a
 // whole batch's in one storage round trip instead of one per item. KV refuses
 // a bulk reply over 25 MB, which also bounds its memory; then, or on any
-// error, each item is read on its own as before.
-const prefetchKvPayloads = async ({ env, slug, ids }) => {
+// error, each item is read on its own as before. A caller hands the Map to
+// each read, which takes its item from it and lets it go.
+export const prefetchKvPayloads = async ({ env, slug, ids }) => {
   const index = getStorageIndexBinding(env);
   if (getStorageR2Binding(env) || typeof index?.get !== 'function' || ids.length > KV_BULK_GET_KEYS) return null;
   try {
@@ -2631,7 +2632,7 @@ export const readStoredCloudflarePayloadsBulk = async ({ env, index, slug, metad
   return payloads;
 };
 
-export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata, strict = false, budget, maxBytes = Infinity }) => {
+export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata, strict = false, budget, maxBytes = Infinity, prefetched }) => {
   const id = trim(metadata?.id);
   if (!id) return null;
   const limit = Math.min(maxBytes, budget?.remainingPayloadBytes ?? Infinity);
@@ -2647,7 +2648,7 @@ export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metad
     }
   }
   budget?.operation();
-  const envelope = await readKvPayloadEnvelope({ index, slug, id, strict, maxBytes: limit });
+  const envelope = await readKvPayloadEnvelope({ index, slug, id, strict, maxBytes: limit, prefetched });
   if (typeof envelope?.payloadBase64url !== 'string') return null;
   // Check encoded length before decoding a whole KV payload. R2 uses its size
   // and a bounded stream above; neither path relies only on index size hints.
@@ -3106,9 +3107,10 @@ export const readContextSourceRow = async ({ env, slug, id, strict = false } = {
 // A context source's stored bytes, decrypted. The Worker reads them for the
 // session's AI, so each worker_envelope read is audited under that principal.
 // With `strict`, a storage error is thrown rather than read as missing bytes.
-export const readContextSourceBytes = async ({ env, config, slug, metadata, maxBytes, principal = 'session-ai', strict = false, deps } = {}) => {
+// `prefetched` is a Map from prefetchKvPayloads that may already hold this item.
+export const readContextSourceBytes = async ({ env, config, slug, metadata, maxBytes, principal = 'session-ai', strict = false, deps, prefetched } = {}) => {
   const index = getStorageIndexBinding(env);
-  let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes, strict });
+  let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes, strict, prefetched });
   if (!bytes) return null;
   if (isObj(metadata?.envelope)) {
     await writeStorageEnvelopeKeyReleaseAudit({
