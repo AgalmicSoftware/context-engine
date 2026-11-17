@@ -50,6 +50,7 @@ import {
   isEnvelopeAesGcm256,
   resolveSingleQuestionMapFromCacheValue,
   resolvePromptGateTooltipProps,
+  shortenAtWord,
 } from './singleQuestionResponseHelpers.js';
 import {
   SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE,
@@ -171,6 +172,8 @@ type SingleQuestionResponseProps = SingleQuestionRecord & {
   sessionSlug?: unknown;
   showImportance?: unknown;
   showMiniExpand?: boolean;
+  /** In mini mode, a free-text answer longer than about this many characters is cut short until the row is opened. */
+  shortenAnswerAt?: number;
   stackCompactDecryptCta?: boolean;
   storeCache?: SingleQuestionRecord | null;
   userHeldSBTs?: unknown;
@@ -200,6 +203,9 @@ type SingleQuestionCacheEntry = SingleQuestionRecord & {
 };
 type SingleQuestionQuestionCacheMap = Record<string, unknown>;
 
+// Each row's answer needs an id of its own for its Show more button to name.
+let answerIdCounter = 0;
+
 /**
  * SingleQuestionResponse is a component responsible for displaying:
  *
@@ -218,6 +224,7 @@ type SingleQuestionQuestionCacheMap = Record<string, unknown>;
  *   - aggregatorResponseMode: boolean. If true, we show aggregated stats for allResponses.
  *   - showImportance: boolean (whether to show importance slider UI in single-person mode)
  *   - showMiniExpand: boolean. Set false for compact cards with no additional detail to reveal.
+ *   - shortenAnswerAt: number. In mini mode, cut a longer free-text answer short, with a Show more button.
  *   - onDecryptQuestion(questionId, fieldToDecrypt): function to decrypt (only relevant if single-person mode)
  *   - onReloadQuestionPrompt(questionId): function to force prompt metadata/decrypt refresh
  *   - canDecryptOtherResponses: boolean. When true and viewer satisfies the session response gate,
@@ -236,6 +243,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
   private _crossGroupQuestionMemo: Map<string, unknown | null>;
   private _multichoiceOptionsMemo: Map<string, string[]>;
   private _aggregatorAnsweredMemo: SingleQuestionAggregatorAnsweredMemo;
+  private _answerId: string;
+  private _answerToggleRef = React.createRef<HTMLButtonElement>();
+  private _refocusAnswerToggle = false;
 
   constructor(props: SingleQuestionResponseProps) {
     super(props);
@@ -249,6 +259,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     this._crossGroupQuestionMemo = new Map();
     this._multichoiceOptionsMemo = new Map();
     this._aggregatorAnsweredMemo = { responsesRef: null, signature: '', value: [] };
+    answerIdCounter += 1;
+    this._answerId = `ce-answer-${answerIdCounter}`;
   }
 
   componentDidMount() {
@@ -270,7 +282,12 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     );
   }
 
-  componentDidUpdate(prevProps: SingleQuestionResponseProps) {
+  componentDidUpdate(prevProps: SingleQuestionResponseProps, prevState: SingleQuestionResponseState) {
+    // Show more and Show less are one button in two places; keep the keyboard on it across the change.
+    if (this._refocusAnswerToggle && prevState.miniExpanded !== this.state.miniExpanded) {
+      this._refocusAnswerToggle = false;
+      this._answerToggleRef.current?.focus();
+    }
     if (this.props.question?.id !== prevProps.question?.id) {
       this.checkBookmarkStatus();
     }
@@ -646,6 +663,11 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
   toggleMiniExpand = (): void => {
     this.setState((prev: SingleQuestionResponseState) => ({ miniExpanded: !prev.miniExpanded }));
+  };
+
+  toggleAnswerExpand = (): void => {
+    this._refocusAnswerToggle = true;
+    this.toggleMiniExpand();
   };
 
   /** Pick a stable id for cache lookups */
@@ -1249,7 +1271,12 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                 )}
               </div>
               {showMiniExpand && (
-                <Button className={styles.miniExpandButton} onClick={this.toggleMiniExpand}>
+                <Button
+                  className={styles.miniExpandButton}
+                  onClick={this.toggleMiniExpand}
+                  aria-expanded={!!miniExpanded}
+                  aria-label={miniExpanded ? 'Close details' : 'Open details'}
+                >
                   {miniExpanded ? <FontAwesomeIcon icon={faChevronUp} /> : <FontAwesomeIcon icon={faChevronDown} />}
                 </Button>
               )}
@@ -1489,8 +1516,39 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
       case 'freeform':
       default:
-        return <div className={styles.freeformAnswer}>{typeof value === 'string' ? value : JSON.stringify(value)}</div>;
+        return typeof value === 'string' ? (
+          this.renderFreeText(value)
+        ) : (
+          <div className={styles.freeformAnswer}>{JSON.stringify(value)}</div>
+        );
     }
+  };
+
+  // A free-text answer. In a mini row asked to shorten, a long one shows its start while the row is
+  // closed and all of it once open, with the button that does both at the end of the text.
+  renderFreeText = (text: string): React.ReactNode => {
+    const { mode, shortenAnswerAt } = this.props;
+    const short = mode === 'mini' ? shortenAtWord(text, Number(shortenAnswerAt) || 0) : null;
+    if (!short?.shortened) return <div className={styles.freeformAnswer}>{text}</div>;
+    const open = !!this.state.miniExpanded;
+    return (
+      <div className={styles.freeformAnswer}>
+        <span id={this._answerId} dir="auto">
+          {open ? text : short.text}
+        </span>{' '}
+        <button
+          ref={this._answerToggleRef}
+          type="button"
+          className={styles.answerToggle}
+          data-ce-control-appearance="frameless"
+          aria-expanded={open}
+          aria-controls={this._answerId}
+          onClick={this.toggleAnswerExpand}
+        >
+          {open ? 'Show less' : 'Show more'}
+        </button>
+      </div>
+    );
   };
 }
 

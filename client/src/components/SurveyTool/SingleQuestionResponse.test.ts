@@ -471,7 +471,7 @@ describe('SingleQuestionResponse option lookup memoization', () => {
 
     const prevProps = { ...subject.props };
     (subject as any).props = { ...subject.props, questionsCacheNonce: 3 };
-    subject.componentDidUpdate(prevProps);
+    subject.componentDidUpdate(prevProps, subject.state);
     subject.getMultichoiceOptions({ id: 'q1', type: 'multichoice' });
 
     expect(listSpy).toHaveBeenCalledTimes(4);
@@ -491,7 +491,7 @@ describe('SingleQuestionResponse option lookup memoization', () => {
 
     const prevProps = { ...subject.props };
     (subject as any).props = { ...subject.props, questionResponsesNonce: 8 };
-    subject.componentDidUpdate(prevProps);
+    subject.componentDidUpdate(prevProps, subject.state);
     const second = subject.getMultichoiceOptions({ id: 'q1', type: 'multichoice' });
 
     expect(second).toBe(first);

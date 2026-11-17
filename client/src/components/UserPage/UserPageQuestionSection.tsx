@@ -9,6 +9,9 @@ import styles from './UserPage.module.scss';
 
 type SingleQuestionResponseProps = React.ComponentProps<typeof SingleQuestionResponse>;
 
+// A profile lists many answers; a long free-text one shows its start, with Show more.
+export const LONG_ANSWER_LENGTH = 100;
+
 type UserPageSectionToggleState = {
   isOpen?: boolean;
   shouldRenderClosedIcon?: boolean;
@@ -155,6 +158,7 @@ const UserPageQuestionSection = ({
                   response={userResp}
                   isOwnResponse={false}
                   mode="mini"
+                  shortenAnswerAt={LONG_ANSWER_LENGTH}
                   showImportance={true}
                   compactEncryptedAnswerCta={true}
                   stackCompactDecryptCta={true}

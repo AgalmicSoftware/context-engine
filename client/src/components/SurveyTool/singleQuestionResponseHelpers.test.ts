@@ -17,6 +17,7 @@ import {
   responseHasLitSbtRecipient,
   resolveSingleQuestionMapFromCacheValue,
   resolvePromptGateTooltipProps,
+  shortenAtWord,
 } from './singleQuestionResponseHelpers.js';
 
 describe('singleQuestionResponseHelpers gate addresses', () => {
@@ -478,5 +479,71 @@ describe('singleQuestionResponseHelpers prompt gate tooltip props', () => {
       mode: 'all',
       sbtAddresses: ['0x111'],
     });
+  });
+});
+
+describe('shortenAtWord', () => {
+  const words = (count: number) => Array.from({ length: count }, (_, index) => `word${index}`).join(' ');
+
+  it('leaves a text at or a little over the limit whole', () => {
+    expect(shortenAtWord('A short answer.', 100)).toEqual({ text: 'A short answer.', shortened: false });
+    const nearLimit = 'x'.repeat(120);
+    expect(shortenAtWord(nearLimit, 100)).toEqual({ text: nearLimit, shortened: false });
+    expect(shortenAtWord('', 100)).toEqual({ text: '', shortened: false });
+    expect(shortenAtWord(undefined, 100)).toEqual({ text: '', shortened: false });
+    expect(shortenAtWord({ not: 'text' }, 100)).toEqual({ text: '', shortened: false });
+  });
+
+  it('cuts a long text at the last whole word within the limit and ends it with an ellipsis', () => {
+    const long = words(40);
+    const { text, shortened } = shortenAtWord(long, 100);
+    expect(shortened).toBe(true);
+    expect(text.endsWith('…')).toBe(true);
+    const kept = text.slice(0, -1);
+    expect(long.startsWith(kept)).toBe(true);
+    expect(kept.length).toBeLessThanOrEqual(100);
+    expect(kept.length).toBeGreaterThan(80);
+    // No word is split: what follows the kept part starts with a space.
+    expect(long[kept.length]).toBe(' ');
+  });
+
+  it('keeps a word that ends exactly at the limit, and drops punctuation before the ellipsis', () => {
+    const hundred = `${'word '.repeat(19)}abcde`;
+    expect(hundred).toHaveLength(100);
+    expect(shortenAtWord(`${hundred} ${'b'.repeat(60)}`, 100).text).toBe(`${hundred}…`);
+    const sentence = `${'First sentence here. '.repeat(4)}Second part, which goes on for a good while longer than the limit allows.`;
+    const { text } = shortenAtWord(sentence, 100);
+    expect(text).toMatch(/[A-Za-z]…$/);
+  });
+
+  it('cuts at the limit when there is no word break to step back to', () => {
+    expect(shortenAtWord('x'.repeat(300), 100).text).toBe(`${'x'.repeat(100)}…`);
+    // A break near the start is not worth stepping back to.
+    expect(shortenAtWord(`Hi ${'x'.repeat(300)}`, 100).text).toBe(`Hi ${'x'.repeat(97)}…`);
+    const noSpaces = '民主的な議論のための道具。'.repeat(20);
+    expect(Array.from(shortenAtWord(noSpaces, 100).text)).toHaveLength(101);
+  });
+
+  it('counts whole characters, never half of one', () => {
+    const { text } = shortenAtWord(`a${'😀'.repeat(200)}`, 100);
+    expect(Array.from(text)).toHaveLength(101);
+    expect(text.endsWith('…')).toBe(true);
+    expect(() => encodeURIComponent(text)).not.toThrow();
+  });
+
+  it('does not count the space around a text, or leave an answer of only punctuation empty', () => {
+    const padded = `Yes.${'\n'.repeat(130)}`;
+    expect(shortenAtWord(padded, 100)).toEqual({ text: padded, shortened: false });
+    // 110 characters is within the slack, however many bytes each takes.
+    const wide = '😀'.repeat(110);
+    expect(shortenAtWord(wide, 100)).toEqual({ text: wide, shortened: false });
+    expect(shortenAtWord(`  ${'word '.repeat(60)}`, 100).text.startsWith('word word')).toBe(true);
+    expect(shortenAtWord('.'.repeat(300), 100).text).toBe(`${'.'.repeat(100)}…`);
+  });
+
+  it('does nothing without a limit', () => {
+    const long = words(60);
+    expect(shortenAtWord(long, 0)).toEqual({ text: long, shortened: false });
+    expect(shortenAtWord(long, Number.NaN)).toEqual({ text: long, shortened: false });
   });
 });

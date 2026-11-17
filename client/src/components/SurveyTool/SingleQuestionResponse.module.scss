@@ -325,6 +325,23 @@
   }
 }
 
+/* Show more / Show less at the end of a long answer that a mini row cuts short. It sits in the
+   answer's own line and takes the answer's colour, so it reads wherever the answer does. */
+.answerToggle {
+  display: inline;
+  margin: 0 0 0 2px;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.86em;
+  font-style: normal;
+  text-decoration: underline;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 /* NEW - Read-only Answer Styles */
 .readOnlyBinary {
   display: inline-flex;

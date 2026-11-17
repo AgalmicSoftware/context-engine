@@ -530,3 +530,24 @@ export const responseHasLitSbtRecipient = (response: unknown): boolean => {
     return hasLitSbtRecipientEncryptedPortion(fieldRecord?.encryptedPortion);
   });
 };
+
+/**
+ * The start of a long text, cut at a word and ended with an ellipsis, for a row that can be opened
+ * to show the rest. A text only a little over the limit is left whole, so opening always reveals
+ * more than a word or two. Space around the text does not count towards its length.
+ */
+export const shortenAtWord = (text: unknown, limit = 100): { text: string; shortened: boolean } => {
+  const slack = 20;
+  const whole = typeof text === 'string' ? text : '';
+  if (!(limit > 0) || whole.length <= limit + slack) return { text: whole, shortened: false };
+  const characters = Array.from(whole.trim());
+  if (characters.length <= limit + slack) return { text: whole, shortened: false };
+  const head = characters.slice(0, limit).join('');
+  const lastBreak = head.search(/\s\S*$/);
+  // The limit can land on the end of a word; otherwise step back to the last whole word, unless
+  // that would throw away much of the text (one very long word, or a script without spaces).
+  const endsOnWord = /\s/.test(characters[limit]);
+  const cut = !endsOnWord && lastBreak >= head.length * 0.6 ? head.slice(0, lastBreak) : head;
+  // Punctuation reads badly before an ellipsis; a text of nothing else keeps it.
+  return { text: `${cut.replace(/[\s.,;:!?…-]+$/, '') || head}…`, shortened: true };
+};

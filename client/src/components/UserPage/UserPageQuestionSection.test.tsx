@@ -21,6 +21,7 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
     responderAddress,
     sbtCacheRevision,
     sessionSlug,
+    shortenAnswerAt,
     showImportance,
   }: {
     canDecryptOtherResponses?: boolean;
@@ -33,6 +34,7 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
     responderAddress?: unknown;
     sbtCacheRevision?: unknown;
     sessionSlug?: unknown;
+    shortenAnswerAt?: unknown;
     showImportance?: unknown;
   }) {
     const ReactModule = jest.requireActual('react') as typeof React;
@@ -60,6 +62,7 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
         data-responder-address={String(responderAddress)}
         data-revision={String(sbtCacheRevision)}
         data-session-slug={String(sessionSlug)}
+        data-shorten-answer-at={String(shortenAnswerAt)}
         data-show-importance={String(showImportance)}
       >
         {question?.prompt || question?.id}
@@ -153,6 +156,9 @@ describe('UserPageQuestionSection', () => {
     expect(screen.getByTestId('question-response-card')).toHaveAttribute('data-revision', 'revision-1');
     expect(screen.getByTestId('created-question-card')).toHaveAttribute('data-session-slug', 'fallback-session');
     expect(screen.getByTestId('created-question-card')).toHaveAttribute('data-show-importance', 'false');
+    // A profile's long free-text answers start short; a created question has no answer to shorten.
+    expect(screen.getByTestId('question-response-card')).toHaveAttribute('data-shorten-answer-at', '100');
+    expect(screen.getByTestId('created-question-card')).toHaveAttribute('data-shorten-answer-at', 'undefined');
 
     fireEvent.click(screen.getByTestId('question-response-card').querySelector('button') as HTMLButtonElement);
     expect(onDecryptQuestion).toHaveBeenCalledWith('q-response');
