@@ -220,3 +220,11 @@ describe('Interview layout', () => {
     expect(block).toMatch(/\.sessionInterviewStatusPill \{[^}]*font-size: 0\.8rem;/);
   });
 });
+
+it('starts a phone choice list at its top, so an overflowing list keeps its first option in reach', () => {
+  const scss = readSurveyToolScss();
+  const phone = scss.slice(scss.indexOf('// Mobile: options should be full-width and scroll within the card.'));
+  const rule = phone.slice(phone.indexOf('#multiChoice {'), phone.indexOf('}'));
+  expect(rule).toMatch(/overflow-y: auto;/);
+  expect(rule).toMatch(/justify-content: flex-start;/);
+});

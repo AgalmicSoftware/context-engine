@@ -193,7 +193,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: stretch;
-    justify-content: center;
+    // Not center: an overflowing list would push its first options above the scroll top, out of reach.
+    justify-content: flex-start;
     max-height: 42vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
