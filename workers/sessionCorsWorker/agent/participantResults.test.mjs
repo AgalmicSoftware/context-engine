@@ -20,6 +20,8 @@ test('JSON and image group projections contain the same permitted memberships', 
   assert.deepEqual(projected.imageGroups.map(group => group.aliases), [['P1', 'P2']]);
   assert.deepEqual(projected.imageGroups.map(group => [group.groupId, group.size]),
     projected.groups.map(group => [group.groupId, group.size]));
+  // Questions may share a wording, so each statement names its question.
+  assert.deepEqual(projected.groups[0].topStatements.map(statement => statement.questionId), ['binary']);
 });
 
 test('rating scores increase monotonically across the declared scale', () => {
