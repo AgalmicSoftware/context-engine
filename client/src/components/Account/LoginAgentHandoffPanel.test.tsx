@@ -18,7 +18,7 @@ beforeEach(() => {
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
 });
 
-const renderPanel = (props: Partial<React.ComponentProps<typeof LoginAgentHandoffPanel>> = {}) =>
+const renderClosedPanel = (props: Partial<React.ComponentProps<typeof LoginAgentHandoffPanel>> = {}) =>
   render(
     <LoginAgentHandoffPanel
       agentHttpEnabled
@@ -28,6 +28,41 @@ const renderPanel = (props: Partial<React.ComponentProps<typeof LoginAgentHandof
       {...props}
     />,
   );
+
+const renderPanel = (props: Partial<React.ComponentProps<typeof LoginAgentHandoffPanel>> = {}) => {
+  const view = renderClosedPanel(props);
+  fireEvent.click(screen.getByRole('button', { name: 'Your AI agent' }));
+  return view;
+};
+
+it('starts closed, with its explanation still at hand, and opens as a disclosure', () => {
+  renderClosedPanel();
+  const toggle = screen.getByRole('button', { name: 'Your AI agent' });
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(toggle).toHaveAttribute('aria-controls', 'ce-agent-handoff-body');
+  expect(document.getElementById('ce-agent-handoff-body')).not.toBeVisible();
+  expect(screen.getByRole('button', { name: 'As itself', hidden: true })).not.toBeVisible();
+  expect(screen.getByRole('region', { name: 'Your AI agent' })).toContainElement(toggle);
+
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('button', { name: 'As itself' })).toBeVisible();
+});
+
+it('keeps its choices and name when closed and opened again', () => {
+  renderPanel();
+  const toggle = screen.getByRole('button', { name: 'Your AI agent' });
+  const reopen = () => {
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+  };
+  fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Audrey' } });
+  reopen();
+  expect(screen.getByLabelText('Your name')).toHaveValue('Audrey');
+  fireEvent.click(screen.getByRole('button', { name: 'On my behalf' }));
+  reopen();
+  expect(screen.getByRole('button', { name: 'On my behalf' })).toHaveAttribute('aria-pressed', 'true');
+});
 
 it('sets up the MCP as itself, named after its person', async () => {
   renderPanel();

@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import {
   AGENT_KEY_ENV,
   AgentDelegateKeyError,
@@ -116,6 +116,8 @@ const LoginAgentHandoffPanel = ({
   sessionName,
   requestKey,
 }: LoginAgentHandoffPanelProps) => {
+  // Starts closed so the sign-in dialog stays short; closing only hides it, so a key or choice survives.
+  const [open, setOpen] = useState(false);
   const [way, setWay] = useState<'self' | 'behalf'>('self');
   const [ownerName, setOwnerName] = useState('');
   // The key lives only here, never in browser storage, and goes when the dialog closes.
@@ -186,152 +188,164 @@ const LoginAgentHandoffPanel = ({
     >
       <div className={styles.agentHandoffHeader}>
         <h3 id="ce-agent-handoff-title" className={styles.agentHandoffTitle}>
-          Your AI agent
+          <button
+            type="button"
+            className={styles.agentHandoffToggle}
+            aria-expanded={open}
+            aria-controls="ce-agent-handoff-body"
+            onClick={() => setOpen((wasOpen) => !wasOpen)}
+            data-testid="ce-agent-handoff-toggle"
+          >
+            Your AI agent
+            <FontAwesomeIcon icon={open ? faCaretUp : faCaretDown} className={styles.settingsSectionChevron} />
+          </button>
         </h3>
         <Help id="ce-agent-handoff-about">
           Bring your AI agent to this session. As itself, it takes part with its own key and name, shown as an agent. On
           your behalf, it answers as you, and submits only the answers you approve.
         </Help>
       </div>
-      <div className={styles.agentHandoffChoices} role="group" aria-label="How your agent takes part">
-        <button
-          type="button"
-          className={styles.agentHandoffChoice}
-          aria-pressed={way === 'self'}
-          onClick={() => chooseWay('self')}
-          data-testid="ce-agent-handoff-self"
-        >
-          As itself
-        </button>
-        <button
-          type="button"
-          className={styles.agentHandoffChoice}
-          aria-pressed={way === 'behalf'}
-          onClick={() => chooseWay('behalf')}
-          data-testid="ce-agent-handoff-behalf"
-        >
-          On my behalf
-        </button>
-      </div>
-
-      {way === 'self' ? (
-        <>
-          <label className={styles.agentHandoffLabel}>
-            <span>Your name</span>
-            <input
-              type="text"
-              value={ownerName}
-              onChange={(event) => setOwnerName(event.target.value)}
-              maxLength={60}
-              autoComplete="given-name"
-              className={styles.agentHandoffInput}
-              data-testid="ce-agent-handoff-name"
-            />
-          </label>
-          <Step
-            id="mcp"
-            label={
-              <>
-                1. Add the MCP
-                <Help id="ce-agent-handoff-mcp-about">
-                  For Claude Code. In another MCP host, add the server {MCP_SERVER_COMMAND}
-                  {displayName ? `, with CE_MCP_DISPLAY_NAME set to ${displayName}` : ''}.
-                </Help>
-              </>
-            }
-            shown={mcpCommand}
-            copyLabel="Copy the MCP command"
-            copied={copiedStep === 'mcp'}
-            onCopy={() => copy('mcp', 'command', mcpCommand)}
-          />
-          <Step
-            id="join"
-            label="2. Ask your agent"
-            shown={joinPrompt}
-            copyLabel="Copy the prompt"
-            copied={copiedStep === 'join'}
-            onCopy={() => copy('join', 'prompt', joinPrompt)}
-          />
-        </>
-      ) : !agentHttpEnabled ? (
-        <p className={styles.agentHandoffHint}>
-          Not on in {sessionName}
-          <Help id="ce-agent-handoff-off-about" placement="bottom">
-            Session admins can turn on Agents (HTTP API).
-          </Help>
-        </p>
-      ) : !key ? (
-        <div className={styles.agentHandoffActions}>
+      <div id="ce-agent-handoff-body" hidden={!open}>
+        <div className={styles.agentHandoffChoices} role="group" aria-label="How your agent takes part">
           <button
             type="button"
-            className={styles.agentHandoffButton}
-            onClick={makeKey}
-            disabled={making}
-            data-testid="ce-agent-handoff-make-key"
+            className={styles.agentHandoffChoice}
+            aria-pressed={way === 'self'}
+            onClick={() => chooseWay('self')}
+            data-testid="ce-agent-handoff-self"
           >
-            {making ? 'Making a key…' : 'Make a key'}
+            As itself
           </button>
-          <Help id="ce-agent-handoff-key-about" placement="bottom">
-            The key lets your agent read the questions, save drafts and submit the answers you approve, as you. It stops
-            when your sign-in ends or when you make a new one. It needs an agent that runs commands on your computer,
-            such as Claude Code or Codex.
-          </Help>
-        </div>
-      ) : (
-        <>
-          <Step
-            id="key"
-            label={
-              <>
-                1. Run in your terminal
-                <Help id="ce-agent-handoff-terminal-about">
-                  Then start your agent from the same terminal. It reads the key from {AGENT_KEY_ENV}, so the key never
-                  goes into the chat. In PowerShell: $env:{AGENT_KEY_ENV} = &apos;…&apos;
-                </Help>
-              </>
-            }
-            shown={buildAgentKeyCommand(keyShown ? key.token : MASKED_KEY)}
-            copyLabel="Copy the key command"
-            copied={copiedStep === 'key'}
-            onCopy={() => copy('key', 'command', buildAgentKeyCommand(key.token))}
+          <button
+            type="button"
+            className={styles.agentHandoffChoice}
+            aria-pressed={way === 'behalf'}
+            onClick={() => chooseWay('behalf')}
+            data-testid="ce-agent-handoff-behalf"
           >
+            On my behalf
+          </button>
+        </div>
+
+        {way === 'self' ? (
+          <>
+            <label className={styles.agentHandoffLabel}>
+              <span>Your name</span>
+              <input
+                type="text"
+                value={ownerName}
+                onChange={(event) => setOwnerName(event.target.value)}
+                maxLength={60}
+                autoComplete="given-name"
+                className={styles.agentHandoffInput}
+                data-testid="ce-agent-handoff-name"
+              />
+            </label>
+            <Step
+              id="mcp"
+              label={
+                <>
+                  1. Add the MCP
+                  <Help id="ce-agent-handoff-mcp-about">
+                    For Claude Code. In another MCP host, add the server {MCP_SERVER_COMMAND}
+                    {displayName ? `, with CE_MCP_DISPLAY_NAME set to ${displayName}` : ''}.
+                  </Help>
+                </>
+              }
+              shown={mcpCommand}
+              copyLabel="Copy the MCP command"
+              copied={copiedStep === 'mcp'}
+              onCopy={() => copy('mcp', 'command', mcpCommand)}
+            />
+            <Step
+              id="join"
+              label="2. Ask your agent"
+              shown={joinPrompt}
+              copyLabel="Copy the prompt"
+              copied={copiedStep === 'join'}
+              onCopy={() => copy('join', 'prompt', joinPrompt)}
+            />
+          </>
+        ) : !agentHttpEnabled ? (
+          <p className={styles.agentHandoffHint}>
+            Not on in {sessionName}
+            <Help id="ce-agent-handoff-off-about" placement="bottom">
+              Session admins can turn on Agents (HTTP API).
+            </Help>
+          </p>
+        ) : !key ? (
+          <div className={styles.agentHandoffActions}>
             <button
               type="button"
               className={styles.agentHandoffButton}
-              aria-pressed={keyShown}
-              aria-label="Show the key"
-              onClick={() => setKeyShown(!keyShown)}
-              data-testid="ce-agent-handoff-key-show"
+              onClick={makeKey}
+              disabled={making}
+              data-testid="ce-agent-handoff-make-key"
             >
-              Show
+              {making ? 'Making a key…' : 'Make a key'}
             </button>
-          </Step>
-          <p className={styles.agentHandoffHint}>Works until {expiry}</p>
-          <Step
-            id="behalf-prompt"
-            label="2. Ask your agent"
-            shown={buildOnMyBehalfPrompt(key)}
-            copyLabel="Copy the prompt"
-            copied={copiedStep === 'behalf-prompt'}
-            onCopy={() => copy('behalf-prompt', 'prompt', buildOnMyBehalfPrompt(key))}
-          />
-        </>
-      )}
+            <Help id="ce-agent-handoff-key-about" placement="bottom">
+              The key lets your agent read the questions, save drafts and submit the answers you approve, as you. It
+              stops when your sign-in ends or when you make a new one. It needs an agent that runs commands on your
+              computer, such as Claude Code or Codex.
+            </Help>
+          </div>
+        ) : (
+          <>
+            <Step
+              id="key"
+              label={
+                <>
+                  1. Run in your terminal
+                  <Help id="ce-agent-handoff-terminal-about">
+                    Then start your agent from the same terminal. It reads the key from {AGENT_KEY_ENV}, so the key
+                    never goes into the chat. In PowerShell: $env:{AGENT_KEY_ENV} = &apos;…&apos;
+                  </Help>
+                </>
+              }
+              shown={buildAgentKeyCommand(keyShown ? key.token : MASKED_KEY)}
+              copyLabel="Copy the key command"
+              copied={copiedStep === 'key'}
+              onCopy={() => copy('key', 'command', buildAgentKeyCommand(key.token))}
+            >
+              <button
+                type="button"
+                className={styles.agentHandoffButton}
+                aria-pressed={keyShown}
+                aria-label="Show the key"
+                onClick={() => setKeyShown(!keyShown)}
+                data-testid="ce-agent-handoff-key-show"
+              >
+                Show
+              </button>
+            </Step>
+            <p className={styles.agentHandoffHint}>Works until {expiry}</p>
+            <Step
+              id="behalf-prompt"
+              label="2. Ask your agent"
+              shown={buildOnMyBehalfPrompt(key)}
+              copyLabel="Copy the prompt"
+              copied={copiedStep === 'behalf-prompt'}
+              onCopy={() => copy('behalf-prompt', 'prompt', buildOnMyBehalfPrompt(key))}
+            />
+          </>
+        )}
 
-      {/* Live regions stay mounted, so screen readers hear their first message too. */}
-      <div role="alert">
-        {error ? (
-          <div className={styles.agentHandoffError} data-testid="ce-agent-handoff-error">
-            {error}
-          </div>
-        ) : null}
-      </div>
-      <div role="status">
-        {copyStatus ? (
-          <div key={copyCount} className={styles.agentHandoffHint}>
-            {copyStatus}
-          </div>
-        ) : null}
+        {/* Live regions stay mounted, so screen readers hear their first message too. */}
+        <div role="alert">
+          {error ? (
+            <div className={styles.agentHandoffError} data-testid="ce-agent-handoff-error">
+              {error}
+            </div>
+          ) : null}
+        </div>
+        <div role="status">
+          {copyStatus ? (
+            <div key={copyCount} className={styles.agentHandoffHint}>
+              {copyStatus}
+            </div>
+          ) : null}
+        </div>
       </div>
     </section>
   );
