@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { optionsOf } from '../../../../shared/questions/answerValue.mjs';
 import { FormGroup, Input, Label } from 'reactstrap';
 import styles from './SurveyTool.module.scss';
@@ -49,6 +50,8 @@ const MultichoiceQuestionInput = ({
   const normalizedOptions = optionsOf({ options });
   const normalizedSelectedValues = Array.isArray(selectedValues) ? selectedValues : [];
   const duplicateLabels = findDuplicateMultichoiceOptionLabels(normalizedOptions);
+  // The same question can show in two places at once, so the id is per instance.
+  const kindId = useId();
 
   if (duplicateLabels.length > 0) {
     return (
@@ -60,8 +63,10 @@ const MultichoiceQuestionInput = ({
 
   return (
     <>
-      <span className={styles.choiceKindPill}>{choiceKindLabel(isSingleSelect)}</span>
-      <FormGroup id={styles.multiChoice}>
+      <span className={styles.choiceKindPill} id={kindId}>
+        {choiceKindLabel(isSingleSelect)}
+      </span>
+      <FormGroup id={styles.multiChoice} role="group" aria-describedby={kindId}>
         {normalizedOptions.map((option, optionIndex) => {
           const optionLabel = option;
           const isSelected = normalizedSelectedValues.includes(option);
