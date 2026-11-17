@@ -174,6 +174,8 @@ export type SurveyQuestionsInstanceFields = {
   _maskedQuestionVisibilityMemoByPool: WeakMap<object, unknown>;
   // These property names survive minification in the SurveyQuestions chunk.
   _a: SurveyQuestionsRuntimeRecord | null;
+  /** Advances on every render except one that only changed answers; see SurveyQuestionCard. */
+  _questionCardEpoch: number;
   _audioInputWorkerPropsMemo: SurveyAudioWorkerPropsMemo | null;
   _q: Map<string, SurveyQuestionsRuntimeRecord>;
   _canDecryptOtherResponsesKey: string;
@@ -261,6 +263,7 @@ export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFi
   _lockedQuestionGateDetailsMemo: { key: '', poolRef: null, poolVersion: 0, value: [] },
   _maskedQuestionVisibilityMemoByPool: new WeakMap(),
   _a: null,
+  _questionCardEpoch: 0,
   _audioInputWorkerPropsMemo: null,
   _q: new Map(),
   _canDecryptOtherResponsesKey: '',

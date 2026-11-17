@@ -207,6 +207,10 @@ describe('surveyQuestionsRouteRuntime', () => {
         visibleQuestionPool: QUESTION_POOL,
       }),
     );
+    // Each card renders inside its own memo, from the question and the form's slice.
+    const [card] = element.props.authoringPanelProps.renderedEditableQuestions;
+    expect(card.key).toBe('q1');
+    expect(card.props.render()).toBe('editable-question');
     expect(context.renderQuestion).toHaveBeenCalledWith(QUESTION_POOL[0], 0, {
       answers: { q1: { value: 'Yes' } },
     });
@@ -235,7 +239,7 @@ describe('surveyQuestionsRouteRuntime', () => {
         lockedQuestionsBanner: 'locked-panel',
         onScrollToTop: context.handleScrollToTop,
         onShowJsonAtBottom: context.handleShowJsonAtBottom,
-        renderedEditableQuestions: ['editable-question'],
+        renderedEditableQuestions: [expect.objectContaining({ key: 'q1' })],
       }),
     );
     expect(context.buildSurveyQuestionsRouteJsonControlsProps).toHaveBeenCalledWith(
