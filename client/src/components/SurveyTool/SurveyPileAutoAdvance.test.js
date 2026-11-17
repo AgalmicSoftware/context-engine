@@ -254,3 +254,20 @@ it('moves on from a single choice after the set delay, and not if the choice cha
     mockSingleChoiceDelay = null;
   }
 });
+
+it('does not move on later when the person moved by hand within the delay', async () => {
+  mockSingleChoiceDelay = 200;
+  try {
+    const pile = await mountPile();
+    await act(async () => pile.engine().handleNext());
+    choose('checkbox', 'Beta');
+    await act(async () => pile.engine().handleNext());
+    await act(async () => pile.engine().handlePrev());
+    expect(card()).toHaveAccessibleName('Question 2 of 6');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+    expect(card()).toHaveAccessibleName('Question 2 of 6');
+    expect(answer(pile, 'q2')).toEqual(['Beta']);
+  } finally {
+    mockSingleChoiceDelay = null;
+  }
+});

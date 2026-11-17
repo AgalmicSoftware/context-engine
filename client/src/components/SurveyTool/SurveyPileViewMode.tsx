@@ -1517,6 +1517,8 @@ const triggerNavFade = (engine: PileViewModeEngine) => {
 };
 
 const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
+  // A move by hand cancels a pending move-on from a single choice.
+  clearTimeout(engine._pileChoiceAdvanceTimer);
   if (engine._persistTimer) {
     clearTimeout(engine._persistTimer);
     engine._persistTimer = null;
@@ -1553,6 +1555,8 @@ const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
 };
 
 const handlePrev = (engine: PileViewModeEngine) => {
+  // A move by hand cancels a pending move-on from a single choice.
+  clearTimeout(engine._pileChoiceAdvanceTimer);
   if (engine._persistTimer) {
     clearTimeout(engine._persistTimer);
     engine._persistTimer = null;
