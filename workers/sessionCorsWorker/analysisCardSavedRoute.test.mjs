@@ -180,6 +180,27 @@ test('a person past their saves for the day is refused and nothing is written', 
   assert.equal(result.kv.puts.length, 0);
 });
 
+test('withdrawing is never counted, still works past the day\'s saves, and writes only when needed', async () => {
+  const kv = createKv();
+  await run({ kv });
+  const withdrawn = await run({ kv, body: { published: false }, refuse: ['analysis-card-save'] });
+  assert.equal(withdrawn.response.status, 200);
+  assert.deepEqual(withdrawn.body, { published: false });
+  assert.deepEqual(withdrawn.counted, []);
+  assert.equal(kv.puts.length, 2);
+  // Taking down a card that is already down writes nothing.
+  const again = await run({ kv, body: { published: false } });
+  assert.deepEqual(again.body, { published: false });
+  assert.deepEqual(again.counted, []);
+  assert.equal(kv.puts.length, 2);
+  // With nothing saved, the "no" is still kept, so the page does not save a card on its own later.
+  const fresh = createKv();
+  await run({ kv: fresh, body: { published: false } });
+  assert.deepEqual((await read(fresh)).body, { published: false });
+  const failing = { get: async () => { throw new Error('kv down'); }, put: async () => {} };
+  assert.equal((await run({ env: { GROUP_KV: failing }, body: { published: false } })).response.status, 503);
+});
+
 test('a session without its store says so instead of pretending to save', async () => {
   const missing = await run({ env: {} });
   assert.equal(missing.response.status, 503);

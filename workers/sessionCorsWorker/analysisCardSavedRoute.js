@@ -15,7 +15,8 @@ export const ANALYSIS_CARD_PUBLISH_PATH = '/analysis-card/publish';
 export const ANALYSIS_CARD_PUBLISHED_PATH = '/analysis-card/published';
 export const ANALYSIS_CARD_SAVED_PATHS = [ANALYSIS_CARD_PUBLISH_PATH, ANALYSIS_CARD_PUBLISHED_PATH];
 
-// Saves and withdrawals one person may make in a day.
+// Saves one person may make in a day. Withdrawing is never counted, so nobody is kept from taking their card down;
+// it writes only when there is something to take down, so the writes a person can cause stay bounded by their saves.
 export const ANALYSIS_CARD_SAVES_PER_DAY = 20;
 // Cards and markers sit beside the session's config in GROUP_KV, which no backup reads; each lasts a year from
 // its last save.
@@ -65,7 +66,7 @@ export const dispatchAnalysisCardSavedRoute = async ({
       computeScopesForLogin: deps?.computeScopesForLogin,
       json: deps?.json,
     },
-    // Only a save is counted; reading a card is not.
+    // Only a save is counted. A read is not: checking the count costs as much as the read itself.
     countLater: true,
   });
   if (!preflight?.ok) return preflight?.response;
@@ -98,8 +99,18 @@ export const dispatchAnalysisCardSavedRoute = async ({
   if (typeof body?.published !== 'boolean') return send({ error: 'invalid_request' }, 400);
   const card = body.published ? normalizeSavedAnalysisCard(body.card) : null;
   if (body.published && !card) return send({ error: 'invalid_card' }, 400);
-  const refused = await preflight.count?.();
-  if (refused) return refused;
+  if (card) {
+    const refused = await preflight.count?.();
+    if (refused) return refused;
+  } else {
+    let stored;
+    try {
+      stored = parseJson(await kv.get(keyOf(owner)));
+    } catch {
+      return send({ error: 'card_store_unavailable' }, 503);
+    }
+    if (stored?.published === false) return send({ published: false }, 200);
+  }
   const now = Number(deps?.now?.() ?? Date.now());
   const value = card ? { published: true, card, savedAt: now } : { published: false, withdrawnAt: now };
   try {

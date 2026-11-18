@@ -3267,19 +3267,27 @@ Signed login/bootstrap requests:
     only (`shared/analysisCardSaved.mjs`: title, match note, figure, guessed
     works and up to three of the person's public answers, capped, at most
     8,000 bytes); anything else is dropped, and a card without a title or a
-    figure in "Name (years)" form is 400 `invalid_card`. A person may save or
-    withdraw 20 times a day (429 past that).
+    figure in "Name (years)" form is 400 `invalid_card`. A person may save 20
+    times a day (429 past that).
   - Withdrawing replaces the card with `{ published: false, withdrawnAt }`, so
     none of its words stay stored and the page knows not to save a new one on
-    its own. Ticking the box again saves the card again.
+    its own. It is never counted, so the day's saves never keep anyone from
+    taking their card down, and it writes nothing when the card is already
+    down. Ticking the box again saves the card again.
   - `published` takes `{ "account": "0x..." }` and answers `{ published: true,
     card, savedAt }`, `{ published: false }` (withdrawn) or `{ published: null
-    }` (nothing saved). Reading is not counted.
+    }` (nothing saved). Reading is not counted: checking a count costs as much
+    as the read.
   - Stored in `session:{slug}:analysis-card-saved:v1:{address}`, each record
     kept a year from its last save. A backup does not carry these records, and
     a restore does not bring them back. Signed-out visitors see no card. An
     older bundle put back leaves the records unused until they expire; the
     page then shows no saved card.
+  - Known limits. A saved card keeps the answers it quotes even after the
+    question is hidden, the answer is made private or the person leaves the
+    session; withdrawing removes them. A visitor's view draws the card's
+    portrait again once the stored one has expired (after 30 days), counted
+    to the visitor's AI calls and the session's daily pictures.
 - `POST /session-agent/ask` answers a question to the Session Agent
   through the session's own AI, under the `/ai` scope check and rate limit.
   `POST /session-agent/status` says how the signed-in person would be answered,
