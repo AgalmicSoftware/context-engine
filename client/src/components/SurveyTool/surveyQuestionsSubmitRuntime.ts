@@ -55,6 +55,7 @@ export const createSurveyQuestionsSubmitRuntime = (
     maybeBlockSubmitUntilQuestionPoolComplete,
     normalizeQuestionIdKey,
     normalizeSessionSlugValue,
+    persistDraftSafely,
     prepareJsonAndHash,
     propsRef,
     resolveDiffBaselineSlice,
@@ -710,7 +711,9 @@ export const createSurveyQuestionsSubmitRuntime = (
           .filter(Boolean),
       );
 
-      // 1. STOP any pending draft saves immediately
+      // 1. Hold any pending draft write until the new baseline is in place. Written now, it would keep the drafts
+      // of the answers just stored; dropped, it would lose an answer changed just before that is still unsent.
+      const draftWritePending = !!inst._persistTimer;
       if (inst._persistTimer) {
         clearTimeout(inst._persistTimer);
         inst._persistTimer = null;
@@ -869,6 +872,7 @@ export const createSurveyQuestionsSubmitRuntime = (
         afterStateApplied: async () => {
           try {
             if (!isSubmitContextCurrent(submitContext)) return;
+            if (draftWritePending) persistDraftSafely();
             if (stateRef.current.draftPersistenceError && getChangedQidsAndFields(surveyIndex).changedQids.size === 0) {
               setState({ draftPersistenceError: '' });
             }

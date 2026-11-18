@@ -221,6 +221,24 @@ describe('surveyQuestionsSubmitRuntime', () => {
     expect(context.inst._submitUploadRevisions).toBeUndefined();
   });
 
+  it.each([
+    ['writes a draft change still waiting when Submit returns', true],
+    ['writes no draft when none was waiting', false],
+  ])('%s, once the stored answers are the baseline', async (_name, pending) => {
+    const persistDraftSafely = jest.fn();
+    const context = createContext({ persistDraftSafely });
+    const timer = pending ? setTimeout(() => undefined, 60_000) : null;
+    context.inst._persistTimer = timer;
+    await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    // Not before the baseline moves: written then, it would keep the stored answers' drafts.
+    expect(context.inst._persistTimer).toBeNull();
+    expect(persistDraftSafely).not.toHaveBeenCalled();
+    await context.runSurveyQuestionsSubmitSuccessController.mock.calls[0][0].afterStateApplied();
+    // Dropped, an answer changed just before the Submit returned and still unsent would be lost on reload.
+    expect(persistDraftSafely).toHaveBeenCalledTimes(pending ? 1 : 0);
+    if (timer) clearTimeout(timer);
+  });
+
   it('starts a new operation when the account or session changes after a failed attempt', async () => {
     const context = createContext();
     context.submitSurveyResponse.mockRejectedValue(new Error('reply lost'));

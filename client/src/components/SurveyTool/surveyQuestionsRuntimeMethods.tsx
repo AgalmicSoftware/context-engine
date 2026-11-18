@@ -2009,6 +2009,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     invalidateDiffCaches,
     isQuestionLockedForResponse,
     maybeBlockSubmitUntilQuestionPoolComplete,
+    persistDraftSafely,
     prepareJsonAndHash,
     resolveDiffBaselineSlice,
     resolveFieldEncryptionAudience,
