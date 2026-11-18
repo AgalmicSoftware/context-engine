@@ -85,4 +85,9 @@
     --ce-data-viz-point: #004b70;
     --ce-data-viz-point-active: #703c00;
   }
+
+  // The pile's highlighted Next follows the accent, which this mode turns blue in the dark theme.
+  :root[data-ce-color-vision='color-blind'][data-ce-theme='context-engine'] {
+    --ce-pile-next-highlight: #80ccff;
+  }
 }

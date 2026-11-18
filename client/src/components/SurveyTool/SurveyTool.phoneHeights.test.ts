@@ -90,6 +90,19 @@ it('keeps Submit readable on the narrowest phone rows', () => {
   );
 });
 
+// Next is the same arrow once a card has an answer, only in the theme's highlight, with a glow that pulses and then
+// holds still (and only holds still under reduced motion).
+it('highlights Next without changing its size', () => {
+  const primary = css.match(/\n\.pileNav \.pileNavArrow\.pileNavArrowPrimary\s*\{([^{}]*)\}/)?.[1] || '';
+  // Each theme sets its own highlight; themeContrast.test.ts holds it to 3:1 on the page.
+  expect(primary).toMatch(/--pile-next-highlight: var\(--ce-pile-next-highlight\);/);
+  expect(primary).not.toMatch(/width|height|padding|background/);
+  expect(css).toMatch(/\.pileNavArrowPrimary\.pileNavArrowNudge\s*\{\s*animation: pileNextNudge 1\.1s ease-in-out 3;/);
+  expect(css).toMatch(
+    /prefers-reduced-motion: reduce[\s\S]*\.pileNavArrowPrimary\.pileNavArrowNudge:hover:not\(:disabled\)\s*\{\s*animation: none !important;\s*filter: drop-shadow/,
+  );
+});
+
 // A free-text box fills the room under its prompt: a small box under a tall gap read as broken.
 it('lets a phone free-text box fill the card', () => {
   expect(css).toMatch(

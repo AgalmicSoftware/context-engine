@@ -6831,7 +6831,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .pileNav .pileNavArrow.pileNavArrowPrimary.pileNavArrowNudge,
   .pileNav .pileNavArrow.pileNavArrowPrimary.pileNavArrowNudge:hover:not(:disabled) {
     animation: none !important;
-    filter: drop-shadow(0 0 5px var(--pile-next-nudge-color));
+    filter: drop-shadow(0 0 5px var(--pile-next-highlight));
   }
 
   .multiChoice .option,
@@ -7828,27 +7828,21 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// Once the card has an answer, Next reads as the step to take, in every theme: a filled arrow. On a phone it keeps
-// the theme's arrow size (48px in Classic 95), so neither arrow moves when it fills.
+// Once the card has an answer, Next is the step to take: the same arrow, the same size and place, in the theme's
+// highlight for it.
 .pileNav .pileNavArrow.pileNavArrowPrimary {
-  padding: 0;
-  border-radius: var(--ce-radius-pill);
-  background: var(--ce-action-primary) !important;
-  color: var(--ce-action-primary-text) !important;
-  font-size: 1.1rem;
+  --pile-next-highlight: var(--ce-pile-next-highlight);
+  color: var(--pile-next-highlight) !important;
   opacity: 1 !important;
 
   &:hover:not(:disabled),
   &:focus-visible {
-    background: var(--ce-action-primary) !important;
-    color: var(--ce-action-primary-text) !important;
-    transform: none;
-    filter: none;
+    color: var(--pile-next-highlight) !important;
   }
 }
 
-// Once someone answers a card that stays put, Next glows three times in the theme's accent, then rests. Only a glow:
-// a swell covered the counter beside it. It stops while Next has keyboard focus, leaving the focus ring alone.
+// Once someone answers a card that stays put, Next glows three times in its highlight, then rests highlighted. Only a
+// glow, so nothing moves. It stops while Next has keyboard focus, leaving the focus ring alone.
 @keyframes pileNextNudge {
   0%,
   100% {
@@ -7856,32 +7850,16 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 
   50% {
-    filter: drop-shadow(0 0 9px var(--pile-next-nudge-color));
+    filter: drop-shadow(0 0 9px var(--pile-next-highlight)) drop-shadow(0 0 3px var(--pile-next-highlight));
   }
 }
 
 .pileNav .pileNavArrow.pileNavArrowPrimary.pileNavArrowNudge {
-  --pile-next-nudge-color: var(--ce-action-accent);
   animation: pileNextNudge 1.1s ease-in-out 3;
 
   &:focus-visible {
     animation: none;
     filter: none;
-  }
-}
-
-// Classic 95's control row is the accent's own teal, so there the glow is the bevel's white highlight.
-@container ce-theme style(--ce-layout-profile: desktop-window) {
-  .pileNav .pileNavArrow.pileNavArrowPrimary.pileNavArrowNudge {
-    --pile-next-nudge-color: var(--ce-edge-highlight);
-  }
-}
-
-// The desktop rail's arrows are bare chevrons; there the filled Next is a 44px circle.
-@media (min-width: 769px) {
-  .pileNav .pileNavArrow.pileNavArrowPrimary {
-    width: 44px;
-    height: 44px;
   }
 }
 

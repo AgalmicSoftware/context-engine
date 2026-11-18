@@ -521,7 +521,7 @@ it('makes Next the step to take once the card has an answer, until the end of th
   const next = screen.getByRole('button', { name: 'Next Question' });
   expect(next).not.toHaveClass('pileNavArrowPrimary');
   rerender(renderPileInteractionSurface({ ...props, nextIsPrimary: true }));
-  // Filled, not widened by a word: the arrows keep their places in the phone row.
+  // Highlighted, not widened by a word: the arrows keep their places in the phone row.
   expect(screen.getByRole('button', { name: 'Next Question' })).toHaveClass('pileNavArrowPrimary');
   expect(screen.getByRole('button', { name: 'Next Question' })).toHaveTextContent('');
   // At the end of the set Next does nothing, so it does not look like the step to take.

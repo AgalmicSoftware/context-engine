@@ -146,6 +146,8 @@ describe('bundled app-theme contrast', () => {
     assertContrast(values, 'data-viz-point', 'data-viz-surface', 3, 'surface');
     assertContrast(values, 'data-viz-point-active', 'data-viz-surface', 3, 'surface');
     assertContrast(values, 'focus-ring', 'surface', 3, 'canvas');
+    // Next's highlight is an icon on the page beside the question card.
+    assertContrast(values, 'pile-next-highlight', 'canvas', 3, 'canvas');
   });
 
   // Group Conversation stacks translucent layers on the dialog's sunken surface (SurveyTool.module.scss):
