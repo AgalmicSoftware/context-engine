@@ -2920,10 +2920,16 @@ const renderPileResponseInput = (
       // There it would clear or repeat the choice; a quick press on another option is a new choice and counts.
       const picksAnother =
         pileAnswerIsGiven(value) && JSON.stringify(value) !== JSON.stringify(engine._pileChoicePendingValue);
+      // On a single-choice list, which stays put, the second press would untick the choice the first one made.
+      const unticksSingleChoice =
+        !pileAnswerIsGiven(value) &&
+        normalizePileQuestionInputType(question) === 'multichoice' &&
+        (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question));
       if (
         repeatedPress &&
         (engine._pileAdvancedIntoQuestionId === questionId ||
-          (engine._pileChoicePendingQuestionId === questionId && !picksAnother))
+          (engine._pileChoicePendingQuestionId === questionId && !picksAnother) ||
+          unticksSingleChoice)
       )
         return;
       // A new choice replaces any move a single choice was waiting to make.
@@ -2933,11 +2939,8 @@ const renderPileResponseInput = (
       // transition marker would reject later quadratic steps in that gesture.
       engine._pileAdvancedIntoQuestionId = null;
       const inputType = normalizePileQuestionInputType(question);
-      const canAdvance =
-        CHOICE_ADVANCE_DELAY_MS !== null &&
-        (inputType === 'binary' ||
-          (inputType === 'multichoice' &&
-            (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question))));
+      // Only agree/unsure/disagree moves on by itself; a single-choice list stays, ticked, until Next.
+      const canAdvance = CHOICE_ADVANCE_DELAY_MS !== null && inputType === 'binary';
       const arrowSelection = engine._pileAnswerArrowKeyDown === true;
       const chosenAt = Date.now();
       // A tap that ended a scroll of the card picks, but never moves on; nor does a choice the person scrolled away from.
@@ -2951,12 +2954,7 @@ const renderPileResponseInput = (
         // Inspect the committed answer: clicking a selected binary option clears it.
         // Only direct card edits reach this callback; interview drafts and hydration do not.
         const savedValue = readPlainRecord(engine.state.surveysResponseState?.[0]?.answers?.[questionId]).value;
-        if (
-          inputType === 'binary'
-            ? typeof savedValue !== 'string' || !['Agree', 'Unsure', 'Disagree'].includes(savedValue)
-            : normalizeMultichoiceValue(savedValue).length !== 1
-        )
-          return;
+        if (typeof savedValue !== 'string' || !['Agree', 'Unsure', 'Disagree'].includes(savedValue)) return;
         const visibleQuestions = resolveEarlyVisiblePileQuestions({
           pileQuestions: engine.state.pileQuestions,
           questionPool: (engine.state.questionPool?.length

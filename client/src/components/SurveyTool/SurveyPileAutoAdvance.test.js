@@ -9,7 +9,7 @@ import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionListeningPanel', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionVoiceModeModal', () => ({ __esModule: true, default: () => null }));
-// The owner's switch for one-choice cards: a delay moves on after it (shortened here); null stays on the card.
+// The owner's switch for agree/unsure/disagree cards: a delay moves on after it (shortened here); null stays on the card.
 const TEST_DELAY_MS = 60;
 let mockChoiceDelay = TEST_DELAY_MS;
 jest.mock('./surveyPileNavigation', () => ({
@@ -89,7 +89,7 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-it('saves binary and single-choice answers, moves on after a ticked beat, focuses the next card, and keeps answers on Back', async () => {
+it('moves on from agree/disagree after a ticked beat, keeps a single choice on its card, and keeps answers on Back', async () => {
   localStorage.setItem('ce:pileAutoAdvanceEnabled', 'false');
   const pile = await mountPile();
   choose('radio', 'Agree');
@@ -99,13 +99,12 @@ it('saves binary and single-choice answers, moves on after a ticked beat, focuse
   await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 6'));
   expect(answer(pile, 'q1')).toBe('Agree');
   expect(card()).toHaveFocus();
-  // A single choice behaves the same way.
+  // A single choice stays ticked on its card until Next.
   choose('checkbox', 'Beta');
   expect(within(card()).getByRole('checkbox', { name: 'Beta' })).toBeChecked();
+  await pause(TEST_DELAY_MS * 2);
   expect(card()).toHaveAccessibleName('Question 2 of 6');
-  await waitFor(() => expect(card()).toHaveAccessibleName('Question 3 of 6'));
   expect(answer(pile, 'q2')).toEqual(['Beta']);
-  await act(async () => pile.engine().handlePrev());
   await act(async () => pile.engine().handlePrev());
   choose('radio', 'Agree');
   expect(answer(pile, 'q1')).toBe('');
@@ -235,6 +234,22 @@ it('keeps a double tap on one option as one choice while the card waits to move 
   expect(answer(pile, 'q1')).toBe('Agree');
 });
 
+it('keeps a double tap on a single choice as one choice', async () => {
+  const pile = await mountPile();
+  await act(async () => pile.engine().handleNext());
+  const beta = within(card()).getByRole('checkbox', { name: 'Beta' });
+  fireEvent.mouseDown(beta.closest('label'), { detail: 1 });
+  fireEvent.click(beta, { detail: 0 });
+  fireEvent.mouseDown(beta.closest('label'), { detail: 2 });
+  fireEvent.click(beta, { detail: 0 });
+  expect(answer(pile, 'q2')).toEqual(['Beta']);
+  expect(within(card()).getByRole('checkbox', { name: 'Beta' })).toBeChecked();
+  // A deliberate second press later still unticks it.
+  fireEvent.mouseDown(beta.closest('label'), { detail: 1 });
+  fireEvent.click(beta, { detail: 0 });
+  expect(answer(pile, 'q2')).toEqual([]);
+});
+
 it('takes a quick press on another option while the card waits as the new choice', async () => {
   const pile = await mountPile();
   const agree = within(card()).getByRole('radio', { name: 'Agree' });
@@ -318,33 +333,31 @@ it('keeps an open comment editor mounted while choosing an answer so pending dic
   expect(within(card()).getByRole('textbox')).toHaveValue('Partial comment with final dictated words');
 });
 
-it('moves on from a single choice after the set delay, and not if the choice changes in the meantime', async () => {
+it('moves on after the set delay, and not if the choice is cleared in the meantime', async () => {
   mockChoiceDelay = 200;
   const pile = await mountPile();
-  await act(async () => pile.engine().handleNext());
-  choose('checkbox', 'Alpha');
-  expect(card()).toHaveAccessibleName('Question 2 of 6');
-  choose('checkbox', 'Alpha');
+  choose('radio', 'Agree');
+  expect(card()).toHaveAccessibleName('Question 1 of 6');
+  choose('radio', 'Agree');
   await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
-  expect(answer(pile, 'q2')).toEqual([]);
-  expect(card()).toHaveAccessibleName('Question 2 of 6');
+  expect(answer(pile, 'q1')).toBe('');
+  expect(card()).toHaveAccessibleName('Question 1 of 6');
 
-  choose('checkbox', 'Beta');
-  expect(within(card()).getByRole('checkbox', { name: 'Beta' })).toBeChecked();
-  expect(card()).toHaveAccessibleName('Question 2 of 6');
-  await waitFor(() => expect(card()).toHaveAccessibleName('Question 3 of 6'));
-  expect(answer(pile, 'q2')).toEqual(['Beta']);
+  choose('radio', 'Disagree');
+  expect(within(card()).getByRole('radio', { name: 'Disagree' })).toBeChecked();
+  expect(card()).toHaveAccessibleName('Question 1 of 6');
+  await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 6'));
+  expect(answer(pile, 'q1')).toBe('Disagree');
 });
 
 it('does not move on later when the person moved by hand within the delay', async () => {
   mockChoiceDelay = 200;
   const pile = await mountPile();
-  await act(async () => pile.engine().handleNext());
-  choose('checkbox', 'Beta');
+  choose('radio', 'Disagree');
   await act(async () => pile.engine().handleNext());
   await act(async () => pile.engine().handlePrev());
-  expect(card()).toHaveAccessibleName('Question 2 of 6');
+  expect(card()).toHaveAccessibleName('Question 1 of 6');
   await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
-  expect(card()).toHaveAccessibleName('Question 2 of 6');
-  expect(answer(pile, 'q2')).toEqual(['Beta']);
+  expect(card()).toHaveAccessibleName('Question 1 of 6');
+  expect(answer(pile, 'q1')).toBe('Disagree');
 });
