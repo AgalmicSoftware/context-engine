@@ -2384,8 +2384,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /function openRiskMatrixModal\(point\)/);
   assert.match(html, /renderRiskCommentGroup\('Opportunities', opportunities, 'opportunity'/);
   assert.match(html, /document\.querySelectorAll\('\[data-ce-risk-matrix-cell\]'\)\.forEach/);
-  assert.match(html, /class="riskMatrixCell cell riskMatrixHeaderCell headerCell activeHeaderCell"/);
-  assert.match(html, /riskMatrixHeaderCell headerCell riskMatrixRowHeader activeHeaderCell/);
+  assert.match(html, /class="riskMatrixCell cell riskMatrixHeaderCell headerCell axisTop activeHeaderCell"/);
+  assert.match(html, /riskMatrixHeaderCell headerCell riskMatrixRowHeader axisLeft activeHeaderCell/);
   assert.match(html, /class="riskMatrixCell cell riskMatrixGridCell gridCell/);
   assert.doesNotMatch(html, /opportunity balance \+/);
   assert.doesNotMatch(html, /risk balance -/);
@@ -2398,6 +2398,15 @@ test('report renders models as participants in a OnePageSession-style results sh
   // The grid's help sits beside its title, with no line of its own.
   assert.doesNotMatch(html, /Open a square to read/);
   assert.match(html, /<\/h3>\s*<details class="detailHelp"><summary aria-label="How to read this grid">/);
+  // On a phone the labels stay in view while the grid scrolls.
+  assert.match(html, /class="riskMatrixCell cell riskMatrixCornerCell cornerCell axisTop axisLeft"/);
+  assert.match(html, /class="riskMatrixCell cell riskMatrixHeaderCell headerCell axisTop/);
+  assert.match(html, /riskMatrixRowHeader axisLeft/);
+  assert.match(html, /detailHeading axisTop"/);
+  assert.match(html, /detailHeading axisLeft"/);
+  assert.match(html, /@media \(max-width: 768px\) \{\s*\.riskMatrixGridScroll\.gridScroll \{ max-height: 70svh; overflow: auto; scroll-padding: 64px 0 0 130px; \}/);
+  assert.match(html, /\.riskMatrixHeaderCell\.headerCell\.axisLeft:focus-visible \{ position: sticky;/);
+  assert.match(html, /\.riskMatrixSectionCard \.detailAxis\.axisLeft \{[^}]*align-self: stretch; \}/);
   // The detail grid names its axes, has a key, and says when a square is empty.
   assert.match(html, />Columns: [^<]+<\/div>/);
   assert.match(html, />Rows: [^<]+<\/div>/);

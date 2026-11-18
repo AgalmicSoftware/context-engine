@@ -559,15 +559,20 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
 
     return (
       <section className={styles.sectionCard}>
-        <div className={styles.gridScroll}>
+        <div className={`${styles.gridScroll} ${styles.pinnedScroll}`}>
           <div
             className={styles.gridContainer}
             style={{
               gridTemplateColumns: `122px repeat(${numCategories}, minmax(104px, 1fr))`,
+              // At least its columns' least widths, so a label pinned on a phone travels the whole scroll.
+              minWidth: `max(980px, ${122 + numCategories * (104 + 8)}px)`,
               gridTemplateRows: `auto repeat(${numCategories}, minmax(78px, auto))`,
             }}
           >
-            <div className={clsx(styles.cell, styles.cornerCell)} style={{ gridColumn: 1, gridRow: 1 }}>
+            <div
+              className={clsx(styles.cell, styles.cornerCell, styles.axisTop, styles.axisLeft)}
+              style={{ gridColumn: 1, gridRow: 1 }}
+            >
               <span>Y / X</span>
             </div>
 
@@ -578,6 +583,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                 className={clsx(
                   styles.cell,
                   styles.headerCell,
+                  styles.axisTop,
                   activeCategoryX === catX.name && styles.activeHeaderCell,
                 )}
                 style={{ gridColumn: index + 2, gridRow: 1 }}
@@ -597,6 +603,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                   className={clsx(
                     styles.cell,
                     styles.headerCell,
+                    styles.axisLeft,
                     activeCategoryY === catY.name && styles.activeHeaderCell,
                   )}
                   style={{ gridColumn: 1, gridRow: rowIndex + 2 }}
