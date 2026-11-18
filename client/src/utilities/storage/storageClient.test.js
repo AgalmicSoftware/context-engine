@@ -1,6 +1,7 @@
 import {
   LegacyOwnResponseListingError,
   listSessionStorageRefsPage,
+  readSessionStorageBatch,
   readSessionStorageBlob,
   uploadDataToSessionStorage,
 } from './storageClient.js';
@@ -522,6 +523,35 @@ describe('storageClient', () => {
       { method: 'GET' },
       expect.objectContaining({ preferAnonymous: true }),
     );
+  });
+
+  test('keeps a list or a read signed out when asked to, so a refusal stays a refusal', async () => {
+    const config = { storageProfile: { backend: 'cloudflare' } };
+    const reply = (body) =>
+      new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    fetchWorkerWithAuth.mockResolvedValueOnce(reply({ items: [], cursor: null, listComplete: true }));
+    await listSessionStorageRefsPage({ sessionSlug: 'alpha', sessionConfig: config, anonymousOnly: true });
+    fetchWorkerWithAuth.mockResolvedValueOnce(reply({ items: [{ id: 'cf_a', status: 200, text: '{}' }] }));
+    await readSessionStorageBatch({ sessionSlug: 'alpha', sessionConfig: config, ids: ['cf_a'], anonymousOnly: true });
+    fetchWorkerWithAuth.mockResolvedValueOnce(reply({}));
+    await readSessionStorageBlob({
+      sessionSlug: 'alpha',
+      sessionConfig: config,
+      storageRef: { backend: 'cloudflare', id: 'cf_01j7safeopaqueid' },
+      anonymousOnly: true,
+    });
+    expect(
+      fetchWorkerWithAuth.mock.calls.map(([url, , options]) => [new URL(url).pathname, options.anonymousOnly]),
+    ).toEqual([
+      ['/storage/list', true],
+      ['/storage/read-batch', true],
+      ['/storage/read', true],
+    ]);
+    // Left out, a request may still be sent again signed in.
+    fetchWorkerWithAuth.mockClear();
+    fetchWorkerWithAuth.mockResolvedValueOnce(reply({ items: [], cursor: null, listComplete: true }));
+    await listSessionStorageRefsPage({ sessionSlug: 'alpha', sessionConfig: config });
+    expect('anonymousOnly' in fetchWorkerWithAuth.mock.calls[0][2]).toBe(false);
   });
 
   test('lets a list the page loads by itself refuse to ask for a sign-in', async () => {

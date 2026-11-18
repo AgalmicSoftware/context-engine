@@ -118,6 +118,10 @@ export const loadWorkerResponses = async (
   const listPage = deps.listSessionStorageRefsPage || listSessionStorageRefsPage;
   const readBlob = deps.readSessionStorageBlob || readSessionStorageBlob;
   const context = { account, providerLike };
+  // A load keeps the reader it started as. One started signed out reads signed out to its end: a members-only
+  // session's refusal ends it. Were its refused page sent again under a sign-in that landed meanwhile, it would
+  // read every answer for a reader who is gone, beside the load that sign-in starts.
+  const signedOutLoad = !readString(account) && !ownResponses ? { anonymousOnly: true as const } : {};
   const items: UnknownRecord[] = [];
   const seenCursors = new Set<string>();
   let cursor: string | null = (!ownResponses && readString(startCursor)) || null;
@@ -169,6 +173,7 @@ export const loadWorkerResponses = async (
     context,
     workerUrl: target.workerUrl,
     ...(signal ? { signal } : {}),
+    ...signedOutLoad,
   };
   // The Worker sends an answer's research material only to its author and the session's admins, so those reads
   // go signed in: a signed-out copy would drop it from Results, the export, and a resubmitted answer. Everyone
@@ -341,7 +346,7 @@ export const loadWorkerResponses = async (
         resource: 'responses',
         ...(ownResponses
           ? { ownResponses: { account: readString(account).toLowerCase(), sessionId: target.sessionId }, signal }
-          : {}),
+          : signedOutLoad),
         cursor,
         limit: 100,
       });

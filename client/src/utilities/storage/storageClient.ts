@@ -45,6 +45,8 @@ interface ReadSessionStorageBlobOptions extends StorageWorkerOptions {
   preferAnonymous?: boolean;
   /** false never asks the person to sign in, for reads the page makes by itself. */
   prompt?: boolean;
+  /** true reads signed out and keeps a refusal, even if someone signs in meanwhile. */
+  anonymousOnly?: boolean;
 }
 
 interface ListSessionStorageRefsPageOptions extends StorageWorkerOptions {
@@ -59,6 +61,8 @@ interface ListSessionStorageRefsPageOptions extends StorageWorkerOptions {
   preferAnonymous?: boolean;
   /** false never asks the person to sign in, for lists the page loads by itself. */
   prompt?: boolean;
+  /** true lists signed out and keeps a refusal, even if someone signs in meanwhile. */
+  anonymousOnly?: boolean;
 }
 
 interface SessionStorageRefsPage {
@@ -372,6 +376,7 @@ export const readSessionStorageBlob = async ({
   signal,
   preferAnonymous = true,
   prompt,
+  anonymousOnly,
 }: ReadSessionStorageBlobOptions = {}): Promise<Response> => {
   const ref = normalizeStorageRef(storageRef, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE });
   if (!ref || ref.backend !== STORAGE_BACKENDS.CLOUDFLARE) throw new Error('Cloudflare storageRef is required.');
@@ -388,6 +393,7 @@ export const readSessionStorageBlob = async ({
       allowDemoFallback: defaultStrictAllowDemoFallback(),
       preferAnonymous,
       prompt,
+      ...(anonymousOnly ? { anonymousOnly } : {}),
     },
   );
   if (!response.ok) {
@@ -428,6 +434,7 @@ export const readSessionStorageBatch = async ({
   signal,
   preferAnonymous = true,
   prompt,
+  anonymousOnly,
 }: Omit<ReadSessionStorageBlobOptions, 'storageRef'> & { ids: string[] }): Promise<unknown[]> => {
   if (!ids.length || ids.length > STORAGE_READ_BATCH_MAX_IDS) throw new Error('A batch read takes 1 to 100 ids.');
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
@@ -447,6 +454,7 @@ export const readSessionStorageBatch = async ({
       allowDemoFallback: defaultStrictAllowDemoFallback(),
       preferAnonymous,
       prompt,
+      ...(anonymousOnly ? { anonymousOnly } : {}),
       anonymousRefused: batchNeedsSignIn,
     },
   );
@@ -478,6 +486,7 @@ export const readSessionStorageBatch = async ({
           signal,
           preferAnonymous,
           prompt,
+          anonymousOnly,
         });
         return parse(await single.text());
       }
@@ -502,6 +511,7 @@ export const listSessionStorageRefsPage = async ({
   signal,
   preferAnonymous = !ownResponses,
   prompt,
+  anonymousOnly,
 }: ListSessionStorageRefsPageOptions = {}): Promise<SessionStorageRefsPage> => {
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   const params = new URLSearchParams({ resource: toStr(resource).trim() || 'docsContext' });
@@ -523,6 +533,7 @@ export const listSessionStorageRefsPage = async ({
       allowDemoFallback: defaultStrictAllowDemoFallback(),
       preferAnonymous,
       prompt,
+      ...(anonymousOnly ? { anonymousOnly } : {}),
     },
   );
   const body = (await response.json().catch(() => ({}))) as UnknownRecord;
