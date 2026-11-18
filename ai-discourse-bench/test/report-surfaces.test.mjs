@@ -2395,7 +2395,9 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /data-testid="ce-risk-matrix-subgrid"/);
   assert.match(html, /class="subgridContainer detailGrid"/);
   assert.match(html, /data-testid="ce-risk-matrix-subcell-/);
-  assert.match(html, /Open a square to read its analysis\./);
+  // The grid's help sits beside its title, with no line of its own.
+  assert.doesNotMatch(html, /Open a square to read/);
+  assert.match(html, /<\/h3>\s*<details class="detailHelp"><summary aria-label="How to read this grid">/);
   // The detail grid names its axes, has a key, and says when a square is empty.
   assert.match(html, />Columns: [^<]+<\/div>/);
   assert.match(html, />Rows: [^<]+<\/div>/);

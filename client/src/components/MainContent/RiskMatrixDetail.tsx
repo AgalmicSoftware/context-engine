@@ -91,18 +91,15 @@ export default function RiskMatrixDetail(props: Props) {
         <h3 className={styles.sectionTitle}>
           {rows.name} x {columns.name}
         </h3>
-        <p className={styles.subgridSummary}>
-          {demo ? 'Open a square for its notes and linked atlas scenarios.' : 'Open a square to read its notes.'}{' '}
-          <button
-            type="button"
-            id={helpId}
-            className={styles.detailHelp}
-            aria-label="How to read this grid"
-            onClick={(event) => event.currentTarget.focus()}
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} />
-          </button>
-        </p>
+        <button
+          type="button"
+          id={helpId}
+          className={styles.detailHelp}
+          aria-label="How to read this grid"
+          onClick={(event) => event.currentTarget.focus()}
+        >
+          <FontAwesomeIcon icon={faQuestionCircle} />
+        </button>
         <CETooltip target={helpId} placement="bottom" trigger="hover focus" autohide={false}>
           Each column is a sub-section of {columns.name}; each row, a sub-section of {rows.name}. A square holds the
           notes on where the two meet. Each note is an opportunity or a risk at an intensity from 1 to 10; the number

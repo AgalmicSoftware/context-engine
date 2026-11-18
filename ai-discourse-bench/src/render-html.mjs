@@ -2720,11 +2720,9 @@ const renderRiskMatrix = (report) => {
   const subgridSection = (activeCategoryXEntry && activeCategoryYEntry) ? `<section class="riskMatrixSectionCard sectionCard" data-testid="ce-risk-matrix-subgrid">
     <div class="subgridHeader">
       <h3 class="riskMatrixSectionTitle sectionTitle">${escapeHtml(activeCategoryYEntry.name)} x ${escapeHtml(activeCategoryXEntry.name)}</h3>
-      <div class="subgridSummary">Open a square to read its analysis.
-        <details class="detailHelp"><summary aria-label="How to read this grid">?</summary>
-          <p>Each column is a sub-section of ${escapeHtml(activeCategoryXEntry.name)}; each row, a sub-section of ${escapeHtml(activeCategoryYEntry.name)}. A square holds the analysis of where the two meet. The number adds the opportunities and subtracts the risks.</p>
-        </details>
-      </div>
+      <details class="detailHelp"><summary aria-label="How to read this grid">?</summary>
+        <p>Each column is a sub-section of ${escapeHtml(activeCategoryXEntry.name)}; each row, a sub-section of ${escapeHtml(activeCategoryYEntry.name)}. A square holds the analysis of where the two meet. The number adds the opportunities and subtracts the risks.</p>
+      </details>
     </div>
     <ul class="detailLegend" aria-label="Key">
       <li><span class="detailSwatch detailSwatchOpportunity" aria-hidden="true"></span><strong>▲ +</strong> More opportunity</li>
@@ -4522,10 +4520,11 @@ export const renderHtmlReport = (inputReport) => {
     .popOutEffect { transform: translateY(-2px) scale(1.02); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28); }
     .riskMatrixCellValue { padding: 2px 8px; border-radius: var(--ce-radius-pill); background: #1f234f; color: rgba(244, 247, 255, 0.96); font-size: 1.2rem; font-weight: 700; letter-spacing: 0.02em; }
     .riskMatrixCellMeta { color: rgba(190, 199, 230, 0.72); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
-    .subgridHeader { margin-bottom: 14px; }
+    .subgridHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
     .subgridSummary { margin: 8px 0 0; color: rgba(190, 199, 230, 0.82); font-size: 0.88rem; line-height: 1.5; }
     .subgridContainer { display: grid; gap: 8px; min-width: 100%; width: 100%; }
-    .detailHelp { display: inline-block; margin-left: 4px; }
+    .detailHelp { display: inline-block; }
+    .detailHelp[open] { flex-basis: 100%; }
     .detailHelp summary { display: inline-flex; align-items: center; justify-content: center; width: 1.4em; height: 1.4em; border: 1px solid rgba(190, 199, 230, 0.82); border-radius: 50%; color: rgba(244, 247, 255, 0.96); font-weight: 700; cursor: pointer; list-style: none; }
     .detailHelp summary::-webkit-details-marker { display: none; }
     .detailHelp summary:focus-visible { outline: 3px solid rgba(77, 255, 164, 0.7); outline-offset: 2px; }
