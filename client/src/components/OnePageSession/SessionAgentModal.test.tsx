@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
-import { dictationNeedsSignIn, dictationOffered, sessionEnded } from '../../domains/worker/sessionFeedbackPorts';
+import { dictationNeedsSignIn, dictationOffered, sessionEnded } from '../../domains/worker/sessionDictationPorts';
 import SessionAgentModal from './SessionAgentModal';
 import {
   askSessionAgent,
@@ -12,7 +12,7 @@ import {
   type SessionAgentStatus,
 } from './sessionAgentRequests';
 
-jest.mock('../../domains/worker/sessionFeedbackPorts', () => ({
+jest.mock('../../domains/worker/sessionDictationPorts', () => ({
   dictationOffered: jest.fn(),
   dictationNeedsSignIn: jest.fn(),
   sessionEnded: jest.fn(),

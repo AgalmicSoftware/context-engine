@@ -3,12 +3,11 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
+import { dictationOffered, sessionEnded } from '../../domains/worker/sessionDictationPorts';
 import {
   FEEDBACK_TEXT_MAX,
-  dictationOffered,
   feedbackOffered,
   feedbackWorkerRun,
-  sessionEnded,
   feedbackView,
   sendFeedback,
   type FeedbackDraft,

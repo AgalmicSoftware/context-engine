@@ -3,13 +3,13 @@ import { useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCircle, faMicrophone } from '@fortawesome/free-solid-svg-icons';
 
-import type { FeedbackOptions } from '../../domains/worker/sessionFeedbackPorts';
+import type { DictationOptions } from '../../domains/worker/sessionDictationPorts';
 import { RECORDING_STATUS, useWhisper } from '../../utilities/useWhisper';
 import CETooltip from '../Shared/CETooltip';
 import styles from './SessionDictation.module.scss';
 
 type Props = {
-  options: FeedbackOptions;
+  options: DictationOptions;
   onWords: (words: string) => void;
   /** Recording or writing down, during which sending would lose the words. */
   onBusy: (busy: boolean) => void;
