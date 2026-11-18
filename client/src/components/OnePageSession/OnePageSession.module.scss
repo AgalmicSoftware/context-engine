@@ -830,6 +830,20 @@
   }
 }
 
+// The group's session, on its page: underlined always, so it reads as a link where nothing hovers.
+.workerGroupSessionLink {
+  overflow-wrap: anywhere;
+  color: var(--ce-action-accent);
+  // The page's own link rule removes underlines.
+  text-decoration: underline !important;
+  text-transform: none !important;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--ce-action-accent);
+  }
+}
+
 .workerGroupDetailAddress {
   overflow-wrap: anywhere;
   font-family: var(--ce-font-mono);

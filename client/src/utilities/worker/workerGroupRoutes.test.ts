@@ -1,11 +1,27 @@
 import {
   buildWorkerGroupsPath,
+  buildWorkerSessionPath,
   readWorkerGroupIdFromHash,
   readWorkerGroupIdFromPath,
   readWorkerGroupSessionSlugFromSearch,
 } from './workerGroupRoutes';
 
 describe('workerGroupRoutes', () => {
+  it("links a group's page to its session, always with the session's Worker", () => {
+    // A listed session too: its plain link may be an event's entry link, which joins a group.
+    expect(buildWorkerSessionPath({ sessionSlug: 'eddy26', workerUrl: 'https://listed.example' })).toBe(
+      '/session/eddy26?worker=https%3A%2F%2Flisted.example',
+    );
+    expect(buildWorkerSessionPath({ sessionSlug: 'unlisted-one', workerUrl: 'https://w.example' })).toBe(
+      '/session/unlisted-one?worker=https%3A%2F%2Fw.example',
+    );
+    // Only a Worker's own address goes into the link: one carrying more (an invite, a path) is left out whole.
+    expect(
+      buildWorkerSessionPath({ sessionSlug: 'unlisted-one', workerUrl: 'https://w.example/join?invite=secret' }),
+    ).not.toContain('secret');
+    expect(buildWorkerSessionPath({ sessionSlug: '' })).toBe('');
+  });
+
   const legacyAddressGroupId = '0x1234567890abcdef1234567890abcdef12345678';
 
   it('builds a query-scoped list route and a path-scoped detail route', () => {
