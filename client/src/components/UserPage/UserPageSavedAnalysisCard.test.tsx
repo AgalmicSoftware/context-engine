@@ -1,15 +1,20 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import type { SavedAnalysisCard } from '@ce-shared/analysisCardSaved.mjs';
 import { fetchAnalysisCardPicture } from 'utilities/ai/aiClient.js';
-import { readSavedAnalysisCard, subscribeSavedAnalysisCards } from 'utilities/analysisCard/analysisCardSaved';
+import {
+  publishSavedAnalysisCard,
+  readSavedAnalysisCard,
+  subscribeSavedAnalysisCards,
+} from 'utilities/analysisCard/analysisCardSaved';
 
 import UserPageSavedAnalysisCard from './UserPageSavedAnalysisCard';
 
 jest.mock('utilities/ai/aiClient.js', () => ({ fetchAnalysisCardPicture: jest.fn() }));
 jest.mock('utilities/analysisCard/analysisCardSaved', () => ({
   readSavedAnalysisCard: jest.fn(),
+  publishSavedAnalysisCard: jest.fn(),
   subscribeSavedAnalysisCards: jest.fn(),
   formatSavedAnalysisCardDate: (savedAt: number) => `day ${savedAt}`,
 }));
@@ -25,6 +30,7 @@ jest.mock('./UserPageAnalysisCard', () => ({
 const mockedRead = jest.mocked(readSavedAnalysisCard);
 const mockedPicture = jest.mocked(fetchAnalysisCardPicture);
 const mockedSubscribe = jest.mocked(subscribeSavedAnalysisCards);
+const mockedPublish = jest.mocked(publishSavedAnalysisCard);
 const PERSON = '0x00000000000000000000000000000000000000aa';
 const VISITOR = '0x00000000000000000000000000000000000000bb';
 const CARD: SavedAnalysisCard = {
@@ -102,6 +108,30 @@ it('takes the card away at once when it is withdrawn on this page', async () => 
   mockedRead.mockResolvedValue({ status: 'withdrawn' });
   await act(async () => changed());
   await waitFor(() => expect(container.innerHTML).toBe(''));
+});
+
+it('on my own page takes the card off without a new one, and says when it could not', async () => {
+  mockedRead.mockResolvedValue({ status: 'ready', card: CARD, savedAt: 9 });
+  mockedPublish.mockRejectedValueOnce(new Error('card_store_unavailable'));
+  const { container } = show({ account: PERSON });
+  fireEvent.click(await screen.findByRole('button', { name: 'Take it off my page' }));
+  expect(mockedPublish).toHaveBeenCalledWith(PERSON, false, null, OPTIONS);
+  await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/could not be taken off/));
+
+  mockedPublish.mockImplementationOnce(async () => {
+    mockedRead.mockResolvedValue({ status: 'withdrawn' });
+    changed();
+    return { status: 'withdrawn' };
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Take it off my page' }));
+  await waitFor(() => expect(container.innerHTML).toBe(''));
+});
+
+it("offers no way to take someone else's card off", async () => {
+  mockedRead.mockResolvedValue({ status: 'ready', card: CARD, savedAt: 9 });
+  show();
+  await screen.findByTestId('analysis-card');
+  expect(screen.queryByRole('button', { name: 'Take it off my page' })).toBeNull();
 });
 
 it('shows nothing of the last person or sign-in while the next one loads', async () => {

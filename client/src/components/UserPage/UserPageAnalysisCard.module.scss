@@ -120,3 +120,29 @@
   text-align: center;
   color: var(--ce-document-text-muted);
 }
+
+// "Take it off my page", under my own saved card.
+.takeOff {
+  margin-top: 8px;
+  text-align: center;
+
+  button {
+    min-height: 40px;
+    border: 1px solid var(--ce-document-border);
+    border-radius: var(--ce-radius-8);
+    background: transparent;
+    color: var(--ce-document-text);
+    font: inherit;
+    font-weight: 600;
+    padding: 8px 14px;
+
+    &:disabled {
+      opacity: 0.6;
+    }
+  }
+
+  p {
+    margin: 6px 0 0;
+    color: var(--ce-document-text);
+  }
+}
