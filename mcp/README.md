@@ -241,6 +241,19 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.6.0
+
+- Where a session keeps names (a Worker advertising `session_names_v1`, Context
+  Engine 0.9.17 or later), the display name is saved in the session on
+  `join_session` and with `set_profile`, and both report the saved name.
+  Answers there no longer carry the name. On an older Worker the name still
+  travels in each answer.
+- `get_results`: a partial result's `next` says its counts are not the
+  session's totals, why, and how to read the rest. Answers list up to 500 a
+  page where the Worker allows it.
+- `ask_session_agent`'s reply gains `chat`, one sentence to pass on with the
+  answer, saying whether the question and answer were stored.
+
 ## Upgrading to 0.5.1
 
 - `answer` tells a mistyped question id from a locked one. An id that matches
