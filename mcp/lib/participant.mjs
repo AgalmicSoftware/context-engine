@@ -10,7 +10,9 @@ import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorage
 import { htmlToPlainText, normalizeSessionContext } from '../../shared/sessionContext.mjs';
 import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
 import { MAX_AGENT_INSTRUCTIONS_CHARS } from '../../shared/sessionConfigEdits.mjs';
-import { CONTEXT_AGENT_ADDER, CONTEXT_FILE_TYPES, CONTEXT_SOURCE_LIMITS, agentAdderName, contextCardsOn, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import {
+  CONTEXT_AGENT_ADDER, CONTEXT_FILE_TYPES, CONTEXT_SOURCE_LIMITS, agentAdderName, contextCardsOn, contextFileIsReadByAi, participantsMayAddContext,
+} from '../../shared/sessionContextSources.mjs';
 import { buildNote, checkContextLink, contextInvitation, contextUploadForm, readContextFile, workerReadsContext } from './contextAdditions.mjs';
 import {
   CONTEXT_DATA_NOTE, CONTEXT_LIST_MAX, contextEntries, contextEntryMatches, contextTextOf, contextTextPart, publicContextEntry,
@@ -99,6 +101,11 @@ const CONTEXT_ADMINS_ONLY = 'This session limits context to its admins, so nothi
 const CONTEXT_ENDED = 'This session has ended, so it takes no more context.';
 // A session's loader reads at most a few hundred context rows; a list past this is said to be partial.
 const MAX_CONTEXT_ROWS = 1000;
+// The Worker gives its AI three minutes to read a file; the tool call waits a part of that
+// and says the reading goes on, so a host that gives a call a minute still gets its answer.
+const CONTEXT_READ_TIMEOUT_MS = 200_000;
+const CONTEXT_READ_WAIT_MS = 40_000;
+const CONTEXT_NOT_READ = 'Not read by the session’s AI, so it gives the AI no text yet. A session admin can have it read.';
 const NO_CONTEXT_SOURCES = 'This session keeps no context files or links where an agent can list them.';
 const CONTEXT_NO_LINKS = 'This session’s Worker doesn’t take links from participants yet. You can add a file or text.';
 const CONTEXT_NO_FETCH = 'This session doesn’t let you have its Worker fetch pages, so it takes no links from you. You can add a file or text.';
@@ -433,7 +440,7 @@ const progressNotes = (questions, mine) => ({
 });
 
 export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), sbt = null, createProvider, sleep, registry = {},
-  ownAnswerWaitMs = OWN_ANSWER_WAIT_MS }) => {
+  ownAnswerWaitMs = OWN_ANSWER_WAIT_MS, contextReadWaitMs = CONTEXT_READ_WAIT_MS }) => {
   const requestTestEth = createTestEthRequester({ config, wallet, createProvider, now, sleep });
   const sessions = new Map(); // key -> { info, client, records: Map(storageId -> payload), missing: Map(storageId -> time) }
   let state = null;
@@ -546,6 +553,26 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   };
   // The Worker fetches a participant's link only with their fetch scope.
   const mayAddLinks = (ctx, sessionConfig) => isSessionAdmin(ctx, sessionConfig) || ctx.client.tokenClaims?.scopes?.fetch === true;
+
+  // A PDF or image gives the session's AI no text until it is read. Where the session lets
+  // whoever added one ask for that, the agent does, once. The reading goes on at the Worker
+  // if this call stops waiting, so it is never given the call's own signal.
+  const analyzeAdded = async (ctx, sessionConfig, id, wanted) => {
+    if (wanted === false || !id) return CONTEXT_NOT_READ;
+    if (!isSessionAdmin(ctx, sessionConfig) && !contextCardsOn(sessionConfig)) return CONTEXT_NOT_READ;
+    const reading = ctx.client.contextAction({ action: 'read-pdf', id }, { timeoutMs: CONTEXT_READ_TIMEOUT_MS })
+      .then((result) => ({ result }), (error) => ({ error }));
+    let timer = null;
+    const waited = await Promise.race([
+      reading,
+      new Promise((resolve) => { timer = setTimeout(() => resolve(null), contextReadWaitMs); }),
+    ]);
+    clearTimeout(timer);
+    if (!waited) return 'The session’s AI is still reading it, which can take a few minutes. list_context shows readByAi once it has.';
+    if (waited.error) return `Added, but the session’s AI did not read it: ${describeError(waited.error)} A session admin can have it read.`;
+    const chars = Number(waited.result?.text?.chars) || 0;
+    return `Read by the session’s AI${chars ? ` (${chars.toLocaleString('en-US')} characters)` : ''}. Its text is now context for whoever can see the file, and it counted as one of your AI uses today.`;
+  };
 
   // The session's context sources as the Worker lists them for this agent.
   const listContextEntries = async (ctx) => {
@@ -1615,13 +1642,14 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       return { session: ctx.info.slug, leftGroup: id };
     },
 
-    async addContext({ session, file, url, text: note, title, adminsOnly = false, groups } = {}) {
+    async addContext({ session, file, url, text: note, title, adminsOnly = false, groups, analyze } = {}) {
       const given = { file, url, text: note };
       const chosen = Object.keys(given).filter((key) => given[key] !== undefined && given[key] !== '');
       if (chosen.length !== 1) throw new Error('Pass exactly one of file, url or text.');
       const [kind] = chosen;
       if (kind === 'file' && title !== undefined) throw new Error('A file keeps its own name; pass title only with url or text.');
       if (adminsOnly !== undefined && typeof adminsOnly !== 'boolean') throw new Error('adminsOnly must be true or false.');
+      if (analyze !== undefined && typeof analyze !== 'boolean') throw new Error('analyze must be true or false.');
       // The website's "Visible to": the members of any of these groups, and the admins.
       if (groups !== undefined && (!Array.isArray(groups) || groups.some((id) => typeof id !== 'string'))) {
         throw new Error('groups must be a list of group IDs.');
@@ -1685,7 +1713,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         const upload = kind === 'file' ? await readContextFile(file, { stateDir: config.stateDir }) : buildNote({ text: note, title });
         checkpoint();
         const storageRef = await ctx.client.uploadForm(contextUploadForm(upload, { adminsOnly, groupIds, adderName }), { signal });
-        return { session: ctx.info.slug, added: kind, id: text(storageRef?.id), name: upload.name, visibleTo };
+        const id = text(storageRef?.id);
+        // The file is added whatever becomes of its reading.
+        const analysis = contextFileIsReadByAi(upload.contentType) ? await analyzeAdded(ctx, sessionConfig, id, analyze) : '';
+        return { session: ctx.info.slug, added: kind, id, name: upload.name, visibleTo, ...(analysis ? { analysis } : {}) };
       } catch (error) {
         throw contextRefusal(error, { olderLink: kind === 'url' && featuresUnread });
       }

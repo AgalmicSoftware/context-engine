@@ -190,7 +190,7 @@ export const buildTools = (participant) => [
     name: 'add_context',
     title: 'Add context',
     description:
-      'Add context to a hosted session, when it invites you to: exactly one of file (a local PDF, PNG, JPEG or WebP image, Markdown, plain text, CSV or JSON file), url (a public https:// page the Session Worker reads now, where the invitation offers a link) or text (stored as a Markdown file). Everyone in the session sees it, unless adminsOnly is true or groups names some of the session’s groups; then the members of any one of those groups see it, and the admins always do. It is marked as added by an agent, under your display name. Add no private or personal data.',
+      'Add context to a hosted session, when it invites you to: exactly one of file (a local PDF, PNG, JPEG or WebP image, Markdown, plain text, CSV or JSON file), url (a public https:// page the Session Worker reads now, where the invitation offers a link) or text (stored as a Markdown file). Everyone in the session sees it, unless adminsOnly is true or groups names some of the session’s groups; then the members of any one of those groups see it, and the admins always do. It is marked as added by an agent, under your display name. A PDF or image has no text until the session’s AI reads it: where the session lets whoever adds one ask for that, this does so once, which counts as one of your AI uses for the day, and analysis says what came of it. Add no private or personal data.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -200,6 +200,7 @@ export const buildTools = (participant) => [
         text: text('Text to add, in Markdown.'),
         title: text('Optional title for a link or text (up to 120 characters).'),
         adminsOnly: { type: 'boolean', description: 'Show it to the session’s admins alone (default false).' },
+        analyze: { type: 'boolean', description: 'For a PDF or image: have the session’s AI read it, where the session allows (default true). False adds it unread.' },
         groups: {
           type: 'array',
           items: { type: 'string' },

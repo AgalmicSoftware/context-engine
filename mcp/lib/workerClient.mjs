@@ -202,7 +202,7 @@ export const createWorkerClient = ({
 
   // `body` is sent as JSON; `form`, a FormData, as multipart.
   // `raw` returns the response's text as it is, for a stored file; otherwise JSON is parsed.
-  const request = async (path, { method = 'GET', headers = {}, body, form, auth = false, retried = false, busyRetries = 0, maxBytes = MAX_RESPONSE_BYTES, signal, raw: asText = false } = {}) => {
+  const request = async (path, { method = 'GET', headers = {}, body, form, auth = false, retried = false, busyRetries = 0, maxBytes = MAX_RESPONSE_BYTES, signal, raw: asText = false, timeoutMs = REQUEST_TIMEOUT_MS } = {}) => {
     const checkpoint = () => { if (signal?.aborted) throw new Error('Stopped before the Worker request was sent.'); };
     checkpoint();
     if (auth) await ensureToken();
@@ -220,7 +220,7 @@ export const createWorkerClient = ({
           ...headers,
         },
         ...(form ? { body: form } : body === undefined ? {} : { body: JSON.stringify(body) }),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
       throw new WorkerRequestError(`Could not reach the Worker (${text(error?.cause?.code) || text(error?.name) || 'network error'}).`);
@@ -239,13 +239,13 @@ export const createWorkerClient = ({
     if (isRetryableBusy(response.status, data) && !form &&
         busyRetries < COORDINATOR_RETRY_DELAYS_MS.length && replaySafe(path, method, body)) {
       await waitBeforeRetry(busyRetries, signal);
-      return request(path, { method, headers, body, form, auth, retried, busyRetries: busyRetries + 1, maxBytes, signal, raw: asText });
+      return request(path, { method, headers, body, form, auth, retried, busyRetries: busyRetries + 1, maxBytes, signal, raw: asText, timeoutMs });
     }
     if (response.status === 401 && auth && !retried && (!error || TOKEN_ERROR_RE.test(error))) {
       token = '';
       // A sign-in ended by an admin's change: the config the agent holds may be out of date too.
       configLoadedAt = 0;
-      return request(path, { method, headers, body, form, auth, retried: true, busyRetries, maxBytes, signal, raw: asText });
+      return request(path, { method, headers, body, form, auth, retried: true, busyRetries, maxBytes, signal, raw: asText, timeoutMs });
     }
     if (response.status === 401 && error && !TOKEN_ERROR_RE.test(error)) {
       throw new WorkerRequestError(error.slice(0, MAX_ERROR_DETAIL), { status: 401, code: error });
@@ -433,7 +433,9 @@ export const createWorkerClient = ({
     return isRecord(result?.storageRef) ? result.storageRef : { id: text(result?.id) };
   };
 
-  const contextAction = (body, { signal } = {}) => request('/storage/context', { method: 'POST', auth: true, signal, body });
+  // `timeoutMs` for the one action that outlasts an ordinary request: the session's AI reading a file.
+  const contextAction = (body, { signal, timeoutMs } = {}) =>
+    request('/storage/context', { method: 'POST', auth: true, signal, body, ...(timeoutMs ? { timeoutMs } : {}) });
 
   /** A stored context file's text as it is stored: a text file, the AI's reading of a PDF or image, or a link's record. */
   const readContextText = (id, { signal } = {}) =>
