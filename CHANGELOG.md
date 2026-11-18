@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.16] - 2026-11-18
+
 ## [0.9.15] - 2026-11-17
 
 No change to the Session Worker or the MCP: no Worker needs redeploying, and nothing is published to npm.
