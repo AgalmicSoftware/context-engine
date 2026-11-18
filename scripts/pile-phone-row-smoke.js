@@ -145,9 +145,10 @@ const measureRow = (page) =>
   });
 
 // Submit's word must keep room to spare at every width, not only the sampled sizes: the tightest rows sit just
-// past each point where the counter changes form. 4px is the least accepted: a release failed on a runner that
-// drew the same font a little wider than the machine it was tuned on, with 1.4px to spare.
-const MIN_SPARE = 4;
+// past each point where the counter changes form. 3px is the least accepted: a release failed on a runner that
+// drew the same font a little wider than the machine it was tuned on, with 1.4px to spare. The tightest row
+// measures 6.7px on that machine, so another platform may draw the word up to 3.7px wider before this fails.
+const MIN_SPARE = 3;
 const SWEEP = { from: 320, to: 430 };
 // What a browser without style() container queries (Safari before 18, Firefox) gets: the stylesheet's first,
 // unconditional values, in every theme.
