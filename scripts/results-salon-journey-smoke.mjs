@@ -110,13 +110,13 @@ const runSalon = async (engineName) => {
     await assertNoSidewaysScroll(page, 'Results');
     assert.deepEqual(pageErrors, [], 'No page errors while Results loaded');
 
-    // What that load cost. Twenty pages of a hundred answers, read in batches of a hundred. Just after a
-    // sign-in the client reads its first few batches before its sign-in is attached and reads them again, so
-    // the batch allowance is wider than the page count; lower it when that second read goes.
+    // What that load cost. Twenty pages of a hundred answers, read in batches of a hundred; the load takes a
+    // few batches more than its pages. A client that sends batches before its sign-in is attached has them
+    // refused and reads them again, about five more, which this allowance does not cover.
     const pages = Math.ceil((PEOPLE * STATEMENTS) / PAGE);
     const batches = opened.browserRequests.filter(({ path }) => path === '/storage/read-batch');
     const answerLists = opened.browserRequests.filter(({ path, search }) => path === '/storage/list' && search.includes('resource=responses'));
-    assert.ok(batches.length <= pages + 10, `Results read its answers in ${batches.length} batches (at most ${pages + 10})`);
+    assert.ok(batches.length <= pages + 4, `Results read its answers in ${batches.length} batches (at most ${pages + 4})`);
     assert.ok(answerLists.length <= pages + 5, `Results listed its answers in ${answerLists.length} pages (at most ${pages + 5})`);
     assertNoHiddenFaults(session, opened.browserRequests, 'A member\'s Results');
     // Reading must overlap: batches while later pages are still being listed, and items within a batch.
