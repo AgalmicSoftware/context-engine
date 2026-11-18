@@ -860,13 +860,17 @@ Authenticated clients can use the worker as the session storage boundary:
   groups as a file's lock does, not with `adminsOnly` (`400 context_policy_unsupported`, before any fetch);
   Workers that take it advertise `context_link_groups_v1`, and the reply's `source` carries `adminsOnly` and
   `lockedGroupIds`;
-  `{ action: "read-pdf", id }` sends a context PDF to the session's own Claude or OpenAI model and stores the
+  `{ action: "read-pdf", id }` sends a context PDF or image to the session's own Claude or OpenAI model and stores the
   returned text beside it with the same privacy; `{ action: "remove", id }` deletes a context source and that
-  text. A PDF has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the
-  session coordinator applies finished readings and removals one at a time, so a removed PDF stays removed and
+  text. Where `contextCardsEnabled` is `true`, whoever added a PDF or image may send `read-pdf` for it once, while it has
+  no reading, `contextAdditionPolicy` isn't `admin_only` and the session hasn't ended: it needs the token's `ai`
+  scope (`403 context_read_ai_denied`) and counts as one AI call against `limits.aiPerWalletPerDay`, counted only
+  once nothing else refuses (`429` over the limit); a second reading, or anyone else's file, is
+  `403 context_admin_required`. A file has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the
+  session coordinator applies finished readings and removals one at a time, so a removed file stays removed and
   a reading never replaces a newer one. Uploads with a context role on `/storage/upload` must come from someone
-  signed in (an admin, or anyone while `contextAdditionPolicy` isn't `admin_only`), be a PDF (20 MB) or text file
-  (1 MB), carry no access rule other than admins-only or a lock to at most 20 of the session's groups, whose
+  signed in (an admin, or anyone while `contextAdditionPolicy` isn't `admin_only`), be a PDF (20 MB), a PNG, JPEG or
+  WebP image (5 MB) or a text file (1 MB), carry no access rule other than admins-only or a lock to at most 20 of the session's groups, whose
   members may each read it, and be readable by the Worker. The session
   coordinator publishes each context item only while its uploader may still add it, so a link, PDF reading or upload
   that finishes after that admin was replaced, or after participants were limited, returns `409` and is not listed; a content-only settings edit
@@ -874,8 +878,10 @@ Authenticated clients can use the worker as the session storage boundary:
   removes a source's card (admins for any source; anyone else for one they added, while `contextAdditionPolicy`
   isn't `admin_only` and the session hasn't ended; `400 context_card_invalid` for
   an empty card, `409 context_card_unsupported` for an item stored encrypted), and `{ action: "make-card", id }`
-  has the session's AI write it (admins only; `409 context_card_no_text` for a PDF not yet read, `502` when the
-  AI gives no usable card). Workers that keep cards advertise `context_cards_v1`. See
+  has the session's AI write it (admins only; `409 context_card_no_text` for a PDF or image not yet read, `502` when the
+  AI gives no usable card). Both are `409 context_cards_off` unless the session's `contextCardsEnabled` is `true`;
+  while it is not, no card is made on an add, and `/storage/list` returns none. Workers that keep cards advertise
+  `context_cards_v1`. See
   [Session context](session-context-sources.md).
 - `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` needs a session configured for Cloudflare storage: an unencrypted request for it on a session with no backend or plain `arweave` gets `400`, while a `lit-arweave` session or an encrypted payload uses Arweave instead. It writes blobs to R2 and authorization metadata/index rows to KV when R2 is available. An R2 deployment's index KV must have both `get` and `put`; otherwise upload returns `501` before any R2 write. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
   - Worker-canonical participant submissions preserve the verified session
@@ -2831,7 +2837,7 @@ Never return secrets in responses.
   `appearance`, `sessionHeaderImg`, `contextAdditionPolicy`,
   `resultsAdminAddresses`, every interview setting (`interviewModeEnabled` and
   all of `interviewMode`, which each interview request reads afresh),
-  `sessionAgent`, `groupMemberCeiling`, `feedbackEnabled` and `namesEnabled` (each read afresh
+  `sessionAgent`, `groupMemberCeiling`, `feedbackEnabled`, `namesEnabled` and `contextCardsEnabled` (each read afresh
   where it applies), and the curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior

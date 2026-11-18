@@ -49,12 +49,13 @@ Sources (`shared/sessionContextSources.mjs`):
 
 | | Limit |
 |---|---|
-| File types | PDF, Markdown, plain text, CSV, JSON |
+| File types | PDF; PNG, JPEG and WebP images; Markdown, plain text, CSV, JSON |
 | PDF | 20 MB |
+| Image | 5 MB |
 | Text file | 1 MB |
 | Link URL | 1,000 characters |
 | Page fetched for a link | 2 MB, then up to 100,000 characters of text |
-| Text the AI reads from a PDF | up to 100,000 characters |
+| Text the AI reads from a PDF or image | up to 100,000 characters |
 
 ## Adding and removing
 
@@ -69,13 +70,14 @@ for fetches as well as for storage. The Worker checks all this, and that
 whoever adds a link may add files to the session, before it fetches the page.
 Each source shows who added it, and a refreshed link keeps its adder. Whoever
 added a file or link may remove it, and admins may remove any source. Only admins refresh links
-and have the AI read a PDF, because those make the Worker fetch a page again or
+and have the AI read a file again, because those make the Worker fetch a page again or
 spend the session's AI key on an item already there; the Worker refuses anyone
-else.
+else. Where the session has [cards](#cards) on, whoever added a PDF or image
+may have the AI read it once (see [PDFs and images](#pdfs-and-images)).
 
 - **Setup (`/new`):** the Context section takes paragraphs, links and files.
   Files stay in the browser until **Create**; then **Add context to
-  the session** uploads them, has the session's AI read the PDFs marked
+  the session** uploads them, has the session's AI read the PDFs and images marked
   **Analyze with the session's AI**, and, unless unticked, reads each link's
   page for the AI. After a reload only the file names remain, to attach again.
 - **The session page's Context section**, when open, has **Add** and **View** in
@@ -93,11 +95,11 @@ else.
 - **Settings (`/session/<slug>/settings`)** and **the session page's Context
   section** (for admins) list the sources with their privacy and what the AI
   has of each. **Add a link**, **Add a file**, **Refresh** (a link),
-  **Read with AI** (a PDF) and **Remove** apply at once; they are not part of
-  **Save**. Removing a PDF also removes the AI's reading of it.
+  **Read with AI** (a PDF or image) and **Remove** apply at once; they are not part of
+  **Save**. Removing a file also removes the AI's reading of it.
 
 Files go through `POST /storage/upload` with the tags `CE-DocRole: context`
-and `CE-DocKind: file`. Links and PDF readings go through `POST /storage/context`
+and `CE-DocKind: file`. Links and the AI's readings go through `POST /storage/context`
 (see [the Worker's storage routes](session-cors-worker.md#session-storage-routes)),
 so every link snapshot is one the Worker fetched.
 
@@ -143,11 +145,12 @@ snapshot is withdrawn and the link stays as it was. The same checks
 apply to `fetch_url` and `fetch_image`, which question generation and image
 links use, so an `http://`, IP-address or local link is refused there too.
 
-## PDFs
+## PDFs and images
 
-No PDF library is involved. With **Analyze with the session's AI**, the Worker
-sends the PDF to the session's own AI provider with the session's key, which
-never leaves the Worker:
+A PDF or an image has no text of its own, so what the AI is given of it is the
+session's AI's **reading** of it. No PDF or image library is involved. With
+**Analyze with the session's AI**, the Worker sends the file to the session's
+own AI provider with the session's key, which never leaves the Worker:
 
 - Claude: a user message whose first content block is
   `{ "type": "document", "source": { "type": "base64", "media_type": "application/pdf", "data": "…" } }`,
@@ -155,10 +158,33 @@ never leaves the Worker:
 - OpenAI: the Responses API's `input_file` part with a
   `data:application/pdf;base64,…` URL, followed by `input_text`.
 
-Other providers are refused. The returned text is stored beside the PDF,
-tagged `CE-DocRole: context-text` with the model and date, and the page shows
-it as **Read by AI**. Unticked, the PDF is stored and listed but gives the AI
-no text; **Read with AI** reads it later.
+An image (PNG, JPEG or WebP, up to 5 MB; an SVG can carry script and only the
+first frame of an animation would be read, so neither is taken) goes the same
+way: Claude gets an `image` block with the same `base64` source, OpenAI an
+`input_image` part with a `data:<type>;base64,…` URL. Its instruction asks for
+any words in the image, as written, and then what it shows: a chart's title,
+axes and figures, a diagram's parts, what a photo is of. The Worker stores and
+forwards an image's bytes and never decodes them.
+
+Other providers are refused. The returned text is stored beside the file
+under the file's own access rule, tagged `CE-DocRole: context-text` with the
+model and date, and the page shows it as **Read by AI**. So the reading is
+context for exactly the people, and the AI calls, that may see the file.
+Unticked, the file is stored and listed but gives the AI no text;
+**Read with AI** reads it later.
+
+**Who may have a file read.** Admins, any PDF or image, as often as they ask.
+Where the session has [cards](#cards) on, whoever added a PDF or image may
+also have it read, once: `POST /storage/context { action: 'read-pdf', id }`
+from its adder is taken while the file has no reading, the session still takes
+context from participants and has not ended. It needs the `ai` scope of their
+sign-in and counts as one of their AI calls for the day
+(`limits.aiPerWalletPerDay`), counted only once nothing else refuses. The
+adder need not be able to read the file themselves: an admins-only file's
+reading is stored for admins, and the reply says only how long it is. The
+session page offers this as **Analyze with the session's AI** when they add the
+file, and the Context Engine MCP asks for it after `add_context`. A reading
+can cost far more than a card: a long PDF is many thousands of tokens.
 
 ## Cards
 
@@ -166,6 +192,15 @@ A source's **card** says what it is about: a summary of up to 300 characters,
 up to 6 topic tags (lowercase words, 32 characters each) and up to 6 key names
 (40 characters each), about a kilobyte at most. Workers that keep cards
 advertise `context_cards_v1`.
+
+**Cards are off unless an admin turns them on**: **Context cards** in a
+session's Settings, under Context (`contextCardsEnabled`, off when unset; the
+setting is offered only where the Worker keeps cards, and changing it signs no
+one out). While off, no card is made, written, listed or given to an AI, so
+the session's prompts are exactly those of a session without cards, and only
+admins can have a PDF or image read. Cards written while it was on stay stored
+and show again when it is turned back on. A card a person wrote is still
+carried over when its link is refreshed.
 
 - **Where it lives.** On the source's own doc-library row, beside its tags.
   `/storage/list` returns it as `metadata.card` on the rows it lists to the
@@ -175,8 +210,8 @@ advertise `context_cards_v1`.
   than the source. A PDF's card sits on the PDF's row, not its reading's. The
   row's key-list entry never holds the card.
 - **When it is made.** Once, when the source is added: for a link, from the
-  page just read; for a text file, from its bytes; for a PDF, from the text the
-  session's AI read. The card-maker is one short call (`taskType`
+  page just read; for a text file, from its bytes; for a PDF or an image, from the text the
+  session's AI read of it. The card-maker is one short call (`taskType`
   `context-card`, at most 1,500 output tokens) to the session's fast model on
   the session's key, reading the first 12,000 characters, or fewer where the
   text takes more bytes or escapes long (what is sent is at most 16,000 bytes),
@@ -201,7 +236,7 @@ advertise `context_cards_v1`.
   password is refused. A card records who wrote it (`by`: `ai`, `admin` or
   `adder`) and when.
   The AI never replaces a card a person wrote, not on a link's refresh (which
-  carries the card over) and not on a PDF's re-read.
+  carries the card over) and not when a file is read again.
 - **Making missing ones.** `{ action: 'make-card', id }` has the session's AI
   write the card of a source without one; admins only, as it is a call on the
   session's key. The page's **Make missing cards** button shows how many
