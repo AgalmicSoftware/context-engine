@@ -271,13 +271,13 @@ const gatherMaterial = async ({ env, slug, config, setting, address, scopes, ask
   ]);
   return {
     material: {
-      sessionContext: config?.sessionContext, sources: context.sources, results: results.text, resultsQuestions: results.questions,
+      sessionContext: config?.sessionContext, sources: context.sources, notRead: context.notRead, results: results.text, resultsQuestions: results.questions,
       answers: answers?.groups || [],
     },
     answersUnavailable: UNAVAILABLE.get(answers) || answers === null,
     contextLeftOut: context.leftOut,
     // The groups whose locked files this answer may draw on.
-    lockedTo: [...new Set(context.sources.filter((source) => !source.everyone).flatMap((source) => source.groupIds))].sort(),
+    lockedTo: [...new Set([...context.sources, ...context.notRead].filter((source) => !source.everyone).flatMap((source) => source.groupIds))].sort(),
   };
 };
 
