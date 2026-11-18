@@ -190,3 +190,11 @@ it('fades a phone choice list where more options are', () => {
   expect(css).toMatch(/\[data-list-cue=start\],[^{]*\[data-list-cue=middle\]\s*\{\s*--pile-list-fade-bottom:/);
   expect(css).toMatch(/\[data-list-cue=middle\],[^{]*\[data-list-cue=end\]\s*\{\s*--pile-list-fade-top:/);
 });
+
+// The options spread apart by what usePileHalfRowCut measures, so a long list fills its room and still ends
+// partway through an option; a fixed gap left a blank band under it.
+it('lets a phone choice list spread its options to fill the card', () => {
+  expect(css).toMatch(
+    /\.pileCardInner \.multichoiceQuestionContainer #multiChoice\s*\{[^}]*flex-direction: column;[^}]*gap: calc\(8px \+ var\(--pile-list-row-spread, 0px\)\);/,
+  );
+});
