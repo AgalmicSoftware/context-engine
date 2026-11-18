@@ -21,6 +21,7 @@ export type WorkerResponseHydrationLoader = (options: {
   onListed?: (storageRefIds: ReadonlySet<string>) => void;
   onRows?: (rows: WorkerCanonicalResponseRow[], progress: WorkerResponseLoadProgress) => void;
   ownResponses?: boolean;
+  signal?: AbortSignal;
 }) => Promise<WorkerCanonicalResponseRow[]>;
 
 // How often rows that have landed are merged in while a load runs, so Results fill in as answers arrive.
@@ -191,7 +192,15 @@ export const hydrateWorkerCanonicalResponses = async ({
       // A failed mid-load merge is retried by the final one, which reports its own failure.
       .catch(() => {});
   };
+  // A load whose reader or session changed while it ran is stale: nothing it reads is kept. It stops at the next
+  // rows it reports, rather than read every answer to the end beside the load that replaced it (someone signing in
+  // while a public session's answers load started a second full read).
+  const stale = new AbortController();
   const onRows = (landed: WorkerCanonicalResponseRow[], progress: WorkerResponseLoadProgress) => {
+    if (shouldStop()) {
+      stale.abort();
+      return;
+    }
     unmerged.push(...landed);
     lastProgress = progress;
     if (!progressTimer) progressTimer = setTimeout(mergeProgress, mergedOnce ? PROGRESS_MERGE_MS : 0);
@@ -223,6 +232,7 @@ export const hydrateWorkerCanonicalResponses = async ({
           listedStorageRefIds = storageRefIds;
         },
         onRows,
+        signal: stale.signal,
       });
     let rows = await load(new Set([...cachedStorageRefIds].filter((refId) => !strippedRefIds.has(refId))), startCursor);
     if (shouldStop()) return;
@@ -284,6 +294,8 @@ export const hydrateWorkerCanonicalResponses = async ({
     markReady(partial);
   } catch (error) {
     await stopProgress();
+    // Stopped here because it was stale: not a failure, and the load that replaced it reports for itself.
+    if (stale.signal.aborted) return;
     // Say the load failed, so Results offer a retry instead of spinning; what was merged stays shown.
     if (!shouldStop()) {
       const marked = await updateQuestionsCacheAtomic((current) => {
