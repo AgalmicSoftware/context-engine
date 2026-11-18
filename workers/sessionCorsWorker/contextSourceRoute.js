@@ -20,7 +20,7 @@ import { contextCardContent } from '../../shared/contextCards.mjs';
 import { looksSecret } from '../../shared/secretText.mjs';
 import { resolveSessionLifecycle } from '../shared/sessionLifecycle.mjs';
 import { cardAfterContextAdd, makeContextCard, readContextCardText, setContextCard } from './contextCard.js';
-import { readFileWithSessionAi } from './contextDocumentRead.js';
+import { prepareFileRead, readFileWithSessionAi } from './contextDocumentRead.js';
 import { contextCardOf, mayHaveContextCard } from './contextSourcePolicy.js';
 import { fetchContextSnapshotText } from './fetchExecution.js';
 import {
@@ -221,14 +221,13 @@ export const finishContextPdfReading = async ({ env, slug, pdfId, readingId, rea
 };
 
 // The session's AI reads the PDF or image; its text is stored beside it with the same privacy.
-const readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, json, now }) => {
+const readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, json, now, secrets }) => {
   const noun = contextFileNoun(pdf.contentType);
   const bytes = await readContextSourceBytes({
     env, config, slug, metadata: pdf, maxBytes: contextFileByteLimit(pdf.contentType), principal: admin, deps,
   });
   if (!bytes) return { response: json({ error: `That ${noun} is no longer in the session.` }, 404) };
   const name = contextTagValue(pdf.tags, TAGS.name) || (noun === 'PDF' ? 'document.pdf' : 'image');
-  const secrets = (await deps?.getSessionSecrets?.(env, slug)) || {};
   const read = await readFileWithSessionAi({
     config, secrets, bytes, filename: name, contentType: pdf.contentType, deps: { fetch: deps?.fetch, readTimeoutMs: deps?.readTimeoutMs },
   });
@@ -256,23 +255,30 @@ const readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, jso
 };
 
 // A PDF or an image: one reading at a time, replacing any earlier reading. A second read
-// while one runs is refused rather than paying for the same read twice.
-const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now }) => {
+// while one runs is refused rather than paying for the same read twice. An adder's reading
+// (not an admin's) is their one, granted by the session coordinator, and `countAi` counts it.
+const readPdf = async ({ body, env, config, slug, admin, isAdmin, deps, store, json, now, countAi }) => {
   const pdf = await readContextSourceRow({ env, slug, id: body.id });
   if (!pdf || contextRoleOf(pdf.tags) !== CONTEXT_ROLE || !contextFileIsReadByAi(pdf.contentType)) {
     return json({ error: 'That PDF or image is no longer in the session.' }, 404);
   }
-  if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
+  // Refusals that call no provider come before the reading is begun or counted.
+  const secrets = (await deps?.getSessionSecrets?.(env, slug)) || {};
+  const ready = prepareFileRead({ config, secrets, contentType: pdf.contentType });
+  if (!ready.ok) return json({ error: ready.error, reason: ready.reason }, ready.status);
   if (Number(pdf.size) > contextFileByteLimit(pdf.contentType)) {
     return json({ error: `This ${contextFileNoun(pdf.contentType)} is too large for the session’s AI to read.` }, 413);
   }
-  const begun = await coordinate(deps, { env, slug, operation: 'begin-read', id: pdf.id });
+  // The coordinator knows of every reading stored, even one the file's row doesn't show yet.
+  const begun = await coordinate(deps, { env, slug, operation: 'begin-read', id: pdf.id, ...(isAdmin ? {} : { once: true }) });
   if (!begun.ok) return json(begun.body, begun.status);
   const end = (reading = {}) => coordinate(deps, { env, slug, operation: 'end-read', id: pdf.id, token: begun.body.token,
     ...(reading.id ? { readingId: reading.id, readAt: reading.readAt } : {}) });
   let reading;
   try {
-    reading = await readAndStorePdf({ pdf, env, config, slug, admin, deps, store, json, now });
+    // An adder's reading is counted only once it has begun; a refused count frees the file.
+    const refused = isAdmin ? null : await countAi();
+    reading = refused ? { response: refused } : await readAndStorePdf({ pdf, env, config, slug, admin, deps, store, json, now, secrets });
   } catch (error) {
     await end();
     throw error;
@@ -404,6 +410,7 @@ export const contextSourceRoute = async ({
       if (!fetchAccess?.ok) return fetchAccess?.response || json({ error: 'Fetch access could not be checked.' }, 403);
     }
   }
+  let countAi = null;
   if (!isAdmin && participantMay && name !== 'add-link') {
     // A row that can't be read proves nothing, so it removes nothing, and its card stays as it is.
     const row = await readContextSourceRow({ env, slug, id: body.id });
@@ -412,19 +419,23 @@ export const contextSourceRoute = async ({
     if (name === 'read-pdf') {
       if (!contextFileIsReadByAi(row.contentType)) return json({ error: 'That PDF or image is no longer in the session.' }, 404);
       // One reading for its adder. Another would spend the session's AI again on a file it has read.
+      // The coordinator refuses it too, where this row doesn't show its reading yet.
       if (row.contextReadingId) {
         return json({ error: 'The session’s AI has read this file. Only session admins can have it read again.', reason: 'context_admin_required' }, 403);
       }
       // It spends the session's AI for them, so it takes the AI scope of their sign-in and
-      // counts against their daily limit, as /ai does. Counted last, once nothing else refuses.
+      // counts against their daily limit, as /ai does: counted once the reading has begun.
       if (authScopes?.ai !== true) {
         return json({ error: 'This session doesn’t let you use its AI, so only an admin can have this file read.', reason: 'context_read_ai_denied' }, 403);
       }
       const aiAccess = await checkAiAccess?.();
-      if (!aiAccess?.ok) return aiAccess?.response || json({ error: 'AI access could not be checked.' }, 403);
+      if (!aiAccess?.ok || typeof aiAccess.count !== 'function') {
+        return aiAccess?.response || json({ error: 'AI access could not be checked.' }, 403);
+      }
+      countAi = aiAccess.count;
     }
   }
   const action = ACTIONS[name];
   const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
-  return action({ body, env, config, slug, admin, isAdmin, deps, store, json, now });
+  return action({ body, env, config, slug, admin, isAdmin, deps, store, json, now, countAi });
 };

@@ -6,7 +6,8 @@ import { installSessionCoordinatorBinding } from '../../tests/helpers/sessionCor
 // session coordinator, a session with the default access, pages from a scripted
 // network, and a scripted AI provider. Nothing here reaches a real network or service.
 // `state.scopes` are a signed-in caller's scopes, and `state.fetchAccess` is what
-// the dispatcher's fetch check answers. Work a route leaves for after its reply
+// the dispatcher's fetch check answers. `state.aiAccess` is what its AI check answers, and
+// `state.aiCount` what that check's `count()` does: null counts the call (in `aiCounts`). Work a route leaves for after its reply
 // (a source's card) is held as the runtime holds it; `settled()` waits for it.
 export const ADMIN = `0x${'1'.repeat(40)}`;
 export const PARTICIPANT = `0x${'2'.repeat(40)}`;
@@ -91,10 +92,12 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
     scopes: { storage: true, fetch: true },
     fetchAccess: { ok: true },
     aiAccess: { ok: true },
+    aiCount: null,
   };
   const pageCalls = [];
   const fetchChecks = [];
   const aiChecks = [];
+  const aiCounts = [];
   const network = async (url, init) => {
     pageCalls.push(String(url));
     const page = pages[String(url)];
@@ -148,7 +151,14 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
     },
     checkAiAccess: async () => {
       aiChecks.push(address);
-      return state.aiAccess;
+      const access = await state.aiAccess;
+      if (!access?.ok) return access;
+      const count = async () => {
+        if (state.aiCount) return state.aiCount;
+        aiCounts.push(address);
+        return null;
+      };
+      return { ...access, count };
     },
     deps,
   });
@@ -177,7 +187,7 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
   const pdfReads = () =>
     providerCalls.filter((made) =>
       ['document', 'image', 'input_file', 'input_image'].includes(made.body?.messages?.[0]?.content?.[0]?.type ?? made.body?.input?.[0]?.content?.[0]?.type));
-  return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, fetchChecks, aiChecks, providerCalls, pdfReads, settled };
+  return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, fetchChecks, aiChecks, aiCounts, providerCalls, pdfReads, settled };
 };
 
 export const idOf = async (response) => {

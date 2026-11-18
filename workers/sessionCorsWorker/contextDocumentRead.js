@@ -125,9 +125,9 @@ const readReply = (provider, data) => {
   };
 };
 
-// Reads a PDF or an image with the session's own AI and key, which never leave
-// the Worker. Claude and OpenAI read both natively; other providers are refused.
-export const readFileWithSessionAi = async ({ config, secrets, bytes, filename, contentType = CONTEXT_FILE_TYPES.pdf, deps = {} } = {}) => {
+// What a reading would call, or why it can't be had: the session's AI is on, is Claude
+// or OpenAI, has its key, and allows the call. No provider is called, so a refusal costs nothing.
+export const prepareFileRead = ({ config, secrets, contentType = CONTEXT_FILE_TYPES.pdf } = {}) => {
   const noun = contextFileNoun(contentType);
   if (config?.scopes?.ai === false) return fail(403, 'AI is turned off for this session.', 'ai_disabled');
   const { provider, model } = resolveSessionAiModel(config, { taskType: 'context-read' });
@@ -142,12 +142,22 @@ export const readFileWithSessionAi = async ({ config, secrets, bytes, filename, 
     config,
   });
   if (!policy.ok) return fail(403, policy.error, policy.reason);
+  return { ok: true, provider, key, payload: policy.payload };
+};
+
+// Reads a PDF or an image with the session's own AI and key, which never leave
+// the Worker. Claude and OpenAI read both natively; other providers are refused.
+export const readFileWithSessionAi = async ({ config, secrets, bytes, filename, contentType = CONTEXT_FILE_TYPES.pdf, deps = {} } = {}) => {
+  const noun = contextFileNoun(contentType);
+  const ready = prepareFileRead({ config, secrets, contentType });
+  if (!ready.ok) return ready;
+  const { provider, key, payload } = ready;
   const request = buildContextReadRequest({
     contentType,
     provider,
-    model: policy.payload.model,
-    maxTokens: policy.payload.max_tokens,
-    reasoningEffort: policy.payload.reasoning_effort,
+    model: payload.model,
+    maxTokens: payload.max_tokens,
+    reasoningEffort: payload.reasoning_effort,
     bytes,
     filename,
   });
@@ -176,5 +186,5 @@ export const readFileWithSessionAi = async ({ config, secrets, bytes, filename, 
   if (reply.refused) return fail(422, `The session’s AI declined to read this ${noun}.`, 'context_pdf_refused');
   const text = trim(reply.text);
   if (!text) return fail(422, `The session’s AI found no text in this ${noun}.`, 'context_pdf_empty');
-  return { ok: true, text, model: policy.payload.model, provider, truncated: !!reply.truncated };
+  return { ok: true, text, model: payload.model, provider, truncated: !!reply.truncated };
 };

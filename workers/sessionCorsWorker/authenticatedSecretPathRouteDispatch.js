@@ -76,7 +76,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   const scope = route === 'storage' && scopes?.storage !== true ? 'arweave' : route;
   // Withdrawing your own AI draft text needs only a sign-in, so someone who lost the session's gate can still do it.
   const allowWithoutScope = path === '/storage/draft-text/delete';
-  const preflightFor = (preflightScope, preflightRoute, preflightLimit = limit) => deps?.evaluateAuthenticatedRoutePreflight?.({
+  const preflightFor = (preflightScope, preflightRoute, preflightLimit = limit, countLater = false) => deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
     scope: preflightScope,
     route: preflightRoute,
@@ -92,6 +92,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
       computeScopesForLogin: deps?.computeScopesForLogin,
       json: deps?.json,
     },
+    countLater,
   });
   const preflight = await preflightFor(scope, route);
   if (!preflight?.ok) {
@@ -152,8 +153,9 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
         baseHeaders: headers,
         // A participant's context link has the Worker fetch a page, as /fetch does.
         checkFetchAccess: () => preflightFor('fetch', 'fetch'),
-        // Whoever adds a PDF or image may have the session's AI read it, which counts as /ai does.
-        checkAiAccess: () => preflightFor('ai', 'ai', resolveAiDailyLimit(config)),
+        // Whoever adds a PDF or image may have the session's AI read it, which counts as /ai does:
+        // checked here, and counted by the route's `count()` once the reading has begun.
+        checkAiAccess: () => preflightFor('ai', 'ai', resolveAiDailyLimit(config), true),
       }),
     };
   }

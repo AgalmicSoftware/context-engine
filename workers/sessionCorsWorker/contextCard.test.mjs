@@ -604,23 +604,24 @@ test('where cards are on, whoever added a PDF or image has the AI read it once, 
   h.state.scopes = { ...h.state.scopes, ai: false };
   assert.deepEqual(await refusal(await read(mine)), [403, 'context_read_ai_denied']);
   h.state.scopes = { ...h.state.scopes, ai: true };
-  assert.deepEqual([h.aiChecks, h.pdfReads().length], [[], 0], 'nothing is counted until nothing else refuses');
-  h.state.aiAccess = { ok: false, response: json({ error: 'Rate limit exceeded.' }, 429) };
+  assert.deepEqual([h.aiCounts, h.pdfReads().length], [[], 0], 'nothing is counted until nothing else refuses');
+  h.state.aiCount = json({ error: 'Rate limit exceeded.' }, 429);
   assert.equal((await read(mine)).status, 429);
   assert.equal(h.pdfReads().length, 0);
-  h.state.aiAccess = { ok: true };
+  h.state.aiCount = null;
 
   // Their own, once: the reading is stored under the file's rule, which here they cannot read themselves.
+  // The refused count above freed the file, so it can be read at once.
   const done = await read(mine);
   const { text } = await done.json();
   await h.settled();
-  assert.deepEqual([done.status, h.aiChecks, h.pdfReads().length], [200, [PARTICIPANT, PARTICIPANT], 1]);
+  assert.deepEqual([done.status, h.aiCounts, h.pdfReads().length], [200, [PARTICIPANT], 1]);
   assert.equal((await h.read(text.id, PARTICIPANT)).status, 403);
   assert.equal(await (await h.read(text.id, ADMIN)).text(), 'Deck: coalition goals.');
   assert.deepEqual(content((await rowOf(h, mine)).card), STORED, 'and its card is written from the reading');
   // Reading it again is an admin's call, and costs the adder nothing.
   assert.deepEqual(await refusal(await read(mine)), [403, 'context_admin_required']);
-  assert.deepEqual([h.aiChecks.length, h.pdfReads().length], [2, 1]);
+  assert.deepEqual([h.aiCounts.length, h.pdfReads().length], [1, 1]);
   assert.equal((await read(mine, ADMIN)).status, 200);
   // An image, by its adder.
   assert.equal((await read(theirs, MEMBER)).status, 200);
@@ -633,5 +634,89 @@ test('where cards are on, whoever added a PDF or image has the AI read it once, 
   assert.equal((await read(later)).status, 410);
   h.state.config = { ...h.state.config, sessionEndsAt: undefined, contextCardsEnabled: false };
   assert.deepEqual(await refusal(await read(later)), [403, 'context_admin_required']);
-  assert.equal(h.aiChecks.filter((address) => address === PARTICIPANT).length, 2, 'none of those refusals was counted');
+  assert.equal(h.aiCounts.filter((address) => address === PARTICIPANT).length, 1, 'none of those refusals was counted');
+});
+
+// A provider that holds each reading until the test lets it go; card calls pass at once.
+const heldReadings = () => {
+  const held = [];
+  const answer = provider();
+  return {
+    provider: async (url, init) => {
+      const body = JSON.parse(typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body));
+      if (isPdfRead(body)) await new Promise((resolve) => held.push(resolve));
+      return answer(url, init);
+    },
+    held: () => held.length,
+    release: () => held.shift()?.(),
+  };
+};
+const until = async (check) => {
+  for (let tries = 0; tries < 500 && !check(); tries += 1) await new Promise((resolve) => setTimeout(resolve, 2));
+  assert.ok(check(), 'waited too long');
+};
+
+test('an adder gets one reading, whenever they ask again: during it, as it ends, or from a row that lags', async () => {
+  const ai = heldReadings();
+  const h = harness({ provider: ai.provider });
+  h.state.scopes = { ...h.state.scopes, ai: true };
+  const mine = await idOf(await h.uploadFile({ address: PARTICIPANT, name: 'mine.pdf' }));
+  const read = (address = PARTICIPANT) => h.context({ action: 'read-pdf', id: mine }, address);
+  const refusal = async (response) => [response.status, (await response.json()).reason];
+  const key = rowKey(mine);
+  const rowBefore = h.kv.store.get(key);
+
+  // Asked again while the AI reads it: refused, and not counted.
+  const first = read();
+  await until(() => ai.held() === 1);
+  assert.deepEqual(await refusal(await read()), [409, 'context_pdf_reading']);
+  assert.deepEqual(h.aiCounts, [PARTICIPANT]);
+
+  // Asked again with an AI check that ends only after the reading has: refused, and not counted.
+  let checked;
+  h.state.aiAccess = new Promise((resolve) => { checked = () => resolve({ ok: true }); });
+  const late = read();
+  await until(() => h.aiChecks.length === 2);
+  ai.release();
+  assert.equal((await first).status, 200);
+  checked();
+  assert.deepEqual(await refusal(await late), [403, 'context_admin_required']);
+  h.state.aiAccess = { ok: true };
+
+  // Asked again where the file's row doesn't show its reading yet: the coordinator refuses it.
+  assert.ok(JSON.parse(h.kv.store.get(key)).contextReadingId);
+  const get = h.kv.get;
+  h.kv.get = async (name) => (name === key ? rowBefore : get(name));
+  assert.deepEqual(await refusal(await read()), [403, 'context_admin_required']);
+  h.kv.get = get;
+  await h.settled();
+  assert.deepEqual([h.aiCounts, h.pdfReads().length], [[PARTICIPANT], 1], 'one reading, counted once');
+
+  // An admin may have it read again; removing the file forgets that it was read.
+  const again = read(ADMIN);
+  await until(() => ai.held() === 1);
+  ai.release();
+  assert.equal((await again).status, 200);
+  const coordinator = [...h.env.__coordinatorInstances.values()][0].store;
+  assert.equal(coordinator.get(`context-pdf-has-reading:${mine}`), true);
+  assert.equal((await h.context({ action: 'remove', id: mine }, PARTICIPANT)).status, 200);
+  assert.equal(coordinator.has(`context-pdf-has-reading:${mine}`), false);
+});
+
+test('a reading the session’s AI could never make is refused before it is begun or counted', async () => {
+  for (const [setup, reason] of [
+    [(h) => { h.state.config = { ...h.state.config, scopes: { ai: false } }; }, 'ai_disabled'],
+    [(h) => { h.state.config = { ...h.state.config, ai: { mode: 'openrouter', models: { fast: { provider: 'openrouter', model: 'openai/gpt-4.1' } } } }; }, 'context_pdf_provider_unsupported'],
+    [(h) => { h.deps.getSessionSecrets = async () => ({}); }, 'context_pdf_key_missing'],
+  ]) {
+    const h = harness({ provider: provider() });
+    h.state.scopes = { ...h.state.scopes, ai: true };
+    const mine = await idOf(await h.uploadFile({ address: PARTICIPANT, name: 'mine.pdf' }));
+    setup(h);
+    for (const address of [PARTICIPANT, PARTICIPANT, ADMIN]) {
+      const response = await h.context({ action: 'read-pdf', id: mine }, address);
+      assert.deepEqual([response.status >= 400, (await response.json()).reason], [true, reason], reason);
+    }
+    assert.deepEqual([h.aiCounts, h.pdfReads().length], [[], 0], reason);
+  }
 });

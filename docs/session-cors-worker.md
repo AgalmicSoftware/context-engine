@@ -865,8 +865,10 @@ Authenticated clients can use the worker as the session storage boundary:
   text. Where `contextCardsEnabled` is `true`, whoever added a PDF or image may send `read-pdf` for it once, while it has
   no reading, `contextAdditionPolicy` isn't `admin_only` and the session hasn't ended: it needs the token's `ai`
   scope (`403 context_read_ai_denied`) and counts as one AI call against `limits.aiPerWalletPerDay`, counted only
-  once nothing else refuses (`429` over the limit); a second reading, or anyone else's file, is
-  `403 context_admin_required`. A file has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the
+  once the session coordinator has begun the reading (`429` over the limit, which frees the file again); a refusal
+  before that (`ai_disabled`, `context_pdf_provider_unsupported`, `context_pdf_key_missing`, `413`, `409`) costs
+  nothing. A second reading, which the coordinator refuses once any reading of the file is stored, or anyone else's
+  file, is `403 context_admin_required`. A file has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the
   session coordinator applies finished readings and removals one at a time, so a removed file stays removed and
   a reading never replaces a newer one. Uploads with a context role on `/storage/upload` must come from someone
   signed in (an admin, or anyone while `contextAdditionPolicy` isn't `admin_only`), be a PDF (20 MB), a PNG, JPEG or

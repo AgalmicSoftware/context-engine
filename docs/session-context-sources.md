@@ -185,7 +185,11 @@ also have it read, once: `POST /storage/context { action: 'read-pdf', id }`
 from its adder is taken while the file has no reading, the session still takes
 context from participants and has not ended. It needs the `ai` scope of their
 sign-in and counts as one of their AI calls for the day
-(`limits.aiPerWalletPerDay`), counted only once nothing else refuses. The
+(`limits.aiPerWalletPerDay`), counted only once the reading has begun: a
+request refused before that (AI off, a model that can't read files, no key,
+a file too large, a reading running or one already stored) costs nothing. The
+session coordinator keeps the one-reading rule, so a second request is refused
+even where the file's stored row doesn't show its first reading yet. The
 adder need not be able to read the file themselves: an admins-only file's
 reading is stored for admins, and the reply says only how long it is. The
 session page offers this as **Analyze with the session's AI** when they add the

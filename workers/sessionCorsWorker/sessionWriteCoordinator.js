@@ -114,6 +114,9 @@ const FAUCET_WALLET_POLL_MS = 100;
 const CONTEXT_PDF_READING_PREFIX = 'context-pdf-reading:';
 // Longer than a PDF reading's AI deadline, so an abandoned reading frees its PDF.
 const CONTEXT_PDF_READING_LEASE_MS = 5 * 60 * 1000;
+// Kept once a reading of a file is stored, until the file is removed: its adder's one
+// reading is refused here even while the file's KV row doesn't show that reading yet.
+const CONTEXT_PDF_HAS_READING_PREFIX = 'context-pdf-has-reading:';
 const WORKER_GROUP_CAPACITY_META_KEY = 'worker-group-capacity-meta-v3';
 const WORKER_GROUP_CAPACITY_GROUP_PREFIX = 'worker-group-capacity-group-v3:';
 const WORKER_GROUP_CAPACITY_MEMBER_PREFIX = 'worker-group-capacity-member-v3:';
@@ -2780,11 +2783,18 @@ export class SessionWriteCoordinator {
         const slug = normalizeWorkerSessionSlug(payload?.slug);
         const id = toTrimmedString(payload?.id);
         const leaseKey = `${CONTEXT_PDF_READING_PREFIX}${id}`;
+        const readKey = `${CONTEXT_PDF_HAS_READING_PREFIX}${id}`;
         const markWrite = () => bumpStorageBackupRevision(this.state.storage);
         if (operation === 'begin-read') {
           const nowMs = Number(this.now()) || Date.now();
           if ((await this.state.storage.get(leaseKey))?.expiresAtMs > nowMs) {
             return jsonResponse({ error: 'This file is already being read.', reason: 'context_pdf_reading' }, 409);
+          }
+          // An adder's one reading (`once`) is refused once any reading of the file is stored.
+          if (payload.once === true && await this.state.storage.get(readKey)) {
+            return jsonResponse({
+              error: 'The session’s AI has read this file. Only session admins can have it read again.', reason: 'context_admin_required',
+            }, 403);
           }
           const token = createAttemptId(this.crypto);
           await this.state.storage.put(leaseKey, { token, expiresAtMs: nowMs + CONTEXT_PDF_READING_LEASE_MS });
@@ -2796,11 +2806,13 @@ export class SessionWriteCoordinator {
           await assertNoActiveBackupImport(this);
           const result = await finishContextPdfReading({ env: this.env, slug, pdfId: id, readingId: toTrimmedString(payload.readingId),
             readAt: toTrimmedString(payload.readAt), markWrite });
+          if (result.status === 200) await this.state.storage.put(readKey, true);
           return jsonResponse(result.body, result.status);
         }
         if (operation === 'remove') {
           await assertNoActiveBackupImport(this);
           const result = await removeContextSource({ env: this.env, slug, id, readingIds: payload.readingIds, markWrite });
+          if (result.status === 200) await this.state.storage.delete(readKey);
           return jsonResponse(result.body, result.status);
         }
         if (operation === 'set-card') {
