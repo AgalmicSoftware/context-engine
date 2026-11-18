@@ -12,7 +12,7 @@ import SessionVoiceModeBackButton, {
   VoiceModeBackContext,
   VoiceModeUnjoinedGroupsContext,
 } from './SessionVoiceModeBack';
-import SessionVoiceModeChooser from './SessionVoiceModeChooser';
+import SessionVoiceModeChooser, { SessionVoiceModeHelp } from './SessionVoiceModeChooser';
 import SessionVoicePrefillCard from './SessionVoicePrefillCard';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
@@ -300,6 +300,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                   {/* The dialog takes its name from the title alone, not the icons beside it. */}
                   <span id="ce-session-voice-mode-title">{title}</span>
                   {mode === 'recordGroup' ? <SessionRecordingHelp /> : null}
+                  {!mode ? <SessionVoiceModeHelp /> : null}
                 </span>
                 <span className={styles.sessionVoiceModeActions}>
                   {/* Group Conversation's + for audio and transcripts goes here. */}

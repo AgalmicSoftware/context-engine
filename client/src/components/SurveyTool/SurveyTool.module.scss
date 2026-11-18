@@ -3662,7 +3662,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 .sessionVoiceModeChooser {
-  // The choices' padding, which also places each "?" beside its icon.
+  // The choices' padding.
   --ce-voice-choice-pad: clamp(14px, 3vw, 28px);
 
   display: grid;
@@ -3671,7 +3671,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 .sessionVoiceModeChoice {
-  position: relative;
   display: grid;
   min-width: 0;
 }
@@ -3718,21 +3717,17 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// Just right of the choice's icon and level with it: below the card's border and
-// padding, half the 2.4rem icon's height down and half its fixed 1.25em width
-// across, less half this 44px button. On very narrow cards it stops at the edge.
-.sessionVoiceModeChoiceHelp {
-  position: absolute;
-  top: calc(var(--ce-border-control-width, 1px) + var(--ce-voice-choice-pad) + 1.2rem - 22px);
-  left: min(calc(50% + 1.5rem), calc(100% - 44px));
-}
+// The voice mode "?" names each choice above its description.
+.sessionVoiceModeHelpItem {
+  display: block;
 
-// While its card is highlighted, the "?" and its focus ring take the card's
-// highlight color; the theme's ring color can match the highlight itself.
-.sessionVoiceModeChoiceButton:hover + .sessionVoiceModeChoiceHelp,
-.sessionVoiceModeChoiceButton:focus-visible + .sessionVoiceModeChoiceHelp {
-  color: var(--ce-action-accent-text) !important;
-  outline-color: var(--ce-action-accent-text);
+  strong {
+    display: block;
+  }
+
+  & + & {
+    margin-top: 6px;
+  }
 }
 
 // The AI-prefill option below the voice choices; the prompt card inside it drops its own frame.

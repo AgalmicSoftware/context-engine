@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faMicrophone, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
@@ -56,34 +56,44 @@ export default function SessionVoiceModeChooser({
               <FontAwesomeIcon icon={icon} fixedWidth />
               <strong>{title}</strong>
             </button>
-            {/* Beside the choice's icon, but not inside the choice: a button can't hold another. */}
-            <button
-              type="button"
-              id={`ce-voice-mode-${mode}-help`}
-              className={`${styles.sessionInterviewHeaderButton} ${styles.sessionVoiceModeChoiceHelp}`}
-              data-ce-control-appearance="frameless"
-              aria-label={`About ${title}`}
-              aria-describedby={`ce-voice-mode-${mode}-about`}
-            >
-              <FontAwesomeIcon icon={faQuestionCircle} />
-            </button>
-            {/* Tooltips aren't read out, so screen readers get the description from here,
-                with its controls only: `aria-describedby` still reads hidden text. */}
+            {/* Screen readers hear each choice's description with it: `aria-describedby` still reads hidden text. */}
             <span id={`ce-voice-mode-${mode}-about`} hidden>
               {about}
             </span>
-            <UncontrolledTooltip
-              target={`ce-voice-mode-${mode}-help`}
-              placement="top"
-              trigger="hover focus"
-              autohide={false}
-            >
-              {about}
-            </UncontrolledTooltip>
           </div>
         ))}
       </div>
       {children}
     </div>
+  );
+}
+
+/** One "?" beside the dialog's "Voice mode" title, explaining both choices, each under its name. */
+export function SessionVoiceModeHelp() {
+  const id = `ce-voice-mode-help-${useId().replace(/:/g, '')}`;
+  const items = CHOICES.map(({ mode, title, about }) => (
+    <span key={mode} className={styles.sessionVoiceModeHelpItem}>
+      <strong>{title}</strong> {about}
+    </span>
+  ));
+  return (
+    <>
+      <button
+        type="button"
+        id={id}
+        className={styles.sessionInterviewHeaderButton}
+        data-ce-control-appearance="frameless"
+        aria-label="About voice mode"
+        aria-describedby={`${id}-description`}
+      >
+        <FontAwesomeIcon icon={faQuestionCircle} />
+      </button>
+      <span id={`${id}-description`} hidden>
+        {items}
+      </span>
+      <UncontrolledTooltip target={id} trigger="hover focus" autohide={false}>
+        {items}
+      </UncontrolledTooltip>
+    </>
   );
 }

@@ -2153,26 +2153,33 @@ describe('SessionVoiceModeModal', () => {
 
   it('offers the two large requested voice-mode choices, with the AI-prefill option below them', async () => {
     render(<SessionVoiceModeModal {...baseProps} />);
-    // Each choice shows its icon and title; its description sits behind a "?" beside the icon.
+    // Each choice shows its icon and title, and screen readers hear its description with it.
     const interviewAbout = 'Talk with an AI interviewer to answer the session’s questions, then review your responses.';
+    const groupAbout = 'Record a group discussion and generate questions and context from it.';
     const interview = screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW);
     expect(interview).toHaveTextContent(/^Interview$/);
     expect(interview).toHaveAccessibleDescription(interviewAbout);
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP)).toHaveAccessibleDescription(
-      'Record a group discussion and generate questions and context from it.',
-    );
-    // A "?" explains its choice on hover or keyboard focus, and never picks it.
-    const interviewHelp = screen.getByRole('button', { name: 'About Interview' });
-    fireEvent.click(interviewHelp);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP)).toHaveAccessibleDescription(groupAbout);
+    // One "?" beside the "Voice mode" title explains both, each under its name; the choices carry none of their own.
+    const chooser = screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER);
+    expect(within(chooser).queryByRole('button', { name: /^About / })).not.toBeInTheDocument();
+    const help = screen.getByRole('button', { name: 'About voice mode' });
+    expect(help.closest('.modal-header')).toHaveTextContent('Voice mode');
+    fireEvent.click(help);
     expect(baseProps.onSelectMode).not.toHaveBeenCalled();
-    fireEvent.mouseOver(interviewHelp);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(interviewAbout);
-    fireEvent.mouseOut(interviewHelp);
+    fireEvent.mouseOver(help);
+    const tip = await screen.findByRole('tooltip');
+    expect([...tip.querySelectorAll('strong')].map((name) => name.textContent)).toEqual([
+      'Interview',
+      'Group Conversation',
+    ]);
+    expect(tip).toHaveTextContent(`Interview ${interviewAbout}Group Conversation ${groupAbout}`);
+    fireEvent.mouseOut(help);
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
-    const groupHelp = screen.getByRole('button', { name: 'About Group Conversation' });
-    fireEvent.focus(groupHelp);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Record a group discussion');
-    fireEvent.blur(groupHelp);
+    fireEvent.focus(help);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(groupAbout);
+    fireEvent.blur(help);
+    expect(help).toHaveAccessibleDescription(`Interview ${interviewAbout} Group Conversation ${groupAbout}`);
     const prefill = screen.getByRole('region', { name: 'Let your AI draft your answers' });
     // Its description is only read out with its "?", not shown as text.
     const prefillAbout =

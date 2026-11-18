@@ -12,7 +12,11 @@ jest.mock('./SessionInterviewPanel', () => ({
   },
 }));
 jest.mock('./SessionListeningPanel', () => ({ __esModule: true, default: () => null }));
-jest.mock('./SessionVoiceModeChooser', () => ({ __esModule: true, default: () => <div>Chooser</div> }));
+jest.mock('./SessionVoiceModeChooser', () => ({
+  __esModule: true,
+  default: () => <div>Chooser</div>,
+  SessionVoiceModeHelp: () => null,
+}));
 jest.mock('./SessionVoicePrefillCard', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionRecordingHelp', () => ({ __esModule: true, default: () => null }));
 jest.mock('../../utilities/audio/useRecordingChunkQueue', () => ({
