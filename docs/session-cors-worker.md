@@ -3255,6 +3255,31 @@ Signed login/bootstrap requests:
   - A session without an OpenAI key answers 409 `picture_needs_openai_key`,
     whatever provider its text model uses, and an ended session answers 410.
     The page then shows the card without a picture.
+- `POST /analysis-card/publish` and `POST /analysis-card/published` keep one
+  personal analysis card per person, shown on their page to every visitor
+  without pressing Analyze. Both take the picture route's rule (the `ai` scope,
+  rechecked against the session's current rules, in a session that has not
+  ended: 403 or 410 otherwise), call no model and count no AI call.
+  - `publish` takes `{ "published": true, "card": {...} }` to save the
+    caller's card, or `{ "published": false }` to withdraw it. The card is
+    always filed under the signed-in address, whatever the body names, so
+    nobody can save a card onto someone else's page. It holds the card's words
+    only (`shared/analysisCardSaved.mjs`: title, match note, figure, guessed
+    works and up to three of the person's public answers, capped, at most
+    8,000 bytes); anything else is dropped, and a card without a title or a
+    figure in "Name (years)" form is 400 `invalid_card`. A person may save or
+    withdraw 20 times a day (429 past that).
+  - Withdrawing replaces the card with `{ published: false, withdrawnAt }`, so
+    none of its words stay stored and the page knows not to save a new one on
+    its own. Ticking the box again saves the card again.
+  - `published` takes `{ "account": "0x..." }` and answers `{ published: true,
+    card, savedAt }`, `{ published: false }` (withdrawn) or `{ published: null
+    }` (nothing saved). Reading is not counted.
+  - Stored in `session:{slug}:analysis-card-saved:v1:{address}`, each record
+    kept a year from its last save. A backup does not carry these records, and
+    a restore does not bring them back. Signed-out visitors see no card. An
+    older bundle put back leaves the records unused until they expire; the
+    page then shows no saved card.
 - `POST /session-agent/ask` answers a question to the Session Agent
   through the session's own AI, under the `/ai` scope check and rate limit.
   `POST /session-agent/status` says how the signed-in person would be answered,

@@ -300,3 +300,11 @@ test('an analysis card picture has no signed-out route: with or without a token 
   assert.deepEqual(select(), { kind: 'authenticated' });
   assert.deepEqual(select({ Authorization: 'Bearer token' }), { kind: 'authenticated' });
 });
+
+test('a saved analysis card has no signed-out route: saving and reading both go to sign-in', () => {
+  for (const path of ['/analysis-card/publish', '/analysis-card/published']) {
+    const select = (headers) => resolveTopLevelRouteSelection({ path, method: 'POST', request: createRequest(headers), deps: { toStr: String } });
+    assert.deepEqual(select(), { kind: 'authenticated' }, path);
+    assert.deepEqual(select({ Authorization: 'Bearer token' }), { kind: 'authenticated' }, path);
+  }
+});

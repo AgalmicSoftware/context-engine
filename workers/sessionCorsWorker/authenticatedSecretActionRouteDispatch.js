@@ -9,6 +9,7 @@ import { FEEDBACK_PATH, sendSessionFeedback } from './sessionFeedbackRoute.js';
 import { SET_NAME_PATH, setOwnSessionName } from './sessionNames.js';
 import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
 import { ANALYSIS_CARD_PICTURE_PATH, dispatchAnalysisCardPictureRoute } from './analysisCardPictureRoute.js';
+import { ANALYSIS_CARD_SAVED_PATHS, dispatchAnalysisCardSavedRoute } from './analysisCardSavedRoute.js';
 
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return DEFAULT_ANTHROPIC_MODEL;
@@ -58,6 +59,12 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     return {
       handled: true,
       response: await dispatchAnalysisCardPictureRoute({ body, config, slug, address, env, headers, scopes, deps }),
+    };
+  }
+  if (ANALYSIS_CARD_SAVED_PATHS.includes(path)) {
+    return {
+      handled: true,
+      response: await dispatchAnalysisCardSavedRoute({ path, body, config, slug, address, env, headers, scopes, deps }),
     };
   }
   const isFaucetAction = action === 'request_test_eth';

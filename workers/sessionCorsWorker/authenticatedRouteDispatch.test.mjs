@@ -54,7 +54,7 @@ test('dispatchAuthenticatedRoute short-circuits secret path routes before authen
 });
 
 test('a path that answers for itself is never routed by an action in its body', async () => {
-  for (const path of ['/session-agent/opt-out', '/session-agent/attribution', '/session-agent/ask', '/feedback', '/analysis-card/picture']) {
+  for (const path of ['/session-agent/opt-out', '/session-agent/attribution', '/session-agent/ask', '/feedback', '/analysis-card/picture', '/analysis-card/publish', '/analysis-card/published']) {
     const reached = [];
     const result = await dispatchAuthenticatedRoute({
       path,
