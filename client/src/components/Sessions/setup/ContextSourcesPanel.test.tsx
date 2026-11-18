@@ -192,8 +192,17 @@ describe('context sources panel', () => {
     fireEvent.change(screen.getByTestId('ce-context-file'), {
       target: { files: [new File(['x'], 'slides.pptx', { type: 'application/vnd.ms-powerpoint' })] },
     });
-    expect(screen.getByText(/Add a PDF, Markdown, plain text, CSV or JSON file/)).toBeInTheDocument();
+    expect(screen.getByText(/Add a PDF, a PNG, JPEG or WebP image, or a Markdown/)).toBeInTheDocument();
     expect(screen.getByTestId('ce-context-add-file')).toBeDisabled();
+
+    // An image is read as a PDF is: Analyze is offered (unticked above), and the reading follows the upload.
+    const chart = new File(['png'], 'chart.png', { type: 'image/png' });
+    fireEvent.change(screen.getByTestId('ce-context-file'), { target: { files: [chart] } });
+    fireEvent.click(screen.getByTestId('ce-context-file-analyze'));
+    expect(screen.getByTestId('ce-context-file-analyze')).toBeChecked();
+    await act(async () => fireEvent.click(screen.getByTestId('ce-context-add-file')));
+    expect(uploadContextFile).toHaveBeenLastCalledWith({ file: chart }, options);
+    expect(readContextPdf).toHaveBeenCalledTimes(2);
   });
 
   it('reads the session’s unread page links, and explains when sources cannot be added', async () => {

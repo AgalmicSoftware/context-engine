@@ -98,7 +98,9 @@ describe('context cards on the client', () => {
       source({ id: 'unread-pdf', mime: 'application/pdf' }),
       source({ id: 'sealed', encrypted: true }),
       source({ id: 'read-pdf', mime: 'application/pdf', reading: { id: 'r', model: 'm', at: '' } }),
+      source({ id: 'unread-image', mime: 'image/png' }),
+      source({ id: 'read-image', mime: 'image/jpeg', reading: { id: 'r2', model: 'm', at: '' } }),
     ]);
-    expect(missing.map((entry) => entry.id)).toEqual(['text', 'read-pdf']);
+    expect(missing.map((entry) => entry.id)).toEqual(['text', 'read-pdf', 'read-image']);
   });
 });

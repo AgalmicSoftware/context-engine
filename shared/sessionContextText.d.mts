@@ -9,7 +9,8 @@ export type SessionContextPromptSource = {
   url?: string;
   text?: string;
   /** Text the session's AI read from a PDF. */
-  readByAi?: boolean;
+  /** True for a PDF's AI reading, 'image' for an image's. */
+  readByAi?: boolean | 'image';
   /** Its card, when it has one: a source that finds no room in the block is then named there. */
   card?: unknown;
 };

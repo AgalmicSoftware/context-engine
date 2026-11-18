@@ -1,7 +1,7 @@
 /** @file setupQuestionSuggestions.ts: question drafts on /new from its context, before any Worker exists. */
 import { DEFAULT_AI_MODELS } from '@ce-shared/aiDefaults.mjs';
 import { fitReasoningEffort, inferAiProviderFromModel, isOpenAiReasoningModel } from '@ce-shared/aiModelFamily.mjs';
-import { CONTEXT_FILE_TYPES, resolveContextFileType } from '@ce-shared/sessionContextSources.mjs';
+import { CONTEXT_FILE_TYPES, isContextImage, resolveContextFileType } from '@ce-shared/sessionContextSources.mjs';
 import { buildSessionContextPrompt } from '@ce-shared/sessionContextText.mjs';
 import { GENERATED_QUESTIONS_RESPONSE_FORMAT, seedGenPrompt } from '../../../prompts/seedGenPrompt.js';
 import {
@@ -22,7 +22,10 @@ type PdfPart = { name: string; data: string };
 /** True when the page holds context the AI can draft from. */
 export const hasSuggestionContext = (draft: SetupDraft, pending: PendingContextFiles): boolean =>
   !!buildSessionContextPrompt({ sessionContext: draft.sessionContext }).text ||
-  Object.values(pending.files).some(({ file }) => !!resolveContextFileType(file));
+  Object.values(pending.files).some(({ file }) => {
+    const type = resolveContextFileType(file);
+    return !!type && !isContextImage(type);
+  });
 
 // FileReader, as the client's other uploads use.
 const readFile = (file: File, as: 'readAsText' | 'readAsDataURL') =>
@@ -34,7 +37,8 @@ const readFile = (file: File, as: 'readAsText' | 'readAsDataURL') =>
   });
 
 // Text files go into the context block; PDFs the session's AI may analyze go
-// to OpenAI as files, while they fit in one request. Files left out are named.
+// to OpenAI as files, while they fit in one request. Files left out are named,
+// images among them: a draft is not made from pictures.
 const readPendingFiles = async (pending: PendingContextFiles) => {
   const texts: Array<{ title: string; kind: 'file'; text: string }> = [];
   const pdfs: PdfPart[] = [];
@@ -43,6 +47,10 @@ const readPendingFiles = async (pending: PendingContextFiles) => {
   for (const [name, { file, analyze }] of Object.entries(pending.files)) {
     const type = resolveContextFileType(file);
     if (!type || (type === CONTEXT_FILE_TYPES.pdf && !analyze)) continue;
+    if (isContextImage(type)) {
+      skipped.push(name);
+      continue;
+    }
     try {
       if (type !== CONTEXT_FILE_TYPES.pdf) {
         texts.push({ title: name, kind: 'file', text: await readFile(file, 'readAsText') });

@@ -5,6 +5,7 @@ import {
   CONTEXT_TEXT_ROLE,
   contextAdderProblem,
   contextFileByteLimit,
+  contextFileNoun,
   contextRoleOf,
   contextTagValue,
   isAdminsOnlyAccess,
@@ -47,10 +48,10 @@ export const checkContextSourceUpload = ({ payload = {}, config, uploader = '', 
   }
   if (kind !== 'file') return fail(400, 'A context source is a file or a link.', 'context_kind_invalid');
   const type = resolveContextFileType({ type: payload.contentType });
-  if (!type) return fail(415, 'Context files are PDF, Markdown, plain text, CSV or JSON.', 'context_type_unsupported');
+  if (!type) return fail(415, 'Context files are PDF, PNG, JPEG or WebP images, Markdown, plain text, CSV or JSON.', 'context_type_unsupported');
   const limit = contextFileByteLimit(type);
   if ((payload.bytes?.length || 0) > limit) {
-    return fail(413, `This file is larger than ${limit / MIB} MB, the most a context ${type === 'application/pdf' ? 'PDF' : 'text file'} may be.`, 'context_too_large');
+    return fail(413, `This file is larger than ${limit / MIB} MB, the most a context ${contextFileNoun(type)} may be.`, 'context_too_large');
   }
   return { ok: true, role };
 };

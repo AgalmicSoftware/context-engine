@@ -3,14 +3,15 @@ import { Input } from 'reactstrap';
 
 import { CONTEXT_CARD_COST_USD } from '@ce-shared/contextCards.mjs';
 import {
-  CONTEXT_FILE_TYPES,
   CONTEXT_SOURCE_LIMITS,
+  contextFileIsReadByAi,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
 import ContextAccessPicker, { contextGroupsLabel } from './ContextAccessPicker';
 import ContextCardChips from '../../OnePageSession/ContextCardChips';
 import ContextCardEditor, { CONTEXT_CARD_HELP } from '../../OnePageSession/ContextCardEditor';
 import {
+  CONTEXT_FILE_ACCEPT,
   addContextLink,
   checkContextFile,
   contextAdderLabel,
@@ -37,7 +38,7 @@ export const CONTEXT_PRIVACY_HELP =
 export const FILE_ACCESS_HELP =
   'A file locked to groups is for their members and the session’s admins; an admins-only file is for admins. The session’s AI uses a file only when it works for someone who may read it.';
 export const CONTEXT_ANALYZE_HELP =
-  'Sends the PDF to the session’s own AI provider with the session’s key. The text it returns is saved with the PDF. Unticked, the PDF is kept but gives the AI no text.';
+  'Sends the PDF or image to the session’s own AI provider with the session’s key. The text it returns is saved with the file. Unticked, the file is kept but gives the AI no text.';
 const LINK_HELP =
   'The Session Worker reads the page now and keeps its text for the session’s AI. Refresh reads it again. Use https:// links to public pages.';
 
@@ -56,7 +57,8 @@ export const describeCardCost = (count: number): string => {
   );
 };
 
-export const isContextPdf = (source: Pick<ContextSource, 'mime'>) => source.mime === CONTEXT_FILE_TYPES.pdf;
+/** True for a PDF or an image: a file whose text is the session’s AI’s reading of it. */
+export const isAiReadSource = (source: Pick<ContextSource, 'mime'>) => contextFileIsReadByAi(source.mime);
 
 /** One line about a source: who may read it, who added it, and what the AI has of it. */
 export const describeContextSource = (
@@ -74,7 +76,7 @@ export const describeContextSource = (
     ...(source.addedByAgent ? ['Agent'] : []),
     source.kind === 'link'
       ? `Read ${formatDate(source.fetchedAt)}`.trim()
-      : isContextPdf(source)
+      : isAiReadSource(source)
         ? source.reading
           ? `Read by AI (${source.reading.model}, ${formatDate(source.reading.at)})`
           : 'Not read by AI'
@@ -175,7 +177,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
     });
   };
   const fileProblem = file ? checkContextFile(file) : '';
-  const fileIsPdf = !!file && resolveContextFileType(file) === CONTEXT_FILE_TYPES.pdf;
+  const fileIsAiRead = !!file && contextFileIsReadByAi(resolveContextFileType(file));
 
   return (
     <div className={styles.listRowBody} data-testid="ce-context-sources">
@@ -235,16 +237,16 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
                     Refresh
                   </button>
                 ) : null}
-                {isContextPdf(source) ? (
+                {isAiReadSource(source) ? (
                   <button
                     type="button"
                     className={styles.button}
                     disabled={busy}
                     aria-label={`${source.reading ? 'Read again with the session’s AI' : 'Read with the session’s AI'}: ${source.title}`}
                     onClick={() =>
-                      void run('The session’s AI is reading the PDF…', async () => {
+                      void run('The session’s AI is reading the file…', async () => {
                         await readContextPdf(source.id, options);
-                        return 'The session’s AI read the PDF.';
+                        return 'The session’s AI read the file.';
                       })
                     }
                   >
@@ -359,7 +361,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
           key={fileKey}
           id="ce-context-file"
           type="file"
-          accept=".pdf,.md,.markdown,.txt,.csv,.json,application/pdf,text/markdown,text/plain,text/csv,application/json"
+          accept={CONTEXT_FILE_ACCEPT}
           data-testid="ce-context-file"
           onChange={(event) => setFile((event.target as HTMLInputElement).files?.[0] || null)}
         />
@@ -375,7 +377,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
           onChange={setFileAccess}
         />
       </SetupField>
-      {fileIsPdf ? (
+      {fileIsAiRead ? (
         <SetupCheck
           id="ce-context-file-analyze"
           label="Analyze with the session’s AI"
@@ -397,7 +399,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
               const id = await uploadContextFile({ file, ...fileAccess }, options);
               setFile(null);
               setFileKey((key) => key + 1);
-              if (!(analyze && fileIsPdf)) return 'File added.';
+              if (!(analyze && fileIsAiRead)) return 'File added.';
               setStatus('File added. The session’s AI is reading it…');
               try {
                 await readContextPdf(id, options);

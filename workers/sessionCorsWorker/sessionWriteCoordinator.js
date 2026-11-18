@@ -2784,7 +2784,7 @@ export class SessionWriteCoordinator {
         if (operation === 'begin-read') {
           const nowMs = Number(this.now()) || Date.now();
           if ((await this.state.storage.get(leaseKey))?.expiresAtMs > nowMs) {
-            return jsonResponse({ error: 'This PDF is already being read.', reason: 'context_pdf_reading' }, 409);
+            return jsonResponse({ error: 'This file is already being read.', reason: 'context_pdf_reading' }, 409);
           }
           const token = createAttemptId(this.crypto);
           await this.state.storage.put(leaseKey, { token, expiresAtMs: nowMs + CONTEXT_PDF_READING_LEASE_MS });

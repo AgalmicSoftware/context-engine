@@ -9,8 +9,11 @@ import {
   CONTEXT_TAGS,
   CONTEXT_TEXT_ROLE,
   contextFileByteLimit,
+  contextFileIsReadByAi,
+  contextFileNoun,
   contextRoleOf,
   contextTagValue,
+  isContextImage,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
 import { normalizeContextCard, type ContextCard, type ContextCardContent } from '@ce-shared/contextCards.mjs';
@@ -211,9 +214,9 @@ export const readContextSourceBlob = async (
   return !source.mime || blob.type === source.mime ? blob : new Blob([blob], { type: source.mime });
 };
 
-/** A source's text for an AI: a link's page snapshot, a text file, or a PDF's AI reading ('' when unread). */
+/** A source's text for an AI: a link's page snapshot, a text file, or the AI's reading of a PDF or image ('' when unread). */
 export const readContextSourceText = async (source: ContextSource, options: ContextSourceOptions): Promise<string> => {
-  if (source.mime === CONTEXT_FILE_TYPES.pdf) return source.reading ? readText(source.reading.id, options) : '';
+  if (contextFileIsReadByAi(source.mime)) return source.reading ? readText(source.reading.id, options) : '';
   const text = await readText(source.id, options);
   if (source.kind !== 'link') return text;
   try {
@@ -239,7 +242,7 @@ export const loadContextSourcesForAi = async (
               kind: source.kind,
               url: source.url,
               text,
-              readByAi: source.mime === CONTEXT_FILE_TYPES.pdf,
+              readByAi: isContextImage(source.mime) ? ('image' as const) : source.mime === CONTEXT_FILE_TYPES.pdf,
             }
           : null;
       } catch {
@@ -335,7 +338,7 @@ export const contextSourceTakesCard = (source: Pick<ContextSource, 'encrypted'>)
 export const contextSourcesWithoutCards = (sources: ContextSource[]): ContextSource[] =>
   sources.filter(
     (source) =>
-      !source.card && contextSourceTakesCard(source) && (source.mime !== CONTEXT_FILE_TYPES.pdf || !!source.reading),
+      !source.card && contextSourceTakesCard(source) && (!contextFileIsReadByAi(source.mime) || !!source.reading),
   );
 
 /** Removes a source and the AI's reading of it (named too, as a list can lag a recent reading). */
@@ -352,10 +355,10 @@ export const removeContextSource = async (
 /** A file the context accepts, or the reason it does not. */
 export const checkContextFile = (file: { name?: string; type?: string; size?: number }): string => {
   const type = resolveContextFileType({ name: file.name, type: file.type });
-  if (!type) return 'Add a PDF, Markdown, plain text, CSV or JSON file.';
+  if (!type) return 'Add a PDF, a PNG, JPEG or WebP image, or a Markdown, plain text, CSV or JSON file.';
   const limit = contextFileByteLimit(type);
   return (file.size || 0) > limit
-    ? `${file.name || 'This file'} is larger than ${limit / (1024 * 1024)} MB, the most for a ${type === CONTEXT_FILE_TYPES.pdf ? 'PDF' : 'text file'}.`
+    ? `${file.name || 'This file'} is larger than ${limit / (1024 * 1024)} MB, the most for ${isContextImage(type) ? 'an' : 'a'} ${contextFileNoun(type)}.`
     : '';
 };
 
@@ -397,10 +400,19 @@ const KIND_LABELS: Record<string, string> = {
   [CONTEXT_FILE_TYPES.txt]: 'Text',
   [CONTEXT_FILE_TYPES.csv]: 'CSV',
   [CONTEXT_FILE_TYPES.json]: 'JSON',
+  [CONTEXT_FILE_TYPES.png]: 'Image',
+  [CONTEXT_FILE_TYPES.jpeg]: 'Image',
+  [CONTEXT_FILE_TYPES.webp]: 'Image',
 };
-const FILE_EXTENSION = /\.(?:pdf|md|markdown|txt|csv|json)$/i;
+const FILE_EXTENSION = /\.(?:pdf|md|markdown|txt|csv|json|png|jpe?g|webp)$/i;
 
-/** What kind of source it is, in a word: Link, PDF, Markdown, Text, CSV, JSON or File. */
+/** What a file picker for context offers: every accepted extension and type. */
+export const CONTEXT_FILE_ACCEPT = [
+  ...Object.keys(CONTEXT_FILE_TYPES).map((extension) => `.${extension}`),
+  ...new Set(Object.values(CONTEXT_FILE_TYPES)),
+].join(',');
+
+/** What kind of source it is, in a word: Link, PDF, Image, Markdown, Text, CSV, JSON or File. */
 export const contextSourceKindLabel = (source: Pick<ContextSource, 'kind' | 'mime' | 'title'>): string =>
   source.kind === 'link'
     ? 'Link'

@@ -49,7 +49,8 @@ export const sessionContextNotes = (sessionContext) => {
  * The session's notes (its paragraphs, or its HTML's words) and links, then
  * its sources, as one delimited block of untrusted data for a prompt.
  * `sources` must already be only the items the person the AI acts for may
- * read: { title, kind, url?, text, readByAi? }.
+ * read: { title, kind, url?, text, readByAi? }, where readByAi is true for a
+ * PDF's AI reading and 'image' for an image's.
  * Each text is cut to `itemChars`, and items stop at `totalChars` for the
  * whole block. `text` is '' when there is nothing to give.
  * `notRead` are sources that were not read for lack of room, as
@@ -117,7 +118,7 @@ export const buildSessionContextPrompt = ({
       title: clip(text(source.title), 200) || 'Untitled',
       kind: source.kind === 'link' ? 'link' : 'file',
       ...(text(source.url) ? { url: text(source.url) } : {}),
-      ...(source.readByAi ? { readBy: 'the session’s AI, from a PDF' } : {}),
+      ...(source.readByAi ? { readBy: `the session’s AI, from ${source.readByAi === 'image' ? 'an image' : 'a PDF'}` } : {}),
     };
     const before = omitted;
     addText('sources', body, (fitted) => ({ ...about, text: fitted }));

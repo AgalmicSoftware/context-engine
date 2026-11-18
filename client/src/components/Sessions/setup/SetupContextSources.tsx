@@ -2,11 +2,12 @@ import { useCallback, useState } from 'react';
 import { Input } from 'reactstrap';
 
 import {
-  CONTEXT_FILE_TYPES,
   CONTEXT_SOURCE_LIMITS,
+  contextFileIsReadByAi,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
 import {
+  CONTEXT_FILE_ACCEPT,
   addContextLink,
   checkContextFile,
   readContextPdf,
@@ -64,7 +65,7 @@ export type SetupGroupOption = { groupId: string; label: string };
 const FILE_VISIBILITY_HELP = `${FILE_ACCESS_HELP} Groups set up under Access and identity are made at Create, before these files are added.`;
 
 const MB = 1024 * 1024;
-const ADD_FILE_HELP = `A PDF up to ${CONTEXT_SOURCE_LIMITS.pdfBytes / MB} MB, or Markdown, text, CSV or JSON up to ${CONTEXT_SOURCE_LIMITS.textFileBytes / MB} MB. It is added to the session after Create, for the people you choose in its Visible to.`;
+const ADD_FILE_HELP = `A PDF up to ${CONTEXT_SOURCE_LIMITS.pdfBytes / MB} MB, a PNG, JPEG or WebP image up to ${CONTEXT_SOURCE_LIMITS.imageBytes / MB} MB, or Markdown, text, CSV or JSON up to ${CONTEXT_SOURCE_LIMITS.textFileBytes / MB} MB. It is added to the session after Create, for the people you choose in its Visible to.`;
 const ATTACH_AGAIN_HELP =
   'The page holds chosen files only until it reloads. Choose this file again so Create can add it.';
 
@@ -85,7 +86,8 @@ const withAccess = (entry: ContextFileEntry, access: ContextFileAccess): Context
   };
 };
 
-const isPdf = (file: File) => resolveContextFileType(file) === CONTEXT_FILE_TYPES.pdf;
+// A PDF or an image: a file the session's AI reads to give its text.
+const isAiRead = (file: File) => contextFileIsReadByAi(resolveContextFileType(file));
 
 type FilesProps = {
   draft: SetupDraft;
@@ -145,7 +147,7 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
                   }
                 />
               </SetupField>
-              {chosen && isPdf(chosen.file) ? (
+              {chosen && isAiRead(chosen.file) ? (
                 <SetupCheck
                   id={`ce-setup-context-file-analyze-${index}`}
                   label="Analyze with the session’s AI"
@@ -174,7 +176,7 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
           id="ce-setup-context-file"
           type="file"
           aria-describedby={setupHelpId('ce-setup-context-file')}
-          accept=".pdf,.md,.markdown,.txt,.csv,.json,application/pdf,text/markdown,text/plain,text/csv,application/json"
+          accept={CONTEXT_FILE_ACCEPT}
           data-testid="ce-setup-context-file-input"
           onChange={(event) => {
             attach((event.target as HTMLInputElement).files?.[0]);
@@ -250,7 +252,7 @@ export const SetupContextPublisher = ({
         const id = await uploadContextFile({ file: chosen.file, ...access }, options);
         added.push(entry.name);
         pending.set(entry.name, null);
-        if (chosen.analyze && isPdf(chosen.file)) {
+        if (chosen.analyze && isAiRead(chosen.file)) {
           setStatus(`The session’s AI is reading ${entry.name}…`);
           await readContextPdf(id, options).catch((error: unknown) =>
             problems.push(

@@ -4,7 +4,12 @@ import { Input } from 'reactstrap';
 import ContextAccessPicker from '../Sessions/setup/ContextAccessPicker';
 import { SetupField } from '../Sessions/setup/SetupPrimitives';
 import setupStyles from '../Sessions/setup/SessionSetup.module.scss';
-import { checkContextFile, uploadContextFile, type ContextFileAccess } from '../../utilities/docLibrary/contextSources';
+import {
+  CONTEXT_FILE_ACCEPT,
+  checkContextFile,
+  uploadContextFile,
+  type ContextFileAccess,
+} from '../../utilities/docLibrary/contextSources';
 import type { ContextGroup } from '../../utilities/docLibrary/useContextGroups';
 
 type Props = {
@@ -49,7 +54,7 @@ const SessionContextAddFile = ({ sessionSlug, sessionConfig, account, groups, on
           key={fileKey}
           id="ce-session-context-file"
           type="file"
-          accept=".pdf,.md,.markdown,.txt,.csv,.json,application/pdf,text/markdown,text/plain,text/csv,application/json"
+          accept={CONTEXT_FILE_ACCEPT}
           onChange={(event) => setFile((event.target as HTMLInputElement).files?.[0] || null)}
         />
       </SetupField>

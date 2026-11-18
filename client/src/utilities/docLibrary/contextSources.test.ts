@@ -1,6 +1,7 @@
 import {
   addContextLink,
   buildContextNote,
+  CONTEXT_FILE_ACCEPT,
   checkContextFile,
   contextAdderLabel,
   contextDuplicateIds,
@@ -171,11 +172,23 @@ describe('context sources on the client', () => {
         ],
       },
     });
-    expect(checkContextFile({ name: 'slides.pptx', type: 'application/vnd.ms-powerpoint' })).toMatch(/PDF, Markdown/);
+    expect(checkContextFile({ name: 'slides.pptx', type: 'application/vnd.ms-powerpoint' })).toMatch(
+      /Add a PDF, a PNG/,
+    );
     expect(checkContextFile({ name: 'big.pdf', type: 'application/pdf', size: 21 * 1024 * 1024 })).toMatch(/20 MB/);
+    // An image is context too, up to its own size; SVG and animated images are not.
+    expect(checkContextFile({ name: 'chart.png', type: 'image/png', size: 5 * 1024 * 1024 })).toBe('');
+    expect(checkContextFile({ name: 'photo.JPG', type: '', size: 1 })).toBe('');
+    expect(checkContextFile({ name: 'big.webp', type: 'image/webp', size: 5 * 1024 * 1024 + 1 })).toMatch(
+      /5 MB, the most for an image/,
+    );
+    expect(checkContextFile({ name: 'logo.svg', type: 'image/svg+xml' })).toMatch(/Add a PDF, a PNG/);
+    expect(CONTEXT_FILE_ACCEPT.split(',')).toEqual(
+      expect.arrayContaining(['.pdf', '.png', '.jpg', '.webp', 'image/jpeg']),
+    );
     await expect(
-      uploadContextFile({ file: new File(['x'], 'photo.png', { type: 'image/png' }) }, options),
-    ).rejects.toThrow(/PDF, Markdown/);
+      uploadContextFile({ file: new File(['x'], 'clip.mp4', { type: 'video/mp4' }) }, options),
+    ).rejects.toThrow(/Add a PDF, a PNG/);
     expect(upload).toHaveBeenCalledTimes(3);
   });
 
@@ -369,11 +382,13 @@ describe('how the Context section names and sizes sources', () => {
       source({ mime: 'text/plain' }),
       source({ mime: 'text/csv' }),
       source({ mime: 'application/json' }),
+      source({ mime: 'image/png' }),
+      source({ mime: '', title: 'town-hall.jpeg' }),
       source({ mime: '', title: 'pilots.csv' }),
       source({ mime: '', title: 'odd' }),
       source({ kind: 'link', mime: 'application/json' }),
     ].map(contextSourceKindLabel);
-    expect(kinds).toEqual(['PDF', 'Markdown', 'Text', 'CSV', 'JSON', 'CSV', 'File', 'Link']);
+    expect(kinds).toEqual(['PDF', 'Markdown', 'Text', 'CSV', 'JSON', 'Image', 'Image', 'CSV', 'File', 'Link']);
   });
 
   it('gives sizes as the limits do', () => {

@@ -571,3 +571,17 @@ test('contextCardsEnabled is true or false, signs no one out, and the site can r
   assert.deepEqual(classifySessionConfigEdits(base, { ...base, contextCardsEnabled: true }), { content: ['contextCardsEnabled'], authority: [], signsParticipantsOut: false });
   assert.equal(projectPublicWorkerSessionConfig({ ...base, contextCardsEnabled: true }).contextCardsEnabled, true);
 });
+
+test('an image gets its card from the AI’s reading of it, and none before it is read', async () => {
+  const h = harness({ provider: provider() });
+  const image = await idOf(await h.uploadFile({ name: 'chart.png', type: 'image/png', bytes: new Uint8Array([137, 80, 78, 71, 1, 2, 3]) }));
+  await h.settled();
+  assert.deepEqual([(await rowOf(h, image)).card, cardCalls(h).length], [undefined, 0], 'an image’s bytes are never sent to the card-maker');
+  const unread = await h.context({ action: 'make-card', id: image });
+  assert.deepEqual([unread.status, (await unread.json()).reason], [409, 'context_card_no_text']);
+  assert.equal((await h.context({ action: 'read-pdf', id: image })).status, 200);
+  await h.settled();
+  assert.deepEqual(content((await rowOf(h, image)).card), STORED);
+  const [made] = cardCalls(h);
+  assert.match(made.body.messages[0].content, /Deck: coalition goals\./, 'the card is written from the reading');
+});

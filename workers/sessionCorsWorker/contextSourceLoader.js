@@ -1,13 +1,14 @@
 import {
-  CONTEXT_FILE_TYPES,
   CONTEXT_ROLE,
   CONTEXT_TAGS as TAGS,
   CONTEXT_TEXT_ROLE,
   contextCardsOn,
+  contextFileIsReadByAi,
   contextRoleOf,
   contextTagValue,
   groupLockedIds,
   isAdminsOnlyAccess,
+  isContextImage,
 } from '../../shared/sessionContextSources.mjs';
 import { buildSessionContextPrompt, SESSION_CONTEXT_TEXT_LIMITS } from '../../shared/sessionContextText.mjs';
 import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
@@ -210,7 +211,7 @@ export const loadParticipantContextSources = async ({
     let places = Math.min(PREFETCH_SOURCES, maxSources - sources.length);
     let room = totalChars - chars;
     for (; next < ordered.length && places > 0 && room > 0; next += 1) {
-      const isPdf = ordered[next].contentType === CONTEXT_FILE_TYPES.pdf;
+      const isPdf = contextFileIsReadByAi(ordered[next].contentType);
       const textRow = isPdf ? readings.get(ordered[next].id) : ordered[next];
       const size = Number(textRow?.size);
       if (!textRow?.id || !(size <= MAX_READ_BYTES)) {
@@ -231,7 +232,7 @@ export const loadParticipantContextSources = async ({
     if (sources.length >= maxSources || chars >= totalChars) {
       // A PDF the AI never read has no text to leave out.
       const rest = ordered.slice(position)
-        .filter((later) => later.contentType !== CONTEXT_FILE_TYPES.pdf || readings.has(later.id) || later.contextReadingId);
+        .filter((later) => !contextFileIsReadByAi(later.contentType) || readings.has(later.id) || later.contextReadingId);
       leftOut += rest.length;
       // Each passed this reader's own check above, so its card may go where its text would have.
       rest.forEach((later) => {
@@ -245,7 +246,8 @@ export const loadParticipantContextSources = async ({
       });
       break;
     }
-    const isPdf = row.contentType === CONTEXT_FILE_TYPES.pdf;
+    // A PDF or an image: its text is the AI's reading of it.
+    const isPdf = contextFileIsReadByAi(row.contentType);
     // A storage error is a read that failed just now; bytes that are gone, or
     // too large to read here, will never be read.
     let bytes = null;
@@ -283,7 +285,7 @@ export const loadParticipantContextSources = async ({
     text = text.trim().slice(0, itemChars + 1);
     sources.push({
       card: cardOf(row),
-      title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isPdf,
+      title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isContextImage(row.contentType) ? 'image' : isPdf,
       everyone: forEveryone(row, config), groupIds: groupLockedIds(row.accessConditions) || [], uploader: lower(row.uploader),
     });
     chars += Math.min(text.length, itemChars);

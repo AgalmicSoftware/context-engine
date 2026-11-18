@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import { CONTEXT_FILE_TYPES } from '@ce-shared/sessionContextSources.mjs';
+import { CONTEXT_FILE_TYPES, isContextImage } from '@ce-shared/sessionContextSources.mjs';
 import { DocumentLibraryViewerBody } from '../DocumentLibrary/DocumentLibraryPanelViews';
 import {
   contextSourceDisplayTitle,
@@ -29,7 +29,7 @@ type Content = { loading: boolean; error: string; text: string; blobUrl: string;
 // By its type, or else its name, as its kind label is.
 const isPdf = (source: ContextSource) => contextSourceKindLabel(source) === 'PDF';
 
-// A text file's text, or a PDF as a blob: URL that is freed when it is no longer shown.
+// A text file's text, or a PDF or an image as a blob: URL that is freed when it is no longer shown.
 const useSourceContent = (source: ContextSource, { sessionSlug, sessionConfig, account }: Reader): Content => {
   const configRef = useRef(sessionConfig);
   configRef.current = sessionConfig;
@@ -43,16 +43,17 @@ const useSourceContent = (source: ContextSource, { sessionSlug, sessionConfig, a
     const options = { sessionSlug, sessionConfig: configRef.current, context: { account } };
     const file = sourceRef.current;
     setContent({ loading: true, error: '', text: '', blobUrl: '', mime: '' });
-    const load = isPdf(file)
-      ? readContextSourceBlob(file, options).then((blob) => {
-          const viewer = toViewerBlob(blob, CONTEXT_FILE_TYPES.pdf);
-          if (!current) return;
-          blobUrl = URL.createObjectURL(viewer.blob);
-          setContent({ loading: false, error: '', text: '', blobUrl, mime: viewer.mime });
-        })
-      : readContextSourceText(file, options).then((text) => {
-          if (current) setContent({ loading: false, error: '', text, blobUrl: '', mime: file.mime });
-        });
+    const load =
+      isPdf(file) || isContextImage(file.mime)
+        ? readContextSourceBlob(file, options).then((blob) => {
+            const viewer = toViewerBlob(blob, isContextImage(file.mime) ? file.mime : CONTEXT_FILE_TYPES.pdf);
+            if (!current) return;
+            blobUrl = URL.createObjectURL(viewer.blob);
+            setContent({ loading: false, error: '', text: '', blobUrl, mime: viewer.mime });
+          })
+        : readContextSourceText(file, options).then((text) => {
+            if (current) setContent({ loading: false, error: '', text, blobUrl: '', mime: file.mime });
+          });
     load.catch((failure: unknown) => {
       if (current) {
         setContent({
@@ -74,7 +75,7 @@ const useSourceContent = (source: ContextSource, { sessionSlug, sessionConfig, a
 
 type InlineProps = Reader & { source: ContextSource; onOpen: () => void };
 
-/** The start of a text file, or a PDF's first page, under its name; the PDF opens the viewer. */
+/** The start of a text file, a PDF's first page or an image, under its name; a PDF or image opens the viewer. */
 export const ContextInlinePreview = ({ source, onOpen, ...reader }: InlineProps) => {
   const content = useSourceContent(source, reader);
   const title = contextSourceDisplayTitle(source);
@@ -83,13 +84,17 @@ export const ContextInlinePreview = ({ source, onOpen, ...reader }: InlineProps)
   if (content.blobUrl) {
     return (
       <div className={styles.pdfThumb}>
-        {/* The browser's own PDF viewer, as on the docs page; the button above it takes the clicks. */}
-        <iframe
-          title={`${title}, first page`}
-          src={`${content.blobUrl}#page=1&toolbar=0&navpanes=0&view=FitH`}
-          tabIndex={-1}
-          aria-hidden="true"
-        />
+        {content.mime.startsWith('image/') ? (
+          <img src={content.blobUrl} alt="" />
+        ) : (
+          // The browser's own PDF viewer, as on the docs page; the button above it takes the clicks.
+          <iframe
+            title={`${title}, first page`}
+            src={`${content.blobUrl}#page=1&toolbar=0&navpanes=0&view=FitH`}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+        )}
         <button type="button" className={styles.pdfThumbOpen} onClick={onOpen} aria-label={`Open ${title}`}>
           <span>Open</span>
         </button>

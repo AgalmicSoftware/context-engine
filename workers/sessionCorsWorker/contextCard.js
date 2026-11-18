@@ -1,10 +1,10 @@
 import { CONTEXT_CARD_LIMITS as LIMITS, normalizeContextCard, parseContextCardReply } from '../../shared/contextCards.mjs';
 import {
-  CONTEXT_FILE_TYPES,
   CONTEXT_ROLE,
   CONTEXT_TAGS as TAGS,
   CONTEXT_TEXT_ROLE,
   contextCardsOn,
+  contextFileIsReadByAi,
   contextRoleOf,
   contextTagValue,
   resolveContextFileType,
@@ -149,11 +149,10 @@ const coordinate = (deps, args) => (deps?.executeCoordinatedContextSourceOperati
 /** Writes (or with null, removes) a source's card through the session coordinator, one change at a time. */
 export const setContextCard = ({ env, slug, id, card, deps }) => coordinate(deps, { env, slug, operation: 'set-card', id, card });
 
-/** A source's text as its card-maker reads it: a link's page snapshot, a text file, or a PDF's AI reading; '' when it has none. */
+/** A source's text as its card-maker reads it: a link's page snapshot, a text file, or the AI's reading of a PDF or image; '' when it has none. */
 export const readContextCardText = async ({ env, config, slug, row, principal, deps }) => {
-  const isPdf = row.contentType === CONTEXT_FILE_TYPES.pdf;
   let textRow = row;
-  if (isPdf) {
+  if (contextFileIsReadByAi(row.contentType)) {
     const reading = row.contextReadingId ? await readContextSourceRow({ env, slug, id: row.contextReadingId }) : null;
     if (!reading || contextRoleOf(reading.tags) !== CONTEXT_TEXT_ROLE || contextTagValue(reading.tags, TAGS.derivedFrom) !== row.id) return '';
     textRow = reading;
@@ -200,11 +199,11 @@ export const cardAfterContextAdd = async ({ env, config, slug, id, text, carried
   else await work;
 };
 
-/** After a text file is uploaded as context: its card, from the bytes just stored. A PDF's comes with its reading. */
+/** After a text file is uploaded as context: its card, from the bytes just stored. A PDF's or an image's comes with its reading. */
 export const cardAfterContextUpload = async ({ response, payload, env, config, slug, deps }) => {
   if (!response?.ok || contextRoleOf(payload?.tags) !== CONTEXT_ROLE || contextTagValue(payload.tags, TAGS.kind) !== 'file') return;
   const type = resolveContextFileType({ type: payload.contentType });
-  if (!type || type === CONTEXT_FILE_TYPES.pdf) return;
+  if (!type || contextFileIsReadByAi(type)) return;
   const id = trim((await response.clone().json().catch(() => ({})))?.id);
   if (!id || !payload.bytes?.length) return;
   // A character is at most four bytes, so this holds all the card-maker reads.

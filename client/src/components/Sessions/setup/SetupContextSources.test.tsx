@@ -85,9 +85,9 @@ describe('setup context files', () => {
     ]);
     expect(screen.getByText('Files are added to the session once it is created.')).toBeInTheDocument();
     fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), {
-      target: { files: [new File(['x'], 'photo.png', { type: 'image/png' })] },
+      target: { files: [new File(['x'], 'clip.mp4', { type: 'video/mp4' })] },
     });
-    expect(screen.getByText(/Add a PDF, Markdown, plain text, CSV or JSON file/)).toBeInTheDocument();
+    expect(screen.getByText(/Add a PDF, a PNG, JPEG or WebP image, or a Markdown/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Remove brief.pdf' }));
     expect(latest.contextFiles).toEqual([{ name: 'deck.pdf', adminsOnly: true }]);
   });
