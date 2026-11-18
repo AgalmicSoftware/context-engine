@@ -6566,7 +6566,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
   font-size: 1.5rem;
   font-weight: 600;
 }
@@ -6961,10 +6961,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .pileNavCounterText {
     color: var(--ce-panel-text-muted);
     text-shadow: none;
-  }
-
-  .ratingValueDisplay {
-    color: var(--ce-panel-text);
   }
 
   .pileNavArrow,
