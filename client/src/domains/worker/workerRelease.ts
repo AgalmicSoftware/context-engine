@@ -36,6 +36,17 @@ export const readWorkerTakesFeedback = async (
   return found.features.includes('session_feedback');
 };
 
+/** Whether the Session Worker keeps context cards; false when it can't be read. An older one would refuse the setting. */
+export const readWorkerKeepsContextCards = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> => {
+  if (!workerOrigin) return false;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.features.includes('context_cards_v1');
+};
+
 /** Whether the Session Worker accepts a note on where research data goes (0.9.11 on); false when it can't be read. */
 export const readWorkerTakesDataNote = async (
   workerOrigin: string,

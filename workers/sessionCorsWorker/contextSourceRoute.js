@@ -6,6 +6,7 @@ import {
   CONTEXT_TAGS as TAGS,
   CONTEXT_TEXT_ROLE,
   contextAdderProblem,
+  contextCardsOn,
   contextRoleOf,
   contextTagValue,
   groupLockedAccess,
@@ -359,6 +360,9 @@ export const contextSourceRoute = async ({
   if (!isAdmin && !participantMay) return refused();
   if (!isObj(body)) return json({ error: 'Invalid JSON.' }, 400);
   if (!Object.hasOwn(ACTIONS, name)) return json({ error: 'Unknown context action.' }, 400);
+  if (['set-card', 'make-card'].includes(name) && !contextCardsOn(config)) {
+    return json({ error: 'Context cards are off for this session.', reason: 'context_cards_off' }, 409);
+  }
   // A card is words the AI may be shown, so writing one is adding: not where
   // the session limits context to admins, and not once it has ended.
   if (!isAdmin && name === 'set-card') {

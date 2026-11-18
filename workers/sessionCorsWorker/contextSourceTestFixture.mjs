@@ -73,7 +73,8 @@ const createR2 = () => {
 export const pageResponse = (body, type = 'text/html; charset=utf-8') => new Response(body, { headers: { 'content-type': type } });
 
 // `r2: false` binds no R2, as deployed Workers do: every item's bytes are then a KV key.
-export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthropic', model: 'claude-sonnet-5-5' }, provider, r2: withR2 = true } = {}) => {
+// `cards: true` turns the session's context cards on; they are off unless an admin does.
+export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthropic', model: 'claude-sonnet-5-5' }, provider, r2: withR2 = true, cards = false } = {}) => {
   const kv = createKv();
   const r2 = withR2 ? createR2() : null;
   const env = installSessionCoordinatorBinding({
@@ -85,6 +86,7 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
       adminAddress: ADMIN,
       storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate', encryption, accessConditions: SESSION_CONDITIONS } },
       ai: { mode: ai.mode, models: { fast: { provider: ai.mode, model: ai.model }, thinking: { provider: ai.mode, model: ai.model } } },
+      ...(cards ? { contextCardsEnabled: true } : {}),
     },
     scopes: { storage: true, fetch: true },
     fetchAccess: { ok: true },

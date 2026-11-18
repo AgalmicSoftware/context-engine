@@ -503,6 +503,33 @@ describe('saving the edit page through the Session Worker', () => {
     expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
   });
 
+  it('saves the Context cards choice only when it changes, and signs no one out', () => {
+    const stored = publishedSession();
+    // Off unless turned on: a session that never set it shows the box clear.
+    const on = editAndSave(stored, (draft) => {
+      expect(draft.contextCardsEnabled).toBe(false);
+      draft.contextCardsEnabled = true;
+    });
+    expect(on.save.patch).toEqual({ contextCardsEnabled: true });
+    expect(on.save.classification).toMatchObject({ content: ['contextCardsEnabled'], signsParticipantsOut: false });
+    expect(describeSessionSettingsPath('contextCardsEnabled')).toBe('Context cards');
+    expect(on.result).toMatchObject({ ok: true });
+    expect(projectPublicWorkerSessionConfig(on.result.config).contextCardsEnabled).toBe(true);
+
+    const off = editAndSave(on.result.config, (draft) => {
+      expect(draft.contextCardsEnabled).toBe(true);
+      draft.contextCardsEnabled = false;
+    });
+    expect(off.save.patch).toEqual({ contextCardsEnabled: false });
+    expect(off.result).toMatchObject({ ok: true });
+
+    // Left alone, it is never sent, so a Worker too old to know it refuses nothing.
+    const untouched = editAndSave(stored, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
+  });
+
   it('saves SBT defaults only where SBTs grant access, as the Worker requires', () => {
     const plain = editAndSave(publishedSession(), (draft) => {
       draft.defaultSbtTags = 'members';

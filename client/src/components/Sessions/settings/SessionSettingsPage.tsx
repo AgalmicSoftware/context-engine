@@ -48,6 +48,7 @@ import {
   readWorkerKeepsDraftText,
   readWorkerTakesDataNote,
   readWorkerReleaseLabel,
+  readWorkerKeepsContextCards,
   readWorkerTakesFeedback,
 } from '../../../domains/worker/workerRelease';
 import { workerOffersGroupJoinChoices } from '@ce-shared/workerGroupJoin.mjs';
@@ -77,7 +78,12 @@ import {
 import { SettingsAiSection } from './SettingsAiSection';
 import { SettingsChainFacts, SettingsChainFields } from './SettingsChainFields';
 import SettingsFeedbackPanel from './SettingsFeedbackPanel';
-import { SettingsFeedbackField, SettingsQuestionListFields, SettingsSbtFields } from './SettingsListFields';
+import {
+  SettingsContextCardsField,
+  SettingsFeedbackField,
+  SettingsQuestionListFields,
+  SettingsSbtFields,
+} from './SettingsListFields';
 import SettingsResultsAdminsField from './SettingsResultsAdminsField';
 
 type SessionSettingsPageProps = {
@@ -229,6 +235,8 @@ const SessionSettingsPage = ({
   const [workerKeepsDraftText, setWorkerKeepsDraftText] = useState<boolean | null>(null);
   // Whether it takes feedback about the app; an older one shows no Feedback section here or button on the session page.
   const [workerTakesFeedback, setWorkerTakesFeedback] = useState(false);
+  // Whether it keeps context cards; an older one would refuse the setting, so it isn't offered there.
+  const [workerKeepsCards, setWorkerKeepsCards] = useState(false);
   // Whether it counts a separate AI daily limit; an older one would store the field and ignore it.
   const [workerCountsAiLimit, setWorkerCountsAiLimit] = useState(false);
   const [workerRunsWorkersAi, setWorkerRunsWorkersAi] = useState(false);
@@ -242,6 +250,7 @@ const SessionSettingsPage = ({
     setWorkerRelease('');
     setWorkerKeepsDraftText(null);
     setWorkerTakesFeedback(false);
+    setWorkerKeepsCards(false);
     setWorkerCountsAiLimit(false);
     setWorkerRunsWorkersAi(false);
     setWorkerTakesDataNote(false);
@@ -254,6 +263,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerTakesFeedback(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesFeedback(takes);
+    });
+    void readWorkerKeepsContextCards(workerOrigin, sessionSlug, fetchImpl).then((keeps) => {
+      if (!stale) setWorkerKeepsCards(keeps);
     });
     void readWorkerCountsAiLimit(workerOrigin, sessionSlug, fetchImpl).then((counts) => {
       if (!stale) setWorkerCountsAiLimit(counts);
@@ -557,6 +569,7 @@ const SessionSettingsPage = ({
                   <option value="admin_only">Admins only</option>
                 </Input>
               </SetupField>
+              {workerKeepsCards && !onChain ? <SettingsContextCardsField draft={draft} onChange={updateDraft} /> : null}
               <ContextSourcesPanel
                 sessionSlug={sessionSlug}
                 sessionConfig={saved}

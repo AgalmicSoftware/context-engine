@@ -82,6 +82,9 @@ const validFeedbackConfig = (config) =>
 // People's names in the session: absent means on.
 const validNamesConfig = (config) =>
   !hasOwn(config, 'namesEnabled') || typeof config.namesEnabled === 'boolean';
+// Context cards: absent means off.
+const validContextCardsConfig = (config) =>
+  !hasOwn(config, 'contextCardsEnabled') || typeof config.contextCardsEnabled === 'boolean';
 
 const validInterviewModeConfig = (config) => {
   if (hasOwn(config, 'interviewModeEnabled') && typeof config.interviewModeEnabled !== 'boolean') return false;
@@ -284,6 +287,7 @@ const SETTINGS_CHECKS = Object.freeze([
   [validPileAutoAdvanceConfig, 'Invalid pile auto-advance config.'],
   [validFeedbackConfig, 'feedbackEnabled must be true or false.'],
   [validNamesConfig, 'namesEnabled must be true or false.'],
+  [validContextCardsConfig, 'contextCardsEnabled must be true or false.'],
   [validAiDailyLimit, `limits.aiPerWalletPerDay must be a whole number from 0 to ${AI_DAILY_LIMIT_MAX}, or empty.`, { mergedOnly: true }],
   [validInterviewModeConfig, 'Invalid interview mode config.'],
   [validResultsAnalysisSettingsConfig, 'Invalid results analysis settings config.'],

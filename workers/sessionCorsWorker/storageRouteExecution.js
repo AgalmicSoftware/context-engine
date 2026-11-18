@@ -1,4 +1,4 @@
-import { CONTEXT_ROLE, CONTEXT_SOURCE_LIMITS, CONTEXT_TEXT_ROLE, contextRoleOf, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { CONTEXT_ROLE, CONTEXT_SOURCE_LIMITS, CONTEXT_TEXT_ROLE, contextCardsOn, contextRoleOf, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import { markStorageBackupWrite } from './storageBackupRevision.js';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
@@ -2454,7 +2454,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
           encryption: metadataAccess.encryption,
         },
         payloadAccessMode: deriveLegacyPayloadAccessMode(metadataAccess),
-        ...contextSourceListFields(metadata),
+        ...contextSourceListFields(metadata, { cards: contextCardsOn(config) }),
       },
     });
   }

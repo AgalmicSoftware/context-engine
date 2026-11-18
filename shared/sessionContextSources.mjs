@@ -63,6 +63,14 @@ const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArr
 /** Everyone the session admits may add files and links, unless an admin limits it to admins. */
 export const participantsMayAddContext = (config) => config?.contextAdditionPolicy !== 'admin_only';
 
+/**
+ * Context cards are off unless an admin turns them on. On, the session's AI
+ * writes a card for each source added, people may write and edit cards, the AI
+ * is told of sources it had no room to read, and whoever adds a PDF or image
+ * may have the AI read it once.
+ */
+export const contextCardsOn = (config) => config?.contextCardsEnabled === true;
+
 /** The one adder mark an item may carry: an agent's. */
 export const CONTEXT_AGENT_ADDER = 'agent';
 

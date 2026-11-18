@@ -3,6 +3,7 @@ import {
   CONTEXT_ROLE,
   CONTEXT_TAGS as TAGS,
   CONTEXT_TEXT_ROLE,
+  contextCardsOn,
   contextRoleOf,
   contextTagValue,
   groupLockedIds,
@@ -182,6 +183,8 @@ export const loadParticipantContextSources = async ({
   };
   const sources = [];
   const notRead = [];
+  // With cards off, no AI is told of one: its prompt is as it was before cards.
+  const cardOf = contextCardsOn(config) ? contextCardOf : () => null;
   const kindOf = (row) => (contextTagValue(row.tags, TAGS.kind) === 'link' ? 'link' : 'file');
   const mine = contextReadingOrder(visible.filter((row) => contextRoleOf(row.tags) === CONTEXT_ROLE));
   const ordered = mine.filter((row) => !leaveOutUploaders?.has(lower(row.uploader)));
@@ -232,7 +235,7 @@ export const loadParticipantContextSources = async ({
       leftOut += rest.length;
       // Each passed this reader's own check above, so its card may go where its text would have.
       rest.forEach((later) => {
-        const card = contextCardOf(later);
+        const card = cardOf(later);
         if (!card) return;
         // Who may read it, as a source says: a card tells its reader something of a locked file too.
         notRead.push({
@@ -279,7 +282,7 @@ export const loadParticipantContextSources = async ({
     // over says it was longer. A session's largest files are then never all held at once.
     text = text.trim().slice(0, itemChars + 1);
     sources.push({
-      card: contextCardOf(row),
+      card: cardOf(row),
       title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isPdf,
       everyone: forEveryone(row, config), groupIds: groupLockedIds(row.accessConditions) || [], uploader: lower(row.uploader),
     });

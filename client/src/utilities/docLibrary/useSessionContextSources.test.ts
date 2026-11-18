@@ -167,24 +167,35 @@ describe('useSessionContextSources', () => {
     expect(workerSupportsContextCards).not.toHaveBeenCalled();
   });
 
-  it('offers card writing only to someone signed in, on a Worker that keeps cards', async () => {
+  it('offers card writing only to someone signed in, on a Worker that keeps cards, in a session with cards on', async () => {
     jest.mocked(workerSupportsContextCards).mockClear();
-    const signedIn = mount(READER);
+    const cardsOn = { ...config(), contextCardsEnabled: true } as ReturnType<typeof config>;
+    const mountOn = (account: string) =>
+      renderHook(() => useSessionContextSources({ sessionSlug: 'salon', sessionConfig: cardsOn, account }));
+    const signedIn = mountOn(READER);
     await resolveLatest([]);
     await waitFor(() => expect(signedIn.result.current.cardsSupported).toBe(true));
-    const signedOut = mount('');
+    const signedOut = mountOn('');
     await resolveLatest([]);
     expect(signedOut.result.current.cardsSupported).toBe(false);
     expect(workerSupportsContextCards).toHaveBeenCalledTimes(1);
-    jest.mocked(workerSupportsContextCards).mockResolvedValueOnce(false);
-    const older = mount(ADMIN);
+    // Cards are off unless an admin turned them on, whatever the Worker keeps.
+    const off = mount(ADMIN);
     await resolveLatest([]);
     await waitFor(() => expect(workerSupportsContextCards).toHaveBeenCalledTimes(2));
+    await act(async () => undefined);
+    expect(off.result.current.cardsSupported).toBe(false);
+    jest.mocked(workerSupportsContextCards).mockClear();
+    jest.mocked(workerSupportsContextCards).mockResolvedValueOnce(false);
+    const older = mountOn(ADMIN);
+    await resolveLatest([]);
+    await waitFor(() => expect(workerSupportsContextCards).toHaveBeenCalledTimes(1));
+    await act(async () => undefined);
     expect(older.result.current.cardsSupported).toBe(false);
     // Where the Worker would refuse a participant's card, it isn't offered: context limited to admins,
     // or a session that has ended. An admin still may.
-    const limited = { ...config(), contextAdditionPolicy: 'admin_only' } as ReturnType<typeof config>;
-    const ended = { ...config(), sessionEndsAt: '2020-01-01T00:00:00.000Z' } as ReturnType<typeof config>;
+    const limited = { ...cardsOn, contextAdditionPolicy: 'admin_only' } as ReturnType<typeof config>;
+    const ended = { ...cardsOn, sessionEndsAt: '2020-01-01T00:00:00.000Z' } as ReturnType<typeof config>;
     for (const sessionConfig of [limited, ended]) {
       const before = jest.mocked(workerSupportsContextCards).mock.calls.length;
       const reader = renderHook(() =>

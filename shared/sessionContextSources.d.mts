@@ -48,6 +48,7 @@ export function contextTagValue(tags: unknown, name: string): string;
 export function contextRoleOf(tags: unknown): '' | 'context' | 'context-text';
 export function isAdminsOnlyAccess(accessConditions: unknown): boolean;
 export function participantsMayAddContext(config: unknown): boolean;
+export function contextCardsOn(config: unknown): boolean;
 /** The one adder mark an item may carry: an agent's. */
 export const CONTEXT_AGENT_ADDER: 'agent';
 /** An agent's name as an item carries it: one line of plain text, cut to fit. */

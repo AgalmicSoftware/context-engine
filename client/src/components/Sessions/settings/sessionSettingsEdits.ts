@@ -138,6 +138,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     sessionModeProfile: clone(source.sessionModeProfile ?? null),
     pileAutoAdvanceEnabled: resolvePileAutoAdvanceEnabled(source),
     feedbackEnabled: source.feedbackEnabled !== false,
+    contextCardsEnabled: source.contextCardsEnabled === true,
     defaultFilterState: formatFilterState(source.defaultFilterState),
     defaultSbtTags: text(source.defaultSbtTags),
     autoFeatureSBTsBySessionSlug: resolveSessionWizardAutoFeatureBySessionSlug(source) !== false,
@@ -315,6 +316,10 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
   if (!onChain && (draft.feedbackEnabled !== false) !== (before.feedbackEnabled !== false)) {
     values.feedbackEnabled = draft.feedbackEnabled !== false;
   }
+  // Context cards are off unless turned on. Only a changed choice is stored, for the same reason.
+  if (!onChain && (draft.contextCardsEnabled === true) !== (before.contextCardsEnabled === true)) {
+    values.contextCardsEnabled = draft.contextCardsEnabled === true;
+  }
   // A cleared end time is sent as '' so the stored one goes; an unchanged one is left alone.
   if (trimmed(draft.sessionEndsAt) !== trimmed(before.sessionEndsAt)) {
     values.sessionEndsAt = normalizeSessionWizardEndsAt(draft.sessionEndsAt, { nowMs });
@@ -360,6 +365,7 @@ const unchanged = (key: string, before: unknown, after: unknown) => {
   // Voice interviews are on unless turned off.
   if (key === 'interviewModeEnabled') return (before !== false) === after;
   if (key === 'feedbackEnabled') return (before !== false) === after;
+  if (key === 'contextCardsEnabled') return (before === true) === after;
   return same(before, after) || (isBlank(before) && isBlank(after));
 };
 
@@ -495,6 +501,7 @@ const LABELS: Record<string, string> = {
   storageProfile: 'Storage access',
   pileAutoAdvanceEnabled: 'Next question after an answer',
   feedbackEnabled: 'Feedback box',
+  contextCardsEnabled: 'Context cards',
   defaultFilterState: 'Default filters',
   defaultSbtTags: 'SBT tags',
   autoFeatureSBTsBySessionSlug: 'Feature this session’s SBTs',

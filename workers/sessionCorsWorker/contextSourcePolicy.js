@@ -67,9 +67,10 @@ export const mayHaveContextCard = (row) =>
 /** A source's card within its limits, or null: read from its row alone, so it goes only where the row does. */
 export const contextCardOf = (row) => (mayHaveContextCard(row) ? normalizeContextCard(row.card) : null);
 
-// What a list shows of a context source beyond its tags: the privacy level, who added it and its card.
-export const contextSourceListFields = (metadata = {}) => {
-  const card = contextCardOf(metadata);
+// What a list shows of a context source beyond its tags: the privacy level, who added it and,
+// where the session has cards on, its card.
+export const contextSourceListFields = (metadata = {}, { cards = false } = {}) => {
+  const card = cards ? contextCardOf(metadata) : null;
   return metadata?.contextSource === true
     ? {
       contextSource: true,

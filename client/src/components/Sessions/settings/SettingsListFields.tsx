@@ -159,6 +159,18 @@ export const SettingsSbtFields = ({ draft, onChange, onChain }: FieldsProps & { 
   </>
 );
 
+// Whether the session's AI writes a card for each context source, and reads a PDF or image for whoever adds it.
+export const SettingsContextCardsField = ({ draft, onChange }: FieldsProps) => (
+  <SetupCheck
+    id="ce-settings-context-cards"
+    label="Context cards"
+    help="The session’s AI writes a short card for each file or link added: a summary, topic tags and key names. Cards show as tags in the list, and tell the AI and agents what a source covers when there is no room to read it. Whoever adds a PDF or image can also have the AI read it once. Each card and each reading uses the session’s AI key."
+    checked={draft.contextCardsEnabled === true}
+    testId="ce-settings-context-cards"
+    onChange={(checked) => onChange(['contextCardsEnabled'], checked)}
+  />
+);
+
 // Whether the session page offers its Feedback button, for feedback about the app itself.
 export const SettingsFeedbackField = ({ draft, onChange }: FieldsProps) => (
   <SetupCheck

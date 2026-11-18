@@ -1,7 +1,7 @@
 /** @file useSessionContextSources.ts: the context sources a reader may see, and their text for the AI. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { participantsMayAddContext } from '@ce-shared/sessionContextSources.mjs';
+import { contextCardsOn, participantsMayAddContext } from '@ce-shared/sessionContextSources.mjs';
 import { buildSessionContextPrompt } from '@ce-shared/sessionContextText.mjs';
 import { getUsableSessionWorkerUrl } from '../session/sessionWorkerAvailability';
 import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
@@ -179,9 +179,10 @@ export function useSessionContextSources({
     participantsCanAddLinks: mayAdd && workerAccepts.files && workerAccepts.links,
     // Not offered while the list, and any sign-in it asked for, is still under way.
     groupFilesHidden: groupFilesHidden && !loading,
-    // Whether this reader may write cards here: an admin any source's, anyone else their own
-    // sources', and only while they could still add context, as the Worker rules.
-    cardsSupported: workerKeepsCards && (isAdmin || mayAdd),
+    // Whether this reader may write cards here: where the session has cards on, an admin any
+    // source's, anyone else their own sources', and only while they could still add context,
+    // as the Worker rules.
+    cardsSupported: workerKeepsCards && contextCardsOn(sessionConfig) && (isAdmin || mayAdd),
     reload,
   };
 }

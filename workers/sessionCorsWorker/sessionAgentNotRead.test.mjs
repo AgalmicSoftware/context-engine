@@ -67,7 +67,7 @@ const blockOf = (prompt) => JSON.parse(prompt.slice(prompt.indexOf(OPEN) + OPEN.
 
 test('a Session Agent answer is given the cards of the sources it could not read, and nothing else of them', async () => {
   // Each source's card names it, so the prompt shows whose cards it was given.
-  const h = harness({ provider: async (url, init) => cardReply({ summary: `Card of ${titleSent(init)}.`, tags: ['notes'], names: [] }) });
+  const h = harness({ cards: true, provider: async (url, init) => cardReply({ summary: `Card of ${titleSent(init)}.`, tags: ['notes'], names: [] }) });
   h.state.config.sessionAgent = { audiences: [{ who: everyone, answers: 'general' }] };
   await addNotes(h);
   const prompt = await ask(h);
@@ -87,7 +87,7 @@ test('a Session Agent answer is given the cards of the sources it could not read
 
 test('a stored chat is marked for a group when the answer saw that group’s file only as its card', async () => {
   // Only the group's file has a card, so its card is the one the answer is shown.
-  const h = harness({ provider: async (url, init) => cardReply(titleSent(init) === 'group' ? { summary: 'CARD of the group plan.', tags: ['plan'] } : 'no card') });
+  const h = harness({ cards: true, provider: async (url, init) => cardReply(titleSent(init) === 'group' ? { summary: 'CARD of the group plan.', tags: ['plan'] } : 'no card') });
   h.state.config.sessionAgent = { audiences: [{ who: salonMembers, answers: 'detailed' }, { who: everyone, answers: 'general' }], history: true };
   await addNotes(h);
   await idOf(await h.uploadFile({

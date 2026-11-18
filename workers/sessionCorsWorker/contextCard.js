@@ -4,6 +4,7 @@ import {
   CONTEXT_ROLE,
   CONTEXT_TAGS as TAGS,
   CONTEXT_TEXT_ROLE,
+  contextCardsOn,
   contextRoleOf,
   contextTagValue,
   resolveContextFileType,
@@ -170,13 +171,16 @@ export const readContextCardText = async ({ env, config, slug, row, principal, d
 };
 
 /**
- * Makes and stores the card of a source just added or read, from `text`.
- * Nothing is spent on a source that may not have a card, or that carries one
- * a person wrote (`carried`, on a refreshed link, is the earlier record's).
+ * Makes and stores the card of a source just added or read, from `text`,
+ * where the session has cards on. Nothing is spent on a source that may not
+ * have a card, or that carries one a person wrote (`carried`, on a refreshed
+ * link, is the earlier record's, and is kept whether cards are on or off).
  * Never throws: a source without a card reads as it always did. Where the
  * runtime can finish work after the reply, the reply does not wait.
  */
 export const cardAfterContextAdd = async ({ env, config, slug, id, text, carried = null, deps = {} }) => {
+  const on = contextCardsOn(config);
+  if (!on && !(carried && carried.by !== 'ai')) return;
   const work = (async () => {
     const row = await readContextSourceRow({ env, slug, id });
     if (!row || contextRoleOf(row.tags) !== CONTEXT_ROLE || !mayHaveContextCard(row)) return;
@@ -185,6 +189,7 @@ export const cardAfterContextAdd = async ({ env, config, slug, id, text, carried
       if (written === carried) await setContextCard({ env, slug, id, card: written, deps });
       return;
     }
+    if (!on) return;
     const made = await makeContextCard({
       env, config, secrets: (await deps.getSessionSecrets?.(env, slug)) || {}, deps, text,
       title: contextTagValue(row.tags, TAGS.name), kind: contextTagValue(row.tags, TAGS.kind),

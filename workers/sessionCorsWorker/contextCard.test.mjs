@@ -5,11 +5,17 @@ import { CONTEXT_CARD_PROMPT, cardAfterContextAdd, setContextCard } from './cont
 import { buildParticipantContextPrompt, loadParticipantContextSources } from './contextSourceLoader.js';
 import { resolveInterviewStarter } from './interviewStarter.js';
 import { buildIndexKey } from './storageRouteExecution.js';
+import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionServiceBinding.js';
+import { projectPublicWorkerSessionConfig } from '../shared/workerSessionConfig.mjs';
+import { classifySessionConfigEdits } from '../../shared/sessionConfigEdits.mjs';
 import { CONTEXT_CARD_LIMITS } from '../../shared/contextCards.mjs';
 import { buildSessionContextPrompt } from '../../shared/sessionContextText.mjs';
 import { groupLockedAccess, isAdminsOnlyAccess } from '../../shared/sessionContextSources.mjs';
-import { ADMIN, PARTICIPANT, harness, idOf, json, pageResponse } from './contextSourceTestFixture.mjs';
+import { ADMIN, PARTICIPANT, harness as sessionHarness, idOf, json, pageResponse } from './contextSourceTestFixture.mjs';
+
+// Every test here but the last few runs in a session whose admins turned cards on.
+const harness = (options = {}) => sessionHarness({ cards: true, ...options });
 
 const MEMBER = `0x${'3'.repeat(40)}`;
 const OPEN = '<session_context>';
@@ -521,4 +527,47 @@ test('a refresh whose old record can’t be removed leaves the link as it was, o
   // Once it can be, the refresh goes through and one record is left.
   const refreshed = await idOf(await h.context({ action: 'add-link', url: 'https://example.org/essay', replaces: link }));
   assert.deepEqual(await linksListed(), [refreshed]);
+});
+
+test('cards are off until an admin turns them on: nothing is made, written, listed or told to the AI', async () => {
+  const h = sessionHarness({ provider: provider(), pages: { 'https://example.org/essay': async () => pageResponse('<p>Essay.</p>') } });
+  ticking(h);
+  const first = await addFile(h, 'first.md', 'First. '.repeat(900));
+  const second = await addFile(h, 'second.md', 'Second. '.repeat(900));
+  const link = await idOf(await h.context({ action: 'add-link', url: 'https://example.org/essay' }));
+  await h.settled();
+  assert.equal(cardCalls(h).length, 0, 'no card is paid for');
+  assert.deepEqual([(await rowOf(h, first)).card, (await rowOf(h, link)).card], [undefined, undefined]);
+  for (const body of [{ action: 'set-card', id: first, card: { summary: 'Mine.' } }, { action: 'make-card', id: first }]) {
+    const refused = await h.context(body);
+    assert.deepEqual([refused.status, (await refused.json()).reason], [409, 'context_cards_off']);
+  }
+  const before = await participantPrompt(h, 4000);
+
+  // On: cards are written and shown. Off again: they stay stored, and no list or prompt carries them.
+  h.state.config = { ...h.state.config, contextCardsEnabled: true };
+  for (const id of [second, link]) assert.equal((await h.context({ action: 'set-card', id, card: { summary: 'Written by an admin.' } })).status, 200);
+  assert.equal((await cardsListed(h, ADMIN))[second].summary, 'Written by an admin.');
+  assert.notEqual(await participantPrompt(h, 4000), before);
+  h.state.config = { ...h.state.config, contextCardsEnabled: false };
+  assert.deepEqual(await cardsListed(h, ADMIN), { [first]: null, [second]: null, [link]: null });
+  assert.equal(await participantPrompt(h, 4000), before, 'the prompt is the one a session without cards gets');
+  const loaded = await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, totalChars: 4000 });
+  assert.deepEqual([loaded.notRead, loaded.sources.map((source) => source.card)], [[], [null]]);
+
+  // A link refreshed while cards are off keeps the card a person wrote, and still pays for none.
+  const again = await idOf(await h.context({ action: 'add-link', url: 'https://example.org/essay', replaces: link }));
+  await h.settled();
+  const kept = (await rowOf(h, again)).card;
+  assert.deepEqual([kept.summary, kept.by, cardCalls(h).length], ['Written by an admin.', 'admin', 0]);
+});
+
+test('contextCardsEnabled is true or false, signs no one out, and the site can read it', () => {
+  const base = { slug: 's', sessionId: `0x${'ab'.repeat(16)}`, adminAddress: ADMIN };
+  const save = (contextCardsEnabled) =>
+    applySessionConfigMutation({ existingConfig: base, slug: 's', mutation: { kind: 'set-config', incomingConfig: { ...base, contextCardsEnabled } } });
+  assert.deepEqual([save('yes').ok, save('yes').status, save('yes').error], [false, 400, 'contextCardsEnabled must be true or false.']);
+  assert.deepEqual([save(true).ok, save(false).ok], [true, true]);
+  assert.deepEqual(classifySessionConfigEdits(base, { ...base, contextCardsEnabled: true }), { content: ['contextCardsEnabled'], authority: [], signsParticipantsOut: false });
+  assert.equal(projectPublicWorkerSessionConfig({ ...base, contextCardsEnabled: true }).contextCardsEnabled, true);
 });
