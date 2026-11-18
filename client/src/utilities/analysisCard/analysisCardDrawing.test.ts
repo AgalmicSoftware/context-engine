@@ -1,4 +1,4 @@
-import { CARD_HEIGHT, CARD_WIDTH, drawAnalysisCardPages } from './analysisCardCanvas';
+import { CARD_HEIGHT, CARD_WIDTH, drawAnalysisCardPages, loadAnalysisCardFonts } from './analysisCardCanvas';
 import { normalizeAnalysisCard, type AnalysisCard } from './analysisCardModel';
 
 // A stand-in for a canvas that measures every character as half its type size and records what is drawn, so
@@ -215,6 +215,21 @@ describe('drawAnalysisCardPages', () => {
     expect(contextOf(pages!.page2).texts.some((drawn) => drawn.text === 'CONSTRUCTOR')).toBe(true);
   });
 
+  it('cuts an answer too long for its chip, inside the chip', () => {
+    const long = normalizeAnalysisCard({
+      ...full,
+      answers: {
+        ...full.answers,
+        yesNo: { prompt: 'Should towns run their own water?', text: 'Strongly agree, with conditions' },
+      },
+    }) as AnalysisCard;
+    const pages = drawAnalysisCardPages(long, picture, mark);
+    const chip = contextOf(pages!.page2).texts.find((drawn) => drawn.text.startsWith('STRONGLY')) as Drawn;
+    expect(chip.text.endsWith('…')).toBe(true);
+    // The chip's box ends 42 inside the answer box, which ends 42 inside the page's margin.
+    expect(chip.x + chip.width).toBeLessThanOrEqual(CARD_WIDTH - 72 - 42 - 32);
+  });
+
   it('draws a card that has nothing but a title and a figure', () => {
     const bare = normalizeAnalysisCard({ title: 'Undecided', figure: 'Someone (1900–1950)' }) as AnalysisCard;
     const pages = drawAnalysisCardPages(bare, null);
@@ -225,5 +240,22 @@ describe('drawAnalysisCardPages', () => {
   it('gives no pages where the browser has no canvas', () => {
     jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     expect(drawAnalysisCardPages(full, null)).toBeNull();
+  });
+});
+
+describe('loadAnalysisCardFonts', () => {
+  it("asks for the parts of each font that the card's own letters need, small and capital", async () => {
+    const load = jest.fn(async () => []);
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { load } });
+    try {
+      await loadAnalysisCardFonts({ ...full, title: 'Ελπίδα' });
+      expect(load).toHaveBeenCalledTimes(6);
+      load.mock.calls.forEach((call: unknown[]) => {
+        expect(call[1]).toContain('Ελπίδα');
+        expect(call[1]).toContain('ΕΛΠΊΔΑ');
+      });
+    } finally {
+      delete (document as unknown as { fonts?: unknown }).fonts;
+    }
   });
 });

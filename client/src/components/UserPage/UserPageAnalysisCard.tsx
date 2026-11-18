@@ -57,7 +57,7 @@ const UserPageAnalysisCard = ({ card, picture = null }: UserPageAnalysisCardProp
     let current = true;
     void (async () => {
       try {
-        await loadAnalysisCardFonts();
+        await loadAnalysisCardFonts(card);
         const [image, mark] = await Promise.all([
           pictureUrl ? loadImage(pictureUrl).catch(() => null) : null,
           loadImage(siteMark).catch(() => null),

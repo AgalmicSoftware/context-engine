@@ -604,11 +604,20 @@ const boxed = (context: Ctx, theme: AnalysisCardTheme, fit: number, rows: Row[])
   };
 };
 
-const chipRow = (context: Ctx, text: string, theme: AnalysisCardTheme, fit: number, x: number): Row => {
+// An answer chip; an answer too long for the box is cut short with an ellipsis rather than run past its edge.
+const chipRow = (
+  context: Ctx,
+  answer: string,
+  theme: AnalysisCardTheme,
+  fit: number,
+  x: number,
+  width: number,
+): Row => {
   const style: Style = { weight: 800, size: 88 * fit, family: DISPLAY, upper: true };
   const lineHeight = style.size * 1.1;
-  const [fill, ink] = STANCE_COLOURS.get(text.trim().toLowerCase()) || [theme.accent, theme.chip];
+  const [fill, ink] = STANCE_COLOURS.get(answer.trim().toLowerCase()) || [theme.accent, theme.chip];
   const height = lineHeight + 14;
+  const text = fitLine((value) => widthOf(context, value, style), answer, width - 64);
   return {
     gap: 24,
     height,
@@ -649,7 +658,7 @@ const pageTwoBoxes = (
     boxes.push(
       boxed(context, theme, fit, [
         textRow(context, yesNo.prompt, big, { x, width, lead: 1.14, colour: theme.ink, maxLines: lines(6) }),
-        chipRow(context, yesNo.text, theme, fit, x),
+        chipRow(context, yesNo.text, theme, fit, x, width),
       ]),
     );
   }
@@ -760,11 +769,15 @@ const drawPageTwo = (
 
 export type AnalysisCardPages = { page1: HTMLCanvasElement; page2: HTMLCanvasElement; theme: AnalysisCardTheme };
 
-// The fonts the card is drawn with must be loaded before a canvas can use them.
-export const loadAnalysisCardFonts = async (): Promise<void> => {
+// The fonts the card is drawn with must be loaded before a canvas can use them. A font split by script loads only
+// the parts the text asks for, so the card's own text is named, as written and in capitals (labels and chips are
+// set in capitals, and a capital can sit in another part than its small letter).
+export const loadAnalysisCardFonts = async (card?: AnalysisCard): Promise<void> => {
   if (typeof document === 'undefined' || !document.fonts?.load) return;
+  const words = card ? JSON.stringify(card) : '';
+  const text = `${words}${words.toUpperCase()}` || undefined;
   const faces = [`800 40px ${DISPLAY}`, ...[400, 500, 600, 700, 800].map((weight) => `${weight} 40px ${BODY}`)];
-  await Promise.all(faces.map((face) => document.fonts.load(face).catch(() => []))).catch(() => undefined);
+  await Promise.all(faces.map((face) => document.fonts.load(face, text).catch(() => []))).catch(() => undefined);
 };
 
 // Draws both pages at full size. Returns null where the browser gives no canvas to draw on.
