@@ -330,8 +330,14 @@ export const DEBATE_VISUAL_MODES = Object.freeze({
 const DEMO_LEVEL_LABELS = ['Category', 'Sub-Category', 'Topic', 'Instance'];
 const LEVEL_DOT_CLASSES = ['category', 'subcategory', 'topic', 'instance'];
 
+// The node atlas (the orbital picture) is hidden for now, its code kept so it can come back; the switch calls the
+// circles view "Atlas", and a map set to open on the node atlas opens on the circles.
+const NODE_ATLAS_SHOWN: boolean = false;
+
 const getInitialDebateVisualMode = (atlasLayoutMode: AtlasLayoutMode): DebateVisualMode =>
-  atlasLayoutMode === ATLAS_LAYOUT_MODES.ORBITAL ? DEBATE_VISUAL_MODES.ATLAS : DEBATE_VISUAL_MODES.CIRCLES;
+  NODE_ATLAS_SHOWN && atlasLayoutMode === ATLAS_LAYOUT_MODES.ORBITAL
+    ? DEBATE_VISUAL_MODES.ATLAS
+    : DEBATE_VISUAL_MODES.CIRCLES;
 
 const getAtlasCommentCount = (node: DebateNode): number =>
   (node.questions ? node.questions.length : 0) + (node.comments ? node.comments.length : 0);
@@ -2623,17 +2629,19 @@ const DebateMap = ({
                 className={visualMode === DEBATE_VISUAL_MODES.CIRCLES ? styles.active : ''}
                 onClick={() => handleVisualModeChange(DEBATE_VISUAL_MODES.CIRCLES)}
               >
-                <FontAwesomeIcon icon={faCircle} /> Circles
+                <FontAwesomeIcon icon={faCircle} /> Atlas
               </button>
-              <button
-                type="button"
-                data-testid={E2E_TESTIDS.DEBATE_VIEW_MODE}
-                data-ce-view-mode={DEBATE_VISUAL_MODES.ATLAS}
-                className={visualMode === DEBATE_VISUAL_MODES.ATLAS ? styles.active : ''}
-                onClick={() => handleVisualModeChange(DEBATE_VISUAL_MODES.ATLAS)}
-              >
-                <FontAwesomeIcon icon={faNetworkWired} /> Atlas
-              </button>
+              {NODE_ATLAS_SHOWN && (
+                <button
+                  type="button"
+                  data-testid={E2E_TESTIDS.DEBATE_VIEW_MODE}
+                  data-ce-view-mode={DEBATE_VISUAL_MODES.ATLAS}
+                  className={visualMode === DEBATE_VISUAL_MODES.ATLAS ? styles.active : ''}
+                  onClick={() => handleVisualModeChange(DEBATE_VISUAL_MODES.ATLAS)}
+                >
+                  <FontAwesomeIcon icon={faNetworkWired} /> Node atlas
+                </button>
+              )}
               <button
                 type="button"
                 data-testid={E2E_TESTIDS.DEBATE_VIEW_MODE}

@@ -3197,7 +3197,7 @@ const renderDebateAtlas = (report) => {
           <div class="controls">
             <div class="primaryControls">
               <div class="viewModeSwitch" aria-label="Debate atlas view mode">
-                <button type="button" data-testid="ce-debate-view-mode" data-ce-view-mode="circles" class="active">${renderFontAwesomeIcon('circle', 'debateViewModeIcon')} Circles</button>
+                <button type="button" data-testid="ce-debate-view-mode" data-ce-view-mode="circles" class="active">${renderFontAwesomeIcon('circle', 'debateViewModeIcon')} Atlas</button>
                 <button type="button" data-testid="ce-debate-view-mode" data-ce-view-mode="list">${renderFontAwesomeIcon('list', 'debateViewModeIcon')} List</button>
                 <span class="viewModeSeparator" aria-hidden="true"></span>
                 <span class="inlineLegendItem"><span class="legendDot category"></span><span>Category</span></span>

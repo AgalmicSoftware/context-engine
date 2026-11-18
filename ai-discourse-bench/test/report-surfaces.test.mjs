@@ -1993,7 +1993,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.debateMap \.primaryControls, \.debateMap \.secondaryControls \{[^}]*min-width: 0/);
   assert.match(html, /class="viewModeSwitch"/);
   assert.doesNotMatch(html, /\.ce-results-mode-pane \.debateMap \.viewModeSwitch \{ border: 1px solid #ddd; border-radius: var\(--ce-radius-4\); background: #fff; \}/);
-  assert.match(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="circles" class="active"/);
+  assert.match(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="circles" class="active">[^<]*<[^]*?<\/svg> Atlas<\/button>/);
   assert.doesNotMatch(html, /data-testid="ce-debate-view-mode"[^>]*aria-pressed=/);
   assert.doesNotMatch(html, /data-testid="ce-debate-view-mode"[^>]*title="Static benchmark report includes/);
   assert.doesNotMatch(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="atlas">/);
