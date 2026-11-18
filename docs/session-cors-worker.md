@@ -870,7 +870,13 @@ Authenticated clients can use the worker as the session storage boundary:
   members may each read it, and be readable by the Worker. The session
   coordinator publishes each context item only while its uploader may still add it, so a link, PDF reading or upload
   that finishes after that admin was replaced, or after participants were limited, returns `409` and is not listed; a content-only settings edit
-  meanwhile does not stop it. See [Session context](session-context-sources.md).
+  meanwhile does not stop it. `{ action: "set-card", id, card: { summary, tags, names } | null }` writes or
+  removes a source's card (admins for any source; anyone else for one they added, while `contextAdditionPolicy`
+  isn't `admin_only` and the session hasn't ended; `400 context_card_invalid` for
+  an empty card, `409 context_card_unsupported` for an item stored encrypted), and `{ action: "make-card", id }`
+  has the session's AI write it (admins only; `409 context_card_no_text` for a PDF not yet read, `502` when the
+  AI gives no usable card). Workers that keep cards advertise `context_cards_v1`. See
+  [Session context](session-context-sources.md).
 - `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` needs a session configured for Cloudflare storage: an unencrypted request for it on a session with no backend or plain `arweave` gets `400`, while a `lit-arweave` session or an encrypted payload uses Arweave instead. It writes blobs to R2 and authorization metadata/index rows to KV when R2 is available. An R2 deployment's index KV must have both `get` and `put`; otherwise upload returns `501` before any R2 write. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
   - Worker-canonical participant submissions preserve the verified session
     config through this call, so response uploads target the session's own

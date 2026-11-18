@@ -137,7 +137,9 @@ passwords in the link, no IP addresses, localhost or private names (such as
 `.local` or `.internal`), and every redirect is checked the same way, up to
 five. It reads HTML (as text), JSON, plain text and Markdown, stops after
 10 seconds or 2 MB, and records the fetch date. **Refresh** reads the same page
-again and replaces the snapshot, keeping its title, privacy and who added it. The same checks
+again and replaces the snapshot, keeping its title, privacy and who added it. The
+old record is removed through the session coordinator; if that fails, the new
+snapshot is withdrawn and the link stays as it was. The same checks
 apply to `fetch_url` and `fetch_image`, which question generation and image
 links use, so an `http://`, IP-address or local link is refused there too.
 
@@ -157,6 +159,63 @@ Other providers are refused. The returned text is stored beside the PDF,
 tagged `CE-DocRole: context-text` with the model and date, and the page shows
 it as **Read by AI**. Unticked, the PDF is stored and listed but gives the AI
 no text; **Read with AI** reads it later.
+
+## Cards
+
+A source's **card** says what it is about: a summary of up to 300 characters,
+up to 6 topic tags (lowercase words, 32 characters each) and up to 6 key names
+(40 characters each), about a kilobyte at most. Workers that keep cards
+advertise `context_cards_v1`.
+
+- **Where it lives.** On the source's own doc-library row, beside its tags.
+  `/storage/list` returns it as `metadata.card` on the rows it lists to the
+  caller, and the Worker's AI features take it only from rows the reader passed
+  the access check for. So a card reaches exactly the people and AI calls its
+  source reaches: an admins-only or group-locked source's card goes no further
+  than the source. A PDF's card sits on the PDF's row, not its reading's. The
+  row's key-list entry never holds the card.
+- **When it is made.** Once, when the source is added: for a link, from the
+  page just read; for a text file, from its bytes; for a PDF, from the text the
+  session's AI read. The card-maker is one short call (`taskType`
+  `context-card`, at most 1,500 output tokens) to the session's fast model on
+  the session's key, reading the first 12,000 characters, or fewer where the
+  text takes more bytes or escapes long (what is sent is at most 16,000 bytes),
+  so a card costs about the same whatever it describes. Settings → AI lists
+  it as **Context cards**. The call is given 20 seconds; past that the source
+  has no card. Where the runtime can finish work after replying, the add does
+  not wait for the card. Card calls run for whoever added the source and are
+  not counted against that person's daily AI limit; each person's 20 adds
+  bound them.
+- **When it is not.** No card is made when AI is off for the session, when the
+  session's provider key is missing, or when the fast model's provider is one
+  the card-maker doesn't use (Cloudflare's models answer only the Session
+  Agent). A reply that is not one JSON object within the limits is dropped. In
+  each case the source simply has no card and is read as before. An item
+  stored encrypted (`worker_envelope`) never has a card: none is made, written
+  or shown, since a card is plain text on its row.
+- **Writing one by hand.** `POST /storage/context { action: 'set-card', id,
+  card: { summary, tags, names } }` writes a card, and `card: null` takes it
+  off. Admins write any source's; anyone else only the card of a source they
+  added, and only while they could still add context: not once the session
+  limits context to admins or has ended. Text that looks like a key, token or
+  password is refused. A card records who wrote it (`by`: `ai`, `admin` or
+  `adder`) and when.
+  The AI never replaces a card a person wrote, not on a link's refresh (which
+  carries the card over) and not on a PDF's re-read.
+- **Making missing ones.** `{ action: 'make-card', id }` has the session's AI
+  write the card of a source without one; admins only, as it is a call on the
+  session's key. The page's **Make missing cards** button shows how many
+  sources lack a card and an estimated cost before it makes any. Nothing is
+  made for sources added before cards existed until an admin asks.
+- **Untrusted text.** A card is cut to its limits wherever it is stored, listed
+  or given to an AI. Tags are reduced to letters, digits, spaces and hyphens,
+  and characters that show as nothing (zero-width and tag characters) are
+  dropped, so a card holds no words its reader can't see.
+  The card-maker is given the source as escaped JSON inside `<document>` tags
+  and told it is data.
+
+On the page each source shows its tags as chips; the summary, the names and who
+wrote the card are behind the "?" beside them.
 
 ## What the AI reads
 
@@ -199,6 +258,25 @@ Rows stored before 0.9.9 carry no adder or time in their list entry and count
 as the oldest participants'. The page lists up to 500. Of the Worker's
 features, only the Session Agent says when context was left out (its reply's
 `note`); the others leave it out silently.
+
+**Sources that don't fit:** the sources a Worker feature stopped before, for
+lack of room, reach its prompt as their cards. The block gains a `notRead` list
+(each entry a title, kind, summary, tags and names) after what was read, and a
+sentence saying these sources were not read and are untrusted data too. The
+list is given at most an eighth of the block, out of the block's own cap, in
+reading order, up to 100 entries; it grows past that only into room the block
+has left unused. A card too long for the room left is passed
+over, so it never hides the cards after it; `notReadMore` counts the cards not
+listed, and is given with an empty list when none fits. Only sources the reader
+may read are listed, and only those with a card:
+a source without one is left out silently, as before. A source that was
+fetched but then found no room in the block is named there too, ahead of those
+never fetched, where the block has room left over for its name: naming it
+never takes room from what was read. A session none of whose sources has a
+card gets exactly the block it got before cards. A block built in the browser, and the Session
+Agent's export file, do not carry the list. A stored Session Agent chat is
+marked with a group when its answer was shown that group's locked file, in
+full or as its card.
 
 **Adds per person:** each signed-in person, an agent included, adds at most 20
 context items (files and links) to a session; admins are not limited. The

@@ -501,7 +501,8 @@ can't be stored the answer still comes back, with a note.
 An answer can hold what only its asker may read, so a chat also keeps whom its
 answer was fit for: `scope: "admin"` when it was given to an admin or a results
 admin (it may draw on admins-only context, thinly answered questions or results
-not yet open), or `groups` when it drew on files locked to those groups. That,
+not yet open), or `groups` when it drew on files locked to those groups, read in
+full or shown only as their [cards](session-context-sources.md#cards). That,
 and the answer style, say something about who asked even with no address: in a
 session with one admin, or a small group, a chat stored with **No address** can
 still point to its asker.
