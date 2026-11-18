@@ -78,15 +78,18 @@
   min-height: 30px;
   min-width: 12rem;
   padding: 4px 8px;
-  border: 1px solid color-mix(in srgb, var(--ce-session-chrome-contrast) 40%, transparent);
+  // The theme's input colours outrank a plain rule, so these are the field's own, as on the group cards.
+  border: 1px solid var(--ce-input-border-strong) !important;
   border-radius: var(--ce-radius-4);
-  background: var(--ce-session-chrome);
-  color: var(--ce-session-chrome-contrast);
+  background: linear-gradient(var(--ce-input-bg), var(--ce-input-bg)), var(--ce-surface) !important;
+  color: var(--ce-control-text) !important;
+  -webkit-text-fill-color: var(--ce-control-text);
   font-family: inherit;
   font-size: 0.85rem;
 
   &::placeholder {
-    color: color-mix(in srgb, var(--ce-session-chrome-contrast) 75%, transparent);
+    color: color-mix(in srgb, var(--ce-control-text) 78%, transparent) !important;
+    -webkit-text-fill-color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
   }
 
   &:focus-visible {
@@ -96,9 +99,19 @@
 }
 
 @media (max-width: 480px) {
+  // The message keeps the full width, and the field, its Join and any refusal wrap below it.
   .notice {
+    flex-wrap: wrap;
     width: calc(100% - 32px);
     gap: 8px;
     padding-inline: 8px;
+  }
+
+  .actions,
+  .codeForm {
+    flex-wrap: wrap;
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 100%;
   }
 }

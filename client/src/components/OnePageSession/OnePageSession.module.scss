@@ -620,15 +620,19 @@
   width: 100%;
   min-height: 40px;
   padding: 8px 10px;
-  border: 1px solid var(--ce-authoring-input-border);
+  // The theme's input colours outrank a plain rule, as in WorkerGroupCreateForm. The fill is opaque because the
+  // card sits on a dark panel or a white page, and a translucent one takes the colour of whichever is under it.
+  border: 1px solid var(--ce-input-border-strong) !important;
   border-radius: var(--ce-radius-6);
-  background: var(--ce-authoring-input-bg);
-  color: var(--ce-authoring-input-text);
+  background: linear-gradient(var(--ce-input-bg), var(--ce-input-bg)), var(--ce-surface) !important;
+  color: var(--ce-control-text) !important;
+  -webkit-text-fill-color: var(--ce-control-text);
   font-family: var(--ce-font-body);
   font-size: 0.9rem;
 
   &::placeholder {
-    color: var(--ce-authoring-input-placeholder);
+    color: color-mix(in srgb, var(--ce-control-text) 78%, transparent) !important;
+    -webkit-text-fill-color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
     opacity: 1;
   }
 
