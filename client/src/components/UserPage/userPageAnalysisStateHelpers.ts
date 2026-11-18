@@ -332,6 +332,8 @@ export const buildUserPageAnalysisResultStatePatch = ({
     analysisCard: normalizedResult.card,
     analysisCardPending: false,
     analysisCardPicture: null,
+    analysisCardPublish: null,
+    analysisCardSavedAt: null,
     ...(includeElapsed ? { analysisElapsedMs: 0 } : {}),
     ...(includeError ? { analysisError: '', analysisErrorAction: '' } : {}),
     analyzing: false,
@@ -357,6 +359,8 @@ export const buildUserPageAnalysisResetStatePatch = ({
   analysisCard: null,
   analysisCardPending: false,
   analysisCardPicture: null,
+  analysisCardPublish: null,
+  analysisCardSavedAt: null,
   analysisServedFromCache: false,
   analysisCachedAt: null,
 });

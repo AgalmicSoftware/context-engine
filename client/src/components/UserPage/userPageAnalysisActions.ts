@@ -3,8 +3,10 @@ import { analyzeUserCard, analyzeUserOpinions, fetchAnalysisCardPicture } from '
 import {
   buildAnalysisCard,
   normalizeAnalysisCard,
+  type AnalysisCard,
   type AnalysisCardPlace,
 } from 'utilities/analysisCard/analysisCardModel';
+import { publishSavedAnalysisCard, readSavedAnalysisCard } from 'utilities/analysisCard/analysisCardSaved';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -76,6 +78,78 @@ export const invalidateUserAnalysis = (page: UserPage, closeModal: boolean): voi
     }));
   }
 };
+
+const analysisAiContextOf = (page: UserPage) => ({
+  account: String(page.props.account || ''),
+  providerLike: page.props.provider,
+  chainId: page.props.network?.id ?? page.props.networkChainId ?? null,
+  lit: getGlobalLitHooks(),
+});
+
+// The card's foot names the account, this site and the session's page, as an address someone could type.
+export const buildAnalysisCardPlace = ({
+  own,
+  account,
+  sessionSlug,
+}: {
+  own: boolean;
+  account: string;
+  sessionSlug: unknown;
+}): AnalysisCardPlace => {
+  const slug = String(sessionSlug || '').trim();
+  const host = typeof window === 'undefined' ? '' : window.location.host;
+  const link = host && slug ? `${host}${buildPublicRoute(`/session/${encodeURIComponent(slug)}`)}` : host;
+  return { own, link, account };
+};
+
+// The options a saved card is read with: the session the Analyze window would use, with the viewer's sign-in.
+export async function resolveSavedAnalysisCardOptions(this: UserPage): Promise<ProfileRecord | null> {
+  const session = await this.resolveAnalysisSessionContext();
+  return session?.sessionConfig
+    ? buildUserPageAnalysisAiOptions({ analysisSession: session, context: analysisAiContextOf(this) })
+    : null;
+}
+
+// What the "Show this card on my page" box needs to save or withdraw my card, set when the card is shown.
+type CardPublishContext = { account: string; aiOptions: ProfileRecord; isCurrent: () => boolean };
+const publishContexts = new WeakMap<UserPage, CardPublishContext>();
+
+const publishCard = async (
+  page: UserPage,
+  { account, aiOptions, isCurrent }: CardPublishContext,
+  published: boolean,
+  card: unknown,
+): Promise<void> => {
+  const before = page.state.analysisCardPublish?.shown !== false;
+  const update = (patch: ProfileRecord): void =>
+    page.setState((previous: ProfileRecord) =>
+      isCurrent() && previous.analysisCardPublish
+        ? { analysisCardPublish: { ...(previous.analysisCardPublish as ProfileRecord), ...patch } }
+        : null,
+    );
+  update({ shown: published, saving: true, note: '' });
+  try {
+    await publishSavedAnalysisCard(account, published, card, aiOptions);
+    update({ saving: false });
+  } catch (error: unknown) {
+    accountLog.warn('[UserPage] saved analysis card not changed:', getUserPageErrorMessage(error, ''));
+    update({
+      shown: before,
+      saving: false,
+      note: published
+        ? 'The card could not be saved to your page. Try again.'
+        : 'The card could not be taken off your page. Try again.',
+    });
+  }
+};
+
+// The box's change: save the card now shown, or withdraw my saved card.
+export function setAnalysisCardShown(this: UserPage, shown: boolean): void {
+  const context = publishContexts.get(this);
+  const card = this.state.analysisCard;
+  if (!context?.isCurrent() || this.state.analysisCardPublish?.saving || (shown && !card)) return;
+  void publishCard(this, context, shown, card);
+}
 
 export async function analyzeUser(this: UserPage, forceRefresh = false): Promise<void> {
   if (!this._isMounted) return;
@@ -167,26 +241,18 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
       : String(this.props.network?.id ?? this.props.network?.chainId ?? '');
   owner.addressLower = addressLower;
   owner.networkId = networkId;
-  const analysisAiContext = {
-    account: String(this.props.account || ''),
-    providerLike: this.props.provider,
-    chainId: this.props.network?.id ?? this.props.networkChainId ?? null,
-    lit: getGlobalLitHooks(),
-  };
+  const analysisAiContext = analysisAiContextOf(this);
   // The card says "my answers" on the viewer's own page and "their answers" on anyone else's. That, and what
   // its foot shows, follow who is looking now, not who first cached the analysis.
   const ownProfile = !!addressLower && analysisAiContext.account.trim().toLowerCase() === addressLower;
-  // The card's foot names the account, this site and the session's page, as an address someone could type.
   const pageSlug = String(this.props.activeSessionSlug || this.props.sessionSlug || '').trim();
-  const cardPlace = (sessionSlug: unknown): AnalysisCardPlace => {
-    const slug = pageSlug || String(sessionSlug || '').trim();
-    const host = typeof window === 'undefined' ? '' : window.location.host;
-    const link = host && slug ? `${host}${buildPublicRoute(`/session/${encodeURIComponent(slug)}`)}` : host;
-    return { own: ownProfile, link, account: addressLower };
-  };
+  const cardPlace = (sessionSlug: unknown): AnalysisCardPlace =>
+    buildAnalysisCardPlace({ own: ownProfile, account: addressLower, sessionSlug: pageSlug || sessionSlug });
   // The card is made once the analysis is on screen, by two requests that run side by side: its words (from the
   // answers and the analysis) and its picture (from the figure's name alone). Neither holds the analysis up, and
   // neither failing is an error of the analysis: the card is then left out, or shown without its picture.
+  // First the person's saved card is looked up: on someone else's page it is shown in place of a new one, and a
+  // card they withdrew is not replaced by another; on my own page it decides the "Show this card on my page" box.
   const showAnalysisCard = (result: ProfileRecord, aiOptions: ProfileRecord, cardCache: CacheContext): void => {
     const alignment = (result.historicalAlignment || {}) as ProfileRecord;
     const figure = String(alignment.figure || '').trim();
@@ -196,31 +262,81 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
     this.setState(() =>
       isCurrent()
         ? {
-            analysisCard: kept ? normalizeAnalysisCard({ ...kept, ...place }) : null,
-            analysisCardPending: !kept,
+            analysisCard: null,
+            analysisCardPending: true,
             analysisCardPicture: { status: 'loading' },
+            analysisCardPublish: null,
+            analysisCardSavedAt: null,
           }
         : null,
     );
-    fetchAnalysisCardPicture(figure, aiOptions)
-      .then((picture) =>
-        this.setState(() => (isCurrent() ? { analysisCardPicture: { status: 'ready', ...picture } } : null)),
-      )
-      .catch((pictureError: unknown) => {
-        accountLog.warn('[UserPage] analysis card picture unavailable:', getUserPageErrorMessage(pictureError, ''));
-        this.setState(() => (isCurrent() ? { analysisCardPicture: { status: 'none' } } : null));
-      });
-    if (kept) return;
-    analyzeUserCard(
-      userData,
-      { name: result.name, summary: result.summary, details: result.details, figure, reasoning: alignment.reasoning },
-      aiOptions,
-    )
-      .then(async (reply) => {
-        const card = buildAnalysisCard({ card: reply, historicalAlignment: alignment }, questions, place);
-        this.setState(() => (isCurrent() ? { analysisCard: card, analysisCardPending: false } : null));
-        if (!card) return;
-        // Kept with the analysis, so reopening it does not write the card again.
+    const showPicture = (pictureFigure: string): void => {
+      fetchAnalysisCardPicture(pictureFigure, aiOptions)
+        .then((picture) =>
+          this.setState(() => (isCurrent() ? { analysisCardPicture: { status: 'ready', ...picture } } : null)),
+        )
+        .catch((pictureError: unknown) => {
+          accountLog.warn('[UserPage] analysis card picture unavailable:', getUserPageErrorMessage(pictureError, ''));
+          this.setState(() => (isCurrent() ? { analysisCardPicture: { status: 'none' } } : null));
+        });
+    };
+    const writeCard = async (): Promise<AnalysisCard | null> => {
+      try {
+        const reply = await analyzeUserCard(
+          userData,
+          {
+            name: result.name,
+            summary: result.summary,
+            details: result.details,
+            figure,
+            reasoning: alignment.reasoning,
+          },
+          aiOptions,
+        );
+        return buildAnalysisCard({ card: reply, historicalAlignment: alignment }, questions, place);
+      } catch (cardError: unknown) {
+        accountLog.warn('[UserPage] analysis card unavailable:', getUserPageErrorMessage(cardError, ''));
+        return null;
+      }
+    };
+    void readSavedAnalysisCard(addressLower, aiOptions).then(async (saved) => {
+      if (!isCurrent()) return;
+      if (!ownProfile && saved?.status === 'ready') {
+        const card = normalizeAnalysisCard({ ...saved.card, ...place });
+        if (card) showPicture(card.figure);
+        this.setState(() =>
+          isCurrent()
+            ? {
+                analysisCard: card,
+                analysisCardPending: false,
+                analysisCardPicture: card ? { status: 'loading' } : null,
+                analysisCardSavedAt: saved.savedAt,
+              }
+            : null,
+        );
+        return;
+      }
+      if (!ownProfile && saved?.status === 'withdrawn') {
+        this.setState(() => (isCurrent() ? { analysisCardPending: false, analysisCardPicture: null } : null));
+        return;
+      }
+      showPicture(figure);
+      // The box is ticked unless I withdrew my card. When the saved card could not be read the box is left out
+      // and nothing is saved, so a "no" given on another device is never overridden.
+      const publish = ownProfile && saved ? { account: addressLower, aiOptions, isCurrent } : null;
+      if (publish) publishContexts.set(this, publish);
+      const shown = saved?.status !== 'withdrawn';
+      this.setState(() =>
+        isCurrent() ? { analysisCardPublish: publish ? { shown, saving: false, note: '' } : null } : null,
+      );
+      const card = kept ? normalizeAnalysisCard({ ...kept, ...place }) : await writeCard();
+      this.setState(() => (isCurrent() ? { analysisCard: card, analysisCardPending: false } : null));
+      if (!card) return;
+      // A new card replaces the saved one; a card kept with the analysis is saved only where none is.
+      if (publish && shown && (!kept || saved?.status === 'none')) await publishCard(this, publish, true, card);
+      if (kept) return;
+      // Kept with the analysis, so reopening it does not write the card again.
+      try {
         await this._writeAnalysisCacheEntry({
           sessionSlug: cardCache.sessionSlug,
           networkId,
@@ -229,11 +345,10 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
           aiContext: cardCache.aiContext,
           result: { ...result, card },
         });
-      })
-      .catch((cardError: unknown) => {
-        accountLog.warn('[UserPage] analysis card unavailable:', getUserPageErrorMessage(cardError, ''));
-        this.setState(() => (isCurrent() ? { analysisCardPending: false } : null));
-      });
+      } catch (cacheError: unknown) {
+        accountLog.warn('[UserPage] analysis card cache write failed:', getUserPageErrorMessage(cacheError, ''));
+      }
+    });
   };
   const hydrateAnalysisCacheIfPresent = (cacheContextToRead: CacheContext, session: unknown): boolean => {
     const cacheReadDescriptor = buildUserPageAnalysisCacheReadDescriptor({

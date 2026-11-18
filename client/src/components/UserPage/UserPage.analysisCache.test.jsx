@@ -5,6 +5,7 @@ import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { analyzeUserCard, analyzeUserOpinions, fetchAnalysisCardPicture } from 'utilities/ai/aiClient.js';
+import { publishSavedAnalysisCard, readSavedAnalysisCard } from 'utilities/analysisCard/analysisCardSaved';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
@@ -30,6 +31,13 @@ jest.mock('utilities/ai/aiClient.js', () => ({
   })),
   analyzeUserCard: jest.fn(),
   fetchAnalysisCardPicture: jest.fn(),
+}));
+
+jest.mock('utilities/analysisCard/analysisCardSaved', () => ({
+  readSavedAnalysisCard: jest.fn(),
+  publishSavedAnalysisCard: jest.fn(),
+  subscribeSavedAnalysisCards: jest.fn(() => () => {}),
+  formatSavedAnalysisCardDate: jest.fn(() => '18 Nov 2026'),
 }));
 
 const makeInstance = (props = {}) => {
@@ -169,6 +177,10 @@ describe('UserPage analysis cache and routing', () => {
     // Unless a test says otherwise, the card request returns nothing usable and no picture can be drawn.
     analyzeUserCard.mockReset().mockResolvedValue({});
     fetchAnalysisCardPicture.mockReset().mockRejectedValue(new Error('picture_unavailable'));
+    // Unless a test says otherwise, the person's saved card cannot be read (an older Worker): the card is made
+    // for the viewer as before, and nothing is saved.
+    readSavedAnalysisCard.mockReset().mockResolvedValue(null);
+    publishSavedAnalysisCard.mockReset().mockResolvedValue({ status: 'none' });
     checkSponsoredAccess.mockResolvedValue({
       status: 'unknown',
       gate: null,
@@ -425,7 +437,11 @@ describe('UserPage analysis cache and routing', () => {
     expect(instance.state.analyzing).toBe(false);
     expect(instance.state.analysisCard).toBeNull();
     expect(instance.state.analysisCardPending).toBe(true);
+    await waitFor(() => expect(analyzeUserCard).toHaveBeenCalledTimes(1));
     expect(fetchAnalysisCardPicture).toHaveBeenCalledTimes(1);
+    expect(instance.state.analysisCardPending).toBe(true);
+    // Someone else's page: no box, and nothing saved.
+    expect(instance.state.analysisCardPublish).toBeNull();
     const [cardData, cardAnalysis, cardOptions] = analyzeUserCard.mock.calls[0];
     expect(cardData).toBe(analyzeUserOpinions.mock.calls[0][0]);
     expect(cardAnalysis).toEqual({
@@ -477,6 +493,111 @@ describe('UserPage analysis cache and routing', () => {
     expect(instance.state.analysisCard.title).toBe('Trusts plain tools over grand plans');
     expect(instance.state.analysisCardPending).toBe(false);
     expect(instance.state.analysisError).toBe('');
+  });
+
+  const SAVED_CARD = {
+    title: 'Keeps the commons in common hands',
+    matchNote: 'Both trust neighbours to set the rules.',
+    figure: 'Elinor Ostrom (1933–2012)',
+    tastes: { book: null, game: null, film: null, song: null },
+    answers: { yesNo: null, ownWords: null, vote: null },
+  };
+  const matchedAnalysis = () =>
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'summary',
+      details: 'details',
+      name: 'name',
+      historicalAlignment: { figure: 'Grace Hopper (1906–1992)', reasoning: 'Reasoning.' },
+    });
+
+  it("on someone else's page shows the card they saved, without writing another", async () => {
+    const { instance, slug, addressLower } = makeAnalysisCacheInstance();
+    matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'ready', card: SAVED_CARD, savedAt: 1763460000000 });
+    fetchAnalysisCardPicture.mockResolvedValueOnce({ dataUrl: 'data:image/jpeg;base64,AAAA', accentHex: '' });
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+
+    expect(readSavedAnalysisCard).toHaveBeenCalledWith(addressLower, expect.objectContaining({ sessionSlug: slug }));
+    expect(instance.state.analysisCard).toMatchObject({
+      own: false,
+      title: 'Keeps the commons in common hands',
+      figure: 'Elinor Ostrom (1933–2012)',
+      link: `${window.location.host}/session/${slug}`,
+    });
+    expect(instance.state.analysisCardSavedAt).toBe(1763460000000);
+    expect(analyzeUserCard).not.toHaveBeenCalled();
+    // The picture is of their card's figure, not of the one this analysis matched.
+    expect(fetchAnalysisCardPicture.mock.calls.map(([figure]) => figure)).toEqual(['Elinor Ostrom (1933–2012)']);
+    await waitFor(() => expect(instance.state.analysisCardPicture?.status).toBe('ready'));
+    expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
+    expect(instance.state.analysisCardPublish).toBeNull();
+  });
+
+  it("on someone else's page shows no card when they withdrew theirs", async () => {
+    const { instance } = makeAnalysisCacheInstance();
+    matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'withdrawn' });
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+
+    expect(instance.state.aiAnalysis).toBe('summary');
+    expect(instance.state.analysisCard).toBeNull();
+    expect(instance.state.analysisCardPicture).toBeNull();
+    expect(analyzeUserCard).not.toHaveBeenCalled();
+    expect(fetchAnalysisCardPicture).not.toHaveBeenCalled();
+  });
+
+  it('on my own page saves a new card, and the box saves or withdraws it', async () => {
+    const own = '0x00000000000000000000000000000000000000bb';
+    const { instance, slug } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+    matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'none' });
+    analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(publishSavedAnalysisCard).toHaveBeenCalledTimes(1));
+
+    const [account, published, card, options] = publishSavedAnalysisCard.mock.calls[0];
+    expect([account, published, options.sessionSlug]).toEqual([own, true, slug]);
+    expect(card).toBe(instance.state.analysisCard);
+    expect(card).toMatchObject({ own: true, title: 'Trusts plain tools over grand plans' });
+    await waitFor(() => expect(instance.state.analysisCardPublish).toEqual({ shown: true, saving: false, note: '' }));
+
+    // Unticked: withdrawn. A failure puts the box back and says so.
+    instance.setAnalysisCardShown(false);
+    await waitFor(() => expect(instance.state.analysisCardPublish).toEqual({ shown: false, saving: false, note: '' }));
+    expect(publishSavedAnalysisCard.mock.calls[1].slice(0, 2)).toEqual([own, false]);
+    publishSavedAnalysisCard.mockRejectedValueOnce(new Error('card_store_unavailable'));
+    instance.setAnalysisCardShown(true);
+    await waitFor(() => expect(instance.state.analysisCardPublish.note).toMatch(/could not be saved/));
+    expect(instance.state.analysisCardPublish).toMatchObject({ shown: false, saving: false });
+  });
+
+  it('on my own page never saves over a "no", nor when the saved card cannot be read', async () => {
+    const own = '0x00000000000000000000000000000000000000bb';
+    const withdrawn = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+    matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'withdrawn' });
+    analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+    await withdrawn.instance.analyzeUser();
+    await waitFor(() =>
+      expect(withdrawn.instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans'),
+    );
+    expect(withdrawn.instance.state.analysisCardPublish).toEqual({ shown: false, saving: false, note: '' });
+
+    const unreadable = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+    matchedAnalysis();
+    analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+    await unreadable.instance.analyzeUser();
+    await waitFor(() =>
+      expect(unreadable.instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans'),
+    );
+    expect(unreadable.instance.state.analysisCardPublish).toBeNull();
+    unreadable.instance.setAnalysisCardShown(true);
+    expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
   });
 
   it('keeps the analysis when the card cannot be written, and tries the card again next time', async () => {

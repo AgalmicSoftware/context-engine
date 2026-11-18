@@ -25,6 +25,11 @@ jest.mock('reactstrap', () => ({
       {children}
     </div>
   ),
+  UncontrolledTooltip: ({ children }: { children: React.ReactNode }) => <div role="tooltip">{children}</div>,
+}));
+
+jest.mock('utilities/analysisCard/analysisCardSaved', () => ({
+  formatSavedAnalysisCardDate: (savedAt: number) => `day ${savedAt}`,
 }));
 
 jest.mock('./UserPageAnalysisCard', () => ({
@@ -103,6 +108,54 @@ describe('UserPageAnalysisModal', () => {
       />,
     );
     expect(screen.queryByTestId('analysis-card')).toBeNull();
+  });
+
+  it('on my own page puts a "Show this card on my page" box under the card; on another page, their date', () => {
+    const card = {
+      own: true,
+      link: 'contextengine.sh',
+      account: '',
+      title: 'Wants AI doing paperwork',
+      matchNote: '',
+      figure: 'Elinor Ostrom (1933–2012)',
+      figureName: 'Elinor Ostrom',
+      years: '1933–2012',
+      tastes: { book: null, game: null, film: null, song: null },
+      answers: { yesNo: null, ownWords: null, vote: null },
+    };
+    const onAnalysisCardShownChange = jest.fn();
+    const { rerender } = render(
+      <UserPageAnalysisModal
+        {...createProps({
+          analysisCard: card,
+          analysisCardPublish: { shown: true, saving: false, note: '' },
+          onAnalysisCardShownChange,
+        })}
+      />,
+    );
+    const box = screen.getByRole('checkbox', { name: 'Show this card on my page' }) as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    expect(screen.getByRole('tooltip').textContent).toMatch(/three of your public answers/);
+    fireEvent.click(box);
+    expect(onAnalysisCardShownChange).toHaveBeenCalledWith(false);
+
+    rerender(
+      <UserPageAnalysisModal
+        {...createProps({
+          analysisCard: card,
+          analysisCardPublish: { shown: false, saving: true, note: 'The card could not be saved to your page.' },
+          onAnalysisCardShownChange,
+        })}
+      />,
+    );
+    const saving = screen.getByRole('checkbox', { name: 'Show this card on my page' }) as HTMLInputElement;
+    expect(saving.checked).toBe(false);
+    expect(saving.disabled).toBe(true);
+    expect(screen.getByRole('status').textContent).toBe('The card could not be saved to your page.');
+
+    rerender(<UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardSavedAt: 7 })} />);
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.getByText('Their saved card, from day 7')).toBeTruthy();
   });
 
   it('labels the model that produced a cached summary and distinguishes older requested-only metadata', () => {

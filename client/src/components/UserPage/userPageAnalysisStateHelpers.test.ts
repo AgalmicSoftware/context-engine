@@ -162,12 +162,16 @@ describe('userPageAnalysisStateHelpers', () => {
       analysisCard: { title: 'Wants AI doing paperwork', figureName: 'Elinor Ostrom', years: '1933–2012' },
       analysisCardPending: false,
       analysisCardPicture: null,
+      analysisCardPublish: null,
+      analysisCardSavedAt: null,
     });
     expect(buildUserPageAnalysisResultStatePatch({ result: { card: { title: 'No figure' } } }).analysisCard).toBeNull();
     expect(buildUserPageAnalysisResetStatePatch()).toMatchObject({
       analysisCard: null,
       analysisCardPending: false,
       analysisCardPicture: null,
+      analysisCardPublish: null,
+      analysisCardSavedAt: null,
     });
     expect(buildUserPageAnalysisResetStatePatch({ analyzing: 'yes' }).analyzing).toBe(false);
     expect(buildUserPageAnalysisElapsedStatePatch({ nowMs: 1250, startedAt: 1000 })).toEqual({

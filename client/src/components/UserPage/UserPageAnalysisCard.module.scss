@@ -70,3 +70,53 @@
   text-align: center;
   color: var(--ce-document-text-muted);
 }
+
+// "Show this card on my page", under the card on my own page.
+.publish {
+  margin-top: 12px;
+  color: var(--ce-document-text);
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    cursor: pointer;
+  }
+
+  input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--ce-action-accent);
+  }
+}
+
+.publishHelp {
+  border: 0;
+  background: transparent;
+  color: var(--ce-document-text-muted);
+  min-width: 32px;
+  min-height: 32px;
+  cursor: help;
+}
+
+// A person's saved card, on their page.
+.saved {
+  margin: 16px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-12);
+  color: var(--ce-document-text);
+
+  h4 {
+    margin: 0 0 8px;
+    font-weight: 700;
+    color: var(--ce-document-text-muted);
+  }
+}
+
+.savedDate {
+  margin: 8px 0 0;
+  text-align: center;
+  color: var(--ce-document-text-muted);
+}
