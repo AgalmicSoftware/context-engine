@@ -7321,57 +7321,106 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     margin-left: auto;
   }
 
-  // The narrowest phones (320 to 360px) need the gaps for Submit's word.
-  @media (max-width: 370px) {
+  // The counter sits between the arrows, whole, and gives way before Submit's word is ever cut: on one line where
+  // the row has room, its two numbers stacked where it is tight, gone where even that would not fit. Which, is
+  // worked out from the row's own width against what an answered row needs beside it: its buttons and gaps
+  // (--pile-row-fixed) and Submit's word. The word is counted in digits of the font in use (ch), so a wider font,
+  // a platform that draws the same font a little wider, or larger text all ask for more room; nothing here is a
+  // width measured in one browser. It is the same on every card whether or not Submit shows, so the arrows never
+  // move.
+  .pileInteractionUnit .pileControls {
+    container: pile-row / inline-size;
+    // Actions 88, arrows 88, Clear 28, the counter's margins 10 and six gaps of 4px.
+    --pile-row-fixed: 238px;
+    // How wide Submit's word is, in the counter's digits and in its own: Poppins here.
+    --pile-submit-digits: 7;
+    --pile-submit-chars: 5.95;
+  }
+
+  // Each theme's own fonts: Open Sans has narrow digits, and Classic 95 a smaller counter and 48px arrows.
+  @container ce-theme style(--ce-layout-profile: minimal-app) {
+    .pileInteractionUnit .pileControls {
+      --pile-submit-digits: 8;
+      --pile-submit-chars: 6.8;
+    }
+  }
+
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .pileInteractionUnit .pileControls {
+      --pile-row-arrows: 8px;
+      --pile-submit-digits: 9;
+      --pile-submit-chars: 6.5;
+    }
+  }
+
+  // Phones up to the common 390 to 400px need the gaps for the counter and Submit's word.
+  @media (max-width: 409px) {
+    .pileInteractionUnit .pileControls {
+      --pile-row-fixed: 220px;
+    }
+
     .pileInteractionUnit .pileControls,
     .pileInteractionUnit .pileControls > .pileActions,
     .pileInteractionUnit .pileFooter,
     .pileInteractionUnit .pileControls > .pileNav {
       gap: 1px;
     }
-
-    .pileInteractionUnit .pileFooter .pileSubmitButton {
-      letter-spacing: 0;
-    }
   }
 
-  // The counter sits between the arrows, whole, in a slot as wide as its longest count, so the arrows never move;
-  // Submit gives up room before it does. Where the row is tight it stacks its two numbers, and on the narrowest phones
-  // (320px), where even that would cut Submit's word, it leaves the row.
-  .pileInteractionUnit .pileControls {
-    container: pile-row / inline-size;
+  // The word is measured without letter spacing, on every phone row.
+  .pileInteractionUnit .pileFooter .pileSubmitButton {
+    letter-spacing: 0;
   }
 
   .pileInteractionUnit .pileNav .pileNavCounterText {
+    --pile-counter-line: calc(var(--pile-counter-digits, 2) * 2ch + 2ch);
+    --pile-counter-stack: calc(var(--pile-counter-digits, 2) * 1ch + 4px);
+    --pile-row-rest: calc(var(--pile-row-fixed) + var(--pile-row-arrows, 0px) + var(--pile-submit-digits) * 1ch + 4px);
+    // Switches: far above zero while the row has room for that form, far below once it has not.
+    --pile-room-line: calc((100cqw - var(--pile-row-rest) - var(--pile-counter-line)) * 999);
+    --pile-room-stack: calc((100cqw - var(--pile-row-rest) - var(--pile-counter-stack)) * 999);
     display: inline-flex;
     flex: none;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 0 0.4ch;
-    width: calc(var(--pile-counter-digits, 2) * 2ch + 2ch);
+    gap: 0;
+    // The line's width with room for it, else the stack's; nothing without room for either.
+    width: min(
+      max(0px, var(--pile-room-stack)),
+      clamp(var(--pile-counter-stack), var(--pile-counter-stack) + var(--pile-room-line), var(--pile-counter-line))
+    );
     // Clear of an arrow's focus ring (2px, 3px out).
-    margin: 0 5px;
+    margin: 0 clamp(0px, var(--pile-room-stack), 5px);
+    overflow: hidden;
     line-height: 1.1;
     white-space: nowrap;
     opacity: 1 !important;
     pointer-events: none;
   }
 
-  @container pile-row (max-width: 359px) {
-    .pileInteractionUnit .pileNav .pileNavCounterText {
-      flex-direction: column;
-      width: calc(var(--pile-counter-digits, 2) * 1ch + 4px);
-    }
-
-    .pileInteractionUnit .pileNav .pileNavCounterSlash {
-      display: none;
-    }
+  // Stacked, the first number takes a whole line, so a short count (1 of 11) never runs together, and the slash
+  // shrinks to nothing.
+  .pileInteractionUnit .pileNav .pileNavCounterText > span:first-child {
+    min-width: clamp(0px, var(--pile-room-line) * -1, 100%);
+    text-align: center;
   }
 
-  @container pile-row (max-width: 299px) {
-    .pileInteractionUnit .pileNav .pileNavCounterText {
-      display: none;
-    }
+  .pileInteractionUnit .pileNav .pileNavCounterSlash {
+    padding: 0 0.4ch;
+    font-size: clamp(0px, var(--pile-room-line), 1em);
+  }
+
+  // Where the row cannot hold Submit's word even with the counter gone (the narrowest phones in a wide font), the
+  // word is set smaller rather than cut.
+  .pileInteractionUnit .pileFooter .pileSubmitButtonLabel {
+    font-size: clamp(
+      0.8em,
+      1em +
+        (100cqw - var(--pile-row-fixed) - var(--pile-row-arrows, 0px) + 10px - var(--pile-submit-chars) * 1ch - 2px) *
+        999,
+      1em
+    );
   }
 
   // The unsent-answers notice reads as a line under the whole row, so it never squeezes Submit or moves the arrows.

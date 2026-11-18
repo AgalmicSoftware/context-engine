@@ -68,7 +68,7 @@ it('keeps the phone controls in one row, with the arrows fixed at its end', () =
   );
   expect(rule('\\.pileInteractionUnit \\.pileFooter')).toMatch(/flex: 1 1 0;\s*min-width: 0;/);
   const counter = css.match(/\.pileInteractionUnit \.pileNav \.pileNavCounterText\s*\{([^{}]*)\}/)?.[1] || '';
-  expect(counter).toMatch(/flex: none;[\s\S]*width: calc\(var\(--pile-counter-digits, 2\) \* 2ch \+ 2ch\);/);
+  expect(counter).toMatch(/flex: none;/);
   expect(counter).not.toMatch(/position: absolute/);
   expect(css).toMatch(/\.pileInteractionUnit \.pileFooter \.pilePendingAnswerNotice\s*\{\s*position: absolute;/);
   expect(css).not.toMatch(/\.pileNav\s*\{\s*flex-basis: 100%;/);
@@ -79,7 +79,7 @@ it('keeps the phone controls in one row, with the arrows fixed at its end', () =
 // Where a phone row is short of room, Submit keeps its word and its spinner rather than showing either cut.
 it('keeps Submit readable on the narrowest phone rows', () => {
   expect(css).toMatch(
-    /@media [^{]*max-width: 370px\)\s*\{[^@]*\.pileInteractionUnit \.pileControls > \.pileNav\s*\{\s*gap: 1px;/,
+    /@media [^{]*max-width: 409px\)\s*\{[^@]*\.pileInteractionUnit \.pileControls > \.pileNav\s*\{\s*gap: 1px;/,
   );
   expect(css).toMatch(
     /\.pileInteractionUnit \.pileFooter \.pileSubmitProgress\s*\{\s*flex-wrap: wrap;[^}]*max-height: 1\.25em;\s*overflow: hidden;/,
@@ -89,6 +89,57 @@ it('keeps Submit readable on the narrowest phone rows', () => {
   // The unsent-answers notice under the row keeps its own room, so a failed save's line below never sits under it.
   expect(css).toMatch(
     /\.pileInteractionUnit \.pileControls:has\(\.pilePendingAnswerNotice\)\s*\{\s*margin-bottom: 16px;/,
+  );
+});
+
+// The counter gives way to Submit's word: one line, then its numbers stacked, then gone. A row that was a hair too
+// tight in another platform's rendering of the same font cut the word ("Submit" lost its end at 375px). Its form
+// now comes from the row's width against what the row needs in the font in use, never from a width in pixels.
+it('sizes the phone counter by the room the row has in the font in use', () => {
+  const counter = css.match(/\.pileInteractionUnit \.pileNav \.pileNavCounterText\s*\{([^{}]*)\}/)?.[1] || '';
+  // What the rest of an answered row needs: its fixed parts and Submit's word, counted in this font's digits.
+  expect(counter).toMatch(
+    /--pile-row-rest: calc\(var\(--pile-row-fixed\) \+ var\(--pile-row-arrows, 0px\) \+ var\(--pile-submit-digits\) \* 1ch \+ 4px\);/,
+  );
+  // Each form's switch compares the row's own width (cqw) with that need and the form's width.
+  expect(counter).toMatch(
+    /--pile-room-line: calc\(\(100cqw - var\(--pile-row-rest\) - var\(--pile-counter-line\)\) \* 999\);/,
+  );
+  expect(counter).toMatch(
+    /--pile-room-stack: calc\(\(100cqw - var\(--pile-row-rest\) - var\(--pile-counter-stack\)\) \* 999\);/,
+  );
+  // The line's width with room for it, else the stack's, else nothing; and nothing it shows is cut.
+  expect(counter).toMatch(
+    /width: min\(max\(0px, var\(--pile-room-stack\)\), clamp\(var\(--pile-counter-stack\), var\(--pile-counter-stack\) \+ var\(--pile-room-line\), var\(--pile-counter-line\)\)\);/,
+  );
+  expect(counter).toMatch(/flex-wrap: wrap;[\s\S]*overflow: hidden;/);
+  expect(css).toMatch(
+    /\.pileInteractionUnit \.pileNav \.pileNavCounterSlash\s*\{[^}]*font-size: clamp\(0px, var\(--pile-room-line\), 1em\);/,
+  );
+  // Stacked, the first number takes a line to itself, so "1" and "11" never read as 111 once the slash has gone.
+  expect(css).toMatch(
+    /\.pileNavCounterText > span:first-child\s*\{\s*min-width: clamp\(0px, var\(--pile-room-line\) \* -1, 100%\);/,
+  );
+  // Submit's word is measured without letter spacing on every phone row, not only the narrow ones.
+  expect(css).toMatch(
+    /@media \(max-width: 768px\)\s*\{\s*\.pileInteractionUnit \.pileFooter \.pileSubmitButton\s*\{\s*letter-spacing: 0;/,
+  );
+  // No breakpoint in pixels decides the counter's form any more.
+  expect(css).not.toMatch(/@container pile-row \(max-width: \d+px\)/);
+  // The same on every card, with or without Submit, so the arrows never move: nothing about Submit selects it.
+  expect(css).not.toMatch(/:has\([^)]*pileSubmit[^)]*\)[^{]*\.pileNavCounterText/);
+  // Each theme says how wide Submit's word is in its own fonts.
+  const themed = [...css.matchAll(/--pile-submit-digits: (\d+);\s*--pile-submit-chars: ([\d.]+);/g)].map((match) =>
+    match.slice(1, 3).map(Number),
+  );
+  expect(themed).toEqual([
+    [7, 5.95],
+    [8, 6.8],
+    [9, 6.5],
+  ]);
+  // Past the last resort (no counter, and still no room): the word is set smaller, not cut.
+  expect(css).toMatch(
+    /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonLabel\s*\{\s*font-size: clamp\(0\.8em, 1em \+ \(100cqw - var\(--pile-row-fixed\) - var\(--pile-row-arrows, 0px\) \+ 10px - var\(--pile-submit-chars\) \* 1ch - 2px\) \* 999, 1em\);/,
   );
 });
 

@@ -22,6 +22,7 @@ const SIZES = Object.freeze([
   { name: 'iPhone SE', width: 375, height: 667 },
   { name: 'iPhone 13, toolbars shown', width: 390, height: 664 },
   { name: 'iPhone 13', width: 390, height: 844 },
+  { name: 'Pixel', width: 412, height: 915 },
   { name: 'large phone', width: 430, height: 740 },
 ]);
 const THEMES = themeRegistry.themes.map((theme) => theme.id);
@@ -114,6 +115,18 @@ const measureRow = (page) =>
       textLeft: text.getBoundingClientRect().left,
       textRight: text.getBoundingClientRect().right,
       lines: Math.abs(numbers[0].top - numbers[1].top) < 2 ? 1 : 2,
+      slash: box(counterBox.children[1]).width,
+      // The same with the shortest count there is, which must not run together where a longer one stacks.
+      shortLines: (() => {
+        const [first, last] = [counterBox.firstElementChild, counterBox.lastElementChild];
+        const [was, wasLast] = [first.textContent, last.textContent];
+        first.textContent = '1';
+        last.textContent = '11';
+        const lines = Math.abs(box(first).top - box(last).top) < 2 ? 1 : 2;
+        first.textContent = was;
+        last.textContent = wasLast;
+        return lines;
+      })(),
       opacity: getComputedStyle(counterBox).opacity,
       previousRight: box(document.querySelector('button[aria-label="Previous Question"]')).right,
       nextLeft: box(document.querySelector('button[aria-label="Next Question"]')).left,
@@ -131,7 +144,7 @@ const measureRow = (page) =>
     };
   });
 
-const assertRow = (state, where) => {
+const assertRow = (state, where, { width, wideFont }) => {
   const label = `${where}:`;
   const names = state.controls.map((control) => control.name);
   for (const required of ['Question actions', 'Previous Question', 'Next Question']) {
@@ -149,8 +162,14 @@ const assertRow = (state, where) => {
     assert(right.left >= left.right - 0.5, `${label} ${left.name} and ${right.name} should not overlap`);
   }
   const { counter } = state;
-  // On the narrowest phones the counter leaves the row so Submit keeps its word; elsewhere it sits between the arrows.
-  assert.equal(counter.shown, counter.room >= 300, `${label} the counter should ${counter.room >= 300 ? '' : 'not '}show`);
+  // The counter gives way to Submit's word by the room the row has in the font in use: one line, then its numbers
+  // stacked, then gone. In the site's own fonts that leaves it off the narrowest phones, on from 375px, and on one
+  // line on a large phone; in a wide font it may give way sooner, and Submit's word (checked above) still shows whole.
+  if (!wideFont) {
+    if (width <= 320) assert.equal(counter.shown, false, `${label} the counter should leave the row to Submit`);
+    if (width >= 375) assert.equal(counter.shown, true, `${label} the counter should show`);
+    if (width >= 430) assert.equal(counter.lines, 1, `${label} the counter should take one line`);
+  }
   if (counter.shown) {
     assert(
       counter.left >= counter.previousRight - 0.5 && counter.right <= counter.nextLeft + 0.5,
@@ -163,14 +182,25 @@ const assertRow = (state, where) => {
       counter.textLeft >= counter.previousRight + counter.ring - 0.5 && counter.textRight <= counter.nextLeft - counter.ring + 0.5,
       `${label} an arrow's focus ring should not cover the counter`,
     );
-    // One line wherever the row has room for it; stacked only where it does not.
-    assert.equal(counter.lines, counter.room >= 360 ? 1 : 2, `${label} the counter should take ${counter.room >= 360 ? 'one line' : 'two lines'}`);
+    // One line with its slash, or one number over the other, whatever the count: never two numbers run together.
+    assert(counter.lines === 2 || counter.slash > 1, `${label} the counter's one line should show its slash`);
+    assert.equal(counter.shortLines, counter.lines, `${label} a short count should take the same form`);
+    // Whole in either form: both numbers inside its box.
+    assert(
+      counter.textLeft >= counter.left - 0.5 && counter.textRight <= counter.right + 0.5,
+      `${label} the counter's numbers should show whole`,
+    );
   }
   assert.equal(state.scrollY, 0, `${label} the page should not have scrolled`);
   assert(state.overflowX <= 0, `${label} the page should not be wider than the screen (${state.overflowX}px over)`);
 };
 
-async function runTheme(browser, baseUrl, browserName, theme) {
+// A second pass in a font wider than the site's own: a runner's fallback font, a person's larger text setting or a
+// longer word all take more of the row, and Submit's word must still show whole. Verdana where it is installed,
+// DejaVu Sans on a Linux runner; both are among the widest common faces.
+const WIDE_FONT_CSS = `* { font-family: Verdana, 'DejaVu Sans', sans-serif !important; }`;
+
+async function runTheme(browser, baseUrl, browserName, theme, wideFont = false) {
   const context = await browser.newContext({
     viewport: SIZES[0],
     hasTouch: true,
@@ -186,6 +216,13 @@ async function runTheme(browser, baseUrl, browserName, theme) {
     },
     { themeId: theme, version: THEME_DEFAULT_VERSION },
   );
+  if (wideFont) {
+    await context.addInitScript((css) => {
+      const add = () => document.head.append(Object.assign(document.createElement('style'), { textContent: css }));
+      if (document.head) add();
+      else document.addEventListener('DOMContentLoaded', add, { once: true });
+    }, WIDE_FONT_CSS);
+  }
   const page = await context.newPage();
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -246,6 +283,8 @@ async function runTheme(browser, baseUrl, browserName, theme) {
           states[`menu ${size.name}`] = await placed.jsonValue();
           await page.keyboard.press('Escape');
           await page.getByRole('dialog', { name: 'Question actions' }).waitFor({ state: 'detached' });
+          // The pointer rests where it clicked; off the row, so the next size measures no hovered button.
+          await page.mouse.move(0, 0);
         }
       }
     };
@@ -269,12 +308,13 @@ async function runTheme(browser, baseUrl, browserName, theme) {
     await measureEverySize('end of set');
 
     for (const size of SIZES) {
-      const where = (stateName) => `${browserName} ${theme} ${size.name} ${size.width}x${size.height} ${stateName}`;
+      const where = (stateName) =>
+        `${browserName} ${theme}${wideFont ? ' (wide font)' : ''} ${size.name} ${size.width}x${size.height} ${stateName}`;
       const byState = ['unanswered', 'answered', 'end of set'].map((stateName) => [
         stateName,
         states[`${stateName} ${size.name}`],
       ]);
-      byState.forEach(([stateName, state]) => assertRow(state, where(stateName)));
+      byState.forEach(([stateName, state]) => assertRow(state, where(stateName), { width: size.width, wideFont }));
       const menu = states[`menu ${size.name}`];
       assert(
         menu.height > 0 && menu.top >= 0 && menu.bottom <= menu.viewportHeight,
@@ -309,11 +349,15 @@ async function runSmoke() {
   if (!browserType) throw new Error(`Unsupported PLAYWRIGHT_BROWSER "${browserName}"`);
   const browser = await browserType.launch({ headless: true });
   try {
-    for (const theme of THEMES) await runTheme(browser, baseUrl, browserName, theme);
+    for (const wideFont of [false, true]) {
+      for (const theme of THEMES) await runTheme(browser, baseUrl, browserName, theme, wideFont);
+    }
   } finally {
     await browser.close();
   }
-  console.log(`Phone question row held in ${browserName}: ${THEMES.length} themes x ${SIZES.length} sizes x 3 states.`);
+  console.log(
+    `Phone question row held in ${browserName}: ${THEMES.length} themes x ${SIZES.length} sizes x 3 states, in the site's fonts and a wide one.`,
+  );
 }
 
 if (require.main === module) {
