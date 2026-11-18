@@ -494,6 +494,26 @@ describe('the check after a submit', () => {
   });
 });
 
+it('pulses Next only while it is the step to take, keeping its name', () => {
+  const props = { ...buildBaseProps(), pileQuestions: [{ id: 'q1' }, { id: 'q2' }] };
+  const { rerender } = render(renderPileInteractionSurface({ ...props, nextNudge: true }));
+  expect(screen.getByRole('button', { name: 'Next Question' })).not.toHaveClass('pileNavArrowNudge');
+  rerender(renderPileInteractionSurface({ ...props, nextIsPrimary: true, nextNudge: true }));
+  expect(screen.getByRole('button', { name: 'Next Question' })).toHaveClass('pileNavArrowPrimary', 'pileNavArrowNudge');
+  rerender(renderPileInteractionSurface({ ...props, nextIsPrimary: true }));
+  expect(screen.getByRole('button', { name: 'Next Question' })).not.toHaveClass('pileNavArrowNudge');
+  rerender(
+    renderPileInteractionSurface({
+      ...props,
+      nextIsPrimary: true,
+      nextNudge: true,
+      activePileIndex: 1,
+      endOfSetCard: <div />,
+    }),
+  );
+  expect(screen.getByRole('button', { name: 'Next Question' })).not.toHaveClass('pileNavArrowNudge');
+});
+
 it('makes Next the step to take once the card has an answer, until the end of the set', () => {
   const props = { ...buildBaseProps(), pileQuestions: [{ id: 'q1' }, { id: 'q2' }] };
   const { rerender } = render(renderPileInteractionSurface(props));

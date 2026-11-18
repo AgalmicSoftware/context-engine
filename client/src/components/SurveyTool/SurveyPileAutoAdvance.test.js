@@ -78,6 +78,7 @@ const mountPile = async (sessionConfig = SESSION_CONFIG, questionList = question
 const card = () => screen.getByTestId('ce-pile-active-question');
 const choose = (role, name) => fireEvent.click(within(card()).getByRole(role, { name }));
 const answer = (pile, id) => pile.engine().state.surveysResponseState[0].answers[id]?.value;
+const next = () => screen.getByRole('button', { name: 'Next Question' });
 beforeEach(() => {
   mockChoiceDelay = TEST_DELAY_MS;
   localStorage.clear();
@@ -360,4 +361,79 @@ it('does not move on later when the person moved by hand within the delay', asyn
   await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
   expect(card()).toHaveAccessibleName('Question 1 of 6');
   expect(answer(pile, 'q1')).toBe('Disagree');
+});
+
+it('pulses Next once a card that stays is answered, for that visit only', async () => {
+  const pile = await mountPile();
+  // Agree/disagree moves on by itself, so Next has nothing to point at.
+  choose('radio', 'Agree');
+  await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 6'));
+  expect(next()).not.toHaveClass('pileNavArrowNudge');
+  choose('checkbox', 'Beta');
+  expect(next()).toHaveClass('pileNavArrowPrimary', 'pileNavArrowNudge');
+  // Moving on ends it, and coming back to the answered card does not start it again.
+  await act(async () => pile.engine().handleNext());
+  expect(next()).not.toHaveClass('pileNavArrowNudge');
+  await act(async () => pile.engine().handlePrev());
+  expect(next()).toHaveClass('pileNavArrowPrimary');
+  expect(next()).not.toHaveClass('pileNavArrowNudge');
+  await act(async () => pile.engine().handleNext());
+  choose('checkbox', 'Alpha');
+  expect(next()).toHaveClass('pileNavArrowNudge');
+  // A rating starts it once the slider is let go.
+  await act(async () => pile.engine().handleNext());
+  const slider = within(card()).getByRole('slider');
+  fireEvent.change(slider, { target: { value: '3' } });
+  fireEvent.mouseUp(slider, { target: { value: '3' } });
+  await waitFor(() => expect(next()).toHaveClass('pileNavArrowNudge'));
+});
+
+it('waits for the person to leave a free-text field before pulsing Next', async () => {
+  const pile = await mountPile();
+  await act(async () => pile.engine().setState({ activePileIndex: 4 }));
+  const field = within(card()).getByPlaceholderText('Your response...');
+  await act(async () => field.focus());
+  fireEvent.change(field, { target: { value: 'A typed answer' } });
+  await waitFor(() => expect(answer(pile, 'q5')).toBe('A typed answer'));
+  expect(next()).toHaveClass('pileNavArrowPrimary');
+  expect(next()).not.toHaveClass('pileNavArrowNudge');
+  await act(async () => field.blur());
+  expect(next()).toHaveClass('pileNavArrowNudge');
+});
+
+it('pulses Next on agree/disagree when the session stays put, but never on the last question', async () => {
+  const pile = await mountPile({ ...SESSION_CONFIG, pileAutoAdvanceEnabled: false });
+  choose('radio', 'Unsure');
+  expect(card()).toHaveAccessibleName('Question 1 of 6');
+  expect(next()).toHaveClass('pileNavArrowNudge');
+  await act(async () => pile.engine().setState({ activePileIndex: 5 }));
+  choose('radio', 'Agree');
+  expect(answer(pile, 'q6')).toBe('Agree');
+  expect(next()).toHaveClass('pileNavArrowPrimary');
+  expect(next()).not.toHaveClass('pileNavArrowNudge');
+});
+
+it('pulses Next for dictated text, and not for leaving a comment on a card answered earlier', async () => {
+  const pile = await mountPile();
+  await act(async () => pile.engine().setState({ activePileIndex: 4 }));
+  // Text that arrives while no field has focus, as dictation does, is a finished answer.
+  fireEvent.change(within(card()).getByPlaceholderText('Your response...'), { target: { value: 'Dictated' } });
+  await waitFor(() => expect(next()).toHaveClass('pileNavArrowNudge'));
+  await act(async () => pile.engine().handlePrev());
+  await act(async () => pile.engine().handleNext());
+  expect(next()).not.toHaveClass('pileNavArrowNudge');
+  await act(async () => pile.engine().toggleComments('q5'));
+  const comment = await within(card()).findByPlaceholderText('Additional comments...');
+  await act(async () => comment.focus());
+  await act(async () => comment.blur());
+  expect(next()).not.toHaveClass('pileNavArrowNudge');
+});
+
+it('pulses Next when an agree/disagree choice made with the arrow keys stays on its card', async () => {
+  const user = userEvent.setup();
+  await mountPile();
+  await act(async () => within(card()).getByRole('radio', { name: 'Agree' }).focus());
+  await user.keyboard('{ArrowRight}');
+  expect(card()).toHaveAccessibleName('Question 1 of 6');
+  expect(next()).toHaveClass('pileNavArrowNudge');
 });

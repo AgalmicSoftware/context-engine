@@ -6835,6 +6835,13 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     text-shadow: none;
   }
 
+  // Next's glow after an answer holds steady instead of pulsing, hovered or not.
+  .pileNav .pileNavArrow.pileNavArrowPrimary.pileNavArrowNudge,
+  .pileNav .pileNavArrow.pileNavArrowPrimary.pileNavArrowNudge:hover:not(:disabled) {
+    animation: none !important;
+    filter: drop-shadow(0 0 5px var(--pile-next-nudge-color));
+  }
+
   .multiChoice .option,
   #startFreshButton,
   #decryptEditButton,
@@ -7805,6 +7812,36 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;
+}
+
+// Once someone answers a card that stays put, Next glows three times in the theme's accent, then rests. Only a glow:
+// a swell covered the counter beside it. It stops while Next has keyboard focus, leaving the focus ring alone.
+@keyframes pileNextNudge {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 9px var(--pile-next-nudge-color));
+  }
+}
+
+.pileNav .pileNavArrow.pileNavArrowPrimary.pileNavArrowNudge {
+  --pile-next-nudge-color: var(--ce-action-accent);
+  animation: pileNextNudge 1.1s ease-in-out 3;
+
+  &:focus-visible {
+    animation: none;
+    filter: none;
+  }
+}
+
+// Classic 95's control row is the accent's own teal, so there the glow is the bevel's white highlight.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .pileNav .pileNavArrow.pileNavArrowPrimary.pileNavArrowNudge {
+    --pile-next-nudge-color: var(--ce-edge-highlight);
+  }
 }
 
 // The desktop rail is narrower than the word (64px in Classic 95): there the filled arrow alone marks the step.

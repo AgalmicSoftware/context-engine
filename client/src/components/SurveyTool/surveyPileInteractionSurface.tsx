@@ -59,6 +59,8 @@ type PileNavControlsProps = {
   navCounterVisible: boolean;
   /** The card has an answer, so Next is the step to take. */
   nextIsPrimary?: boolean;
+  /** The person has just answered a card that stays put, so Next draws the eye. */
+  nextNudge?: boolean;
   /** Next has opened the end of the set; on the last question it opens it. */
   endOfSetShown?: boolean;
   handlePrev: VoidHandler;
@@ -173,6 +175,7 @@ export type PileInteractionSurfaceProps = {
   handleRevertPendingChanges: VoidHandler;
   navCounterVisible: boolean;
   nextIsPrimary?: boolean;
+  nextNudge?: boolean;
   /** Shown in place of the cards once Next passes the last question. */
   endOfSetCard?: React.ReactNode;
   handlePrev: VoidHandler;
@@ -255,6 +258,7 @@ const renderPileNavControls = ({
   activePileIndex,
   navCounterVisible,
   nextIsPrimary = false,
+  nextNudge = false,
   endOfSetShown = false,
   handlePrev,
   handleNext,
@@ -283,7 +287,7 @@ const renderPileNavControls = ({
       <button
         onClick={handleNext}
         disabled={nextDisabled}
-        className={`${styles.pileNavArrow}${nextStands ? ` ${styles.pileNavArrowPrimary}` : ''}`}
+        className={`${styles.pileNavArrow}${nextStands ? ` ${styles.pileNavArrowPrimary}` : ''}${nextStands && nextNudge ? ` ${styles.pileNavArrowNudge}` : ''}`}
         aria-label="Next Question"
         data-ce-control-appearance="frameless"
       >
@@ -671,6 +675,7 @@ export const renderPileInteractionSurface = ({
   handleRevertPendingChanges,
   navCounterVisible,
   nextIsPrimary,
+  nextNudge,
   endOfSetCard = null,
   handlePrev,
   handleNext,
@@ -776,6 +781,7 @@ export const renderPileInteractionSurface = ({
         activePileIndex,
         navCounterVisible,
         nextIsPrimary,
+        nextNudge,
         endOfSetShown: !!endOfSetCard,
         handlePrev,
         handleNext,
