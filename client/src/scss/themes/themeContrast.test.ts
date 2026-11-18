@@ -115,6 +115,8 @@ describe('bundled app-theme contrast', () => {
       ['status-success-contrast', 'status-success', 'canvas'],
       ['status-error-contrast', 'status-error', 'canvas'],
       ['control-text', 'control-face', 'canvas'],
+      // Read-only answer boxes on a light card: panel text on the control face.
+      ['panel-text', 'control-face', 'canvas'],
       ['option-scroll-text', 'option-scroll-bg', 'canvas'],
       ['option-scroll-text', 'option-scroll-hover-bg', 'canvas'],
       ['option-scroll-disabled-text', 'option-scroll-disabled-bg', 'canvas'],

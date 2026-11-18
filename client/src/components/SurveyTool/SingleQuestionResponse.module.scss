@@ -744,3 +744,37 @@
     color: var(--ce-panel-text);
   }
 }
+
+// Classic 95 draws cards light grey, where the card's own white text does not read. Two things are
+// safe to recolour on any card there: the answer boxes, which bring their own face, and the compact
+// row's own text and controls, which only ever sit on the grey card. A full-size card can sit on
+// that theme's teal panels (Results, per person), so its title and labels are left as they are.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .freeformAnswer,
+  .readOnlyRating,
+  .readOnlyMultichoice .choiceItem {
+    background: var(--ce-control-face);
+    border-color: var(--ce-input-border);
+    color: var(--ce-panel-text);
+  }
+
+  .additionalCommentsContent,
+  .encryptedResponseText {
+    background: var(--ce-control-face);
+    border-color: var(--ce-input-border);
+    color: var(--ce-panel-text) !important;
+    opacity: 1;
+  }
+
+  .miniQuestionContainer .miniPromptAbbrev:not(.maskedPromptActionButton),
+  .miniQuestionContainer .importanceText,
+  .miniQuestionContainer .miniExpandButton,
+  .miniQuestionContainer .cardLinkButton {
+    color: var(--ce-panel-text);
+    opacity: 1;
+  }
+
+  .miniQuestionContainer .additionalCommentsLabel {
+    color: var(--ce-panel-text-muted);
+  }
+}

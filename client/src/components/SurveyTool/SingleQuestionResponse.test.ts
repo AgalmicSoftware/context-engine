@@ -96,6 +96,32 @@ describe('SingleQuestionResponse style contracts', () => {
     );
   });
 
+  it('gives Classic 95 readable answer boxes on any card, and readable text on the compact row', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'SingleQuestionResponse.module.scss'), 'utf8');
+    const classic = scss.match(
+      /@container ce-theme style\(--ce-layout-profile: desktop-window\) \{\n([\s\S]*?)\n\}\n/,
+    )?.[1];
+
+    expect(classic).toBeDefined();
+    // The answer boxes bring their own face, so dark text on them reads whatever the card's colour.
+    expect(classic).toMatch(
+      /\.freeformAnswer,[\s\S]*?\.readOnlyMultichoice \.choiceItem \{\s*background:\s*var\(--ce-control-face\);[\s\S]*?color:\s*var\(--ce-panel-text\);/,
+    );
+    expect(classic).toMatch(
+      /\.additionalCommentsContent,\s*\.encryptedResponseText \{\s*background:\s*var\(--ce-control-face\);[\s\S]*?color:\s*var\(--ce-panel-text\) !important;/,
+    );
+    // Text that sits on the card itself is recoloured only in the compact row, which is always on a
+    // grey card; a full-size card can sit on a teal panel in this theme.
+    const onCard = [...String(classic).matchAll(/^ {2}(\.[^{]+?)\s*\{\s*color:/gm)].map((match) => match[1]);
+    expect(onCard.length).toBeGreaterThan(0);
+    onCard
+      .flatMap((selectors) => selectors.split(','))
+      .forEach((selector) => expect(selector.trim()).toMatch(/^\.miniQuestionContainer \./));
+    expect(classic).not.toMatch(/\.questionTitle|\.ratingTrack/);
+    // Show more takes the answer's colour, so it reads wherever the answer does.
+    expect(scss).toMatch(/\.answerToggle\s*\{[^}]*color:\s*inherit;/);
+  });
+
   it('restores prompt width when a response card has no top-right actions to show', () => {
     const scssPath = path.join(__dirname, 'SingleQuestionResponse.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
