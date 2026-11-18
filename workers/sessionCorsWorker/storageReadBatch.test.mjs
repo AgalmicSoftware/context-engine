@@ -120,6 +120,22 @@ test('on a members-only session a batch refuses visitors with the reason, and se
   assert.deepEqual(member.body.items.map((item) => item.status), [200, 200, 200, 200]);
 });
 
+test('a batch of members-only answers tells every cache not to keep it, as each single read does', async () => {
+  const { env, participants } = await seed({
+    people: 2,
+    questions: 2,
+    configOverrides: { sessionModeProfile: { ...createSessionEnv().config.sessionModeProfile, results: { visibility: 'session_member_full' } } },
+  });
+  const [{ token }] = participants;
+  const ids = (await listAll(signedOut(env).call, token)).flat();
+  const single = await fetchWorker(makeRequest(`/storage/read?id=${ids[0]}`, { token }), env);
+  assert.equal(single.status, 200);
+  assert.equal(single.headers.get('Cache-Control'), 'private, no-store');
+  const batch = await fetchWorker(makeRequest('/storage/read-batch', { method: 'POST', token, body: { ids } }), env);
+  assert.deepEqual((await batch.json()).items.map((item) => item.status), [200, 200, 200, 200]);
+  assert.equal(batch.headers.get('Cache-Control'), 'private, no-store');
+});
+
 test('a batch stops reading once it holds 8 MiB and leaves the rest to single reads', async () => {
   const { admin, env } = createSessionEnv();
   const adminToken = await login({ env, wallet: admin });
