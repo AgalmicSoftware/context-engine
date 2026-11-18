@@ -525,6 +525,16 @@ export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } =
   const phone = page.viewportSize().width <= 768;
   const matrix = view.locator('section').filter({ has: page.locator('[data-testid^="ce-risk-matrix-header-y-"]') }).last();
   await step('risk matrix pinned labels', () => assertPinnedAxes(matrix, 'risk matrix', phone));
+  // On a phone the grid takes the Results panel's width: only the card's border and thin side remain (16px on a desktop).
+  await step('risk matrix side room', async () => {
+    const inset = await view.evaluate((root) => {
+      const row = [...root.querySelectorAll('[data-testid^="ce-risk-matrix-header-y-"]')].pop();
+      let box = row.parentElement;
+      while (box && !/auto|scroll/.test(getComputedStyle(box).overflowX)) box = box.parentElement;
+      return Math.round(box.getBoundingClientRect().left - root.querySelector('[data-testid="ce-risk-matrix"]').getBoundingClientRect().left);
+    });
+    assert(phone ? inset <= 9 : inset === 17, `The grid starts ${inset}px inside the matrix`);
+  });
 
   // The strongest opportunity and risk, and a faint cell holding both kinds.
   for (const pair of ['transport-vs-housing', 'housing-vs-safety', 'safety-vs-transport']) {

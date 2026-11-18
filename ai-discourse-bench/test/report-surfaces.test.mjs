@@ -2404,7 +2404,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /riskMatrixRowHeader axisLeft/);
   assert.match(html, /detailHeading axisTop"/);
   assert.match(html, /detailHeading axisLeft"/);
-  assert.match(html, /@media \(max-width: 768px\) \{\s*\.riskMatrixGridScroll\.gridScroll \{ max-height: 70svh; overflow: auto; scroll-padding: 64px 0 0 130px; \}/);
+  assert.match(html, /@media \(max-width: 768px\) \{\s*\.riskMatrixEmbedded\.embedded \{ padding-left: 0; padding-right: 0; \}\s*\.riskMatrixEmbedded \.riskMatrixSectionCard\.sectionCard \{ padding-left: 8px; padding-right: 8px; \}\s*\.riskMatrixGridScroll\.gridScroll \{ max-height: 70svh; overflow: auto; scroll-padding: 64px 0 0 130px; \}/);
   assert.match(html, /\.riskMatrixHeaderCell\.headerCell\.axisLeft:focus-visible \{ position: sticky;/);
   assert.match(html, /\.riskMatrixSectionCard \.detailAxis\.axisLeft \{[^}]*align-self: stretch; \}/);
   // The detail grid names its axes, has a key, and says when a square is empty.

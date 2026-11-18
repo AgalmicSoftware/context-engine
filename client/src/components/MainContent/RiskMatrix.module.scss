@@ -1409,6 +1409,15 @@ button.cell {
 }
 
 @media (max-width: 768px) {
+  // In Results a phone gives the matrix the panel's whole width: no side padding of its own, and thin card sides.
+  .embedded {
+    padding-inline: 0;
+  }
+
+  .embedded .sectionCard {
+    padding-inline: 8px;
+  }
+
   .pinnedScroll {
     max-height: 70svh;
     overflow: auto;

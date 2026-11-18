@@ -4544,6 +4544,8 @@ export const renderHtmlReport = (inputReport) => {
        at the top, the corner over both. Each keeps its tint, laid over the card and the page, with a rim of the same over
        the gaps, so squares passing beneath never show through. */
     @media (max-width: 768px) {
+      .riskMatrixEmbedded.embedded { padding-left: 0; padding-right: 0; }
+      .riskMatrixEmbedded .riskMatrixSectionCard.sectionCard { padding-left: 8px; padding-right: 8px; }
       .riskMatrixGridScroll.gridScroll { max-height: 70svh; overflow: auto; scroll-padding: 64px 0 0 130px; }
       .riskMatrixSectionCard .axisTop,
       .riskMatrixSectionCard .axisLeft,
