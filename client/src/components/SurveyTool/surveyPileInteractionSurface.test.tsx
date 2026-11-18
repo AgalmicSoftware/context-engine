@@ -417,7 +417,7 @@ describe('surveyPileInteractionSurface', () => {
     }
   });
 
-  it('marks every icon-only pile toolbar button as frameless across app themes', () => {
+  it('marks every icon-only pile toolbar button as frameless', () => {
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),
       pileQuestions: [{ id: 'q1', prompt: 'Q1' }],

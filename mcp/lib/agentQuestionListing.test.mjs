@@ -180,7 +180,7 @@ test('the answer value has a JSON-schema type covering every answer type', () =>
   assert.deepEqual(value.anyOf[2].items.anyOf.map((option) => option.type), ['string', 'number']);
 });
 
-test('get_results stops listing answers after 20 seconds and reading them at 40, and says it is partial', async (t) => {
+test('get_results stops listing answers after 20 seconds and says it is partial', async (t) => {
   // Each page of everyone's answers takes 3 seconds, as on a busy Worker.
   let clock = Date.parse('2026-11-13T00:00:00.000Z');
   let pages = 0;
