@@ -200,7 +200,7 @@ export const buildTools = (participant) => [
         text: text('Text to add, in Markdown.'),
         title: text('Optional title for a link or text (up to 120 characters).'),
         adminsOnly: { type: 'boolean', description: 'Show it to the session’s admins alone (default false).' },
-        analyze: { type: 'boolean', description: 'For a PDF or image: have the session’s AI read it, where the session allows (default true). False adds it unread.' },
+        analyze: { type: 'boolean', description: 'For a PDF or image: have the session’s AI read it. Default: true where the session has context cards on, else false (with cards off only an admin may ask). False adds it unread.' },
         groups: {
           type: 'array',
           items: { type: 'string' },

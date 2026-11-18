@@ -554,12 +554,13 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   // The Worker fetches a participant's link only with their fetch scope.
   const mayAddLinks = (ctx, sessionConfig) => isSessionAdmin(ctx, sessionConfig) || ctx.client.tokenClaims?.scopes?.fetch === true;
 
-  // A PDF or image gives the session's AI no text until it is read. Where the session lets
-  // whoever added one ask for that, the agent does, once. The reading goes on at the Worker
-  // if this call stops waiting, so it is never given the call's own signal.
+  // A PDF or image gives the session's AI no text until it is read. Where the session has cards
+  // on, whoever added one may ask for that, and the agent does, once, unless told not to. With
+  // cards off only an admin's agent asks, and only when told to. The reading goes on at the
+  // Worker if this call stops waiting, so it is never given the call's own signal.
   const analyzeAdded = async (ctx, sessionConfig, id, wanted) => {
-    if (wanted === false || !id) return CONTEXT_NOT_READ;
-    if (!isSessionAdmin(ctx, sessionConfig) && !contextCardsOn(sessionConfig)) return CONTEXT_NOT_READ;
+    const cardsOn = contextCardsOn(sessionConfig);
+    if (!id || !(wanted ?? cardsOn) || (!cardsOn && !isSessionAdmin(ctx, sessionConfig))) return CONTEXT_NOT_READ;
     const reading = ctx.client.contextAction({ action: 'read-pdf', id }, { timeoutMs: CONTEXT_READ_TIMEOUT_MS })
       .then((result) => ({ result }), (error) => ({ error }));
     let timer = null;
@@ -571,7 +572,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     if (!waited) return 'The session’s AI is still reading it, which can take a few minutes. list_context shows readByAi once it has.';
     if (waited.error) return `Added, but the session’s AI did not read it: ${describeError(waited.error)} A session admin can have it read.`;
     const chars = Number(waited.result?.text?.chars) || 0;
-    return `Read by the session’s AI${chars ? ` (${chars.toLocaleString('en-US')} characters)` : ''}. Its text is now context for whoever can see the file, and it counted as one of your AI uses today.`;
+    // An admin's reading isn't counted against a daily limit; an adder's is.
+    const counted = isSessionAdmin(ctx, sessionConfig) ? '' : ', and it counted as one of your AI uses today';
+    return `Read by the session’s AI${chars ? ` (${chars.toLocaleString('en-US')} characters)` : ''}. Its text is now context for whoever can see the file${counted}.`;
   };
 
   // The session's context sources as the Worker lists them for this agent.

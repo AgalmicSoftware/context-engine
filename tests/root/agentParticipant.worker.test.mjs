@@ -1408,6 +1408,24 @@ test('in a session with cards off, an agent’s list shows the sources without c
   assert.deepEqual((await kami.participant.listContext()).sources.map((source) => source.title), ['Evenings.md', `${process.pid}-deck.pdf`]);
 });
 
+test('with cards off, an admin’s agent has a PDF read only when it asks, and that costs it no AI use', async (t) => {
+  const wallet = ethers.Wallet.createRandom();
+  const env = await cardSessionEnv({ contextCardsEnabled: false, adminAddress: wallet.address });
+  const host = await createAgent(env, 'Test Host', [], null, { wallet });
+  t.after(() => fs.rm(host.stateDir, { recursive: true, force: true }));
+  await host.participant.joinSession({ link: LINK });
+  let readings = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    if (isReadingRequest(init)) readings += 1;
+    return aiReply('Plan: two steps.');
+  });
+  const unasked = await host.participant.addContext({ file: await agentFile(t, host, 'deck.pdf', '%PDF-1.7 deck') });
+  assert.deepEqual([unasked.analysis.startsWith('Not read by the session’s AI'), readings], [true, 0]);
+  const asked = await host.participant.addContext({ file: await agentFile(t, host, 'plan.pdf', '%PDF-1.7 plan'), analyze: true });
+  assert.equal(asked.analysis, 'Read by the session’s AI (16 characters). Its text is now context for whoever can see the file.');
+  assert.equal(readings, 1);
+});
+
 test('an agent makes a file, a link or a note visible to some of the session’s groups, as the website’s Visible to does', async (t) => {
   const env = createEnv([groupSessionConfig()]);
   const host = groupHost(env);

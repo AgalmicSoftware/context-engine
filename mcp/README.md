@@ -428,7 +428,7 @@ directory when upgrading; identities and saved session access do not change.
 | `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; only unanswered ones unless `filter` asks for `answered` or `all`. Up to 100 a call; `more` and `next` say how to get the rest. |
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. When some are refused the rest are still stored: `next` says which went through, and a question id that matches nothing gets the nearest listed id when it looks mistyped. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
-| `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set, or `groups` names some of the session's groups: then the members of any one of them see it, and the admins. A PDF or image has no text until the session's AI reads it: where the session lets whoever adds one ask for that, the tool asks once (unless `analyze` is false), and `analysis` says what came of it. |
+| `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set, or `groups` names some of the session's groups: then the members of any one of them see it, and the admins. A PDF or image has no text until the session's AI reads it: where the session has context cards on, the tool asks for that once (unless `analyze` is false); with cards off only an admin's agent can, with `analyze: true`. `analysis` says what came of it. |
 | `list_context` | Lists the files and links people added to the session's context that the agent may read, each with its card (a short summary, topic tags and key names) where the session keeps cards. `query` keeps the sources that hold every word given, in their title, link or card; no AI is asked. |
 | `read_context` | Returns one context source's text by its id: a link's page as the Session Worker read it, a text file, or the session's AI's reading of a PDF or image. Up to 20,000 characters a call; `next` is the `offset` for the following part. |
 | `ask_session_agent` | Asks the session's own Session Agent one question, when it has one and its admins let the agent ask. Chats with it can be recorded when the session's recording setting is on (`get_session` shows `sessionAgent.recording`): the question and answer are then stored for the session's organisers unless `store` is false, with the agent's address only if `attribution` is `address`. The reply's `chat` says in a sentence whether this one was stored, to pass on with the answer. |
@@ -528,7 +528,8 @@ unknown `CE_MCP_*` name.
   cards on, whoever adds one may have it read once, as one of their AI uses
   for the day; `add_context` asks for that unless `analyze` is false, waits up
   to 40 seconds, and reports in `analysis` whether it was read, is still being
-  read, or could not be. The reading is context for whoever can see the file. Files in the state directory,
+  read, or could not be. With cards off it asks only when an admin's agent
+  sets `analyze` to true. The reading is context for whoever can see the file. Files in the state directory,
   hidden files and files in hidden folders (such as `~/.config` or `~/.aws`)
   are never added. Text that looks like a key, token or password is refused,
   credentials in JSON included; a PDF's text isn't checked, so check a PDF
