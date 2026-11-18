@@ -338,8 +338,15 @@ jobs:
       - name: Install Session Worker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
+      # The runner image already has Chromium's system libraries. Fetching them
+      # on every run has stalled this job for minutes on a slow package mirror,
+      # so fetch them only when the browser cannot start. Both smokes launch
+      # headless, which needs only the headless shell build.
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          npx playwright install --only-shell chromium
+          node -e "require('playwright').chromium.launch().then((browser) => browser.close())" \
+            || npx playwright install-deps chromium
 
       - name: Build client
         run: npm --prefix client run build
