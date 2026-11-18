@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.17] - 2026-11-18
 
+Session Workers need redeploying for the Worker changes below. A redeploy changes no stored data and signs no one out; with names on, people can set a name others in the session see.
+
+### Client — available when the site deploys
+
+- Session names: in a session on a Session Worker from this release you can set your name; others the session admits see it on your page, in Results and in group lists, in place of your address. Your private label for someone shows as "your label". Sessions without a place for names keep your name on this device.
+- Session Agent: you can speak a question with the microphone; an answer lists what it read; the dialog says who gets Detailed answers.
+- An AI build that cannot read a session says which limit it met: too many stored versions, too much answer text, or too much stored material.
+- Classic 95 rating value readable on its card.
+- Answers sent right after sign-in are read once.
+- "Talk it through" opens the interview directly.
+- Debate map views: Atlas, Tree, List.
+- Results version picker on one row.
+- On phones, the risk matrix uses the full width and keeps its row and column labels in view.
+- Topic window close button easier to see.
+- The question count sits between the arrows.
+- One "?" beside "Voice mode".
+
+### Workers — requires redeployment
+
+- People can give themselves a display name in a session, up to 32 characters, shown to members in place of their address; admins can clear one and turn names off (`namesEnabled`; absent means on); names travel in backups. Names stay out of AI prompts, exports and agent results. The Worker advertises `session_names_v1`.
+- Results load faster on large sessions: a batch of answers is read from storage in one request instead of one per answer, the session's access gate is checked once per request, and the answer list returns up to 500 a page (older sites keep pages of 100).
+- Saving an answer no longer reads every question's record each time: a Worker keeps a session's question list for 5 seconds, and reads it again for a question it does not know.
+- The Session Agent reads far more of a session's context for an answer: up to 320,000 characters from 48 items, each to 12,000, or 160,000 characters on Cloudflare's model. Each question costs more on the session's provider key.
+- The Session Agent lists what an answer read. Asked for numbers a General answer is not given, it says they are on the Results page; asked whether a chat is recorded, it answers from the session's setting.
+- AI builds count only the answers they keep against their limit, with a 32 MiB guard on stored bytes, so a session of AI-prefilled answers with research material can build.
+- A backup reads its pages in bulk. On a 4,000-item drill, storage operations fell from 12,525 to 1,139, with identical pages and an identical restore.
+
+### Agents and MCP
+
+- MCP 0.6.0. Where a session keeps names, an agent's display name is saved in the session on joining and with `set_profile`, and its answers there no longer carry the name; older Workers still get it in answers.
+- `get_results`: a partial result's `next` says its counts are not the session's totals, why, and how to read the rest; answers list 500 a page on Workers that allow it.
+- `ask_session_agent`'s reply gains `chat`, one sentence saying whether the question and answer were stored.
+
+### Local tooling
+
+- A test drills the way back: data, names and a backup made by this release's Worker are read, restored and edited under the published 0.9.12 Worker bundle.
+- Two browser journeys run as a hosted job in Chromium and WebKit: a phone participant's visit with a look pass in three themes, and Results at 50 people by 40 statements.
+- New Session Worker tests: every route asked from an unlisted origin, a results admin refused other admin actions, members-only answer batches kept uncached, and a file-form answer replayed by request id.
+
 ## [0.9.16] - 2026-11-18
 
 No change to the Session Worker or the MCP: no Worker needs redeploying, and nothing is published to npm.
