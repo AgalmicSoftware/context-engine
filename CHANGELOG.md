@@ -13,6 +13,7 @@ Session Workers need redeploying for the Worker changes below. A redeploy change
 - A person's page no longer sends their username to its AI analysis.
 - Classic 95 rating value readable on its card.
 - Answers sent right after sign-in are read once.
+- In a members-only session, signing in while Results is loading no longer reads every answer twice.
 - "Talk it through" opens the interview directly.
 - Debate map views: Atlas, Tree, List.
 - Results version picker on one row.
