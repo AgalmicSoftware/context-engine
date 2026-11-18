@@ -58,7 +58,7 @@ it('gives every phone question card one height that leaves the controls row in v
 
 // The actions, Submit and the arrows share one row on a phone. The arrows hold the row's right end at a fixed width
 // and Submit takes what is left, so Submit appearing, the Submitted check and the unsent-answers notice never move
-// them; the counter floats above the arrows.
+// them; the counter sits between the arrows in a slot of fixed width, so it takes room from Submit, never from them.
 it('keeps the phone controls in one row, with the arrows fixed at its end', () => {
   const rule = (selector: string) =>
     css.match(new RegExp(`@media \\(max-width: 768px\\)\\s*\\{[^@]*?${selector}\\s*\\{([^{}]*)\\}`))?.[1] || '';
@@ -67,7 +67,9 @@ it('keeps the phone controls in one row, with the arrows fixed at its end', () =
     /flex: 0 0 auto;[\s\S]*margin-left: auto;/,
   );
   expect(rule('\\.pileInteractionUnit \\.pileFooter')).toMatch(/flex: 1 1 0;\s*min-width: 0;/);
-  expect(css).toMatch(/\.pileInteractionUnit \.pileNav \.pileNavCounterText\s*\{\s*position: absolute;/);
+  const counter = css.match(/\.pileInteractionUnit \.pileNav \.pileNavCounterText\s*\{([^{}]*)\}/)?.[1] || '';
+  expect(counter).toMatch(/flex: none;[\s\S]*width: calc\(var\(--pile-counter-digits, 2\) \* 2ch \+ 2ch\);/);
+  expect(counter).not.toMatch(/position: absolute/);
   expect(css).toMatch(/\.pileInteractionUnit \.pileFooter \.pilePendingAnswerNotice\s*\{\s*position: absolute;/);
   expect(css).not.toMatch(/\.pileNav\s*\{\s*flex-basis: 100%;/);
   // Choices keep room below the last one for the fade and its focus ring.
@@ -77,7 +79,7 @@ it('keeps the phone controls in one row, with the arrows fixed at its end', () =
 // Where a phone row is short of room, Submit keeps its word and its spinner rather than showing either cut.
 it('keeps Submit readable on the narrowest phone rows', () => {
   expect(css).toMatch(
-    /@media [^{]*max-width: 340px\)\s*\{[^@]*\.pileInteractionUnit \.pileControls > \.pileNav\s*\{\s*gap: 1px;/,
+    /@media [^{]*max-width: 370px\)\s*\{[^@]*\.pileInteractionUnit \.pileControls > \.pileNav\s*\{\s*gap: 1px;/,
   );
   expect(css).toMatch(
     /\.pileInteractionUnit \.pileFooter \.pileSubmitProgress\s*\{\s*flex-wrap: wrap;[^}]*max-height: 1\.25em;\s*overflow: hidden;/,
