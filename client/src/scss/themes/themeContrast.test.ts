@@ -387,6 +387,46 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
 
+  // The debate map's topic window closes from an X that sat bare on the window, and half over the dimmed page on a
+  // phone. It is now an opaque disc ringed in its own X colour; Classic 95 keeps its raised title-bar button.
+  const debateMapCss = compileModule('components/DebateMap/DebateMap.module.scss');
+  test.each(registry.themes.map(({ id, layoutProfile }) => [id, layoutProfile]))(
+    '%s shows the topic window close button clearly',
+    (themeId, layoutProfile) => {
+      const values = themeValues(css, themeId);
+      const paint = painter(values);
+      const close = '.debateMap .modalContent .modalHeader .modalControls .closeIcon';
+      const firstContainer = debateMapCss.indexOf('@container');
+      const rule =
+        layoutProfile === 'desktop-window'
+          ? moduleRule(debateMapCss, '.debateMapWrapper.embeddedAtlas .debateMap .modalContent .modalHeader .closeIcon')
+          : moduleRule(layoutProfile === 'minimal-app' ? debateMapCss : debateMapCss.slice(0, firstContainer), close);
+      const window = paint(
+        layoutProfile === 'desktop-window'
+          ? 'var(--ce-titlebar-bg)'
+          : layoutProfile === 'minimal-app'
+            ? 'var(--ce-overlay-surface)'
+            : 'var(--ce-document-text)',
+      );
+      const fill = composite(paint(rule.background), window);
+      const x = composite(paint(rule.color), fill);
+      const ratio = (a: Rgba, b: Rgba) => Number(contrastRatio(a, b).toFixed(2));
+      expect(ratio(x, fill)).toBeGreaterThanOrEqual(4.5);
+      if (layoutProfile === 'desktop-window') {
+        expect(ratio(fill, window)).toBeGreaterThanOrEqual(3);
+        return;
+      }
+      // Its ring takes the X's colour, so the edge shows on the window, and the ring or the fill on the dimmed page.
+      expect(rule.border).toBe('2px solid currentColor');
+      expect(ratio(x, window)).toBeGreaterThanOrEqual(3);
+      const dimmed = composite(
+        paint('color-mix(in srgb, var(--ce-compat-dark) 85%, transparent)'),
+        paint('var(--ce-canvas)'),
+      );
+      expect(Math.max(ratio(x, dimmed), ratio(fill, dimmed))).toBeGreaterThanOrEqual(3);
+    },
+  );
+
   // The Session Doc Library's fields sit in an upload box on a panel, both translucent layers on the page canvas.
   // Its link fields took the document text the recipe gives every field (1.93:1 in Context Engine), and Classic 95's
   // placeholders were 1.82:1.

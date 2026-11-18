@@ -314,6 +314,17 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   await step('open topic', () => page.locator('[data-testid^="ce-political-compass-point-"]').first().waitFor({ timeout: 15000 }));
   const panel = page.locator('[class*="modalContent"]').last();
   await step('topic panel', () => assertReadable(panel));
+  // Its close button reaches 44px across and down, for a thumb, in every theme.
+  await step('topic close reach', async () => {
+    const reach = await panel.getByTitle('Close').evaluate((button) => {
+      const box = button.getBoundingClientRect();
+      const [x, y] = [box.left + box.width / 2, box.top + box.height / 2];
+      const hits = (points) => points.filter(([px, py]) => button.contains(document.elementFromPoint(px, py))).length;
+      const offsets = Array.from({ length: 121 }, (_, index) => index - 60);
+      return [hits(offsets.map((d) => [x + d, y])), hits(offsets.map((d) => [x, y + d]))];
+    });
+    assert(Math.min(...reach) >= 44, `The topic window's close button reaches only ${reach.join(' by ')}px`);
+  });
 
   // The summary leads short; its positions open on request.
   const more = panel.getByRole('button', { name: 'Show more' });
