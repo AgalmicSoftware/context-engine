@@ -99,7 +99,7 @@ it('sizes the phone counter by the room the row has in the font in use', () => {
   const counter = css.match(/\.pileInteractionUnit \.pileNav \.pileNavCounterText\s*\{([^{}]*)\}/)?.[1] || '';
   // What the rest of an answered row needs: its fixed parts and Submit's word, counted in this font's digits.
   expect(counter).toMatch(
-    /--pile-row-rest: calc\(var\(--pile-row-fixed\) \+ var\(--pile-row-arrows, 0px\) \+ var\(--pile-submit-digits\) \* 1ch \+ 4px\);/,
+    /--pile-row-rest: calc\(var\(--pile-row-fixed\) \+ var\(--pile-row-arrows\) \+ var\(--pile-submit-digits\) \* 1ch \+ 8px\);/,
   );
   // Each form's switch compares the row's own width (cqw) with that need and the form's width.
   expect(counter).toMatch(
@@ -128,18 +128,22 @@ it('sizes the phone counter by the room the row has in the font in use', () => {
   expect(css).not.toMatch(/@container pile-row \(max-width: \d+px\)/);
   // The same on every card, with or without Submit, so the arrows never move: nothing about Submit selects it.
   expect(css).not.toMatch(/:has\([^)]*pileSubmit[^)]*\)[^{]*\.pileNavCounterText/);
-  // Each theme says how wide Submit's word is in its own fonts.
-  const themed = [...css.matchAll(/--pile-submit-digits: (\d+);\s*--pile-submit-chars: ([\d.]+);/g)].map((match) =>
-    match.slice(1, 3).map(Number),
-  );
+  // Each theme says how wide Submit's word is in its own fonts. The first, unconditional values are the most any
+  // theme needs: a browser without style queries (Safari before 18) gets those in every theme, and must hold back
+  // too much room rather than too little.
+  const themed = [
+    ...css.matchAll(/--pile-submit-digits: (\d+);\s*--pile-submit-chars: ([\d.]+);\s*--pile-row-arrows: (\d+)px;/g),
+  ].map((match) => match.slice(1, 4).map(Number));
   expect(themed).toEqual([
-    [7, 5.95],
-    [8, 6.8],
-    [9, 6.5],
+    [9, 6.8, 8],
+    [7, 5.95, 0],
+    [8, 6.8, 0],
+    [9, 6.5, 8],
   ]);
-  // Past the last resort (no counter, and still no room): the word is set smaller, not cut.
+  themed.slice(1).forEach((own) => own.forEach((value, at) => expect(value).toBeLessThanOrEqual(themed[0][at])));
+  // Where the row is short even with the counter gone, the word shrinks by as much as it is short, not cut.
   expect(css).toMatch(
-    /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonLabel\s*\{\s*font-size: clamp\(0\.8em, 1em \+ \(100cqw - var\(--pile-row-fixed\) - var\(--pile-row-arrows, 0px\) \+ 10px - var\(--pile-submit-chars\) \* 1ch - 2px\) \* 999, 1em\);/,
+    /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonLabel\s*\{\s*font-size: clamp\(0\.8em, 1em \+ \(100cqw - var\(--pile-row-fixed\) - var\(--pile-row-arrows\) \+ 10px - var\(--pile-submit-chars\) \* 1ch - 8px\) \* 0\.3, 1em\);/,
   );
 });
 

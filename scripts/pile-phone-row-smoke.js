@@ -144,6 +144,41 @@ const measureRow = (page) =>
     };
   });
 
+// Submit's word must keep room to spare at every width, not only the sampled sizes: the tightest rows sit just
+// past each point where the counter changes form. 4px is the least accepted: a release failed on a runner that
+// drew the same font a little wider than the machine it was tuned on, with 1.4px to spare.
+const MIN_SPARE = 4;
+const SWEEP = { from: 320, to: 430 };
+// What a browser without style() container queries (Safari before 18, Firefox) gets: the stylesheet's first,
+// unconditional values, in every theme.
+const NO_STYLE_QUERY_CSS = (() => {
+  const scss = fs.readFileSync(path.join(__dirname, '../client/src/components/SurveyTool/SurveyTool.module.scss'), 'utf8');
+  const first = (name) => scss.match(new RegExp(`${name}: ([^;]+);`))[1];
+  return `[class*="_pileControls_"] { --pile-submit-digits: ${first('--pile-submit-digits')} !important; --pile-submit-chars: ${first('--pile-submit-chars')} !important; --pile-row-arrows: ${first('--pile-row-arrows')} !important; }`;
+})();
+
+const measureSpare = (page, digits) =>
+  page.evaluate((digitCount) => {
+    const row = document.querySelector('[class*="_pileControls_"]');
+    const counterBox = row.querySelector('[class*="_pileNavCounterText_"]');
+    const [first, last] = [counterBox.firstElementChild, counterBox.lastElementChild];
+    const was = [first.textContent, last.textContent, counterBox.style.getPropertyValue('--pile-counter-digits')];
+    const count = '1'.padEnd(digitCount, '0');
+    first.textContent = count;
+    last.textContent = count;
+    counterBox.style.setProperty('--pile-counter-digits', String(digitCount));
+    const button = [...row.querySelectorAll('button')].find((el) => /^Submit/.test(el.getAttribute('aria-label') || el.textContent.trim()));
+    const label = button.querySelector('[class*="_pileSubmitButtonLabel_"]');
+    const word = document.createRange();
+    word.selectNodeContents(label.firstChild);
+    const spare = button.clientWidth - word.getBoundingClientRect().width;
+    const lines = counterBox.getBoundingClientRect().width < 1 ? 0 : Math.abs(first.getBoundingClientRect().top - last.getBoundingClientRect().top) < 2 ? 1 : 2;
+    first.textContent = was[0];
+    last.textContent = was[1];
+    counterBox.style.setProperty('--pile-counter-digits', was[2]);
+    return { spare, lines };
+  }, digits);
+
 const assertRow = (state, where, { width, wideFont }) => {
   const label = `${where}:`;
   const names = state.controls.map((control) => control.name);
@@ -200,7 +235,7 @@ const assertRow = (state, where, { width, wideFont }) => {
 // DejaVu Sans on a Linux runner; both are among the widest common faces.
 const WIDE_FONT_CSS = `* { font-family: Verdana, 'DejaVu Sans', sans-serif !important; }`;
 
-async function runTheme(browser, baseUrl, browserName, theme, wideFont = false) {
+async function runTheme(browser, baseUrl, browserName, theme, wideFont = false, noStyleQueries = false) {
   const context = await browser.newContext({
     viewport: SIZES[0],
     hasTouch: true,
@@ -216,12 +251,12 @@ async function runTheme(browser, baseUrl, browserName, theme, wideFont = false) 
     },
     { themeId: theme, version: THEME_DEFAULT_VERSION },
   );
-  if (wideFont) {
+  if (wideFont || noStyleQueries) {
     await context.addInitScript((css) => {
       const add = () => document.head.append(Object.assign(document.createElement('style'), { textContent: css }));
       if (document.head) add();
       else document.addEventListener('DOMContentLoaded', add, { once: true });
-    }, WIDE_FONT_CSS);
+    }, `${wideFont ? WIDE_FONT_CSS : ''} ${noStyleQueries ? NO_STYLE_QUERY_CSS : ''}`);
   }
   const page = await context.newPage();
   const pageErrors = [];
@@ -297,6 +332,27 @@ async function runTheme(browser, baseUrl, browserName, theme, wideFont = false) 
     // Submit widens into its place; measure once it has.
     await page.waitForTimeout(800);
     await measureEverySize('answered');
+    // Every width a phone has, for a two-digit and a three-digit count.
+    const tightest = {};
+    for (const digits of [2, 3]) {
+      for (let width = SWEEP.from; width <= SWEEP.to; width += 1) {
+        await page.setViewportSize({ width, height: 700 });
+        await page.waitForTimeout(40);
+        const { spare, lines } = await measureSpare(page, digits);
+        if (!tightest[digits] || spare < tightest[digits].spare) tightest[digits] = { spare, width, lines };
+      }
+    }
+    const spareNote = [2, 3]
+      .map((digits) => `${digits} digits ${tightest[digits].spare.toFixed(1)}px at ${tightest[digits].width}px (count ${['gone', 'on one line', 'stacked'][tightest[digits].lines]})`)
+      .join('; ');
+    console.log(`  ${theme}${wideFont ? ' (wide font)' : ''}${noStyleQueries ? ' (no style queries)' : ''}: Submit's least spare room, ${SWEEP.from} to ${SWEEP.to}px: ${spareNote}`);
+    for (const digits of [2, 3]) {
+      // In a wide font the word may sit closer to its edges, but it is never cut.
+      assert(
+        tightest[digits].spare >= (wideFont ? 0 : MIN_SPARE),
+        `${browserName} ${theme}${wideFont ? ' (wide font)' : ''}: Submit's word should keep ${wideFont ? 0 : MIN_SPARE}px to spare at every width (${spareNote})`,
+      );
+    }
     await page.waitForFunction(
       () => {
         const next = document.querySelector('button[aria-label="Next Question"]');
@@ -312,12 +368,15 @@ async function runTheme(browser, baseUrl, browserName, theme, wideFont = false) 
 
     for (const size of SIZES) {
       const where = (stateName) =>
-        `${browserName} ${theme}${wideFont ? ' (wide font)' : ''} ${size.name} ${size.width}x${size.height} ${stateName}`;
+        `${browserName} ${theme}${wideFont ? ' (wide font)' : ''}${noStyleQueries ? ' (no style queries)' : ''} ${size.name} ${size.width}x${size.height} ${stateName}`;
       const byState = ['unanswered', 'answered', 'end of set'].map((stateName) => [
         stateName,
         states[`${stateName} ${size.name}`],
       ]);
-      byState.forEach(([stateName, state]) => assertRow(state, where(stateName), { width: size.width, wideFont }));
+      byState.forEach(([stateName, state]) =>
+        // Without style queries the counter may give way sooner than each theme's own numbers would have it.
+        assertRow(state, where(stateName), { width: size.width, wideFont: wideFont || noStyleQueries }),
+      );
       const menu = states[`menu ${size.name}`];
       assert(
         menu.height > 0 && menu.top >= 0 && menu.bottom <= menu.viewportHeight,
@@ -352,14 +411,18 @@ async function runSmoke() {
   if (!browserType) throw new Error(`Unsupported PLAYWRIGHT_BROWSER "${browserName}"`);
   const browser = await browserType.launch({ headless: true });
   try {
-    for (const wideFont of [false, true]) {
-      for (const theme of THEMES) await runTheme(browser, baseUrl, browserName, theme, wideFont);
+    for (const [wideFont, noStyleQueries] of [
+      [false, false],
+      [true, false],
+      [false, true],
+    ]) {
+      for (const theme of THEMES) await runTheme(browser, baseUrl, browserName, theme, wideFont, noStyleQueries);
     }
   } finally {
     await browser.close();
   }
   console.log(
-    `Phone question row held in ${browserName}: ${THEMES.length} themes x ${SIZES.length} sizes x 3 states, in the site's fonts and a wide one.`,
+    `Phone question row held in ${browserName}: ${THEMES.length} themes x ${SIZES.length} sizes x 3 states, in the site's fonts, a wide one, and without style queries; every width from ${SWEEP.from} to ${SWEEP.to}px.`,
   );
 }
 

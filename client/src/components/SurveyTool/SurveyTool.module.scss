@@ -7332,24 +7332,37 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     container: pile-row / inline-size;
     // Actions 88, arrows 88, Clear 28, the counter's margins 10 and six gaps of 4px.
     --pile-row-fixed: 238px;
-    // How wide Submit's word is, in the counter's digits and in its own: Poppins here.
-    --pile-submit-digits: 7;
-    --pile-submit-chars: 5.95;
+    // How wide Submit's word is, in the counter's digits and in its own, and what wider arrows add. These are
+    // the most any theme needs, so a browser without style queries (Safari before 18, Firefox) holds back more
+    // room than a theme may need, never less.
+    --pile-submit-digits: 9;
+    --pile-submit-chars: 6.8;
+    --pile-row-arrows: 8px;
   }
 
-  // Each theme's own fonts: Open Sans has narrow digits, and Classic 95 a smaller counter and 48px arrows.
+  // Each theme's own fonts: Poppins' word is narrow against its digits, Open Sans has narrow digits, and Classic
+  // 95 (the values above) has a smaller counter and 48px arrows.
+  @container ce-theme style(--ce-layout-profile: standard-app) {
+    .pileInteractionUnit .pileControls {
+      --pile-submit-digits: 7;
+      --pile-submit-chars: 5.95;
+      --pile-row-arrows: 0px;
+    }
+  }
+
   @container ce-theme style(--ce-layout-profile: minimal-app) {
     .pileInteractionUnit .pileControls {
       --pile-submit-digits: 8;
       --pile-submit-chars: 6.8;
+      --pile-row-arrows: 0px;
     }
   }
 
   @container ce-theme style(--ce-layout-profile: desktop-window) {
     .pileInteractionUnit .pileControls {
-      --pile-row-arrows: 8px;
       --pile-submit-digits: 9;
       --pile-submit-chars: 6.5;
+      --pile-row-arrows: 8px;
     }
   }
 
@@ -7375,7 +7388,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .pileInteractionUnit .pileNav .pileNavCounterText {
     --pile-counter-line: calc(var(--pile-counter-digits, 2) * 2ch + 2ch);
     --pile-counter-stack: calc(var(--pile-counter-digits, 2) * 1ch + 4px);
-    --pile-row-rest: calc(var(--pile-row-fixed) + var(--pile-row-arrows, 0px) + var(--pile-submit-digits) * 1ch + 4px);
+    --pile-row-rest: calc(var(--pile-row-fixed) + var(--pile-row-arrows) + var(--pile-submit-digits) * 1ch + 8px);
     // Switches: far above zero while the row has room for that form, far below once it has not.
     --pile-room-line: calc((100cqw - var(--pile-row-rest) - var(--pile-counter-line)) * 999);
     --pile-room-stack: calc((100cqw - var(--pile-row-rest) - var(--pile-counter-stack)) * 999);
@@ -7411,14 +7424,13 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     font-size: clamp(0px, var(--pile-room-line), 1em);
   }
 
-  // Where the row cannot hold Submit's word even with the counter gone (the narrowest phones in a wide font), the
-  // word is set smaller rather than cut.
+  // Where the row cannot hold Submit's word at full size even with the counter gone (the narrowest phones, more
+  // so in a wide font), the word is set a little smaller, by as much as the row is short, rather than cut.
   .pileInteractionUnit .pileFooter .pileSubmitButtonLabel {
     font-size: clamp(
       0.8em,
-      1em +
-        (100cqw - var(--pile-row-fixed) - var(--pile-row-arrows, 0px) + 10px - var(--pile-submit-chars) * 1ch - 2px) *
-        999,
+      1em + (100cqw - var(--pile-row-fixed) - var(--pile-row-arrows) + 10px - var(--pile-submit-chars) * 1ch - 8px) *
+        0.3,
       1em
     );
   }
