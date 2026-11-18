@@ -1846,6 +1846,17 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(screen.queryByText('All of it')).not.toBeInTheDocument();
   });
 
+  it.each([
+    [{ min: 0, max: 10, step: 2 }, '2'],
+    [{ min: -0.5, max: 0.5, step: 0.1 }, '0.1'],
+    [{ min: 1, max: 5 }, '1'],
+  ])('steps the pile rating slider as its question does: %j', (scale, step) => {
+    renderPile({ questionPool: [{ id: 'rating-q1', type: 'rating', prompt: 'Rate readiness', scale }] });
+
+    // A slider stepping by 1 offers values the Worker refuses for this question.
+    expect(screen.getByRole('slider')).toHaveAttribute('step', step);
+  });
+
   it('passes the delayed pile-entry mode toggle prop into the pile create panel', async () => {
     renderPile();
 

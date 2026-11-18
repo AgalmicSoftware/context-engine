@@ -3062,7 +3062,7 @@ const renderPileResponseInput = (
           <CESlider
             min={ratingScale.min}
             max={ratingScale.max}
-            step={1}
+            step={ratingScale.step}
             value={ratingValue}
             onChange={(val: number, event: Event) => {
               changedDuringInteraction = true;
