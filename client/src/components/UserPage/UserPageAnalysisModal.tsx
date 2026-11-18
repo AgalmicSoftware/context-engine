@@ -3,7 +3,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faSync } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
+import type { AnalysisCard } from 'utilities/analysisCard/analysisCardModel';
+
 import styles from './UserPage.module.scss';
+import UserPageAnalysisCard, { type UserPageAnalysisCardPicture } from './UserPageAnalysisCard';
 import type { UserAnalysisGeneration } from './userPageAnalysisStateHelpers';
 
 type UserPageAnalysisCacheStatusState = {
@@ -24,6 +27,9 @@ type UserPageAnalysisModalDisplayState = {
 type UserPageAnalysisModalProps = {
   aiAnalysis?: React.ReactNode;
   analysisCacheStatusState: UserPageAnalysisCacheStatusState;
+  analysisCard?: AnalysisCard | null;
+  analysisCardPending?: boolean;
+  analysisCardPicture?: UserPageAnalysisCardPicture | null;
   analysisDetails?: React.ReactNode;
   analysisElapsedMs?: number;
   analysisError?: React.ReactNode;
@@ -43,6 +49,9 @@ type UserPageAnalysisModalProps = {
 const UserPageAnalysisModal = ({
   aiAnalysis,
   analysisCacheStatusState,
+  analysisCard = null,
+  analysisCardPending = false,
+  analysisCardPicture = null,
   analysisDetails,
   analysisElapsedMs = 0,
   analysisError,
@@ -126,6 +135,18 @@ const UserPageAnalysisModal = ({
               {analysisModalDisplayState.shouldRenderHistoricalFigure && <p>{analysisHistoricalFigure}</p>}
               {analysisModalDisplayState.shouldRenderHistoricalReasoning && (
                 <p className={styles.placeholderNote}>{analysisHistoricalReasoning}</p>
+              )}
+            </div>
+          )}
+          {(analysisCard || analysisCardPending) && (
+            <div className={styles.historicalAlignment}>
+              <h4>Picture card</h4>
+              {analysisCard ? (
+                <UserPageAnalysisCard card={analysisCard} picture={analysisCardPicture} />
+              ) : (
+                <p className={styles.placeholderNote} role="status">
+                  <FontAwesomeIcon icon={faSpinner} spin /> Making the card…
+                </p>
               )}
             </div>
           )}

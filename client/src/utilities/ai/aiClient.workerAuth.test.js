@@ -2,9 +2,11 @@ import { transcribe as transcribeWorker } from '../../../../workers/sessionCorsW
 import * as audioTranscription from './aiClientAudioTranscription';
 import {
   analyzeClusterOpinions,
+  analyzeUserCard,
   analyzeUserOpinions,
   analyzePhotoForQuestionGeneration,
   callAI,
+  fetchAnalysisCardPicture,
   rankQuestionsAI,
   runCompareToolkit,
   requestAiRewrite,
@@ -95,6 +97,107 @@ describe('aiClient worker auth options', () => {
     expect(result.summary).toBe('A cautious supporter.');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
   });
+
+  it('writes the picture card in a second request, after the analysis and without holding it up', async () => {
+    getEffectiveAiConfig.mockResolvedValue({ provider: 'openai', model: 'gpt-4o-mini', apiKeySource: 'worker' });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    const card = { title: 'Trusts plain tools', answers: { yesNo: { questionId: 'q1' } } };
+    fetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ completion: JSON.stringify({ summary: 'A summary.', card }) }),
+    });
+    // The analysis asks for no card and returns none, whatever the model adds.
+    const analysis = await analyzeUserOpinions({ questions: [] }, { sessionSlug: 'session-a' });
+    expect(analysis).not.toHaveProperty('card');
+    const analysisBody = JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body);
+    expect(analysisBody.response_format.json_schema.name).toBe('user_analysis');
+    expect(analysisBody.messages[0].content).not.toContain('"tastes"');
+
+    fetchWorkerWithAuth.mockResolvedValue({ ok: true, json: async () => ({ completion: JSON.stringify(card) }) });
+    const reply = await analyzeUserCard(
+      { questions: [{ id: 'q1', prompt: 'A question?' }] },
+      { summary: 'A summary.', figure: 'Grace Hopper (1906–1992)' },
+      { sessionSlug: 'session-a' },
+    );
+    expect(reply).toEqual(card);
+    const cardBody = JSON.parse(fetchWorkerWithAuth.mock.calls[1][1].body);
+    expect(cardBody.response_format.json_schema.name).toBe('user_analysis_card');
+    expect(cardBody.messages[0].content).toContain('"figure": "Grace Hopper (1906–1992)"');
+    expect(cardBody.messages[0].content).toContain('"prompt": "A question?"');
+
+    fetchWorkerWithAuth.mockResolvedValue({ ok: true, json: async () => ({ completion: '"not a card"' }) });
+    await expect(analyzeUserCard({}, {}, { sessionSlug: 'session-a' })).rejects.toThrow('not a card');
+  });
+
+  it('asks the Session Worker for a card picture by figure and keeps it for the visit', async () => {
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example/');
+    fetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        figure: 'Grace Hopper (1906–1992)',
+        look: { accentHex: '#aa3311' },
+        image: { mime: 'image/jpeg', base64: 'AAAA' },
+      }),
+    });
+    const options = { sessionSlug: 'session-a', sessionConfig: { slug: 'session-a' }, context: { account: '0x1' } };
+
+    const picture = await fetchAnalysisCardPicture('Grace Hopper (1906–1992)', options);
+
+    expect(picture).toEqual({ dataUrl: 'data:image/jpeg;base64,AAAA', accentHex: '#aa3311' });
+    const [url, init, auth] = fetchWorkerWithAuth.mock.calls[0];
+    expect(url).toBe('https://worker.example/analysis-card/picture');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ figure: 'Grace Hopper (1906–1992)' });
+    expect(auth).toMatchObject({ sessionSlug: 'session-a', workerUrl: 'https://worker.example' });
+    // Signed-in only: the route has no anonymous path. The page asks, so a lapsed sign-in never prompts.
+    expect(auth.preferAnonymous).toBeUndefined();
+    expect(auth.prompt).toBe(false);
+
+    await expect(fetchAnalysisCardPicture('Grace Hopper (1906–1992)', options)).resolves.toBe(picture);
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    // Another session draws its own.
+    await fetchAnalysisCardPicture('Grace Hopper (1906–1992)', { ...options, sessionSlug: 'session-b' });
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    [{ ok: false, json: async () => ({ error: 'picture_session_limit' }) }, 'picture_session_limit'],
+    [{ ok: true, json: async () => ({ image: { mime: 'text/html', base64: 'AAAA' } }) }, 'picture_unavailable'],
+    [{ ok: true, json: async () => ({ image: { mime: 'image/jpeg' } }) }, 'picture_unavailable'],
+    [
+      {
+        ok: false,
+        json: async () => {
+          throw new Error('not json');
+        },
+      },
+      'picture_unavailable',
+    ],
+  ])('refuses a card picture reply that is not a picture, and asks again next time', async (reply, message) => {
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockResolvedValue(reply);
+    const figure = `Nobody ${message} ${fetchWorkerWithAuth.mock.calls.length} (1900–1950)`;
+
+    await expect(fetchAnalysisCardPicture(figure, { sessionSlug: 's' })).rejects.toThrow(message);
+    await expect(fetchAnalysisCardPicture(figure, { sessionSlug: 's' })).rejects.toThrow(message);
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['figure_not_recognised', 'picture_refused', 'picture_needs_openai_key'])(
+    'remembers for the visit that a card picture cannot be made (%s)',
+    async (error) => {
+      getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+      fetchWorkerWithAuth.mockResolvedValue({ ok: false, json: async () => ({ error }) });
+      const figure = `Refused ${error.replace(/_/g, ' ')} (1900–1950)`;
+
+      await expect(fetchAnalysisCardPicture(figure, { sessionSlug: 's' })).rejects.toThrow(error);
+      await expect(fetchAnalysisCardPicture(figure, { sessionSlug: 's' })).rejects.toThrow(error);
+      expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+      // Another session may be able to.
+      await expect(fetchAnalysisCardPicture(figure, { sessionSlug: 'other' })).rejects.toThrow(error);
+      expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it('uses anonymous-first worker transport for callAI', async () => {
     getEffectiveAiConfig.mockResolvedValue({

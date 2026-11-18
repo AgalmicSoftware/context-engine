@@ -150,7 +150,7 @@ export type BuildSessionResultsSnapshotInput = {
 };
 
 export type BrowserFileDownloadOptions = {
-  content: string;
+  content: BlobPart;
   documentRef?: Document;
   filename: string;
   mimeType?: string;

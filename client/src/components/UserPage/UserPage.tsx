@@ -3850,6 +3850,9 @@ class UserPage extends Component<any, any> {
         <UserPageAnalysisModal
           aiAnalysis={aiAnalysis}
           analysisCacheStatusState={analysisCacheStatusState}
+          analysisCard={this.state.analysisCard}
+          analysisCardPending={this.state.analysisCardPending}
+          analysisCardPicture={this.state.analysisCardPicture}
           analysisDetails={analysisDetails}
           analysisElapsedMs={analysisElapsedMs}
           analysisError={analysisError}

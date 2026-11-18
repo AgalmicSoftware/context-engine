@@ -1,5 +1,11 @@
 import type UserPage from './UserPage';
-import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
+import { analyzeUserCard, analyzeUserOpinions, fetchAnalysisCardPicture } from 'utilities/ai/aiClient.js';
+import {
+  buildAnalysisCard,
+  normalizeAnalysisCard,
+  type AnalysisCardPlace,
+} from 'utilities/analysisCard/analysisCardModel';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
@@ -161,7 +167,75 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
       : String(this.props.network?.id ?? this.props.network?.chainId ?? '');
   owner.addressLower = addressLower;
   owner.networkId = networkId;
-  const hydrateAnalysisCacheIfPresent = (cacheContextToRead: CacheContext): boolean => {
+  const analysisAiContext = {
+    account: String(this.props.account || ''),
+    providerLike: this.props.provider,
+    chainId: this.props.network?.id ?? this.props.networkChainId ?? null,
+    lit: getGlobalLitHooks(),
+  };
+  // The card says "my answers" on the viewer's own page and "their answers" on anyone else's. That, and what
+  // its foot shows, follow who is looking now, not who first cached the analysis.
+  const ownProfile = !!addressLower && analysisAiContext.account.trim().toLowerCase() === addressLower;
+  // The card's foot names the account, this site and the session's page, as an address someone could type.
+  const pageSlug = String(this.props.activeSessionSlug || this.props.sessionSlug || '').trim();
+  const cardPlace = (sessionSlug: unknown): AnalysisCardPlace => {
+    const slug = pageSlug || String(sessionSlug || '').trim();
+    const host = typeof window === 'undefined' ? '' : window.location.host;
+    const link = host && slug ? `${host}${buildPublicRoute(`/session/${encodeURIComponent(slug)}`)}` : host;
+    return { own: ownProfile, link, account: addressLower };
+  };
+  // The card is made once the analysis is on screen, by two requests that run side by side: its words (from the
+  // answers and the analysis) and its picture (from the figure's name alone). Neither holds the analysis up, and
+  // neither failing is an error of the analysis: the card is then left out, or shown without its picture.
+  const showAnalysisCard = (result: ProfileRecord, aiOptions: ProfileRecord, cardCache: CacheContext): void => {
+    const alignment = (result.historicalAlignment || {}) as ProfileRecord;
+    const figure = String(alignment.figure || '').trim();
+    if (!figure || !isCurrent()) return;
+    const place = cardPlace(aiOptions.sessionSlug);
+    const kept = normalizeAnalysisCard(result.card);
+    this.setState(() =>
+      isCurrent()
+        ? {
+            analysisCard: kept ? normalizeAnalysisCard({ ...kept, ...place }) : null,
+            analysisCardPending: !kept,
+            analysisCardPicture: { status: 'loading' },
+          }
+        : null,
+    );
+    fetchAnalysisCardPicture(figure, aiOptions)
+      .then((picture) =>
+        this.setState(() => (isCurrent() ? { analysisCardPicture: { status: 'ready', ...picture } } : null)),
+      )
+      .catch((pictureError: unknown) => {
+        accountLog.warn('[UserPage] analysis card picture unavailable:', getUserPageErrorMessage(pictureError, ''));
+        this.setState(() => (isCurrent() ? { analysisCardPicture: { status: 'none' } } : null));
+      });
+    if (kept) return;
+    analyzeUserCard(
+      userData,
+      { name: result.name, summary: result.summary, details: result.details, figure, reasoning: alignment.reasoning },
+      aiOptions,
+    )
+      .then(async (reply) => {
+        const card = buildAnalysisCard({ card: reply, historicalAlignment: alignment }, questions, place);
+        this.setState(() => (isCurrent() ? { analysisCard: card, analysisCardPending: false } : null));
+        if (!card) return;
+        // Kept with the analysis, so reopening it does not write the card again.
+        await this._writeAnalysisCacheEntry({
+          sessionSlug: cardCache.sessionSlug,
+          networkId,
+          addressLower,
+          fingerprint: cardCache.fingerprint,
+          aiContext: cardCache.aiContext,
+          result: { ...result, card },
+        });
+      })
+      .catch((cardError: unknown) => {
+        accountLog.warn('[UserPage] analysis card unavailable:', getUserPageErrorMessage(cardError, ''));
+        this.setState(() => (isCurrent() ? { analysisCardPending: false } : null));
+      });
+  };
+  const hydrateAnalysisCacheIfPresent = (cacheContextToRead: CacheContext, session: unknown): boolean => {
     const cacheReadDescriptor = buildUserPageAnalysisCacheReadDescriptor({
       sessionSlug: cacheContextToRead.sessionSlug,
       networkId,
@@ -174,6 +248,11 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
     if (!cachedEntry) return false;
     if (!isCurrent()) return true;
     this._hydrateAnalysisFromCache(cachedEntry, isCurrent);
+    showAnalysisCard(
+      (cachedEntry.result || {}) as ProfileRecord,
+      buildUserPageAnalysisAiOptions({ analysisSession: session, context: analysisAiContext }),
+      cacheContextToRead,
+    );
     return true;
   };
 
@@ -194,19 +273,13 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
     if (!isCurrent()) return;
     owner.fingerprint = cacheContext.fingerprint;
     owner.sessionSlug = cacheContext.sessionSlug;
-    if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
+    if (hydrateAnalysisCacheIfPresent(cacheContext, analysisSession)) return;
 
     if (!isCurrent()) return;
     this.setState(() => (isCurrent() ? buildUserPageAnalysisResetStatePatch({ analyzing: true }) : null));
     this.startAnalysisTimer(isCurrent);
 
-    const analysisAiContext = {
-      account: String(this.props.account || ''),
-      providerLike: this.props.provider,
-      chainId: this.props.network?.id ?? this.props.networkChainId ?? null,
-      lit: getGlobalLitHooks(),
-    };
-    const aiOptions = buildUserPageAnalysisAiOptions({
+    let aiOptions = buildUserPageAnalysisAiOptions({
       analysisSession,
       context: analysisAiContext,
     });
@@ -233,13 +306,14 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
       if (!isCurrent()) return;
       owner.fingerprint = cacheContext.fingerprint;
       owner.sessionSlug = cacheContext.sessionSlug;
-      if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
+      if (hydrateAnalysisCacheIfPresent(cacheContext, fallbackSession)) return;
       const fallbackOpts = buildUserPageAnalysisAiOptions({
         analysisSession: fallbackSession,
         context: analysisAiContext,
         defaultReason: 'fallback-gate-unavailable',
       });
       result = await analyzeUserOpinions(userData, fallbackOpts);
+      aiOptions = fallbackOpts;
     }
     // Cache writes retain the captured owner even after its view is gone.
     // Update UI
@@ -254,6 +328,7 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
           : null,
       );
       this.clearAnalysisTimer();
+      showAnalysisCard(normalizedResult, aiOptions, cacheContext);
     }
     try {
       await this._writeAnalysisCacheEntry({

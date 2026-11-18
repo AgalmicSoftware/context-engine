@@ -27,6 +27,15 @@ jest.mock('reactstrap', () => ({
   ),
 }));
 
+jest.mock('./UserPageAnalysisCard', () => ({
+  __esModule: true,
+  default: ({ card, picture }: { card: { title: string }; picture: { status: string } | null }) => (
+    <div data-testid="analysis-card">
+      {card.title} / {picture?.status || 'no picture yet'}
+    </div>
+  ),
+}));
+
 const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageAnalysisModal>> = {}) => ({
   aiAnalysis: 'Profile synthesis',
   analysisCacheStatusState: {
@@ -56,6 +65,46 @@ const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageAnal
 });
 
 describe('UserPageAnalysisModal', () => {
+  it('shows the picture card under the analysis only when the analysis has one', () => {
+    const card = {
+      own: true,
+      link: 'contextengine.sh',
+      account: '',
+      title: 'Wants AI doing paperwork',
+      matchNote: '',
+      figure: 'Elinor Ostrom (1933–2012)',
+      figureName: 'Elinor Ostrom',
+      years: '1933–2012',
+      tastes: { book: null, game: null, film: null, song: null },
+      answers: { yesNo: null, ownWords: null, vote: null },
+    };
+    const { rerender } = render(<UserPageAnalysisModal {...createProps()} />);
+    expect(screen.queryByText('Picture card')).toBeNull();
+
+    // The analysis is readable while the card is still being written.
+    rerender(<UserPageAnalysisModal {...createProps({ analysisCardPending: true })} />);
+    expect(screen.getByText('Profile synthesis')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('Making the card…');
+    expect(screen.queryByTestId('analysis-card')).toBeNull();
+
+    rerender(
+      <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'loading' } })} />,
+    );
+    expect(screen.getByText('Picture card')).toBeTruthy();
+    expect(screen.getByTestId('analysis-card').textContent).toBe('Wants AI doing paperwork / loading');
+
+    // While an analysis is running or has failed there is no card to show.
+    rerender(
+      <UserPageAnalysisModal
+        {...createProps({
+          analysisCard: card,
+          analysisModalDisplayState: { shouldRenderAnalyzing: true, shouldRenderAnalysisBody: false },
+        })}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-card')).toBeNull();
+  });
+
   it('labels the model that produced a cached summary and distinguishes older requested-only metadata', () => {
     const { rerender } = render(
       <UserPageAnalysisModal

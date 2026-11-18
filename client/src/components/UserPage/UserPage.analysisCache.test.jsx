@@ -4,7 +4,7 @@ import UserPage from './UserPage';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
-import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
+import { analyzeUserCard, analyzeUserOpinions, fetchAnalysisCardPicture } from 'utilities/ai/aiClient.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
@@ -28,6 +28,8 @@ jest.mock('utilities/ai/aiClient.js', () => ({
     name: 'name',
     historicalAlignment: {},
   })),
+  analyzeUserCard: jest.fn(),
+  fetchAnalysisCardPicture: jest.fn(),
 }));
 
 const makeInstance = (props = {}) => {
@@ -164,6 +166,9 @@ describe('UserPage analysis cache and routing', () => {
     analyzeUserOpinions
       .mockReset()
       .mockResolvedValue({ summary: 'summary', details: 'details', name: 'name', historicalAlignment: {} });
+    // Unless a test says otherwise, the card request returns nothing usable and no picture can be drawn.
+    analyzeUserCard.mockReset().mockResolvedValue({});
+    fetchAnalysisCardPicture.mockReset().mockRejectedValue(new Error('picture_unavailable'));
     checkSponsoredAccess.mockResolvedValue({
       status: 'unknown',
       gate: null,
@@ -398,6 +403,119 @@ describe('UserPage analysis cache and routing', () => {
       nowSpy.mockRestore();
       warnSpy.mockRestore();
     }
+  });
+
+  it('shows the analysis first, then makes the card: its words and its picture side by side', async () => {
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    const picture = { dataUrl: 'data:image/jpeg;base64,AAAA', accentHex: '#aa3311' };
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'summary',
+      details: 'details',
+      name: 'name',
+      historicalAlignment: { figure: 'Grace Hopper (1906–1992)', reasoning: 'Reasoning.' },
+    });
+    let finishCard;
+    analyzeUserCard.mockReturnValueOnce(new Promise((resolve) => (finishCard = resolve)));
+    fetchAnalysisCardPicture.mockResolvedValueOnce(picture);
+
+    await instance.analyzeUser();
+
+    // The analysis is on screen and both card requests are out, before the card's words have come back.
+    expect(instance.state.aiAnalysis).toBe('summary');
+    expect(instance.state.analyzing).toBe(false);
+    expect(instance.state.analysisCard).toBeNull();
+    expect(instance.state.analysisCardPending).toBe(true);
+    expect(fetchAnalysisCardPicture).toHaveBeenCalledTimes(1);
+    const [cardData, cardAnalysis, cardOptions] = analyzeUserCard.mock.calls[0];
+    expect(cardData).toBe(analyzeUserOpinions.mock.calls[0][0]);
+    expect(cardAnalysis).toEqual({
+      name: 'name',
+      summary: 'summary',
+      details: 'details',
+      figure: 'Grace Hopper (1906–1992)',
+      reasoning: 'Reasoning.',
+    });
+    expect(cardOptions.sessionSlug).toBe(slug);
+    // The picture request carries the figure and the session to ask, and nothing the person wrote.
+    const [figure, options] = fetchAnalysisCardPicture.mock.calls[0];
+    expect(figure).toBe('Grace Hopper (1906–1992)');
+    expect(options.sessionSlug).toBe(slug);
+    expect(JSON.stringify(fetchAnalysisCardPicture.mock.calls[0])).not.toContain('A deterministic answer');
+    await waitFor(() => expect(instance.state.analysisCardPicture).toEqual({ status: 'ready', ...picture }));
+
+    finishCard({
+      title: 'Trusts plain tools over grand plans',
+      matchNote: 'Made machines speak plainly.',
+      tastes: { book: { title: 'A Book', by: 'An Author, 1950' } },
+      answers: { ownWords: { questionId: 'q1', quote: 'A deterministic answer' } },
+    });
+    await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+    expect(instance.state.analysisCard).toMatchObject({
+      own: false,
+      // The foot of the card: the account the answers belong to and this site's page for the session.
+      account: `${addressLower.slice(0, 6)}…${addressLower.slice(-4)}`,
+      link: `${window.location.host}/session/${slug}`,
+      title: 'Trusts plain tools over grand plans',
+      figure: 'Grace Hopper (1906–1992)',
+      answers: { ownWords: { text: 'A deterministic answer', trimmed: true } },
+    });
+    await waitFor(() =>
+      expect(getSingleAnalysisCacheEntry({ slug, networkID, addressLower }).entry.result.card?.title).toBe(
+        'Trusts plain tools over grand plans',
+      ),
+    );
+
+    // Opened again, the analysis and the card come from the cache: only the picture is asked for. A session
+    // that cannot draw leaves the card without one.
+    analyzeUserOpinions.mockClear();
+    analyzeUserCard.mockClear();
+    fetchAnalysisCardPicture.mockRejectedValueOnce(new Error('picture_needs_openai_key'));
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.analysisCardPicture).toEqual({ status: 'none' }));
+    expect(analyzeUserOpinions).not.toHaveBeenCalled();
+    expect(analyzeUserCard).not.toHaveBeenCalled();
+    expect(instance.state.analysisCard.title).toBe('Trusts plain tools over grand plans');
+    expect(instance.state.analysisCardPending).toBe(false);
+    expect(instance.state.analysisError).toBe('');
+  });
+
+  it('keeps the analysis when the card cannot be written, and tries the card again next time', async () => {
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'summary',
+      details: 'details',
+      name: 'name',
+      historicalAlignment: { figure: 'Grace Hopper (1906–1992)', reasoning: 'Reasoning.' },
+    });
+    analyzeUserCard.mockRejectedValueOnce(new Error('Rate limit exceeded.'));
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+
+    expect(instance.state.aiAnalysis).toBe('summary');
+    expect(instance.state.analysisError).toBe('');
+    expect(instance.state.analysisCard).toBeNull();
+    expect(getSingleAnalysisCacheEntry({ slug, networkID, addressLower }).entry.result.card).toBeNull();
+
+    // The cached analysis has no card yet, so opening it again asks for the card only.
+    analyzeUserOpinions.mockClear();
+    analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans'));
+    expect(analyzeUserOpinions).not.toHaveBeenCalled();
+    expect(analyzeUserCard).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes no card when the analysis matched no figure', async () => {
+    const { instance } = makeAnalysisCacheInstance();
+
+    await instance.analyzeUser();
+
+    expect(instance.state.analysisCard).toBeNull();
+    expect(instance.state.analysisCardPending).toBe(false);
+    expect(instance.state.analysisCardPicture).toBeNull();
+    expect(analyzeUserCard).not.toHaveBeenCalled();
+    expect(fetchAnalysisCardPicture).not.toHaveBeenCalled();
   });
 
   it('hydrates unchanged analysis input from analysisCache without calling AI', async () => {
