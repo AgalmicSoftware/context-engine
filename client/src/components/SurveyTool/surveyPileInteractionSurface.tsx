@@ -285,9 +285,18 @@ const renderPileNavControls = ({
       >
         <FontAwesomeIcon icon={faChevronLeft} />
       </button>
-      <span className={styles.pileNavCounterText} style={resolvePileNavCounterStyle(navCounterVisible)}>
+      <span
+        className={styles.pileNavCounterText}
+        // A phone sizes the counter's slot by the total's digits, so the arrows keep their place from card to card.
+        style={
+          {
+            ...resolvePileNavCounterStyle(navCounterVisible),
+            '--pile-counter-digits': String(pileQuestions.length).length,
+          } as React.CSSProperties
+        }
+      >
         <span>{pileQuestions.length === 0 ? 0 : activePileIndex + 1}</span>
-        <span> / </span>
+        <span className={styles.pileNavCounterSlash}> / </span>
         <span>{pileQuestions.length}</span>
       </span>
       <button

@@ -98,8 +98,30 @@ const measureRow = (page) =>
       const box = document.querySelector(`button[aria-label="${name}"]`).getBoundingClientRect();
       return `${Math.round(box.left)},${Math.round(box.top)}`;
     };
+    // The counter sits between the arrows: its numbers on one line or stacked, and clear of either arrow's focus ring.
+    const counterBox = row.querySelector('[class*="_pileNavCounterText_"]');
+    const box = (el) => el.getBoundingClientRect();
+    const numbers = [counterBox.firstElementChild, counterBox.lastElementChild].map(box);
+    const text = document.createRange();
+    text.selectNodeContents(counterBox);
+    const rowStyle = getComputedStyle(row);
+    const counter = {
+      shown: shown(counterBox),
+      room: row.clientWidth - parseFloat(rowStyle.paddingLeft) - parseFloat(rowStyle.paddingRight),
+      left: box(counterBox).left,
+      right: box(counterBox).right,
+      middle: (box(counterBox).top + box(counterBox).bottom) / 2,
+      textLeft: text.getBoundingClientRect().left,
+      textRight: text.getBoundingClientRect().right,
+      lines: Math.abs(numbers[0].top - numbers[1].top) < 2 ? 1 : 2,
+      opacity: getComputedStyle(counterBox).opacity,
+      previousRight: box(document.querySelector('button[aria-label="Previous Question"]')).right,
+      nextLeft: box(document.querySelector('button[aria-label="Next Question"]')).left,
+      arrowMiddle: (box(document.querySelector('button[aria-label="Next Question"]')).top + box(document.querySelector('button[aria-label="Next Question"]')).bottom) / 2,
+    };
     return {
       controls,
+      counter,
       arrows: `${arrow('Previous Question')} ${arrow('Next Question')}`,
       cardHeight: Math.round(card.height),
       cardTop: getComputedStyle(row.parentElement).getPropertyValue('--pile-card-top'),
@@ -125,6 +147,24 @@ const assertRow = (state, where) => {
   }
   for (const [left, right] of state.controls.slice(1).map((control, i) => [state.controls[i], control])) {
     assert(right.left >= left.right - 0.5, `${label} ${left.name} and ${right.name} should not overlap`);
+  }
+  const { counter } = state;
+  // On the narrowest phones the counter leaves the row so Submit keeps its word; elsewhere it sits between the arrows.
+  assert.equal(counter.shown, counter.room >= 300, `${label} the counter should ${counter.room >= 300 ? '' : 'not '}show`);
+  if (counter.shown) {
+    assert(
+      counter.left >= counter.previousRight - 0.5 && counter.right <= counter.nextLeft + 0.5,
+      `${label} the counter should sit between the arrows`,
+    );
+    assert(Math.abs(counter.middle - counter.arrowMiddle) <= 4, `${label} the counter should share the arrows' line`);
+    assert.equal(counter.opacity, '1', `${label} the counter should show whole`);
+    assert(counter.ring > 0, `${label} an arrow should draw a focus ring from the keyboard (${counter.ring})`);
+    assert(
+      counter.textLeft >= counter.previousRight + counter.ring - 0.5 && counter.textRight <= counter.nextLeft - counter.ring + 0.5,
+      `${label} an arrow's focus ring should not cover the counter`,
+    );
+    // One line wherever the row has room for it; stacked only where it does not.
+    assert.equal(counter.lines, counter.room >= 360 ? 1 : 2, `${label} the counter should take ${counter.room >= 360 ? 'one line' : 'two lines'}`);
   }
   assert.equal(state.scrollY, 0, `${label} the page should not have scrolled`);
   assert(state.overflowX <= 0, `${label} the page should not be wider than the screen (${state.overflowX}px over)`);
@@ -183,6 +223,17 @@ async function runTheme(browser, baseUrl, browserName, theme) {
         await page.evaluate(() => window.scrollTo(0, 0));
         await page.waitForTimeout(150);
         states[`${stateName} ${size.name}`] = await measureRow(page);
+        // An arrow's focus ring, as the keyboard draws it, must stay clear of the counter (both arrows share it; Next
+        // is disabled at the end of the set).
+        await page.keyboard.press('Shift');
+        await page.focus('button[aria-label="Previous Question"]');
+        states[`${stateName} ${size.name}`].counter.ring = await page.evaluate(() => {
+          const focused = document.activeElement;
+          if (focused?.getAttribute('aria-label') !== 'Previous Question' || !focused.matches(':focus-visible')) return NaN;
+          const style = getComputedStyle(focused);
+          return parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth);
+        });
+        await page.evaluate(() => document.activeElement.blur());
         if (stateName === 'unanswered') {
           // The row sits at the foot of the screen, so its actions menu must open where it can be seen.
           await page.getByRole('button', { name: 'Question actions' }).click();

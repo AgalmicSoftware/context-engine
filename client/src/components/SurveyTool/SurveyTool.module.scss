@@ -7326,8 +7326,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     margin-left: auto;
   }
 
-  // The narrowest phones (320px) need the gaps for Submit's word.
-  @media (max-width: 340px) {
+  // The narrowest phones (320 to 360px) need the gaps for Submit's word.
+  @media (max-width: 370px) {
     .pileInteractionUnit .pileControls,
     .pileInteractionUnit .pileControls > .pileActions,
     .pileInteractionUnit .pileFooter,
@@ -7340,19 +7340,43 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     }
   }
 
-  // The counter shows briefly after a move; it floats above the arrows rather than taking the row's width.
+  // The counter sits between the arrows, whole, in a slot as wide as its longest count, so the arrows never move;
+  // Submit gives up room before it does. Where the row is tight it stacks its two numbers, and on the narrowest phones
+  // (320px), where even that would cut Submit's word, it leaves the row.
+  .pileInteractionUnit .pileControls {
+    container: pile-row / inline-size;
+  }
+
   .pileInteractionUnit .pileNav .pileNavCounterText {
-    position: absolute;
-    bottom: calc(100% + 1px);
-    left: 50%;
     display: inline-flex;
-    flex-direction: row;
-    gap: 4px;
-    margin: 0;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0 0.4ch;
+    width: calc(var(--pile-counter-digits, 2) * 2ch + 2ch);
+    // Clear of an arrow's focus ring (2px, 3px out).
+    margin: 0 5px;
     line-height: 1.1;
-    transform: translateX(-50%);
     white-space: nowrap;
+    opacity: 1 !important;
     pointer-events: none;
+  }
+
+  @container pile-row (max-width: 359px) {
+    .pileInteractionUnit .pileNav .pileNavCounterText {
+      flex-direction: column;
+      width: calc(var(--pile-counter-digits, 2) * 1ch + 4px);
+    }
+
+    .pileInteractionUnit .pileNav .pileNavCounterSlash {
+      display: none;
+    }
+  }
+
+  @container pile-row (max-width: 299px) {
+    .pileInteractionUnit .pileNav .pileNavCounterText {
+      display: none;
+    }
   }
 
   // The unsent-answers notice reads as a line under the whole row, so it never squeezes Submit or moves the arrows.
