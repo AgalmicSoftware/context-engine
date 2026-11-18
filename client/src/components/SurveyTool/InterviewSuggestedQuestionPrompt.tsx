@@ -4,6 +4,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPenNib } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
+import { PromptWithChoiceKind } from './MultichoiceQuestionInput';
+import { fullQuestionChoiceKind } from './surveyQuestionsFullQuestionResponseInputState';
 import styles from './CreateQuestionsAndSurveys.module.scss';
 
 const QUESTION_TYPE_LABELS: Record<string, string> = {
@@ -82,7 +84,16 @@ export default function InterviewSuggestedQuestionPrompt({
         </>
       ) : (
         <>
-          <h3>{prompt || 'Question prompt'}</h3>
+          <h3>
+            {PREVIEWED_TYPES.includes(questionType) && fullQuestionChoiceKind({ type: questionType, singleSelect }) ? (
+              <PromptWithChoiceKind
+                text={prompt || 'Question prompt'}
+                kind={fullQuestionChoiceKind({ type: questionType, singleSelect })}
+              />
+            ) : (
+              prompt || 'Question prompt'
+            )}
+          </h3>
           {PREVIEWED_TYPES.includes(questionType) ? (
             // The answer as respondents see it; it takes no focus or input here.
             <fieldset disabled aria-label="Answer preview" className={styles.interviewQuestionPreview}>

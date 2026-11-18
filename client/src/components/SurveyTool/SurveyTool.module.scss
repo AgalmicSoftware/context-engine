@@ -6695,15 +6695,23 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
 // Says whether a choice question takes one option or any number.
 .choiceKindPill {
+  display: inline-block;
   flex: 0 0 auto;
   align-self: flex-start;
+  vertical-align: 0.15em;
   padding: 1px 10px;
   border: 1px solid currentColor;
   border-radius: var(--ce-radius-pill);
-  color: inherit;
+  // Its own colour, not the line it sits in: inherited, it was a muted slate on the dark card (2:1).
+  color: var(--ce-panel-text);
   font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.5;
+  white-space: nowrap;
+}
+
+// The end of a choice prompt: its last word and the pill wrap together, so the pill never starts a line alone.
+.choiceKindPromptEnd {
   white-space: nowrap;
 }
 

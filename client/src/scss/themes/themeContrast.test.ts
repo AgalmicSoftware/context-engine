@@ -84,6 +84,19 @@ describe('bundled app-theme contrast', () => {
     style: 'expanded',
   }).css;
 
+  // The "Pick one" / "Pick any" pill on a question card names its own colour, held to text contrast on the card.
+  // Inheriting, it took a muted slate in the dark theme (about 2:1).
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the choice pill readable on the card', (themeId) => {
+    const surveyCss = sass.compile(path.resolve(scssDir, 'components/SurveyTool/SurveyTool.module.scss'), {
+      loadPaths: [scssDir],
+      style: 'expanded',
+      logger: sass.Logger.silent,
+    }).css;
+    const token = surveyCss.match(/\.choiceKindPill\s*\{[^}]*?\bcolor:\s*var\(--ce-([a-z0-9-]+)\)/)?.[1];
+    expect(token).toBeDefined();
+    assertContrast(themeValues(css, themeId), token as string, 'card-bg', 4.5);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s meets documented text and focus contrast', (themeId) => {
     const values = themeValues(css, themeId);
     const textPairs = [

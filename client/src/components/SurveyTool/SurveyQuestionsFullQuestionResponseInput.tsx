@@ -126,6 +126,7 @@ export const SurveyQuestionsFullQuestionResponseInput = ({
           isSingleSelect={inputDescriptor.isSingleSelect}
           disabled={inputDescriptor.disabled}
           onChange={emitAnswerChange}
+          kindInPrompt
         />
       );
     }

@@ -277,7 +277,12 @@ describe('SurveyPileViewMode runtime surface', () => {
       isSurveyCacheReady: false,
     });
 
-    expect(await screen.findByText('Which capability matters most?')).toBeInTheDocument();
+    // The choice kind ends the prompt, in its line, and names the options' group.
+    const prompt = await screen.findByText(
+      (_, element) => element?.tagName === 'H4' && element.textContent.startsWith('Which capability matters most?'),
+    );
+    expect(prompt).toHaveTextContent(/^Which capability matters most\? ?Pick one$/);
+    expect(screen.getByRole('group', { name: 'Pick one' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Cross-site graph' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Session memory' })).toBeInTheDocument();
   });

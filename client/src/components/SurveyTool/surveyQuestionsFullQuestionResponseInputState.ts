@@ -1,6 +1,7 @@
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { normalizeRatingScale, type RatingScale } from '../../utilities/survey/ratingValue.js';
 import { getNormalizedUiRatingValue, isSingleSelectMultichoice, normalizeMultichoiceValue } from './surveyToolUtils';
+import { choiceKindLabel } from './MultichoiceQuestionInput';
 
 type SurveyQuestionRecord = {
   id: string;
@@ -87,6 +88,11 @@ type BuildResponseInputActionDescriptorArgs = {
   event?: unknown;
   nextEncryptedState?: boolean;
 };
+
+// "Pick one" or "Pick any" for a question this view answers with choices, which its prompt ends with; otherwise ''.
+export const fullQuestionChoiceKind = (
+  question: { type?: unknown; singleSelect?: unknown } | null | undefined,
+): string => (question?.type === 'multichoice' ? choiceKindLabel(isSingleSelectMultichoice(question as never)) : '');
 
 export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
   question,

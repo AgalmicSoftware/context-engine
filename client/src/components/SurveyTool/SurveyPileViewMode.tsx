@@ -31,7 +31,7 @@ import styles from './SurveyTool.module.scss';
 import QuestionFilter from './QuestionFilter';
 import LazyFallback from '../Shared/LazyFallback';
 import BinaryChoiceInput from './BinaryChoiceInput';
-import MultichoiceQuestionInput from './MultichoiceQuestionInput';
+import MultichoiceQuestionInput, { choiceKindLabel } from './MultichoiceQuestionInput';
 import AnswerTooLongNotice from './AnswerTooLongNotice';
 import { extractSingleQuestionOptionsFromCandidate } from './singleQuestionResponseHelpers.js';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
@@ -663,6 +663,12 @@ const isPollSingleSelectQuestion = (question: any): boolean => {
     return false;
   return question?.singleSelect !== false && question?.singleChoice !== false;
 };
+
+// "Pick one" or "Pick any" for a card that shows choices, which its prompt ends with; otherwise ''.
+const pileChoiceKind = (question: Parameters<typeof isSingleSelectMultichoice>[0]): string =>
+  normalizePileQuestionInputType(question) === 'multichoice'
+    ? choiceKindLabel(isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question))
+    : '';
 
 const buildQuestionOptionsDigest = (engine: PileViewModeEngine, options: any) => {
   if (!Array.isArray(options) || options.length === 0) return '0:0';
@@ -3105,6 +3111,7 @@ const renderPileResponseInput = (
           isSingleSelect={isSingleSelect}
           disabled={engine.state.isSubmitting}
           onChange={updateAnswer}
+          kindInPrompt
         />
       );
     }
@@ -3358,7 +3365,7 @@ const renderPileCardShell = (
   { question, questionComponent, questionContainerClass, footerSection }: any,
 ) => {
   return renderPileCardShellView({
-    promptHeader: engine.renderPromptWithManualDecrypt(question),
+    promptHeader: engine.renderPromptWithManualDecrypt(question, pileChoiceKind(question)),
     questionType: question.type,
     questionComponent,
     questionContainerClass,
@@ -3433,7 +3440,7 @@ const renderActiveQuestion = (engine: PileViewModeEngine, question: any) => {
     question,
     promptMasked,
     renderQuestionMaskedPromptCard: engine.renderQuestionMaskedPromptCard,
-    promptHeader: engine.renderPromptWithManualDecrypt(question),
+    promptHeader: engine.renderPromptWithManualDecrypt(question, pileChoiceKind(question)),
     questionComponent,
     questionContainerClass,
     footerSection: engine.renderPileFooterSection({

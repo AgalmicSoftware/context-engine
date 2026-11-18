@@ -5,6 +5,7 @@ import { resolveEditableQuestionList } from './surveyToolResponsePayloadControll
 import { resolveRevertPendingAnswerValue } from './surveyToolHydrationFlow';
 import { resolveStableSurveyAudioWorkerProps } from './surveyToolRuntimeSupport';
 import { AnswerSavedMark } from './SubmittedMarks';
+import { fullQuestionChoiceKind } from './surveyQuestionsFullQuestionResponseInputState';
 
 export type SurveyQuestionsQuestionDisplayRuntime = SurveyQuestionsLegacyRecord;
 
@@ -643,7 +644,7 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     <SurveyQuestionsFullQuestionCardShell
       key={cardKey}
       cardKey={cardKey}
-      promptContent={renderPromptWithManualDecrypt(question)}
+      promptContent={renderPromptWithManualDecrypt(question, fullQuestionChoiceKind(question))}
       cardIcons={cardIcons}
       mainContent={mainContent}
       footerIcons={footerIcons}
