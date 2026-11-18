@@ -283,7 +283,10 @@ async function runTheme(browser, baseUrl, browserName, theme, wideFont = false) 
           states[`menu ${size.name}`] = await placed.jsonValue();
           await page.keyboard.press('Escape');
           await page.getByRole('dialog', { name: 'Question actions' }).waitFor({ state: 'detached' });
-          // The pointer rests where it clicked; off the row, so the next size measures no hovered button.
+          // The pointer rests where it clicked. Off the row, so the next size measures no hovered button, and so
+          // the next click starts from elsewhere: a click on a button the mouse already rests on, after a resize,
+          // moves the page in Chromium, and the menu closes on any scroll. On a slow runner that closed it before
+          // this step could see it. A tap, as on a phone, never does this.
           await page.mouse.move(0, 0);
         }
       }
