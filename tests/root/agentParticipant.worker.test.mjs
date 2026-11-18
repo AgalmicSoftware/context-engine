@@ -1664,6 +1664,26 @@ test('the MCP says a session’s agent stores nothing where recording is off, an
   assert.equal(reply.chat, 'This question and its answer were not stored: this session records no chats.');
   assert.deepEqual((await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/all' })).body.entries, []);
 
+  // The session begins recording before the MCP reads its settings again: the MCP sends nothing about storing,
+  // and the Worker, which now records, keeps nothing and gives no reason. The sentence then points at no note,
+  // and the caller's own word is kept.
+  const sent = [];
+  const sinceTurnedOn = workerFetch(env);
+  const carol = await createAgent(env, 'carol.delve.town', [], async (url, init = {}) => {
+    if (!String(url).endsWith('/session-agent/ask')) return sinceTurnedOn(url, init);
+    sent.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ answer: 'Most agree.', answers: 'general', stored: false }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+  assert.equal((await carol.participant.joinSession({ link: LINK })).sessionAgent.recording, false);
+  const unasked = await carol.participant.askSessionAgent({ question: 'Kept now?' });
+  assert.deepEqual([unasked.recording, unasked.stored, 'note' in unasked], [true, false, false]);
+  assert.equal(unasked.chat, 'This question and its answer were not stored.');
+  const keptOut = await carol.participant.askSessionAgent({ question: 'Kept out?', store: false });
+  assert.equal(keptOut.chat, 'This question and its answer were not stored, as you asked.');
+  assert.deepEqual(sent, [{ question: 'Kept now?' }, { question: 'Kept out?' }]);
+
   // A session with no Session Agent says so, and the tool refuses before any call.
   const plain = createEnv([sessionConfig()]);
   const bob = await createAgent(plain, 'bob.delve.town', []);

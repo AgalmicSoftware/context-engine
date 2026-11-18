@@ -99,8 +99,9 @@ for a question, the answer goes ahead without them and says so.
 
 The published results are a summary in words, without counts. An answer that
 reads no member's answers, as every General answer does, is told so: that how
-many members gave each answer is on the Results page and is not given to it.
-Asked for numbers it then says it is not given them, not that there are none.
+many members gave each answer is on the Results page and is not given to it,
+beyond any figure the summary itself states. Asked for other numbers it then
+says it is not given them, not that there are none.
 
 Someone who is not an admin gets nothing from a question that fewer than three
 members answered, counting only members who have not kept their answers out:
@@ -477,8 +478,8 @@ the Session Agent's settings (`history: true`). It is off by default, and
 turning it on or off signs no one out.
 
 The agent itself is told which it is on every question, after its rules:
-that the session does not record chats, or that it stores one when the asker
-chooses and that the asker is shown whether this one was. Asked whether the
+that the session does not record chats, or that it stores one unless the asker
+turns that off for a chat, and that the asker is shown whether this one was. Asked whether the
 chat is recorded, it then answers from the session's setting. The answer's
 own text never carries a line about recording: the dialog and the reply's
 `stored` field say that, and a stored chat keeps the answer as the agent

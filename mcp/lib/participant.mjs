@@ -1644,9 +1644,13 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         chat = `This question and its answer were stored for the session’s organisers, who may export them, ${
           keep.attribution === 'address' ? 'with' : 'without'} your address.`;
       } else if (recording) {
-        chat = keep.store === false
-          ? 'This question and its answer were not stored, as you asked.'
-          : 'This question and its answer were not stored; note says why.';
+        // The caller's own word, whatever was sent: a session that began recording since it was last
+        // read is sent nothing about storing, and the Worker then keeps nothing and gives no reason.
+        chat = 'This question and its answer were not stored.';
+        if (store === false) chat = 'This question and its answer were not stored, as you asked.';
+        else if (/chat (wasn’t|couldn’t be) stored/.test(text(reply?.note))) {
+          chat = 'This question and its answer were not stored; note says why.';
+        }
       }
       return {
         session: ctx.info.slug,

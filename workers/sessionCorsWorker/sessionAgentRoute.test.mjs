@@ -591,8 +591,39 @@ const chatStore = () => {
 test('each question tells the agent whether this session records chats', async () => {
   assert.match((await ask(await seeded())).prompt, /About this chat: this session does not record chats with you/);
   const kept = await ask(await seeded(recording), { deps: chatStore().deps });
-  assert.match(kept.prompt, /About this chat: this session stores a chat with you in its records, for its organisers, when the asker chooses/);
+  const STORES = /About this chat: this session stores a chat with you in its records, for its organisers, unless the asker turns that off for a chat/;
+  assert.match(kept.prompt, STORES);
   assert.match((await askSignedOut(await seeded())).prompt, /About this chat: this session does not record chats with you/);
+  // Someone not signed in is told the same of a session that records, and their chat is stored when they ask for it.
+  const store = chatStore();
+  const visitor = await askSignedOut(await seeded(recording), { body: { question: 'What do people want?', store: true }, deps: store.deps });
+  assert.match(visitor.prompt, STORES);
+  assert.equal(visitor.body.stored, true);
+  assert.deepEqual((await store.kept()).map(({ question, by, signedOut }) => ({ question, by, signedOut })), [
+    { question: 'What do people want?', by: undefined, signedOut: true },
+  ]);
+});
+
+test('a General answer is told the counts are on the Results page, and a Detailed one is given them', async () => {
+  const NOT_GIVEN = /you are not given those counts here, beyond any figure the summary itself states\. Asked for other numbers, say that you are not given them and that the Results page shows them, never that there are none\./;
+  const general = await ask(await seeded());
+  assert.equal(general.body.answers, 'general');
+  assert.match(general.prompt, NOT_GIVEN);
+  assert.match((await askSignedOut(await seeded())).prompt, NOT_GIVEN);
+  // Three members answered, so a Detailed answer has their answers and their counts to read.
+  const three = { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+    ok: true,
+    snapshot: {
+      questions: [{ id: 'q1', prompt: 'What should change?', type: 'text' }],
+      responses: ['meet less', 'meet later', 'meet outside'].map((answer, index) => (
+        { questionId: 'q1', answer: `ANSWER ${answer}`, participantId: `participant_00${index + 1}` })),
+    },
+    participantAddresses: new Map([MEMBER, `0x${'7'.repeat(40)}`, `0x${'8'.repeat(40)}`].map((address, index) => [`participant_00${index + 1}`, address])),
+  }) };
+  const detailed = await ask(await seeded(), { address: MEMBER, deps: three });
+  assert.equal(detailed.body.answers, 'detailed');
+  assert.match(detailed.prompt, /ANSWER meet less/);
+  assert.doesNotMatch(detailed.prompt, NOT_GIVEN);
 });
 
 test('nothing asked is kept unless the session stores chats and the asker asked for it', async () => {

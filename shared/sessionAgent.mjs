@@ -269,13 +269,14 @@ export const sessionAgentOpenToAnyone = (setting) => !!setting && setting.anyone
 /** Whether an asker may have an exchange stored in this session. */
 export const sessionAgentStoresChats = (setting) => setting?.history === true;
 
-// What the agent is told about its own chats, by the session's setting. Only what is sure: whether
-// one chat is stored is the asker's choice and the Worker's to report, after the answer is written.
+// What the agent is told about its own chats, by the session's setting. Only what is sure: a chat is
+// stored unless its asker says otherwise, as the dialog and the MCP start, and whether this one was
+// is the Worker's to report, after the answer is written.
 const CHAT_NOT_STORED =
   'About this chat: this session does not record chats with you, so this question and your answer are not stored in its records. ' +
   'Say so if asked.';
 const CHAT_MAY_BE_STORED =
-  'About this chat: this session stores a chat with you in its records, for its organisers, when the asker chooses. ' +
+  'About this chat: this session stores a chat with you in its records, for its organisers, unless the asker turns that off for a chat. ' +
   'Whether this one is stored is shown to the asker beside your answer; say so if asked.';
 
 /** The instructions a style is sent: the admin's, or the default. */
@@ -449,8 +450,9 @@ export const buildSessionAgentMessages = ({ setting, style, question, material =
           (answers.length
             ? ''
             : ' It is a summary in words. How many members gave each answer is on the session’s Results page; ' +
-              'you are not given those counts here. Asked for numbers, say that you are not given them and ' +
-              'that the Results page shows them, never that there are none.'),
+              'you are not given those counts here, beyond any figure the summary itself states. Asked for ' +
+              'other numbers, say that you are not given them and that the Results page shows them, never ' +
+              'that there are none.'),
         'session_results',
         results,
       ),

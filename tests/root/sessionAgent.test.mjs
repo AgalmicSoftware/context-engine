@@ -478,7 +478,7 @@ test('a question reads context whole to its limits, and less on Cloudflare’s m
 
 test('without members’ answers the agent is told the counts are on the Results page, not that there are none', () => {
   const material = { results: 'Two themes.', answers: [{ question: 'Shorter meetings?', answers: [{ choices: ['Agree'] }, { choices: ['Agree'] }] }] };
-  const NOT_GIVEN = /It is a summary in words\. How many members gave each answer is on the session’s Results page; you are not given those counts here\. Asked for numbers, say that you are not given them and that the Results page shows them, never that there are none\./;
+  const NOT_GIVEN = /It is a summary in words\. How many members gave each answer is on the session’s Results page; you are not given those counts here, beyond any figure the summary itself states\. Asked for other numbers, say that you are not given them and that the Results page shows them, never that there are none\./;
   const promptOf = (style, given = material) => buildSessionAgentMessages({ style, question: 'How many agreed?', material: given }).messages[1].content;
   // General answers read no member's answer, so they hold no counts.
   assert.match(promptOf('general'), NOT_GIVEN);
@@ -497,7 +497,7 @@ test('the agent is told whether the session records its chats, so it can say whe
   const off = systemOf({ audiences: [audience(everyone)] });
   assert.match(off, /About this chat: this session does not record chats with you, so this question and your answer are not stored in its records\. Say so if asked\.$/);
   const on = systemOf({ audiences: [audience(everyone)], history: true });
-  assert.match(on, /About this chat: this session stores a chat with you in its records, for its organisers, when the asker chooses\. Whether this one is stored is shown to the asker beside your answer; say so if asked\.$/);
+  assert.match(on, /About this chat: this session stores a chat with you in its records, for its organisers, unless the asker turns that off for a chat\. Whether this one is stored is shown to the asker beside your answer; say so if asked\.$/);
   // It comes after the rules, which no setting moves or removes.
   for (const system of [off, on]) assert.ok(system.indexOf('These rules always apply') < system.indexOf('About this chat:'));
   assert.match(systemOf(undefined), /does not record chats/);
