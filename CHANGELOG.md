@@ -9,8 +9,8 @@ Session Workers need redeploying for the Worker changes below. A redeploy change
 ### Client — available when the site deploys
 
 - Session names: in a session on a Session Worker from this release you can set your name; others the session admits see it on your page, in Results and in group lists, in place of your address. Your private label for someone shows as "your label". Sessions without a place for names keep your name on this device.
-- Session Agent: you can speak a question with the microphone; an answer lists what it read; the dialog says who gets Detailed answers.
-- An AI build that cannot read a session says which limit it met: too many stored versions, too much answer text, or too much stored material.
+- Session Agent: you can speak a question with the microphone, and the dialog says who gets Detailed answers. On a Session Worker from this release an answer lists what it read.
+- A person's page no longer sends their username to its AI analysis.
 - Classic 95 rating value readable on its card.
 - Answers sent right after sign-in are read once.
 - "Talk it through" opens the interview directly.
@@ -24,16 +24,17 @@ Session Workers need redeploying for the Worker changes below. A redeploy change
 ### Workers — requires redeployment
 
 - People can give themselves a display name in a session, up to 32 characters, shown to members in place of their address; admins can clear one and turn names off (`namesEnabled`; absent means on); names travel in backups. Names stay out of AI prompts, exports and agent results. The Worker advertises `session_names_v1`.
-- Results load faster on large sessions: a batch of answers is read from storage in one request instead of one per answer, the session's access gate is checked once per request, and the answer list returns up to 500 a page (older sites keep pages of 100).
+- Once a session's Worker is redeployed with names on, names carried inside answers stop showing (answers made before the redeploy, agents on MCP 0.5.1 or earlier, interview answers given with a name) until the person or agent sets a name in the session. Signed-out viewers of public Results see no names.
+- Results load faster on large sessions: a batch of answers is read from storage in one request instead of one per answer, and the session's access gate is checked once per request. The answer list returns up to 500 a page when asked: MCP 0.6.0 asks for 500, the site still asks for 100.
 - Saving an answer no longer reads every question's record each time: a Worker keeps a session's question list for 5 seconds, and reads it again for a question it does not know.
 - The Session Agent reads far more of a session's context for an answer: up to 320,000 characters from 48 items, each to 12,000, or 160,000 characters on Cloudflare's model. Each question costs more on the session's provider key.
 - The Session Agent lists what an answer read. Asked for numbers a General answer is not given, it says they are on the Results page; asked whether a chat is recorded, it answers from the session's setting.
-- AI builds count only the answers they keep against their limit, with a 32 MiB guard on stored bytes, so a session of AI-prefilled answers with research material can build.
+- AI builds count only the answers they keep against their limit, with a 32 MiB guard on stored bytes, so a session of AI-prefilled answers with research material can build. A build that cannot read a session says which limit it met: too many stored versions, too much answer text, or too much stored material.
 - A backup reads its pages in bulk. On a 4,000-item drill, storage operations fell from 12,525 to 1,139, with identical pages and an identical restore.
 
 ### Agents and MCP
 
-- MCP 0.6.0. Where a session keeps names, an agent's display name is saved in the session on joining and with `set_profile`, and its answers there no longer carry the name; older Workers still get it in answers.
+- MCP 0.6.0. Where a session keeps names, an agent's display name is saved in the session on joining and with `set_profile`, and its answers there no longer carry the name; older Workers still get it in answers. An agent that joined a session before that session's Worker was redeployed, or whose name did not save on joining, runs `set_profile` with its display name once afterwards; until then Results shows its address with "(agent)".
 - `get_results`: a partial result's `next` says its counts are not the session's totals, why, and how to read the rest; answers list 500 a page on Workers that allow it.
 - `ask_session_agent`'s reply gains `chat`, one sentence saying whether the question and answer were stored.
 

@@ -248,6 +248,10 @@ removing its empty `state.lock` directory and restarting. Keep the key and
   `join_session` and with `set_profile`, and both report the saved name.
   Answers there no longer carry the name. On an older Worker the name still
   travels in each answer.
+- An agent that joined a session before that session's Worker was upgraded,
+  or whose name did not save on joining, runs `set_profile` with its display
+  name once after the upgrade. Until then Results shows its address with
+  "(agent)".
 - `get_results`: a partial result's `next` says its counts are not the
   session's totals, why, and how to read the rest. Answers list up to 500 a
   page where the Worker allows it.
