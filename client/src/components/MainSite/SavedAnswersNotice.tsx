@@ -7,8 +7,6 @@ import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { readSurveyToolScopedCacheNode } from '../SurveyTool/surveyToolWorkerCacheIsolation';
 
 export const SAVED_ANSWERS_SLOW_MS = 20_000;
-// A saved sign-in comes back a moment after the page loads; until then the person only looks signed out.
-export const SIGNED_OUT_NOTICE_DELAY_MS = 3_000;
 
 /** The session pages that hold the answer form: the session itself and its questions view, not docs or settings. */
 export const isSavedAnswersRoute = (path: string): boolean => {
@@ -94,14 +92,6 @@ export default function SavedAnswersNotice({
   // A partial load has its own notice and never becomes ready.
   const loading = workerSession && signedIn && !answersReady && !partial && !answersFailed;
   const slow = useHeldFor(loading, SAVED_ANSWERS_SLOW_MS);
-  const signedOut = useHeldFor(workerSession && !signedIn, SIGNED_OUT_NOTICE_DELAY_MS);
-  if (signedOut) {
-    return (
-      <div className="alert alert-info" role="status">
-        Answered before? Log in to see your saved answers.
-      </div>
-    );
-  }
   if (!loading) return null;
   // Read on each render: the page renders again as each batch of answers lands.
   const count = savedAnswersProgressText(readSavedAnswersProgress(sessionConfig, sessionSlug));
