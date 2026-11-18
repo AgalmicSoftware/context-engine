@@ -416,6 +416,19 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-tree-${tag}.png` });
 }
 
+// The picker and its model and counts share a row, going under only where both can't fit.
+async function assertHeaderRow(view) {
+  const result = await view.evaluate((root) => {
+    const header = root.querySelector('header');
+    const [picker, meta] = header.children;
+    const width = (el) => el.getBoundingClientRect().width;
+    const sameRow = Math.abs(picker.getBoundingClientRect().top - meta.getBoundingClientRect().top) < 12;
+    const gap = parseFloat(getComputedStyle(header).columnGap) || 0;
+    return { sameRow, fits: width(picker) + gap + width(meta) <= width(header) + 0.5 };
+  });
+  assert.equal(result.sameRow, result.fits, `The version header ${result.sameRow ? 'shares' : 'splits'} its row (fits: ${result.fits})`);
+}
+
 // A built risk matrix: its stamp, picker and "?", its cells in each state, a
 // cell's notes, and the detail grid of the two areas it joins.
 export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } = {}) {
@@ -444,6 +457,7 @@ export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } =
   await help.blur();
   const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
   assert(overflow <= 1, `The page scrolls sideways by ${overflow}px`);
+  await step('risk matrix header row', () => assertHeaderRow(view));
 
   // The strongest opportunity and risk, and a faint cell holding both kinds.
   for (const pair of ['transport-vs-housing', 'housing-vs-safety', 'safety-vs-transport']) {

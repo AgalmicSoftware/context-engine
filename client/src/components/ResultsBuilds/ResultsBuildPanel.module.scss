@@ -9,11 +9,12 @@
   color: var(--ce-panel-text);
 }
 
+// The version and its model and counts share a row, the counts going under only where a phone can't hold both.
 .header {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
 }
 
 .help {
@@ -44,21 +45,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   font-size: 0.85rem;
   select {
     // A select is as wide as its longest option unless it may shrink.
     min-width: 0;
     max-width: min(100%, 30rem);
     padding: 4px 8px;
-  }
-}
-
-@media (max-width: 480px) {
-  .picker {
-    width: 100%;
-    select {
-      flex: 1;
-    }
   }
 }
 
