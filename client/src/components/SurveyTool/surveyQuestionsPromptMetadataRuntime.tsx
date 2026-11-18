@@ -1,6 +1,7 @@
 import { getDecryptCacheGeneration } from '../../utilities/crypto/cryptography.js';
 import { stampDecryptedQuestion } from '../../utilities/survey/decryptedQuestionReader';
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
+import { PromptWithChoiceKind } from './MultichoiceQuestionInput';
 
 export type SurveyQuestionsPromptMetadataRuntime = SurveyQuestionsLegacyRecord;
 
@@ -450,7 +451,8 @@ export const createSurveyQuestionsPromptMetadataRuntime = (
     }
   };
 
-  const renderPromptWithManualDecrypt = (question: SurveyQuestionsLegacyValue) => {
+  // `choiceKind` ("Pick one" or "Pick any") ends a choice question's prompt; its options' group names it aloud.
+  const renderPromptWithManualDecrypt = (question: SurveyQuestionsLegacyValue, choiceKind = '') => {
     const qid: SurveyQuestionsLegacyValue = String(question?.id || '')
       .trim()
       .toLowerCase();
@@ -492,6 +494,8 @@ export const createSurveyQuestionsPromptMetadataRuntime = (
                 promptDisplay.promptLabel
               )}
             </button>
+          ) : choiceKind && typeof promptDisplay.promptText === 'string' ? (
+            <PromptWithChoiceKind text={promptDisplay.promptText} kind={choiceKind} />
           ) : (
             promptDisplay.promptText
           )}

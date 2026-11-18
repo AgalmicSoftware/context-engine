@@ -31,7 +31,7 @@ import styles from './SurveyTool.module.scss';
 import QuestionFilter from './QuestionFilter';
 import LazyFallback from '../Shared/LazyFallback';
 import BinaryChoiceInput from './BinaryChoiceInput';
-import MultichoiceQuestionInput from './MultichoiceQuestionInput';
+import MultichoiceQuestionInput, { choiceKindLabel } from './MultichoiceQuestionInput';
 import AnswerTooLongNotice from './AnswerTooLongNotice';
 import { extractSingleQuestionOptionsFromCandidate } from './singleQuestionResponseHelpers.js';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
@@ -664,6 +664,12 @@ const isPollSingleSelectQuestion = (question: any): boolean => {
   return question?.singleSelect !== false && question?.singleChoice !== false;
 };
 
+// "Pick one" or "Pick any" for a card that shows choices, which its prompt ends with; otherwise ''.
+const pileChoiceKind = (question: Parameters<typeof isSingleSelectMultichoice>[0]): string =>
+  normalizePileQuestionInputType(question) === 'multichoice'
+    ? choiceKindLabel(isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question))
+    : '';
+
 const buildQuestionOptionsDigest = (engine: PileViewModeEngine, options: any) => {
   if (!Array.isArray(options) || options.length === 0) return '0:0';
   let hash = 2166136261;
@@ -1239,6 +1245,25 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
   ['touchstart', 'touchmove', 'wheel'].forEach((type) =>
     document.addEventListener(type, engine._pileScrollListener, { capture: true, passive: true }),
   );
+  // A typed answer is done when the person leaves its field having changed it. The card and its answer are noted as
+  // the field takes focus, so leaving a card that has already been swapped away, or a field (a comment, say) whose
+  // answer did not change, starts nothing.
+  engine._pileFieldEnterListener = (event: Event) => {
+    if (!isActivePileCardTextField(engine, event.target)) return;
+    const { questionId } = resolvePileActivePlace(engine.state, engine.props);
+    engine._pileFieldEntry = { questionId, answer: JSON.stringify(readSavedPileAnswer(engine, questionId)) };
+  };
+  engine._pileFieldLeaveListener = (event: Event) => {
+    const entry = engine._pileFieldEntry;
+    engine._pileFieldEntry = null;
+    if (!entry || !isActivePileCardTextField(engine, event.target)) return;
+    const { questions, index, questionId } = resolvePileActivePlace(engine.state, engine.props);
+    if (questionId !== entry.questionId || pileCardMovesOnByItself(engine, questions[index])) return;
+    const saved = readSavedPileAnswer(engine, questionId);
+    if (pileAnswerIsGiven(saved) && JSON.stringify(saved) !== entry.answer) startPileNextNudge(engine, questionId);
+  };
+  document.addEventListener('focusin', engine._pileFieldEnterListener, true);
+  document.addEventListener('focusout', engine._pileFieldLeaveListener, true);
   stripUnknownSessionModeQuery();
   // Regression guard: consume the prefill during pure initialization, but clear it only after mount.
   // Clearing inside the reducer initializer makes React Strict Mode's second initialization lose the packet.
@@ -1295,6 +1320,14 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   }
   if (prevState.pileQuestions !== engine.state.pileQuestions) {
     engine.syncCurrentPileQuestionsSignature(engine.state.pileQuestions);
+  }
+  // The nudge belongs to one visit to one card: moving, or a new list or filter, ends it, and coming back does not
+  // replay it.
+  if (
+    engine.state.pileNextNudgeQuestionId &&
+    resolvePileActivePlace(engine.state, engine.props).questionId !== engine.state.pileNextNudgeQuestionId
+  ) {
+    engine.setState({ pileNextNudgeQuestionId: null });
   }
   // The end of the set ends with a new filter, or once its last question is no longer the active last one.
   if (
@@ -1479,6 +1512,8 @@ const runPileComponentWillUnmount = (engine: PileViewModeEngine) => {
   ['touchstart', 'touchmove', 'wheel'].forEach((type) =>
     document.removeEventListener(type, engine._pileScrollListener, { capture: true }),
   );
+  document.removeEventListener('focusin', engine._pileFieldEnterListener, true);
+  document.removeEventListener('focusout', engine._pileFieldLeaveListener, true);
   engine._pileOwnAnswersSubmitController?.abort();
   engine._pileOwnAnswersSubmitController = null;
   try {
@@ -1565,8 +1600,8 @@ type PileSetPosition = {
 };
 type PileQuestionPoolProps = { questionPool?: unknown };
 
-const isPileSetEndShown = (state: PileSetPosition, props: PileQuestionPoolProps): boolean => {
-  if (!state.pileSetEndQuestionId) return false;
+/** The questions the pile shows, the active card's place among them, and the last place. */
+const resolvePileActivePlace = (state: PileSetPosition, props: PileQuestionPoolProps) => {
   const pool = Array.isArray(state.questionPool) && state.questionPool.length ? state.questionPool : props.questionPool;
   const questions = resolveEarlyVisiblePileQuestions({
     pileQuestions: state.pileQuestions as EarlyVisiblePileQuestion[] | null | undefined,
@@ -1574,11 +1609,48 @@ const isPileSetEndShown = (state: PileSetPosition, props: PileQuestionPoolProps)
     isFilterActive: !!state.isFilterActive || isSurveyToolFilterStateActive(state.filterState),
   });
   const last = questions.length - 1;
+  const index = Math.min(Math.max(0, Number(state.activePileIndex || 0)), Math.max(last, 0));
+  return { questions, index, last, questionId: normalizeQuestionIdKey(questions[index]?.id) };
+};
+
+const isPileSetEndShown = (state: PileSetPosition, props: PileQuestionPoolProps): boolean => {
+  if (!state.pileSetEndQuestionId) return false;
+  const { index, last, questionId } = resolvePileActivePlace(state, props);
+  return last >= 0 && index === last && questionId === state.pileSetEndQuestionId;
+};
+
+/** Agree/unsure/disagree moves to the next question by itself where the session moves on; every other card stays. */
+const pileCardMovesOnByItself = (engine: PileViewModeEngine, question: unknown): boolean =>
+  CHOICE_ADVANCE_DELAY_MS !== null &&
+  normalizePileQuestionInputType(question) === 'binary' &&
+  resolvePileAutoAdvanceEnabled(engine.getEffectivePileSessionConfig());
+
+const PILE_TEXT_FIELD = 'textarea, input:not([type]), input[type="text"], input[type="search"]';
+
+/** Whether the person is typing in a field on the pile, where Next waits until they leave it. */
+const isPileTextFieldFocused = (engine: PileViewModeEngine): boolean => {
+  const focused = document.activeElement;
   return (
-    last >= 0 &&
-    Math.min(Number(state.activePileIndex || 0), last) === last &&
-    normalizeQuestionIdKey(questions[last]?.id) === state.pileSetEndQuestionId
+    focused instanceof HTMLElement && !!engine.pileContainer?.contains(focused) && focused.matches(PILE_TEXT_FIELD)
   );
+};
+
+const isActivePileCardTextField = (engine: PileViewModeEngine, target: EventTarget | null): boolean =>
+  target instanceof HTMLElement &&
+  target.matches(PILE_TEXT_FIELD) &&
+  !!engine.pileContainer?.contains(target) &&
+  !!target.closest('[data-testid="ce-pile-active-question"]');
+
+const readSavedPileAnswer = (engine: PileViewModeEngine, questionId: string): unknown =>
+  readPlainRecord(engine.state.surveysResponseState?.[0]?.answers?.[questionId]).value;
+
+/**
+ * Once a card that stays put is answered, Next draws the eye until the person moves (the class's own few pulses, then
+ * still). It starts once per visit to the card; arriving at an answered card does not start it.
+ */
+const startPileNextNudge = (engine: PileViewModeEngine, questionId: string) => {
+  if (!questionId || engine.state.pileNextNudgeQuestionId === questionId) return;
+  engine.setState({ pileNextNudgeQuestionId: questionId });
 };
 
 const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
@@ -2920,10 +2992,16 @@ const renderPileResponseInput = (
       // There it would clear or repeat the choice; a quick press on another option is a new choice and counts.
       const picksAnother =
         pileAnswerIsGiven(value) && JSON.stringify(value) !== JSON.stringify(engine._pileChoicePendingValue);
+      // On a single-choice list, which stays put, the second press would untick the choice the first one made.
+      const unticksSingleChoice =
+        !pileAnswerIsGiven(value) &&
+        normalizePileQuestionInputType(question) === 'multichoice' &&
+        (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question));
       if (
         repeatedPress &&
         (engine._pileAdvancedIntoQuestionId === questionId ||
-          (engine._pileChoicePendingQuestionId === questionId && !picksAnother))
+          (engine._pileChoicePendingQuestionId === questionId && !picksAnother) ||
+          unticksSingleChoice)
       )
         return;
       // A new choice replaces any move a single choice was waiting to make.
@@ -2933,11 +3011,8 @@ const renderPileResponseInput = (
       // transition marker would reject later quadratic steps in that gesture.
       engine._pileAdvancedIntoQuestionId = null;
       const inputType = normalizePileQuestionInputType(question);
-      const canAdvance =
-        CHOICE_ADVANCE_DELAY_MS !== null &&
-        (inputType === 'binary' ||
-          (inputType === 'multichoice' &&
-            (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question))));
+      // Only agree/unsure/disagree moves on by itself; a single-choice list stays, ticked, until Next.
+      const canAdvance = CHOICE_ADVANCE_DELAY_MS !== null && inputType === 'binary';
       const arrowSelection = engine._pileAnswerArrowKeyDown === true;
       const chosenAt = Date.now();
       // A tap that ended a scroll of the card picks, but never moves on; nor does a choice the person scrolled away from.
@@ -2951,30 +3026,18 @@ const renderPileResponseInput = (
         // Inspect the committed answer: clicking a selected binary option clears it.
         // Only direct card edits reach this callback; interview drafts and hydration do not.
         const savedValue = readPlainRecord(engine.state.surveysResponseState?.[0]?.answers?.[questionId]).value;
-        if (
-          inputType === 'binary'
-            ? typeof savedValue !== 'string' || !['Agree', 'Unsure', 'Disagree'].includes(savedValue)
-            : normalizeMultichoiceValue(savedValue).length !== 1
-        )
-          return;
-        const visibleQuestions = resolveEarlyVisiblePileQuestions({
-          pileQuestions: engine.state.pileQuestions,
-          questionPool: (engine.state.questionPool?.length
-            ? engine.state.questionPool
-            : engine.props.questionPool) as EarlyVisiblePileQuestion[],
-          isFilterActive: !!engine.state.isFilterActive || isSurveyToolFilterStateActive(engine.state.filterState),
-        });
-        const index = Math.min(
-          Math.max(0, Number(engine.state.activePileIndex || 0)),
-          Math.max(visibleQuestions.length - 1, 0),
-        );
-        if (normalizeQuestionIdKey(visibleQuestions[index]?.id) !== questionId || index >= visibleQuestions.length - 1)
-          return;
-        engine._pileAdvancedIntoQuestionId = normalizeQuestionIdKey(visibleQuestions[index + 1]?.id);
+        if (typeof savedValue !== 'string' || !['Agree', 'Unsure', 'Disagree'].includes(savedValue)) return;
+        const place = resolvePileActivePlace(engine.state, engine.props);
+        if (place.questionId !== questionId || place.index >= place.last) return;
+        engine._pileAdvancedIntoQuestionId = normalizeQuestionIdKey(place.questions[place.index + 1]?.id);
         engine.handleNext(true);
       };
       engine.handleAnswerPile(question.id, value, {
         afterUpdate: () => {
+          // Free text waits until the person leaves the field, so Next does not flash while they type. A choice made
+          // with the arrow keys, or by a tap that ended a scroll, stays on its card too.
+          const staysOnCard = !pileCardMovesOnByItself(engine, question) || arrowSelection || endedScroll;
+          if (staysOnCard && !isPileTextFieldFocused(engine)) startPileNextNudge(engine, questionId);
           // Radio arrows select within the group. An open comment editor may still
           // be receiving dictation, so leave both on this card until explicit Next.
           if (!canAdvance || arrowSelection || endedScroll) return;
@@ -3048,6 +3111,7 @@ const renderPileResponseInput = (
           isSingleSelect={isSingleSelect}
           disabled={engine.state.isSubmitting}
           onChange={updateAnswer}
+          kindInPrompt
         />
       );
     }
@@ -3062,7 +3126,7 @@ const renderPileResponseInput = (
           <CESlider
             min={ratingScale.min}
             max={ratingScale.max}
-            step={1}
+            step={ratingScale.step}
             value={ratingValue}
             onChange={(val: number, event: Event) => {
               changedDuringInteraction = true;
@@ -3074,6 +3138,7 @@ const renderPileResponseInput = (
                 if (onAnswerChange) onAnswerChange(val);
                 else engine.handleAnswerPile(question.id, val);
               }
+              if (!onAnswerChange) startPileNextNudge(engine, normalizeQuestionIdKey(question.id));
               engine.flushDraftPersistAfterSliderChange();
             }}
             disabled={engine.state.isSubmitting}
@@ -3300,7 +3365,7 @@ const renderPileCardShell = (
   { question, questionComponent, questionContainerClass, footerSection }: any,
 ) => {
   return renderPileCardShellView({
-    promptHeader: engine.renderPromptWithManualDecrypt(question),
+    promptHeader: engine.renderPromptWithManualDecrypt(question, pileChoiceKind(question)),
     questionType: question.type,
     questionComponent,
     questionContainerClass,
@@ -3375,7 +3440,7 @@ const renderActiveQuestion = (engine: PileViewModeEngine, question: any) => {
     question,
     promptMasked,
     renderQuestionMaskedPromptCard: engine.renderQuestionMaskedPromptCard,
-    promptHeader: engine.renderPromptWithManualDecrypt(question),
+    promptHeader: engine.renderPromptWithManualDecrypt(question, pileChoiceKind(question)),
     questionComponent,
     questionContainerClass,
     footerSection: engine.renderPileFooterSection({
@@ -3687,6 +3752,11 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
               engine.setState({ interviewPendingNoticeContext: '' });
             },
             navCounterVisible,
+            // Not on the last question, where Next opens the end-of-set card.
+            nextNudge:
+              effectiveActivePileIndex < pileQuestions.length - 1 &&
+              engine.state.pileNextNudgeQuestionId ===
+                normalizeQuestionIdKey(pileQuestions[effectiveActivePileIndex]?.id),
             nextIsPrimary: pileAnswerIsGiven(
               readPlainRecord(
                 engine.state.surveysResponseState?.[0]?.answers?.[

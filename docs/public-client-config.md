@@ -433,7 +433,8 @@ writes (about 240), so set up caching there separately.
 ## Question pile navigation
 
 `REACT_APP_CE_PILE_AUTO_ADVANCE_ENABLED=true` controls the deployment default for
-advancing after a binary or single-select answer. It defaults to `true`; set it
+advancing after an agree, unsure or disagree answer; every other card stays until
+Next. It defaults to `true`; set it
 in `client/.env` and restart the dev server or rebuild the deployed client.
 Each session can override it with a top-level boolean in its session config:
 

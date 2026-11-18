@@ -5,6 +5,7 @@ import { Collapse } from 'reactstrap';
 
 import { toSafeLinkHref } from '../../utilities/arweave/arweaveUrls.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
+import { LONG_ANSWER_LENGTH } from './UserPageQuestionSection';
 import {
   resolveUserPageSectionToggleDisplayState,
   resolveUserPageSurveyCountDisplayState,
@@ -216,6 +217,7 @@ const UserPageSurveySection = ({
                           response={questionResponse.responseData}
                           isOwnResponse={false}
                           mode="mini"
+                          shortenAnswerAt={LONG_ANSWER_LENGTH}
                           showImportance={true}
                           compactEncryptedAnswerCta={true}
                           stackCompactDecryptCta={true}

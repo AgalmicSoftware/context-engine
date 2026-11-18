@@ -325,6 +325,23 @@
   }
 }
 
+/* Show more / Show less at the end of a long answer that a mini row cuts short. It sits in the
+   answer's own line and takes the answer's colour, so it reads wherever the answer does. */
+.answerToggle {
+  display: inline;
+  margin: 0 0 0 2px;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.86em;
+  font-style: normal;
+  text-decoration: underline;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 /* NEW - Read-only Answer Styles */
 .readOnlyBinary {
   display: inline-flex;
@@ -725,5 +742,39 @@
   .miniExpandButton,
   .externalLink {
     color: var(--ce-panel-text);
+  }
+}
+
+// Classic 95 draws cards light grey, where the card's own white text does not read. Two things are
+// safe to recolour on any card there: the answer boxes, which bring their own face, and the compact
+// row's own text and controls, which only ever sit on the grey card. A full-size card can sit on
+// that theme's teal panels (Results, per person), so its title and labels are left as they are.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .freeformAnswer,
+  .readOnlyRating,
+  .readOnlyMultichoice .choiceItem {
+    background: var(--ce-control-face);
+    border-color: var(--ce-input-border);
+    color: var(--ce-panel-text);
+  }
+
+  .additionalCommentsContent,
+  .encryptedResponseText {
+    background: var(--ce-control-face);
+    border-color: var(--ce-input-border);
+    color: var(--ce-panel-text) !important;
+    opacity: 1;
+  }
+
+  .miniQuestionContainer .miniPromptAbbrev:not(.maskedPromptActionButton),
+  .miniQuestionContainer .importanceText,
+  .miniQuestionContainer .miniExpandButton,
+  .miniQuestionContainer .cardLinkButton {
+    color: var(--ce-panel-text);
+    opacity: 1;
+  }
+
+  .miniQuestionContainer .additionalCommentsLabel {
+    color: var(--ce-panel-text-muted);
   }
 }

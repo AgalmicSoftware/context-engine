@@ -19,6 +19,7 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
     response,
     sbtCacheRevision,
     sessionSlug,
+    shortenAnswerAt,
   }: {
     canDecryptOtherResponses?: boolean;
     onDecryptQuestion?: (...args: unknown[]) => void;
@@ -28,6 +29,7 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
     response?: unknown;
     sbtCacheRevision?: unknown;
     sessionSlug?: unknown;
+    shortenAnswerAt?: unknown;
   }) => {
     const responseRecord =
       response && typeof response === 'object'
@@ -50,6 +52,7 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
         data-responder-address={String(responderAddress)}
         data-revision={String(sbtCacheRevision)}
         data-session-slug={String(sessionSlug)}
+        data-shorten-answer-at={String(shortenAnswerAt)}
       >
         {question?.prompt || question?.id}
         <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>
@@ -177,6 +180,8 @@ describe('UserPageSurveySection', () => {
     expect(screen.getByTestId('survey-question-response')).toHaveAttribute('data-can-decrypt', 'true');
     expect(screen.getByTestId('survey-question-response')).toHaveAttribute('data-nonce', 'nonce-1');
     expect(screen.getByTestId('survey-question-response')).toHaveAttribute('data-revision', 'revision-1');
+    // Long free-text answers inside a survey start short too.
+    expect(screen.getByTestId('survey-question-response')).toHaveAttribute('data-shorten-answer-at', '100');
 
     fireEvent.click(screen.getByTestId('survey-question-response').querySelector('button') as HTMLButtonElement);
     expect(onDecryptQuestion).toHaveBeenCalledWith('q-response');

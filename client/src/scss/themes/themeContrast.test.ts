@@ -84,6 +84,19 @@ describe('bundled app-theme contrast', () => {
     style: 'expanded',
   }).css;
 
+  // The "Pick one" / "Pick any" pill on a question card names its own colour, held to text contrast on the card.
+  // Inheriting, it took a muted slate in the dark theme (about 2:1).
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the choice pill readable on the card', (themeId) => {
+    const surveyCss = sass.compile(path.resolve(scssDir, 'components/SurveyTool/SurveyTool.module.scss'), {
+      loadPaths: [scssDir],
+      style: 'expanded',
+      logger: sass.Logger.silent,
+    }).css;
+    const token = surveyCss.match(/\.choiceKindPill\s*\{[^}]*?\bcolor:\s*var\(--ce-([a-z0-9-]+)\)/)?.[1];
+    expect(token).toBeDefined();
+    assertContrast(themeValues(css, themeId), token as string, 'card-bg', 4.5);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s meets documented text and focus contrast', (themeId) => {
     const values = themeValues(css, themeId);
     const textPairs = [
@@ -115,6 +128,8 @@ describe('bundled app-theme contrast', () => {
       ['status-success-contrast', 'status-success', 'canvas'],
       ['status-error-contrast', 'status-error', 'canvas'],
       ['control-text', 'control-face', 'canvas'],
+      // Read-only answer boxes on a light card: panel text on the control face.
+      ['panel-text', 'control-face', 'canvas'],
       ['option-scroll-text', 'option-scroll-bg', 'canvas'],
       ['option-scroll-text', 'option-scroll-hover-bg', 'canvas'],
       ['option-scroll-disabled-text', 'option-scroll-disabled-bg', 'canvas'],
@@ -144,6 +159,8 @@ describe('bundled app-theme contrast', () => {
     assertContrast(values, 'data-viz-point', 'data-viz-surface', 3, 'surface');
     assertContrast(values, 'data-viz-point-active', 'data-viz-surface', 3, 'surface');
     assertContrast(values, 'focus-ring', 'surface', 3, 'canvas');
+    // Next's highlight is an icon on the page beside the question card.
+    assertContrast(values, 'pile-next-highlight', 'canvas', 3, 'canvas');
   });
 
   // Group Conversation stacks translucent layers on the dialog's sunken surface (SurveyTool.module.scss):

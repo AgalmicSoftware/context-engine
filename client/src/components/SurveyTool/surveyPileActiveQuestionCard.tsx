@@ -2,18 +2,38 @@ import React from 'react';
 import { Card, CardBody } from 'reactstrap';
 
 import styles from './SurveyTool.module.scss';
-import { QuadraticScrollControlsProvider } from './QuadraticScrollControls';
+import { ListScrollCue, QuadraticScrollControlsProvider } from './QuadraticScrollControls';
 import PileQuestionPrompt from './PileQuestionPrompt';
 import { usePileHalfRowCut } from './pileHalfRowCut';
 
-/** The card's answer area. Where it scrolls (a phone's choice list), its last visible option is always cut through. */
+const PILE_LIST_ROW_SELECTOR = `.${styles.checkboxOptionText}`;
+
+/**
+ * The card's answer area. Where it scrolls (a phone's choice list), its last visible option is always cut through,
+ * and the quadratic card's chevrons show in the footer while options are out of view above or below. Their place
+ * stays in the footer while none shows, so the footer, and the room it leaves the list, never changes with them.
+ */
 const PileAnswerArea = ({ children }: { children: React.ReactNode }): React.ReactElement => {
   const ref = React.useRef<HTMLDivElement>(null);
-  usePileHalfRowCut(ref, `.${styles.checkboxOptionText}`);
+  const id = `pile-answers-${React.useId().replace(/:/g, '')}`;
+  const cue = usePileHalfRowCut(ref, PILE_LIST_ROW_SELECTOR);
   return (
-    <div className={styles.pileCardMainContent} ref={ref}>
-      {children}
-    </div>
+    <>
+      <div className={styles.pileCardMainContent} ref={ref} id={id}>
+        {children}
+      </div>
+      {cue !== 'off' && (
+        <ListScrollCue
+          listRef={ref}
+          rows={() => Array.from(ref.current?.querySelectorAll(PILE_LIST_ROW_SELECTOR) || [])}
+          controlsId={id}
+          canScrollUp={cue === 'middle' || cue === 'end'}
+          canScrollDown={cue === 'start' || cue === 'middle'}
+          // A card without the footer slot (the agent's question list) keeps only the cut.
+          inline={false}
+        />
+      )}
+    </>
   );
 };
 

@@ -1,10 +1,6 @@
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
-import SavedAnswersNotice, {
-  isSavedAnswersRoute,
-  SAVED_ANSWERS_SLOW_MS,
-  SIGNED_OUT_NOTICE_DELAY_MS,
-} from './SavedAnswersNotice';
+import SavedAnswersNotice, { isSavedAnswersRoute, SAVED_ANSWERS_SLOW_MS } from './SavedAnswersNotice';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import { resolveWorkerResponseHydrationRun } from '../../utilities/survey/workerResponseHydrationRuntime';
 import { readSurveyToolScopedCacheNode } from '../SurveyTool/surveyToolWorkerCacheIsolation';
@@ -82,21 +78,21 @@ it('leaves a failed load, or a partial load of this session, to their own messag
   expect(screen.getByRole('status')).toHaveTextContent('Loading your saved answers');
 });
 
-it('tells a signed-out person to log in, once a saved sign-in has had time to come back', () => {
-  const { rerender } = render(notice({ signedIn: false }));
-  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+it('says nothing to a signed-out person, and counts their saved answers once they log in', () => {
+  const { container, rerender } = render(notice({ signedIn: false }));
   act(() => {
-    jest.advanceTimersByTime(SIGNED_OUT_NOTICE_DELAY_MS);
+    jest.advanceTimersByTime(SAVED_ANSWERS_SLOW_MS);
   });
-  expect(screen.getByRole('status')).toHaveTextContent('Log in to see your saved answers');
+  // No empty status region either, so nothing sits under the navbar.
+  expect(container).toBeEmptyDOMElement();
   rerender(notice({ signedIn: true }));
   expect(screen.getByRole('status')).toHaveTextContent('Loading your saved answers');
 });
 
 it('says nothing on a session whose answers do not come from a Worker', () => {
-  render(notice({ sessionConfig: { slug: 'example' }, signedIn: false }));
+  render(notice({ sessionConfig: { slug: 'example' } }));
   act(() => {
-    jest.advanceTimersByTime(SIGNED_OUT_NOTICE_DELAY_MS);
+    jest.advanceTimersByTime(SAVED_ANSWERS_SLOW_MS);
   });
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });
@@ -104,9 +100,8 @@ it('says nothing on a session whose answers do not come from a Worker', () => {
 it('says nothing on a private session shown before the person is let in', () => {
   const { rerender } = render(notice({ sessionConfig: { ...sessionConfig, privateSession: 'invite_required' } }));
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  rerender(notice({ sessionConfig: { ...sessionConfig, privateSession: 'invite_required' }, signedIn: false }));
   act(() => {
-    jest.advanceTimersByTime(SIGNED_OUT_NOTICE_DELAY_MS);
+    jest.advanceTimersByTime(SAVED_ANSWERS_SLOW_MS);
   });
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });

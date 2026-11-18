@@ -190,6 +190,19 @@ test('quadratic importance parser enforces known ids, integer votes, and squared
   );
 });
 
+test('quadratic importance parser scores only JSON numbers as votes', () => {
+  const options = { questionIds: new Set(['q1', 'q2']), budget: 10, maxAllocations: 2, maxVotesPerQuestion: 3 };
+  const parse = (votes) => parseImportanceAllocation(JSON.stringify({ allocations: [{ questionId: 'q1', votes }], rationale: '' }), options);
+  // Number() would read each of these as a vote: true as 1, [2] and "2" as 2.
+  for (const votes of [true, [2], '2', null, 1.5]) {
+    const parsed = parse(votes);
+    assert.match(parsed.parseError, /votes must be a positive integer/, JSON.stringify(votes));
+    assert.deepEqual(parsed.allocations, []);
+    assert.equal(parsed.spentCredits, 0);
+  }
+  assert.deepEqual(parse(2).allocations, [{ questionId: 'q1', votes: 2, cost: 4 }]);
+});
+
 test('importance runner retries invalid allocations and resumes compatible successful runs', async () => {
   const calls = new Map();
   const first = await runImportanceBenchmark({

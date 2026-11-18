@@ -82,6 +82,26 @@ test('E2E smoke timeout leaves room for Playwright installation and execution', 
   assert.match(e2eJob, /timeout-minutes: 20/);
 });
 
+test('E2E smoke fetches system packages only when Chromium cannot start', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+  const e2eJob = workflow.slice(workflow.indexOf('  e2e-smoke:'), workflow.indexOf('  cecc-and-node:'));
+
+  assert.doesNotMatch(e2eJob, /--with-deps/);
+  assert.match(
+    e2eJob,
+    /npx playwright install --only-shell chromium\n\s+node -e "require\('playwright'\)\.chromium\.launch\(\)\.then\(\(browser\) => browser\.close\(\)\)" \\\n\s+\|\| npx playwright install-deps chromium\n/,
+  );
+  // The headless shell is the only browser build installed, so each smoke must
+  // keep launching headless and must not ask for a branded or full build.
+  for (const relativePath of ['scripts/vite-navigation-smoke.js', 'scripts/session-setup-publish-smoke.mjs']) {
+    const source = fs.readFileSync(path.join(rootDir, relativePath), 'utf8');
+    assert.equal((source.match(/\blaunch\w*\(/g) || []).length, 1, `${relativePath} must launch one browser`);
+    assert.match(source, /\.launch\(\{\s+headless: true,/, `${relativePath} must launch headless`);
+    assert.doesNotMatch(source, /\bchannel\b|headless: (?!true,)/, `${relativePath} must not need a full browser build`);
+  }
+});
+
 test('E2E gate runs publication with isolated Worker dependencies and diagnostics', () => {
   const rootDir = path.resolve(__dirname, '..');
   const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
@@ -92,8 +112,10 @@ test('E2E gate runs publication with isolated Worker dependencies and diagnostic
   assert.deepEqual(gates.gates['e2e-smoke'].commands.map(({ args }) => args), [
     ['run', 'test:e2e:smoke'],
     ['run', 'test:e2e:publish'],
+    ['run', 'test:e2e:phone-row'],
   ]);
   assert.equal(manifest.scripts['test:e2e:publish'], 'node scripts/session-setup-publish-smoke.mjs');
+  assert.equal(manifest.scripts['test:e2e:phone-row'], 'node scripts/pile-phone-row-smoke.js');
   assert.match(e2eJob, /workers\/sessionCorsWorker\/package-lock\.json/);
   assert.match(e2eJob, /npm --prefix workers\/sessionCorsWorker ci/);
   assert.match(e2eJob, /OUTPUT_DIR: \/tmp\/context-engine-publication-smoke/);

@@ -1,13 +1,6 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faChevronDown,
-  faChevronUp,
-  faMinus,
-  faPlus,
-  faQuestionCircle,
-  faUndo,
-} from '@fortawesome/free-solid-svg-icons';
+import { faMinus, faPlus, faQuestionCircle, faUndo } from '@fortawesome/free-solid-svg-icons';
 import CETooltip from '../Shared/CETooltip';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -17,7 +10,7 @@ import {
   validateQuadraticQuestion,
 } from '../../../../shared/questions/quadraticAllocation.mjs';
 import styles from './QuadraticAllocationInput.module.scss';
-import { QuadraticScrollControls } from './QuadraticScrollControls';
+import { ListScrollCue } from './QuadraticScrollControls';
 import { measurePileListRows, resolvePileHalfRowCut } from './pileHalfRowCut';
 
 type Props = {
@@ -88,17 +81,6 @@ export default function QuadraticAllocationInput({
       list.removeEventListener('scroll', updateScrollState);
     };
   }, [options.length, questionId]);
-  const scrollToMoreOptions = () => {
-    const list = optionsRef.current;
-    if (!list) return;
-    const bounds = list.getBoundingClientRect();
-    const next = Array.from(list.children).find((option) => option.getBoundingClientRect().bottom > bounds.bottom + 1);
-    const nextTop = next ? next.getBoundingClientRect().top - bounds.top + list.scrollTop : list.scrollHeight;
-    // If one long option fills the viewport, advance through it instead of
-    // repeatedly aligning its already-visible top.
-    const top = nextTop > list.scrollTop + 1 ? nextTop : list.scrollTop + list.clientHeight * 0.8;
-    list.scrollTo({ top, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  };
   const helpId = `quadratic-help-${instanceId}`;
   const question = { options, voiceCredits };
   const questionError = validateQuadraticQuestion(question);
@@ -349,39 +331,14 @@ export default function QuadraticAllocationInput({
         </div>
       </div>
       {scrollState.overflow && (
-        <QuadraticScrollControls>
-          <div className={styles.scrollControls}>
-            {scrollState.canScrollUp && (
-              <button
-                type="button"
-                className={`${styles.moreOptions} ${styles.scrollPrevious}`}
-                aria-label="Scroll to previous options"
-                aria-controls={optionsId}
-                onClick={() =>
-                  optionsRef.current?.scrollBy({
-                    top: -optionsRef.current.clientHeight * 0.8,
-                    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-                  })
-                }
-              >
-                <FontAwesomeIcon icon={faChevronUp} />
-              </button>
-            )}
-            {scrollState.canScrollDown && (
-              <button
-                type="button"
-                className={`${styles.moreOptions} ${styles.scrollNext}`}
-                onClick={scrollToMoreOptions}
-                aria-label="Scroll to more options"
-                aria-controls={optionsId}
-                title="More options below"
-                data-testid={E2E_TESTIDS.QUADRATIC_SCROLL_MORE}
-              >
-                <FontAwesomeIcon icon={faChevronDown} />
-              </button>
-            )}
-          </div>
-        </QuadraticScrollControls>
+        <ListScrollCue
+          listRef={optionsRef}
+          rows={() => Array.from(optionsRef.current?.children || [])}
+          controlsId={optionsId}
+          canScrollUp={scrollState.canScrollUp}
+          canScrollDown={scrollState.canScrollDown}
+          nextTestId={E2E_TESTIDS.QUADRATIC_SCROLL_MORE}
+        />
       )}
       {valueError && (
         <p className={styles.error} role="alert">

@@ -1,5 +1,5 @@
 /** @file pileHalfRowCut.ts: where a scrolling answer list ends, so its last visible row is always cut through. */
-import React, { useLayoutEffect } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 
 export type PileListRow = { top: number; height: number };
 
@@ -38,11 +38,18 @@ export const measurePileListRows = (list: HTMLElement, rows: Element[]): PileLis
   });
 };
 
+export type PileListCue = 'none' | 'start' | 'middle' | 'end';
+
 /**
- * Keeps a scrolling answer area ending inside a row, and marks which ends have more (`data-list-cue`), so a long
- * list never looks complete. Applies only while the area scrolls (phones); elsewhere it leaves it alone.
+ * Keeps a scrolling answer area ending inside a row, and marks which ends have more (`data-list-cue`), so a long list
+ * never looks complete. Applies only while the area scrolls (phones); elsewhere it leaves it alone. Returns the cue,
+ * or 'off' where the area cannot scroll.
  */
-export const usePileHalfRowCut = (ref: React.RefObject<HTMLElement | null>, rowSelector: string): void => {
+export const usePileHalfRowCut = (
+  ref: React.RefObject<HTMLElement | null>,
+  rowSelector: string,
+): PileListCue | 'off' => {
+  const [listCue, setListCue] = useState<PileListCue | 'off'>('off');
   useLayoutEffect(() => {
     const area = ref.current;
     const frame = area?.parentElement;
@@ -54,11 +61,14 @@ export const usePileHalfRowCut = (ref: React.RefObject<HTMLElement | null>, rowS
       const end = rows.length
         ? Math.max(...measurePileListRows(area, rows).map((row) => row.top + row.height))
         : area.scrollHeight - (parseFloat(getComputedStyle(area).paddingBottom) || 0);
-      const scrolls = end > area.clientHeight + 1;
+      const overflowY = getComputedStyle(area).overflowY;
+      const scrollable = overflowY === 'auto' || overflowY === 'scroll';
+      const scrolls = scrollable && end > area.clientHeight + 1;
       const atStart = area.scrollTop <= 1;
       const atEnd = area.scrollTop + area.clientHeight >= end - 1;
-      const cue = !scrolls ? 'none' : atStart ? 'start' : atEnd ? 'end' : 'middle';
+      const cue: PileListCue = !scrolls ? 'none' : atStart ? 'start' : atEnd ? 'end' : 'middle';
       if (area.dataset.listCue !== cue) area.dataset.listCue = cue;
+      setListCue(scrollable ? cue : 'off');
     };
     const fit = () => {
       area.style.maxHeight = '';
@@ -94,6 +104,8 @@ export const usePileHalfRowCut = (ref: React.RefObject<HTMLElement | null>, rowS
       area.removeEventListener('scroll', updateCue);
       area.style.maxHeight = '';
       delete area.dataset.listCue;
+      setListCue('off');
     };
   }, [ref, rowSelector]);
+  return listCue;
 };

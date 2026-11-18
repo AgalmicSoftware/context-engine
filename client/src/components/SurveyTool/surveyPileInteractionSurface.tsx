@@ -59,6 +59,8 @@ type PileNavControlsProps = {
   navCounterVisible: boolean;
   /** The card has an answer, so Next is the step to take. */
   nextIsPrimary?: boolean;
+  /** The person has just answered a card that stays put, so Next draws the eye. */
+  nextNudge?: boolean;
   /** Next has opened the end of the set; on the last question it opens it. */
   endOfSetShown?: boolean;
   handlePrev: VoidHandler;
@@ -173,6 +175,7 @@ export type PileInteractionSurfaceProps = {
   handleRevertPendingChanges: VoidHandler;
   navCounterVisible: boolean;
   nextIsPrimary?: boolean;
+  nextNudge?: boolean;
   /** Shown in place of the cards once Next passes the last question. */
   endOfSetCard?: React.ReactNode;
   handlePrev: VoidHandler;
@@ -207,6 +210,12 @@ export const buildPileFilterButtonClassName = (styleMap: Record<string, string>,
 
 export const buildPileFooterClassName = (styleMap: Record<string, string>, pileTopRailVisible: unknown) =>
   `${styleMap.pileFooter}${pileTopRailVisible ? '' : ` ${styleMap.pileFooterHidden}`}`;
+
+// "Submit (2)" splits into its word and count, so a narrow phone row can drop the count alone.
+export const splitPileSubmitLabel = (text: string): { word: string; count: string } => {
+  const match = /^(.*?) (\(\d+\))$/.exec(text);
+  return match ? { word: match[1], count: match[2] } : { word: text, count: '' };
+};
 
 export const buildPileSubmitButtonClassName = (
   styleMap: Record<string, string>,
@@ -255,6 +264,7 @@ const renderPileNavControls = ({
   activePileIndex,
   navCounterVisible,
   nextIsPrimary = false,
+  nextNudge = false,
   endOfSetShown = false,
   handlePrev,
   handleNext,
@@ -277,21 +287,16 @@ const renderPileNavControls = ({
       </button>
       <span className={styles.pileNavCounterText} style={resolvePileNavCounterStyle(navCounterVisible)}>
         <span>{pileQuestions.length === 0 ? 0 : activePileIndex + 1}</span>
-        <span className={styles.pileNavCounterSeparator}> / </span>
+        <span> / </span>
         <span>{pileQuestions.length}</span>
       </span>
       <button
         onClick={handleNext}
         disabled={nextDisabled}
-        className={`${styles.pileNavArrow}${nextStands ? ` ${styles.pileNavArrowPrimary}` : ''}`}
+        className={`${styles.pileNavArrow}${nextStands ? ` ${styles.pileNavArrowPrimary}` : ''}${nextStands && nextNudge ? ` ${styles.pileNavArrowNudge}` : ''}`}
         aria-label="Next Question"
         data-ce-control-appearance="frameless"
       >
-        {nextStands && (
-          <span className={styles.pileNavNextLabel} aria-hidden="true">
-            Next
-          </span>
-        )}
         <FontAwesomeIcon icon={faChevronRight} />
       </button>
     </div>
@@ -433,66 +438,74 @@ const renderPileFooterControls = ({
   showClearPendingButton,
   handleRevertPendingChanges,
   endOfSetShown = false,
-}: PileFooterControlsProps): React.ReactElement => (
-  <div className={buildPileFooterClassName(styles, pileTopRailVisible)}>
-    {/* Always present, so screen readers hear the text that arrives in it. */}
-    <span className={styles.pileSubmitStatusText} role="status">
-      {showSuccessBadge ? 'Your answers are submitted.' : ''}
-    </span>
-    {showSuccessBadge ? (
-      <PileSubmittedCheck />
-    ) : showSubmitButton ? (
-      <>
-        <Button
-          onClick={handlePileSubmitClick}
-          data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-          className={`${buildPileSubmitButtonClassName(styles, hasPendingPileChanges, shouldHidePileSubmitButton)}${
-            endOfSetShown ? ` ${styles.pileFooterControlAway}` : ''
-          }`}
-          disabled={isSubmitting || activePromptMasked}
-        >
-          {isSubmitting ? (
-            // Counts seconds from the Submit's start, as the AI flows' progress labels do.
-            <span className={styles.pileSubmitProgress}>
-              <ElapsedLoadingLabel label={submittingLabel(submitCountText)} />
-              <FontAwesomeIcon icon={faSpinner} spin />
-            </span>
-          ) : (
-            <span className={styles.pileSubmitButtonContent}>
-              <span className={styles.pileSubmitButtonCopy}>
-                <span className={styles.pileSubmitButtonLabel}>{finalSubmitText}</span>
+}: PileFooterControlsProps): React.ReactElement => {
+  const submitLabel = splitPileSubmitLabel(finalSubmitText);
+  return (
+    <div className={buildPileFooterClassName(styles, pileTopRailVisible)}>
+      {/* Always present, so screen readers hear the text that arrives in it. */}
+      <span className={styles.pileSubmitStatusText} role="status">
+        {showSuccessBadge ? 'Your answers are submitted.' : ''}
+      </span>
+      {showSuccessBadge ? (
+        <PileSubmittedCheck />
+      ) : showSubmitButton ? (
+        <>
+          <Button
+            onClick={handlePileSubmitClick}
+            data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
+            className={`${buildPileSubmitButtonClassName(styles, hasPendingPileChanges, shouldHidePileSubmitButton)}${
+              endOfSetShown ? ` ${styles.pileFooterControlAway}` : ''
+            }`}
+            disabled={isSubmitting || activePromptMasked}
+            // A narrow phone row hides the count; the name keeps it.
+            aria-label={isSubmitting ? undefined : finalSubmitText}
+          >
+            {isSubmitting ? (
+              // Counts seconds from the Submit's start, as the AI flows' progress labels do.
+              <span className={styles.pileSubmitProgress}>
+                <ElapsedLoadingLabel label={submittingLabel(submitCountText)} />
+                <FontAwesomeIcon icon={faSpinner} spin />
               </span>
-              <span className={styles.pileSubmitButtonTrail} aria-hidden="true">
-                <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
-                <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
-                <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+            ) : (
+              <span className={styles.pileSubmitButtonContent}>
+                <span className={styles.pileSubmitButtonCopy}>
+                  <span className={styles.pileSubmitButtonLabel}>
+                    {submitLabel.word}
+                    {submitLabel.count && <span className={styles.pileSubmitButtonCount}>{submitLabel.count}</span>}
+                  </span>
+                </span>
+                <span className={styles.pileSubmitButtonTrail} aria-hidden="true">
+                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
+                </span>
               </span>
+            )}
+          </Button>
+          {pendingAnswerCount > 0 && (
+            <span className={styles.pilePendingAnswerNotice} role="status">
+              {pendingAnswerCount}{' '}
+              {pendingAnswerCount === 1 ? "answer on the page isn't" : "answers on the page aren't"} submitted yet.
             </span>
           )}
-        </Button>
-        {pendingAnswerCount > 0 && (
-          <span className={styles.pilePendingAnswerNotice} role="status">
-            {pendingAnswerCount} {pendingAnswerCount === 1 ? "answer on the page isn't" : "answers on the page aren't"}{' '}
-            submitted yet.
-          </span>
-        )}
-      </>
-    ) : null}
+        </>
+      ) : null}
 
-    {showClearPendingButton && (
-      <button
-        type="button"
-        className={`${styles.pileIconButton}${endOfSetShown ? ` ${styles.pileFooterControlAway}` : ''}`}
-        onClick={handleRevertPendingChanges}
-        title="Clear changes"
-        aria-label="Clear pending changes"
-        data-ce-control-appearance="frameless"
-      >
-        <FontAwesomeIcon icon={faTimes} />
-      </button>
-    )}
-  </div>
-);
+      {showClearPendingButton && (
+        <button
+          type="button"
+          className={`${styles.pileIconButton}${endOfSetShown ? ` ${styles.pileFooterControlAway}` : ''}`}
+          onClick={handleRevertPendingChanges}
+          title="Clear changes"
+          aria-label="Clear pending changes"
+          data-ce-control-appearance="frameless"
+        >
+          <FontAwesomeIcon icon={faTimes} />
+        </button>
+      )}
+    </div>
+  );
+};
 
 const renderPileDeckWindow = ({
   pileQuestions,
@@ -621,6 +634,48 @@ const renderPileEmptyState = ({
   return 'No questions available.';
 };
 
+// On a phone the card takes the screen below its own top less the controls row (--pile-phone-card-height). What sits
+// above it (header, session title, sign-in hint) varies by session and changes as the page loads, so the top is
+// measured: on mount, and whenever the page's size changes. A change applies on the next frame, as setting it resizes
+// the page the observer watches (Safari reports a loop otherwise).
+const PileInteractionUnit = ({
+  className,
+  children,
+}: {
+  className: string;
+  children: React.ReactNode;
+}): React.ReactElement => {
+  const unitRef = React.useRef<HTMLDivElement>(null);
+  React.useLayoutEffect(() => {
+    const unit = unitRef.current;
+    if (!unit || typeof ResizeObserver === 'undefined') return undefined;
+    // The card's own top, so a notice above it inside the unit (saved answers that failed to load) counts too.
+    const readTop = () => {
+      const card = unit.querySelector(`:scope > .${styles.pileCardContainer}`) || unit;
+      return `${Math.round(card.getBoundingClientRect().top + window.scrollY)}px`;
+    };
+    let frame = 0;
+    unit.style.setProperty('--pile-card-top', readTop());
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const top = readTop();
+        if (unit.style.getPropertyValue('--pile-card-top') !== top) unit.style.setProperty('--pile-card-top', top);
+      });
+    });
+    observer.observe(document.body);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, []);
+  return (
+    <div ref={unitRef} className={className}>
+      {children}
+    </div>
+  );
+};
+
 export const renderPileInteractionSurface = ({
   submissionError,
   draftPersistenceError,
@@ -671,11 +726,12 @@ export const renderPileInteractionSurface = ({
   handleRevertPendingChanges,
   navCounterVisible,
   nextIsPrimary,
+  nextNudge,
   endOfSetCard = null,
   handlePrev,
   handleNext,
 }: PileInteractionSurfaceProps): React.ReactElement => (
-  <div className={styles.pileInteractionUnit}>
+  <PileInteractionUnit className={styles.pileInteractionUnit}>
     {showMiniBackgroundSpinner && (
       <div className={styles.miniSpinnerWrapper}>
         <FontAwesomeIcon
@@ -776,6 +832,7 @@ export const renderPileInteractionSurface = ({
         activePileIndex,
         navCounterVisible,
         nextIsPrimary,
+        nextNudge,
         endOfSetShown: !!endOfSetCard,
         handlePrev,
         handleNext,
@@ -789,5 +846,5 @@ export const renderPileInteractionSurface = ({
         {submissionError}
       </p>
     )}
-  </div>
+  </PileInteractionUnit>
 );

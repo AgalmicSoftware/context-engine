@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import MultichoiceQuestionInput, {
+  PromptWithChoiceKind,
   buildMultichoiceOptionClassName,
   findDuplicateMultichoiceOptionLabels,
 } from './MultichoiceQuestionInput';
@@ -61,6 +62,37 @@ describe('MultichoiceQuestionInput', () => {
     rerender(<MultichoiceQuestionInput questionId="q1" options={['Alpha', 'Beta']} />);
     expect(screen.getByText('Pick any')).toBeInTheDocument();
     expect(screen.queryByText('Pick one')).not.toBeInTheDocument();
+  });
+
+  it('leaves the kind to the prompt when the prompt ends with it, still naming the options', () => {
+    render(<MultichoiceQuestionInput questionId="q1" options={['Alpha', 'Beta']} isSingleSelect kindInPrompt />);
+    expect(screen.queryByText('Pick one')).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Pick one' })).toBeInTheDocument();
+  });
+
+  it('ends a prompt with its kind, kept on one line with the last word', () => {
+    const { container } = render(
+      <h4>
+        <PromptWithChoiceKind text="Who should decide? " kind="Pick any" />
+      </h4>,
+    );
+    expect(container.querySelector('h4')).toHaveTextContent(/^Who should decide\? Pick any$/);
+    const pill = screen.getByText('Pick any');
+    // The options' group says it to screen readers, so the prompt does not say it twice.
+    expect(pill).toHaveAttribute('aria-hidden', 'true');
+    expect(pill.parentElement).toHaveClass('choiceKindPromptEnd');
+    expect(pill.parentElement).toHaveTextContent(/^decide\? Pick any$/);
+  });
+
+  it('lets a long last word break rather than widen the card', () => {
+    const url = 'https://example.org/a-very-long-reference';
+    const { container } = render(
+      <h4>
+        <PromptWithChoiceKind text={`See ${url}`} kind="Pick one" />
+      </h4>,
+    );
+    expect(container.querySelector('h4')).toHaveTextContent(`See ${url} Pick one`);
+    expect(container.querySelector('.choiceKindPromptEnd')).not.toBeInTheDocument();
   });
 
   it('does not emit value changes when disabled', () => {

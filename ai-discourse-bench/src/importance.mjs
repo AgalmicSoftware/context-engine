@@ -148,7 +148,8 @@ export const parseImportanceAllocation = (rawText, {
       let parseError = '';
       for (const [index, allocation] of parsedObject.allocations.entries()) {
         const questionId = typeof allocation?.questionId === 'string' ? allocation.questionId.trim() : '';
-        const votes = Number(allocation?.votes);
+        // Only a JSON number is a vote: Number() would read true as 1 and [2] as 2.
+        const votes = typeof allocation?.votes === 'number' ? allocation.votes : NaN;
         if (!questionId || (knownQuestionIds.size && !knownQuestionIds.has(questionId))) {
           parseError = `allocations[${index}].questionId is unknown`;
           break;

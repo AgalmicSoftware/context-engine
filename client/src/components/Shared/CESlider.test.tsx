@@ -59,3 +59,23 @@ it.each<[string, number]>([
   expect(onChange).toHaveBeenCalledWith(expected, expect.any(Event));
   expect(onChangeComplete).toHaveBeenCalledWith(expected);
 });
+
+it.each<[string, number, number]>([
+  ['ArrowRight', -0.4, -0.3],
+  ['ArrowLeft', 0.3, 0.2],
+  ['PageUp', -0.5, -0.4],
+  ['End', 0, 0.5],
+])('keeps %s from %s on a fractional step grid', (key, value, expected) => {
+  const onChange = jest.fn();
+  render(<CESlider min={-0.5} max={0.5} step={0.1} value={value} onChange={onChange} />);
+  fireEvent.keyDown(screen.getByRole('slider'), { key });
+  // Plain addition would give -0.30000000000000004 and 0.19999999999999998.
+  expect(onChange).toHaveBeenCalledWith(expected, expect.any(Event));
+});
+
+it('ends on the last whole step when the range is not a multiple of the step', () => {
+  const onChange = jest.fn();
+  render(<CESlider min={0} max={10} step={3} value={3} onChange={onChange} />);
+  fireEvent.keyDown(screen.getByRole('slider'), { key: 'End' });
+  expect(onChange).toHaveBeenCalledWith(9, expect.any(Event));
+});

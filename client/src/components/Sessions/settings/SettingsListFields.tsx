@@ -49,7 +49,7 @@ export const SettingsQuestionListFields = ({
     <SetupCheck
       id="ce-settings-pile-auto-advance"
       label="Next question after an answer"
-      help="After someone answers, the question pile moves on by itself."
+      help="After an agree, unsure or disagree answer, the question pile moves on by itself."
       checked={draft.pileAutoAdvanceEnabled === true}
       testId="ce-settings-pile-auto-advance"
       onChange={(checked) => onChange(['pileAutoAdvanceEnabled'], checked)}

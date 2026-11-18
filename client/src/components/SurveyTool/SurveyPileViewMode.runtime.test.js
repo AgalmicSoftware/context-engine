@@ -277,7 +277,12 @@ describe('SurveyPileViewMode runtime surface', () => {
       isSurveyCacheReady: false,
     });
 
-    expect(await screen.findByText('Which capability matters most?')).toBeInTheDocument();
+    // The choice kind ends the prompt, in its line, and names the options' group.
+    const prompt = await screen.findByText(
+      (_, element) => element?.tagName === 'H4' && element.textContent.startsWith('Which capability matters most?'),
+    );
+    expect(prompt).toHaveTextContent(/^Which capability matters most\? ?Pick one$/);
+    expect(screen.getByRole('group', { name: 'Pick one' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Cross-site graph' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Session memory' })).toBeInTheDocument();
   });
@@ -1844,6 +1849,17 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(screen.getByLabelText('Current rating')).toHaveTextContent('–');
     expect(screen.queryByText('Almost none of it')).not.toBeInTheDocument();
     expect(screen.queryByText('All of it')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [{ min: 0, max: 10, step: 2 }, '2'],
+    [{ min: -0.5, max: 0.5, step: 0.1 }, '0.1'],
+    [{ min: 1, max: 5 }, '1'],
+  ])('steps the pile rating slider as its question does: %j', (scale, step) => {
+    renderPile({ questionPool: [{ id: 'rating-q1', type: 'rating', prompt: 'Rate readiness', scale }] });
+
+    // A slider stepping by 1 offers values the Worker refuses for this question.
+    expect(screen.getByRole('slider')).toHaveAttribute('step', step);
   });
 
   it('passes the delayed pile-entry mode toggle prop into the pile create panel', async () => {
