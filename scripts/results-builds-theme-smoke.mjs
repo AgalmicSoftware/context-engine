@@ -450,6 +450,8 @@ async function assertHeaderRow(view) {
 // On a phone a grid scrolls inside its card and keeps its labels in view: scrolled to its far corner, the row
 // labels still sit at its left and the column labels at its top, opaque and on top. On a desktop none stick.
 async function assertPinnedAxes(grid, name, phone, { mustScroll = true } = {}) {
+  // Focus as the keyboard does, so the labels' focus ring is the one a keyboard user sees.
+  await grid.page().keyboard.press('Shift');
   const result = await grid.evaluate((root, phone) => {
     const rows = root.querySelectorAll('[data-testid*="header-y-"]');
     const columns = root.querySelectorAll('[data-testid*="header-x-"]');
@@ -483,6 +485,19 @@ async function assertPinnedAxes(grid, name, phone, { mustScroll = true } = {}) {
       // The rim over the gaps between labels draws (a theme's button shadow must not win over it).
       rim: [rowHead, columnHead].every((el) => /0px 0px 0px 6px/.test(getComputedStyle(el).boxShadow)),
       backgrounds: [rowHead, columnHead].map((el) => getComputedStyle(el).backgroundColor).join(' | '),
+      // A focused label draws its ring inside itself: outside, a neighbour's rim or the scroll edge covers it.
+      ring: [rowHead, columnHead].map((el) => {
+        el.focus({ preventScroll: true });
+        const style = getComputedStyle(el);
+        const inside =
+          el.matches(':focus-visible') &&
+          style.outlineStyle !== 'none' &&
+          parseFloat(style.outlineWidth) >= 2 &&
+          parseFloat(style.outlineOffset) <= -parseFloat(style.outlineWidth);
+        const seen = `${el.matches(':focus-visible')} ${style.outlineStyle} ${style.outlineWidth} ${style.outlineOffset}`;
+        el.blur();
+        return inside || seen;
+      }),
     };
     box.scrollTo(0, 0);
     return out;
@@ -502,6 +517,7 @@ async function assertPinnedAxes(grid, name, phone, { mustScroll = true } = {}) {
   assert(result.opaque, `${name}: the labels are see-through (${result.backgrounds})`);
   assert(result.cornerCovers, `${name}: a heading or square shows in the corner`);
   assert(result.rim, `${name}: the rim between the labels doesn't draw`);
+  assert(result.ring.every((ring) => ring === true), `${name}: a focused label's ring isn't drawn inside it (${result.ring})`);
 }
 
 // A built risk matrix: its stamp, picker and "?", its cells in each state, a

@@ -1421,8 +1421,8 @@ button.cell {
   .pinnedScroll {
     max-height: 70svh;
     overflow: auto;
-    // A square reached by keyboard stops clear of the pinned labels.
-    scroll-padding: 64px 0 0 130px;
+    // A square reached by keyboard stops clear of the pinned labels (the header row is at least 72px, plus its rim).
+    scroll-padding: 84px 0 0 130px;
   }
 
   .axisTop,
@@ -1437,6 +1437,13 @@ button.cell {
     &:hover,
     &:focus-visible {
       @include pinned-face(color-mix(in srgb, var(--ce-action-accent) 14%, transparent));
+    }
+
+    // The ring is drawn inside the label: outside, a neighbour's rim or the scroll edge would cover it. A theme's own
+    // ring keeps its look; only its offset is moved in.
+    &:focus-visible {
+      outline: 3px solid var(--ce-focus-ring);
+      outline-offset: -3px !important;
     }
   }
 

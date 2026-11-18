@@ -2404,8 +2404,10 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /riskMatrixRowHeader axisLeft/);
   assert.match(html, /detailHeading axisTop"/);
   assert.match(html, /detailHeading axisLeft"/);
-  assert.match(html, /@media \(max-width: 768px\) \{\s*\.riskMatrixEmbedded\.embedded \{ padding-left: 0; padding-right: 0; \}\s*\.riskMatrixEmbedded \.riskMatrixSectionCard\.sectionCard \{ padding-left: 8px; padding-right: 8px; \}\s*\.riskMatrixGridScroll\.gridScroll \{ max-height: 70svh; overflow: auto; scroll-padding: 64px 0 0 130px; \}/);
-  assert.match(html, /\.riskMatrixHeaderCell\.headerCell\.axisLeft:focus-visible \{ position: sticky;/);
+  assert.match(html, /@media \(max-width: 768px\) \{\s*\.riskMatrixEmbedded\.embedded \{ padding-left: 0; padding-right: 0; \}\s*\.riskMatrixEmbedded \.riskMatrixSectionCard\.sectionCard \{ padding-left: 8px; padding-right: 8px; \}\s*\.riskMatrixGridScroll\.gridScroll \{ max-height: 70svh; overflow: auto; scroll-padding: 84px 0 0 130px; \}/);
+  assert.match(html, /\.riskMatrixSectionCard \.axisLeft \{ position: sticky; z-index: 1;/);
+  assert.match(html, /\.axisLeft:focus-visible \{ background: linear-gradient\(rgba\(77, 255, 164, 0\.14\)/);
+  assert.match(html, /\.axisLeft:focus-visible \{ outline: 3px solid #4dffa4; outline-offset: -3px; \}/);
   assert.match(html, /\.riskMatrixSectionCard \.detailAxis\.axisLeft \{[^}]*align-self: stretch; \}/);
   // The detail grid names its axes, has a key, and says when a square is empty.
   assert.match(html, />Columns: [^<]+<\/div>/);
