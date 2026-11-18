@@ -217,6 +217,10 @@ export const loadWorkerResponses = async (
     }
   };
   let batched: boolean | null = null;
+  // A signed-out batch a members-only session refuses is read again signed in, and only then does this tab know
+  // the route needs a sign-in (workerSignInRoutes). Until one has come back, a signed-in reader's batches go one
+  // at a time, so the first is the only one sent twice; a signed-out reader has no sign-in to learn.
+  let signedOutRouteKnown = !reader || readsAllWhole;
   const readBatch = deps.readSessionStorageBatch || readSessionStorageBatch;
   const readPayloads = async (chunk: WantedRead[]): Promise<unknown[]> => {
     const payloads: unknown[] = [];
@@ -229,6 +233,7 @@ export const loadWorkerResponses = async (
         const read = whole
           ? await readWhole((auth) => readBatch({ ...readTarget, ...auth, ids }))
           : await readBatch({ ...readTarget, ids });
+        if (!whole) signedOutRouteKnown = true;
         part.forEach(({ index }, at) => {
           payloads[index] = read[at];
         });
@@ -283,7 +288,7 @@ export const loadWorkerResponses = async (
     reportProgress(rows);
   };
   const pump = () => {
-    const limit = batched ? RESPONSE_BATCH_CONCURRENCY : 1;
+    const limit = batched && signedOutRouteKnown ? RESPONSE_BATCH_CONCURRENCY : 1;
     while (!failure && active < limit && next < chunks.length) {
       const at = next++;
       active += 1;

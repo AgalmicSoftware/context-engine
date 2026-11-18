@@ -951,6 +951,38 @@ describe('reading a large listing', () => {
     expect(Math.max(...progress)).toBe(PAGES * 100);
   });
 
+  // A members-only session refuses a signed-out batch; it is read again signed in, and the tab then sends that
+  // route signed in. Six batches sent at once before that would all be read twice.
+  it('holds a signed-in reader to one batch until a signed-out one comes back', async () => {
+    const pending: Array<{ ids: string[]; resolve: (value: unknown[]) => void }> = [];
+    const readBatch = jest.fn(
+      ({ ids }: any) =>
+        new Promise<unknown[]>((resolve) => {
+          pending.push({ ids, resolve });
+        }),
+    );
+    const loading = loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: workerConfig, account: '0xreader' },
+      batchDeps(readBatch),
+    );
+    const settle = async () => {
+      for (let i = 0; i < 200; i += 1) await Promise.resolve();
+    };
+    await settle();
+    expect(pending).toHaveLength(1);
+    const first = pending.shift()!;
+    first.resolve(first.ids.map(payload));
+    await settle();
+    expect(pending).toHaveLength(RESPONSE_BATCH_CONCURRENCY);
+    while (pending.length) {
+      const batch = pending.shift()!;
+      batch.resolve(batch.ids.map(payload));
+      await settle();
+    }
+    expect(await loading).toHaveLength(PAGES * 100);
+    expect(readBatch).toHaveBeenCalledTimes(PAGES);
+  });
+
   it('counts each listed page while a reload reuses its cached answers', async () => {
     const readBatch = jest.fn(async ({ ids }: any) => ids.map(payload));
     const progress: Array<[number, number, boolean]> = [];
