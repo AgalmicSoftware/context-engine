@@ -572,6 +572,7 @@ test('repository manifest keeps CI full-test universes single-pass and release s
     'root-jest',
     'workers',
     'e2e-smoke',
+    'e2e-journey',
     'cecc-and-node',
   ]);
   assert.equal(ciCommands.filter((value) => value === 'npm run test:client:shards').length, 1);

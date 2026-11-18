@@ -19,6 +19,7 @@
       "root-jest",
       "workers",
       "e2e-smoke",
+      "e2e-journey",
       "cecc-and-node"
     ],
     "release": [
@@ -322,6 +323,26 @@
           "args": [
             "run",
             "test:e2e:phone-row"
+          ]
+        }
+      ]
+    },
+    "e2e-journey": {
+      "commands": [
+        {
+          "label": "Run phone participant journey smoke",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:e2e:journey"
+          ]
+        },
+        {
+          "label": "Run salon-size Results journey smoke",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:e2e:results-salon"
           ]
         }
       ]

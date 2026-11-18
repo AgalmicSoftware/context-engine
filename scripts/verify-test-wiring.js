@@ -239,6 +239,14 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectProfileContains('release', 'release');
   expectProfileContains('release', 'recording-durability');
   expectGateContains('recording-durability', 'npm run test:e2e:recording-durability');
+  // The browser journeys are the only proof that the built client works against the Worker's own code.
+  expectScriptContains('test:e2e:publish', 'scripts/session-setup-publish-smoke.mjs');
+  expectScriptContains('test:e2e:journey', 'scripts/participant-journey-smoke.mjs');
+  expectScriptContains('test:e2e:results-salon', 'scripts/results-salon-journey-smoke.mjs');
+  expectGateContains('e2e-smoke', 'npm run test:e2e:publish');
+  expectProfileContains('hosted', 'e2e-journey');
+  expectGateContains('e2e-journey', 'npm run test:e2e:journey');
+  expectGateContains('e2e-journey', 'npm run test:e2e:results-salon');
 
   [
     'npm run type-debt:check',

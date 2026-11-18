@@ -102,6 +102,32 @@ test('E2E smoke fetches system packages only when Chromium cannot start', () => 
   }
 });
 
+test('the browser journeys run as their own hosted job, one leg per engine, and count toward the result', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+  const journeyJob = workflow.slice(workflow.indexOf('  e2e-journey:'), workflow.indexOf('  test:'));
+  const aggregateJob = workflow.slice(workflow.indexOf('  test:'));
+  const gates = JSON.parse(fs.readFileSync(path.join(rootDir, 'scripts/ci-gates.json'), 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+
+  assert.deepEqual(gates.gates['e2e-journey'].commands.map(({ args }) => args), [
+    ['run', 'test:e2e:journey'],
+    ['run', 'test:e2e:results-salon'],
+  ]);
+  assert.ok(gates.profiles.hosted.includes('e2e-journey'));
+  assert.equal(manifest.scripts['test:e2e:journey'], 'node scripts/participant-journey-smoke.mjs');
+  assert.equal(manifest.scripts['test:e2e:results-salon'], 'node scripts/results-salon-journey-smoke.mjs');
+  // WebKit is the engine of every iPhone browser; each engine is its own leg, so one cannot hide the other.
+  assert.match(journeyJob, /fail-fast: false\s+matrix:\s+engine: \[chromium, webkit\]/);
+  assert.match(journeyJob, /JOURNEY_ENGINES: \$\{\{ matrix\.engine \}\}/);
+  assert.match(journeyJob, /npx playwright install --with-deps webkit/);
+  assert.match(journeyJob, /npm --prefix workers\/sessionCorsWorker ci/);
+  assert.match(journeyJob, /timeout-minutes: 20/);
+  assert.match(journeyJob, /curl -fsS "\$BASE_URL" >\/dev\/null\s+npm run ci:gate -- e2e-journey/);
+  assert.match(aggregateJob, /needs:[\s\S]*?- e2e-journey\n/);
+  assert.match(aggregateJob, /"e2e-journey":"\$\{\{ needs\.e2e-journey\.result \}\}"/);
+});
+
 test('E2E gate runs publication with isolated Worker dependencies and diagnostics', () => {
   const rootDir = path.resolve(__dirname, '..');
   const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
@@ -156,6 +182,7 @@ test('release-staging PR events do not duplicate the authoritative push matrix',
     'root-jest',
     'workers',
     'e2e-smoke',
+    'e2e-journey',
     'cecc-and-node',
   ]) {
     assert.ok(
@@ -318,6 +345,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:e2e:quick': 'npm run -s test:e2e:smoke',
           'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
           'test:e2e:recording-durability': 'node scripts/breakout-recording-durability-smoke.mjs',
+          'test:e2e:publish': 'node scripts/session-setup-publish-smoke.mjs',
+          'test:e2e:journey': 'node scripts/participant-journey-smoke.mjs',
+          'test:e2e:results-salon': 'node scripts/results-salon-journey-smoke.mjs',
           'ai:test-nav:smoke': 'node scripts/vite-navigation-smoke.js',
           'type-debt:check': 'node scripts/check-type-debt-ratchet.mjs',
           'coverage-floor:check': 'node scripts/check-client-coverage-floors.mjs',
