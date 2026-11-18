@@ -42,6 +42,8 @@ No change to the Session Worker or the MCP: no Worker needs redeploying, and not
 - After a reload, "Loading your saved answers..." counts the session's answers as they are read; Results counts them during a reload too.
 - On phones, a long multiple-choice list no longer hides its first option behind the question.
 - `rxc-ra-26` is no longer in `known-sessions.json`, so a plain `/session/rxc-ra-26` link no longer opens; its `worker=` links still work, and the session and its Worker are untouched.
+- An answer changed just before Submit, whose upload then failed, is no longer lost on reload.
+- The group invite notice fits a phone screen, and its invite link or password field is readable in every theme.
 
 ### Local tooling
 
