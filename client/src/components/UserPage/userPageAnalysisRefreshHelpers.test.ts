@@ -223,6 +223,8 @@ describe('userPage analysis refresh helpers', () => {
         figure: 'Ada',
         reasoning: 'Pattern match',
       },
+      // No card came with the analysis.
+      card: null,
     });
 
     expect(normalizeUserAnalysisResult(null)).toEqual({
@@ -233,6 +235,7 @@ describe('userPage analysis refresh helpers', () => {
         figure: '',
         reasoning: '',
       },
+      card: null,
     });
     expect(
       buildUserPageAnalysisResultStatePatch({
@@ -258,6 +261,11 @@ describe('userPage analysis refresh helpers', () => {
       analysisName: 'Cached',
       analysisHistoricalFigure: 'Ada',
       analysisHistoricalReasoning: 'Reason',
+      analysisCard: null,
+      analysisCardPending: false,
+      analysisCardPicture: null,
+      analysisCardPublish: null,
+      analysisCardSavedAt: null,
       analysisGeneration: null,
       analysisElapsedMs: 0,
       analysisError: '',
@@ -276,6 +284,11 @@ describe('userPage analysis refresh helpers', () => {
       analysisName: 'User Analysis',
       analysisHistoricalFigure: '',
       analysisHistoricalReasoning: '',
+      analysisCard: null,
+      analysisCardPending: false,
+      analysisCardPicture: null,
+      analysisCardPublish: null,
+      analysisCardSavedAt: null,
       analysisGeneration: null,
       analyzing: false,
       analysisServedFromCache: false,
@@ -292,6 +305,11 @@ describe('userPage analysis refresh helpers', () => {
       analysisElapsedMs: 0,
       analysisHistoricalFigure: '',
       analysisHistoricalReasoning: '',
+      analysisCard: null,
+      analysisCardPending: false,
+      analysisCardPicture: null,
+      analysisCardPublish: null,
+      analysisCardSavedAt: null,
       analysisGeneration: null,
       analysisServedFromCache: false,
       analysisCachedAt: null,
