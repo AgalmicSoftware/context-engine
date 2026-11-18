@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.16] - 2026-11-18
 
+No change to the Session Worker or the MCP: no Worker needs redeploying, and nothing is published to npm.
+
+### Client — available when the site deploys
+
+- Single-choice questions no longer move to the next question by themselves, as they did in 0.9.15; the choice stays ticked until **Next**. Agree/unsure/disagree cards still move on after 0.7 seconds.
+- **Next** is the same arrow again, the same size and in the same place, instead of 0.9.15's filled Next button. Once you answer a question that stays put it turns the theme's highlight colour (yellow in Classic 95, blue in Civic) and glows a few times, or holds a steady glow with reduced motion.
+- On phones the menu, microphone, **Submit** and the arrows sit in one row under the question card, in view without scrolling, and every card is the screen's height less that row. On a narrow phone Submit drops its count first; while it saves, its spinner always shows.
+- "Pick one" or "Pick any" sits at the end of the question instead of on its own line, and is readable in the Context Engine theme, where it was faint.
+- A multiple-choice list with more options below shows the down arrow quadratic questions use; tapping it brings the next options into view, and an up arrow scrolls back.
+- On a person's page, long free-text answers show their first 100 characters or so, with **Show more** to read the rest in place.
+- In the Classic 95 theme, answers in the answer card are readable; they were white on grey.
+- A rating question with a step other than 1 now steps correctly in the Pile and interview slider, and the slider's arrow keys stay on the question's steps.
+- The signed-out line "Answered before? Log in to see your saved answers." on the session page is removed.
+
+### Local tooling
+
+- Benchmark: the importance parser scores only JSON numbers as votes.
+- The e2e smoke gate runs a phone smoke of the question card's controls row, offline, in three themes.
+- CI: the browser smoke job no longer downloads system packages the runner already has; it fetches them only if the browser cannot start.
+
 ## [0.9.15] - 2026-11-17
 
 No change to the Session Worker or the MCP: no Worker needs redeploying, and nothing is published to npm.
