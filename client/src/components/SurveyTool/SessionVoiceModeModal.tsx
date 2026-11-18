@@ -269,7 +269,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                     value={{ sessionSlug, owner, restored: keptReview, keptFor: keptForRef }}
                   >
                     <SessionInterviewPanel
-                      key={`${interviewVersion}:${prefillIdentity}:${keptReview ? 'kept' : ''}`}
+                      key={`${props.openCount || 0}:${interviewVersion}:${prefillIdentity}:${keptReview ? 'kept' : ''}`}
                       {...props}
                       prefillPacket={reviewPacket}
                       claim={claim}
