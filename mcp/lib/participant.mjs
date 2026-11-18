@@ -10,8 +10,11 @@ import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorage
 import { htmlToPlainText, normalizeSessionContext } from '../../shared/sessionContext.mjs';
 import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
 import { MAX_AGENT_INSTRUCTIONS_CHARS } from '../../shared/sessionConfigEdits.mjs';
-import { CONTEXT_AGENT_ADDER, CONTEXT_SOURCE_LIMITS, agentAdderName, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { CONTEXT_AGENT_ADDER, CONTEXT_FILE_TYPES, CONTEXT_SOURCE_LIMITS, agentAdderName, contextCardsOn, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { buildNote, checkContextLink, contextInvitation, contextUploadForm, readContextFile, workerReadsContext } from './contextAdditions.mjs';
+import {
+  CONTEXT_DATA_NOTE, CONTEXT_LIST_MAX, contextEntries, contextEntryMatches, contextTextOf, contextTextPart, publicContextEntry,
+} from './contextLibrary.mjs';
 import { createKnownSessions } from './knownSessions.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
@@ -94,6 +97,9 @@ const MAX_GROUP_TAGS = 20;
 const MAX_TAG_LENGTH = 80;
 const CONTEXT_ADMINS_ONLY = 'This session limits context to its admins, so nothing was added.';
 const CONTEXT_ENDED = 'This session has ended, so it takes no more context.';
+// A session's loader reads at most a few hundred context rows; a list past this is said to be partial.
+const MAX_CONTEXT_ROWS = 1000;
+const NO_CONTEXT_SOURCES = 'This session keeps no context files or links where an agent can list them.';
 const CONTEXT_NO_LINKS = 'This session’s Worker doesn’t take links from participants yet. You can add a file or text.';
 const CONTEXT_NO_FETCH = 'This session doesn’t let you have its Worker fetch pages, so it takes no links from you. You can add a file or text.';
 const CONTEXT_RATE_LIMITED = 'The session’s Worker is rate limiting you, so nothing was added. Retry in a few minutes; if it still refuses, you may have reached the session’s daily limit for your address, which clears within a day.';
@@ -540,6 +546,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   };
   // The Worker fetches a participant's link only with their fetch scope.
   const mayAddLinks = (ctx, sessionConfig) => isSessionAdmin(ctx, sessionConfig) || ctx.client.tokenClaims?.scopes?.fetch === true;
+
+  // The session's context sources as the Worker lists them for this agent.
+  const listContextEntries = async (ctx) => {
+    const { items, complete } = await ctx.client.listAll('docsContext', { role: 'context', maxItems: MAX_CONTEXT_ROWS, signal });
+    return { entries: contextEntries(items, { self: wallet.address.toLowerCase() }), complete };
+  };
 
   // The groups this agent may see, and whether it's in each. The MCP gives
   // groups and their tags no meaning; the session's instructions do.
@@ -1677,6 +1689,57 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       } catch (error) {
         throw contextRefusal(error, { olderLink: kind === 'url' && featuresUnread });
       }
+    },
+
+    // The files and links people added to the session, each with its card. The Worker lists
+    // only what this agent may read, so a card arrives exactly where its source does.
+    async listContext({ session, query } = {}) {
+      if (query !== undefined && typeof query !== 'string') throw new Error('query must be text.');
+      const ctx = await resolveSession(session);
+      if (ctx.registry) return { session: ctx.info.slug, sources: [], count: 0, note: NO_CONTEXT_SOURCES };
+      const sessionConfig = await ensureReady(ctx);
+      if (!workerReadsContext(sessionConfig)) return { session: ctx.info.slug, sources: [], count: 0, note: NO_CONTEXT_SOURCES };
+      checkpoint();
+      const { entries, complete } = await listContextEntries(ctx);
+      const asked = trim(query);
+      const matched = entries.filter((entry) => contextEntryMatches(entry, asked));
+      const shown = matched.slice(0, CONTEXT_LIST_MAX);
+      return {
+        session: ctx.info.slug,
+        sources: shown.map(publicContextEntry),
+        count: entries.length,
+        ...(asked ? { query: asked, matched: matched.length } : {}),
+        ...(matched.length > shown.length ? { more: matched.length - shown.length } : {}),
+        ...(complete ? {} : { partial: true }),
+        note: contextCardsOn(sessionConfig)
+          ? CONTEXT_DATA_NOTE
+          : `${CONTEXT_DATA_NOTE} This session has context cards off, so its sources carry no summaries or tags and a query matches titles and links only.`,
+      };
+    },
+
+    // One source's text, a part at a time: a link's page as the Worker read it, a text file,
+    // or the session's AI's reading of a PDF or image.
+    async readContext({ session, id, offset } = {}) {
+      const wanted = trim(id);
+      if (!wanted) throw new Error('Pass the id of a source from list_context.');
+      if (offset !== undefined && (!Number.isSafeInteger(offset) || offset < 0)) throw new Error('offset must be a whole number, 0 or more.');
+      const ctx = await resolveSession(session);
+      if (ctx.registry) throw new Error(NO_CONTEXT_SOURCES);
+      if (!workerReadsContext(await ensureReady(ctx))) throw new Error(NO_CONTEXT_SOURCES);
+      checkpoint();
+      const { entries } = await listContextEntries(ctx);
+      const entry = entries.find((candidate) => candidate.id === wanted);
+      if (!entry) throw new Error('This session lists no context source with that id that you can read. list_context lists them.');
+      const source = publicContextEntry(entry);
+      if (!entry.textId) {
+        return {
+          session: ctx.info.slug, source, text: '', chars: 0,
+          note: `The session’s AI has not read this ${entry.type === CONTEXT_FILE_TYPES.pdf ? 'PDF' : 'image'}, so it has no text yet.`,
+        };
+      }
+      checkpoint();
+      const raw = await ctx.client.readContextText(entry.textId, { signal });
+      return { session: ctx.info.slug, source, ...contextTextPart(contextTextOf(entry, raw), offset), note: CONTEXT_DATA_NOTE };
     },
 
     async askSessionAgent({ session, question, store, attribution, name } = {}) {

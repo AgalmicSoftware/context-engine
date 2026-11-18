@@ -11,6 +11,8 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 // Stored records are small (the Worker caps a question at 128 KiB).
 const MAX_RECORD_BYTES = 256 * 1024;
+// A context text file is at most 1 MiB; a link's record holds its page text as JSON.
+const MAX_CONTEXT_TEXT_BYTES = 2 * 1024 * 1024;
 // The Worker stops filling a batch at 8 MB of text, so the last few items and
 // the JSON around them can go a little past it.
 const MAX_BATCH_RESPONSE_BYTES = 12 * 1024 * 1024;
@@ -199,7 +201,8 @@ export const createWorkerClient = ({
   });
 
   // `body` is sent as JSON; `form`, a FormData, as multipart.
-  const request = async (path, { method = 'GET', headers = {}, body, form, auth = false, retried = false, busyRetries = 0, maxBytes = MAX_RESPONSE_BYTES, signal } = {}) => {
+  // `raw` returns the response's text as it is, for a stored file; otherwise JSON is parsed.
+  const request = async (path, { method = 'GET', headers = {}, body, form, auth = false, retried = false, busyRetries = 0, maxBytes = MAX_RESPONSE_BYTES, signal, raw: asText = false } = {}) => {
     const checkpoint = () => { if (signal?.aborted) throw new Error('Stopped before the Worker request was sent.'); };
     checkpoint();
     if (auth) await ensureToken();
@@ -236,13 +239,13 @@ export const createWorkerClient = ({
     if (isRetryableBusy(response.status, data) && !form &&
         busyRetries < COORDINATOR_RETRY_DELAYS_MS.length && replaySafe(path, method, body)) {
       await waitBeforeRetry(busyRetries, signal);
-      return request(path, { method, headers, body, form, auth, retried, busyRetries: busyRetries + 1, maxBytes, signal });
+      return request(path, { method, headers, body, form, auth, retried, busyRetries: busyRetries + 1, maxBytes, signal, raw: asText });
     }
     if (response.status === 401 && auth && !retried && (!error || TOKEN_ERROR_RE.test(error))) {
       token = '';
       // A sign-in ended by an admin's change: the config the agent holds may be out of date too.
       configLoadedAt = 0;
-      return request(path, { method, headers, body, form, auth, retried: true, busyRetries, maxBytes, signal });
+      return request(path, { method, headers, body, form, auth, retried: true, busyRetries, maxBytes, signal, raw: asText });
     }
     if (response.status === 401 && error && !TOKEN_ERROR_RE.test(error)) {
       throw new WorkerRequestError(error.slice(0, MAX_ERROR_DETAIL), { status: 401, code: error });
@@ -254,7 +257,7 @@ export const createWorkerClient = ({
         details: { balanceEth: text(data?.balanceEth), thresholdEth: text(data?.thresholdEth) },
       });
     }
-    return data;
+    return asText ? raw : data;
   };
 
   const loadConfig = async ({ renewed = false } = {}) => {
@@ -354,7 +357,7 @@ export const createWorkerClient = ({
    */
   const listAll = async (
     resource,
-    { mine = false, maxItems = DEFAULT_MAX_LIST_ITEMS, maxPages = MAX_LIST_PAGES, pageSize = 100, deadlineMs = LIST_DEADLINE_MS, signal = null } = {},
+    { mine = false, role = '', maxItems = DEFAULT_MAX_LIST_ITEMS, maxPages = MAX_LIST_PAGES, pageSize = 100, deadlineMs = LIST_DEADLINE_MS, signal = null } = {},
   ) => {
     const items = [];
     const deadline = now() + deadlineMs;
@@ -364,6 +367,8 @@ export const createWorkerClient = ({
       // A Worker sends at most its own page size, whatever is asked.
       const query = new URLSearchParams({ resource, limit: String(pageSize) });
       if (mine) query.set('mine', 'true');
+      // For docsContext, 'context' lists only context sources and the AI's readings of them.
+      if (role) query.set('role', role);
       if (cursor) query.set('cursor', cursor);
       const data = await request(`/storage/list?${query}`, { auth: true });
       const pageItems = Array.isArray(data?.items) ? data.items.filter(isRecord) : [];
@@ -430,6 +435,10 @@ export const createWorkerClient = ({
 
   const contextAction = (body, { signal } = {}) => request('/storage/context', { method: 'POST', auth: true, signal, body });
 
+  /** A stored context file's text as it is stored: a text file, the AI's reading of a PDF or image, or a link's record. */
+  const readContextText = (id, { signal } = {}) =>
+    request(`/storage/read?id=${encodeURIComponent(id)}`, { auth: true, signal, raw: true, maxBytes: MAX_CONTEXT_TEXT_BYTES });
+
   // `secret` (a one-use code) or `proof` (a group password's signature) admits
   // the caller to a group that isn't open.
   const joinGroup = (groupId, { signal, secret, proof } = {}) => request('/groups/join', {
@@ -485,6 +494,7 @@ export const createWorkerClient = ({
     upload,
     uploadForm,
     contextAction,
+    readContextText,
     joinGroup,
     leaveGroup,
     listGroups,

@@ -44,7 +44,7 @@ test('the executable answers MCP over stdio and keeps one agent identity per sta
   assert.deepEqual(
     byId[2].result.tools.map((tool) => tool.name).sort(),
     ['add_context', 'add_statement', 'answer', 'ask_session_agent', 'claim_sbt', 'get_results', 'get_session', 'join_group', 'join_session',
-      'leave_group', 'list_questions', 'request_test_eth', 'set_profile', 'whoami'],
+      'leave_group', 'list_context', 'list_questions', 'read_context', 'request_test_eth', 'set_profile', 'whoami'],
   );
   const whoami = byId[3].result.structuredContent;
   assert.deepEqual(byId[2].result.tools.find((tool) => tool.name === 'request_test_eth').annotations, {
