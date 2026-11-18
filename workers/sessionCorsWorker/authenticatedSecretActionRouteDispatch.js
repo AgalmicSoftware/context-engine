@@ -8,6 +8,7 @@ import { SESSION_AGENT_PATHS, dispatchSessionAgentRoute } from './sessionAgentRo
 import { FEEDBACK_PATH, sendSessionFeedback } from './sessionFeedbackRoute.js';
 import { SET_NAME_PATH, setOwnSessionName } from './sessionNames.js';
 import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
+import { ANALYSIS_CARD_PICTURE_PATH, dispatchAnalysisCardPictureRoute } from './analysisCardPictureRoute.js';
 
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return DEFAULT_ANTHROPIC_MODEL;
@@ -52,6 +53,12 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
   if (path === SET_NAME_PATH) {
     const result = await setOwnSessionName({ env, slug, config, body, address, checkRateLimit: deps?.checkRateLimit, now: deps?.now });
     return { handled: true, response: deps?.json?.(result.body, result.status, headers) };
+  }
+  if (path === ANALYSIS_CARD_PICTURE_PATH) {
+    return {
+      handled: true,
+      response: await dispatchAnalysisCardPictureRoute({ body, config, slug, address, env, headers, scopes, deps }),
+    };
   }
   const isFaucetAction = action === 'request_test_eth';
   const isAiAction = path === '/ai' || action === 'ai';

@@ -2492,6 +2492,11 @@ Runtime:
   - The Cloudflare API token is never a session secret. A direct `/new` token is
     consumed only by the deploy helper and is not written to either KV record.
 
+- `session:{slug}:analysis-card-picture:v1:figure:{figure}` JSON for one
+  drawn card picture (TTL 30 days) or a remembered refusal (one day),
+  `…:v1:looks` for the recent art directions and `…:v1:session-limit` while the
+  session's daily number is used up (one hour). All can be deleted; the next
+  request asks again.
 - `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
 - route and auth-nonce counters are authoritative only in `CE_SESSION_COORDINATOR`; no KV counter fallback is accepted
 
@@ -3209,6 +3214,47 @@ Signed login/bootstrap requests:
   - Route scope disables fail before the request-`apiKey` bypass.
   - Provider inference:
     omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI. When both provider and model are omitted on a session-funded request, the Worker selects the saved fast model (or thinking model when `modelType: thinking`), including its provider.
+- `POST /analysis-card/picture` returns the picture on a personal analysis
+  card: an illustration of the historical figure the analysis matched, in a
+  style of the figure's own time. It takes `{ "figure": "Name (years)" }` under
+  the `/ai` scope check and nothing else: no answer, name or address reaches
+  it. A name that is not at most six words of letters followed by years in
+  brackets is refused with 400 `invalid_figure`. Two requests go to OpenAI with
+  the session's own key. The first sees only the figure's name and returns an
+  art direction; it answers `died: 0` for anyone living, fictional or unknown,
+  and the route then returns 422 `figure_not_recognised` without drawing, as it
+  does when the name the model returns is not of the person asked for (the two
+  share no word of three letters or more, or, for a name of shorter words, are
+  not the same name). The second draws from
+  that art direction alone (`shared/analysisCardPicture.mjs` holds both
+  prompts) with the image model Session Wrapped uses, 1024 by 1536, and never
+  asks for words in the picture. If OpenAI's moderation refuses the portrait
+  the route tries once more with a still life of the figure's objects
+  (`portrait: false`), then returns 422 `picture_refused`. The reply is
+  `{ figure, name, portrait, look: { era, ground, accentHex }, image: { mime,
+  base64 }, cached }`.
+  - Each figure is drawn once per session and kept for 30 days in
+    `session:{slug}:analysis-card-picture:v1:figure:{figure}`, where `{figure}`
+    is the request's own text in lower case with plain hyphens; a kept picture
+    is returned without calling OpenAI or counting a use. The years are part
+    of the key, so two people who share a name are kept apart, and nothing is
+    folded away, so a string that only looks like a figure never shares its
+    record. The
+    last eight art directions are kept beside it so a new figure is told which
+    looks are taken. A backup does not carry these records.
+  - A new picture counts as one of the person's AI calls a day, and a session
+    draws at most 60 new pictures a day (429 `picture_session_limit`). The
+    first request is bounded per person by the same daily number, so
+    unrecognised names cannot spend the session's key without limit.
+  - A figure the model does not know, or whose picture was refused, is
+    remembered for a day, and a session that reached its daily number for an
+    hour: until then the same answer is returned without another request or
+    another of the viewer's AI calls. Kept pictures are still returned, a
+    refusal is never written over a picture, and an answer that named somebody
+    else is not remembered.
+  - A session without an OpenAI key answers 409 `picture_needs_openai_key`,
+    whatever provider its text model uses, and an ended session answers 410.
+    The page then shows the card without a picture.
 - `POST /session-agent/ask` answers a question to the Session Agent
   through the session's own AI, under the `/ai` scope check and rate limit.
   `POST /session-agent/status` says how the signed-in person would be answered,
