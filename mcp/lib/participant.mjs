@@ -636,16 +636,26 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   // on joining, and shows it in place of the address; answers there carry no
   // name of their own.
   const keepsNames = async (ctx) => !ctx.registry && !!(await ctx.client.readFeatures())?.includes('session_names_v1');
-  const saveName = async (ctx) => {
+  // A saved name is remembered per session, so answers don't save it again after an admin cleared it.
+  const markNameSaved = (ctx, name) =>
+    saveState((fresh) => {
+      const entry = fresh.sessions[sessionKey(ctx.info)];
+      if (isRecord(entry) && entry.sessionId === ctx.client.sessionId) entry.nameSaved = name;
+    }).catch(() => {});
+  const saveName = async (ctx, { signal } = {}) => {
     if (!(await keepsNames(ctx))) return null;
     // A name saved before the admin turned names off is still readable, so ask the setting.
     if (ctx.client.config?.namesEnabled === false) return { saved: false, error: 'Names are off in this session.' };
     const wanted = profile().displayName;
     try {
       // Each change counts against a daily limit, so a name already saved is left as it is.
-      const current = await ctx.client.request(`/names/me?slug=${encodeURIComponent(ctx.info.slug)}`, { auth: true }).catch(() => null);
-      if (current && (current.name || '') === wanted.normalize('NFKC').trim().replace(/\s+/gu, ' ')) return { saved: true, name: current.name };
-      const saved = await ctx.client.request('/names/set', { method: 'POST', auth: true, body: { name: wanted } });
+      const current = await ctx.client.request(`/names/me?slug=${encodeURIComponent(ctx.info.slug)}`, { auth: true, signal }).catch(() => null);
+      if (current && (current.name || '') === wanted.normalize('NFKC').trim().replace(/\s+/gu, ' ')) {
+        await markNameSaved(ctx, wanted);
+        return { saved: true, name: current.name };
+      }
+      const saved = await ctx.client.request('/names/set', { method: 'POST', auth: true, body: { name: wanted }, signal });
+      await markNameSaved(ctx, wanted);
       return { saved: true, name: saved?.name ?? null };
     } catch (error) {
       return { saved: false, error: text(error?.message) || 'The session didn’t save your name.' };
@@ -1269,7 +1279,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const loaded = await loadQuestions(ctx);
       const questions = new Map(loaded.map((question) => [question.id, question]));
       const recruitmentSource = text(sessionState(ctx).recruitmentSource);
-      const answerProfile = (await keepsNames(ctx)) ? { ...profile(), displayName: '' } : profile();
+      const namesKept = await keepsNames(ctx);
+      const answerProfile = namesKept ? { ...profile(), displayName: '' } : profile();
       const results = [];
       const answered = [];
       const pendingAnswers = [];
@@ -1380,12 +1391,30 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           warning = 'Answers were submitted, but the local answer history could not be saved. Do not resubmit them to fix this warning.';
         }
       }
+      // These answers carry no name, so a name never saved in the session (the
+      // agent joined before its Worker kept names, or the save on joining failed)
+      // is saved now. After the answers, so a slow or refused save neither holds
+      // nor loses them; tried once per session and name in this process, since
+      // each attempt can count against the daily limit. Once saved it is not
+      // saved again from here, so an admin's clear stands.
+      let name;
+      const wanted = profile().displayName;
+      if (namesKept && answered.length && wanted && ctx.nameChecked !== wanted && sessionState(ctx).nameSaved !== wanted &&
+        ctx.client.config?.namesEnabled !== false && !signal?.aborted) {
+        const saved = await saveName(ctx, { signal });
+        // A Worker whose features could not be read, or a call stopped mid-save, is tried again next time.
+        if (saved && !signal?.aborted) ctx.nameChecked = wanted;
+        if (saved && !saved.saved) {
+          name = { ...saved, next: 'Your answers were stored and show your address for now. To try again, call set_profile with your displayName.' };
+        }
+      }
       const failed = results.filter((result) => !result.ok);
       return {
         session: ctx.info.slug,
         ...(txHash ? { txHash } : {}),
         ...(reconciliationRequired ? { reconciliationRequired: true } : {}),
         ...(warning ? { warning } : {}),
+        ...(name ? { name } : {}),
         submitted: results.length - failed.length,
         failed: failed.length,
         // A model that reads one refusal can take the whole call for lost, or the refused answer for sent.

@@ -241,6 +241,16 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.6.1
+
+- Where a session keeps names and the agent's display name is not saved there
+  yet (it joined before the session's Worker was upgraded, or the save on
+  joining failed), its next `answer` saves it, once per session in each run.
+  A save that fails leaves the answers stored; the reply's `name` says why,
+  and `set_profile` tries again. Once a name is saved, answers never save it
+  again, so an admin's clear stands. The `set_profile` step below is no
+  longer needed.
+
 ## Upgrading to 0.6.0
 
 - Where a session keeps names (a Worker advertising `session_names_v1`, Context
