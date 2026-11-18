@@ -173,8 +173,10 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
   const list = async (address) => (await (await call('/storage/list?resource=docsContext&role=context', { address })).json()).items;
   const read = (id, address) => call(`/storage/read?id=${encodeURIComponent(id)}`, { address });
   const settled = async () => { while (background.length) await background.shift(); };
-  // The provider calls that read a PDF, apart from the calls that write cards.
-  const pdfReads = () => providerCalls.filter((made) => made.body?.messages?.[0]?.content?.[0]?.type === 'document' || made.body?.input?.[0]?.content?.[0]?.type === 'input_file');
+  // The provider calls that read a PDF or an image, apart from the calls that write cards.
+  const pdfReads = () =>
+    providerCalls.filter((made) =>
+      ['document', 'image', 'input_file', 'input_image'].includes(made.body?.messages?.[0]?.content?.[0]?.type ?? made.body?.input?.[0]?.content?.[0]?.type));
   return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, fetchChecks, aiChecks, providerCalls, pdfReads, settled };
 };
 

@@ -353,7 +353,7 @@ const SessionContextSources = ({
             sessionConfig={sessionConfig}
             account={account}
             groups={groups}
-            canAnalyze={list.cardsSupported}
+            cardsOn={list.cardsSupported}
             onAdded={list.reload}
           />
           <h3 className={setupStyles.fieldLabel}>Add a note</h3>

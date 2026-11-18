@@ -87,7 +87,19 @@ describe('setup context files', () => {
     fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), {
       target: { files: [new File(['x'], 'clip.mp4', { type: 'video/mp4' })] },
     });
-    expect(screen.getByText(/Add a PDF, a PNG, JPEG or WebP image, or a Markdown/)).toBeInTheDocument();
+    expect(screen.getByText('Add a PDF, or a Markdown, plain text, CSV or JSON file.')).toBeInTheDocument();
+    // A new session starts with cards off, so setup takes no image.
+    expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).not.toMatch(/image|\.png/);
+    fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), {
+      target: { files: [new File(['png'], 'chart.png', { type: 'image/png' })] },
+    });
+    expect(
+      screen.getByText('A session takes images only once Context cards are on in its settings.'),
+    ).toBeInTheDocument();
+    expect(latest.contextFiles).toEqual([
+      { name: 'brief.pdf', adminsOnly: false },
+      { name: 'deck.pdf', adminsOnly: true },
+    ]);
     fireEvent.click(screen.getByRole('button', { name: 'Remove brief.pdf' }));
     expect(latest.contextFiles).toEqual([{ name: 'deck.pdf', adminsOnly: true }]);
   });

@@ -8,6 +8,7 @@ import {
   CONTEXT_SOURCE_LIMITS,
   CONTEXT_TAGS,
   CONTEXT_TEXT_ROLE,
+  contextCardsOn,
   contextFileByteLimit,
   contextFileIsReadByAi,
   contextFileNoun,
@@ -352,10 +353,21 @@ export const removeContextSource = async (
   );
 };
 
-/** A file the context accepts, or the reason it does not. */
-export const checkContextFile = (file: { name?: string; type?: string; size?: number }): string => {
+/**
+ * A file the context accepts, or the reason it does not. `images` says whether
+ * the session takes images: only with Context cards on, as its Worker checks too.
+ */
+export const checkContextFile = (
+  file: { name?: string; type?: string; size?: number },
+  { images }: { images: boolean },
+): string => {
   const type = resolveContextFileType({ name: file.name, type: file.type });
-  if (!type) return 'Add a PDF, a PNG, JPEG or WebP image, or a Markdown, plain text, CSV or JSON file.';
+  if (!type) {
+    return images
+      ? 'Add a PDF, a PNG, JPEG or WebP image, or a Markdown, plain text, CSV or JSON file.'
+      : 'Add a PDF, or a Markdown, plain text, CSV or JSON file.';
+  }
+  if (isContextImage(type) && !images) return 'A session takes images only once Context cards are on in its settings.';
   const limit = contextFileByteLimit(type);
   return (file.size || 0) > limit
     ? `${file.name || 'This file'} is larger than ${limit / (1024 * 1024)} MB, the most for ${isContextImage(type) ? 'an' : 'a'} ${contextFileNoun(type)}.`
@@ -370,7 +382,7 @@ export const uploadContextFile = async (
   { file, adminsOnly = false, groupIds = [] }: { file: File } & ContextFileAccess,
   options: ContextSourceOptions,
 ): Promise<string> => {
-  const problem = checkContextFile(file);
+  const problem = checkContextFile(file, { images: contextCardsOn(options.sessionConfig) });
   if (problem) throw new Error(problem);
   const contentType = resolveContextFileType({ name: file.name, type: file.type });
   const result = await uploadDataToSessionStorage(new File([file], file.name, { type: contentType }), undefined, {
@@ -406,11 +418,11 @@ const KIND_LABELS: Record<string, string> = {
 };
 const FILE_EXTENSION = /\.(?:pdf|md|markdown|txt|csv|json|png|jpe?g|webp)$/i;
 
-/** What a file picker for context offers: every accepted extension and type. */
-export const CONTEXT_FILE_ACCEPT = [
-  ...Object.keys(CONTEXT_FILE_TYPES).map((extension) => `.${extension}`),
-  ...new Set(Object.values(CONTEXT_FILE_TYPES)),
-].join(',');
+/** What a file picker for context offers: every accepted extension and type, images only where the session takes them. */
+export const contextFileAccept = ({ images }: { images: boolean }): string => {
+  const types = Object.entries(CONTEXT_FILE_TYPES).filter(([, type]) => images || !isContextImage(type));
+  return [...types.map(([extension]) => `.${extension}`), ...new Set(types.map(([, type]) => type))].join(',');
+};
 
 /** What kind of source it is, in a word: Link, PDF, Image, Markdown, Text, CSV, JSON or File. */
 export const contextSourceKindLabel = (source: Pick<ContextSource, 'kind' | 'mime' | 'title'>): string =>

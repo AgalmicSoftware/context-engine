@@ -11,9 +11,9 @@ import ContextAccessPicker, { contextGroupsLabel } from './ContextAccessPicker';
 import ContextCardChips from '../../OnePageSession/ContextCardChips';
 import ContextCardEditor, { CONTEXT_CARD_HELP } from '../../OnePageSession/ContextCardEditor';
 import {
-  CONTEXT_FILE_ACCEPT,
   addContextLink,
   checkContextFile,
+  contextFileAccept,
   contextAdderLabel,
   contextSourceTakesCard,
   contextSourcesWithoutCards,
@@ -176,7 +176,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
       return problem ? `${wrote} ${withoutCards.length - made} could not be written: ${problem}` : wrote;
     });
   };
-  const fileProblem = file ? checkContextFile(file) : '';
+  const fileProblem = file ? checkContextFile(file, { images: cardsSupported }) : '';
   const fileIsAiRead = !!file && contextFileIsReadByAi(resolveContextFileType(file));
 
   return (
@@ -361,7 +361,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
           key={fileKey}
           id="ce-context-file"
           type="file"
-          accept={CONTEXT_FILE_ACCEPT}
+          accept={contextFileAccept({ images: cardsSupported })}
           data-testid="ce-context-file"
           onChange={(event) => setFile((event.target as HTMLInputElement).files?.[0] || null)}
         />

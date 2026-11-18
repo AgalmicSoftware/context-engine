@@ -48,12 +48,12 @@ export const workerReadsContext = (config) => {
     word(access.encryption) !== 'lit' && word(access.mode) !== 'lit_encrypted';
 };
 
-/** The invitation join_session and get_session show, with the limits; links only where the Worker takes them. */
-export const contextInvitation = ({ links }) => ({
+/** The invitation join_session and get_session show, with the limits; links and images only where the session takes them. */
+export const contextInvitation = ({ links, images = false }) => ({
   invitation: `You’re invited to add context to this session: ${links ? 'a file, a link or text' : 'a file or text'}. Everyone in the session will see it.`,
   how: `Call add_context with exactly one of file (a local path)${links ? ', url' : ''} or text (with an optional title). Pass adminsOnly to show it to the session’s admins alone.`,
   limits: {
-    file: `PDF up to ${megabytes(CONTEXT_SOURCE_LIMITS.pdfBytes)}; a PNG, JPEG or WebP image up to ${megabytes(CONTEXT_SOURCE_LIMITS.imageBytes)}, where the session’s Worker takes images; Markdown, plain text, CSV or JSON up to ${megabytes(CONTEXT_SOURCE_LIMITS.textFileBytes)}.`,
+    file: `PDF up to ${megabytes(CONTEXT_SOURCE_LIMITS.pdfBytes)}; ${images ? `a PNG, JPEG or WebP image up to ${megabytes(CONTEXT_SOURCE_LIMITS.imageBytes)}; ` : ''}Markdown, plain text, CSV or JSON up to ${megabytes(CONTEXT_SOURCE_LIMITS.textFileBytes)}.`,
     ...(links
       ? { url: `A public https:// page of up to ${megabytes(CONTEXT_SOURCE_LIMITS.pageBytes)}, which the Session Worker reads once; the link up to ${CONTEXT_SOURCE_LIMITS.urlChars} characters.` }
       : {}),
@@ -88,9 +88,10 @@ export const checkContextLink = ({ url, title }) => {
 /**
  * A local file as a context upload. The MCP's state folder, which holds the
  * agent's key, is never read, nor are hidden files and folders, where keys and
- * settings live.
+ * settings live. `images` says whether the session takes images: only with
+ * Context cards on, as its Worker checks too.
  */
-export const readContextFile = async (filePath, { stateDir }) => {
+export const readContextFile = async (filePath, { stateDir, images = false }) => {
   const given = path.resolve(String(filePath ?? '').trim());
   let real;
   try {
@@ -110,7 +111,14 @@ export const readContextFile = async (filePath, { stateDir }) => {
   // The type comes from the file itself, not a link's name for it.
   const name = path.basename(real);
   const contentType = resolveContextFileType({ name });
-  if (!contentType) throw new Error('Add a PDF, a PNG, JPEG or WebP image, or a Markdown, plain text, CSV or JSON file.');
+  if (!contentType) {
+    throw new Error(images
+      ? 'Add a PDF, a PNG, JPEG or WebP image, or a Markdown, plain text, CSV or JSON file.'
+      : 'Add a PDF, or a Markdown, plain text, CSV or JSON file.');
+  }
+  if (isContextImage(contentType) && !images) {
+    throw new Error('This session takes images only once an admin turns on Context cards in its settings.');
+  }
   const limit = contextFileByteLimit(contentType);
   const tooLarge = () => new Error(`${name} is larger than ${megabytes(limit)}, the most for ${isContextImage(contentType) ? 'an' : 'a'} ${contextFileNoun(contentType)}.`);
   if (stat.size > limit) throw tooLarge();

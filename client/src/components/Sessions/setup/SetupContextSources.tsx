@@ -7,9 +7,9 @@ import {
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
 import {
-  CONTEXT_FILE_ACCEPT,
   addContextLink,
   checkContextFile,
+  contextFileAccept,
   readContextPdf,
   uploadContextFile,
   type ContextFileAccess,
@@ -65,7 +65,9 @@ export type SetupGroupOption = { groupId: string; label: string };
 const FILE_VISIBILITY_HELP = `${FILE_ACCESS_HELP} Groups set up under Access and identity are made at Create, before these files are added.`;
 
 const MB = 1024 * 1024;
-const ADD_FILE_HELP = `A PDF up to ${CONTEXT_SOURCE_LIMITS.pdfBytes / MB} MB, a PNG, JPEG or WebP image up to ${CONTEXT_SOURCE_LIMITS.imageBytes / MB} MB, or Markdown, text, CSV or JSON up to ${CONTEXT_SOURCE_LIMITS.textFileBytes / MB} MB. It is added to the session after Create, for the people you choose in its Visible to.`;
+const ADD_FILE_HELP = `A PDF up to ${CONTEXT_SOURCE_LIMITS.pdfBytes / MB} MB, or Markdown, text, CSV or JSON up to ${CONTEXT_SOURCE_LIMITS.textFileBytes / MB} MB. It is added to the session after Create, for the people you choose in its Visible to. Images can be added once Context cards are on in the session’s settings.`;
+// A new session starts with Context cards off, so it takes no images yet.
+const NO_IMAGES = { images: false };
 const ATTACH_AGAIN_HELP =
   'The page holds chosen files only until it reloads. Choose this file again so Create can add it.';
 
@@ -106,7 +108,7 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
   const save = (next: ContextFileEntry[]) => onChange(['contextFiles'], next);
   const attach = (file: File | undefined, replacing = '') => {
     if (!file) return;
-    const reason = checkContextFile(file);
+    const reason = checkContextFile(file, NO_IMAGES);
     setProblem(reason);
     if (reason) return;
     if (replacing && replacing !== file.name) pending.set(replacing, null);
@@ -176,7 +178,7 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
           id="ce-setup-context-file"
           type="file"
           aria-describedby={setupHelpId('ce-setup-context-file')}
-          accept={CONTEXT_FILE_ACCEPT}
+          accept={contextFileAccept(NO_IMAGES)}
           data-testid="ce-setup-context-file-input"
           onChange={(event) => {
             attach((event.target as HTMLInputElement).files?.[0]);

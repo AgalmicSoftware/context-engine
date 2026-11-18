@@ -870,7 +870,7 @@ Authenticated clients can use the worker as the session storage boundary:
   session coordinator applies finished readings and removals one at a time, so a removed file stays removed and
   a reading never replaces a newer one. Uploads with a context role on `/storage/upload` must come from someone
   signed in (an admin, or anyone while `contextAdditionPolicy` isn't `admin_only`), be a PDF (20 MB), a PNG, JPEG or
-  WebP image (5 MB) or a text file (1 MB), carry no access rule other than admins-only or a lock to at most 20 of the session's groups, whose
+  WebP image (5 MB, only where `contextCardsEnabled` is `true`; else `415 context_images_off`) or a text file (1 MB), carry no access rule other than admins-only or a lock to at most 20 of the session's groups, whose
   members may each read it, and be readable by the Worker. The session
   coordinator publishes each context item only while its uploader may still add it, so a link, PDF reading or upload
   that finishes after that admin was replaced, or after participants were limited, returns `409` and is not listed; a content-only settings edit

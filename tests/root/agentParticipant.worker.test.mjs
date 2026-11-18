@@ -1313,7 +1313,8 @@ test('an agent’s PDF or image is read by the session’s AI as it is added, an
   const kami = await createAgent(env, 'Test Kami', []);
   const ada = await createAgent(env, 'Ada', []);
   t.after(() => Promise.all([kami, ada].map((agent) => fs.rm(agent.stateDir, { recursive: true, force: true }))));
-  await kami.participant.joinSession({ link: LINK });
+  const joined = await kami.participant.joinSession({ link: LINK });
+  assert.match(joined.addingContext.limits.file, /a PNG, JPEG or WebP image up to 5 MB/);
   await ada.participant.joinSession({ link: LINK });
   const readings = [];
   t.mock.method(globalThis, 'fetch', async (url, init) => {
@@ -1388,7 +1389,8 @@ test('in a session with cards off, an agent’s list shows the sources without c
   const env = await cardSessionEnv({ contextCardsEnabled: false });
   const kami = await createAgent(env, 'Test Kami', []);
   t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
-  await kami.participant.joinSession({ link: LINK });
+  const joined = await kami.participant.joinSession({ link: LINK });
+  assert.equal(joined.addingContext.limits.file, 'PDF up to 20 MB; Markdown, plain text, CSV or JSON up to 1 MB.');
   t.mock.method(globalThis, 'fetch', async () => assert.fail('no AI is asked where cards are off'));
   await kami.participant.addContext({ text: 'Residents asked for evening sessions.', title: 'Evenings' });
   const listed = await kami.participant.listContext();
@@ -1398,6 +1400,12 @@ test('in a session with cards off, an agent’s list shows the sources without c
   // Nor is a PDF sent to be read: only an admin can have that done here.
   const deck = await kami.participant.addContext({ file: await agentFile(t, kami, 'deck.pdf', '%PDF-1.7 deck') });
   assert.match(deck.analysis, /^Not read by the session’s AI/);
+  // And it takes no image, which is refused before anything is sent.
+  await assert.rejects(
+    kami.participant.addContext({ file: await agentFile(t, kami, 'chart.png', PNG) }),
+    /^Error: This session takes images only once an admin turns on Context cards in its settings\.$/,
+  );
+  assert.deepEqual((await kami.participant.listContext()).sources.map((source) => source.title), ['Evenings.md', `${process.pid}-deck.pdf`]);
 });
 
 test('an agent makes a file, a link or a note visible to some of the session’s groups, as the website’s Visible to does', async (t) => {

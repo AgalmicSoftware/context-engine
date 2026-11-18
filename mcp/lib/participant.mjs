@@ -637,7 +637,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     if (ctx.registry || !participantsMayAddContext(sessionConfig) || hasEnded(sessionConfig) || !workerReadsContext(sessionConfig)) return {};
     const features = await ctx.client.readFeatures();
     if (!features?.includes('participant_context_v1')) return {};
-    return { addingContext: contextInvitation({ links: features.includes('participant_context_links_v1') && mayAddLinks(ctx, sessionConfig) }) };
+    return {
+      addingContext: contextInvitation({
+        links: features.includes('participant_context_links_v1') && mayAddLinks(ctx, sessionConfig),
+        images: contextCardsOn(sessionConfig),
+      }),
+    };
   };
 
   const remember = (ctx, title, recruitmentSource) =>
@@ -1710,7 +1715,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           const source = isRecord(result?.source) ? result.source : {};
           return { session: ctx.info.slug, added: 'link', id: text(source.id), url: link.url, title: text(source.title) || link.title, visibleTo };
         }
-        const upload = kind === 'file' ? await readContextFile(file, { stateDir: config.stateDir }) : buildNote({ text: note, title });
+        const upload = kind === 'file'
+          ? await readContextFile(file, { stateDir: config.stateDir, images: contextCardsOn(sessionConfig) })
+          : buildNote({ text: note, title });
         checkpoint();
         const storageRef = await ctx.client.uploadForm(contextUploadForm(upload, { adminsOnly, groupIds, adderName }), { signal });
         const id = text(storageRef?.id);

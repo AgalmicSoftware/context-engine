@@ -49,7 +49,7 @@ Sources (`shared/sessionContextSources.mjs`):
 
 | | Limit |
 |---|---|
-| File types | PDF; PNG, JPEG and WebP images; Markdown, plain text, CSV, JSON |
+| File types | PDF; Markdown, plain text, CSV, JSON; PNG, JPEG and WebP images where [cards](#cards) are on |
 | PDF | 20 MB |
 | Image | 5 MB |
 | Text file | 1 MB |
@@ -75,9 +75,10 @@ spend the session's AI key on an item already there; the Worker refuses anyone
 else. Where the session has [cards](#cards) on, whoever added a PDF or image
 may have the AI read it once (see [PDFs and images](#pdfs-and-images)).
 
-- **Setup (`/new`):** the Context section takes paragraphs, links and files.
+- **Setup (`/new`):** the Context section takes paragraphs, links and files
+  other than images, since a new session starts with cards off.
   Files stay in the browser until **Create**; then **Add context to
-  the session** uploads them, has the session's AI read the PDFs and images marked
+  the session** uploads them, has the session's AI read the PDFs marked
   **Analyze with the session's AI**, and, unless unticked, reads each link's
   page for the AI. After a reload only the file names remain, to attach again.
 - **The session page's Context section**, when open, has **Add** and **View** in
@@ -159,8 +160,13 @@ own AI provider with the session's key, which never leaves the Worker:
   `data:application/pdf;base64,…` URL, followed by `input_text`.
 
 An image (PNG, JPEG or WebP, up to 5 MB; an SVG can carry script and only the
-first frame of an animation would be read, so neither is taken) goes the same
-way: Claude gets an `image` block with the same `base64` source, OpenAI an
+first frame of an animation would be read, so neither is taken) is taken only
+where the session has [cards](#cards) on: elsewhere the Worker refuses it with
+`415 context_images_off`, from admins too, and the site and the MCP offer none.
+An older Worker would treat a stored image as a text file, so a session that
+never turns cards on holds exactly what it held before. Images already stored
+stay when cards are turned off, and admins can still have them read. An image
+goes the same way as a PDF: Claude gets an `image` block with the same `base64` source, OpenAI an
 `input_image` part with a `data:<type>;base64,…` URL. Its instruction asks for
 any words in the image, as written, and then what it shows: a chart's title,
 axes and figures, a diagram's parts, what a photo is of. The Worker stores and
@@ -197,8 +203,8 @@ advertise `context_cards_v1`.
 session's Settings, under Context (`contextCardsEnabled`, off when unset; the
 setting is offered only where the Worker keeps cards, and changing it signs no
 one out). While off, no card is made, written, listed or given to an AI, so
-the session's prompts are exactly those of a session without cards, and only
-admins can have a PDF or image read. Cards written while it was on stay stored
+the session's prompts are exactly those of a session without cards, only
+admins can have a PDF or image read, and the session takes no new images. Cards written while it was on stay stored
 and show again when it is turned back on. A card a person wrote is still
 carried over when its link is refreshed.
 

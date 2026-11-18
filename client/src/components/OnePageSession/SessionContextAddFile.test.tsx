@@ -15,7 +15,7 @@ const read = jest.mocked(readContextPdf);
 const options = { sessionSlug: 'salon', sessionConfig: { slug: 'salon' }, context: { account: '0xme' } };
 const pdf = () => new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' });
 
-const renderForm = (canAnalyze: boolean) => {
+const renderForm = (cardsOn: boolean) => {
   const onAdded = jest.fn();
   render(
     <SessionContextAddFile
@@ -23,7 +23,7 @@ const renderForm = (canAnalyze: boolean) => {
       sessionConfig={{ slug: 'salon' }}
       account="0xme"
       groups={[]}
-      canAnalyze={canAnalyze}
+      cardsOn={cardsOn}
       onAdded={onAdded}
     />,
   );
@@ -74,8 +74,14 @@ describe('a participant adding a file to the context', () => {
     expect(read).not.toHaveBeenCalled();
   });
 
-  it('asks for no reading where cards are off or the Worker keeps none', async () => {
+  it('asks for no reading, and takes no image, where cards are off or the Worker keeps none', async () => {
     renderForm(false);
+    expect(screen.getByLabelText('File').getAttribute('accept')).not.toMatch(/image|\.png/);
+    choose(new File(['png'], 'chart.png', { type: 'image/png' }));
+    expect(
+      screen.getByText('A session takes images only once Context cards are on in its settings.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add file' })).toBeDisabled();
     choose(pdf());
     expect(screen.queryByLabelText('Analyze with the session’s AI')).not.toBeInTheDocument();
     await add();

@@ -24,16 +24,20 @@ test('a local file is read as a context file of its own type and within its size
   assert.equal((await readContextFile(await write('deck.pdf', '%PDF-1.7 deck'), { stateDir })).contentType, 'application/pdf');
   assert.equal((await readContextFile(await write('table.csv', 'a,b\n1,2\n'), { stateDir })).contentType, 'text/csv');
 
-  // An image is sent as it is, when it begins as its name says.
+  // Where the session has cards on, an image is sent as it is, when it begins as its name says.
+  const cardsOn = { stateDir, images: true };
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
-  const read = await readContextFile(await write('chart.png', png), { stateDir });
+  const read = await readContextFile(await write('chart.png', png), cardsOn);
   assert.deepEqual([read.contentType, Buffer.compare(read.bytes, png)], ['image/png', 0]);
-  assert.equal((await readContextFile(await write('photo.JPG', Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1])), { stateDir })).contentType, 'image/jpeg');
-  assert.equal((await readContextFile(await write('map.webp', Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 ', 'latin1')), { stateDir })).contentType, 'image/webp');
-  await assert.rejects(readContextFile(await write('image.png', 'png'), { stateDir }), /image\.png is not a PNG image\./);
-  await assert.rejects(readContextFile(await write('notes.webp', 'RIFF and then text'), { stateDir }), /notes\.webp is not a WebP image\./);
-  await assert.rejects(readContextFile(await write('big.jpg', Buffer.alloc(5 * 1024 * 1024 + 1, 0xff)), { stateDir }), /big\.jpg is larger than 5 MB, the most for an image\./);
-  await assert.rejects(readContextFile(await write('logo.svg', '<svg/>'), { stateDir }), /Add a PDF, a PNG, JPEG or WebP image, or a Markdown, plain text, CSV or JSON file\./);
+  assert.equal((await readContextFile(await write('photo.JPG', Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1])), cardsOn)).contentType, 'image/jpeg');
+  assert.equal((await readContextFile(await write('map.webp', Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 ', 'latin1')), cardsOn)).contentType, 'image/webp');
+  await assert.rejects(readContextFile(await write('image.png', 'png'), cardsOn), /image\.png is not a PNG image\./);
+  await assert.rejects(readContextFile(await write('notes.webp', 'RIFF and then text'), cardsOn), /notes\.webp is not a WebP image\./);
+  await assert.rejects(readContextFile(await write('big.jpg', Buffer.alloc(5 * 1024 * 1024 + 1, 0xff)), cardsOn), /big\.jpg is larger than 5 MB, the most for an image\./);
+  await assert.rejects(readContextFile(await write('logo.svg', '<svg/>'), cardsOn), /Add a PDF, a PNG, JPEG or WebP image, or a Markdown, plain text, CSV or JSON file\./);
+  // With cards off, as a session starts, it takes no image.
+  await assert.rejects(readContextFile(path.join(dir, 'chart.png'), { stateDir }), /takes images only once an admin turns on Context cards/);
+  await assert.rejects(readContextFile(path.join(dir, 'logo.svg'), { stateDir }), /^Error: Add a PDF, or a Markdown, plain text, CSV or JSON file\.$/);
   await assert.rejects(readContextFile(await write('fake.pdf', 'not a pdf'), { stateDir }), /fake\.pdf is not a PDF\./);
   await assert.rejects(readContextFile(await write('latin.txt', Buffer.from([0xff, 0xfe, 0x41])), { stateDir }), /latin\.txt is not UTF-8 text\./);
   await assert.rejects(readContextFile(await write('big.txt', 'x'.repeat(1024 * 1024 + 1)), { stateDir }), /big\.txt is larger than 1 MB, the most for a text file\./);

@@ -795,6 +795,7 @@ const IMAGE_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x
 
 test('an image is context whose text is the AI’s reading of it, as a PDF’s is', async () => {
   const h = harness({
+    cards: true,
     provider: async () => json({ content: [{ type: 'text', text: 'Title: Turnout by region. North 61%, South 48%.' }], stop_reason: 'end_turn' }),
   });
   const image = await idOf(await h.uploadFile({ name: 'turnout.png', type: 'image/png', bytes: IMAGE_BYTES, adminsOnly: true }));
@@ -824,6 +825,7 @@ test('an image is context whose text is the AI’s reading of it, as a PDF’s i
 
 test('an OpenAI session reads an image through the Responses API image input', async () => {
   const h = harness({
+    cards: true,
     ai: { mode: 'openai', model: 'gpt-5.6-terra' },
     provider: async () => json({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'A photo of a town hall.' }] }], status: 'completed' }),
   });
@@ -835,7 +837,7 @@ test('an OpenAI session reads an image through the Responses API image input', a
 });
 
 test('context images are PNG, JPEG or WebP of at most 5 MB; a text file is never sent to be read', async () => {
-  const h = harness();
+  const h = harness({ cards: true });
   for (const [options, status, reason] of [
     [{ name: 'a.webp', type: 'image/webp', bytes: IMAGE_BYTES }, 200, undefined],
     [{ name: 'a.jpeg', type: 'image/jpeg', bytes: new Uint8Array(5 * 1024 * 1024) }, 200, undefined],
@@ -851,5 +853,22 @@ test('context images are PNG, JPEG or WebP of at most 5 MB; a text file is never
   }
   const notes = await idOf(await h.uploadFile({ name: 'notes.txt', type: 'text/plain', bytes: new TextEncoder().encode('Notes') }));
   assert.equal((await h.context({ action: 'read-pdf', id: notes })).status, 404);
-  assert.equal(h.providerCalls.length, 0);
+  assert.equal(h.pdfReads().length, 0);
+});
+
+test('a session with cards off takes no image, from an admin or anyone: it holds only what it held before', async () => {
+  const h = harness({ provider: async () => json({ content: [{ type: 'text', text: 'A bar chart.' }] }) });
+  for (const address of [ADMIN, PARTICIPANT]) {
+    const refused = await h.uploadFile({ address, name: 'chart.png', type: 'image/png', bytes: IMAGE_BYTES });
+    assert.deepEqual([refused.status, (await refused.json()).reason], [415, 'context_images_off']);
+  }
+  assert.deepEqual(await h.list(ADMIN), []);
+  // An image added while cards were on stays, and an admin can still have it read.
+  h.state.config = { ...h.state.config, contextCardsEnabled: true };
+  const image = await idOf(await h.uploadFile({ name: 'chart.png', type: 'image/png', bytes: IMAGE_BYTES }));
+  h.state.config = { ...h.state.config, contextCardsEnabled: false };
+  assert.deepEqual((await h.list(ADMIN)).map((item) => item.storageRef.id), [image]);
+  assert.equal((await h.context({ action: 'read-pdf', id: image })).status, 200);
+  assert.equal(h.pdfReads().length, 1);
+  assert.equal((await h.uploadFile({ name: 'deck.pdf' })).status, 200, 'a PDF is taken as before');
 });

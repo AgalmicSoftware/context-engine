@@ -6,8 +6,8 @@ import ContextAccessPicker from '../Sessions/setup/ContextAccessPicker';
 import { SetupCheck, SetupField } from '../Sessions/setup/SetupPrimitives';
 import setupStyles from '../Sessions/setup/SessionSetup.module.scss';
 import {
-  CONTEXT_FILE_ACCEPT,
   checkContextFile,
+  contextFileAccept,
   readContextPdf,
   uploadContextFile,
   type ContextFileAccess,
@@ -19,8 +19,8 @@ type Props = {
   sessionConfig: Record<string, unknown> | null;
   account: string;
   groups: ContextGroup[];
-  /** Whether the session lets whoever adds a PDF or image have its AI read it. */
-  canAnalyze?: boolean;
+  /** Whether the session has Context cards on: it then takes images, and whoever adds a PDF or image may have its AI read it. */
+  cardsOn?: boolean;
   onAdded: () => void;
 };
 
@@ -30,15 +30,15 @@ const ABOUT_ANALYZE =
   'Sends the PDF or image to the session’s AI. The text it returns is saved with the file, for everyone who can see the file, and counts as one of your AI uses today. Unticked, the file is kept but gives the AI no text until an admin has it read.';
 
 // A participant's own addition to the session's context: a file, and who may read it.
-const SessionContextAddFile = ({ sessionSlug, sessionConfig, account, groups, canAnalyze = false, onAdded }: Props) => {
+const SessionContextAddFile = ({ sessionSlug, sessionConfig, account, groups, cardsOn = false, onAdded }: Props) => {
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
   const [access, setAccess] = useState<ContextFileAccess>({});
   const [analyze, setAnalyze] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
-  const problem = file ? checkContextFile(file) : '';
-  const offersAnalyze = canAnalyze && !!file && contextFileIsReadByAi(resolveContextFileType(file));
+  const problem = file ? checkContextFile(file, { images: cardsOn }) : '';
+  const offersAnalyze = cardsOn && !!file && contextFileIsReadByAi(resolveContextFileType(file));
   const add = async () => {
     if (!file || busy) return;
     setBusy(true);
@@ -77,7 +77,7 @@ const SessionContextAddFile = ({ sessionSlug, sessionConfig, account, groups, ca
           key={fileKey}
           id="ce-session-context-file"
           type="file"
-          accept={CONTEXT_FILE_ACCEPT}
+          accept={contextFileAccept({ images: cardsOn })}
           onChange={(event) => setFile((event.target as HTMLInputElement).files?.[0] || null)}
         />
       </SetupField>

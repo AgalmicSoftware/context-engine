@@ -521,8 +521,8 @@ unknown `CE_MCP_*` name.
   (`groups`, by the IDs `get_session` lists): belonging to any one of them is
   enough, and admins always see it. A link for groups needs a Worker that
   advertises `context_link_groups_v1`. Files are
-  a PDF up to 20 MB, a PNG, JPEG or WebP image up to 5 MB (where the
-  session's Worker takes images), or
+  a PDF up to 20 MB, a PNG, JPEG or WebP image up to 5 MB (only where the
+  session has context cards on; the invitation lists images only then), or
   Markdown, plain text, CSV or JSON up to 1 MB. A PDF or image gives the
   session's AI no text until that AI has read it. Where a session has context
   cards on, whoever adds one may have it read once, as one of their AI uses

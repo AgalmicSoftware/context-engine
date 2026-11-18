@@ -1,9 +1,9 @@
 import {
   addContextLink,
   buildContextNote,
-  CONTEXT_FILE_ACCEPT,
   checkContextFile,
   contextAdderLabel,
+  contextFileAccept,
   contextDuplicateIds,
   contextSourceDisplayTitle,
   contextSourceKindLabel,
@@ -172,24 +172,59 @@ describe('context sources on the client', () => {
         ],
       },
     });
-    expect(checkContextFile({ name: 'slides.pptx', type: 'application/vnd.ms-powerpoint' })).toMatch(
+    const cardsOn = { images: true };
+    expect(checkContextFile({ name: 'slides.pptx', type: 'application/vnd.ms-powerpoint' }, cardsOn)).toMatch(
       /Add a PDF, a PNG/,
     );
-    expect(checkContextFile({ name: 'big.pdf', type: 'application/pdf', size: 21 * 1024 * 1024 })).toMatch(/20 MB/);
-    // An image is context too, up to its own size; SVG and animated images are not.
-    expect(checkContextFile({ name: 'chart.png', type: 'image/png', size: 5 * 1024 * 1024 })).toBe('');
-    expect(checkContextFile({ name: 'photo.JPG', type: '', size: 1 })).toBe('');
-    expect(checkContextFile({ name: 'big.webp', type: 'image/webp', size: 5 * 1024 * 1024 + 1 })).toMatch(
+    expect(checkContextFile({ name: 'big.pdf', type: 'application/pdf', size: 21 * 1024 * 1024 }, cardsOn)).toMatch(
+      /20 MB/,
+    );
+    // With cards on an image is context too, up to its own size; SVG and animated images are not.
+    expect(checkContextFile({ name: 'chart.png', type: 'image/png', size: 5 * 1024 * 1024 }, cardsOn)).toBe('');
+    expect(checkContextFile({ name: 'photo.JPG', type: '', size: 1 }, cardsOn)).toBe('');
+    expect(checkContextFile({ name: 'big.webp', type: 'image/webp', size: 5 * 1024 * 1024 + 1 }, cardsOn)).toMatch(
       /5 MB, the most for an image/,
     );
-    expect(checkContextFile({ name: 'logo.svg', type: 'image/svg+xml' })).toMatch(/Add a PDF, a PNG/);
-    expect(CONTEXT_FILE_ACCEPT.split(',')).toEqual(
-      expect.arrayContaining(['.pdf', '.png', '.jpg', '.webp', 'image/jpeg']),
+    expect(checkContextFile({ name: 'logo.svg', type: 'image/svg+xml' }, cardsOn)).toMatch(/Add a PDF, a PNG/);
+    expect(contextFileAccept(cardsOn).split(',')).toEqual(
+      expect.arrayContaining(['.pdf', '.md', '.png', '.jpg', '.webp', 'image/jpeg', 'application/pdf']),
+    );
+    // With cards off, as a session starts, it takes no image and its pickers offer none.
+    const cardsOff = { images: false };
+    expect(checkContextFile({ name: 'chart.png', type: 'image/png', size: 1 }, cardsOff)).toBe(
+      'A session takes images only once Context cards are on in its settings.',
+    );
+    expect(checkContextFile({ name: 'notes.md', type: '', size: 1 }, cardsOff)).toBe('');
+    expect(checkContextFile({ name: 'logo.svg', type: 'image/svg+xml' }, cardsOff)).toBe(
+      'Add a PDF, or a Markdown, plain text, CSV or JSON file.',
+    );
+    expect(contextFileAccept(cardsOff).split(',').sort()).toEqual(
+      [
+        '.csv',
+        '.json',
+        '.markdown',
+        '.md',
+        '.pdf',
+        '.txt',
+        'application/json',
+        'application/pdf',
+        'text/csv',
+        'text/markdown',
+        'text/plain',
+      ].sort(),
     );
     await expect(
       uploadContextFile({ file: new File(['x'], 'clip.mp4', { type: 'video/mp4' }) }, options),
-    ).rejects.toThrow(/Add a PDF, a PNG/);
+    ).rejects.toThrow('Add a PDF, or a Markdown, plain text, CSV or JSON file.');
+    await expect(
+      uploadContextFile({ file: new File(['png'], 'chart.png', { type: 'image/png' }) }, options),
+    ).rejects.toThrow(/only once Context cards are on/);
     expect(upload).toHaveBeenCalledTimes(3);
+    // Where cards are on, the image goes up as itself.
+    const withCards = { ...options, sessionConfig: { ...options.sessionConfig, contextCardsEnabled: true } };
+    await uploadContextFile({ file: new File(['png'], 'chart.png', { type: 'image/png' }) }, withCards);
+    expect(upload).toHaveBeenCalledTimes(4);
+    expect(upload.mock.calls[3][2]).toMatchObject({ contentType: 'image/png' });
   });
 
   it('asks someone signed in to sign in only where the caller allows it, and otherwise uses a held token', async () => {
