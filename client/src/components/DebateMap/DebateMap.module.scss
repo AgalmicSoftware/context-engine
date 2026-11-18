@@ -3722,24 +3722,24 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
             }
           }
 
-          // Close stays as small as Windows 95's, with a thumb's 44px reach from its top right corner, inside the
-          // window. The bar keeps that reach clear of its other buttons, so it never takes their clicks.
+          // Close stays as small as Windows 95's, with a thumb's reach around it: 44px wide at the bar's right end
+          // and as tall as the bar, never below it, where a tap belongs to the window's first line. The reach is
+          // placed against the bar (sticky, so it holds positioned children), and the bar keeps it clear of its
+          // other buttons, so it never takes their clicks.
           .modalControls {
             padding-left: 22px;
           }
 
           .closeIcon {
-            position: relative;
-            top: auto;
-            right: auto;
+            position: static;
 
             &::after {
               content: '';
               position: absolute;
-              top: -4px;
-              right: -4px;
+              top: 0;
+              right: 0;
+              bottom: 0;
               width: 44px;
-              height: 44px;
             }
           }
 

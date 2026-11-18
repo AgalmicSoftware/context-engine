@@ -314,16 +314,30 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   await step('open topic', () => page.locator('[data-testid^="ce-political-compass-point-"]').first().waitFor({ timeout: 15000 }));
   const panel = page.locator('[class*="modalContent"]').last();
   await step('topic panel', () => assertReadable(panel));
-  // Its close button reaches 44px across and down, for a thumb, in every theme.
+  // Its close button reaches 44px across and down, for a thumb. In a title bar (Classic 95) it reaches the bar's
+  // whole height instead, and never below it, where a tap belongs to the window's first line.
   await step('topic close reach', async () => {
     const reach = await panel.getByTitle('Close').evaluate((button) => {
       const box = button.getBoundingClientRect();
       const [x, y] = [box.left + box.width / 2, box.top + box.height / 2];
-      const hits = (points) => points.filter(([px, py]) => button.contains(document.elementFromPoint(px, py))).length;
+      const hit = ([px, py]) => button.contains(document.elementFromPoint(px, py));
       const offsets = Array.from({ length: 121 }, (_, index) => index - 60);
-      return [hits(offsets.map((d) => [x + d, y])), hits(offsets.map((d) => [x, y + d]))];
+      const header = button.closest('[class*="modalHeader"]');
+      const bar = getComputedStyle(header).position === 'sticky' ? header.getBoundingClientRect() : null;
+      return {
+        across: offsets.filter((d) => hit([x + d, y])).length,
+        down: offsets.filter((d) => hit([x, y + d])).length,
+        barHeight: bar ? Math.floor(bar.height) : 0,
+        // Every pixel from the bar's foot to 60px under the button's middle.
+        underBar: bar ? offsets.filter((d) => y + d >= bar.bottom && hit([x, y + d])).length : 0,
+      };
     });
-    assert(Math.min(...reach) >= 44, `The topic window's close button reaches only ${reach.join(' by ')}px`);
+    const tall = reach.barHeight ? Math.min(44, reach.barHeight - 1) : 44;
+    assert(
+      reach.across >= 44 && reach.down >= tall,
+      `The topic window's close button reaches only ${reach.across} by ${reach.down}px`,
+    );
+    assert.equal(reach.underBar, 0, `The close button takes taps ${reach.underBar}px below its title bar`);
   });
 
   // The summary leads short; its positions open on request.
