@@ -1,6 +1,8 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 
+import * as pileHalfRowCut from './pileHalfRowCut';
+import { QuadraticScrollControlsSlot } from './QuadraticScrollControls';
 import {
   renderPileActiveQuestionCard,
   renderPileCardShell,
@@ -135,5 +137,69 @@ describe('surveyPileActiveQuestionCard', () => {
     expect(
       findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'question-component'),
     ).toBeNull();
+  });
+});
+
+describe('the answer area’s scroll chevrons', () => {
+  it('shows the quadratic card’s chevrons in the footer while choices are out of view', () => {
+    const cue = jest.spyOn(pileHalfRowCut, 'usePileHalfRowCut');
+    const renderCard = () =>
+      render(
+        renderPileCardShell({
+          promptHeader: 'Who should decide?',
+          questionComponent: <div>Choices</div>,
+          questionContainerClass: 'multichoiceQuestionContainer',
+          footerSection: (
+            <div data-testid="footer">
+              <QuadraticScrollControlsSlot />
+            </div>
+          ),
+          questionType: 'multichoice',
+        }),
+      );
+    try {
+      cue.mockReturnValue('start');
+      const { getByTestId, getByRole, queryByRole, unmount } = renderCard();
+      const more = getByRole('button', { name: 'Scroll to more options' });
+      // In the footer's slot, as on a quadratic card, and pointing at the list it scrolls.
+      expect(getByTestId('footer')).toContainElement(more);
+      expect(document.getElementById(more.getAttribute('aria-controls') || '')).toHaveTextContent('Choices');
+      expect(queryByRole('button', { name: 'Scroll to previous options' })).not.toBeInTheDocument();
+      unmount();
+
+      cue.mockReturnValue('end');
+      const atEnd = renderCard();
+      expect(atEnd.getByRole('button', { name: 'Scroll to previous options' })).toBeInTheDocument();
+      expect(atEnd.queryByRole('button', { name: 'Scroll to more options' })).not.toBeInTheDocument();
+      atEnd.unmount();
+
+      // A list that fits keeps the chevrons' place, empty, so the footer does not change as it comes and goes.
+      cue.mockReturnValue('none');
+      const fits = renderCard();
+      expect(fits.queryByRole('button', { name: /^Scroll to/ })).not.toBeInTheDocument();
+      expect(fits.getByTestId('footer').querySelector('.scrollControls')).toBeInTheDocument();
+      fits.unmount();
+
+      cue.mockReturnValue('off');
+      const off = renderCard();
+      expect(off.getByTestId('footer').querySelector('.scrollControls')).not.toBeInTheDocument();
+      off.unmount();
+
+      // Without the footer slot (the agent's question list), they never take a line of their own.
+      cue.mockReturnValue('start');
+      const noSlot = render(
+        renderPileCardShell({
+          promptHeader: 'Who should decide?',
+          questionComponent: <div>Choices</div>,
+          questionContainerClass: 'multichoiceQuestionContainer',
+          footerSection: <div data-testid="footer" />,
+          questionType: 'multichoice',
+        }),
+      );
+      expect(noSlot.queryByRole('button', { name: /^Scroll to/ })).not.toBeInTheDocument();
+      expect(noSlot.container.querySelector('.scrollControls')).not.toBeInTheDocument();
+    } finally {
+      cue.mockRestore();
+    }
   });
 });

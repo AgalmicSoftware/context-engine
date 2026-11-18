@@ -65,10 +65,10 @@ describe('usePileHalfRowCut', () => {
 
   const List = ({ overflowY }: { overflowY: string }) => {
     const ref = React.useRef<HTMLDivElement>(null);
-    usePileHalfRowCut(ref, '.row');
+    const cue = usePileHalfRowCut(ref, '.row');
     return React.createElement(
       'div',
-      null,
+      { 'data-testid': 'frame', 'data-cue': cue },
       React.createElement(
         'div',
         { ref, 'data-testid': 'area', style: { overflowY } },
@@ -117,17 +117,22 @@ describe('usePileHalfRowCut', () => {
     area.scrollTop = lastRowEnd - 120;
     fireEvent.scroll(area);
     expect(area.dataset.listCue).toBe('end');
+    // The card's chevrons follow the same cue.
+    expect(screen.getByTestId('frame').dataset.cue).toBe('end');
   });
 
   it('shows no cue when every option fits, whatever space is left below the last', async () => {
     const { area } = await renderList('auto', lastRowEnd + 4, lastRowEnd + 40);
     expect(area.style.maxHeight).toBe('');
     expect(area.dataset.listCue).toBe('none');
+    expect(screen.getByTestId('frame').dataset.cue).toBe('none');
   });
 
   it('leaves a list that does not scroll its own height', async () => {
     const { area } = await renderList('hidden', 120);
     expect(area.style.maxHeight).toBe('');
+    // It cannot scroll, so the card has no place for chevrons.
+    expect(screen.getByTestId('frame').dataset.cue).toBe('off');
   });
 
   it('clears its cut and cue when it goes', async () => {
