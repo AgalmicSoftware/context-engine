@@ -1385,6 +1385,25 @@ test('an agent’s add returns while a slow reading goes on, and says so when th
   assert.equal(byTitle(await kami.participant.listContext())[`${process.pid}-broken.pdf`].readByAi, false);
 });
 
+test('an agent out of AI uses for the day is told its file is in, unread, and not to add it again', async (t) => {
+  const env = await cardSessionEnv({ limits: { aiPerWalletPerDay: 1 } });
+  const kami = await createAgent(env, 'Test Kami', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  await kami.participant.joinSession({ link: LINK });
+  let readings = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    if (!isReadingRequest(init)) return aiReply(JSON.stringify({ summary: 'A deck.', tags: [], names: [] }));
+    readings += 1;
+    return aiReply('Deck: one step.');
+  });
+  const first = await kami.participant.addContext({ file: await agentFile(t, kami, 'one.pdf', '%PDF-1.7 one') });
+  assert.match(first.analysis, /^Read by the session’s AI .*counted as one of your AI uses today\.$/);
+  const second = await kami.participant.addContext({ file: await agentFile(t, kami, 'two.pdf', '%PDF-1.7 two') });
+  assert.equal(second.analysis, 'Added, but the session’s AI did not read it: you have reached a daily limit of this session, likely your AI uses for today. Don’t add it again. A session admin can have it read.');
+  assert.equal(readings, 1);
+  assert.equal(byTitle(await kami.participant.listContext())[`${process.pid}-two.pdf`].readByAi, false);
+});
+
 test('in a session with cards off, an agent’s list shows the sources without cards and says so', async (t) => {
   const env = await cardSessionEnv({ contextCardsEnabled: false });
   const kami = await createAgent(env, 'Test Kami', []);

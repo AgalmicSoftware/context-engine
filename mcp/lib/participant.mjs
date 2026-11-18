@@ -569,7 +569,11 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       new Promise((resolve) => { timer = setTimeout(() => resolve(null), contextReadWaitMs); }),
     ]);
     clearTimeout(timer);
-    if (!waited) return 'The session’s AI is still reading it, which can take a few minutes. list_context shows readByAi once it has.';
+    if (!waited) return 'The session’s AI is still reading it, which can take a few minutes. Where you can see the file, list_context shows readByAi once it has.';
+    // A daily limit, not a busy minute: the file is in, and adding it again would only add it twice.
+    if (waited.error instanceof WorkerRequestError && waited.error.status === 429) {
+      return 'Added, but the session’s AI did not read it: you have reached a daily limit of this session, likely your AI uses for today. Don’t add it again. A session admin can have it read.';
+    }
     if (waited.error) return `Added, but the session’s AI did not read it: ${describeError(waited.error)} A session admin can have it read.`;
     const chars = Number(waited.result?.text?.chars) || 0;
     // An admin's reading isn't counted against a daily limit; an adder's is.
