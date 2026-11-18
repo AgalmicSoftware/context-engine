@@ -27,6 +27,7 @@ const AI_TASKS = Object.freeze([
   { key: 'interview-map', label: 'Interview mapping' },
   { key: 'interview-opening', label: 'Interview opening' },
   { key: 'context-read', label: 'Reading context files' },
+  { key: 'context-card', label: 'Context cards' },
   { key: 'session-agent', label: 'Session Agent' },
 ]);
 const EFFORTS = ['low', 'medium', 'high'];

@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Input } from 'reactstrap';
 
+import { CONTEXT_CARD_COST_USD } from '@ce-shared/contextCards.mjs';
 import {
   CONTEXT_FILE_TYPES,
   CONTEXT_SOURCE_LIMITS,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
 import ContextAccessPicker, { contextGroupsLabel } from './ContextAccessPicker';
+import ContextCardChips from '../../OnePageSession/ContextCardChips';
+import ContextCardEditor, { CONTEXT_CARD_HELP } from '../../OnePageSession/ContextCardEditor';
 import {
   addContextLink,
   checkContextFile,
   contextAdderLabel,
+  contextSourceTakesCard,
+  contextSourcesWithoutCards,
+  makeContextCard,
   readContextPdf,
   removeContextSource,
   uploadContextFile,
@@ -23,7 +29,7 @@ import {
   useSessionContextSources,
   type SessionContextSourcesState,
 } from '../../../utilities/docLibrary/useSessionContextSources';
-import { SetupCheck, SetupField, setupHelpId } from './SetupPrimitives';
+import { SetupCheck, SetupField, SetupHelp, setupHelpId } from './SetupPrimitives';
 import styles from './SessionSetup.module.scss';
 
 export const CONTEXT_PRIVACY_HELP =
@@ -38,6 +44,16 @@ const LINK_HELP =
 const formatDate = (value: string): string => {
   const time = Date.parse(value);
   return Number.isFinite(time) ? new Date(time).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
+};
+
+/** What making `count` cards costs, as the estimate an admin sees before any is made. */
+export const describeCardCost = (count: number): string => {
+  const total = count * CONTEXT_CARD_COST_USD;
+  const sum = total < 0.01 ? 'under $0.01' : `about $${total.toFixed(2)}`;
+  return (
+    `${count === 1 ? '1 item has' : `${count} items have`} no card. ` +
+    `Each card is one short call to the session’s AI on the session’s key, about $${CONTEXT_CARD_COST_USD} on the default model: ${sum} in all.`
+  );
 };
 
 export const isContextPdf = (source: Pick<ContextSource, 'mime'>) => source.mime === CONTEXT_FILE_TYPES.pdf;
@@ -81,7 +97,7 @@ type Props = {
 // the session's AI and remove them. Changes apply at once, not on Save.
 const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = [], onSourcesChange, list }: Props) => {
   const own = useSessionContextSources({ sessionSlug, sessionConfig, account, enabled: !list });
-  const { sources, loading, error, supported, reload } = list || own;
+  const { sources, loading, error, supported, cardsSupported, reload } = list || own;
   const [workerReady, setWorkerReady] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -93,6 +109,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
   const groups = useContextGroups({ sessionSlug, sessionConfig, account });
   const [analyze, setAnalyze] = useState(true);
   const [fileKey, setFileKey] = useState(0);
+  const [editingCard, setEditingCard] = useState('');
   const options = { sessionSlug, sessionConfig, context: { account }, asAdmin: true };
 
   useEffect(() => {
@@ -138,6 +155,25 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
   const unreadLinks = pageLinks.filter(
     (link) => link.url && !sources.some((source) => source.kind === 'link' && source.url === link.url),
   );
+  const withoutCards = cardsSupported ? contextSourcesWithoutCards(sources) : [];
+  // The count and the cost come first; nothing is spent without a yes.
+  const makeMissingCards = () => {
+    if (!window.confirm(`${describeCardCost(withoutCards.length)} Make them now?`)) return;
+    void run('The session’s AI is writing cards…', async () => {
+      let made = 0;
+      let problem = '';
+      for (const source of withoutCards) {
+        try {
+          await makeContextCard(source.id, options);
+          made += 1;
+        } catch (failure) {
+          problem ||= failure instanceof Error ? failure.message : 'the session’s AI did not answer.';
+        }
+      }
+      const wrote = made === 1 ? 'Wrote 1 card.' : `Wrote ${made} cards.`;
+      return problem ? `${wrote} ${withoutCards.length - made} could not be written: ${problem}` : wrote;
+    });
+  };
   const fileProblem = file ? checkContextFile(file) : '';
   const fileIsPdf = !!file && resolveContextFileType(file) === CONTEXT_FILE_TYPES.pdf;
 
@@ -160,8 +196,29 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
                     adder: contextAdderLabel(source, sessionConfig, account),
                   })}
                 </span>
+                <ContextCardChips card={source.card} title={source.title || source.url || 'Untitled'} />
+                {editingCard === source.id ? (
+                  <ContextCardEditor
+                    source={source}
+                    options={options}
+                    onSaved={reload}
+                    onClose={() => setEditingCard('')}
+                  />
+                ) : null}
               </div>
               <div className={styles.buttonRow}>
+                {cardsSupported && contextSourceTakesCard(source) ? (
+                  <button
+                    type="button"
+                    className={styles.button}
+                    disabled={busy}
+                    aria-label={`Edit the card of ${source.title || source.url}`}
+                    aria-expanded={editingCard === source.id}
+                    onClick={() => setEditingCard((open) => (open === source.id ? '' : source.id))}
+                  >
+                    Edit card
+                  </button>
+                ) : null}
                 {source.kind === 'link' ? (
                   <button
                     type="button"
@@ -215,6 +272,21 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
         </ul>
       ) : !loading ? (
         <p className={styles.hint}>No files or links yet.</p>
+      ) : null}
+      {withoutCards.length ? (
+        <div className={styles.buttonRow}>
+          <button
+            type="button"
+            className={styles.button}
+            disabled={busy}
+            aria-describedby={setupHelpId('ce-context-make-cards')}
+            data-testid="ce-context-make-cards"
+            onClick={makeMissingCards}
+          >
+            Make missing cards ({withoutCards.length})
+          </button>
+          <SetupHelp id="ce-context-make-cards" label="cards" help={CONTEXT_CARD_HELP} />
+        </div>
       ) : null}
       {unreadLinks.length ? (
         <div className={styles.buttonRow}>

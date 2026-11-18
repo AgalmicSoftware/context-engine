@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import {
   workerAcceptsParticipantContext,
   workerAcceptsParticipantLinks,
+  workerSupportsContextCards,
   type ContextSource,
   type ContextSourceOptions,
 } from './contextSources';
@@ -34,6 +35,7 @@ jest.mock('../worker/workerGroupChangeEvents', () => ({
 jest.mock('./contextSources', () => ({
   workerAcceptsParticipantContext: jest.fn(async () => true),
   workerAcceptsParticipantLinks: jest.fn(async () => false),
+  workerSupportsContextCards: jest.fn(async () => true),
   listContextSources: jest.fn(
     (options: ContextSourceOptions) => new Promise((resolve) => mockRequests.push({ options, resolve })),
   ),
@@ -151,6 +153,7 @@ describe('useSessionContextSources', () => {
 
   it('skips the Worker check where adding isn’t on offer, as for the AI’s context', async () => {
     jest.mocked(workerAcceptsParticipantContext).mockClear();
+    jest.mocked(workerSupportsContextCards).mockClear();
     renderHook(() =>
       useSessionContextSources({ sessionSlug: 'salon', sessionConfig: config(), account: READER, offersAdding: false }),
     );
@@ -161,6 +164,37 @@ describe('useSessionContextSources', () => {
     );
     await resolveLatest([]);
     expect(workerAcceptsParticipantContext).not.toHaveBeenCalled();
+    expect(workerSupportsContextCards).not.toHaveBeenCalled();
+  });
+
+  it('offers card writing only to someone signed in, on a Worker that keeps cards', async () => {
+    jest.mocked(workerSupportsContextCards).mockClear();
+    const signedIn = mount(READER);
+    await resolveLatest([]);
+    await waitFor(() => expect(signedIn.result.current.cardsSupported).toBe(true));
+    const signedOut = mount('');
+    await resolveLatest([]);
+    expect(signedOut.result.current.cardsSupported).toBe(false);
+    expect(workerSupportsContextCards).toHaveBeenCalledTimes(1);
+    jest.mocked(workerSupportsContextCards).mockResolvedValueOnce(false);
+    const older = mount(ADMIN);
+    await resolveLatest([]);
+    await waitFor(() => expect(workerSupportsContextCards).toHaveBeenCalledTimes(2));
+    expect(older.result.current.cardsSupported).toBe(false);
+    // Where the Worker would refuse a participant's card, it isn't offered: context limited to admins,
+    // or a session that has ended. An admin still may.
+    const limited = { ...config(), contextAdditionPolicy: 'admin_only' } as ReturnType<typeof config>;
+    const ended = { ...config(), sessionEndsAt: '2020-01-01T00:00:00.000Z' } as ReturnType<typeof config>;
+    for (const sessionConfig of [limited, ended]) {
+      const before = jest.mocked(workerSupportsContextCards).mock.calls.length;
+      const reader = renderHook(() =>
+        useSessionContextSources({ sessionSlug: 'salon', sessionConfig, account: READER }),
+      );
+      const admin = renderHook(() => useSessionContextSources({ sessionSlug: 'salon', sessionConfig, account: ADMIN }));
+      await waitFor(() => expect(admin.result.current.cardsSupported).toBe(true));
+      await waitFor(() => expect(workerSupportsContextCards).toHaveBeenCalledTimes(before + 2));
+      expect(reader.result.current.cardsSupported).toBe(false);
+    }
   });
 
   it('lists again when a token or a new membership arrives, as they can open a group’s files', async () => {

@@ -13,6 +13,7 @@ import {
   contextTagValue,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
+import { normalizeContextCard, type ContextCard, type ContextCardContent } from '@ce-shared/contextCards.mjs';
 import type { SessionContextPromptSource } from '@ce-shared/sessionContextText.mjs';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy';
 import { fetchWorkerWithAuth, hasCachedWorkerSessionToken } from '../worker/workerAuth.js';
@@ -50,6 +51,10 @@ export type ContextSource = {
   fetchedAt: string;
   /** A PDF's text as the session's AI read it. */
   reading: { id: string; model: string; at: string } | null;
+  /** What it is about, as the session's AI or a person wrote it; absent when it has no card. */
+  card?: ContextCard;
+  /** True when the Worker stores it encrypted: such an item takes no card. */
+  encrypted?: boolean;
 };
 
 export type ContextSourceOptions = {
@@ -95,6 +100,10 @@ export const workerSupportsContextSources = (options: ContextSourceOptions): Pro
 export const workerAcceptsParticipantContext = (options: ContextSourceOptions): Promise<boolean> =>
   workerHasFeature(options, 'participant_context_v1');
 
+/** True when this session's Worker keeps a card for each context source. */
+export const workerSupportsContextCards = (options: ContextSourceOptions): Promise<boolean> =>
+  workerHasFeature(options, 'context_cards_v1');
+
 /** True when this session's Worker lets participants add links too (Session Workers from 0.9.2). */
 export const workerAcceptsParticipantLinks = (options: ContextSourceOptions): Promise<boolean> =>
   workerHasFeature(options, 'participant_context_links_v1');
@@ -109,6 +118,8 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
   const role = contextRoleOf(tags);
   if (!role) return null;
   const addedByAgent = contextTagValue(tags, CONTEXT_TAGS.adderKind) === CONTEXT_AGENT_ADDER;
+  // Cut to the card's limits again here: a list is only as careful as its Worker.
+  const card = role === CONTEXT_ROLE ? normalizeContextCard(metadata.card) : null;
   return {
     id,
     role,
@@ -133,6 +144,8 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
       role === CONTEXT_TEXT_ROLE
         ? { id, model: contextTagValue(tags, CONTEXT_TAGS.readModel), at: contextTagValue(tags, CONTEXT_TAGS.readAt) }
         : null,
+    ...(card ? { card } : {}),
+    ...(metadata.encrypted === true ? { encrypted: true } : {}),
   };
 };
 
@@ -300,6 +313,30 @@ export const addContextLink = async (
 /** Asks the session's AI to read a PDF source; its text replaces any earlier reading. */
 export const readContextPdf = async (id: string, options: ContextSourceOptions): Promise<UnknownRecord> =>
   asRecord((await postContextAction({ action: 'read-pdf', id }, options)).text);
+
+/** Writes a source's card as a person, or with null takes it off. Admins write any; others their own source's. */
+export const setContextCard = async (
+  id: string,
+  card: ContextCardContent | null,
+  options: ContextSourceOptions,
+): Promise<void> => {
+  await postContextAction({ action: 'set-card', id, card }, options);
+};
+
+/** Asks the session's AI to write a source's card. Admins only: it is a call on the session's key. */
+export const makeContextCard = async (id: string, options: ContextSourceOptions): Promise<void> => {
+  await postContextAction({ action: 'make-card', id }, options);
+};
+
+/** True when a source may carry a card: not one the Worker stores encrypted. */
+export const contextSourceTakesCard = (source: Pick<ContextSource, 'encrypted'>): boolean => source.encrypted !== true;
+
+/** The sources the session's AI could write a card for: without one, able to carry one, and with text to describe. */
+export const contextSourcesWithoutCards = (sources: ContextSource[]): ContextSource[] =>
+  sources.filter(
+    (source) =>
+      !source.card && contextSourceTakesCard(source) && (source.mime !== CONTEXT_FILE_TYPES.pdf || !!source.reading),
+  );
 
 /** Removes a source and the AI's reading of it (named too, as a list can lag a recent reading). */
 export const removeContextSource = async (

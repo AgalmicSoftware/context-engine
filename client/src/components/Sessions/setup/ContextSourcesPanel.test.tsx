@@ -69,6 +69,7 @@ const list = (overrides: Partial<SessionContextSourcesState> = {}): SessionConte
   signInToAdd: false,
   participantsCanAddLinks: false,
   groupFilesHidden: false,
+  cardsSupported: false,
   reload: jest.fn(),
   ...overrides,
 });

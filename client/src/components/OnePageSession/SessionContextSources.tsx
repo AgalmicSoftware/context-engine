@@ -18,6 +18,8 @@ import {
 
 import { contextGroupsLabel } from '../Sessions/setup/ContextAccessPicker';
 import ContextSourcesPanel from '../Sessions/setup/ContextSourcesPanel';
+import ContextCardChips from './ContextCardChips';
+import ContextCardEditor from './ContextCardEditor';
 import SessionContextAddFile from './SessionContextAddFile';
 import SessionContextAddLink from './SessionContextAddLink';
 import SessionContextAddNote from './SessionContextAddNote';
@@ -27,6 +29,7 @@ import {
   contextDuplicateIds,
   contextSourceDisplayTitle,
   contextSourceKindLabel,
+  contextSourceTakesCard,
   formatContextSize,
   removeContextSource,
   type ContextSource,
@@ -79,6 +82,7 @@ const KIND_ICONS: Record<string, IconDefinition> = {
 // A file's caret shows its start in place; its name opens it in a dialog.
 // Add opens the form, an admin's controls, or for someone signed out the
 // login; View shows a signed-out member their groups' files.
+// Each source's card shows as its topic tags; whoever added a source may write its card.
 const SessionContextSources = ({
   sessionSlug,
   sessionConfig,
@@ -101,6 +105,7 @@ const SessionContextSources = ({
   const [adding, setAdding] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [viewing, setViewing] = useState<ContextSource | null>(null);
+  const [editingCard, setEditingCard] = useState('');
   const idBase = useId().replace(/:/g, '');
   const myGroupsHelpId = `ce-context-my-groups-help-${idBase}`;
   const addPanelId = `ce-context-add-${idBase}`;
@@ -222,6 +227,7 @@ const SessionContextSources = ({
               const adder = contextAdderLabel(source, sessionConfig, account);
               const isOpen = expanded.has(source.id);
               const previewId = `ce-context-preview-${idBase}-${source.id}`;
+              const isMine = !isAdmin && !!account && source.addedBy === account.toLowerCase();
               return (
                 <li key={source.id} className={css.item} data-testid="ce-session-context-item">
                   <div className={css.itemHead}>
@@ -264,7 +270,18 @@ const SessionContextSources = ({
                         {contextGroupsLabel(source.lockedGroupIds, groups)}
                       </span>
                     ) : null}
-                    {!isAdmin && account && source.addedBy === account.toLowerCase() ? (
+                    {isMine && list.cardsSupported && contextSourceTakesCard(source) ? (
+                      <button
+                        type="button"
+                        className={styles.sessionContextRemove}
+                        aria-label={`Edit the card of ${title}`}
+                        aria-expanded={editingCard === source.id}
+                        onClick={() => setEditingCard((open) => (open === source.id ? '' : source.id))}
+                      >
+                        Edit card
+                      </button>
+                    ) : null}
+                    {isMine ? (
                       <button
                         type="button"
                         className={styles.sessionContextRemove}
@@ -283,6 +300,21 @@ const SessionContextSources = ({
                       </button>
                     ) : null}
                   </div>
+                  {source.card ? (
+                    <div className={css.itemCard}>
+                      <ContextCardChips card={source.card} title={title} />
+                    </div>
+                  ) : null}
+                  {editingCard === source.id ? (
+                    <div className={`${setupStyles.page} ${css.preview}`}>
+                      <ContextCardEditor
+                        source={source}
+                        options={{ sessionSlug, sessionConfig, context: { account } }}
+                        onSaved={list.reload}
+                        onClose={() => setEditingCard('')}
+                      />
+                    </div>
+                  ) : null}
                   {isOpen ? (
                     <div id={previewId} className={css.preview}>
                       <Suspense fallback={<p className={css.previewStatus}>Loading…</p>}>

@@ -1,0 +1,44 @@
+// A context source's card: its topic tags as chips, and its summary behind
+// the "?". Colours are the surrounding text's, so the chips read on the
+// session chrome and on the setup page alike.
+
+.card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.chip {
+  max-width: 100%;
+  padding: 0 0.45rem;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: var(--ce-radius-pill, 999px);
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+
+.about {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  min-height: 1.4rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  background: transparent;
+  color: inherit;
+  cursor: help;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
+  }
+}
