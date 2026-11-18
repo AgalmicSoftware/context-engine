@@ -1397,8 +1397,8 @@ test('in a session with cards off, an agent’s list shows the sources without c
   assert.deepEqual(listed.sources.map((source) => [source.title, source.card]), [['Evenings.md', undefined]]);
   assert.match(listed.note, /context cards off, so its sources carry no summaries or tags/);
   assert.deepEqual((await kami.participant.listContext({ query: 'evenings' })).matched, 1);
-  // Nor is a PDF sent to be read: only an admin can have that done here.
-  const deck = await kami.participant.addContext({ file: await agentFile(t, kami, 'deck.pdf', '%PDF-1.7 deck') });
+  // Nor is a PDF sent to be read, even when the agent asks: only an admin can have that done here.
+  const deck = await kami.participant.addContext({ file: await agentFile(t, kami, 'deck.pdf', '%PDF-1.7 deck'), analyze: true });
   assert.match(deck.analysis, /^Not read by the session’s AI/);
   // And it takes no image, which is refused before anything is sent.
   await assert.rejects(
