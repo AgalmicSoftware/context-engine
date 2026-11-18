@@ -82,8 +82,23 @@ const assertReportCountsEveryAnswer = async (page, label) => {
     assert.equal(report.get(number), expectedLine(number), `${label}: statement ${number}`);
   }
 };
+// The page is still laying out when it first shows, and a tap aimed at the Results heading then can land beside
+// it and open nothing. Tap until the heading says Results are open (its caret turns up), a few times at most; a
+// heading that never opens them still fails here.
+const openResults = async (page) => {
+  const toggle = page.getByTestId('ce-session-results-toggle');
+  const open = toggle.locator('svg[data-icon="caret-up"]');
+  let taps = 0;
+  while (taps < 4 && !(await open.count())) {
+    await toggle.click();
+    taps += 1;
+    await open.waitFor({ timeout: 2000 }).catch(() => {});
+  }
+  await open.waitFor({ timeout: 2000 }).catch(() => assert.fail('The Results heading never opened Results'));
+  if (taps > 1) console.log(`  note: the Results heading opened on tap ${taps}; the page was still laying out.`);
+};
 const openReport = async (page) => {
-  await page.getByTestId('ce-session-results-toggle').click();
+  await openResults(page);
   await page.getByRole('button', { name: 'Report', exact: true }).click();
 };
 const runSalon = async (engineName) => {
@@ -171,7 +186,7 @@ const runSalon = async (engineName) => {
     const third = await openPersonContext(browser, session, { viewport: PHONES.iphone, contextOptions: { hasTouch: true } });
     page = await third.context.newPage();
     await page.goto(session.sessionUrl, { waitUntil: 'domcontentloaded' });
-    await page.getByTestId('ce-session-results-toggle').click();
+    await openResults(page);
     await page.getByText(/Log in to see/).first().waitFor();
     assert.equal(await page.getByText(tallyLine).count(), 0, 'A visitor sees no tallies');
     // Requests still under way have no status yet; judge the ones that were answered.
