@@ -6,7 +6,11 @@ import {
   type AnalysisCard,
   type AnalysisCardPlace,
 } from 'utilities/analysisCard/analysisCardModel';
-import { publishSavedAnalysisCard, readSavedAnalysisCard } from 'utilities/analysisCard/analysisCardSaved';
+import {
+  publishSavedAnalysisCard,
+  readSavedAnalysisCard,
+  type SavedAnalysisCardState,
+} from 'utilities/analysisCard/analysisCardSaved';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -102,25 +106,46 @@ export const buildAnalysisCardPlace = ({
   return { own, link, account };
 };
 
+// A saved card belongs to the session the page is about. A page with no session of its own, or an AI that would
+// answer from another one (a fallback), reads and saves no card, so every visitor sees the same one.
+const isPageSession = (page: UserPage, aiOptions: ProfileRecord): boolean => {
+  const pageSession = String(page.props.activeSessionSlug || page.props.sessionSlug || '').trim();
+  return !!pageSession && String(aiOptions.sessionSlug || '').trim() === pageSession;
+};
+
 // The options a saved card is read with: the session the Analyze window would use, with the viewer's sign-in.
 export async function resolveSavedAnalysisCardOptions(this: UserPage): Promise<ProfileRecord | null> {
   const session = await this.resolveAnalysisSessionContext();
-  return session?.sessionConfig
-    ? buildUserPageAnalysisAiOptions({ analysisSession: session, context: analysisAiContextOf(this) })
-    : null;
+  if (!session?.sessionConfig) return null;
+  const options = buildUserPageAnalysisAiOptions({ analysisSession: session, context: analysisAiContextOf(this) });
+  return isPageSession(this, options) ? options : null;
 }
 
-// What the "Show this card on my page" box needs to save or withdraw my card, set when the card is shown.
-type CardPublishContext = { account: string; aiOptions: ProfileRecord; isCurrent: () => boolean };
+// What the "Show this card on my page" box needs to save or withdraw my card, set when the card is shown. `stored`
+// is what the Worker holds now, so a change that fails puts the box back to the truth.
+type CardPublishContext = {
+  account: string;
+  aiOptions: ProfileRecord;
+  isCurrent: () => boolean;
+  stored: SavedAnalysisCardState['status'];
+};
 const publishContexts = new WeakMap<UserPage, CardPublishContext>();
 
 const publishCard = async (
   page: UserPage,
-  { account, aiOptions, isCurrent }: CardPublishContext,
+  context: CardPublishContext,
   published: boolean,
   card: unknown,
 ): Promise<void> => {
-  const before = page.state.analysisCardPublish?.shown !== false;
+  const { account, aiOptions, isCurrent } = context;
+  // Only ever my card, while I am still the one signed in and still looking at it.
+  const mine = (): boolean => isCurrent() && analysisAiContextOf(page).account.trim().toLowerCase() === account;
+  if (!mine()) {
+    // Someone else is signed in now: the box was for the account that was, so it goes.
+    if (publishContexts.get(page) === context) publishContexts.delete(page);
+    page.setState(() => (isCurrent() ? { analysisCardPublish: null } : null));
+    return;
+  }
   const update = (patch: ProfileRecord): void =>
     page.setState((previous: ProfileRecord) =>
       isCurrent() && previous.analysisCardPublish
@@ -129,17 +154,17 @@ const publishCard = async (
     );
   update({ shown: published, saving: true, note: '' });
   try {
-    await publishSavedAnalysisCard(account, published, card, aiOptions);
-    update({ saving: false });
+    const state = await publishSavedAnalysisCard(account, published, card, aiOptions);
+    context.stored = state.status;
+    update({ shown: state.status === 'ready', saving: false });
   } catch (error: unknown) {
-    accountLog.warn('[UserPage] saved analysis card not changed:', getUserPageErrorMessage(error, ''));
-    update({
-      shown: before,
-      saving: false,
-      note: published
-        ? 'The card could not be saved to your page. Try again.'
-        : 'The card could not be taken off your page. Try again.',
-    });
+    const message = getUserPageErrorMessage(error, '');
+    accountLog.warn('[UserPage] saved analysis card not changed:', message);
+    let note = published
+      ? 'The card could not be saved to your page. Try again.'
+      : 'The card could not be taken off your page. Try again.';
+    if (message === 'invalid_card') note = 'This card cannot be saved to your page.';
+    update({ shown: context.stored === 'ready', saving: false, note });
   }
 };
 
@@ -299,7 +324,8 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
         return null;
       }
     };
-    void readSavedAnalysisCard(addressLower, aiOptions).then(async (saved) => {
+    const savedRead = isPageSession(this, aiOptions) ? readSavedAnalysisCard(addressLower, aiOptions) : null;
+    void Promise.resolve(savedRead).then(async (saved) => {
       if (!isCurrent()) return;
       if (!ownProfile && saved?.status === 'ready') {
         const card = normalizeAnalysisCard({ ...saved.card, ...place });
@@ -323,8 +349,10 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
       showPicture(figure);
       // The box is ticked unless I withdrew my card. When the saved card could not be read the box is left out
       // and nothing is saved, so a "no" given on another device is never overridden.
-      const publish = ownProfile && saved ? { account: addressLower, aiOptions, isCurrent } : null;
+      const publish: CardPublishContext | null =
+        ownProfile && saved ? { account: addressLower, aiOptions, isCurrent, stored: saved.status } : null;
       if (publish) publishContexts.set(this, publish);
+      else publishContexts.delete(this);
       const shown = saved?.status !== 'withdrawn';
       this.setState(() =>
         isCurrent() ? { analysisCardPublish: publish ? { shown, saving: false, note: '' } : null } : null,
@@ -332,22 +360,28 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
       const card = kept ? normalizeAnalysisCard({ ...kept, ...place }) : await writeCard();
       this.setState(() => (isCurrent() ? { analysisCard: card, analysisCardPending: false } : null));
       if (!card) return;
+      // Kept with the analysis, so reopening it does not write the card again. Started now and awaited after the
+      // save: the save starts in the same moment the card appears (so the box is never ticked and idle meanwhile),
+      // and a slow save never holds up the cache.
+      const caching = kept
+        ? null
+        : (async () => {
+            try {
+              await this._writeAnalysisCacheEntry({
+                sessionSlug: cardCache.sessionSlug,
+                networkId,
+                addressLower,
+                fingerprint: cardCache.fingerprint,
+                aiContext: cardCache.aiContext,
+                result: { ...result, card },
+              });
+            } catch (cacheError: unknown) {
+              accountLog.warn('[UserPage] analysis card cache write failed:', getUserPageErrorMessage(cacheError, ''));
+            }
+          })();
       // A new card replaces the saved one; a card kept with the analysis is saved only where none is.
       if (publish && shown && (!kept || saved?.status === 'none')) await publishCard(this, publish, true, card);
-      if (kept) return;
-      // Kept with the analysis, so reopening it does not write the card again.
-      try {
-        await this._writeAnalysisCacheEntry({
-          sessionSlug: cardCache.sessionSlug,
-          networkId,
-          addressLower,
-          fingerprint: cardCache.fingerprint,
-          aiContext: cardCache.aiContext,
-          result: { ...result, card },
-        });
-      } catch (cacheError: unknown) {
-        accountLog.warn('[UserPage] analysis card cache write failed:', getUserPageErrorMessage(cacheError, ''));
-      }
+      await caching;
     });
   };
   const hydrateAnalysisCacheIfPresent = (cacheContextToRead: CacheContext, session: unknown): boolean => {

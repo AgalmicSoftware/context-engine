@@ -180,7 +180,11 @@ describe('UserPage analysis cache and routing', () => {
     // Unless a test says otherwise, the person's saved card cannot be read (an older Worker): the card is made
     // for the viewer as before, and nothing is saved.
     readSavedAnalysisCard.mockReset().mockResolvedValue(null);
-    publishSavedAnalysisCard.mockReset().mockResolvedValue({ status: 'none' });
+    publishSavedAnalysisCard
+      .mockReset()
+      .mockImplementation(async (_account, published, card) =>
+        published ? { status: 'ready', card, savedAt: 1763460000000 } : { status: 'withdrawn' },
+      );
     checkSponsoredAccess.mockResolvedValue({
       status: 'unknown',
       gate: null,
@@ -566,14 +570,125 @@ describe('UserPage analysis cache and routing', () => {
     expect(card).toMatchObject({ own: true, title: 'Trusts plain tools over grand plans' });
     await waitFor(() => expect(instance.state.analysisCardPublish).toEqual({ shown: true, saving: false, note: '' }));
 
-    // Unticked: withdrawn. A failure puts the box back and says so.
+    // A failure puts the box back to what is saved, and says so.
+    publishSavedAnalysisCard.mockRejectedValueOnce(new Error('card_store_unavailable'));
+    instance.setAnalysisCardShown(false);
+    await waitFor(() => expect(instance.state.analysisCardPublish.note).toMatch(/could not be taken off/));
+    expect(instance.state.analysisCardPublish).toMatchObject({ shown: true, saving: false });
+    // Unticked: withdrawn.
     instance.setAnalysisCardShown(false);
     await waitFor(() => expect(instance.state.analysisCardPublish).toEqual({ shown: false, saving: false, note: '' }));
-    expect(publishSavedAnalysisCard.mock.calls[1].slice(0, 2)).toEqual([own, false]);
+    expect(publishSavedAnalysisCard.mock.calls[2].slice(0, 2)).toEqual([own, false]);
     publishSavedAnalysisCard.mockRejectedValueOnce(new Error('card_store_unavailable'));
     instance.setAnalysisCardShown(true);
     await waitFor(() => expect(instance.state.analysisCardPublish.note).toMatch(/could not be saved/));
     expect(instance.state.analysisCardPublish).toMatchObject({ shown: false, saving: false });
+    // A card the Worker would refuse says so, without asking to try again.
+    publishSavedAnalysisCard.mockRejectedValueOnce(new Error('invalid_card'));
+    instance.setAnalysisCardShown(true);
+    await waitFor(() =>
+      expect(instance.state.analysisCardPublish.note).toBe('This card cannot be saved to your page.'),
+    );
+    expect(instance.state.analysisCardPublish.shown).toBe(false);
+  });
+
+  it('on my own page starts the save as the card appears, and keeps the card while the save is slow', async () => {
+    const own = '0x00000000000000000000000000000000000000ee';
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+    matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'none' });
+    analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+    publishSavedAnalysisCard.mockReturnValueOnce(new Promise(() => {}));
+    // The cache write that keeps the card is held until the test lets it go.
+    const write = instance._writeAnalysisCacheEntry;
+    let release;
+    let atCard;
+    jest.spyOn(instance, '_writeAnalysisCacheEntry').mockImplementation(async (entry) => {
+      if (entry.result?.card) {
+        // What the box shows once the run that put the card up has finished.
+        queueMicrotask(() => (atCard = instance.state.analysisCardPublish));
+        await new Promise((resolve) => (release = resolve));
+      }
+      return write(entry);
+    });
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans'));
+
+    // The box is busy from the moment the card shows, so an untick cannot race the save.
+    await waitFor(() => expect(release).toBeDefined());
+    expect(publishSavedAnalysisCard).toHaveBeenCalledTimes(1);
+    expect(atCard).toMatchObject({ shown: true, saving: true });
+    // A save that never answers does not hold up the cache.
+    release();
+    await waitFor(() =>
+      expect(getSingleAnalysisCacheEntry({ slug, networkID, addressLower }).entry.result.card?.title).toBe(
+        'Trusts plain tools over grand plans',
+      ),
+    );
+  });
+
+  it('on my own page saves nothing once someone else is signed in', async () => {
+    const own = '0x00000000000000000000000000000000000000bb';
+    const { instance } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+    matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'none' });
+    let finishCard;
+    analyzeUserCard.mockReturnValueOnce(new Promise((resolve) => (finishCard = resolve)));
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(analyzeUserCard).toHaveBeenCalledTimes(1));
+    // The account changes while the card is being written.
+    instance.props = { ...instance.props, account: '0x00000000000000000000000000000000000000cc' };
+    finishCard({ title: 'Trusts plain tools over grand plans' });
+    await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+    // The box was for the account that was: it goes, and changing it saves nothing.
+    await waitFor(() => expect(instance.state.analysisCardPublish).toBeNull());
+    instance.setAnalysisCardShown(false);
+    instance.setAnalysisCardShown(true);
+    expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
+  });
+
+  it("reads and saves no card in a session other than the page's own", async () => {
+    const own = '0x00000000000000000000000000000000000000bb';
+    const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: 'active-slug' });
+    matchedAnalysis();
+    analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+    jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['active-slug', 'open-slug']);
+    jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((slug) => ({ slug }));
+    checkSponsoredAccess.mockImplementation(async ({ sessionSlug }) =>
+      sessionSlug === 'open-slug'
+        ? { status: 'no-gate', gate: null, resourceKey: 'ai' }
+        : { status: 'denied', gate: { type: 'sbt' }, resourceKey: 'ai' },
+    );
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans'));
+
+    expect(analyzeUserCard.mock.calls[0][2].sessionSlug).toBe('open-slug');
+    expect(readSavedAnalysisCard).not.toHaveBeenCalled();
+    expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
+    expect(instance.state.analysisCardPublish).toBeNull();
+    await expect(instance.resolveSavedAnalysisCardOptions()).resolves.toBeNull();
+  });
+
+  it('reads and saves no card on a page with no session of its own', async () => {
+    // Not the account above, whose analysis in this session is cached by now.
+    const own = '0x00000000000000000000000000000000000000dd';
+    const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: '' });
+    matchedAnalysis();
+    analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+    jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['open-slug']);
+    jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((slug) => ({ slug }));
+    checkSponsoredAccess.mockResolvedValue({ status: 'no-gate', gate: null, resourceKey: 'ai' });
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans'));
+
+    expect(analyzeUserCard.mock.calls[0][2].sessionSlug).toBe('open-slug');
+    expect(readSavedAnalysisCard).not.toHaveBeenCalled();
+    expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
+    await expect(instance.resolveSavedAnalysisCardOptions()).resolves.toBeNull();
   });
 
   it('on my own page never saves over a "no", nor when the saved card cannot be read', async () => {

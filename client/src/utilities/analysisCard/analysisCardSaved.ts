@@ -1,7 +1,7 @@
 // The analysis card saved on a person's page, as the Session Worker keeps it: one per person per session, saved by
 // that person's own Analyze and shown to every signed-in visitor without pressing anything. Each person's card is
-// asked for once per visit and shared by the page's section and its Analyze window; a save or withdrawal updates
-// both at once.
+// asked for once per visit and sign-in, and shared by the page's section and its Analyze window; a save or
+// withdrawal updates both at once.
 import { normalizeSavedAnalysisCard, type SavedAnalysisCard } from '@ce-shared/analysisCardSaved.mjs';
 
 import { resolveAiSessionOptions } from '../ai/aiClientRequestOptions';
@@ -16,10 +16,34 @@ export type SavedAnalysisCardState =
 const known = new Map<string, Promise<SavedAnalysisCardState | null>>();
 const listeners = new Set<() => void>();
 
-const keyOf = (opts: unknown, account: unknown): string =>
-  `${resolveAiSessionOptions(opts).sessionSlug}\n${String(account || '')
+// A read, and a save or withdrawal, give up after this long (finding the Worker and a silent sign-in included), so
+// the page never waits on a Worker that does not answer.
+export const SAVED_CARD_READ_TIMEOUT_MS = 8_000;
+export const SAVED_CARD_SAVE_TIMEOUT_MS = 15_000;
+
+// Runs the whole request under one clock: past it the request is cancelled and the caller gets an error.
+const bounded = <T>(work: (signal: AbortSignal) => Promise<T>, ms: number): Promise<T> => {
+  const timeout = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      timeout.abort();
+      reject(new Error('saved_card_timeout'));
+    }, ms);
+  });
+  return Promise.race([work(timeout.signal), expired]).finally(() => clearTimeout(timer));
+};
+
+const lower = (value: unknown): string =>
+  String(value || '')
     .trim()
-    .toLowerCase()}`;
+    .toLowerCase();
+
+// What one sign-in was allowed to read is never shown after another one, or after signing out.
+const keyOf = (opts: unknown, account: unknown): string => {
+  const { context, sessionSlug } = resolveAiSessionOptions(opts);
+  return [sessionSlug, lower(context?.account), lower(account)].join('\n');
+};
 
 const stateOf = (value: unknown): SavedAnalysisCardState | null => {
   const data = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
@@ -30,16 +54,29 @@ const stateOf = (value: unknown): SavedAnalysisCardState | null => {
   return card && Number.isFinite(savedAt) ? { status: 'ready', card, savedAt } : null;
 };
 
-const askWorker = async (path: string, body: unknown, opts: unknown): Promise<SavedAnalysisCardState> => {
+const askWorker = async (
+  path: string,
+  body: unknown,
+  opts: unknown,
+  { requireAccount = '', signal }: { requireAccount?: string; signal?: AbortSignal } = {},
+): Promise<SavedAnalysisCardState> => {
   const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
   const allowDemoFallback = defaultStrictAllowDemoFallback();
   const corsWorkerUrl = await getCorsProxyUrlOrThrow({ sessionSlug, sessionConfig, context, allowDemoFallback });
   const { baseUrl } = resolveAiWorkerEndpoint(corsWorkerUrl);
   const response = await fetchWorkerWithAuth(
     `${baseUrl}${path}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal },
     // Asked for by the page, not the person: a lapsed sign-in shows no saved card, it never raises a sign-in prompt.
-    { sessionSlug, sessionConfig, context, workerUrl: baseUrl, allowDemoFallback, prompt: false },
+    {
+      sessionSlug,
+      sessionConfig,
+      context,
+      workerUrl: baseUrl,
+      allowDemoFallback,
+      prompt: false,
+      ...(requireAccount ? { requireAccount } : {}),
+    },
   );
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
@@ -52,13 +89,16 @@ const askWorker = async (path: string, body: unknown, opts: unknown): Promise<Sa
 
 /**
  * A person's saved card in the session the options name, or null when it cannot be read (signed out, an older
- * Worker, a network failure). A read that fails is asked again the next time.
+ * Worker, a network failure, no answer in time). A read that fails is asked again the next time.
  */
 export const readSavedAnalysisCard = (account: string, opts: unknown): Promise<SavedAnalysisCardState | null> => {
   const key = keyOf(opts, account);
   const kept = known.get(key);
   if (kept) return kept;
-  const read = askWorker('/analysis-card/published', { account }, opts).catch(() => null);
+  const read = bounded(
+    (signal) => askWorker('/analysis-card/published', { account }, opts, { signal }),
+    SAVED_CARD_READ_TIMEOUT_MS,
+  ).catch(() => null);
   known.set(key, read);
   void read.then((state) => {
     if (!state && known.get(key) === read) known.delete(key);
@@ -68,8 +108,9 @@ export const readSavedAnalysisCard = (account: string, opts: unknown): Promise<S
 
 /**
  * Save the signed-in person's own card on their page (published: true, with the card), or withdraw it. The Worker
- * files it under the signed-in address whatever account is named here; the account only keeps this visit's copy
- * in step. Throws when the Worker refuses or cannot be reached.
+ * files it under the signed-in address, so the request is refused unless that is still the account named here.
+ * Throws when the Worker refuses, cannot be reached or does not answer in time; a save that timed out may still
+ * have been made, and doing it again is harmless.
  */
 export const publishSavedAnalysisCard = async (
   account: string,
@@ -79,7 +120,11 @@ export const publishSavedAnalysisCard = async (
 ): Promise<SavedAnalysisCardState> => {
   const saved = published ? normalizeSavedAnalysisCard(card) : null;
   if (published && !saved) throw new Error('invalid_card');
-  const state = await askWorker('/analysis-card/publish', saved ? { published, card: saved } : { published }, opts);
+  const body = saved ? { published, card: saved } : { published };
+  const state = await bounded(
+    (signal) => askWorker('/analysis-card/publish', body, opts, { requireAccount: account, signal }),
+    SAVED_CARD_SAVE_TIMEOUT_MS,
+  );
   known.set(keyOf(opts, account), Promise.resolve(state));
   listeners.forEach((listener) => listener());
   return state;

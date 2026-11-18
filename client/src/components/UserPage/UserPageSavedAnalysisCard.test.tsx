@@ -35,6 +35,8 @@ const CARD: SavedAnalysisCard = {
   answers: { yesNo: null, ownWords: null, vote: null },
 };
 const OPTIONS = { sessionSlug: 'salon' };
+// One loader for every render, as the page gives: only the props a test changes can make the card load again.
+const LOAD = async () => OPTIONS;
 let changed: () => void = () => {};
 
 const show = (props: Partial<React.ComponentProps<typeof UserPageSavedAnalysisCard>> = {}) =>
@@ -44,7 +46,7 @@ const show = (props: Partial<React.ComponentProps<typeof UserPageSavedAnalysisCa
       account={VISITOR}
       pageSlug="salon"
       profileKey="one"
-      loadOptions={async () => OPTIONS}
+      loadOptions={LOAD}
       {...props}
     />,
   );
@@ -100,4 +102,38 @@ it('takes the card away at once when it is withdrawn on this page', async () => 
   mockedRead.mockResolvedValue({ status: 'withdrawn' });
   await act(async () => changed());
   await waitFor(() => expect(container.innerHTML).toBe(''));
+});
+
+it('shows nothing of the last person or sign-in while the next one loads', async () => {
+  mockedRead.mockResolvedValue({ status: 'ready', card: CARD, savedAt: 9 });
+  const view = show();
+  await screen.findByTestId('analysis-card');
+
+  mockedRead.mockReturnValue(new Promise(() => {}));
+  view.rerender(
+    <UserPageSavedAnalysisCard
+      viewAddress={PERSON}
+      account="0x00000000000000000000000000000000000000cc"
+      pageSlug="salon"
+      profileKey="one"
+      loadOptions={LOAD}
+    />,
+  );
+  expect(view.container.innerHTML).toBe('');
+  await waitFor(() => expect(mockedRead).toHaveBeenCalledTimes(2));
+});
+
+it("keeps the picture of the card on screen, not an earlier figure's that comes back late", async () => {
+  let finishFirst: (value: { dataUrl: string; accentHex: string }) => void = () => {};
+  mockedPicture.mockReturnValueOnce(new Promise((resolve) => (finishFirst = resolve)));
+  mockedRead.mockResolvedValue({ status: 'ready', card: CARD, savedAt: 9 });
+  show({ account: PERSON });
+  await waitFor(() => expect(mockedPicture).toHaveBeenCalledTimes(1));
+
+  mockedPicture.mockReturnValueOnce(new Promise(() => {}));
+  mockedRead.mockResolvedValue({ status: 'ready', card: { ...CARD, figure: 'Hypatia (c. 350–415)' }, savedAt: 10 });
+  await act(async () => changed());
+  await waitFor(() => expect(mockedPicture).toHaveBeenCalledTimes(2));
+  await act(async () => finishFirst({ dataUrl: 'data:image/jpeg;base64,AAAA', accentHex: '' }));
+  expect(screen.getByTestId('analysis-card').textContent).toContain('loading');
 });

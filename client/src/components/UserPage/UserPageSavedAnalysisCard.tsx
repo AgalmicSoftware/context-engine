@@ -37,15 +37,17 @@ const UserPageSavedAnalysisCard = ({
   const person = String(viewAddress || '')
     .trim()
     .toLowerCase();
-  const own =
-    !!person &&
-    String(account || '')
-      .trim()
-      .toLowerCase() === person;
+  const viewer = String(account || '')
+    .trim()
+    .toLowerCase();
+  const own = !!person && viewer === person;
 
   useEffect(() => {
     let current = true;
     let figure = '';
+    // Another person, session or sign-in: nothing from the last one stays on screen.
+    setShown(null);
+    setPicture(null);
     const show = async (): Promise<void> => {
       const options = person ? await loadOptions().catch(() => null) : null;
       const saved = options ? await readSavedAnalysisCard(person, options) : null;
@@ -59,11 +61,14 @@ const UserPageSavedAnalysisCard = ({
           : null;
       setShown(card && saved?.status === 'ready' ? { card, savedAt: saved.savedAt } : null);
       if (!card || !options || card.figure === figure) return;
-      figure = card.figure;
+      const drawing = card.figure;
+      figure = drawing;
       setPicture({ status: 'loading' });
-      fetchAnalysisCardPicture(card.figure, options)
-        .then((drawn) => current && setPicture({ status: 'ready', ...drawn }))
-        .catch(() => current && setPicture({ status: 'none' }));
+      // Only the picture of the card on screen now: an earlier figure's picture that comes back late is dropped.
+      const still = (): boolean => current && figure === drawing;
+      fetchAnalysisCardPicture(drawing, options)
+        .then((drawn) => still() && setPicture({ status: 'ready', ...drawn }))
+        .catch(() => still() && setPicture({ status: 'none' }));
     };
     void show();
     // A save or withdrawal on this page shows here at once.
@@ -72,7 +77,7 @@ const UserPageSavedAnalysisCard = ({
       current = false;
       unsubscribe();
     };
-  }, [person, own, pageSlug, profileKey, loadOptions]);
+  }, [person, viewer, own, pageSlug, profileKey, loadOptions]);
 
   if (!shown) return null;
   return (
