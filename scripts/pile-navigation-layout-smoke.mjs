@@ -148,24 +148,14 @@ try {
           for (const control of topRow) {
             assert(Math.abs(control.cy - layout.actions.cy) <= 1, `Menu, microphone, Submit and Clear share the top row: ${detail}`);
           }
-          const wrapped = layout.nav.top >= layout.actions.bottom;
-          if (wrapped) {
-            assert(layout.nav.top >= Math.max(...topRow.map(control => control.bottom)) + 15, `Wrapped arrows have at least 16px separation from Clear: ${detail}`);
-            assert.equal(layout.lineTops.length, 1, `A separate navigation row uses a horizontal counter: ${detail}`);
-            assert(Math.abs(layout.counter.left - layout.prev.right - 4) <= 1 && Math.abs(layout.next.left - layout.counter.right - 4) <= 1, `Arrows closely frame the horizontal counter with 4px gaps: ${detail}`);
-          } else {
-            assert(Math.abs(layout.nav.cy - layout.actions.cy) <= 1, `Controls stay on one row when they fit: ${detail}`);
-            if (layout.lineTops.length === 3) {
-              assert(layout.counter.width < 32 && layout.nav.width < 160, `Stacking is reserved for a constrained shared row: ${detail}`);
-            } else assert.equal(layout.lineTops.length, 1, `Counter is horizontal whenever the shared row has room: ${detail}`);
-          }
-          if (width <= 390 && topRow.length === 2) assert.equal(layout.lineTops.length, 1, `Without Submit, even a phone has room for the horizontal counter: ${detail}`);
-          if (width === 320 && topRow.length > 2) assert(wrapped, `Narrow pending toolbar moves arrows below: ${detail}`);
-          if (width >= 596) assert(!wrapped, `Wide mobile toolbar fits one row: ${detail}`);
+          // One row at every phone width; the counter floats above the arrows.
+          assert(Math.abs(layout.nav.cy - layout.actions.cy) <= 1, `Controls stay on one row: ${detail}`);
+          assert.equal(layout.lineTops.length, 1, `Counter is horizontal: ${detail}`);
+          assert(layout.counter.bottom <= layout.nav.top + 1, `Counter floats above the arrows: ${detail}`);
           assert(layout.submitLabelFits, `Submit label fits its button: ${detail}`);
           assert(layout.submitFontSizes.every(size => size >= 16), `Submit and its count remain readable at phone widths: ${detail}`);
         }
-        if (width <= 768) assert(layout.counter.left >= layout.nav.left && layout.counter.right <= layout.nav.right, `Counter fits its rail: ${detail}`);
+        if (width > 768) assert(layout.counter.left >= layout.nav.left && layout.counter.right <= layout.nav.right, `Counter fits its rail: ${detail}`);
         assert(!layout.overflow, `No horizontal overflow: ${detail}`);
         for (const [index, button] of layout.buttons.entries()) {
           for (const other of layout.buttons.slice(index + 1)) {

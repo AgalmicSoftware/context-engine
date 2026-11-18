@@ -5344,8 +5344,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     margin-top: 10px;
   }
 
+  // Inside the card's width: hanging past the screen's edge, it made Android Chrome zoom the page out.
   .miniSpinnerWrapper {
     top: -30px;
+    right: 0;
   }
 
   .pileFooter {
@@ -5561,20 +5563,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .pileControls > .pileActions {
     justify-self: start;
     width: auto;
-  }
-
-  // Compact fallback; the navigation container expands this when it has room.
-  .pileNavCounterText {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 2ch;
-    line-height: 1.1;
-    margin: 0;
-  }
-
-  .pileNavCounterSeparator {
-    line-height: 0.8;
   }
 }
 
@@ -6364,7 +6352,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 // While a Submit saves: what it is doing, its seconds, and the spinner, in plain case. A little smaller, with even
-// digits, so the longest count fits a phone's Submit and the button holds still as the seconds tick.
+// digits, so the button holds still as the seconds tick. A phone row too narrow for the words keeps the spinner.
 .pileSubmitProgress {
   display: inline-flex;
   align-items: center;
@@ -6396,6 +6384,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.pileSubmitButtonCount {
+  margin-left: 0.35em;
 }
 
 .pileSubmitButtonTrail {
@@ -7260,64 +7252,118 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 @media (max-width: 768px) {
-  // Wrap the final navigation group only when the actual controls need the room.
-  // The row gap separates its touch targets from Clear pending changes above.
+  // One row under the card, never wrapped: the actions at the left, the arrows at the right, Submit between them
+  // taking what is left. Fixed widths at both ends keep the arrows in place whatever Submit shows.
   .pileInteractionUnit .pileControls {
+    position: relative;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 16px 8px;
+    gap: 4px;
     margin-top: 20px;
   }
 
   .pileInteractionUnit .pileControls > .pileActions {
     flex: 0 0 auto;
+    gap: 4px;
   }
 
   .pileInteractionUnit .pileFooter {
-    flex: 1 1 max-content;
-    min-width: max-content;
+    flex: 1 1 0;
+    min-width: 0;
     width: auto;
     gap: 4px;
   }
 
   .pileInteractionUnit .pileFooter .pileSubmitButton {
+    flex: 1 1 auto;
     width: auto;
-    min-width: max-content;
+    min-width: 44px;
     max-width: none;
-    padding-inline: 10px;
+    padding-inline: 8px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .pileInteractionUnit .pileFooter .pileSubmitButton.pileSubmitButtonInactive {
+    flex: 0 0 0;
+    min-width: 0;
+  }
+
+  // The count shows wherever it fits beside the word; where it does not, it wraps onto a hidden second line. The
+  // button's name keeps it either way.
+  .pileInteractionUnit .pileFooter .pileSubmitButtonLabel {
+    flex-wrap: wrap;
+    max-height: 1.25em;
+    overflow: hidden;
+    line-height: 1.25;
+  }
+
+  // While saving, the spinner always shows; the words show where they fit whole and otherwise wrap out of sight.
+  // The button's name keeps them.
+  .pileInteractionUnit .pileFooter .pileSubmitProgress {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-height: 1.25em;
+    overflow: hidden;
+    line-height: 1.25;
+
+    > svg {
+      order: -1;
+      height: 1.25em;
+    }
   }
 
   .pileInteractionUnit .pileControls > .pileNav {
-    container: pile-navigation / inline-size;
-    flex: 1 0 124px;
-    min-width: 124px;
-    max-width: 220px;
-    justify-content: flex-end;
+    position: relative;
+    flex: 0 0 auto;
     gap: 4px;
+    min-width: 0;
     margin-left: auto;
   }
 
-  // A wrapped navigation group grows into its spare row. Its own available
-  // width, rather than the phone breakpoint, determines the counter layout.
-  @container pile-navigation (min-width: 160px) {
-    .pileNavCounterText {
-      display: inline-flex;
-      flex-direction: row;
-      gap: 4px;
-      min-width: 0;
+  // The narrowest phones (320px) need the gaps for Submit's word.
+  @media (max-width: 340px) {
+    .pileInteractionUnit .pileControls,
+    .pileInteractionUnit .pileControls > .pileActions,
+    .pileInteractionUnit .pileFooter,
+    .pileInteractionUnit .pileControls > .pileNav {
+      gap: 1px;
     }
 
-    .pileNavCounterSeparator {
-      line-height: inherit;
+    .pileInteractionUnit .pileFooter .pileSubmitButton {
+      letter-spacing: 0;
     }
   }
 
-  @media (min-width: 641px) {
-    .pileInteractionUnit .pileControls > .pileNav {
-      flex-basis: 180px;
-      min-width: 180px;
-    }
+  // The counter shows briefly after a move; it floats above the arrows rather than taking the row's width.
+  .pileInteractionUnit .pileNav .pileNavCounterText {
+    position: absolute;
+    bottom: calc(100% + 1px);
+    left: 50%;
+    display: inline-flex;
+    flex-direction: row;
+    gap: 4px;
+    margin: 0;
+    line-height: 1.1;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  // The unsent-answers notice reads as a line under the whole row, so it never squeezes Submit or moves the arrows.
+  // It fits the row's bottom gap, and the row keeps room for it so the lines below (a failed save) never sit under it.
+  .pileInteractionUnit .pileFooter .pilePendingAnswerNotice {
+    position: absolute;
+    top: calc(100% + 1px);
+    right: 0;
+    left: 0;
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .pileInteractionUnit .pileControls:has(.pilePendingAnswerNotice) {
+    margin-bottom: 16px;
   }
 
   // The adaptive layout below allocates spare answer space to long prompts.
@@ -7627,13 +7673,23 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// On a phone every question card has one height, most of the screen under the session title, so the arrows below
-// it stay put from card to card. The small viewport unit keeps that height still while Safari's toolbars move.
-// Choice and quadratic prompts take what they need up to 40% of the card, then scroll; the answers get the rest.
+// On a phone every question card has one height: the screen below the card's top (measured, see
+// PileInteractionUnit) less the controls row and its gap, so the row stays in view without scrolling and put from
+// card to card. The small viewport unit is the screen with Safari's toolbars showing, so the row fits then too and
+// the card keeps still while they move. The card gives way before the row does, down to a floor. Choice and
+// quadratic prompts take what they need up to 40% of the card, then scroll; the answers get the rest.
 @media (max-width: 768px) {
   .pileInteractionUnit {
-    --pile-phone-card-height: max(380px, calc(100vh - 170px));
-    --pile-phone-card-height: max(380px, calc(100svh - 170px));
+    --pile-phone-row-space: 80px;
+    --pile-phone-card-height: max(240px, calc(100vh - var(--pile-card-top, 129px) - var(--pile-phone-row-space)));
+    --pile-phone-card-height: max(240px, calc(100svh - var(--pile-card-top, 129px) - var(--pile-phone-row-space)));
+  }
+
+  // Classic 95's 48px row leaves the unsent-answers notice under it 4px more.
+  @container ce-theme style(--ce-layout-profile: desktop-window) {
+    .pileInteractionUnit {
+      --pile-phone-row-space: 84px;
+    }
   }
 
   .pileCardContainer,
@@ -7646,20 +7702,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .pileCardInner {
     height: var(--pile-phone-card-height, 380px);
     min-height: 0;
-  }
-
-  // On a phone the arrows take their own row, so Submit appearing beside the actions never moves them.
-  // Wider screens keep them beside the actions, where there is room for Submit too.
-  @media (max-width: 640px) {
-    .pileInteractionUnit .pileControls > .pileNav {
-      flex-basis: 100%;
-      max-width: none;
-    }
-  }
-
-  // A long unsent-answers notice wraps rather than widening the row.
-  .pileInteractionUnit .pileFooter {
-    min-width: 0;
   }
 
   .pileCardInner .pileCardBody:has(.multichoiceQuestionContainer, .quadraticQuestionContainer) {
@@ -7786,13 +7828,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// Once the card has an answer, Next reads as the step to take, in every theme.
+// Once the card has an answer, Next reads as the step to take, in every theme: a filled arrow. On a phone it keeps
+// the theme's arrow size (48px in Classic 95), so neither arrow moves when it fills.
 .pileNav .pileNavArrow.pileNavArrowPrimary {
-  gap: 6px;
-  width: auto;
-  min-width: 44px;
-  height: 44px;
-  padding: 0 14px;
+  padding: 0;
   border-radius: var(--ce-radius-pill);
   background: var(--ce-action-primary) !important;
   color: var(--ce-action-primary-text) !important;
@@ -7806,12 +7845,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     transform: none;
     filter: none;
   }
-}
-
-.pileNavNextLabel {
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1;
 }
 
 // Once someone answers a card that stays put, Next glows three times in the theme's accent, then rests. Only a glow:
@@ -7844,15 +7877,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// The desktop rail is narrower than the word (64px in Classic 95): there the filled arrow alone marks the step.
+// The desktop rail's arrows are bare chevrons; there the filled Next is a 44px circle.
 @media (min-width: 769px) {
   .pileNav .pileNavArrow.pileNavArrowPrimary {
     width: 44px;
-    padding: 0;
-  }
-
-  .pileNavNextLabel {
-    display: none;
+    height: 44px;
   }
 }
 

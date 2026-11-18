@@ -17,6 +17,7 @@ import {
   resolvePileLoadingProgressFillStyle,
   resolvePileMiniLoaderStyle,
   resolvePileNavCounterStyle,
+  splitPileSubmitLabel,
   type PileInteractionSurfaceProps,
   type PileQuestionLike,
 } from './surveyPileInteractionSurface';
@@ -519,15 +520,64 @@ it('makes Next the step to take once the card has an answer, until the end of th
   const { rerender } = render(renderPileInteractionSurface(props));
   const next = screen.getByRole('button', { name: 'Next Question' });
   expect(next).not.toHaveClass('pileNavArrowPrimary');
-  expect(next).not.toHaveTextContent('Next');
   rerender(renderPileInteractionSurface({ ...props, nextIsPrimary: true }));
+  // Filled, not widened by a word: the arrows keep their places in the phone row.
   expect(screen.getByRole('button', { name: 'Next Question' })).toHaveClass('pileNavArrowPrimary');
-  expect(screen.getByRole('button', { name: 'Next Question' })).toHaveTextContent('Next');
+  expect(screen.getByRole('button', { name: 'Next Question' })).toHaveTextContent('');
   // At the end of the set Next does nothing, so it does not look like the step to take.
   rerender(renderPileInteractionSurface({ ...props, nextIsPrimary: true, activePileIndex: 1, endOfSetCard: <div /> }));
   expect(screen.getByRole('button', { name: 'Next Question' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Next Question' })).not.toHaveClass('pileNavArrowPrimary');
-  expect(screen.getByRole('button', { name: 'Next Question' })).not.toHaveTextContent('Next');
+});
+
+it('sizes the phone card from the measured top of the card, kept current as the page above it changes', () => {
+  const observers: Array<() => void> = [];
+  const original = { ResizeObserver: window.ResizeObserver, raf: window.requestAnimationFrame };
+  window.ResizeObserver = class {
+    constructor(callback: () => void) {
+      observers.push(callback);
+    }
+    observe() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+  window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  }) as typeof window.requestAnimationFrame;
+  let top = 157;
+  const rect = jest
+    .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    // A notice above the card inside the pile moves the card, not the pile.
+    .mockImplementation(function (this: HTMLElement) {
+      return { top: this.classList.contains('pileCardContainer') ? top : 0 } as DOMRect;
+    });
+  try {
+    const { container } = render(
+      renderPileInteractionSurface({
+        ...buildBaseProps(),
+        savedAnswersNotice: { retrying: false, onRetry: jest.fn() },
+      }),
+    );
+    const unit = container.querySelector('.pileInteractionUnit') as HTMLElement;
+    expect(unit.style.getPropertyValue('--pile-card-top')).toBe('157px');
+    // The session title fades out above it: the card grows into the room.
+    top = 133;
+    act(() => observers.forEach((callback) => callback()));
+    expect(unit.style.getPropertyValue('--pile-card-top')).toBe('133px');
+  } finally {
+    rect.mockRestore();
+    window.ResizeObserver = original.ResizeObserver;
+    window.requestAnimationFrame = original.raf;
+  }
+});
+
+it('sets the Submit count apart, so a narrow row can drop it while the name keeps it', () => {
+  expect(splitPileSubmitLabel('Submit (12)')).toEqual({ word: 'Submit', count: '(12)' });
+  expect(splitPileSubmitLabel('Submit')).toEqual({ word: 'Submit', count: '' });
+  expect(splitPileSubmitLabel('Submitted')).toEqual({ word: 'Submitted', count: '' });
+  render(renderPileInteractionSurface({ ...buildBaseProps(), finalSubmitText: 'Submit (3)' }));
+  const submit = screen.getByRole('button', { name: 'Submit (3)' });
+  expect(submit.querySelector('.pileSubmitButtonCount')).toHaveTextContent('(3)');
 });
 
 it('reads the submit out from a status region that was already there', () => {

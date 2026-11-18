@@ -92,8 +92,10 @@ test('E2E gate runs publication with isolated Worker dependencies and diagnostic
   assert.deepEqual(gates.gates['e2e-smoke'].commands.map(({ args }) => args), [
     ['run', 'test:e2e:smoke'],
     ['run', 'test:e2e:publish'],
+    ['run', 'test:e2e:phone-row'],
   ]);
   assert.equal(manifest.scripts['test:e2e:publish'], 'node scripts/session-setup-publish-smoke.mjs');
+  assert.equal(manifest.scripts['test:e2e:phone-row'], 'node scripts/pile-phone-row-smoke.js');
   assert.match(e2eJob, /workers\/sessionCorsWorker\/package-lock\.json/);
   assert.match(e2eJob, /npm --prefix workers\/sessionCorsWorker ci/);
   assert.match(e2eJob, /OUTPUT_DIR: \/tmp\/context-engine-publication-smoke/);

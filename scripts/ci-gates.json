@@ -315,6 +315,14 @@
             "run",
             "test:e2e:publish"
           ]
+        },
+        {
+          "label": "Run phone question row smoke",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:e2e:phone-row"
+          ]
         }
       ]
     },
