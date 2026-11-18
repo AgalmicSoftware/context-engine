@@ -585,3 +585,52 @@ test('an image gets its card from the AI’s reading of it, and none before it i
   const [made] = cardCalls(h);
   assert.match(made.body.messages[0].content, /Deck: coalition goals\./, 'the card is written from the reading');
 });
+
+test('where cards are on, whoever added a PDF or image has the AI read it once, as one of their AI calls', async () => {
+  const h = harness({ provider: provider() });
+  h.state.scopes = { ...h.state.scopes, ai: true };
+  const png = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+  const mine = await idOf(await h.uploadFile({ address: PARTICIPANT, name: 'mine.pdf', adminsOnly: true }));
+  const theirs = await idOf(await h.uploadFile({ address: MEMBER, name: 'theirs.png', type: 'image/png', bytes: png }));
+  const notes = await idOf(await h.uploadFile({ address: PARTICIPANT, name: 'notes.md', type: 'text/markdown', bytes: encode('Notes') }));
+  const read = (id, address = PARTICIPANT) => h.context({ action: 'read-pdf', id }, address);
+  const refusal = async (response) => [response.status, (await response.json()).reason];
+
+  // Not someone else's file, not a text file: neither is counted or sent to the AI.
+  assert.deepEqual(await refusal(await read(theirs)), [403, 'context_admin_required']);
+  assert.equal((await read(notes)).status, 404);
+  // Not without the AI scope of their sign-in, and not past their daily AI limit.
+  h.state.scopes = { ...h.state.scopes, ai: false };
+  assert.deepEqual(await refusal(await read(mine)), [403, 'context_read_ai_denied']);
+  h.state.scopes = { ...h.state.scopes, ai: true };
+  assert.deepEqual([h.aiChecks, h.pdfReads().length], [[], 0], 'nothing is counted until nothing else refuses');
+  h.state.aiAccess = { ok: false, response: json({ error: 'Rate limit exceeded.' }, 429) };
+  assert.equal((await read(mine)).status, 429);
+  assert.equal(h.pdfReads().length, 0);
+  h.state.aiAccess = { ok: true };
+
+  // Their own, once: the reading is stored under the file's rule, which here they cannot read themselves.
+  const done = await read(mine);
+  const { text } = await done.json();
+  await h.settled();
+  assert.deepEqual([done.status, h.aiChecks, h.pdfReads().length], [200, [PARTICIPANT, PARTICIPANT], 1]);
+  assert.equal((await h.read(text.id, PARTICIPANT)).status, 403);
+  assert.equal(await (await h.read(text.id, ADMIN)).text(), 'Deck: coalition goals.');
+  assert.deepEqual(content((await rowOf(h, mine)).card), STORED, 'and its card is written from the reading');
+  // Reading it again is an admin's call, and costs the adder nothing.
+  assert.deepEqual(await refusal(await read(mine)), [403, 'context_admin_required']);
+  assert.deepEqual([h.aiChecks.length, h.pdfReads().length], [2, 1]);
+  assert.equal((await read(mine, ADMIN)).status, 200);
+  // An image, by its adder.
+  assert.equal((await read(theirs, MEMBER)).status, 200);
+
+  // Not where the session limits context to admins, not once it has ended, and not with cards off.
+  const later = await idOf(await h.uploadFile({ address: PARTICIPANT, name: 'later.pdf' }));
+  h.state.config = { ...h.state.config, contextAdditionPolicy: 'admin_only' };
+  assert.deepEqual(await refusal(await read(later)), [403, 'context_admin_required']);
+  h.state.config = { ...h.state.config, contextAdditionPolicy: 'participants', sessionEndsAt: '2020-01-01T00:00:00.000Z' };
+  assert.equal((await read(later)).status, 410);
+  h.state.config = { ...h.state.config, sessionEndsAt: undefined, contextCardsEnabled: false };
+  assert.deepEqual(await refusal(await read(later)), [403, 'context_admin_required']);
+  assert.equal(h.aiChecks.filter((address) => address === PARTICIPANT).length, 2, 'none of those refusals was counted');
+});

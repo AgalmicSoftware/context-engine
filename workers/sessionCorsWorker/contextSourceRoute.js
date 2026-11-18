@@ -346,12 +346,13 @@ const ACTIONS = Object.freeze({ 'add-link': addLink, 'read-pdf': readPdf, remove
 
 // POST /storage/context { action, ... }: admins change context sources. Anyone
 // else may remove what they added and write its card, and add a link while the session takes
-// additions and hasn't ended, when they may have the Worker fetch pages;
-// refreshing a link, having a PDF read and having the AI write a card stay
-// with admins, as each makes the Worker work again for an item already there. Files are added through
-// /storage/upload with a context role.
+// additions and hasn't ended, when they may have the Worker fetch pages. Where cards are on,
+// they may also have the session's AI read a PDF or image they added, once, as one of their
+// AI calls for the day. Refreshing a link, reading a file again and having the AI write a
+// card stay with admins, as each makes the Worker work again for an item already there.
+// Files are added through /storage/upload with a context role.
 export const contextSourceRoute = async ({
-  request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, store, authorizeAdd, checkFetchAccess,
+  request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, store, authorizeAdd, checkFetchAccess, checkAiAccess,
 } = {}) => {
   const json = (body, status = 200) => (deps?.json
     ? deps.json(body, status, baseHeaders)
@@ -363,16 +364,17 @@ export const contextSourceRoute = async ({
   let body = null;
   try { body = await request.json(); } catch { body = null; }
   const name = isObj(body) ? trim(body.action) : '';
-  const participantMay = ['remove', 'set-card'].includes(name) || (name === 'add-link' && !trim(body.replaces));
+  const participantMay = ['remove', 'set-card'].includes(name) || (name === 'read-pdf' && contextCardsOn(config)) ||
+    (name === 'add-link' && !trim(body.replaces));
   if (!isAdmin && !participantMay) return refused();
   if (!isObj(body)) return json({ error: 'Invalid JSON.' }, 400);
   if (!Object.hasOwn(ACTIONS, name)) return json({ error: 'Unknown context action.' }, 400);
   if (['set-card', 'make-card'].includes(name) && !contextCardsOn(config)) {
     return json({ error: 'Context cards are off for this session.', reason: 'context_cards_off' }, 409);
   }
-  // A card is words the AI may be shown, so writing one is adding: not where
-  // the session limits context to admins, and not once it has ended.
-  if (!isAdmin && name === 'set-card') {
+  // A card is words the AI may be shown, and so is a reading, so writing one is adding:
+  // not where the session limits context to admins, and not once it has ended.
+  if (!isAdmin && ['set-card', 'read-pdf'].includes(name)) {
     if (!participantsMayAddContext(config)) return refused();
     if (resolveSessionLifecycle(config, { now: deps?.now }).ended) {
       return json({ error: 'This session has ended.', code: 'session_ended' }, 410);
@@ -407,6 +409,20 @@ export const contextSourceRoute = async ({
     const row = await readContextSourceRow({ env, slug, id: body.id });
     if (!row) return json({ error: 'That item is no longer in the session.' }, 404);
     if (trim(row.uploader).toLowerCase() !== admin) return refused();
+    if (name === 'read-pdf') {
+      if (!contextFileIsReadByAi(row.contentType)) return json({ error: 'That PDF or image is no longer in the session.' }, 404);
+      // One reading for its adder. Another would spend the session's AI again on a file it has read.
+      if (row.contextReadingId) {
+        return json({ error: 'The session’s AI has read this file. Only session admins can have it read again.', reason: 'context_admin_required' }, 403);
+      }
+      // It spends the session's AI for them, so it takes the AI scope of their sign-in and
+      // counts against their daily limit, as /ai does. Counted last, once nothing else refuses.
+      if (authScopes?.ai !== true) {
+        return json({ error: 'This session doesn’t let you use its AI, so only an admin can have this file read.', reason: 'context_read_ai_denied' }, 403);
+      }
+      const aiAccess = await checkAiAccess?.();
+      if (!aiAccess?.ok) return aiAccess?.response || json({ error: 'AI access could not be checked.' }, 403);
+    }
   }
   const action = ACTIONS[name];
   const now = () => new Date(deps?.now?.() || Date.now()).toISOString();

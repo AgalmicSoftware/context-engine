@@ -90,9 +90,11 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
     },
     scopes: { storage: true, fetch: true },
     fetchAccess: { ok: true },
+    aiAccess: { ok: true },
   };
   const pageCalls = [];
   const fetchChecks = [];
+  const aiChecks = [];
   const network = async (url, init) => {
     pageCalls.push(String(url));
     const page = pages[String(url)];
@@ -144,6 +146,10 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
       fetchChecks.push(address);
       return state.fetchAccess;
     },
+    checkAiAccess: async () => {
+      aiChecks.push(address);
+      return state.aiAccess;
+    },
     deps,
   });
   const tags = (role, kind, extra = []) => [
@@ -169,7 +175,7 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
   const settled = async () => { while (background.length) await background.shift(); };
   // The provider calls that read a PDF, apart from the calls that write cards.
   const pdfReads = () => providerCalls.filter((made) => made.body?.messages?.[0]?.content?.[0]?.type === 'document' || made.body?.input?.[0]?.content?.[0]?.type === 'input_file');
-  return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, fetchChecks, providerCalls, pdfReads, settled };
+  return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, fetchChecks, aiChecks, providerCalls, pdfReads, settled };
 };
 
 export const idOf = async (response) => {

@@ -3143,7 +3143,7 @@ export const removeCloudflareStorageRecords = async ({ env, slug, rows = [], mar
 };
 
 export const storageRoute = async ({
-  path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, checkFetchAccess, deps,
+  path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, checkFetchAccess, checkAiAccess, deps,
   answersChecked = false,
 } = {}) => {
   // A read invite opens reads only: never an upload, a context addition or a field key.
@@ -3214,7 +3214,7 @@ export const storageRoute = async ({
   if (path === '/storage/context' && method === 'POST') {
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
     return contextSourceRoute({
-      request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps, checkFetchAccess,
+      request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps, checkFetchAccess, checkAiAccess,
       // The upload's own access check, run before the Worker fetches a link's page.
       authorizeAdd: () => authorizeCloudflareStorageAccess({
         env, config, slug, resource: 'docsContext', operation: 'upload', requesterAddress: uploaderAddress, authScopes,

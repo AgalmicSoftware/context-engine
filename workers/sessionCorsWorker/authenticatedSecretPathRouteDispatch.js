@@ -4,6 +4,7 @@ import { workerGroupsRoute as workerGroupsRouteBoundary } from './workerGroups.j
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { DRAFT_TEXT_PATHS } from './draftTextRoute.js';
+import { resolveAiDailyLimit } from './aiRateLimitPolicy.js';
 
 export const dispatchAuthenticatedSecretPathRoute = async ({
   path,
@@ -75,7 +76,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   const scope = route === 'storage' && scopes?.storage !== true ? 'arweave' : route;
   // Withdrawing your own AI draft text needs only a sign-in, so someone who lost the session's gate can still do it.
   const allowWithoutScope = path === '/storage/draft-text/delete';
-  const preflightFor = (preflightScope, preflightRoute) => deps?.evaluateAuthenticatedRoutePreflight?.({
+  const preflightFor = (preflightScope, preflightRoute, preflightLimit = limit) => deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
     scope: preflightScope,
     route: preflightRoute,
@@ -84,7 +85,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     env,
     slug,
     address,
-    limit,
+    limit: preflightLimit,
     headers,
     deps: {
       checkRateLimit: deps?.checkRateLimit,
@@ -151,6 +152,8 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
         baseHeaders: headers,
         // A participant's context link has the Worker fetch a page, as /fetch does.
         checkFetchAccess: () => preflightFor('fetch', 'fetch'),
+        // Whoever adds a PDF or image may have the session's AI read it, which counts as /ai does.
+        checkAiAccess: () => preflightFor('ai', 'ai', resolveAiDailyLimit(config)),
       }),
     };
   }
