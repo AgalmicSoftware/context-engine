@@ -197,6 +197,11 @@ describe('bundled app-theme contrast', () => {
       const tokenColor = (token: string) => parseColor(values[aliases[token] ?? token]);
       const token = value.match(/^var\(--ce-([a-z0-9-]+)\)$/)?.[1];
       if (token) return tokenColor(token);
+      // A field's translucent input fill laid over an opaque surface.
+      const layered = value.match(
+        /^linear-gradient\(var\(--ce-([a-z0-9-]+)\), var\(--ce-\1\)\), var\(--ce-([a-z0-9-]+)\)$/,
+      );
+      if (layered) return composite(tokenColor(layered[1]), tokenColor(layered[2]));
       const onToken = value.match(/^color-mix\(in srgb, var\(--ce-([a-z0-9-]+)\) (\d+)%, var\(--ce-([a-z0-9-]+)\)\)$/);
       if (onToken) {
         const [top, base] = [tokenColor(onToken[1]), tokenColor(onToken[3])];
@@ -606,6 +611,17 @@ describe('bundled app-theme contrast', () => {
       composite(parseColor(values.surface), parseColor(values.canvas)),
     );
     const notice = compileModule('components/OnePageSession/WorkerGroupAutoJoinNotice.module.scss');
+    // The theme's own input colours outrank the field's unless they are !important.
+    const body = (moduleCss: string, selector: string) =>
+      moduleCss.match(new RegExp(`${selector.replace(/[.:]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    [
+      [onePageCss, '.workerGroupCardCodeInput'],
+      [notice, '.codeInput'],
+    ].forEach(([moduleCss, selector]) => {
+      expect(body(moduleCss, selector)).toMatch(/background: [^;]+ !important;/);
+      expect(body(moduleCss, selector)).toMatch(/[^-]color: [^;]+ !important;/);
+      expect(body(moduleCss, `${selector}::placeholder`)).toMatch(/[^-]color: [^;]+ !important;/);
+    });
     const fields = [
       [field, placeholder],
       [moduleRule(notice, '.codeInput'), moduleRule(notice, '.codeInput::placeholder')],

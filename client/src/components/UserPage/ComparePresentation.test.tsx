@@ -86,6 +86,19 @@ test('does not claim fallback axes or summaries came from AI', () => {
   expect(screen.queryByText('AI-generated axes')).not.toBeInTheDocument();
   expect(screen.getByText('Local comparison · AI summary unavailable')).toBeVisible();
 });
+test('says why the AI summary is unavailable when it is told', () => {
+  render(
+    <ComparePresentation
+      {...props}
+      axesSource="fallback"
+      generation={null}
+      aiUnavailableReason="This page has no AI service for this session."
+    />,
+  );
+  expect(
+    screen.getByText('Local comparison · AI summary unavailable: This page has no AI service for this session.'),
+  ).toBeVisible();
+});
 test('keeps loading timers and explains axis provenance on demand', () => {
   const { rerender } = render(<ComparePresentation {...props} bulletsLoading compassLoading />);
   expect(screen.getByText(/Loading summary/)).toBeVisible();

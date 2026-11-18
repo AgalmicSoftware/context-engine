@@ -17,7 +17,6 @@ export type MainSiteProps = {
   changeFocusedTab: MainSiteCallback;
   toggleLoginModal: MainSiteCallback;
   updateLoginInfo: MainSiteCallback;
-  toggleDemoMode: MainSiteCallback;
   changeActiveSessionSlug: MainSiteCallback;
   profile?: MainSiteRecord;
   account?: string;
@@ -27,8 +26,6 @@ export type MainSiteProps = {
   focusedTab?: number;
   loginComplete?: boolean;
   loginInProgress?: boolean;
-  demoMode?: MainSiteRecord;
-  demoSurfaceMode?: boolean | null;
   activeSessionSlug?: string;
   wagmiChainOptions?: unknown[];
   wagmiBlocknumber?: number;

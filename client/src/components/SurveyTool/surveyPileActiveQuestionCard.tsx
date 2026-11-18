@@ -4,6 +4,18 @@ import { Card, CardBody } from 'reactstrap';
 import styles from './SurveyTool.module.scss';
 import { QuadraticScrollControlsProvider } from './QuadraticScrollControls';
 import PileQuestionPrompt from './PileQuestionPrompt';
+import { usePileHalfRowCut } from './pileHalfRowCut';
+
+/** The card's answer area. Where it scrolls (a phone's choice list), its last visible option is always cut through. */
+const PileAnswerArea = ({ children }: { children: React.ReactNode }): React.ReactElement => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  usePileHalfRowCut(ref, `.${styles.checkboxOptionText}`);
+  return (
+    <div className={styles.pileCardMainContent} ref={ref}>
+      {children}
+    </div>
+  );
+};
 
 export type PileActiveQuestionLike = {
   [key: string]: unknown;
@@ -45,9 +57,9 @@ export const renderPileCardShell = ({
       <CardBody className={styles.pileCardBody}>
         <PileQuestionPrompt>{promptHeader}</PileQuestionPrompt>
 
-        <div className={styles.pileCardMainContent}>
+        <PileAnswerArea>
           <div className={questionContainerClass}>{questionComponent}</div>
-        </div>
+        </PileAnswerArea>
 
         {footerSection}
       </CardBody>

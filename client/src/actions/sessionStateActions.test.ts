@@ -2,8 +2,6 @@ import {
   changeActiveSessionSlug,
   changeFocusedTab,
   fetchSessionState,
-  setDemoSurfaceMode,
-  toggleDemoMode,
   toggleLoginModal,
   toggleTooltips,
   updateGlobalSessionSelection,
@@ -14,8 +12,6 @@ import {
   CHANGE_FOCUSED_TAB,
   FETCH_SESSION_STATE,
   LOGIN_IN_PROGRESS,
-  SET_DEMO_SURFACE_MODE,
-  TOGGLE_DEMO_MODE,
   TOGGLE_LOGIN_MODAL,
   TOGGLE_TOOLTIPS,
   UPDATE_GLOBAL_SESSION_SELECTION,
@@ -100,16 +96,8 @@ describe('sessionStateActions', () => {
         action: { type: TOGGLE_LOGIN_MODAL, payload: { isOpen: true } },
       },
       {
-        run: (dispatch) => setDemoSurfaceMode(false)(dispatch),
-        action: { type: SET_DEMO_SURFACE_MODE, payload: false },
-      },
-      {
         run: (dispatch) => updateLoginInfo({ loginInProgress: true })(dispatch),
         action: { type: LOGIN_IN_PROGRESS, payload: { loginInProgress: true } },
-      },
-      {
-        run: (dispatch) => toggleDemoMode({ tools: true })(dispatch),
-        action: { type: TOGGLE_DEMO_MODE, payload: { tools: true } },
       },
       {
         run: (dispatch) => changeActiveSessionSlug('debate')(dispatch),

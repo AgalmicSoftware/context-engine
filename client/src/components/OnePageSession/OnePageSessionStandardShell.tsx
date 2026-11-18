@@ -166,6 +166,7 @@ type OnePageSessionStandardShellProps = {
   onLoadFullCorpusClick: (event: React.MouseEvent<HTMLElement>) => void;
   onOpenResults: () => void;
   onViewSessionResults?: () => void;
+  onViewSessionGroups?: () => void;
   resultsSectionRef?: React.Ref<HTMLDivElement>;
   onPileSubmitRailVisibilityChange: (visible: unknown) => void;
   onResultsModalClose: () => void;
@@ -333,6 +334,7 @@ export default function OnePageSessionStandardShell({
   onLoadFullCorpusClick,
   onOpenResults,
   onViewSessionResults,
+  onViewSessionGroups,
   resultsSectionRef,
   onPileSubmitRailVisibilityChange,
   onResultsModalClose,
@@ -569,6 +571,7 @@ export default function OnePageSessionStandardShell({
           <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
             <MemoSurveyPage
               onViewSessionResults={onViewSessionResults}
+              onViewSessionGroups={onViewSessionGroups}
               minifiedMode="pile"
               account={account}
               provider={provider}

@@ -48,9 +48,10 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-it('links the check after a submit to your profile in this session', () => {
+it('says the answers were submitted, without a link out of the questions', () => {
   submitted();
-  expect(check()).toHaveAttribute('href', `/u/${account}?session=rxc-ra-test-5`);
+  expect(check()).toHaveTextContent('Submitted');
+  expect(check()).not.toHaveAttribute('href');
 });
 
 it('shows the check for ten seconds after each submit', () => {
@@ -59,10 +60,47 @@ it('shows the check for ten seconds after each submit', () => {
   act(() => {
     jest.advanceTimersByTime(10_000);
   });
-  expect(check()).toHaveClass('pileSubmitSuccessBadgeGone');
+  expect(check()).toHaveClass('pileSubmitDoneGone');
   // An edit brings back Submit, and the next submit its own check.
   act(() => engine.setState({ submittedSinceLastEdit: false }));
   expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeNull();
   act(() => engine.setState({ submittedSinceLastEdit: true }));
-  expect(check()).not.toHaveClass('pileSubmitSuccessBadgeGone');
+  expect(check()).not.toHaveClass('pileSubmitDoneGone');
+});
+
+it('hands focus to the question card when the check hides', () => {
+  jest.useFakeTimers();
+  submitted();
+  // Submit had focus, so the check took it.
+  expect(check()).toHaveFocus();
+  act(() => {
+    jest.advanceTimersByTime(10_000);
+  });
+  expect(screen.getByTestId('ce-pile-active-question')).toHaveFocus();
+});
+
+it('leaves focus alone when the person is somewhere else', () => {
+  jest.useFakeTimers();
+  const elsewhere = document.createElement('button');
+  document.body.append(elsewhere);
+  elsewhere.focus();
+  submitted();
+  expect(elsewhere).toHaveFocus();
+  act(() => {
+    jest.advanceTimersByTime(10_000);
+  });
+  expect(elsewhere).toHaveFocus();
+  elsewhere.remove();
+});
+
+it('hands focus to the end of the set when the check hides there', () => {
+  jest.useFakeTimers();
+  const engine = submitted();
+  act(() => engine.setState({ pileSetEndQuestionId: 'q1' }));
+  expect(screen.getByTestId('ce-pile-end-of-set')).toBeInTheDocument();
+  check().focus();
+  act(() => {
+    jest.advanceTimersByTime(10_000);
+  });
+  expect(screen.getByTestId('ce-pile-end-of-set')).toHaveFocus();
 });

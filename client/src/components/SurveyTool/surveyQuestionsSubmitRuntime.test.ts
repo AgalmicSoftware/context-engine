@@ -221,6 +221,24 @@ describe('surveyQuestionsSubmitRuntime', () => {
     expect(context.inst._submitUploadRevisions).toBeUndefined();
   });
 
+  it.each([
+    ['writes a draft change still waiting when Submit returns', true],
+    ['writes no draft when none was waiting', false],
+  ])('%s, once the stored answers are the baseline', async (_name, pending) => {
+    const persistDraftSafely = jest.fn();
+    const context = createContext({ persistDraftSafely });
+    const timer = pending ? setTimeout(() => undefined, 60_000) : null;
+    context.inst._persistTimer = timer;
+    await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    // Not before the baseline moves: written then, it would keep the stored answers' drafts.
+    expect(context.inst._persistTimer).toBeNull();
+    expect(persistDraftSafely).not.toHaveBeenCalled();
+    await context.runSurveyQuestionsSubmitSuccessController.mock.calls[0][0].afterStateApplied();
+    // Dropped, an answer changed just before the Submit returned and still unsent would be lost on reload.
+    expect(persistDraftSafely).toHaveBeenCalledTimes(pending ? 1 : 0);
+    if (timer) clearTimeout(timer);
+  });
+
   it('starts a new operation when the account or session changes after a failed attempt', async () => {
     const context = createContext();
     context.submitSurveyResponse.mockRejectedValue(new Error('reply lost'));
@@ -254,6 +272,70 @@ describe('surveyQuestionsSubmitRuntime', () => {
       { put: [], remove: ['q1'] },
       expect.objectContaining({ sessionSlug: 'draft-edge', account: '0xabc' }),
     );
+  });
+
+  it('shows Submitted without waiting on AI draft text, which never asks for a sign-in', async () => {
+    const context = createContext();
+    context.propsRef.current.sessionConfig = { interviewMode: { keepDraftTextForAdmins: true } };
+    context.submitSurveyResponse.mockResolvedValueOnce({ __ceQuestionResponses: [{ questionID: 'q1' }] });
+    let failSync: (error: Error) => void = () => undefined;
+    jest
+      .mocked(syncDraftText)
+      .mockClear()
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failSync = reject;
+          }),
+      );
+    const outcome = await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    expect(outcome).toEqual({ status: 'submitted' });
+    expect(context.runSurveyQuestionsSubmitSuccessController).toHaveBeenCalled();
+    expect(jest.mocked(syncDraftText)).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ prompt: false }),
+    );
+    expect(context.setState).not.toHaveBeenCalledWith(
+      expect.objectContaining({ submissionError: expect.stringContaining('AI draft text') }),
+    );
+    failSync(new Error('sign-in needed'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(context.setState).toHaveBeenCalledWith({
+      submissionError: 'Your answers were saved, but the AI draft text kept for admins could not be updated.',
+    });
+  });
+
+  it.each([
+    ['adds to what that Submit reported', null],
+    ['says nothing while a later Submit runs', 2],
+    ['says nothing once a later Submit has finished', 0],
+  ])('a late AI draft text failure %s', async (_name, activeLaterSubmit) => {
+    const laterSubmit = activeLaterSubmit !== null;
+    const context = createContext();
+    context.propsRef.current.sessionConfig = { interviewMode: { keepDraftTextForAdmins: true } };
+    context.submitSurveyResponse.mockResolvedValueOnce({ __ceQuestionResponses: [{ questionID: 'q1' }] });
+    let failSync: (error: Error) => void = () => undefined;
+    jest.mocked(syncDraftText).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failSync = reject;
+        }),
+    );
+    await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+    context.stateRef.current.submissionError = "Some answers didn't save (busy).";
+    if (laterSubmit) {
+      context.inst._submitAttemptSeq = 2;
+      context.inst._activeSubmitAttemptSeq = activeLaterSubmit;
+    }
+    context.setState.mockClear();
+    failSync(new Error('busy'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (laterSubmit) expect(context.setState).not.toHaveBeenCalled();
+    else
+      expect(context.setState).toHaveBeenCalledWith({
+        submissionError:
+          "Some answers didn't save (busy). Your answers were saved, but the AI draft text kept for admins could not be updated.",
+      });
   });
 
   it('resends kept AI draft text deletes for whoever is signed in, and for no one signed out', () => {

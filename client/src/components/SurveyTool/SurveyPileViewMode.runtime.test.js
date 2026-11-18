@@ -1,7 +1,7 @@
 import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import { responseValuesEqual } from './responseValueEquality';
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import {
@@ -469,6 +469,183 @@ describe('SurveyPileViewMode runtime surface', () => {
 
     expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
     expect(screen.getByLabelText('Next Question').parentElement).toHaveTextContent('2 / 2');
+  });
+
+  it('opens the end of the set after the last question, and Back returns to it', async () => {
+    const onViewSessionResults = jest.fn();
+    const onViewSessionGroups = jest.fn();
+    renderPile({
+      questionPool: [
+        { id: 'demo-q1', prompt: 'First canonical question' },
+        { id: 'demo-q2', prompt: 'Second canonical question' },
+      ],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+      onViewSessionResults,
+      onViewSessionGroups,
+    });
+
+    expect(await screen.findByText('First canonical question')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
+    expect(screen.getByLabelText('Next Question')).toBeEnabled();
+
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    const end = await screen.findByTestId('ce-pile-end-of-set');
+    expect(end).toHaveTextContent('That was the last question.');
+    expect(end).toHaveTextContent('You answered 0 of 2.');
+    expect(end).toHaveFocus();
+    expect(screen.queryByText('Second canonical question')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Next Question')).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'See results' }));
+    expect(onViewSessionResults).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Join a group' }));
+    expect(onViewSessionGroups).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByLabelText('Previous Question'));
+    expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-pile-end-of-set')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Next Question').parentElement).toHaveTextContent('2 / 2');
+  });
+
+  it('counts a quadratic moved back to zero as unanswered at the end of the set', async () => {
+    renderPile({
+      questionPool: [
+        {
+          id: 'quadratic-q',
+          type: 'quadratic',
+          prompt: 'Allocate support',
+          options: ['Parks', 'Transit'],
+          voiceCredits: 25,
+        },
+      ],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    const parks = await screen.findByLabelText('Parks');
+    fireEvent.change(parks, { target: { value: '2' } });
+    fireEvent.change(parks, { target: { value: '0' } });
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    expect(await screen.findByTestId('ce-pile-end-of-set')).toHaveTextContent('You answered 0 of 1.');
+  });
+
+  it('ends the end of the set once its last question is no longer last', async () => {
+    const first = { id: 'demo-q1', prompt: 'First canonical question' };
+    const second = { id: 'demo-q2', prompt: 'Second canonical question' };
+    const harness = renderPile({
+      questionPool: [first, second],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    expect(await screen.findByText('First canonical question')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    fireEvent.click(await screen.findByLabelText('Next Question'));
+    expect(await screen.findByTestId('ce-pile-end-of-set')).toBeInTheDocument();
+
+    harness.rerenderSurveyQuestions({ questionPool: [first, second, { id: 'demo-q3', prompt: 'Third question' }] });
+    expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-pile-end-of-set')).not.toBeInTheDocument();
+
+    // The old marker does not bring the end back when the list returns to how it was.
+    harness.rerenderSurveyQuestions({ questionPool: [first, second] });
+    expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-pile-end-of-set')).not.toBeInTheDocument();
+  });
+
+  // The real pile view with a handle on its engine, at the end of a one-question set with an unsent answer.
+  const openEndWithUnsentAnswer = async () => {
+    let engine = null;
+    const strategy = createPileViewRuntimeStrategy();
+    const renderView = strategy.render;
+    strategy.render = (current) => {
+      engine = current;
+      return renderView(current);
+    };
+    renderPile({
+      questionPool: [
+        {
+          id: 'quadratic-q',
+          type: 'quadratic',
+          prompt: 'Allocate support',
+          options: ['Parks', 'Transit'],
+          voiceCredits: 25,
+        },
+      ],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+      runtimeStrategy: strategy,
+    });
+    fireEvent.change(await screen.findByLabelText('Parks'), { target: { value: '2' } });
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    expect(await screen.findByTestId('ce-pile-end-of-set')).toHaveTextContent('You answered 1 of 1.');
+    return engine;
+  };
+
+  it('keeps focus on the end of the set when its Submit goes after a submit', async () => {
+    const engine = await openEndWithUnsentAnswer();
+    const submit = screen.getByRole('button', { name: 'Submit 1 answer' });
+    // Once nothing is unsent the button goes, which drops focus to the page.
+    let submits = 0;
+    engine.handlePileSubmitClick = async () => {
+      submits += 1;
+      submit.blur();
+      return { status: 'submitted' };
+    };
+    submit.focus();
+    fireEvent.click(submit);
+    await waitFor(() => expect(screen.getByTestId('ce-pile-end-of-set')).toHaveFocus());
+    expect(submits).toBe(1);
+  });
+
+  it('hides the rail Submit while the end of the set shows, and Back returns to a lone question', async () => {
+    await openEndWithUnsentAnswer();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('pileFooterControlAway');
+    const back = screen.getByLabelText('Previous Question');
+    back.focus();
+    fireEvent.click(back);
+    expect(await screen.findByLabelText('Parks')).toBeInTheDocument();
+    // Back is off on the first card, so focus goes to the question rather than staying stuck on it.
+    expect(back).toBeDisabled();
+    expect(screen.getByTestId('ce-pile-active-question')).toHaveFocus();
+    // A tap on Safari never focuses the button, so focus starts on the page; it still lands on the question.
+    fireEvent.click(screen.getByLabelText('Next Question'));
+    expect(await screen.findByTestId('ce-pile-end-of-set')).toBeInTheDocument();
+    document.activeElement?.blur();
+    fireEvent.click(back);
+    expect(await screen.findByLabelText('Parks')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-pile-active-question')).toHaveFocus();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).not.toHaveClass('pileFooterControlAway');
+  });
+
+  it('shows the Submit count from the questions state on both Submits', async () => {
+    const engine = await openEndWithUnsentAnswer();
+    act(() => engine.setState({ isSubmitting: true, submitCountText: '1 of 1' }));
+    expect(
+      within(screen.getByTestId('ce-pile-end-of-set')).getByRole('button', { name: 'Saving 1 of 1' }),
+    ).toBeDisabled();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent('Saving 1 of 1');
+  });
+
+  it('ends the end of the set when the filter changes', async () => {
+    const engine = await openEndWithUnsentAnswer();
+    act(() => engine.setState({ filterState: { ...engine.state.filterState } }));
+    await waitFor(() => expect(screen.queryByTestId('ce-pile-end-of-set')).not.toBeInTheDocument());
+    expect(screen.getByLabelText('Parks')).toBeInTheDocument();
   });
 
   it('renders triple trailing arrows inside the pile submit button', () => {
@@ -1515,32 +1692,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(hiddenFooter).toBeNull();
   });
 
-  it('links the pile success checkmark to the submitted responder user page after submit', () => {
-    const responderAddress = '0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD';
-    const tree = renderPileInteractionSurface(
-      buildSurfaceProps({
-        rail: baseRail({
-          pendingStats: { total: 0 },
-          submittedSinceLastEdit: true,
-          account: responderAddress,
-          isAddress: (value) => value === responderAddress,
-          sessionSlug: 'alpha',
-        }),
-      }),
-    );
-    const submitButton = findElement(
-      tree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
-    );
-    const successCheck = findElement(tree, (node) => isElementNode(node) && node.type === PileSubmittedCheck);
-    const hiddenFooter = findNodeByClassName(tree, 'pileFooterHidden');
-
-    expect(submitButton).toBeNull();
-    expect(successCheck.props.href).toBe(`/u/${responderAddress.toLowerCase()}?session=alpha`);
-    expect(hiddenFooter).toBeNull();
-  });
-
-  it('keeps the pile success checkmark non-clickable when no responder address is available', () => {
+  it('shows the pile success check in place of Submit after a submit', () => {
     const tree = renderPileInteractionSurface(
       buildSurfaceProps({
         rail: baseRail({
@@ -1550,9 +1702,15 @@ describe('SurveyPileViewMode runtime surface', () => {
         }),
       }),
     );
+    const submitButton = findElement(
+      tree,
+      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
+    );
     const successCheck = findElement(tree, (node) => isElementNode(node) && node.type === PileSubmittedCheck);
 
-    expect(successCheck.props.href).toBe('');
+    expect(submitButton).toBeNull();
+    expect(successCheck).not.toBeNull();
+    expect(findNodeByClassName(tree, 'pileFooterHidden')).toBeNull();
   });
 
   it('does not call getPendingEditStats during PileViewMode.render', () => {

@@ -4,6 +4,7 @@ import { getQuestionEncryptionGates } from './surveyToolAudienceDerivationContro
 import { resolveEditableQuestionList } from './surveyToolResponsePayloadController';
 import { resolveRevertPendingAnswerValue } from './surveyToolHydrationFlow';
 import { resolveStableSurveyAudioWorkerProps } from './surveyToolRuntimeSupport';
+import { AnswerSavedMark } from './SubmittedMarks';
 
 export type SurveyQuestionsQuestionDisplayRuntime = SurveyQuestionsLegacyRecord;
 
@@ -529,6 +530,7 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     hasAdditionalContent,
     commentsOpen,
     onToggleComments,
+    answerSaved = false,
   }: SurveyQuestionsLegacyValue) => {
     const { lockDisabled, lockTitle }: SurveyQuestionsLegacyValue = getAnswerLockDisplayState({
       field: answer,
@@ -536,22 +538,25 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     });
 
     return (
-      <FullQuestionFooterIcons
-        hasAdditionalContent={hasAdditionalContent}
-        commentsOpen={commentsOpen}
-        onToggleComments={onToggleComments}
-        questionId={question.id}
-      >
-        {renderQuestionAnswerLockControl({
-          surveyIndex,
-          questionId: question.id,
-          answer,
-          glowAnswer,
-          lockDisabled,
-          lockTitle,
-        })}
-        {renderQuestionTagDropdown(question)}
-      </FullQuestionFooterIcons>
+      <>
+        {answerSaved && <AnswerSavedMark />}
+        <FullQuestionFooterIcons
+          hasAdditionalContent={hasAdditionalContent}
+          commentsOpen={commentsOpen}
+          onToggleComments={onToggleComments}
+          questionId={question.id}
+        >
+          {renderQuestionAnswerLockControl({
+            surveyIndex,
+            questionId: question.id,
+            answer,
+            glowAnswer,
+            lockDisabled,
+            lockTitle,
+          })}
+          {renderQuestionTagDropdown(question)}
+        </FullQuestionFooterIcons>
+      </>
     );
   };
 

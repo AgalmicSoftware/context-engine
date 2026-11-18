@@ -55,6 +55,7 @@ export const createSurveyQuestionsSubmitRuntime = (
     maybeBlockSubmitUntilQuestionPoolComplete,
     normalizeQuestionIdKey,
     normalizeSessionSlugValue,
+    persistDraftSafely,
     prepareJsonAndHash,
     propsRef,
     resolveDiffBaselineSlice,
@@ -653,11 +654,14 @@ export const createSurveyQuestionsSubmitRuntime = (
       const earlierProvenance = stateRef.current.editBaseline?.interviewProvenance || {};
       // Await the receipt to ensure transaction is confirmed before optimistic update
       const receipt: SurveyQuestionsLegacyValue = await submitSurveyResponse(activeSlice, submitQids, submitContext);
-      // AI draft text for admins follows the consent each uploaded response was saved with. It runs
+      // AI draft text for admins follows the consent each uploaded response was saved with. It starts
       // before the stale check, so a withdrawal that reached storage sends its delete even after the
       // person moves on. The Worker keys rows by the signer, so it is skipped if someone else signed in.
+      // It never asks for a sign-in (the uploads just did that) and the saved answers don't wait on it:
+      // a sign-in prompt here held "Submitted" back, and could time out. A failed delete is kept and
+      // sent again on the next page load.
       const draftTextConfig = resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props);
-      let draftTextFailed = false;
+      let draftTextSync: Promise<void>;
       try {
         if (!signer(submitContext) || signer(submitContext) !== signer(buildSubmitContextSnapshot())) {
           throw new Error('The signed-in account changed during the upload.');
@@ -668,15 +672,22 @@ export const createSurveyQuestionsSubmitRuntime = (
           drafts: activeSlice?.interviewProvenance || {},
           earlier: earlierProvenance,
         });
-        await syncDraftText(plan, {
+        draftTextSync = syncDraftText(plan, {
           sessionConfig: draftTextConfig,
           sessionSlug: submitContext.effectiveDraftSlug,
           account: String(submitContext.account).toLowerCase(),
+          prompt: false,
         });
       } catch (error) {
-        surveyLog.warn('[SurveyQuestions] AI draft text update failed:', error);
-        draftTextFailed = true;
+        draftTextSync = Promise.reject(error);
       }
+      const draftTextSynced = draftTextSync.then(
+        () => true,
+        (error: unknown) => {
+          surveyLog.warn('[SurveyQuestions] AI draft text update failed:', error);
+          return false;
+        },
+      );
       if (!isSubmitContextCurrent(submitContext)) {
         handleStaleSubmitContext(submitContext);
         return { status: 'stale', message: 'Submission context changed before upload completed.' };
@@ -699,15 +710,10 @@ export const createSurveyQuestionsSubmitRuntime = (
           )
           .filter(Boolean),
       );
-      if (draftTextFailed) {
-        setState(
-          buildSubmissionErrorState(
-            'Your answers were saved, but the AI draft text kept for admins could not be updated.',
-          ),
-        );
-      }
 
-      // 1. STOP any pending draft saves immediately
+      // 1. Hold any pending draft write until the new baseline is in place. Written now, it would keep the drafts
+      // of the answers just stored; dropped, it would lose an answer changed just before that is still unsent.
+      const draftWritePending = !!inst._persistTimer;
       if (inst._persistTimer) {
         clearTimeout(inst._persistTimer);
         inst._persistTimer = null;
@@ -866,6 +872,7 @@ export const createSurveyQuestionsSubmitRuntime = (
         afterStateApplied: async () => {
           try {
             if (!isSubmitContextCurrent(submitContext)) return;
+            if (draftWritePending) persistDraftSafely();
             if (stateRef.current.draftPersistenceError && getChangedQidsAndFields(surveyIndex).changedQids.size === 0) {
               setState({ draftPersistenceError: '' });
             }
@@ -911,6 +918,13 @@ export const createSurveyQuestionsSubmitRuntime = (
             surveyLog.warn('SurveyTool: callback', e);
           }
         },
+      });
+      void draftTextSynced.then((synced) => {
+        // Only while no later Submit has started (running or finished), and added to what this one reported.
+        const laterAttempt = inst._submitAttemptSeq !== submitContext.submitAttemptId;
+        if (synced || laterAttempt || !isSubmitContextCurrent(submitContext)) return;
+        const notice = 'Your answers were saved, but the AI draft text kept for admins could not be updated.';
+        setState(buildSubmissionErrorState([stateRef.current.submissionError, notice].filter(Boolean).join(' ')));
       });
       return { status: 'submitted' };
     } catch (error: any) {

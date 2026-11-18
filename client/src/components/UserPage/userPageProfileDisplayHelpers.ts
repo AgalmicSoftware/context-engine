@@ -28,6 +28,8 @@ export type ResolveUserPageAddressDisplayStateArgs = {
   minimized?: unknown;
   nicknameInput?: unknown;
   propViewAddress?: unknown;
+  /** The session the page is showing, kept on the link to the full profile. */
+  sessionSlug?: unknown;
   stateViewAddress?: unknown;
   username?: unknown;
 };
@@ -160,6 +162,7 @@ export const resolveUserPageAddressDisplayState = ({
   minimized = false,
   nicknameInput = '',
   propViewAddress = '',
+  sessionSlug = '',
   stateViewAddress = '',
   username = '',
 }: ResolveUserPageAddressDisplayStateArgs = {}): UserPageAddressDisplayState => {
@@ -169,7 +172,11 @@ export const resolveUserPageAddressDisplayState = ({
   const pendingNicknameForThis =
     stateViewLower === currentLower && (isEditingNickname || bookmarked) ? pendingNick : '';
   const nicknameToUse = String(cachedNickname || '') || pendingNicknameForThis;
-  const profileUrl = propViewAddress ? `/u/${propViewAddress}` : '';
+  // Without its session the full profile opens on the default session, not the one in view.
+  const session = String(sessionSlug || '').trim();
+  const profileUrl = propViewAddress
+    ? `/u/${propViewAddress}${session ? `?session=${encodeURIComponent(session)}` : ''}`
+    : '';
   const usernameText = String(username || '');
   const shortAddress = propViewAddress
     ? String(typeof getShortenedAddress === 'function' ? getShortenedAddress(propViewAddress, false) : propViewAddress)

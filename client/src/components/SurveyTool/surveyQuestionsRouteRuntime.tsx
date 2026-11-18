@@ -1,4 +1,5 @@
 import type * as React from 'react';
+import { SurveyQuestionCard, surveyQuestionCardDeps } from './SurveyQuestionCard';
 import type {
   SurveyQuestionsAuthoringPanelDisplayState,
   SurveyQuestionsAuthoringRouteReadinessDescriptor,
@@ -207,6 +208,7 @@ export const createSurveyQuestionsRouteRuntime = (
         responseUrl: stateRef.current.responseUrl,
         singleQuestionMode: propsRef.current.singleQuestionMode,
         startFresh: stateRef.current.startFresh,
+        submitCountText: stateRef.current.submitCountText,
         submissionComplete: stateRef.current.submissionComplete,
         submittedSinceLastEdit: stateRef.current.submittedSinceLastEdit,
         useHeaderSubmit: propsRef.current.useHeaderSubmit,
@@ -269,9 +271,19 @@ export const createSurveyQuestionsRouteRuntime = (
       });
     beginQuestionDisplayRender?.();
     const renderedEditableQuestions: React.ReactNode = authoringRouteReadiness.shouldRenderEditableQuestions
-      ? visibleQuestionPool.map((question: SurveyQuestionsLegacyValue, qIndex: SurveyQuestionsLegacyValue) =>
-          renderQuestion(question, qIndex, currentSurveyResponseState),
-        )
+      ? visibleQuestionPool.map((question: SurveyQuestionsLegacyValue, qIndex: number) => (
+          <SurveyQuestionCard
+            key={String(question?.id ?? qIndex)}
+            deps={surveyQuestionCardDeps(
+              inst._questionCardEpoch,
+              question,
+              qIndex,
+              currentSurveyResponseState || {},
+              String(question?.id ?? ''),
+            )}
+            render={() => renderQuestion(question, qIndex, currentSurveyResponseState)}
+          />
+        ))
       : null;
     const lockedGateDetails = getMemoizedLockedQuestionGateDetails(hiddenMaskedQuestionIds);
     const lockedQuestionsBanner = renderLockedQuestionsPanel({

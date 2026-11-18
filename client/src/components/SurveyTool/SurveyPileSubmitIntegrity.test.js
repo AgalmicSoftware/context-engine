@@ -326,52 +326,58 @@ it('keeps a single-question payload byte-identical after a lost reply', async ()
   expect(JSON.stringify(h.submitResponses.mock.calls[1][2])).toBe(JSON.stringify(h.submitResponses.mock.calls[0][2]));
 });
 
-it('keeps answers the Worker stored before a failed upload saved, and resends only the rest', async () => {
-  const h = await fixture();
-  await act(async () => h.sync());
-  await h.mount();
-  const engine = () => h.engine();
-  await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
-  await act(async () => engine().handleAnswerPile(FREEFORM_QID, 'Free answer'));
-  await settle();
-  // The first answer reaches the Worker; the next upload fails.
-  h.submitResponses.mockImplementationOnce(async (_provider, ids, responses) => {
-    const storageRef = h.add('responses', responses[0]);
-    throw Object.assign(new Error('Worker storage is unavailable.'), {
-      partialReceipt: {
-        workerCanonicalSubmission: true,
-        questionResponseRefs: [{ questionId: ids[0], storageRef }],
-        sessionSlug: SLUG,
-        storageRefs: [storageRef],
-      },
+// Answers upload a few at a time, so the stored one may be either answer, not only the first.
+it.each([0, 1])(
+  'keeps the answer the Worker stored (#%i) before a failed upload saved, and resends only the rest',
+  async (storedIndex) => {
+    const h = await fixture();
+    await act(async () => h.sync());
+    await h.mount();
+    const engine = () => h.engine();
+    await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
+    await act(async () => engine().handleAnswerPile(FREEFORM_QID, 'Free answer'));
+    await settle();
+    // One answer reaches the Worker; the other upload fails.
+    h.submitResponses.mockImplementationOnce(async (_provider, ids, responses) => {
+      const storageRef = h.add('responses', responses[storedIndex]);
+      throw Object.assign(new Error('Worker storage is unavailable.'), {
+        partialReceipt: {
+          workerCanonicalSubmission: true,
+          questionResponseRefs: [{ questionId: ids[storedIndex], storageRef }],
+          sessionSlug: SLUG,
+          storageRefs: [storageRef],
+        },
+      });
     });
-  });
 
-  await h.click();
-  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
-  await settle();
+    await h.click();
+    await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+    await settle();
 
-  const [stored, unsaved] = h.submitResponses.mock.calls[0][2].map((row) => row.questionID);
-  const unsavedPrompt = unsaved === FREEFORM_QID ? 'Freeform question' : 'Binary question';
-  expect(engine().state.submissionError).toBe(
-    `Some answers didn't save (Worker storage is unavailable). “${unsavedPrompt}” wasn't saved yet; submit again to send it.`,
-  );
-  expect(engine().getPendingEditStats().total).toBe(1);
-  expect(draftHolds(unsaved)).toBe(true);
+    const sent = h.submitResponses.mock.calls[0][2].map((row) => row.questionID);
+    const stored = sent[storedIndex];
+    const unsaved = sent[1 - storedIndex];
+    const unsavedPrompt = unsaved === FREEFORM_QID ? 'Freeform question' : 'Binary question';
+    expect(engine().state.submissionError).toBe(
+      `Some answers didn't save (Worker storage is unavailable). “${unsavedPrompt}” wasn't saved yet; submit again to send it.`,
+    );
+    expect(engine().getPendingEditStats().total).toBe(1);
+    expect(draftHolds(unsaved)).toBe(true);
 
-  await h.click();
-  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(2));
-  await settle();
+    await h.click();
+    await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(2));
+    await settle();
 
-  expect(h.submitResponses.mock.calls[1][2].map((row) => row.questionID)).toEqual([unsaved]);
-  const operation = h.submitResponses.mock.calls[0][6]?.operationId;
-  expect(operation).toEqual(expect.any(String));
-  expect(h.submitResponses.mock.calls[1][6]?.operationId).toBe(operation);
-  expect(engine()._submitOperationId).toBeUndefined();
-  expect(h.savedRows(stored)).toHaveLength(1);
-  expect(h.savedRows(unsaved)).toHaveLength(1);
-  expect(engine().getPendingEditStats().total).toBe(0);
-});
+    expect(h.submitResponses.mock.calls[1][2].map((row) => row.questionID)).toEqual([unsaved]);
+    const operation = h.submitResponses.mock.calls[0][6]?.operationId;
+    expect(operation).toEqual(expect.any(String));
+    expect(h.submitResponses.mock.calls[1][6]?.operationId).toBe(operation);
+    expect(engine()._submitOperationId).toBeUndefined();
+    expect(h.savedRows(stored)).toHaveLength(1);
+    expect(h.savedRows(unsaved)).toHaveLength(1);
+    expect(engine().getPendingEditStats().total).toBe(0);
+  },
+);
 
 it('names an interview answer held back from the upload and undoes only its draft', async () => {
   const h = await fixture();
@@ -1300,4 +1306,113 @@ it('keeps the interview notice away after Clear discards the unsaved answers', a
   await settle();
   expect(h.engine().getPendingEditStats().total).toBe(1);
   expect(screen.queryByText(/answer on the page/)).not.toBeInTheDocument();
+});
+
+describe('unsent answers in View all', () => {
+  const BINARY_QUESTION = { id: BINARY_QID, type: 'binary', prompt: 'Binary question' };
+  const BOTH = [BINARY_QUESTION, FREEFORM_QUESTION];
+  const SIGNED_OUT = { account: '', loginComplete: false, provider: null };
+  const SIGNED_IN = { account: OWNER, loginComplete: true, provider: { request: jest.fn() } };
+  const form = (h) => {
+    const slice = h.editor().state.surveysResponseState[0];
+    return [slice.answers[BINARY_QID]?.value, slice.answers[FREEFORM_QID]?.value];
+  };
+  const answerBoth = async (h) => {
+    await act(async () => h.editor().handleAnswer(0, BINARY_QID, 'Yes'));
+    await act(async () => h.editor().handleAnswer(0, FREEFORM_QID, 'Unsent words'));
+    await settle();
+  };
+  // A reload starts with no account; a signed-in browser gets it back a moment later.
+  const reload = async (h, signedIn) => {
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    h.unmount();
+    await h.mountEditor({ questionPool: BOTH, ...SIGNED_OUT });
+    if (signedIn) {
+      await act(async () => h.rerender(SIGNED_IN));
+      await settle();
+    }
+  };
+
+  it.each([
+    ['signed in', true],
+    ['signed out', false],
+  ])('keeps every answer through a failed Submit and a reload, %s', async (_label, signedIn) => {
+    const h = await fixture();
+    await h.mountEditor({ questionPool: BOTH, ...(signedIn ? SIGNED_IN : SIGNED_OUT) });
+    await answerBoth(h);
+    h.submitResponses.mockRejectedValueOnce(new Error('Network down'));
+    await h.click();
+    await settle();
+    if (signedIn) expect(h.editor().state.submissionError).toBeTruthy();
+    await reload(h, signedIn);
+    expect(form(h)).toEqual(['Yes', 'Unsent words']);
+  });
+
+  it('keeps answers typed before signing in, after the sign-in and a reload', async () => {
+    const h = await fixture();
+    await h.mountEditor({ questionPool: BOTH, ...SIGNED_OUT });
+    await answerBoth(h);
+    await act(async () => h.rerender(SIGNED_IN));
+    await settle();
+    expect(form(h)).toEqual(['Yes', 'Unsent words']);
+    await reload(h, true);
+    expect(form(h)).toEqual(['Yes', 'Unsent words']);
+  });
+
+  it('restores drafts the list could not read at first, and an edit keeps the others', async () => {
+    const h = await fixture();
+    await h.mountEditor({ questionPool: BOTH });
+    await answerBoth(h);
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    h.unmount();
+    // After the reload the session's draft store is unknown until its config resolves.
+    contractScriptsModule.getSessionConfigBySlug.mockReturnValue(null);
+    await h.mountEditor({ questionPool: BOTH, sessionConfig: null });
+    expect(h.editor().getDraftKey()).toBeNull();
+    contractScriptsModule.getSessionConfigBySlug.mockReturnValue(CONFIG);
+    // A render that changes nothing the list watches.
+    await act(async () => h.rerender({}));
+    await settle();
+    expect(form(h)).toEqual(['Yes', 'Unsent words']);
+    await act(async () => h.editor().handleAnswer(0, FREEFORM_QID, 'Unsent words, more'));
+    await settle();
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    const stored = JSON.parse(sessionStorage.getItem(h.editor().getDraftKey())).answers;
+    expect([stored[BINARY_QID]?.value, stored[FREEFORM_QID]?.value]).toEqual(['Yes', 'Unsent words, more']);
+  });
+
+  it('never drops the stored draft of a question the list has not restored', async () => {
+    const h = await fixture();
+    await h.mountEditor({ questionPool: BOTH });
+    await answerBoth(h);
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    h.unmount();
+    await h.mountEditor({ questionPool: BOTH });
+    // As if the binary question's draft had not been restored: the form shows it blank.
+    h.editor()._viewAllSync.restored.delete(BINARY_QID);
+    act(() =>
+      h.editor().setState((prev) => {
+        const slice = prev.surveysResponseState[0];
+        const answers = { ...slice.answers, [BINARY_QID]: { ...slice.answers[BINARY_QID], value: '' } };
+        return { surveysResponseState: [{ ...slice, answers }], editBaseline: { ...prev.editBaseline, answers } };
+      }),
+    );
+    await settle();
+    expect(form(h)[0]).toBe('');
+    await act(async () => h.editor().handleAnswer(0, FREEFORM_QID, 'Edited'));
+    await settle();
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    const stored = JSON.parse(sessionStorage.getItem(h.editor().getDraftKey())).answers;
+    expect([stored[BINARY_QID]?.value, stored[FREEFORM_QID]?.value]).toEqual(['Yes', 'Edited']);
+  });
 });

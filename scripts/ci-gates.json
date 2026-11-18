@@ -4,6 +4,7 @@
     "ci": [
       "wiring-and-release",
       "contracts",
+      "client-tests",
       "client",
       "root-jest",
       "workers",
@@ -13,6 +14,7 @@
       "wiring-and-release",
       "public-text",
       "contracts",
+      "client-tests",
       "client",
       "root-jest",
       "workers",
@@ -26,6 +28,7 @@
   },
   "gates": {
     "wiring-and-release": {
+      "lane": "suites",
       "commands": [
         {
           "label": "Check test and release wiring",
@@ -73,7 +76,8 @@
           "args": [
             "run",
             "lint"
-          ]
+          ],
+          "lane": "lint"
         },
         {
           "label": "Check client formatting",
@@ -83,7 +87,8 @@
             "client",
             "run",
             "format:check"
-          ]
+          ],
+          "lane": "lint"
         },
         {
           "label": "Lint workers",
@@ -91,7 +96,8 @@
           "args": [
             "run",
             "lint:workers"
-          ]
+          ],
+          "lane": "lint"
         },
         {
           "label": "Typecheck client",
@@ -99,7 +105,8 @@
           "args": [
             "run",
             "typecheck:client"
-          ]
+          ],
+          "lane": "types"
         },
         {
           "label": "Verify typed client tests",
@@ -107,7 +114,8 @@
           "args": [
             "run",
             "typecheck:client-tests"
-          ]
+          ],
+          "lane": "types"
         },
         {
           "label": "Verify release version surfaces",
@@ -139,7 +147,8 @@
           "args": [
             "run",
             "worker:bundle"
-          ]
+          ],
+          "lane": "build"
         },
         {
           "label": "Verify Cloudflare-native Session Worker package",
@@ -147,7 +156,8 @@
           "args": [
             "run",
             "verify:cloudflare-template"
-          ]
+          ],
+          "lane": "build"
         },
         {
           "label": "Build client",
@@ -157,7 +167,8 @@
             "client",
             "run",
             "build"
-          ]
+          ],
+          "lane": "build"
         },
         {
           "label": "Check client bundle budget",
@@ -165,7 +176,8 @@
           "args": [
             "run",
             "client:bundle-budget:check"
-          ]
+          ],
+          "lane": "build"
         }
       ]
     },
@@ -182,6 +194,7 @@
       ]
     },
     "contracts": {
+      "lane": "suites",
       "commands": [
         {
           "label": "Run contract tests and build artifacts",
@@ -225,14 +238,28 @@
         }
       ]
     },
-    "client": {
+    "client-tests": {
+      "lane": "client",
       "commands": [
         {
-          "label": "Run client coverage tests",
+          "label": "Run client coverage tests in shards",
           "command": "npm",
           "args": [
             "run",
-            "test:client"
+            "test:client:shards"
+          ]
+        }
+      ]
+    },
+    "client": {
+      "lane": "client",
+      "commands": [
+        {
+          "label": "Check and merge the client test shards",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:client:merge"
           ]
         },
         {
@@ -246,6 +273,7 @@
       ]
     },
     "root-jest": {
+      "lane": "suites",
       "commands": [
         {
           "label": "Run root Jest tests",
@@ -258,6 +286,7 @@
       ]
     },
     "workers": {
+      "lane": "suites",
       "commands": [
         {
           "label": "Run session CORS Worker tests",
@@ -290,6 +319,7 @@
       ]
     },
     "cecc-and-node": {
+      "lane": "node",
       "commands": [
         {
           "label": "Run tracked root Node tests",

@@ -59,6 +59,10 @@ describe('LoginButton', () => {
       /@media \(max-width: 480px\)\s*\{[\s\S]*?\.settingsQuickControlsGrid\s*\{([^}]+)\}/,
     )?.[1];
     expect(mobileGrid).toContain('grid-template-columns: 1fr;');
+    // Three controls: the lone third one takes its whole row, not half of it.
+    expect(compiledAccountStylesheet).toMatch(
+      /\.settingsQuickControlCell:last-child:nth-child\(odd\)\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/,
+    );
   });
 
   it('opens the account modal when idle', () => {

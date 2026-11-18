@@ -650,6 +650,148 @@ describe('error paths', () => {
     );
   });
 
+  it('reports each stored answer as it is saved, and stops counting at a failure', async () => {
+    window.ethereum = makeRpcProvider();
+    const question2 = `0x${'9'.repeat(64)}`;
+    const question3 = `0x${'8'.repeat(64)}`;
+    const stored = { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' };
+    uploadDataToSessionStorage
+      .mockResolvedValueOnce({ storageRef: stored })
+      .mockResolvedValueOnce({ storageRef: stored })
+      .mockRejectedValueOnce(new Error('Worker storage is unavailable.'));
+    const progress = [];
+
+    await submitResponses(
+      'wagmi',
+      [QUESTION_ID, question2, question3],
+      [
+        { questionID: QUESTION_ID, answer: 'yes' },
+        { questionID: question2, answer: 'no' },
+        { questionID: question3, answer: 'yes' },
+      ],
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+      { onProgress: (saved, total) => progress.push(`${saved} of ${total}`) },
+    ).catch((error) => error);
+
+    expect(progress).toEqual(['1 of 3', '2 of 3']);
+  });
+
+  const questionIds = (count) =>
+    Array.from({ length: count }, (_, index) => `0x${String(index + 1).repeat(64)}`.slice(0, 66));
+  const answersFor = (ids) => ids.map((questionID) => ({ questionID, answer: 'yes' }));
+  const uploadedQuestion = (payload) => JSON.parse(payload).questionID;
+  const later = (ms, value) => new Promise((resolve) => setTimeout(() => resolve(value), ms));
+
+  it('stores four Worker answers at once, and every answer', async () => {
+    window.ethereum = makeRpcProvider();
+    const ids = questionIds(9);
+    let inFlight = 0;
+    let most = 0;
+    uploadDataToSessionStorage.mockImplementation(async () => {
+      inFlight += 1;
+      most = Math.max(most, inFlight);
+      await later(2);
+      inFlight -= 1;
+      return { storageRef: { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' } };
+    });
+    const progress = [];
+    const receipt = await submitResponses(
+      'wagmi',
+      ids,
+      answersFor(ids),
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+      {
+        onProgress: (saved, total) => progress.push(`${saved} of ${total}`),
+      },
+    );
+    expect(most).toBe(4);
+    expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(9);
+    expect(progress).toEqual(Array.from({ length: 9 }, (_, index) => `${index + 1} of 9`));
+    expect(receipt.questionResponseRefs.map((ref) => ref.questionId)).toEqual(ids);
+  });
+
+  it("keeps one question's versions in order while other answers upload alongside", async () => {
+    window.ethereum = makeRpcProvider();
+    const [repeated, ...others] = questionIds(4);
+    const events = [];
+    uploadDataToSessionStorage.mockImplementation(async (payload) => {
+      const qid = uploadedQuestion(payload);
+      events.push(`start ${qid}`);
+      await later(qid === repeated ? 3 : 1);
+      events.push(`end ${qid}`);
+      return { storageRef: { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' } };
+    });
+    const ids = [repeated, others[0], repeated, others[1], others[2]];
+    await submitResponses('wagmi', ids, answersFor(ids), ethers.constants.HashZero, null, WORKER_CANONICAL_GROUP_CFG);
+    const mine = events.filter((event) => event.endsWith(repeated));
+    expect(mine).toEqual([`start ${repeated}`, `end ${repeated}`, `start ${repeated}`, `end ${repeated}`]);
+    expect(events.indexOf(`start ${others[0]}`)).toBeLessThan(events.indexOf(`end ${repeated}`));
+  });
+
+  it('lets answers in flight finish after a failure, starts no more, and names exactly those stored', async () => {
+    window.ethereum = makeRpcProvider();
+    const ids = questionIds(6);
+    let settled = 0;
+    uploadDataToSessionStorage.mockImplementation(async (payload) => {
+      if (uploadedQuestion(payload) === ids[1]) throw new Error('Worker storage is unavailable.');
+      const stored = await later(5, {
+        storageRef: { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' },
+      });
+      settled += 1;
+      return stored;
+    });
+    const failure = await submitResponses(
+      'wagmi',
+      ids,
+      answersFor(ids),
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+    ).catch((error) => error);
+    expect(settled).toBe(3);
+    expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(4);
+    expect(failure.message).toBe('Worker storage is unavailable.');
+    expect(failure.partialReceipt.questionResponseRefs.map((ref) => ref.questionId)).toEqual([ids[0], ids[2], ids[3]]);
+  });
+
+  it('retries only the unsaved answer, under the request id the Worker can replay', async () => {
+    window.ethereum = makeRpcProvider();
+    const ids = questionIds(3);
+    const requestIds = [];
+    uploadDataToSessionStorage.mockImplementation(async (payload, _format, opts) => {
+      requestIds.push([uploadedQuestion(payload), opts.requestId]);
+      if (uploadedQuestion(payload) === ids[1] && requestIds.length <= 3)
+        throw new Error('Worker storage is unavailable.');
+      return { storageRef: { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' } };
+    });
+    const options = { operationId: 'op-1', uploadRevisions: new Map() };
+    const failure = await submitResponses(
+      'wagmi',
+      ids,
+      answersFor(ids),
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+      options,
+    ).catch((error) => error);
+    expect(failure.partialReceipt.questionResponseRefs.map((ref) => ref.questionId)).toEqual([ids[0], ids[2]]);
+    const firstTry = requestIds.find(([qid]) => qid === ids[1])[1];
+    await submitResponses(
+      'wagmi',
+      [ids[1]],
+      answersFor([ids[1]]),
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+      options,
+    );
+    expect(requestIds.slice(3)).toEqual([[ids[1], firstTry]]);
+  });
+
   it('reports no stored answers when the first Worker upload fails', async () => {
     window.ethereum = makeRpcProvider();
     uploadDataToSessionStorage.mockRejectedValueOnce(new Error('Worker storage is unavailable.'));

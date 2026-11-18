@@ -1,4 +1,5 @@
 import React from 'react';
+import { render } from '@testing-library/react';
 
 import {
   renderPileActiveQuestionCard,
@@ -62,8 +63,10 @@ describe('surveyPileActiveQuestionCard', () => {
     expect(
       findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'footer-section'),
     ).not.toBeNull();
-    expect(findElement(tree, (node) => nodeHasClassName(node, 'pileCardMainContent'))).not.toBeNull();
     expect(findElement(tree, (node) => nodeHasClassName(node, 'customQuestionContainer'))).not.toBeNull();
+    // The answer area is a component of its own (it keeps a long list ending partway through an option).
+    const { container } = render(tree);
+    expect(container.querySelector('.pileCardMainContent .customQuestionContainer')).not.toBeNull();
   });
 
   it('renders the pile gated prompt card without the main content shell', () => {

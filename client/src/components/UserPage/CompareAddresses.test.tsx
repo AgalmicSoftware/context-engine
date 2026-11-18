@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import CompareAddress, {
   buildCompareClassName,
+  describeCompareAiFailure,
   buildCompareProfileHref,
   readDgObjectValues,
   resolveCompareAddressBlockieStyle,
@@ -226,7 +227,9 @@ describe('CompareAddresses subject routes', () => {
       </MemoryRouter>,
     );
     await waitFor(() =>
-      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.objectContaining({ sessionSlug: '' })),
+      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.objectContaining({ sessionSlug: '' }), {
+        throwOnError: true,
+      }),
     );
     const payload = mockRunCompareToolkit.mock.calls.find(([task]) => task === 'compare')?.[1];
     expect(payload).toEqual(
@@ -249,9 +252,125 @@ describe('CompareAddresses subject routes', () => {
         <CompareAddress activeSessionSlug="alpha" sessionCachesReady />
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Local comparison · AI summary unavailable')).toBeVisible();
+    expect(
+      await screen.findByText('Local comparison · AI summary unavailable: The AI reply could not be read.'),
+    ).toBeVisible();
     expect(await screen.findByText('Statistical axes')).toBeVisible();
     expect(screen.queryByText('Model: example')).not.toBeInTheDocument();
+  });
+
+  it('sends the session settings the page holds with both AI requests', async () => {
+    seedWorkerAnswers();
+    // Settings name their session as they were stored; the comparison's own name is tidied.
+    const sessionConfig = { slug: ' alpha ', corsWorkerUrl: 'https://alpha.example.workers.dev' };
+    render(
+      <MemoryRouter initialEntries={[comparisonPath]}>
+        <CompareAddress activeSessionSlug="alpha" sessionConfig={sessionConfig} sessionCachesReady />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(mockRunCompareToolkit.mock.calls.map(([task]) => task).sort()).toEqual(['axes', 'compare']),
+    );
+    mockRunCompareToolkit.mock.calls.forEach(([, payload]) =>
+      expect(payload).toEqual(expect.objectContaining({ sessionSlug: 'alpha', sessionConfig })),
+    );
+  });
+
+  it('keeps settings for another session out of the AI requests', async () => {
+    seedWorkerAnswers();
+    render(
+      <MemoryRouter initialEntries={[`${comparisonPath}&session=beta`]}>
+        <CompareAddress activeSessionSlug="alpha" sessionConfig={{ slug: 'alpha' }} sessionCachesReady />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(mockRunCompareToolkit).toHaveBeenCalledTimes(2));
+    mockRunCompareToolkit.mock.calls.forEach(([, payload]) => {
+      expect(payload).toEqual(expect.objectContaining({ sessionSlug: 'beta' }));
+      expect(payload).not.toHaveProperty('sessionConfig');
+    });
+  });
+
+  it('sends no settings that name no session, on the general session', async () => {
+    seedWorkerAnswers(['']);
+    render(
+      <MemoryRouter initialEntries={[comparisonPath]}>
+        <CompareAddress
+          activeSessionSlug=""
+          sessionConfig={{ corsWorkerUrl: 'https://x.example' }}
+          sessionCachesReady
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(mockRunCompareToolkit).toHaveBeenCalled());
+    mockRunCompareToolkit.mock.calls.forEach(([, payload]) => expect(payload).not.toHaveProperty('sessionConfig'));
+  });
+
+  it('ignores a failure from a comparison that was replaced while it ran', async () => {
+    seedWorkerAnswers();
+    let failFirst: (error: Error) => void = () => {};
+    mockRunCompareToolkit.mockImplementation((task: unknown) =>
+      task === 'compare' ? new Promise((_resolve, reject) => (failFirst = reject)) : Promise.resolve(null),
+    );
+    const view = (session: string) => (
+      <MemoryRouter initialEntries={[comparisonPath]}>
+        <CompareAddress activeSessionSlug={session} sessionCachesReady />
+      </MemoryRouter>
+    );
+    const { rerender } = render(view('alpha'));
+    await waitFor(() =>
+      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.anything(), expect.anything()),
+    );
+    const failAlpha = failFirst;
+    mockRunCompareToolkit.mockImplementation(async (task: unknown) =>
+      task === 'compare' ? { agreements: ['Shared view'], disagreements: [] } : null,
+    );
+    rerender(view('beta'));
+    expect(await screen.findByText('Shared view')).toBeVisible();
+    await act(async () => failAlpha(new Error('Failed to fetch')));
+    expect(screen.getByText('Local comparison · AI summary unavailable')).toBeVisible();
+    expect(screen.getByText('Shared view')).toBeVisible();
+  });
+
+  it.each([
+    ['Worker URL is not configured.', 'This page has no AI service for this session.'],
+    ['Failed to fetch', 'Unable to reach the AI service. Check your connection or AI settings, then try again.'],
+    ['The AI request was refused.', 'The AI request was refused.'],
+  ])('says why the AI summary is missing when the request fails with "%s"', async (failure, reason) => {
+    seedWorkerAnswers();
+    mockRunCompareToolkit.mockImplementation(async (...args: unknown[]) => {
+      const [task, , opts] = args as [unknown, unknown, { throwOnError?: boolean } | undefined];
+      // Only a caller that asks for the failure gets it; the map falls back without one.
+      if (task === 'compare' && opts?.throwOnError) throw new Error(failure);
+      return null;
+    });
+    render(
+      <MemoryRouter initialEntries={[comparisonPath]}>
+        <CompareAddress activeSessionSlug="alpha" sessionCachesReady />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(`Local comparison · AI summary unavailable: ${reason}`)).toBeVisible();
+    expect(describeCompareAiFailure(new Error(failure))).toBe(reason);
+  });
+
+  it('drops an earlier failure when the participants are compared again', async () => {
+    seedWorkerAnswers();
+    mockRunCompareToolkit.mockImplementation(async () => {
+      throw new Error('Failed to fetch');
+    });
+    const view = (session: string) => (
+      <MemoryRouter initialEntries={[comparisonPath]}>
+        <CompareAddress activeSessionSlug={session} sessionCachesReady />
+      </MemoryRouter>
+    );
+    const { rerender } = render(view('alpha'));
+    expect(await screen.findByText(/AI summary unavailable: Unable to reach the AI service/)).toBeVisible();
+    // This reply names no model, so the note stays; the earlier run's reason must not.
+    mockRunCompareToolkit.mockImplementation(async (task: unknown) =>
+      task === 'compare' ? { agreements: ['Shared view'], disagreements: [] } : null,
+    );
+    rerender(view('beta'));
+    expect(await screen.findByText('Shared view')).toBeVisible();
+    expect(screen.getByText('Local comparison · AI summary unavailable')).toBeVisible();
   });
 
   it('compares Hosted answers and reruns the same participants when the session changes', async () => {
@@ -263,7 +382,9 @@ describe('CompareAddresses subject routes', () => {
     );
     const { rerender } = render(view('alpha'));
     await waitFor(() =>
-      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.objectContaining({ sessionSlug: 'alpha' })),
+      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.objectContaining({ sessionSlug: 'alpha' }), {
+        throwOnError: true,
+      }),
     );
     const firstPayload = mockRunCompareToolkit.mock.calls.find(([task]) => task === 'compare')?.[1];
     expect(firstPayload).toEqual(
@@ -278,7 +399,9 @@ describe('CompareAddresses subject routes', () => {
     mockRunCompareToolkit.mockClear();
     rerender(view('beta'));
     await waitFor(() =>
-      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.objectContaining({ sessionSlug: 'beta' })),
+      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.objectContaining({ sessionSlug: 'beta' }), {
+        throwOnError: true,
+      }),
     );
     expect(mockRunCompareToolkit.mock.calls.find(([task]) => task === 'compare')?.[1]).toEqual(
       expect.objectContaining({
@@ -325,7 +448,9 @@ describe('CompareAddresses subject routes', () => {
     expect(mockRunCompareToolkit).not.toHaveBeenCalled();
     rerender(view(true));
     await waitFor(() =>
-      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.objectContaining({ sessionSlug: 'alpha' })),
+      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.objectContaining({ sessionSlug: 'alpha' }), {
+        throwOnError: true,
+      }),
     );
     fireEvent.click(screen.getByText('Change participants'));
     expect(screen.getAllByRole('button', { name: 'Clear this subject' })).toHaveLength(2);
@@ -397,6 +522,8 @@ describe('CompareAddresses subject routes', () => {
 
     expect(await screen.findByLabelText('Benjamin Franklin, shipped simulation')).toBeInTheDocument();
     expect(screen.getByLabelText('Franklin D. Roosevelt, shipped simulation')).toBeInTheDocument();
-    await waitFor(() => expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.any(Object)));
+    await waitFor(() =>
+      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.any(Object), { throwOnError: true }),
+    );
   });
 });

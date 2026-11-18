@@ -136,7 +136,10 @@ const fixtureContext = async ({ seed }, { workerEnv = env, failResponseUploadAt 
       ? { questionId: (typeof upload.data === 'string' ? JSON.parse(upload.data) : upload.data).questionID }
       : null;
     if (responseUpload) responseUploads.push(responseUpload);
-    const failUpload = responseUpload && responseUploads.length === failResponseUploadAt;
+    // Number each upload as it arrives: a Submit sends a few at once, so by the time the
+    // Worker answers, later uploads may already have arrived.
+    const uploadNumber = responseUpload ? responseUploads.length : 0;
+    const failUpload = responseUpload && uploadNumber === failResponseUploadAt;
     let response = failUpload ? new Response(JSON.stringify({ error: 'Synthetic storage outage (503)' }), {
       status: 503,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': baseUrl },
@@ -170,7 +173,7 @@ const fixtureContext = async ({ seed }, { workerEnv = env, failResponseUploadAt 
     if (loseResponseUploadAt && responseUpload) {
       const stored = await response.clone().json();
       Object.assign(responseUpload, { requestId: upload.requestId, storedId: stored.id, replayed: stored.replayed === true });
-      if (responseUploads.length === loseResponseUploadAt) {
+      if (uploadNumber === loseResponseUploadAt) {
         assert.equal(response.status, 200, 'The lost reply follows a successful Worker upload');
         response = new Response(JSON.stringify({ error: 'Synthetic lost upload reply (503)' }), {
           status: 503, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': baseUrl },

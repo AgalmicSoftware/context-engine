@@ -400,6 +400,19 @@ describe('OnePageSession results routing', () => {
     expect(subject.state.showResults).toBe(true);
   });
 
+  it('opens and scrolls to Groups from the end of the question set', () => {
+    const subject = createSubject();
+    const section = document.createElement('div');
+    section.id = 'session-groups';
+    section.scrollIntoView = jest.fn();
+    document.body.appendChild(section);
+    subject.state.showGroups = false;
+    subject.viewSessionGroups();
+    expect(subject.state.showGroups).toBe(true);
+    expect(section.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    section.remove();
+  });
+
   it.each(['edge', ''])('opens and scrolls to Report on initial %p session deep link', async (slug) => {
     const priorUrl = window.location.href;
     const originalScroll = window.HTMLElement.prototype.scrollIntoView;

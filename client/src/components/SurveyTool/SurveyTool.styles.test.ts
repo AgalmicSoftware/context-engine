@@ -51,7 +51,7 @@ it('rejects selectors moved to a different reduced-motion rule', () => {
   const text = readSurveyToolScss();
   const mutated = text
     .replace('  .pileCard,\n  .pileActions {', '  .pileActions {')
-    .replace('  .pileSubmitSuccessBadge,', '  .pileCard,\n  .pileSubmitSuccessBadge,');
+    .replace('  .pileSubmitDone,', '  .pileCard,\n  .pileSubmitDone,');
   expect(motionGuardPasses(text)).toBe(true);
   expect(motionGuardPasses(mutated)).toBe(false);
 });
@@ -219,4 +219,12 @@ describe('Interview layout', () => {
     expect(block).toMatch(/\.sessionInterviewHeader \.sessionInterviewHeaderButton \{\s*min-width: 36px;/);
     expect(block).toMatch(/\.sessionInterviewStatusPill \{[^}]*font-size: 0\.8rem;/);
   });
+});
+
+it('starts a phone choice list at its top, so an overflowing list keeps its first option in reach', () => {
+  const scss = readSurveyToolScss();
+  const phone = scss.slice(scss.indexOf('// Mobile: options should be full-width and scroll within the card.'));
+  const rule = phone.slice(phone.indexOf('#multiChoice {'), phone.indexOf('}'));
+  expect(rule).toMatch(/overflow-y: auto;/);
+  expect(rule).toMatch(/justify-content: flex-start;/);
 });

@@ -10,8 +10,9 @@ import {
   resolveSurveySelectorFilterIconStyle,
 } from './SurveySelector';
 import styles from './SurveyTool.module.scss';
+import { HeaderSubmittedCheck } from './SubmittedMarks';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 const syncClassSetState = (subject: any) => {
   subject.setState = jest.fn((next: any, cb?: () => void) => {
@@ -348,6 +349,85 @@ describe('SurveySelector display guards', () => {
     expect(nodeHasClassName(headerSubmitButton, styles.submitGlow)).toBe(true);
     expect(nodeHasClassName(toolbar, styles.embeddedSessionToolbar)).toBe(true);
     expect(nodeHasClassName(toolbar, styles.toolbarWithoutSubmit)).toBe(false);
+  });
+
+  it('turns the header Submit green "Submitted" for ten seconds, only right after a Submit that stored every answer', () => {
+    const subject = new SurveySelector({
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      embeddedSessionToolbar: true,
+    });
+    syncClassSetState(subject);
+    subject.state = { ...subject.state, loading: false, viewMode: 'questions', showLongLoading: false };
+    const check = () => findElement(subject.render(), (element) => element?.type === HeaderSubmittedCheck);
+    const stats = (total: number, submittedSinceLastEdit: boolean, isSubmitting = false) =>
+      subject.handlePendingStatsChange({ total, encrypted: 0, submittedSinceLastEdit, isSubmitting });
+    jest.useFakeTimers();
+    try {
+      stats(40, false, true);
+      stats(40, false); // the Submit failed
+      expect(check()).toBeFalsy();
+      stats(0, true); // nothing left to send: marked submitted, but no Submit just ran
+      expect(check()).toBeFalsy();
+
+      stats(1, false);
+      stats(1, false, true);
+      stats(0, true); // the Submit stored every answer
+      const view = render(check());
+      const shown = view.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
+      expect(shown).toHaveTextContent(/^Submitted$/);
+      expect(shown.classList.contains(styles.headerSubmitDone)).toBe(true);
+      const announced = findElement(subject.render(), (element) => element?.props?.role === 'status');
+      expect(announced?.props?.children).toBe('Your answers are submitted.');
+      act(() => {
+        jest.advanceTimersByTime(10_000);
+      });
+      expect(view.queryByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeNull();
+
+      stats(1, false); // an edit, then Clear changes
+      stats(0, true);
+      expect(check()).toBeFalsy();
+      expect(findElement(subject.render(), (element) => element?.props?.role === 'status')?.props?.children).toBe('');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('counts saved answers on the header Submit while a Submit runs', () => {
+    const subject = new SurveySelector({
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      embeddedSessionToolbar: true,
+    });
+    syncClassSetState(subject);
+    subject.state = { ...subject.state, loading: false, viewMode: 'questions', showLongLoading: false };
+    const submitButton = () =>
+      findElement(subject.render(), (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT);
+    const stats = { total: 40, encrypted: 0, submittedSinceLastEdit: false, isSubmitting: true };
+    jest.useFakeTimers();
+    try {
+      subject.handlePendingStatsChange({ ...stats, submitCountText: '12 of 40' });
+      const view = render(submitButton());
+      expect(view.container).toHaveTextContent('Saving 12 of 40 · 0s');
+      act(() => {
+        jest.advanceTimersByTime(3000);
+      });
+      subject.handlePendingStatsChange({ ...stats, submitCountText: '13 of 40' });
+      view.rerender(submitButton());
+      // The seconds keep counting from the Submit's start as the count moves on.
+      expect(view.container).toHaveTextContent('Saving 13 of 40 · 3s');
+      subject.handlePendingStatsChange({ ...stats, isSubmitting: false, submitCountText: '13 of 40' });
+      view.rerender(submitButton());
+      expect(view.container).toHaveTextContent(/^Submit \(40\)$/);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

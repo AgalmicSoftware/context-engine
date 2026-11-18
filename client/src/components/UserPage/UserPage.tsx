@@ -206,6 +206,7 @@ import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { copyText } from '../../utilities/ui/copyText';
 import { notify } from '../../utilities/ui/notify.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildExplorerAddressUrl } from '../../variables/chains.js';
 import { ethers } from 'ethers';
@@ -2809,8 +2810,13 @@ class UserPage extends Component<any, any> {
     }
   };
 
+  // The full profile opens on the session and Worker this page is showing.
+  getProfileSessionSlug = (): string => String(this.props.sessionConfig?.slug || this.getActiveSessionSlug());
+
   openFullPage = (): void => {
-    window.open(buildPublicRoute(`/u/${this.props.viewAddress}`));
+    const session = this.getProfileSessionSlug();
+    const query = session ? `?session=${encodeURIComponent(session)}` : '';
+    window.open(buildPublicRoute(withWorkerHintForSession(`/u/${this.props.viewAddress}${query}`, session)));
   };
 
   handleUsernameChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -3354,9 +3360,11 @@ class UserPage extends Component<any, any> {
       propViewAddress,
       stateViewAddress: this.state.viewAddress,
       username,
+      sessionSlug: this.getProfileSessionSlug(),
     });
+    // The link from the account box opens the full profile on the same session and Worker.
     const renderedAddressHref = String(addressHref || '').startsWith('/')
-      ? buildPublicRoute(String(addressHref || ''))
+      ? buildPublicRoute(withWorkerHintForSession(String(addressHref || ''), this.getProfileSessionSlug()))
       : addressHref;
     const addressDisplay = shouldLinkAddressLabel ? (
       <a
@@ -3603,7 +3611,8 @@ class UserPage extends Component<any, any> {
 
         <UserPageComparePanel collapseOpen={collapseOpen} minimized={minimized}>
           <CompareAddressSection
-            activeSessionSlug={this.props.sessionConfig?.slug || this.getActiveSessionSlug()}
+            activeSessionSlug={this.getProfileSessionSlug()}
+            sessionConfig={this.props.sessionConfig}
             firstAddress={propViewAddress}
             account={account}
             sessionCachesReady={resolveCompareCachesReady(this.props)}

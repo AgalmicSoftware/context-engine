@@ -433,7 +433,7 @@ Deep-dive docs:
 
 An older Atlas / debate-map demo surface sits alongside the primary session, survey, and group workflows.
 It consists of `/atlas`, `/tag/...`, and embedded debate-map UI inside demo session results.
-The home Tools tab and embedded session views also include the shared risk matrix.
+Embedded session views also include the shared risk matrix.
 
 ## System Architecture (How It Works)
 

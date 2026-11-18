@@ -9,12 +9,7 @@ jest.mock('./ToolExplorer', () => ({
   __esModule: true,
   default: (props: any) => {
     mockToolExplorer(props);
-    return (
-      <div
-        data-testid="mock-tool-explorer"
-        data-demo-surface-mode={typeof props.demoSurfaceMode === 'undefined' ? '' : String(props.demoSurfaceMode)}
-      />
-    );
+    return <div data-testid="mock-tool-explorer" />;
   },
 }));
 
@@ -35,9 +30,6 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
   focusedTab: MAIN_AREA_TABS.TOOLS,
   changeFocusedTab: jest.fn(),
   toggleLoginModal: jest.fn(),
-  toggleDemoMode: jest.fn(),
-  demoMode: { tools: false },
-  demoSurfaceMode: true,
   provider: {},
   network: { id: 84532 },
   networkChainId: 84532,
@@ -76,7 +68,10 @@ describe('MainAreaTabs', () => {
     expect(container.querySelectorAll('.navTabIcon')).toHaveLength(3);
     expect(screen.getByRole('tab', { name: 'Tools' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByTestId('mock-tool-explorer')).toBeInTheDocument();
-    expect(screen.getByTestId('mock-tool-explorer')).toHaveAttribute('data-demo-surface-mode', 'true');
+    // Demo Mode is gone: the Explorer is handed no demo setting.
+    const explorerProps = mockToolExplorer.mock.calls.at(-1)?.[0];
+    expect(explorerProps).not.toHaveProperty('demoSurfaceMode');
+    expect(explorerProps).not.toHaveProperty('demoMode');
   });
 
   it('opens Tools for a retained Latest selection without notifying the parent', async () => {
@@ -102,12 +97,6 @@ describe('MainAreaTabs', () => {
     expect(screen.getByTestId('mock-tool-explorer').closest('.tab-pane')).toHaveClass('active');
     expect(screen.getByTestId('mock-onboarding-walkthrough').closest('.tab-pane')).not.toHaveClass('active');
     expect(changeFocusedTab).not.toHaveBeenCalled();
-  });
-
-  it('passes demoSurfaceMode through to ToolExplorer on the Tools tab', async () => {
-    render(<MainAreaTabs {...createProps({ demoSurfaceMode: false })} />);
-
-    expect(await screen.findByTestId('mock-tool-explorer')).toHaveAttribute('data-demo-surface-mode', 'false');
   });
 
   it('passes the active session cache context through to the embedded explorer', async () => {

@@ -1,7 +1,10 @@
 import * as workerHydration from '../../utilities/survey/workerResponseHydration';
 import { buildSurveyLocalCacheSlice, executeSurveyLocalCacheRehydrate } from './surveyToolHydrationController';
 import { buildDraftAwareCacheHydrationState } from './surveyToolUtils';
-import { createSurveyQuestionsResponseStateRuntime } from './surveyQuestionsResponseStateRuntime';
+import {
+  createSurveyQuestionsResponseStateRuntime,
+  type SurveyQuestionsResponseStateDeps,
+} from './surveyQuestionsResponseStateRuntime';
 import type { SurveyQuestionsProps, SurveyQuestionsState } from './surveyQuestionsTypes';
 
 jest.mock('./surveyToolHydrationController', () => ({
@@ -44,7 +47,7 @@ const createDeps = ({
     _rehydrateLocalCacheLastSig: '',
     _savedAnswersLoadedQids: new Set<string>(),
     _userAnswersSliceCache: { source: null, value: null },
-    _viewAllSync: null as { restored: Set<string> } | null,
+    _viewAllSync: null as SurveyQuestionsResponseStateDeps['inst']['_viewAllSync'],
   },
   propsRef: { current: props },
   stateRef: {
@@ -56,7 +59,7 @@ const createDeps = ({
   },
   setState: jest.fn(),
   setResponseHydrationState: jest.fn(),
-  drafts: { load: loadDraft, persist: jest.fn(), clear: jest.fn() },
+  drafts: { load: loadDraft, persist: jest.fn(), clear: jest.fn(), ready: () => true },
   questionIds: {
     rendered: jest.fn(() => ['q1']),
     editTracking: jest.fn(() => new Set<string>()),
@@ -86,6 +89,31 @@ describe('surveyQuestionsResponseStateRuntime', () => {
     expect(runtime.valuesEqual(['a', 'b'], ['b', 'a'])).toBe(false);
   });
 
+  it('marks a question saved only while its stored answer is unchanged, and counts it pending once it changes', () => {
+    const runtime = createSurveyQuestionsResponseStateRuntime(createDeps());
+    const slice = (answer: unknown, comment = '') => ({
+      answers: { q1: { value: answer, encrypted: false } },
+      additionalComments: { q1: { value: comment, encrypted: false } },
+      importance: {},
+      conviction: {},
+    });
+    const stored = slice('Agree');
+    expect(runtime.isQuestionSaved(stored, slice('Agree'), 'q1')).toBe(true);
+    expect(runtime.computeModifiedQuestionsCount(stored, slice('Agree'))).toBe(0);
+    // A changed answer or comment is pending, not saved.
+    for (const changed of [slice('Disagree'), slice('Agree', 'a comment')]) {
+      expect(runtime.isQuestionSaved(stored, changed, 'q1')).toBe(false);
+      expect(runtime.computeModifiedQuestionsCount(stored, changed)).toBe(1);
+    }
+    // Stored under a differently cased key, it is the same question; a changed slider is pending.
+    const storedUpper = { ...stored, answers: { Q1: { value: 'Agree', encrypted: false } } };
+    expect(runtime.isQuestionSaved(storedUpper, slice('Agree'), 'q1')).toBe(true);
+    expect(runtime.isQuestionSaved(stored, { ...slice('Agree'), importance: { q1: 3 } }, 'q1')).toBe(false);
+    // Nothing stored: an answer on the page is not saved yet, nor is an empty one.
+    expect(runtime.isQuestionSaved(slice(''), slice('Agree'), 'q1')).toBe(false);
+    expect(runtime.isQuestionSaved(slice(''), slice(''), 'q1')).toBe(false);
+  });
+
   it('builds local-cache slices with rendered ids and memo updates', () => {
     const deps = createDeps();
     const runtime = createSurveyQuestionsResponseStateRuntime(deps);
@@ -112,7 +140,7 @@ describe('surveyQuestionsResponseStateRuntime', () => {
       loadDraft: jest.fn(() => ({ answers: { q1: { additional: 'Draft comment' } }, baseline: {} })),
       props: { isStandalone: true, isResponsesCacheReady: true, sessionConfig: null } as SurveyQuestionsProps,
     });
-    deps.inst._viewAllSync = { restored: new Set<string>() };
+    deps.inst._viewAllSync = { restored: new Set<string>(), storeReady: false };
     // Minimal appliers: saved answers fill empty fields; the draft writes its comment.
     deps.inst._applyLocalCacheHydrationEntryToSlice = jest.fn(({ targetSlice, questionId, cachedAnswer }: any) => {
       if (!cachedAnswer || targetSlice.answers[questionId]?.value) return false;
@@ -151,7 +179,7 @@ describe('surveyQuestionsResponseStateRuntime', () => {
   it('leaves loaded questions alone while a Submit result holds the form, and forgets questions that left', () => {
     const deps = viewAllDeps({ submissionComplete: true });
     deps.inst._savedAnswersLoadedQids = new Set(['q1', 'q9']);
-    deps.inst._viewAllSync = { restored: new Set(['q1', 'q9']) };
+    deps.inst._viewAllSync = { restored: new Set(['q1', 'q9']), storeReady: false };
 
     createSurveyQuestionsResponseStateRuntime(deps).syncViewAllQuestions();
 

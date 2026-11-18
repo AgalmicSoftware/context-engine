@@ -108,6 +108,25 @@ afterEach(() => {
   disposals.splice(0).forEach((dispose) => dispose());
 });
 
+test("log-out clears the signed-out account's unsent answers for every session, and only those", async () => {
+  const account = '0x00000000000000000000000000000000000000ab';
+  const kept = [
+    'dg:surveyDraft:edge:84532:anon:questions',
+    'dg:surveyDraft:edge:84532:0x00000000000000000000000000000000000000cd:questions',
+    'unrelated',
+  ];
+  const cleared = [
+    `dg:surveyDraft:edge:84532:${account}:questions`,
+    `dg:surveyDraft:edge:__pending__:${account}:questions:q:q1`,
+    `dg:surveyDraft:other:worker:${account}:questions:authority:x`,
+  ];
+  [...kept, ...cleared].forEach((key) => sessionStorage.setItem(key, '{}'));
+  changeAccount({ account: account.toUpperCase().replace('0X', '0x') })(store.dispatch);
+  await logoutClientAuth();
+  expect(Object.keys(sessionStorage).sort()).toEqual([...kept].sort());
+  sessionStorage.clear();
+});
+
 test('global and agent logout reset all mounted sessions and a return visit makes zero authenticated requests', async () => {
   changeAccount({ account: envelope().address, provider: 'agent_token' })(store.dispatch);
   updateLoginInfo({ loginComplete: true, loginInProgress: false, provider: 'agent_token' })(store.dispatch);

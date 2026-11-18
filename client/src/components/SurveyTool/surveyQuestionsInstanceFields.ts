@@ -66,6 +66,8 @@ type SurveyQuestionsPendingStatsSnapshot = {
   encrypted: number;
   submittedSinceLastEdit: boolean;
   isSubmitting: boolean;
+  // "12 of 40" while a Submit saves several answers.
+  submitCountText: string;
 };
 export type SurveyQuestionsPendingStatsInput =
   Partial<Pick<SurveyQuestionsPendingStatsSnapshot, 'total' | 'encrypted'>> | null | undefined;
@@ -174,6 +176,8 @@ export type SurveyQuestionsInstanceFields = {
   _maskedQuestionVisibilityMemoByPool: WeakMap<object, unknown>;
   // These property names survive minification in the SurveyQuestions chunk.
   _a: SurveyQuestionsRuntimeRecord | null;
+  /** Advances on every render except one that only changed answers; see SurveyQuestionCard. */
+  _questionCardEpoch: number;
   _audioInputWorkerPropsMemo: SurveyAudioWorkerPropsMemo | null;
   _q: Map<string, SurveyQuestionsRuntimeRecord>;
   _canDecryptOtherResponsesKey: string;
@@ -187,8 +191,8 @@ export type SurveyQuestionsInstanceFields = {
   _responseHydrationStateUpdateDepth: number;
   // Questions whose saved answers this view loaded into its form; any other question always loads.
   _savedAnswersLoadedQids: Set<string>;
-  // View all only: questions whose draft was restored in this view.
-  _viewAllSync: { restored: Set<string> } | null;
+  // View all only: questions whose draft was restored in this view, and whether drafts could be read.
+  _viewAllSync: { restored: Set<string>; storeReady: boolean } | null;
   _surveyDecryptAttemptSeq: number;
   _activeSurveyDecryptAttemptSeq: number;
   _submitAttemptSeq: number;
@@ -261,6 +265,7 @@ export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFi
   _lockedQuestionGateDetailsMemo: { key: '', poolRef: null, poolVersion: 0, value: [] },
   _maskedQuestionVisibilityMemoByPool: new WeakMap(),
   _a: null,
+  _questionCardEpoch: 0,
   _audioInputWorkerPropsMemo: null,
   _q: new Map(),
   _canDecryptOtherResponsesKey: '',

@@ -51,13 +51,12 @@ export const LoginSettingsConfigToggleControl = ({
 );
 
 export const LoginSettingsControlRow = ({
-  afterDemo = null,
+  afterToggles = null,
   beforeConfig = null,
   betweenSessionAndTooltips = null,
   configOpen = false,
   configTestId = '',
   containerClassName = '',
-  demoControl = null,
   layout = 'row',
   onToggleConfig = null,
   rowClassName = '',
@@ -66,13 +65,12 @@ export const LoginSettingsControlRow = ({
   themeControl = null,
   tooltipsControl = null,
 }: {
-  afterDemo?: React.ReactNode;
+  afterToggles?: React.ReactNode;
   beforeConfig?: React.ReactNode;
   betweenSessionAndTooltips?: React.ReactNode;
   configOpen?: boolean;
   configTestId?: string;
   containerClassName?: string;
-  demoControl?: React.ReactNode;
   layout?: 'row' | 'quick-grid';
   onToggleConfig?: (() => void) | null;
   rowClassName?: string;
@@ -88,7 +86,6 @@ export const LoginSettingsControlRow = ({
     { key: 'config', control: configControl },
     { key: 'session', control: showSession ? sessionControl : null },
     { key: 'explainers', control: tooltipsControl },
-    { key: 'demo', control: demoControl },
   ];
 
   if (layout === 'quick-grid') {
@@ -104,7 +101,7 @@ export const LoginSettingsControlRow = ({
         </div>
         {themeControl ? <div className={styles.settingsThemeQuickSlot}>{themeControl}</div> : null}
         {betweenSessionAndTooltips}
-        {afterDemo}
+        {afterToggles}
       </div>
     );
   }
@@ -117,8 +114,7 @@ export const LoginSettingsControlRow = ({
         {showSession ? sessionControl : null}
         {betweenSessionAndTooltips}
         {tooltipsControl}
-        {demoControl}
-        {afterDemo}
+        {afterToggles}
       </div>
     </div>
   );

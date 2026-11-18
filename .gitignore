@@ -158,6 +158,9 @@ contextEngine-cc/**/*.log
 contextEngine-cc/.cache/
 contextEngine-cc/cache/
 contextEngine-cc/tmp/
+# Written and removed by its tests; checks that list untracked files run beside them.
+contextEngine-cc/public-static-test-*/
+contextEngine-cc/public/..foo.html
 
 # Local Worker secrets and state, in any Worker directory
 **/.dev.vars

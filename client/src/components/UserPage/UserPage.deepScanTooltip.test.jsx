@@ -955,7 +955,8 @@ describe('UserPage deep scan tooltip formatting', () => {
     );
     const profileLinks = collectTreeNodes(
       tree,
-      (node) => node?.type === 'a' && node?.props?.href === `/u/${viewAddress}`,
+      // The account box links to the full profile on the session it is showing.
+      (node) => node?.type === 'a' && node?.props?.href === `/u/${viewAddress}?session=demo-sh`,
     );
 
     expect(instance.getExplorerChainId()).toBeNull();

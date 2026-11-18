@@ -18,7 +18,12 @@ import QuadraticAllocationInput from './QuadraticAllocationInput';
 /** @file SurveyPileViewMode.tsx */
 
 import React from 'react';
-import { resolvePileAutoAdvanceEnabled } from './surveyPileNavigation';
+import {
+  CHOICE_ADVANCE_DELAY_MS,
+  resolvePileAutoAdvanceEnabled,
+  SCROLL_MOVE_PX,
+  SCROLL_TAP_GUARD_MS,
+} from './surveyPileNavigation';
 // Styles
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
@@ -34,6 +39,7 @@ import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuest
 import {
   buildNoPendingPileSubmitFeedbackPlan,
   buildPileSubmitRailViewState,
+  pileAnswerIsGiven,
   buildPileSubmitViewState,
   buildPileWorkspaceViewState,
   buildPileFilterActivePatch,
@@ -107,7 +113,7 @@ import {
   shouldInitializePileResponses,
 } from './surveyPileResponseController';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation';
-import { clearSurveyDraftsForAccount } from './surveyToolDraftState';
+import PileEndOfSetCard from './PileEndOfSetCard';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildTransientSubmitFeedbackState,
@@ -1209,6 +1215,30 @@ const stripUnknownSessionModeQuery = () => {
 
 const runPileComponentDidMount = (engine: PileViewModeEngine) => {
   engine._isMounted = true;
+  // When the person last dragged or wheeled the card's content, so a tap that ends a scroll is not taken as a choice
+  // to move on. Scrolls the page makes itself (focus, scrolling into view) are not theirs and do not count, and nor
+  // does the few pixels a finger drifts during an ordinary tap.
+  engine._pileScrollListener = (event: Event) => {
+    if (!(event.target instanceof Node && engine.pileContainer?.contains(event.target))) return;
+    // Each finger is measured from where it went down, so a second finger dragging while the first rests counts.
+    const fingers = Array.from((event as TouchEvent).changedTouches ?? []);
+    if (event.type === 'touchstart') {
+      engine._pileTouchStarts ??= new Map();
+      fingers.forEach((finger) =>
+        engine._pileTouchStarts.set(finger.identifier, { x: finger.clientX, y: finger.clientY }),
+      );
+      return;
+    }
+    const dragged = (finger: Touch) => {
+      const start = engine._pileTouchStarts?.get(finger.identifier);
+      return !!start && Math.hypot(finger.clientX - start.x, finger.clientY - start.y) >= SCROLL_MOVE_PX;
+    };
+    if (event.type === 'touchmove' && !fingers.some(dragged)) return;
+    engine._pileLastScrollAt = Date.now();
+  };
+  ['touchstart', 'touchmove', 'wheel'].forEach((type) =>
+    document.addEventListener(type, engine._pileScrollListener, { capture: true, passive: true }),
+  );
   stripUnknownSessionModeQuery();
   // Regression guard: consume the prefill during pure initialization, but clear it only after mount.
   // Clearing inside the reducer initializer makes React Strict Mode's second initialization lose the packet.
@@ -1265,6 +1295,13 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
   }
   if (prevState.pileQuestions !== engine.state.pileQuestions) {
     engine.syncCurrentPileQuestionsSignature(engine.state.pileQuestions);
+  }
+  // The end of the set ends with a new filter, or once its last question is no longer the active last one.
+  if (
+    engine.state.pileSetEndQuestionId &&
+    (prevState.filterState !== engine.state.filterState || !isPileSetEndShown(engine.state, engine.props))
+  ) {
+    engine.setState({ pileSetEndQuestionId: null });
   }
 
   // Rebuild guard: never rebuild lists/slices while user has pending edits
@@ -1369,8 +1406,6 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
     engine._savedAnswersSeenReady = !!engine.props.isResponsesCacheReady;
     engine._pileOwnAnswersSubmitController?.abort();
     engine._pileOwnAnswersSubmitController = null;
-    // Unsaved edits belong to the signed-in account; never leave them for the next person.
-    if (accountChanged && prevProps.account) clearSurveyDraftsForAccount(prevProps.account);
 
     // If context changes, we must reset optimistic flags and reload immediately
     // We do engine regardless of edits because the context (wallet/chain) invalidates the current session
@@ -1441,6 +1476,9 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
 };
 
 const runPileComponentWillUnmount = (engine: PileViewModeEngine) => {
+  ['touchstart', 'touchmove', 'wheel'].forEach((type) =>
+    document.removeEventListener(type, engine._pileScrollListener, { capture: true }),
+  );
   engine._pileOwnAnswersSubmitController?.abort();
   engine._pileOwnAnswersSubmitController = null;
   try {
@@ -1458,6 +1496,7 @@ const runPileComponentWillUnmount = (engine: PileViewModeEngine) => {
     clearTimeout(engine._navFadeTimer);
     engine._navFadeTimer = null;
   }
+  clearTimeout(engine._pileChoiceAdvanceTimer);
   if (engine.loadingTimeout) {
     clearTimeout(engine.loadingTimeout);
   }
@@ -1514,14 +1553,45 @@ const triggerNavFade = (engine: PileViewModeEngine) => {
   }, 2000);
 };
 
+/** Whether Next has passed the last question: it still is the active one, and the last. */
+/** The parts of the pile's state that say where in the set it stands. */
+type PileSetPosition = {
+  pileQuestions?: unknown;
+  questionPool?: unknown;
+  isFilterActive?: unknown;
+  filterState?: unknown;
+  activePileIndex?: unknown;
+  pileSetEndQuestionId?: unknown;
+};
+type PileQuestionPoolProps = { questionPool?: unknown };
+
+const isPileSetEndShown = (state: PileSetPosition, props: PileQuestionPoolProps): boolean => {
+  if (!state.pileSetEndQuestionId) return false;
+  const pool = Array.isArray(state.questionPool) && state.questionPool.length ? state.questionPool : props.questionPool;
+  const questions = resolveEarlyVisiblePileQuestions({
+    pileQuestions: state.pileQuestions as EarlyVisiblePileQuestion[] | null | undefined,
+    questionPool: (Array.isArray(pool) ? pool : []) as EarlyVisiblePileQuestion[],
+    isFilterActive: !!state.isFilterActive || isSurveyToolFilterStateActive(state.filterState),
+  });
+  const last = questions.length - 1;
+  return (
+    last >= 0 &&
+    Math.min(Number(state.activePileIndex || 0), last) === last &&
+    normalizeQuestionIdKey(questions[last]?.id) === state.pileSetEndQuestionId
+  );
+};
+
 const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
+  // A move by hand cancels a pending move-on from a single choice.
+  clearTimeout(engine._pileChoiceAdvanceTimer);
+  engine._pileChoicePendingQuestionId = null;
   if (engine._persistTimer) {
     clearTimeout(engine._persistTimer);
     engine._persistTimer = null;
     engine.persistDraft();
   }
   engine.setState(
-    (prev: any, props: any = engine.props) => {
+    (prev: any, props: PileQuestionPoolProps = engine.props) => {
       const fallbackQuestionPool =
         Array.isArray(prev.questionPool) && prev.questionPool.length > 0
           ? prev.questionPool
@@ -1534,12 +1604,20 @@ const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
         questionPool: fallbackQuestionPool,
         isFilterActive,
       });
-      return {
-        activePileIndex: Math.min(Number(prev.activePileIndex || 0) + 1, Math.max(navigableQuestions.length - 1, 0)),
-      };
+      const lastIndex = navigableQuestions.length - 1;
+      const index = Number(prev.activePileIndex || 0);
+      // Next on the last question opens the end of the set, marked with that question so any move away ends it.
+      if (lastIndex >= 0 && index >= lastIndex) {
+        return { pileSetEndQuestionId: normalizeQuestionIdKey(navigableQuestions[lastIndex]?.id) };
+      }
+      return { activePileIndex: Math.min(index + 1, Math.max(lastIndex, 0)), pileSetEndQuestionId: null };
     },
     () => {
       engine.ensureVisiblePileResponseState();
+      if (engine.state.pileSetEndQuestionId) {
+        engine.pileContainer?.querySelector('[data-testid="ce-pile-end-of-set"]')?.focus({ preventScroll: true });
+        return;
+      }
       if (focusQuestion === true) {
         const card = engine.pileContainer?.querySelector('[data-testid="ce-pile-active-question"]');
         card?.focus({ preventScroll: true });
@@ -1551,17 +1629,26 @@ const handleNext = (engine: PileViewModeEngine, focusQuestion = false) => {
 };
 
 const handlePrev = (engine: PileViewModeEngine) => {
+  // A move by hand cancels a pending move-on from a single choice.
+  clearTimeout(engine._pileChoiceAdvanceTimer);
+  engine._pileChoicePendingQuestionId = null;
   if (engine._persistTimer) {
     clearTimeout(engine._persistTimer);
     engine._persistTimer = null;
     engine.persistDraft();
   }
   engine.setState(
-    (prev: any) => ({
-      activePileIndex: Math.max(prev.activePileIndex - 1, 0),
-    }),
+    (prev: any, props: PileQuestionPoolProps = engine.props) =>
+      // Back from the end of the set returns to the last question.
+      isPileSetEndShown(prev, props)
+        ? { pileSetEndQuestionId: null }
+        : { activePileIndex: Math.max(prev.activePileIndex - 1, 0), pileSetEndQuestionId: null },
     () => {
       engine.ensureVisiblePileResponseState();
+      // Back from the end of a one-question set lands on the first card, where Back is off: focus would be stuck.
+      const focused = document.activeElement;
+      if (!focused || focused === document.body || focused.matches(':disabled'))
+        engine.pileContainer?.querySelector('[data-testid="ce-pile-active-question"]')?.focus({ preventScroll: true });
     },
   );
   engine.triggerNavFade();
@@ -1674,6 +1761,10 @@ const appendCurrentWorkerHintToPath = (pathIn = ''): string => {
 
 const viewResultsFromSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   engine.closeSessionVoiceModeModal();
+  openSessionResults(engine);
+};
+
+const openSessionResults = (engine: PileViewModeEngine) => {
   if (engine.props.onViewSessionResults) {
     engine.props.onViewSessionResults();
     return;
@@ -2825,53 +2916,72 @@ const renderPileResponseInput = (
       // double-click/tap cannot answer the card the first press just revealed.
       const repeatedPress = engine._pileAnswerClickCount > 1;
       engine._pileAnswerClickCount = 0;
-      if (repeatedPress && engine._pileAdvancedIntoQuestionId === questionId) return;
+      // The second press of a double tap lands on the card it moved to, or on this card while it waits to move on.
+      // There it would clear or repeat the choice; a quick press on another option is a new choice and counts.
+      const picksAnother =
+        pileAnswerIsGiven(value) && JSON.stringify(value) !== JSON.stringify(engine._pileChoicePendingValue);
+      if (
+        repeatedPress &&
+        (engine._pileAdvancedIntoQuestionId === questionId ||
+          (engine._pileChoicePendingQuestionId === questionId && !picksAnother))
+      )
+        return;
+      // A new choice replaces any move a single choice was waiting to make.
+      clearTimeout(engine._pileChoiceAdvanceTimer);
+      engine._pileChoicePendingQuestionId = null;
       // An accepted interaction starts a new gesture on this card. Retaining the
       // transition marker would reject later quadratic steps in that gesture.
       engine._pileAdvancedIntoQuestionId = null;
       const inputType = normalizePileQuestionInputType(question);
       const canAdvance =
-        inputType === 'binary' ||
-        (inputType === 'multichoice' && (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question)));
+        CHOICE_ADVANCE_DELAY_MS !== null &&
+        (inputType === 'binary' ||
+          (inputType === 'multichoice' &&
+            (isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question))));
       const arrowSelection = engine._pileAnswerArrowKeyDown === true;
+      const chosenAt = Date.now();
+      // A tap that ended a scroll of the card picks, but never moves on; nor does a choice the person scrolled away from.
+      const endedScroll = chosenAt - Number(engine._pileLastScrollAt || 0) < SCROLL_TAP_GUARD_MS;
+      // Moves on only while this card is still showing one committed answer and nothing is being written on it.
+      const advance = () => {
+        engine._pileChoicePendingQuestionId = null;
+        if (!engine._isMounted || engine.state.showComments?.[question.id]) return;
+        if (Number(engine._pileLastScrollAt || 0) > chosenAt) return;
+        if (!resolvePileAutoAdvanceEnabled(engine.getEffectivePileSessionConfig())) return;
+        // Inspect the committed answer: clicking a selected binary option clears it.
+        // Only direct card edits reach this callback; interview drafts and hydration do not.
+        const savedValue = readPlainRecord(engine.state.surveysResponseState?.[0]?.answers?.[questionId]).value;
+        if (
+          inputType === 'binary'
+            ? typeof savedValue !== 'string' || !['Agree', 'Unsure', 'Disagree'].includes(savedValue)
+            : normalizeMultichoiceValue(savedValue).length !== 1
+        )
+          return;
+        const visibleQuestions = resolveEarlyVisiblePileQuestions({
+          pileQuestions: engine.state.pileQuestions,
+          questionPool: (engine.state.questionPool?.length
+            ? engine.state.questionPool
+            : engine.props.questionPool) as EarlyVisiblePileQuestion[],
+          isFilterActive: !!engine.state.isFilterActive || isSurveyToolFilterStateActive(engine.state.filterState),
+        });
+        const index = Math.min(
+          Math.max(0, Number(engine.state.activePileIndex || 0)),
+          Math.max(visibleQuestions.length - 1, 0),
+        );
+        if (normalizeQuestionIdKey(visibleQuestions[index]?.id) !== questionId || index >= visibleQuestions.length - 1)
+          return;
+        engine._pileAdvancedIntoQuestionId = normalizeQuestionIdKey(visibleQuestions[index + 1]?.id);
+        engine.handleNext(true);
+      };
       engine.handleAnswerPile(question.id, value, {
         afterUpdate: () => {
           // Radio arrows select within the group. An open comment editor may still
           // be receiving dictation, so leave both on this card until explicit Next.
-          if (
-            !canAdvance ||
-            arrowSelection ||
-            engine.state.showComments?.[question.id] ||
-            !resolvePileAutoAdvanceEnabled(engine.getEffectivePileSessionConfig())
-          )
-            return;
-          // Inspect the committed answer: clicking a selected binary option clears it.
-          // Only direct card edits reach this callback; interview drafts and hydration do not.
-          const savedValue = readPlainRecord(engine.state.surveysResponseState?.[0]?.answers?.[questionId]).value;
-          if (
-            inputType === 'binary'
-              ? typeof savedValue !== 'string' || !['Agree', 'Unsure', 'Disagree'].includes(savedValue)
-              : normalizeMultichoiceValue(savedValue).length !== 1
-          )
-            return;
-          const visibleQuestions = resolveEarlyVisiblePileQuestions({
-            pileQuestions: engine.state.pileQuestions,
-            questionPool: (engine.state.questionPool?.length
-              ? engine.state.questionPool
-              : engine.props.questionPool) as EarlyVisiblePileQuestion[],
-            isFilterActive: !!engine.state.isFilterActive || isSurveyToolFilterStateActive(engine.state.filterState),
-          });
-          const index = Math.min(
-            Math.max(0, Number(engine.state.activePileIndex || 0)),
-            Math.max(visibleQuestions.length - 1, 0),
-          );
-          if (
-            normalizeQuestionIdKey(visibleQuestions[index]?.id) !== questionId ||
-            index >= visibleQuestions.length - 1
-          )
-            return;
-          engine._pileAdvancedIntoQuestionId = normalizeQuestionIdKey(visibleQuestions[index + 1]?.id);
-          engine.handleNext(true);
+          if (!canAdvance || arrowSelection || endedScroll) return;
+          // The choice stays ticked on the card for a moment, so it reads as kept before the card moves on.
+          engine._pileChoicePendingQuestionId = questionId;
+          engine._pileChoicePendingValue = value;
+          engine._pileChoiceAdvanceTimer = setTimeout(advance, CHOICE_ADVANCE_DELAY_MS ?? 0);
         },
       });
     });
@@ -3403,8 +3513,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     pileSubmitResponderHref,
     pileTopRailVisible,
     showSubmitButton,
-    showSuccessBadgeLink,
-    showSuccessBadgeStatus,
+    showSuccessBadge,
     showClearPendingButton,
   } = buildPileSubmitRailViewState({
     pendingStats: _pileStats,
@@ -3417,6 +3526,51 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     isAddress: utils.isAddress,
     sessionSlug: resolveEffectiveSlug(engine.props),
   });
+
+  const submitPile = async () => {
+    const context = buildSessionInterviewSubmitContextToken(engine.props);
+    const result = await handlePileSubmitWithOwnAnswers(engine);
+    if (
+      engine._isMounted &&
+      result?.status === 'submitted' &&
+      context === buildSessionInterviewSubmitContextToken(engine.props)
+    ) {
+      engine.setState({ interviewPendingNoticeContext: '' });
+    }
+    return result;
+  };
+  // After Next on the last question: how many were answered, what is still unsent, and where to go from here.
+  const endOfSetCard = isPileSetEndShown(engine.state, engine.props) ? (
+    <PileEndOfSetCard
+      answered={
+        Object.values(
+          readPlainRecord(
+            buildSessionInterviewResponseSlice(
+              engine,
+              pileQuestions.map((question) => normalizeQuestionIdKey(question.id)),
+            ).answers,
+          ),
+        ).filter((entry) => pileAnswerIsGiven(readPlainRecord(entry).value)).length
+      }
+      total={pileQuestions.length}
+      unsent={Number(_pileStats.total || 0)}
+      isSubmitting={!!engine.state.isSubmitting}
+      submitCountText={engine.state.submitCountText}
+      onSubmit={() =>
+        void submitPile().then(() => {
+          // The Submit button goes once nothing is unsent, so focus returns to the card rather than the page.
+          const card = engine.pileContainer?.querySelector('[data-testid="ce-pile-end-of-set"]');
+          if (card && !card.contains(document.activeElement)) card.focus({ preventScroll: true });
+        })
+      }
+      onSeeResults={() => openSessionResults(engine)}
+      onTalkItThrough={
+        isInterviewFeatureEnabled(engine.props?.sessionConfig) ? () => engine.toggleSessionVoiceModeModal() : null
+      }
+      onJoinGroup={typeof engine.props.onViewSessionGroups === 'function' ? engine.props.onViewSessionGroups : null}
+      answersHref={pileSubmitResponderHref}
+    />
+  ) : null;
 
   const gatedEmptyHasDetails = lockedGateDetails.length > 0;
   const gatedEmptyRequirementSentence = engine.getLockedGateRequirementSentence(lockedGateDetails);
@@ -3513,22 +3667,9 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             onViewAllClick: engine.props.onViewAllClick,
             handleViewAllFromPile: engine.handleViewAllFromPile,
             pileTopRailVisible,
-            showSuccessBadgeLink,
-            pileSubmitResponderHref,
-            showSuccessBadgeStatus,
+            showSuccessBadge,
             showSubmitButton,
-            handlePileSubmitClick: async () => {
-              const context = buildSessionInterviewSubmitContextToken(engine.props);
-              const result = await handlePileSubmitWithOwnAnswers(engine);
-              if (
-                engine._isMounted &&
-                result?.status === 'submitted' &&
-                context === buildSessionInterviewSubmitContextToken(engine.props)
-              ) {
-                engine.setState({ interviewPendingNoticeContext: '' });
-              }
-              return result;
-            },
+            handlePileSubmitClick: submitPile,
             hasPendingPileChanges,
             pendingAnswerCount:
               engine.state.interviewPendingNoticeContext === buildSessionInterviewSubmitContextToken(engine.props)
@@ -3536,6 +3677,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 : 0,
             shouldHidePileSubmitButton,
             isSubmitting: engine.state.isSubmitting,
+            submitCountText: engine.state.submitCountText,
             activePromptMasked,
             finalSubmitText,
             showClearPendingButton,
@@ -3545,6 +3687,14 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
               engine.setState({ interviewPendingNoticeContext: '' });
             },
             navCounterVisible,
+            nextIsPrimary: pileAnswerIsGiven(
+              readPlainRecord(
+                engine.state.surveysResponseState?.[0]?.answers?.[
+                  normalizeQuestionIdKey(pileQuestions[effectiveActivePileIndex]?.id)
+                ],
+              ).value,
+            ),
+            endOfSetCard,
             handlePrev: engine.handlePrev,
             handleNext: engine.handleNext,
           })}

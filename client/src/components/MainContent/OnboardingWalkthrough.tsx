@@ -15,8 +15,6 @@ import { faArrowRight, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
 type OnboardingWalkthroughProps = {
   changeTabFunction: (tabIndex: number) => void;
-  demoMode?: unknown;
-  toggleDemoMode?: (demoModeOn: boolean) => void;
 };
 
 type OnboardingWalkthroughState = {

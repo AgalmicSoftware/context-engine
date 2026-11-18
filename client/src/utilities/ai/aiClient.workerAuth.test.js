@@ -821,6 +821,37 @@ describe('aiClient worker auth options', () => {
     );
     expect(JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body).taskType).toBe('compare');
   });
+
+  it('looks up the Worker with the session settings a compare caller supplies', async () => {
+    const sessionConfig = { slug: 'unlisted', corsWorkerUrl: 'https://unlisted.example.workers.dev' };
+    getEffectiveAiConfig.mockResolvedValue({ provider: 'openai', model: 'gpt-4o-mini', apiKeySource: 'worker' });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://unlisted.example.workers.dev');
+    fetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ completion: JSON.stringify({ agreements: ['A'], disagreements: [] }) }),
+    });
+
+    await runCompareToolkit('compare', { users: [], sessionSlug: 'unlisted', sessionConfig });
+
+    expect(getEffectiveAiConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'unlisted', sessionConfig }),
+    );
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'unlisted', sessionConfig }),
+    );
+  });
+
+  it('hands a failed compare call to a caller that asks for it, and null to one that does not', async () => {
+    getEffectiveAiConfig.mockResolvedValue({ provider: 'openai', model: 'gpt-4o-mini', apiKeySource: 'worker' });
+    getCorsProxyUrlOrThrow.mockRejectedValue(new Error('Worker URL is not configured.'));
+    const payload = { users: [], sessionSlug: 'unlisted' };
+
+    await expect(runCompareToolkit('compare', payload, { throwOnError: true })).rejects.toThrow(
+      'Worker URL is not configured.',
+    );
+    await expect(runCompareToolkit('compare', payload)).resolves.toBeNull();
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  });
 });
 
 describe('group transcription fallback', () => {

@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import { configure } from '@testing-library/react';
 import { TextDecoder, TextEncoder } from 'util';
 import { deserialize, serialize } from 'v8';
 
@@ -13,6 +14,10 @@ jest.mock('react-dom/test-utils', () => {
     act: React.act || testUtils.act,
   };
 });
+
+// A loaded machine or a CI runner can take over a second to render. This stays well under the per-test limit
+// in jest.config.cjs, so a wait that fails still reports the page it saw and not a bare timeout.
+configure({ asyncUtilTimeout: 3000 });
 
 if (!global.TextEncoder) {
   global.TextEncoder = TextEncoder;

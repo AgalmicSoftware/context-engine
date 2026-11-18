@@ -474,6 +474,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     computeModifiedQuestionsCount,
     deepClone,
     handleRevertPendingChanges,
+    isQuestionSaved,
     prefillSurveyResponses,
     rehydrateLocalCacheAnswersForRenderedIds,
     resetFormStateForAccountChange,
@@ -486,7 +487,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     stateRef,
     setState: setState.bind(engine),
     setResponseHydrationState: setResponseHydrationState.bind(engine),
-    drafts: { load: () => loadDraft(), persist: () => persistDraft(), clear: clearDraft },
+    drafts: { load: () => loadDraft(), persist: () => persistDraft(), clear: clearDraft, ready: () => !!getDraftKey() },
     questionIds: {
       rendered: getCurrentRenderedQuestionIds,
       editTracking: () => getEditTrackingQuestionIds(),
@@ -634,6 +635,9 @@ export const createSurveyQuestionsRuntimeMethods = (
       responseOverride?: SurveyQuestionsLegacyValue,
     ) => handleDecryptQuestionAnswer(questionId, fieldToDecrypt, responseOverride),
     handleReloadMaskedPrompt,
+    // Against the same baseline as the pending count, so a card is never both saved and pending.
+    isAnswerSaved: (questionId: string, currentSlice: unknown) =>
+      isQuestionSaved(resolveDiffBaselineSlice(true), currentSlice, questionId),
     isQuestionFieldBusy,
     isQuestionPromptMasked,
     renderFullQuestionAdditionalInput,
@@ -795,7 +799,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       })();
     } else {
       // Standalone mode (question pool passed as prop): the View all editor.
-      inst._viewAllSync = { restored: new Set() };
+      inst._viewAllSync = { restored: new Set(), storeReady: false };
       const initialSlice: SurveyQuestionsLegacyValue = initializeSurveyResponseState();
       setState(
         buildInitialStandaloneResponseState({
@@ -957,6 +961,10 @@ export const createSurveyQuestionsRuntimeMethods = (
       prevState.autoDecryptEnabled === stateRef.current.autoDecryptEnabled &&
       prevState.showComments === stateRef.current.showComments &&
       prevState.prefillQueuedAfterCache === stateRef.current.prefillQueuedAfterCache;
+    // View all's drafts become readable once the session's config resolves, which can change no
+    // prop at all; until then no question is marked restored.
+    if (inst._viewAllSync && !inst._viewAllSync.storeReady && getDraftKey()) syncViewAllQuestions();
+
     if (shouldShortCircuitUpdate) {
       bumpSurveyPerfCounter('noopSkipCount');
       return;
@@ -2001,6 +2009,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     invalidateDiffCaches,
     isQuestionLockedForResponse,
     maybeBlockSubmitUntilQuestionPoolComplete,
+    persistDraftSafely,
     prepareJsonAndHash,
     resolveDiffBaselineSlice,
     resolveFieldEncryptionAudience,
@@ -2387,7 +2396,13 @@ export const createSurveyQuestionsRuntimeMethods = (
         hashedSurveyId,
         surveyResponse,
         submissionTarget,
-        { operationId: context.operationId, uploadRevisions: context.uploadRevisions },
+        {
+          operationId: context.operationId,
+          uploadRevisions: context.uploadRevisions,
+          onProgress: (saved: number, total: number) => {
+            if (total > 1) setState({ submitCountText: `${saved} of ${total}` });
+          },
+        },
       );
     } catch (error: unknown) {
       // Answers a Worker stored before a later upload failed are saved; the rest keep
@@ -2402,16 +2417,23 @@ export const createSurveyQuestionsRuntimeMethods = (
         !partialReceipt.questionResponseRefs.length
       )
         throw error;
-      const savedCount = partialReceipt.questionResponseRefs.length;
+      // Answers upload a few at a time, so the stored ones are named by question, not by position.
+      // A Submit carries one answer per question (its question ids are a set), so a name is enough.
+      const storedIds = new Set(
+        partialReceipt.questionResponseRefs.map((ref: SurveyQuestionsLegacyValue) =>
+          String(ref?.questionId || '').toLowerCase(),
+        ),
+      );
+      const isStored = (index: number) => storedIds.has(String(hashedQuestionIds[index] || '').toLowerCase());
       tx = { ...partialReceipt, retryPending: true };
       const failureMessage = 'message' in error ? error.message : '';
       uploadFailure = `Some answers didn't save (${String(failureMessage || 'upload failed').replace(/\.$/, '')}).`;
-      questionResponses
-        .slice(savedCount)
-        .forEach((response: SurveyQuestionsLegacyValue) =>
-          heldBack.set(normalizeQuestionIdKey(response?.questionID), 'unsaved'),
-        );
-      questionResponses = questionResponses.slice(0, savedCount);
+      questionResponses.forEach((response: SurveyQuestionsLegacyValue, index: number) => {
+        if (!isStored(index)) heldBack.set(normalizeQuestionIdKey(response?.questionID), 'unsaved');
+      });
+      questionResponses = questionResponses.filter((_response: SurveyQuestionsLegacyValue, index: number) =>
+        isStored(index),
+      );
       if (surveyResponse) surveyResponse = { ...surveyResponse, responses: questionResponses };
     }
 

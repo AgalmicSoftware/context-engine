@@ -23,7 +23,7 @@ npm test
 
 This runs the canonical root gate (`npm run test:ci`): wiring and ratchets,
 AI Discourse Bench tests, release-surface checks and builds, contract/ABI
-parity, client coverage, public-safe root Jest, both public Worker suites,
+parity, the client coverage shards and their merge, public-safe root Jest, both public Worker suites,
 Context Engine CC, MCP tests, the tracked root Node universe, and the managed-cache guard. The coverage-enabled full client universe and tracked Node
 universe each run exactly once. The wiring lane also verifies that every
 tracked typed client test/support source is in the monotonic test-typecheck
@@ -31,8 +31,47 @@ universe. Build-owning gates immediately run the manifest-backed bundle budget
 against the bytes they just produced, without a second build.
 
 `scripts/ci-gates.json` is the explicit command manifest. Local CI consumes
-its serial `ci` profile; GitHub Actions consumes the same named gates as split
-jobs so slow lanes remain visible. The final hosted `test` job compares all
+its `ci` profile; GitHub Actions consumes the same named gates as split
+jobs so slow lanes remain visible.
+
+A gate, or a command inside a gate, may name a `lane`. Entries that name the
+same lane run one after another in manifest order; different lanes run side by
+side; entries that name none share one lane. A command's lane is counted
+within its own gate. Give two commands the same lane when one reads what the
+other writes, as the client build and its bundle budget do. A lane stops at
+its first failure and the other lanes still finish, so one run reports every
+lane that fails; the timings list what a stopped lane never ran as `not run`.
+Side by side, a line says when each command starts and where its output is
+held, and the output is printed whole when it ends.
+
+Today the `ci` profile runs three gate lanes (the client shards and their
+merge; wiring, contracts, root Jest and Workers; the Node group), and
+`wiring-and-release` runs its lint, type and build commands in three lanes of
+their own. That gate is the only one with command lanes. Its GitHub job passes
+`--serial` until those lanes have been measured against the hosted runner's
+memory; every other job, and the `release` profile, has no lanes and runs one
+command at a time. `--serial` runs everything one at a time, in manifest
+order, with live output:
+
+```bash
+node scripts/run-ci-gates.mjs --profile ci --serial
+```
+
+Every run ends with the time each command took, and `--timings <file>` also
+writes them as JSON. Run the profile on an otherwise idle machine: side by
+side it uses most of the cores, and tests that wait on real timers can time
+out under other load. A run prints the machine's one-minute load average when
+it starts and when it ends, and warns if it starts with the load at or above
+the number of cores, so a run spoiled by other work can be told from its own
+log. Where the machine cannot be kept idle, `CLIENT_TEST_SHARD_CONCURRENCY=4`
+together with `--serial` trades time for slack.
+
+To stop a run, stop its process group (Ctrl-C in a terminal does). A stop
+signal sent to the runner alone ends the commands in flight, prints what they
+had written and fails the run, but a process a command started through a shell
+can run on to its own end. A timeout placed around a run must kill the group.
+
+The final hosted `test` job compares all
 reported results with the manifest's `hosted` profile and fails for missing,
 extra, failed, canceled, or skipped lanes. Event-specific baseline-growth
 authorization remains a protected workflow step beside the manifest-backed
@@ -73,12 +112,44 @@ fails on any new diagnostic signature or count. The raw test project is not
 yet zero-diagnostic, so the ratchet command—not a claim of clean standalone
 `tsc` output—is the current contract.
 
-`npm run test:client` performs one instrumented run with
-`client/jest.full-universe.config.cjs`. Every tracked executable JS, JSX, TS,
-and TSX production file under `client/src` enters the denominator, including
-never-imported files. `npm run coverage-floor:check` reuses that run's
-`coverage-final.json` to enforce the whole-production floor banked in
-`scripts/client-coverage-full-baseline.json`.
+`npm run test:client` runs the instrumented client suite once, split into 12
+shards (`scripts/run-client-coverage.mjs`). Each shard is one Jest process
+under `client/jest.full-universe.config.cjs`; locally the shards run side by
+side (`npm run test:client:shards`), and in GitHub Actions each is its own job
+(`npm run test:client:shard -- <n>`). Shards are filled by recorded run time:
+`client/scripts/jest/shardTimings.json` lists the slow suites, and
+`node scripts/run-client-coverage.mjs --write-timings` refreshes it after a
+run. A stale list only makes the shards uneven.
+
+`npm run test:client:merge` then checks that the shards on disk are one
+complete run of the tree as it is checked out now, including uncommitted
+changes to tracked and untracked files (git-ignored files are not compared),
+and writes their summed coverage to the client's `coverage-final.json`. It
+fails if a shard is missing, failed, or ran before an edit or on another
+commit; if any test file Jest found, or any tracked client test file, was not
+run by exactly one shard; or if two shards instrumented a file differently. Every tracked executable JS, JSX, TS, and TSX production
+file under `client/src` enters the denominator, including never-imported
+files. `npm run coverage-floor:check` reads the merged file to enforce the
+whole-production floor banked in `scripts/client-coverage-full-baseline.json`.
+
+Client tests get room for a slow machine. Each test may take 15 seconds
+(`testTimeout` in `client/jest.config.cjs`), not Jest's 5, and a Testing
+Library wait (`findBy...`, `waitFor`) lasts 3 seconds by default
+(`client/src/setupTests.ts`), not 1. A hosted runner runs these tests about
+twice as slowly as a developer's machine, and a test near a limit fails there
+for no fault of the code. Neither limit can make a failing test pass, and
+both are room, not a target: a test that takes seconds is still worth making
+faster.
+
+Shards make this matter more. A suite's first test runs about one and a half
+times slower in the first forty suites of a Jest process than after the
+hundredth, measured on this suite, and twelve short processes have about 480
+such early suites where one long process has a few dozen.
+
+`npm --prefix client run test:coverage` is the same suite in a single process.
+It takes several times as long and is kept as the reference the shards are
+compared against. Set `CLIENT_TEST_SHARD_CONCURRENCY` to run fewer shards at
+once on a smaller machine.
 
 ### Targeted Root Commands
 
@@ -89,6 +160,7 @@ npm run test:root:jest
 npm run test:worker:session-cors
 npm run test:node
 npm run test:client
+npm run test:client:shard -- 3
 npm run coverage-floor:check
 npm run typecheck:client-tests
 npm run dead-exports:check

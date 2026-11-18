@@ -2,6 +2,56 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.15] - 2026-11-17
+
+No change to the Session Worker or the MCP: no Worker needs redeploying, and nothing is published to npm.
+
+### Client — available when the site deploys
+
+- On phones every question card has the same height, so the arrows below it never move.
+- Multiple-choice options stack in a list that scrolls inside the card, instead of a sideways strip.
+- A long choice or quadratic list always ends partway through an option, with a fade at whichever end has more.
+- Quadratic questions show more options at once on a phone, and a free-text box fills the card.
+- Choice cards say "Pick one" or "Pick any".
+- On single-choice and yes/no cards, a choice is ticked and the card moves on after 0.7 seconds. Tapping another option, or Back or Next, cancels the move; a tap that ends a scroll never moves on.
+- Next becomes a clear **Next** button once a card is answered.
+- After a submit, **Submit** turns into a green "Submitted" for 10 seconds, then goes, keeping its place. Screen readers announce it.
+- Next on the last question opens an end-of-set card: the answered count, Submit for unsent answers, and buttons for See results, Talk it through in the interview, and Join a group. While it shows there is one Submit and the arrows don't move.
+- Unsent answers are no longer deleted when a browser wallet locks, disconnects or switches account, and the all-questions view no longer drops unsent answers it had not restored yet.
+- After a reload, a returning participant sees "Loading your saved answers..." instead of blank questions; signed out, the page says saved answers appear after logging in.
+- Submit counts the answers as they save, with the elapsed seconds ("Saving 12 of 40 · 5s"), on the question card and the end-of-set card on a phone as well as in the header, and no longer waits forever on loading your saved answers.
+- Submit uploads four answers at a time on Session Worker sessions; on a test session 40 answers saved in about 13 seconds where they took about 33.
+- Submit no longer waits on, or asks for a sign-in for, the AI draft text kept for admins after the answers are saved.
+- Typing in the all-questions view is about twice as fast on phones.
+- A passkey prompt that was closed or timed out says so plainly instead of "The operation either timed out or was not allowed".
+- The Tools help panel is readable in dark themes and no longer hides behind the toolbar on phones.
+- Classic 95: unselected option text is black on grey (it was white on light grey).
+- Groups that need a password show a field for the invite link or password everywhere you can join one, signed in or not, and say where it comes from. A pasted invite link works, and a wrong code is refused beside the field.
+- Group pages show members out of the limit ("Members: 3 / 1000"). Signed out, the count shows a dash with a "?" that says to sign in. Admins see the count too.
+- Opening a group in a new tab no longer fails with "The document is not focused."
+- A cancelled or failed sign-in on the groups pages says so in one sentence, with a way to try again, instead of the wallet's own error text.
+- Compare on a person's page sends its AI summary and perspective-map requests to the session's own Worker. Before, on sessions this browser had not listed, it silently fell back to a local comparison.
+- The link from the account box to your own page opens it on the session you are in.
+- When Compare cannot get an AI summary it says why, beside "Local comparison · AI summary unavailable".
+- Analyze on a person's page stays off, and says so, until the page shows something to analyze.
+- The **Demo Mode** switch is gone from Settings. The Debate Atlas and Risks views it added to the home Tools tab are in session Results.
+- The home Tools tab shows Questions, Groups and Context, without the Live/Demo legend or coloured borders, and Context → View always shows the session's documents; the "Demo corpus" checkbox is gone.
+- The session document view under Tools → Context → View is readable in the Minimal theme; its title and empty note were white on white.
+- `REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT` is no longer read.
+- The all-questions view shows a green "Submitted" after Submit, as on the phone card, and marks each saved answer "Saved".
+- After a reload, "Loading your saved answers..." counts the session's answers as they are read; Results counts them during a reload too.
+- On phones, a long multiple-choice list no longer hides its first option behind the question.
+- `rxc-ra-26` is no longer in `known-sessions.json`, so a plain `/session/rxc-ra-26` link no longer opens; its `worker=` links still work, and the session and its Worker are untouched.
+- An answer changed just before Submit, whose upload then failed, is no longer lost on reload.
+- The group invite notice fits a phone screen, and its invite link or password field is readable in every theme.
+
+### Local tooling
+
+- CI and the local release gates run the client tests as 12 time-balanced shards, each one process with the same 4,096 MB heap, and check that the shards are one complete run of the tree before merging their coverage. The coverage floor is unchanged.
+- The gate runner runs independent lanes side by side and prints how long each command took; `--serial` gives the old one-at-a-time run. `npm run test:ci` takes about 6 minutes where it took about 29.
+- Client tests get 15 seconds each by default, where they had 5, and wait up to 3 seconds for the page, where they waited 1. A hanging test still fails.
+- A gate run prints the machine's load at its start and end, and warns when it starts on a busy machine.
+
 ## [0.9.14] - 2026-11-17
 
 ### Client — available when the site deploys

@@ -46,6 +46,7 @@ import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuest
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
 import { renderSurveyQuestionsFullQuestionGatedPromptCard } from './SurveyQuestionsFullQuestionGatedPromptCard';
 import { renderSurveyQuestionsFullQuestionDisplay } from './SurveyQuestionsFullQuestionDisplay';
+import { advanceSurveyQuestionCardEpoch, type SurveyQuestionCardEpoch } from './SurveyQuestionCard';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
@@ -593,6 +594,8 @@ const SurveyQuestionsInner = (
   });
   const stateRef = useRef(state);
   stateRef.current = state;
+  const questionCardEpochRef = useRef<SurveyQuestionCardEpoch>({ props: null, state: null, epoch: 0 });
+  inst._questionCardEpoch = advanceSurveyQuestionCardEpoch(questionCardEpochRef.current, props, state);
   const pendingSetStateCallbacksRef = useRef<SurveyQuestionsSetStateCallback[]>([]);
   const setState = (update: SurveyQuestionsStateUpdate, callback?: SurveyQuestionsSetStateCallback): void => {
     if (callback) pendingSetStateCallbacksRef.current.push(callback);

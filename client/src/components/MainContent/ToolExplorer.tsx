@@ -5,16 +5,7 @@ import { connect } from 'react-redux';
 import { updateGlobalSessionSelection } from '../../actions/sessionStateActions.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import {
-  faExclamationTriangle,
-  faExpand,
-  faEye,
-  faPlus,
-  faProjectDiagram,
-  faQuestionCircle,
-  faSearch,
-  faUsers,
-} from '@fortawesome/free-solid-svg-icons';
+import { faExpand, faEye, faPlus, faQuestionCircle, faSearch, faUsers } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
@@ -29,19 +20,15 @@ import ToolExplorerPluginExplainer from './ToolExplorerPluginExplainer';
 import ToolExplorerSessionControl, { resolveToolSessionConfig } from './ToolExplorerSessionControl';
 import LazyFallback from '../Shared/LazyFallback';
 
-import riskMatrixImage from '../../assets/img/risk_matrix.jpg';
 import modelDirectoryImage from '../../assets/img/model_directory.jpg';
-import debateTreeImage from '../../assets/img/debate_tree.jpg';
 import worldVoteImage from '../../assets/img/world_vote.jpg';
 import magnifyingGlassImage from '../../assets/img/magnifying_glass.png';
 import artHeader from '../../assets/img/art_header.png';
 import styles from './ToolExplorer.module.scss';
 
 // Tools/plugins are lazy-loaded so chunks are fetched only on click.
-const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const SurveyTool = React.lazy(() => import('../SurveyTool/SurveyTool'));
 const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
-const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const AudioSurveyGenerator = React.lazy(() => import('../SurveyTool/SurveyGenerator/SurveyGenerator'));
 
 type ToolComponent = React.ComponentType<any> | React.LazyExoticComponent<React.ComponentType<any>>;
@@ -55,7 +42,6 @@ type ToolData = {
   headerImage?: string | null;
   content: ToolComponent;
   disabled: boolean;
-  status: 'live' | 'future';
 };
 
 type ExpandedComponentState = {
@@ -67,7 +53,6 @@ type ExpandedComponentState = {
 type ToolExplorerProps = {
   activeSessionSlug?: unknown;
   sessionLoadingView?: React.ReactNode;
-  demoSurfaceMode?: unknown;
   updateGlobalSessionSelection?: (selection: { primarySessionSlug: string; selectedSessionSlugs?: string[] }) => void;
   [key: string]: unknown;
 };
@@ -80,8 +65,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
   const [groupsActionsTarget, setGroupsActionsTarget] = useState<HTMLDivElement | null>(null);
   const [dataSessionOverrideSlug, setDataSessionOverrideSlug] = useState<string | null>(null);
   const [dataSessionOverrideTouched, setDataSessionOverrideTouched] = useState(false);
-  const demoSurfaceEnabled = props.demoSurfaceMode !== false;
-  const showDemoCards = demoSurfaceEnabled;
   const activeSessionSlug = normalizeSessionSlug(props.activeSessionSlug || '');
   const activeSessionConfig = resolveToolSessionConfig(activeSessionSlug, props.sessionConfig);
   const showEmbeddedCreateGroup = createGroupSessionSlug === activeSessionSlug;
@@ -97,7 +80,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
       headerImage: artHeader,
       content: SurveyTool,
       disabled: false,
-      status: 'live',
     },
     {
       name: 'Groups',
@@ -108,7 +90,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
       image: modelDirectoryImage,
       content: SBTsPage,
       disabled: false,
-      status: 'live',
     },
     {
       name: 'Context',
@@ -120,31 +101,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
       headerImage: null,
       content: AudioSurveyGenerator,
       disabled: false,
-      status: 'live',
-    },
-    {
-      name: 'Debate Atlas',
-      subtext: 'For efficient discourse',
-      icon: faProjectDiagram,
-      explainText:
-        'Demo of an interactive version of Deepmind\'s "AI Policy Atlas". Intended to help users structure and navigate complex arguments, and to help AI researchers and policymakers understand and communicate about AI policy issues. Work in progress.',
-      image: debateTreeImage,
-      headerImage: null,
-      content: DebateMap,
-      disabled: false,
-      status: 'future',
-    },
-    {
-      name: 'Risks',
-      subtext: 'Track opps and risks',
-      icon: faExclamationTriangle,
-      explainText:
-        'A tool for collective "heatmap" tracking of opportunities and risks related to disruptive technologies. Input from other areas of the site could be used to populate and improve this display. Axes could be different, and a 3D version (with subcategories) can be previewed by clicking a row and column',
-      image: riskMatrixImage,
-      headerImage: null,
-      content: RiskMatrix,
-      disabled: false,
-      status: 'future',
     },
   ];
 
@@ -158,20 +114,16 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
       icon: data.icon,
       image: data.image,
       disabled: data.disabled,
-      status: data.status,
     },
     data: data,
   }));
-  const visibleExampleComponents = exampleComponents.filter(({ data }) => showDemoCards || data.status !== 'future');
-  const useSparseGrid = !expandedComponent && visibleExampleComponents.length <= 3;
+  const useSparseGrid = !expandedComponent && exampleComponents.length <= 3;
 
   const expandedToolName = expandedComponent?.data?.name || '';
   const showGroupsHeaderActions = expandedToolName === 'Groups';
   const showQuestionsHeaderActions = expandedToolName === 'Questions';
   const useCompactExpandedHeader = showGroupsHeaderActions || showQuestionsHeaderActions;
   const showDataHeaderActions = expandedToolName === 'Context';
-  const usePrimaryHeaderControls = showGroupsHeaderActions || showDataHeaderActions || showQuestionsHeaderActions;
-  const expandedDemoCard = expandedComponent?.data?.status === 'future';
   const selectedDataSessionSlug = useMemo(
     () =>
       dataSessionOverrideTouched
@@ -243,13 +195,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
     setCreateGroupSessionSlug(null);
   }, [activeSessionSlug]);
 
-  useEffect(() => {
-    if (props.demoSurfaceMode === false && expandedDemoCard) {
-      setCreateGroupSessionSlug(null);
-      setExpandedComponent(null);
-    }
-  }, [expandedDemoCard, props.demoSurfaceMode]);
-
   const expandedChildProps = expandedComponent
     ? {
         ...expandedComponent.data,
@@ -277,14 +222,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
               toolbarTarget: questionsToolbarTarget,
             }
           : {}),
-        ...(expandedToolName === 'Debate Atlas'
-          ? {
-              demoMode: demoSurfaceEnabled,
-              // The child clears its modal; its default close otherwise routes
-              // to /atlas and discards the surrounding Explorer view.
-              onModalClose: () => undefined,
-            }
-          : {}),
         ...(showGroupsHeaderActions
           ? {
               sessionSlug: props.activeSessionSlug,
@@ -299,7 +236,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
         ...(showDataHeaderActions
           ? {
               explorerMode: dataToolMode,
-              demoSurfaceMode: props.demoSurfaceMode,
               sessionOverrideSlug: dataSessionOverrideSlug,
               sessionOverrideTouched: dataSessionOverrideTouched,
               hideInternalSessionSelector: true,
@@ -349,35 +285,16 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
 
   return (
     <>
-      {showDemoCards ? (
-        <Container className={`${styles.legendContainer} ${expandedComponent ? styles.hidden : ''}`}>
-          <div className={styles.legendItem}>
-            <div className={`${styles.legendDot} ${styles.live}`}></div>
-            <span className={styles.legendText}>Live</span>
-          </div>
-          <div className={styles.legendItem}>
-            <div className={`${styles.legendDot} ${styles.future}`}></div>
-            <span className={styles.legendText}>Demo</span>
-          </div>
-        </Container>
-      ) : null}
       <Container className={`${styles.explorerContainer} ${useSparseGrid ? styles.explorerContainerSparse : ''}`}>
         {expandedComponent ? (
           <div className={styles.breadcrumbContainer}>
             <div
               className={`${styles.expandedHeaderRow} ${useCompactExpandedHeader ? styles.expandedHeaderCompact : ''} ${showQuestionsHeaderActions ? styles.expandedHeaderQuestions : ''} ${showGroupsHeaderActions ? styles.expandedHeaderGroups : ''}`}
             >
-              {usePrimaryHeaderControls ? (
-                <div className={styles.expandedHeaderPrimaryControls}>
-                  {expandedHeaderLead}
-                  {expandedHeaderSession}
-                </div>
-              ) : (
-                <>
-                  {expandedHeaderLead}
-                  {!useCompactExpandedHeader && expandedHeaderSession}
-                </>
-              )}
+              <div className={styles.expandedHeaderPrimaryControls}>
+                {expandedHeaderLead}
+                {expandedHeaderSession}
+              </div>
 
               {!showQuestionsHeaderActions && (
                 <div
@@ -427,17 +344,6 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
                       </button>
                     </div>
                   )}
-
-                  {expandedComponent.data.name === 'Debate Atlas' && (
-                    <a
-                      href={buildPublicRoute('/atlas')}
-                      className={`${styles.headerActionButton} ${styles.headerActionButtonSecondary} ${styles.headerActionLink}`}
-                      title="Open in Full Screen"
-                    >
-                      <FontAwesomeIcon icon={faExpand} />
-                      Full Screen
-                    </a>
-                  )}
                 </div>
               )}
             </div>
@@ -459,13 +365,13 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
           </div>
         ) : (
           <Row className={`${styles.explorerRow} ${useSparseGrid ? styles.explorerRowSparse : ''}`}>
-            {visibleExampleComponents.map(({ Component, props, data }, index) => (
+            {exampleComponents.map(({ Component, props, data }, index) => (
               <Col
                 key={index}
                 xs="12"
                 sm="6"
                 md="4"
-                className={`${styles.explorerCol} ${useSparseGrid ? styles.explorerColSparse : ''} ${props.disabled ? styles.disabled : ''} ${styles[props.status]} ${demoSurfaceEnabled ? styles.statusBorderEnabled : ''}`}
+                className={`${styles.explorerCol} ${useSparseGrid ? styles.explorerColSparse : ''} ${props.disabled ? styles.disabled : ''}`}
                 onClick={() => handleClick(Component, data)}
               >
                 <div className={styles.square}>

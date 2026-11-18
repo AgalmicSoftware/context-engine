@@ -636,11 +636,11 @@ const AdminWorkerGroupsPanel = ({
                 {url}
               </a>
             ))}
-            {group.memberLimit ? (
-              <span>Limit: {group.memberLimit} members</span>
-            ) : (
-              <span>No group-specific member limit</span>
-            )}
+            <span>
+              Members: {Number.isSafeInteger(group.memberCount) ? group.memberCount : '–'} /{' '}
+              {Math.min(group.memberLimit || memberLimitMax, memberLimitMax)}
+              {group.memberLimit ? '' : ' (the session’s limit)'}
+            </span>
             {group.joinEndsAt ? <span>Join deadline: {new Date(group.joinEndsAt).toLocaleString()}</span> : null}
             {group.adminAddress ? <span>Group admin: {group.adminAddress}</span> : null}
             <div>

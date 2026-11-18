@@ -3,9 +3,7 @@ import {
   CHANGE_FOCUSED_TAB,
   TOGGLE_LOGIN_MODAL,
   TOGGLE_TOOLTIPS,
-  SET_DEMO_SURFACE_MODE,
   LOGIN_IN_PROGRESS,
-  TOGGLE_DEMO_MODE,
   CHANGE_ACTIVE_SESSION_SLUG,
   UPDATE_GLOBAL_SESSION_SELECTION,
 } from '../actions/types';
@@ -79,30 +77,12 @@ export const toggleTooltips = (): SessionStateThunk => (dispatch) => {
   });
 };
 
-export const setDemoSurfaceMode =
-  (newDemoSurfaceMode: unknown): SessionStateThunk =>
-  (dispatch) => {
-    dispatch({
-      type: SET_DEMO_SURFACE_MODE,
-      payload: newDemoSurfaceMode,
-    });
-  };
-
 export const updateLoginInfo =
   (pendingLogin: unknown): SessionStateThunk =>
   (dispatch) => {
     dispatch({
       type: LOGIN_IN_PROGRESS,
       payload: pendingLogin,
-    });
-  };
-
-export const toggleDemoMode =
-  (newDemoMode: unknown): SessionStateThunk =>
-  (dispatch) => {
-    dispatch({
-      type: TOGGLE_DEMO_MODE,
-      payload: newDemoMode,
     });
   };
 

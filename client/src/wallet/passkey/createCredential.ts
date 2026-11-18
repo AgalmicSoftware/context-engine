@@ -3,6 +3,7 @@ import type { PasskeyCredentialClient } from '../types.js';
 import { buildPrfExtension, getCredentialPrfEnabled } from './prf.js';
 import { PasskeysUnavailableError } from './unavailable.js';
 import { base64URLToBuffer, randomBytes } from './encoding.js';
+import { describePasskeyPromptError } from './promptError.js';
 
 const credentialClient = (): PasskeyCredentialClient => {
   if (typeof navigator === 'undefined' || !navigator.credentials) {
@@ -76,7 +77,7 @@ export const createPasskeyCredential = async ({
     if (excludeCredentials.length && isInvalidStateError(error)) {
       throw new Error('This device already holds the passkey for the wallet saved in this browser. Use Login.');
     }
-    throw error;
+    throw describePasskeyPromptError(error);
   }
   if (!credential) throw new Error('No passkey credential was created.');
   if (!getCredentialPrfEnabled(credential)) {

@@ -3,9 +3,7 @@ import {
   CHANGE_FOCUSED_TAB,
   TOGGLE_LOGIN_MODAL,
   TOGGLE_TOOLTIPS,
-  SET_DEMO_SURFACE_MODE,
   LOGIN_IN_PROGRESS,
-  TOGGLE_DEMO_MODE,
   CHANGE_ACTIVE_SESSION_SLUG,
   UPDATE_GLOBAL_SESSION_SELECTION,
   SET_ONBOARDING_STEP,
@@ -15,13 +13,7 @@ import {
   normalizeGlobalSessionSelection,
   readStoredGlobalSessionSelection,
 } from '../utilities/session/globalSessionState.js';
-import {
-  normalizeDemoSurfaceMode,
-  persistDemoSurfaceMode,
-  persistTooltipsEnabled,
-  readStoredDemoSurfaceMode,
-  readStoredTooltipsEnabled,
-} from '../utilities/session/sessionPreferencesStorage.js';
+import { persistTooltipsEnabled, readStoredTooltipsEnabled } from '../utilities/session/sessionPreferencesStorage.js';
 import { hasOwn } from '../utilities/shared/primitives.js';
 
 export interface SessionState {
@@ -36,8 +28,6 @@ export interface SessionState {
   explorerHistory: unknown[];
   ETHUSDToggle: boolean;
   explainerMode: boolean;
-  demoMode: Record<string, boolean>;
-  demoSurfaceMode: boolean;
   loginModalToggled: boolean;
   loginModalFocus: string;
   afterLoginModalToggled: boolean;
@@ -57,15 +47,12 @@ type FetchSessionStatePayload = SessionSelectionPayload &
   Partial<Pick<SessionState, 'focusedTab' | 'loginModalToggled' | 'explorerHistory'>>;
 type LoginProgressPayload = Partial<Pick<SessionState, 'loginInProgress' | 'loginComplete'>>;
 type LoginModalPayload = boolean | { isOpen?: unknown; focus?: unknown };
-type DemoModePayload = boolean | Partial<SessionState['demoMode']>;
 type SessionReducerAction =
   | { type: typeof FETCH_SESSION_STATE; payload?: FetchSessionStatePayload }
   | { type: typeof CHANGE_FOCUSED_TAB; payload?: SessionState['focusedTab'] }
   | { type: typeof TOGGLE_LOGIN_MODAL; payload?: LoginModalPayload }
   | { type: typeof TOGGLE_TOOLTIPS }
-  | { type: typeof SET_DEMO_SURFACE_MODE; payload?: unknown }
   | { type: typeof LOGIN_IN_PROGRESS; payload?: LoginProgressPayload }
-  | { type: typeof TOGGLE_DEMO_MODE; payload?: DemoModePayload }
   | { type: typeof CHANGE_ACTIVE_SESSION_SLUG; payload?: unknown }
   | { type: typeof UPDATE_GLOBAL_SESSION_SELECTION; payload?: SessionSelectionPayload }
   | { type: typeof SET_ONBOARDING_STEP; payload?: SessionState['onboardingStep'] }
@@ -82,8 +69,6 @@ const getInitialState = (): SessionState => ({
   explorerHistory: [],
   ETHUSDToggle: false, // Display preference: USD vs ETH denominations.
   explainerMode: true, // Controls whether rules/help modals stay enabled.
-  demoMode: { tools: false },
-  demoSurfaceMode: readStoredDemoSurfaceMode(),
   // Modal state
   loginModalToggled: false,
   loginModalFocus: '',
@@ -135,7 +120,6 @@ export default function sessionStateReducer(
           ...(hasOwn(payload, 'explorerHistory')
             ? { explorerHistory: payload.explorerHistory as SessionState['explorerHistory'] }
             : {}),
-          demoSurfaceMode: readStoredDemoSurfaceMode(),
           tooltipsEnabled: readStoredTooltipsEnabled(),
         };
       }
@@ -176,32 +160,6 @@ export default function sessionStateReducer(
           ? { loginComplete: action.payload.loginComplete as SessionState['loginComplete'] }
           : {}),
       };
-    case TOGGLE_DEMO_MODE:
-      if (!hasOwn(action, 'payload') || action.payload === undefined) return state;
-      if (typeof action.payload === 'boolean') {
-        return { ...state, demoMode: { tools: action.payload } };
-      }
-      if (!isRecord(action.payload)) {
-        return { ...state, demoMode: { ...state.demoMode } };
-      }
-      return {
-        ...state,
-        demoMode: {
-          ...state.demoMode,
-          ...(hasOwn(action.payload, 'tools')
-            ? { tools: action.payload.tools as SessionState['demoMode']['tools'] }
-            : {}),
-        },
-      };
-    case SET_DEMO_SURFACE_MODE: {
-      if (!hasOwn(action, 'payload')) return state;
-      const nextDemoSurfaceMode = normalizeDemoSurfaceMode(action.payload);
-      persistDemoSurfaceMode(nextDemoSurfaceMode);
-      return {
-        ...state,
-        demoSurfaceMode: nextDemoSurfaceMode,
-      };
-    }
     case CHANGE_ACTIVE_SESSION_SLUG: {
       if (!hasOwn(action, 'payload') || action.payload === undefined) return state;
       return {

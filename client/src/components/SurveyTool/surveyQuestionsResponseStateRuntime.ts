@@ -16,6 +16,7 @@ import {
   buildLocalCacheRehydrationState,
   isSavedAnswerRefreshHeld,
 } from './surveyToolHydrationFlow';
+import { hasMeaningfulFieldValue } from './surveyDraftSavedBaseline';
 import { executeSurveyFormStateReset, executeSurveyPendingRevert } from './surveyToolResponseResetController';
 import { resolveSurveyBaselineSourceSlice } from './surveyToolResponseSourceController';
 import {
@@ -61,7 +62,7 @@ export type SurveyQuestionsResponseStateDeps = {
   stateRef: { current: SurveyQuestionsState };
   setState: SetSurveyQuestionsState;
   setResponseHydrationState: SetSurveyQuestionsState;
-  drafts: { load: () => SurveyQuestionsLegacyValue; persist: () => void; clear: () => void };
+  drafts: { load: () => SurveyQuestionsLegacyValue; persist: () => void; clear: () => void; ready: () => boolean };
   questionIds: { rendered: () => string[]; editTracking: () => Set<string>; hydration: () => string[] };
   getQuestionById: (questionId: string) => { type?: unknown } | null | undefined;
   buildEmptyResponseFieldState: (questionId?: string, fieldKey?: string) => unknown;
@@ -76,6 +77,7 @@ export type SurveyQuestionsResponseStateRuntime = {
   buildSliceFromLocalCache: (questionIds?: string[] | null) => SurveyQuestionsLegacyValue;
   buildSliceFromUserAnswers: (userAnswers: unknown, prevSlice?: unknown) => SurveyQuestionsLegacyValue;
   computeModifiedQuestionsCount: (baselineSlice: unknown, currentSlice: unknown) => number;
+  isQuestionSaved: (baselineSlice: unknown, currentSlice: unknown, questionId: string) => boolean;
   deepClone: <T>(value: T) => T;
   handleRevertPendingChanges: () => void;
   prefillSurveyResponses: (userAnswers: unknown, options?: { responseHydrationOwned?: boolean }) => void;
@@ -95,7 +97,7 @@ export const createSurveyQuestionsResponseStateRuntime = ({
   stateRef,
   setState,
   setResponseHydrationState,
-  drafts: { load: loadDraft, persist: persistDraft, clear: clearDraft },
+  drafts: { load: loadDraft, persist: persistDraft, clear: clearDraft, ready: isDraftStoreReady },
   questionIds: {
     rendered: getCurrentRenderedQuestionIds,
     editTracking: getEditTrackingQuestionIds,
@@ -151,84 +153,82 @@ export const createSurveyQuestionsResponseStateRuntime = ({
       field === 'answer' && questionId ? answerValueType(getQuestionById(questionId)?.type) : 'text',
     );
 
+  const pickField = (source: SurveyQuestionsLegacyValue, qid: string): SurveyQuestionsLegacyValue => {
+    if (!source || typeof source !== 'object') return {};
+    if (source[qid] && typeof source[qid] === 'object') return source[qid];
+    const rawKey = Object.keys(source).find((k: string) => normalizeQuestionIdKey(k) === qid);
+    return rawKey && source[rawKey] && typeof source[rawKey] === 'object' ? source[rawKey] : {};
+  };
+  const pickNumber = (source: SurveyQuestionsLegacyValue, qid: string): number | null => {
+    if (!source || typeof source !== 'object') return null;
+    const rawKey = Object.prototype.hasOwnProperty.call(source, qid)
+      ? qid
+      : Object.keys(source).find((k: string) => normalizeQuestionIdKey(k) === qid);
+    if (!rawKey) return null;
+    const n = Number(source[rawKey]);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  /** Whether one question's answer, comment, sliders or encryption differ from the baseline. */
+  const isQuestionChanged = (
+    baselineSlice: SurveyQuestionsLegacyValue,
+    currentSlice: SurveyQuestionsLegacyValue,
+    qId: string,
+  ): boolean => {
+    const bAns = pickField(baselineSlice.answers, qId);
+    const cAns = pickField(currentSlice.answers, qId);
+    const bAdd = pickField(baselineSlice.additionalComments, qId);
+    const cAdd = pickField(currentSlice.additionalComments, qId);
+    return (
+      !valuesEqual(bAns.value, cAns.value, qId, 'answer') ||
+      !valuesEqual(bAdd.value, cAdd.value, qId, 'additional') ||
+      pickNumber(baselineSlice.importance, qId) !== pickNumber(currentSlice.importance, qId) ||
+      pickNumber(baselineSlice.conviction, qId) !== pickNumber(currentSlice.conviction, qId) ||
+      !!bAns.encrypted !== !!cAns.encrypted ||
+      !!bAdd.encrypted !== !!cAdd.encrypted
+    );
+  };
+
   const computeModifiedQuestionsCount = (
     baselineSlice: SurveyQuestionsLegacyValue,
     currentSlice: SurveyQuestionsLegacyValue,
   ) => {
     if (!baselineSlice || !currentSlice) return 0;
 
-    const addNormalizedIds: SurveyQuestionsLegacyValue = (
-      idsSet: SurveyQuestionsLegacyValue,
-      source: SurveyQuestionsLegacyValue,
-    ) => {
-      Object.keys(source || {}).forEach((rawKey: SurveyQuestionsLegacyValue) => {
-        const normalized: SurveyQuestionsLegacyValue = normalizeQuestionIdKey(rawKey);
-        if (normalized) idsSet.add(normalized);
+    const idsFromSlices = new Set<string>();
+    const addNormalizedIds = (source: SurveyQuestionsLegacyValue) =>
+      Object.keys(source || {}).forEach((rawKey: string) => {
+        const normalized = normalizeQuestionIdKey(rawKey);
+        if (normalized) idsFromSlices.add(normalized);
       });
-    };
-    const pickField: SurveyQuestionsLegacyValue = (
-      source: SurveyQuestionsLegacyValue,
-      qid: SurveyQuestionsLegacyValue,
-    ) => {
-      if (!source || typeof source !== 'object') return {};
-      if (source[qid] && typeof source[qid] === 'object') return source[qid];
-      const rawKey: SurveyQuestionsLegacyValue = Object.keys(source).find(
-        (k: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(k) === qid,
-      );
-      return rawKey && source[rawKey] && typeof source[rawKey] === 'object' ? source[rawKey] : {};
-    };
-    const pickNumber: SurveyQuestionsLegacyValue = (
-      source: SurveyQuestionsLegacyValue,
-      qid: SurveyQuestionsLegacyValue,
-    ) => {
-      if (!source || typeof source !== 'object') return null;
-      if (Object.prototype.hasOwnProperty.call(source, qid)) {
-        const n: SurveyQuestionsLegacyValue = Number(source[qid]);
-        return Number.isFinite(n) ? n : null;
-      }
-      const rawKey: SurveyQuestionsLegacyValue = Object.keys(source).find(
-        (k: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(k) === qid,
-      );
-      if (!rawKey) return null;
-      const n: SurveyQuestionsLegacyValue = Number(source[rawKey]);
-      return Number.isFinite(n) ? n : null;
-    };
+    ['answers', 'additionalComments', 'importance', 'conviction'].forEach((field) => {
+      addNormalizedIds(baselineSlice[field]);
+      addNormalizedIds(currentSlice[field]);
+    });
 
-    const idsFromSlices: SurveyQuestionsLegacyValue = new Set();
-    addNormalizedIds(idsFromSlices, baselineSlice.answers);
-    addNormalizedIds(idsFromSlices, currentSlice.answers);
-    addNormalizedIds(idsFromSlices, baselineSlice.additionalComments);
-    addNormalizedIds(idsFromSlices, currentSlice.additionalComments);
-    addNormalizedIds(idsFromSlices, baselineSlice.importance);
-    addNormalizedIds(idsFromSlices, currentSlice.importance);
-    addNormalizedIds(idsFromSlices, baselineSlice.conviction);
-    addNormalizedIds(idsFromSlices, currentSlice.conviction);
-
-    const scopedIds: SurveyQuestionsLegacyValue = getEditTrackingQuestionIds();
-    const ids: SurveyQuestionsLegacyValue = scopedIds.size > 0 ? new Set(scopedIds) : idsFromSlices;
-
-    let count: SurveyQuestionsLegacyValue = 0;
-    ids.forEach((qId: SurveyQuestionsLegacyValue) => {
-      const bAns: SurveyQuestionsLegacyValue = pickField(baselineSlice.answers, qId);
-      const cAns: SurveyQuestionsLegacyValue = pickField(currentSlice.answers, qId);
-      const bAdd: SurveyQuestionsLegacyValue = pickField(baselineSlice.additionalComments, qId);
-      const cAdd: SurveyQuestionsLegacyValue = pickField(currentSlice.additionalComments, qId);
-      const bImp: SurveyQuestionsLegacyValue = pickNumber(baselineSlice.importance, qId);
-      const cImp: SurveyQuestionsLegacyValue = pickNumber(currentSlice.importance, qId);
-      const bConv: SurveyQuestionsLegacyValue = pickNumber(baselineSlice.conviction, qId);
-      const cConv: SurveyQuestionsLegacyValue = pickNumber(currentSlice.conviction, qId);
-
-      let changed: SurveyQuestionsLegacyValue = false;
-      if (!valuesEqual(bAns.value, cAns.value, qId, 'answer')) changed = true;
-      if (!valuesEqual(bAdd.value, cAdd.value, qId, 'additional')) changed = true;
-      if (bImp !== cImp) changed = true;
-      if (bConv !== cConv) changed = true;
-      if (!!bAns.encrypted !== !!cAns.encrypted) changed = true;
-      if (!!bAdd.encrypted !== !!cAdd.encrypted) changed = true;
-
-      if (changed) count++;
+    const scopedIds: Set<string> = getEditTrackingQuestionIds();
+    const ids = scopedIds.size > 0 ? new Set(scopedIds) : idsFromSlices;
+    let count = 0;
+    ids.forEach((qId: string) => {
+      if (isQuestionChanged(baselineSlice, currentSlice, qId)) count++;
     });
     return count;
+  };
+
+  /** A question whose answer is stored and unchanged on the page, so its card can say it is saved. */
+  const isQuestionSaved = (
+    baselineSlice: SurveyQuestionsLegacyValue,
+    currentSlice: SurveyQuestionsLegacyValue,
+    questionId: string,
+  ): boolean => {
+    const qId = normalizeQuestionIdKey(questionId);
+    return (
+      !!baselineSlice &&
+      !!currentSlice &&
+      !!qId &&
+      hasMeaningfulFieldValue(pickField(baselineSlice.answers, qId)) &&
+      !isQuestionChanged(baselineSlice, currentSlice, qId)
+    );
   };
 
   const handleRevertPendingChanges = () => {
@@ -450,7 +450,13 @@ export const createSurveyQuestionsResponseStateRuntime = ({
     const loadIds = listed.filter((questionId: string) =>
       savedAnswersKnown ? !loadedIds.has(questionId) || !formHeld : !formHeld,
     );
-    const restoreIds = current.startFresh ? [] : listed.filter((questionId: string) => !sync.restored.has(questionId));
+    // A question counts as restored only once its draft could be read: one marked while the
+    // session's draft store was unknown would never get its draft, and its next save would drop it.
+    sync.storeReady = isDraftStoreReady();
+    const restoreIds =
+      current.startFresh || !sync.storeReady
+        ? []
+        : listed.filter((questionId: string) => !sync.restored.has(questionId));
     if (!loadIds.length && !restoreIds.length) return;
     // Marked from the committed state; the update below skips any question no longer listed.
     if (savedAnswersKnown) loadIds.forEach((questionId: string) => loadedIds.add(questionId));
@@ -502,6 +508,7 @@ export const createSurveyQuestionsResponseStateRuntime = ({
     computeModifiedQuestionsCount,
     deepClone,
     handleRevertPendingChanges,
+    isQuestionSaved,
     prefillSurveyResponses,
     rehydrateLocalCacheAnswersForRenderedIds,
     resetFormStateForAccountChange,

@@ -162,8 +162,15 @@ type PendingStatsState = {
   encryptedModifiedCount?: unknown;
 } & UnknownRecord;
 
+/** A running Submit's label: "Saving 12 of 40" once answers are storing, else "Saving". Shown with elapsed seconds. */
+export const submittingLabel = (submitCountText?: string): string =>
+  submitCountText ? `Saving ${submitCountText}` : 'Saving';
+
+// While a Submit saves several answers, the header carries its count ("12 of 40").
+type SubmitLabelStats = Partial<PendingStatsSnapshot> & { isSubmitting?: boolean; submitCountText?: string };
+
 type SubmitLabelContext = {
-  getPendingEditStats?: (() => Partial<PendingStatsSnapshot> | PendingStatsSnapshot | null | undefined) | null;
+  getPendingEditStats?: (() => SubmitLabelStats | null | undefined) | null;
   state?: PendingStatsState | null;
 } & UnknownRecord;
 
@@ -686,25 +693,6 @@ export const buildSurveyDraftStorageKey = ({
   // migration, mirror, and purge keys stay inside this authority suffix.
   const authoritySuffix = draftAuthorityKey ? `:authority:${encodeURIComponent(draftAuthorityKey)}` : '';
   return `dg:surveyDraft:${slug}:${networkSegment}:${accountOwner}:${scope}${authoritySuffix}`;
-};
-
-/**
- * Unsaved answers belong to the signed-in account. When it signs out or switches,
- * its drafts go for every session, not only the one on screen.
- */
-export const clearSurveyDraftsForAccount = (account: unknown): void => {
-  const owner = String(account || '')
-    .trim()
-    .toLowerCase();
-  if (!owner || owner === 'anon' || typeof sessionStorage === 'undefined') return;
-  try {
-    // Key layout: dg:surveyDraft:<session>:<network>:<account>:<scope>.
-    Object.keys(sessionStorage)
-      .filter((key) => key.startsWith('dg:surveyDraft:') && key.split(':')[4] === owner)
-      .forEach((key) => sessionStorage.removeItem(key));
-  } catch (_) {
-    // Storage can be unavailable; there is then nothing stored to clear.
-  }
 };
 
 export const buildSurveyDraftStorageVariantKeys = ({
@@ -1321,6 +1309,8 @@ export function computeSubmitLabel(ctx: SubmitLabelContext = {}, opts: SubmitLab
     (typeof ctx.getPendingEditStats === 'function' && ctx.getPendingEditStats()) ||
     getPendingStatsSnapshotFromState(ctx.state);
 
+  const { isSubmitting, submitCountText } = (stats || {}) as SubmitLabelStats;
+  if (isSubmitting) return submittingLabel(submitCountText);
   const pendingCount = Number(stats?.total || 0);
   const base = 'Submit';
   const suffix = opts.suffix ? ` ${String(opts.suffix)}` : '';

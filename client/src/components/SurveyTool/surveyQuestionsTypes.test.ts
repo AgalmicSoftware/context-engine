@@ -1282,6 +1282,7 @@ describe('surveyQuestionsTypes', () => {
     expect(buildSubmitStartState()).toEqual({
       isSubmitting: true,
       submitProgress: 0,
+      submitCountText: '',
       currentStep: 1,
       submissionError: '',
     });
@@ -2046,4 +2047,14 @@ it('explains instead of publishing a masked comment when the answer lock is remo
       },
     ),
   ).toEqual({ submissionError: 'Decrypt the locked answer and comment before making them public.' });
+});
+
+it('counts a Submit that saves several answers', () => {
+  expect(
+    buildSurveyQuestionsSubmitFooterDisplayState({ isSubmitting: true, currentStep: 2, submitCountText: '12 of 40' })
+      .uploadStatusText,
+  ).toBe('Saving 12 of 40...');
+  expect(buildSurveyQuestionsSubmitFooterDisplayState({ isSubmitting: true, currentStep: 2 }).uploadStatusText).toBe(
+    'Uploading...',
+  );
 });

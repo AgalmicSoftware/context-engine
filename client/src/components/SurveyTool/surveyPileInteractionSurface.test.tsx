@@ -142,9 +142,7 @@ const buildBaseProps = (): PileInteractionSurfaceProps => ({
   onViewAllClick: jest.fn(),
   handleViewAllFromPile: jest.fn(),
   pileTopRailVisible: true,
-  showSuccessBadgeLink: false,
-  pileSubmitResponderHref: '',
-  showSuccessBadgeStatus: false,
+  showSuccessBadge: false,
   showSubmitButton: true,
   handlePileSubmitClick: jest.fn(),
   hasPendingPileChanges: true,
@@ -475,55 +473,107 @@ describe('the check after a submit', () => {
     jest.useRealTimers();
   });
 
-  it('links to the responder’s profile for ten seconds, then hides in its place', () => {
+  it('is Submit turned green reading Submitted for ten seconds, then hides in its place, and leads nowhere', () => {
     jest.useFakeTimers();
-    render(<PileSubmittedCheck href="/u/0xabc?session=alpha" />);
-    const check = screen.getByRole('link', { name: 'View your submitted responses' });
-    expect(check).toHaveAttribute('href', '/u/0xabc?session=alpha');
-    expect(check).toHaveAttribute('data-testid', E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
+    render(<PileSubmittedCheck />);
+    const check = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
+    // Submit, which had focus, is gone, so focus stays on what replaced it.
+    expect(check).toHaveFocus();
+    expect(check).toHaveTextContent(/^Submitted$/);
+    expect(check).toHaveClass('pileSubmitButton', 'pileSubmitDone');
+    expect(check.querySelector('svg')).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
     act(() => {
       jest.advanceTimersByTime(9_999);
     });
-    expect(check).not.toHaveClass('pileSubmitSuccessBadgeGone');
+    expect(check).not.toHaveClass('pileSubmitDoneGone');
     act(() => {
       jest.advanceTimersByTime(1);
     });
-    expect(check).toHaveClass('pileSubmitSuccessBadge', 'pileSubmitSuccessBadgeGone');
+    expect(check).toHaveClass('pileSubmitDone', 'pileSubmitDoneGone');
   });
+});
 
-  it.each([
-    [
-      'pointed at',
-      (check: HTMLElement) => fireEvent.mouseEnter(check),
-      (check: HTMLElement) => fireEvent.mouseLeave(check),
-    ],
-    ['focused', (check: HTMLElement) => act(() => check.focus()), (check: HTMLElement) => act(() => check.blur())],
-  ])('stays while it is %s, and goes once left after its ten seconds', (_how, hold, release) => {
-    jest.useFakeTimers();
-    render(<PileSubmittedCheck href="/u/0xabc?session=alpha" />);
-    const check = screen.getByRole('link', { name: 'View your submitted responses' });
-    hold(check);
+it('makes Next the step to take once the card has an answer, until the end of the set', () => {
+  const props = { ...buildBaseProps(), pileQuestions: [{ id: 'q1' }, { id: 'q2' }] };
+  const { rerender } = render(renderPileInteractionSurface(props));
+  const next = screen.getByRole('button', { name: 'Next Question' });
+  expect(next).not.toHaveClass('pileNavArrowPrimary');
+  expect(next).not.toHaveTextContent('Next');
+  rerender(renderPileInteractionSurface({ ...props, nextIsPrimary: true }));
+  expect(screen.getByRole('button', { name: 'Next Question' })).toHaveClass('pileNavArrowPrimary');
+  expect(screen.getByRole('button', { name: 'Next Question' })).toHaveTextContent('Next');
+  // At the end of the set Next does nothing, so it does not look like the step to take.
+  rerender(renderPileInteractionSurface({ ...props, nextIsPrimary: true, activePileIndex: 1, endOfSetCard: <div /> }));
+  expect(screen.getByRole('button', { name: 'Next Question' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Next Question' })).not.toHaveClass('pileNavArrowPrimary');
+  expect(screen.getByRole('button', { name: 'Next Question' })).not.toHaveTextContent('Next');
+});
+
+it('reads the submit out from a status region that was already there', () => {
+  const { rerender } = render(renderPileInteractionSurface(buildBaseProps()));
+  const status = document.querySelector('.pileSubmitStatusText');
+  expect(status).toHaveAttribute('role', 'status');
+  expect(status).toBeEmptyDOMElement();
+  rerender(renderPileInteractionSurface({ ...buildBaseProps(), showSuccessBadge: true }));
+  expect(document.querySelector('.pileSubmitStatusText')).toBe(status);
+  expect(status).toHaveTextContent('Your answers are submitted.');
+});
+
+it('times a Submit and shows its count, as the AI flows do', () => {
+  const { rerender } = render(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: true }));
+  expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent('Saving · 0s');
+  rerender(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: true, submitCountText: '12 of 40' }));
+  expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent('Saving 12 of 40 · 0s');
+  // A stale count from an earlier Submit never shows once it is done.
+  rerender(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: false, submitCountText: '40 of 40' }));
+  expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).not.toHaveTextContent('Saving');
+});
+
+it('counts the seconds of each Submit from its own start', () => {
+  jest.useFakeTimers();
+  try {
+    const { rerender } = render(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: true }));
     act(() => {
-      jest.advanceTimersByTime(10_000);
+      jest.advanceTimersByTime(5_000);
     });
-    expect(check).not.toHaveClass('pileSubmitSuccessBadgeGone');
-    release(check);
-    expect(check).toHaveClass('pileSubmitSuccessBadgeGone');
-  });
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent('Saving · 5s');
+    rerender(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: false }));
+    rerender(renderPileInteractionSurface({ ...buildBaseProps(), isSubmitting: true }));
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent('Saving · 0s');
+  } finally {
+    jest.useRealTimers();
+  }
+});
 
-  it('is a status without an address to open', () => {
-    render(<PileSubmittedCheck href="" />);
-    expect(screen.getByRole('status', { name: 'Submitted' })).toHaveAttribute(
-      'data-testid',
-      E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR,
-    );
-    expect(screen.queryByRole('link')).toBeNull();
-  });
+it('shows the end of the set in place of the cards and stops Next there', () => {
+  render(
+    renderPileInteractionSurface({
+      ...buildBaseProps(),
+      pileQuestions: [{ id: 'q1' }],
+      activePileIndex: 0,
+      nextIsPrimary: true,
+      showClearPendingButton: true,
+      endOfSetCard: <div data-testid="end-of-set">End</div>,
+    }),
+  );
+  expect(screen.getByTestId('end-of-set')).toBeInTheDocument();
+  // In the same frame as a question card, so nothing below it moves.
+  expect(screen.getByTestId('end-of-set').parentElement).toHaveClass('pileCard', 'pileCardActive');
+  expect(screen.queryByTestId('active-question')).not.toBeInTheDocument();
+  const next = screen.getByRole('button', { name: 'Next Question' });
+  expect(next).toBeDisabled();
+  expect(next).not.toHaveClass('pileNavArrowPrimary');
+  // Back returns to a lone question.
+  expect(screen.getByRole('button', { name: 'Previous Question' })).toBeEnabled();
+  // The card has its own Submit, so the rail's Submit and Clear step aside without moving anything.
+  expect(screen.getByRole('button', { name: 'Clear pending changes' })).toHaveClass('pileFooterControlAway');
 });
 
 it('announces a draft storage failure without hiding the submit error', () => {
   const { rerender } = render(renderPileInteractionSurface(buildBaseProps()));
-  const status = screen.getByRole('status');
+  const draftStatus = () => screen.getAllByRole('status').find((el) => !el.classList.contains('pileSubmitStatusText'));
+  const status = draftStatus();
   expect(status).toBeEmptyDOMElement();
   rerender(
     renderPileInteractionSurface({
@@ -532,8 +582,8 @@ it('announces a draft storage failure without hiding the submit error', () => {
       submissionError: 'The response was not submitted.',
     }),
   );
-  expect(screen.getByRole('status')).toHaveTextContent('Draft changes are only in memory.');
-  expect(screen.getByRole('status')).toBe(status);
+  expect(draftStatus()).toHaveTextContent('Draft changes are only in memory.');
+  expect(draftStatus()).toBe(status);
   expect(screen.getByRole('alert')).toHaveTextContent('The response was not submitted.');
 });
 

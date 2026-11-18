@@ -705,6 +705,7 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
  *
  * @param {"compare"|"axes"} task
  * @param {{users:Array}} payload
+ * @param {{throwOnError?:boolean}} opts - `throwOnError` rethrows a failed call instead of returning null.
  * @returns {Promise<unknown>} Parsed JSON per task.
  */
 export async function runCompareToolkit(task: unknown, payload: unknown = {}, opts: unknown = {}) {
@@ -766,6 +767,8 @@ export async function runCompareToolkit(task: unknown, payload: unknown = {}, op
     return parsed ? { ...parsed, generation } : null;
   } catch (err) {
     aiLog.error('runCompareToolkit error:', err);
+    // The comparison page falls back to a local summary and says why.
+    if (readAiOptionThrowOnError(opts)) throw err;
     return null;
   }
 }

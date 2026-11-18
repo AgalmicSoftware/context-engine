@@ -294,6 +294,7 @@ export type SurveyStandaloneAuthResetStatePatch = {
 export type SurveySubmitStartStatePatch = {
   isSubmitting: boolean;
   submitProgress: number;
+  submitCountText: string;
   currentStep: number;
   submissionError: string;
 };
@@ -529,6 +530,8 @@ export type SurveyQuestionsState = SurveyQuestionsLegacyRecord & {
   isEditing: boolean;
   isSubmitting: boolean;
   submitProgress: number;
+  // "12 of 40" while a Submit's answers upload, one at a time.
+  submitCountText: string;
   submissionComplete: boolean;
   submittedSinceLastEdit: boolean;
   responseUrl: string;
@@ -1590,6 +1593,7 @@ export const buildStandaloneAuthResetState = (
 export const buildSubmitStartState = (): SurveySubmitStartStatePatch => ({
   isSubmitting: true,
   submitProgress: 0,
+  submitCountText: '',
   currentStep: 1,
   submissionError: '',
 });
@@ -2060,6 +2064,7 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
   responseUrl = '',
   singleQuestionMode = false,
   startFresh = false,
+  submitCountText = '',
   submissionComplete = false,
   submittedSinceLastEdit = false,
   useHeaderSubmit = false,
@@ -2077,6 +2082,7 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
   responseUrl?: unknown;
   singleQuestionMode?: unknown;
   startFresh?: unknown;
+  submitCountText?: unknown;
   submissionComplete?: unknown;
   submittedSinceLastEdit?: unknown;
   useHeaderSubmit?: unknown;
@@ -2092,7 +2098,11 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
     ((pendingCount > 0 && !isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
       (singleQuestionSubmittedIndicatorActive && !!responseUrl));
   const uploadStatusText =
-    isSubmitting && Number(currentStep || 0) === 1 && !!hasEncryptedAnswers ? 'Encrypting...' : 'Uploading...';
+    isSubmitting && Number(currentStep || 0) === 1 && !!hasEncryptedAnswers
+      ? 'Encrypting...'
+      : submitCountText
+        ? `Saving ${String(submitCountText)}...`
+        : 'Uploading...';
   const submitDisabled = !!(isSubmitting || (singleQuestionMode && hasMaskedCurrentQuestionPayload));
   const canEditQuestions = !userHasResponse || !!startFresh || !!isEditing;
   const hasPendingEdits = !!isDirty || pendingCount > 0;
@@ -2266,6 +2276,7 @@ export const buildInitialSurveyQuestionsState = (props: SurveyQuestionsProps = {
   isEditing: false,
   isSubmitting: false,
   submitProgress: 0,
+  submitCountText: '',
   submissionComplete: false,
   submittedSinceLastEdit: updateSubmittedSinceLastEdit(false, 'reset'),
   responseUrl: '',

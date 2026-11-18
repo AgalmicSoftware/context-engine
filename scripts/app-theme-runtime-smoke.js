@@ -447,11 +447,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       const explainers = Array.from(panel.querySelectorAll('button')).find((button) =>
         button.getAttribute('aria-label')?.startsWith('Explainers '),
       );
-      const demo = Array.from(panel.querySelectorAll('button')).find((button) =>
-        button.getAttribute('aria-label')?.startsWith('Demo Mode '),
-      );
       const row = config?.parentElement;
-      const controls = [config, explainers, demo].filter(Boolean);
+      const controls = [config, explainers].filter(Boolean);
       const rects = controls.map((element) => element.getBoundingClientRect());
       const units = Array.from(row?.children || []);
       const unitRects = units.map((element) => element.getBoundingClientRect());
@@ -3102,7 +3099,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
   if (classicPreloginSettingsControlLayout && currentPreloginSettingsControlLayout) {
     [classicPreloginSettingsControlLayout, currentPreloginSettingsControlLayout].forEach((layout) => {
-      assert.equal(layout.controlCount, 3, 'Pre-login settings should expose Config, Explainers, and Demo Mode');
+      assert.equal(layout.controlCount, 2, 'Pre-login settings should expose Config and Explainers');
       assert.equal(layout.sessionOutsidePanel, true, 'Active Session should remain outside the settings drawer');
       assert.equal(layout.sessionAbovePanel, true, 'Active Session should sit below auth actions and above settings');
       assert.equal(layout.sessionBelowAuthActions, true, 'Active Session should render below Create and Login');
@@ -3122,7 +3119,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       );
       assert.equal(
         layout.rowCount,
-        viewportName === 'mobile' ? 3 : viewportName === 'login feedback' ? 2 : 1,
+        viewportName === 'mobile' ? 2 : 1,
         `Pre-login settings should wrap only when needed in ${viewportName}; received ${JSON.stringify(layout)}`,
       );
     });

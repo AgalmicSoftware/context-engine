@@ -213,6 +213,7 @@ describe('surveyQuestionsSubmitController', () => {
       statePatch: {
         isSubmitting: true,
         submitProgress: 0,
+        submitCountText: '',
         currentStep: 1,
         submissionError: '',
       },
@@ -229,6 +230,7 @@ describe('surveyQuestionsSubmitController', () => {
       statePatch: {
         isSubmitting: true,
         submitProgress: 0,
+        submitCountText: '',
         currentStep: 1,
         submissionError: '',
       },

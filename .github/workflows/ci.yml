@@ -97,7 +97,8 @@ jobs:
       - name: Run wiring and release gate
         env:
           CLIENT_LARGE_FILE_BASE_REF: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}
-        run: npm run ci:gate -- wiring-and-release
+        # One command at a time: the gate's lanes are not yet measured against this runner's memory.
+        run: npm run ci:gate -- wiring-and-release --serial
 
       - name: Run public text gate
         run: npm run ci:gate -- public-text
@@ -174,9 +175,15 @@ jobs:
       - name: Run contracts gate
         run: npm run ci:gate -- contracts
 
-  client:
+  client-tests:
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # One entry per shard; scripts/run-client-coverage.mjs holds the count.
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
     steps:
       - name: Checkout
@@ -192,6 +199,44 @@ jobs:
       - name: Install client dependencies
         run: npm --prefix client ci
 
+      - name: Run one shard of the client tests
+        run: npm run test:client:shard -- ${{ matrix.shard }}
+
+      # A rerun of a failed shard replaces its earlier upload.
+      - name: Upload client test shard results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: client-test-shard-${{ matrix.shard }}
+          path: client/coverage/shards
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+
+  # Fails unless the shards are one complete run of this commit: every test
+  # file run by exactly one shard, and the floors met by their merged coverage.
+  client:
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
+    needs: client-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+
+      - name: Download client test shard results
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: client-test-shard-*
+          path: client/coverage/shards
+          merge-multiple: true
+
       - name: Run client gate
         run: npm run ci:gate -- client
 
@@ -200,8 +245,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: client-coverage
-          path: client/coverage/lcov.info
+          path: client/coverage/coverage-final.json
           if-no-files-found: warn
+          overwrite: true
 
   root-jest:
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
@@ -402,6 +448,7 @@ jobs:
     needs:
       - wiring-and-release
       - contracts
+      - client-tests
       - client
       - root-jest
       - workers
@@ -430,7 +477,7 @@ jobs:
         if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
         env:
           CI_GATE_RESULTS_JSON: >-
-            {"wiring-and-release":"${{ needs.wiring-and-release.result }}","public-text":"${{ needs.wiring-and-release.result }}","contracts":"${{ needs.contracts.result }}","client":"${{ needs.client.result }}","root-jest":"${{ needs.root-jest.result }}","workers":"${{ needs.workers.result }}","e2e-smoke":"${{ needs.e2e-smoke.result }}","cecc-and-node":"${{ needs.cecc-and-node.result }}"}
+            {"wiring-and-release":"${{ needs.wiring-and-release.result }}","public-text":"${{ needs.wiring-and-release.result }}","contracts":"${{ needs.contracts.result }}","client-tests":"${{ needs.client-tests.result }}","client":"${{ needs.client.result }}","root-jest":"${{ needs.root-jest.result }}","workers":"${{ needs.workers.result }}","e2e-smoke":"${{ needs.e2e-smoke.result }}","cecc-and-node":"${{ needs.cecc-and-node.result }}"}
         run: npm run ci:gates:check-hosted
 
       - name: Download tested Worker bundle candidate

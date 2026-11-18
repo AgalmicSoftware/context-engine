@@ -1,4 +1,6 @@
 import WorkerResponseHydrationNotice from './WorkerResponseHydrationNotice';
+import SavedAnswersNotice, { isSavedAnswersRoute } from './SavedAnswersNotice';
+import { hasRouteCacheInitializationError } from './mainSiteRouteSessionNetwork';
 /** @file AppShell.tsx */
 
 import React, { Component } from 'react';
@@ -10,7 +12,6 @@ import {
   changeFocusedTab,
   toggleLoginModal,
   updateLoginInfo,
-  toggleDemoMode,
   changeActiveSessionSlug,
 } from '../../actions/sessionStateActions.js';
 import type { RootState } from '../../reducers/index.js';
@@ -35,7 +36,6 @@ import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js
 import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
 import { clearDecryptCaches, cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { clearSurveyDraftsForAccount } from '../SurveyTool/surveyToolDraftState.js';
 import { purgeWorkerCanonicalCaches } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
@@ -2653,7 +2653,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         .toLowerCase();
     if (accountKey(prevProps.account) !== accountKey(this.props.account)) {
       clearDecryptCaches();
-      clearSurveyDraftsForAccount(prevProps.account);
       void purgeWorkerCanonicalCaches(prevProps.account)
         // Survey titles relocked by the purge are decrypted again for the new reader.
         .then(() => this.refreshEncryptedSurveyPayloadsForGroup(this.getActiveSessionSlug(), { force: true }))
@@ -2760,8 +2759,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     // Re-initialize if the *group* chain id changes (independent of wallet)
     const currSlug = this.getActiveSessionSlug();
     const currChainId = this.getSessionChainId(currSlug);
-    const toolsDemoOn = typeof this.props.demoMode === 'object' ? !!this.props.demoMode?.tools : !!this.props.demoMode;
-    if (this._lastGroupChainId !== currChainId && !toolsDemoOn) {
+    if (this._lastGroupChainId !== currChainId) {
       if (getMainSiteRuntimeWindow()?.ENABLE_RPC_DEBUG_LOGGING === true) {
         mainSiteLog.log('[RPC_DEBUG_TRIGGER] MainSite: group chain change detected', {
           old: this._lastGroupChainId,
@@ -3985,8 +3983,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         <Navbar
           toggleLoginModal={this.props.toggleLoginModal}
           updateLoginInfo={this.props.updateLoginInfo}
-          toggleDemoMode={this.props.toggleDemoMode}
-          demoMode={this.props.demoMode}
           account={this.props.account}
           provider={this.props.provider} // <--- provider is a string name; pass through unchanged
           focusedTab={this.props.focusedTab}
@@ -4012,6 +4008,16 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           sessionSlug={this.getSessionSlugFromProps()}
           partialRuns={this.state.partialWorkerResponseRuns}
         />
+        {hasActiveSessionRoute && isSavedAnswersRoute(effectivePath) && (
+          <SavedAnswersNotice
+            sessionConfig={activeRouteSessionConfig}
+            sessionSlug={this.getSessionSlugFromProps()}
+            signedIn={!!this.props.account && !!this.props.loginComplete}
+            answersReady={!!this.state.isResponsesCacheReady}
+            answersFailed={hasRouteCacheInitializationError(this)}
+            partialRuns={this.state.partialWorkerResponseRuns}
+          />
+        )}
         {mainViewDisplay}
 
         <Footer toggleLoginModal={this.props.toggleLoginModal} flowAtDocumentEnd={hasActiveSessionRoute} />
@@ -4028,8 +4034,6 @@ const mapStateToProps = (state: RootState) => ({
   focusedTab: state.sessionState.focusedTab,
   loginComplete: state.sessionState.loginComplete,
   loginInProgress: state.sessionState.loginInProgress,
-  demoMode: state.sessionState.demoMode,
-  demoSurfaceMode: state.sessionState.demoSurfaceMode,
   activeSessionSlug: state.sessionState.activeSessionSlug,
 });
 
@@ -4042,7 +4046,6 @@ export const appShellDispatchActions = {
   changeFocusedTab,
   toggleLoginModal,
   updateLoginInfo,
-  toggleDemoMode,
   changeActiveSessionSlug,
 };
 

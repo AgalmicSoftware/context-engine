@@ -5,32 +5,11 @@ import {
   CHANGE_FOCUSED_TAB,
   FETCH_SESSION_STATE,
   LOGIN_IN_PROGRESS,
-  SET_DEMO_SURFACE_MODE,
-  TOGGLE_DEMO_MODE,
   TOGGLE_LOGIN_MODAL,
   UPDATE_GLOBAL_SESSION_SELECTION,
 } from '../actions/types';
 
-const DEMO_SURFACE_MODE_ENV_KEY = 'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT';
-const env = process.env as Record<string, string | undefined>;
-const ORIGINAL_DEMO_SURFACE_MODE_ENV = env[DEMO_SURFACE_MODE_ENV_KEY];
-
-const restoreDemoSurfaceModeEnv = () => {
-  if (typeof ORIGINAL_DEMO_SURFACE_MODE_ENV === 'undefined') {
-    delete env[DEMO_SURFACE_MODE_ENV_KEY];
-    return;
-  }
-
-  env[DEMO_SURFACE_MODE_ENV_KEY] = ORIGINAL_DEMO_SURFACE_MODE_ENV;
-};
-
-const loadReducerWithDemoSurfaceModeDefault = (value?: string) => {
-  if (typeof value === 'undefined') {
-    delete env[DEMO_SURFACE_MODE_ENV_KEY];
-  } else {
-    env[DEMO_SURFACE_MODE_ENV_KEY] = value;
-  }
-
+const loadReducer = () => {
   jest.resetModules();
   return require('./sessionStateReducer').default;
 };
@@ -41,17 +20,14 @@ describe('sessionStateReducer', () => {
   });
 
   afterEach(() => {
-    restoreDemoSurfaceModeEnv();
     jest.resetModules();
   });
 
-  afterAll(() => {
-    restoreDemoSurfaceModeEnv();
-  });
-
   it('returns the initial state', () => {
+    // A Demo Mode preference left by an earlier version of the site adds nothing to the state.
+    localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(true));
     const initialSelection = readStoredGlobalSessionSelection();
-    const reloadedReducer = loadReducerWithDemoSurfaceModeDefault();
+    const reloadedReducer = loadReducer();
 
     expect(reloadedReducer(undefined, { type: '@@INIT' })).toEqual({
       focusedTab: 4,
@@ -60,8 +36,6 @@ describe('sessionStateReducer', () => {
       explorerHistory: [],
       ETHUSDToggle: false,
       explainerMode: true,
-      demoMode: { tools: false },
-      demoSurfaceMode: false,
       loginModalToggled: false,
       loginModalFocus: '',
       afterLoginModalToggled: false,
@@ -75,51 +49,11 @@ describe('sessionStateReducer', () => {
     });
   });
 
-  it('treats legacy null demoSurfaceMode storage as enabled', () => {
-    localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(null));
-    const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('false');
-
-    expect(reloadedReducer(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
-  });
-
   it('falls back when stored session preferences contain malformed JSON', () => {
-    localStorage.setItem('ce:demoSurfaceMode', '{bad');
     localStorage.setItem('ce:tooltipsEnabled', '{bad');
-    const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('false');
-    const state = reloadedReducer(undefined, { type: '@@INIT' });
+    const state = loadReducer()(undefined, { type: '@@INIT' });
 
-    expect(state.demoSurfaceMode).toBe(false);
     expect(state.tooltipsEnabled).toBe(true);
-  });
-
-  describe('demoSurfaceMode default precedence', () => {
-    it('uses stored false regardless of the env default', () => {
-      localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(false));
-
-      expect(loadReducerWithDemoSurfaceModeDefault('true')(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(false);
-
-      expect(loadReducerWithDemoSurfaceModeDefault('false')(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(false);
-    });
-
-    it('uses stored true regardless of the env default', () => {
-      localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(true));
-
-      expect(loadReducerWithDemoSurfaceModeDefault('false')(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
-
-      expect(loadReducerWithDemoSurfaceModeDefault('true')(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
-    });
-
-    it('uses the env default when no demoSurfaceMode preference is stored and the default is true', () => {
-      const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('true');
-
-      expect(reloadedReducer(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
-    });
-
-    it('uses the env default when no demoSurfaceMode preference is stored and the default is false', () => {
-      const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('false');
-
-      expect(reloadedReducer(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(false);
-    });
   });
 
   it('hydrates the canonical global session selection from localStorage', () => {
@@ -155,8 +89,6 @@ describe('sessionStateReducer', () => {
   });
 
   it('hydrates fetched session state into the current state shape', () => {
-    localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(false));
-
     const next = reducer(undefined, {
       type: FETCH_SESSION_STATE,
       payload: {
@@ -169,65 +101,14 @@ describe('sessionStateReducer', () => {
     expect(next.focusedTab).toBe(2);
     expect(next.loginModalToggled).toBe(true);
     expect(next.explorerHistory).toEqual(['/one', '/two']);
-    expect(next.demoSurfaceMode).toBe(false);
   });
 
-  it('hydrates demoSurfaceMode from localStorage and keeps it independent from legacy demoMode', () => {
-    localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(true));
-
-    jest.resetModules();
-    const reloadedReducer = require('./sessionStateReducer').default;
-    const initial = reloadedReducer(undefined, { type: '@@INIT' });
-
-    expect(initial.demoSurfaceMode).toBe(true);
-    expect(initial.demoMode).toEqual({ tools: false });
-
-    const updated = reloadedReducer(
-      {
-        ...initial,
-        demoMode: { tools: true },
-      },
-      {
-        type: SET_DEMO_SURFACE_MODE,
-        payload: false,
-      },
-    );
-
-    expect(updated.demoSurfaceMode).toBe(false);
-    expect(updated.demoMode).toEqual({ tools: true });
-    expect(JSON.parse(localStorage.getItem('ce:demoSurfaceMode') || 'null')).toBe(false);
-  });
-
-  it('updates tab and demo mode independently', () => {
+  it('updates the focused tab', () => {
     const withTab = reducer(undefined, {
       type: CHANGE_FOCUSED_TAB,
       payload: 3,
     });
     expect(withTab.focusedTab).toBe(3);
-
-    const withDemoMode = reducer(withTab, {
-      type: TOGGLE_DEMO_MODE,
-      payload: true,
-    });
-    expect(withDemoMode.demoMode).toEqual({
-      tools: true,
-    });
-
-    const withPartialDemoMode = reducer(
-      {
-        ...withTab,
-        demoMode: {
-          tools: false,
-        },
-      },
-      {
-        type: TOGGLE_DEMO_MODE,
-        payload: { tools: true, futureTab: true, votes: true },
-      },
-    );
-    expect(withPartialDemoMode.demoMode).toEqual({
-      tools: true,
-    });
   });
 
   it('toggles login modal for structured payloads', () => {

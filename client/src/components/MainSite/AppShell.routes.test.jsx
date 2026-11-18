@@ -318,6 +318,7 @@ jest.mock('../UserPage/CompareAddresses', () => {
         'data-testid': 'mock-compare-addresses',
         'data-first-address': String(props.firstAddress || ''),
         'data-active-session-slug': String(props.activeSessionSlug || ''),
+        'data-session-config-slug': String(props.sessionConfig?.slug || ''),
         'data-cache-ready': String(props.sessionCachesReady),
         'data-profile-scan-enabled': String(typeof props.scanSpecificUserProfile === 'function'),
       });
@@ -498,9 +499,6 @@ const buildProps = (overrides = {}) => ({
   changeFocusedTab: jest.fn(),
   toggleLoginModal: jest.fn(),
   updateLoginInfo: jest.fn(),
-  toggleDemoMode: jest.fn(),
-  demoMode: { tools: false },
-  demoSurfaceMode: true,
   changeActiveSessionSlug: jest.fn(),
   network: DEFAULT_NETWORK,
   ...overrides,
@@ -602,7 +600,6 @@ const createSubject = ({
   path = '/',
   search = '',
   activeSessionSlug = 'edge',
-  demoSurfaceMode = true,
   firstVisit = false,
   sessionConfig = null,
 } = {}) => {
@@ -616,7 +613,6 @@ const createSubject = ({
     buildProps({
       path,
       firstVisit,
-      demoSurfaceMode,
       sessionState: {
         primarySessionSlug: activeSessionSlug,
         primarySessionExplicit: true,
@@ -991,7 +987,7 @@ describe('AppShell route render smoke', () => {
     expect(subject.setReadinessStateIfChanged).not.toHaveBeenCalled();
   });
 
-  it("clears the previous account's unsaved answers for every session when the account changes", () => {
+  it("keeps every account's unsent answers when the account changes or empties", () => {
     const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
     subject.handleNetworkChange = jest.fn();
     const ACCOUNT_A = '0x00000000000000000000000000000000000000aa';
@@ -1010,15 +1006,11 @@ describe('AppShell route render smoke', () => {
     };
 
     try {
+      // A wallet that switches, locks or disconnects changes the store account; only a
+      // deliberate log-out clears drafts (see clientAuthLogout).
       update(ACCOUNT_A, ACCOUNT_B);
-      expect(sessionStorage.getItem(drafts.a)).toBeNull();
-      expect(sessionStorage.getItem(drafts.aOtherSession)).toBeNull();
-      expect(sessionStorage.getItem(drafts.b)).toBe('{}');
-
-      // Logout clears the store account.
       update(ACCOUNT_B, undefined);
-      expect(sessionStorage.getItem(drafts.b)).toBeNull();
-      expect(sessionStorage.getItem(drafts.anon)).toBe('{}');
+      Object.values(drafts).forEach((key) => expect(sessionStorage.getItem(key)).toBe('{}'));
     } finally {
       sessionStorage.clear();
     }
@@ -2400,6 +2392,9 @@ describe('AppShell route render smoke', () => {
       'data-active-session-slug',
       'worker-session',
     );
+    // Its AI requests need the verified session settings, not only the session's name.
+    expect(mockCompareAddresses).toHaveBeenLastCalledWith(expect.objectContaining({ sessionConfig: workerConfig }));
+    expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-session-config-slug', 'worker-session');
     expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-profile-scan-enabled', 'false');
     expect(screen.getByTestId('mock-compare-addresses')).toHaveAttribute('data-cache-ready', 'true');
   });
@@ -3428,33 +3423,14 @@ describe('AppShell route render smoke', () => {
     }
   });
 
-  it('treats the atlas demoSurfaceMode as enabled by default and only disables it when false', async () => {
-    const defaultSubject = createSubject({ path: '/atlas', demoSurfaceMode: null });
-    const { unmount } = render(defaultSubject.render());
-
-    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).toBeInTheDocument();
-    expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', 'true');
-
-    unmount();
-
-    const enabledSubject = createSubject({ path: '/atlas', demoSurfaceMode: true });
-    const enabledRender = render(enabledSubject.render());
-
-    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).toBeInTheDocument();
-    expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', 'true');
-
-    enabledRender.unmount();
-
-    const disabledSubject = createSubject({ path: '/atlas', demoSurfaceMode: false });
-    render(disabledSubject.render());
+  it('opens the atlas without sample data, and with it only for a ?demo=1 link', async () => {
+    const plain = render(createSubject({ path: '/atlas' }).render());
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', 'false');
-  });
 
-  it('still honors atlas demo deep links when demoSurfaceMode is disabled', async () => {
-    const subject = createSubject({ path: '/atlas', search: '?demo=1', demoSurfaceMode: false });
-    render(subject.render());
+    plain.unmount();
+    render(createSubject({ path: '/atlas', search: '?demo=1' }).render());
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', 'true');
@@ -5209,7 +5185,7 @@ describe('AppShell live pathname updates', () => {
     const shell = React.createRef();
     const store = React.createRef();
     const dispatch = jest.fn();
-    const props = buildProps({ demoSurfaceMode: false, ...propOverrides });
+    const props = buildProps(propOverrides);
     class SessionStore extends React.Component {
       state = { primarySessionSlug: '', primarySessionExplicit: true };
       changeActiveSessionSlug = (slug) => {

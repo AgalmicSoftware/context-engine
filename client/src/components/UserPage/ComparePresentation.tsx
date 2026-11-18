@@ -183,6 +183,8 @@ type Props = {
   compass: ComparisonCompass | null;
   axesSource: 'ai' | 'fallback' | 'mock';
   generation: ComparisonGeneration | null;
+  /** Why there is no AI summary, shown beside the note that the comparison is local. */
+  aiUnavailableReason?: string;
   bulletsLoading?: boolean;
   compassLoading?: boolean;
   opinionComparable?: boolean;
@@ -194,6 +196,7 @@ export default function ComparePresentation({
   compass,
   axesSource,
   generation,
+  aiUnavailableReason = '',
   bulletsLoading = false,
   compassLoading = false,
   opinionComparable = true,
@@ -210,7 +213,7 @@ export default function ComparePresentation({
                 ? 'Preview · simulated summary'
                 : generation
                   ? `${generation.source === 'requested' ? 'Requested model' : 'Model'}: ${generation.model}`
-                  : 'Local comparison · AI summary unavailable'}
+                  : `Local comparison · AI summary unavailable${aiUnavailableReason ? `: ${aiUnavailableReason}` : ''}`}
             </p>
           )}
           {bulletsLoading ? (

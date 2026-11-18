@@ -298,6 +298,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         <div data-testid={E2E_TESTIDS.PAGE_COMPARE_ROOT}>
           <CompareAddresses
             activeSessionSlug={sessionSlug}
+            sessionConfig={sessionConfig}
             firstAddress={firstAddress}
             account={host.props.account}
             sessionCachesReady={resolveCompareCachesReady({ ...host.state, onChainProfileEnabled })}
@@ -578,15 +579,12 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
           <MainAreaTabs
             changeFocusedTab={host.props.changeFocusedTab}
             toggleLoginModal={host.props.toggleLoginModal}
-            toggleDemoMode={host.props.toggleDemoMode}
             account={host.props.account}
             provider={host.props.provider}
             litHooks={host.state.litHooks}
             focusedTab={host.props.focusedTab}
             loginComplete={host.props.loginComplete}
             loginInProgress={host.props.loginInProgress}
-            demoMode={host.props.demoMode}
-            demoSurfaceMode={host.props.demoSurfaceMode}
             activeSessionSlug={defaultSlug}
             sessionConfig={workerRoute.kind === 'verified' ? workerRoute.sessionConfig : defaultSessionCfg}
             sessionLoadingView={sessionLoadingView}
@@ -1397,7 +1395,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const routeLocation = readRouteLocationSearch();
     const { searchStr, searchParams } = routeLocation;
     let { hashStr } = routeLocation;
-    const routeDemoMode = host.props.demoSurfaceMode !== false || searchParams.get('demo') === '1';
+    const routeDemoMode = searchParams.get('demo') === '1';
     const requestedSessionId = searchParams.get('sessionId') || searchParams.get('sessionID') || '';
     const requestedChainIdRaw = searchParams.get('chainId') || searchParams.get('chainID') || '';
     const requestedSponsoredBundleId = searchParams.get('sponsored') || '';

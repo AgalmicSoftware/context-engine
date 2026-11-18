@@ -23,10 +23,7 @@ Docs can be associated with:
   - Worker-native sessions save those sources through the session Worker and show the actual active-session name as the fixed audience. Arweave-backed sessions retain the encrypted audience choice between `only me` and the session `docUploads` resource gate when that gate exists. `docUploads` names the resource gate, not a session.
   - On Arweave-backed sessions, `only me` uses the local `self-eip712-v1` recipient envelope and does not require Lit hooks; the session audience uses the Chipotle/Lit SBT-gated path.
   - When the save option is enabled, generated surveys store doc-library viewer URLs for those saved extra sources instead of the raw source URLs.
-  - `View` defaults to the sample demo corpus viewer used on `/session/demo` when demo surfaces are enabled.
-  - The demo corpus viewer keeps its Context title and corpus actions on one compact desktop header row, then renders each source in a medium-native form: tweets as social posts, policy as a map/list split, papers as academic summaries, LessWrong as argument essays, interviews as transcript cards, sci-fi as book/timeline cards, metrics as charts, and cross-corpus debates as linked source networks.
-  - The local `Demo corpus` checkbox starts checked in demo-enabled mode; unchecking it switches the panel to the real session Doc Library when a session context is available.
-  - When demo surfaces are disabled globally, `View` opens directly to the real session Doc Library or its empty state, and the local demo toggle is hidden.
+  - `View` opens the real session Doc Library, or its empty state when no session context is available.
   - In `View`, the session Doc Library is browse-only: upload/link entry controls stay in `Add`.
   - Image docs render inline thumbnails in the browse list, and opening them still shows the full preview/download viewer.
 - SBT detail page: `SBTPage` shows a “Docs” section for the current SBT group.

@@ -27,8 +27,7 @@ describe('LoginSettingsControlRow', () => {
         beforeConfig={<span>Before</span>}
         betweenSessionAndTooltips={<span>Network</span>}
         tooltipsControl={<button type="button">Explainers</button>}
-        demoControl={<button type="button">Demo</button>}
-        afterDemo={<span>After</span>}
+        afterToggles={<span>After</span>}
       />,
     );
 
@@ -36,11 +35,10 @@ describe('LoginSettingsControlRow', () => {
     expect(screen.getByRole('combobox', { name: 'Session' })).toBeInTheDocument();
     expect(screen.getByText('Network')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Explainers' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Demo' })).toBeInTheDocument();
     expect(screen.getByText('After')).toBeInTheDocument();
   });
 
-  it('groups the four primary settings controls into one equal quick-control grid', () => {
+  it('groups the three primary settings controls into one quick-control grid', () => {
     render(
       <LoginSettingsControlRow
         sessionControl={
@@ -50,7 +48,6 @@ describe('LoginSettingsControlRow', () => {
         }
         layout="quick-grid"
         tooltipsControl={<button type="button">Explainers</button>}
-        demoControl={<button type="button">Demo</button>}
         themeControl={
           <label htmlFor="theme-test">
             Theme
@@ -63,11 +60,10 @@ describe('LoginSettingsControlRow', () => {
     );
 
     const grid = screen.getByTestId('ce-settings-quick-controls');
-    expect(grid.children).toHaveLength(4);
+    expect(grid.children).toHaveLength(3);
     expect(grid).toContainElement(screen.getByRole('button', { name: 'Config' }));
     expect(grid).toContainElement(screen.getByRole('combobox', { name: 'Session' }));
     expect(grid).toContainElement(screen.getByRole('button', { name: 'Explainers' }));
-    expect(grid).toContainElement(screen.getByRole('button', { name: 'Demo' }));
     expect(screen.getByLabelText('Theme')).not.toBe(grid);
     expect(grid.parentElement).toContainElement(screen.getByLabelText('Theme'));
   });
@@ -82,12 +78,10 @@ describe('LoginSettingsControlRow', () => {
         }
         showSession={false}
         tooltipsControl={<button type="button">Explainers</button>}
-        demoControl={<button type="button">Demo</button>}
       />,
     );
 
     expect(screen.queryByRole('combobox', { name: 'Session' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Explainers' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Demo' })).toBeInTheDocument();
   });
 });

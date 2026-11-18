@@ -18,6 +18,7 @@ import {
 } from '../../../../shared/questions/quadraticAllocation.mjs';
 import styles from './QuadraticAllocationInput.module.scss';
 import { QuadraticScrollControls } from './QuadraticScrollControls';
+import { measurePileListRows, resolvePileHalfRowCut } from './pileHalfRowCut';
 
 type Props = {
   questionId: string;
@@ -48,7 +49,7 @@ export default function QuadraticAllocationInput({
   const [optionsHeight, setOptionsHeight] = useState<number>();
   const [scrollState, setScrollState] = useState({ overflow: false, canScrollDown: false, canScrollUp: false });
   const optionsId = `quadratic-options-${instanceId}`;
-  // Leave half of the next label visible in a bounded pile card. Measure the
+  // In a bounded pile card the list ends partway through an option, so it never looks complete. Measure the
   // available parent, not the fitted list, to avoid resize feedback loops.
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -68,18 +69,9 @@ export default function QuadraticAllocationInput({
       );
     };
     const fit = () => {
-      const available = viewport.clientHeight;
-      if (!available || list.scrollHeight <= available) {
-        setOptionsHeight(undefined);
-        return;
-      }
-      const top = list.getBoundingClientRect().top;
-      const peeks = Array.from(list.querySelectorAll('[data-quadratic-option-label]')).map((label) => {
-        const rect = label.getBoundingClientRect();
-        return rect.top - top + list.scrollTop + rect.height / 2;
-      });
-      const height = peeks.filter((peek) => peek <= available && peek > 44).pop();
-      setOptionsHeight(height);
+      setOptionsHeight(
+        resolvePileHalfRowCut(viewport.clientHeight, measurePileListRows(list, Array.from(list.children))),
+      );
     };
     const observer = new ResizeObserver(() => {
       fit();

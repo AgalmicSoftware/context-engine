@@ -193,7 +193,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: stretch;
-    justify-content: center;
+    // Not center: an overflowing list would push its first options above the scroll top, out of reach.
+    justify-content: flex-start;
     max-height: 42vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -1177,6 +1178,39 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: flex-start;
   justify-content: center;
   padding-top: 10px;
+}
+
+// After a submit the header Submit becomes the phone card's green "Submitted" (same colours), and
+// keeps them on hover, as the pile's does.
+.headerSubmitButton.headerSubmitDone,
+.headerSubmitButton.headerSubmitDone:hover,
+.headerSubmitButton.headerSubmitDone:focus {
+  border-color: var(--ce-status-success) !important;
+  color: var(--ce-status-success-contrast) !important;
+  background-color: var(--ce-status-success) !important;
+  box-shadow: none !important;
+  transform: none;
+  cursor: default;
+}
+
+.headerSubmitButton.headerSubmitDone {
+  animation: pileSubmitSuccessPop 220ms ease-out;
+}
+
+// An all-questions card whose answer is stored and unchanged, in the same green.
+.answerSavedMark {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: var(--ce-radius-10);
+  background-color: var(--ce-status-success);
+  color: var(--ce-status-success-contrast);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .fullQuestionHeader .cardLinksContainer {
@@ -5918,6 +5952,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     outline: 2px dotted var(--ce-control-text);
     outline-offset: 2px;
   }
+
+  // Choice text is white for dark cards; this card is light grey. A chosen option keeps its green and white.
+  .multichoiceQuestionContainer #multiChoice .checkboxOptionText:not(.selected) {
+    color: var(--ce-control-text);
+  }
 }
 
 /* Compact Classic 95 shares the default mobile action menu.
@@ -6324,6 +6363,18 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   text-transform: uppercase;
 }
 
+// While a Submit saves: what it is doing, its seconds, and the spinner, in plain case. A little smaller, with even
+// digits, so the longest count fits a phone's Submit and the button holds still as the seconds tick.
+.pileSubmitProgress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .pileSubmitButtonCopy {
   display: flex;
   flex-direction: column;
@@ -6370,46 +6421,39 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   opacity: 0.96;
 }
 
-.pileSubmitSuccessBadge {
-  display: inline-flex;
-  align-items: center;
+// Submit after a submit: the same button shape turned green, reading "Submitted". Its shell sets colours with
+// !important, so this does too.
+// It is a div, so the shell's hover and focus rules (which only skip :disabled) match it too.
+.pileSubmitButton.pileSubmitDone,
+.pileSubmitButton.pileSubmitDone:hover:not(:disabled),
+.pileSubmitButton.pileSubmitDone:focus:not(:disabled) {
   justify-content: center;
-  width: 60px;
-  height: 60px;
-  border-radius: var(--ce-radius-round);
-  color: var(--ce-color-white);
-  text-decoration: none;
-  background:
-    radial-gradient(
-      circle at 30% 28%,
-      color-mix(in srgb, var(--ce-text-inverse) 26%, transparent),
-      color-mix(in srgb, var(--ce-text-inverse) 3%, transparent) 48%
-    ),
-    linear-gradient(135deg, var(--ce-status-success) 0%, var(--ce-status-success) 100%);
-  box-shadow:
-    0 14px 30px color-mix(in srgb, var(--ce-overlay-base) 28%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+  border-color: var(--ce-status-success) !important;
+  color: var(--ce-status-success-contrast) !important;
+  background-color: var(--ce-status-success) !important;
+  box-shadow: none !important;
+  transform: none;
+  font-weight: 700;
+  cursor: default;
+}
+
+.pileSubmitButton.pileSubmitDone {
   animation: pileSubmitSuccessPop 220ms ease-out;
+}
 
-  &:hover,
-  &:focus {
-    color: var(--ce-color-white);
-    text-decoration: none;
-  }
-
-  &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--ce-text-inverse) 86%, transparent);
-    outline-offset: 3px;
-  }
+// Read out, not shown: the green Submitted shows it.
+.pileSubmitStatusText {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 // Ten seconds after a submit (see PileSubmittedCheck): hidden, still holding its place.
-.pileSubmitSuccessBadgeGone {
+.pileSubmitDoneGone {
   visibility: hidden;
-}
-
-.pileSubmitSuccessIcon {
-  font-size: 1.35rem;
 }
 
 @media (min-width: 769px) {
@@ -6494,15 +6538,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     padding: 10px 6px;
     border-radius: var(--ce-radius-8);
   }
-
-  .pileSubmitSuccessBadge {
-    width: 54px;
-    height: 54px;
-  }
-
-  .pileSubmitSuccessIcon {
-    font-size: 1.2rem;
-  }
 }
 
 .pileSubmitButtonInactive {
@@ -6517,6 +6552,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
 .pileFooter .pileSubmitButtonInactive {
   width: 0;
+}
+
+// Hidden, not removed, so the arrows beside and below it stay put.
+.pileFooterControlAway {
+  visibility: hidden;
 }
 
 .ratingContainer {
@@ -6593,15 +6633,16 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
 .multichoiceQuestionContainer #multiChoice {
   font-size: 1rem;
-  flex: 0 0 auto;
+  // The space the pill above leaves, so the wrapped columns are not clipped at the bottom.
+  flex: 1 1 0;
   flex-direction: column;
   flex-wrap: wrap;
   justify-content: flex-start;
   align-content: flex-start;
   align-items: flex-start;
   gap: 14px 18px;
-  height: 100%;
-  min-height: 100%;
+  height: auto;
+  min-height: 0;
   // Leave room for the next wrapped column to peek into view as a scroll cue.
   width: 70%;
   max-width: 70%;
@@ -6658,6 +6699,20 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     border-color: var(--ce-color-success);
     background: var(--ce-color-success);
   }
+}
+
+// Says whether a choice question takes one option or any number.
+.choiceKindPill {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  padding: 1px 10px;
+  border: 1px solid currentColor;
+  border-radius: var(--ce-radius-pill);
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
 }
 
 /* Subtle, reusable icon glow (used for lock/comment) */
@@ -6767,7 +6822,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pileSubmitSuccessBadge,
+  .pileSubmitDone,
   .pileFooter .pileSubmitButton.submitGlow::before,
   .headerSubmitButton.submitGlow::before,
   .submitGlow {
@@ -7479,6 +7534,288 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
         }
       }
     }
+  }
+}
+
+// The end of the set, in place of the cards and at a card's own height, so nothing around it moves.
+.pileCardInner.pileEndCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 24px 20px;
+  color: var(--ce-panel-text);
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: -3px;
+  }
+}
+
+.pileEndTitle {
+  margin: 0;
+  color: inherit;
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.pileEndSummary {
+  margin: 0;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.pileEndActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.pileEndPrimary,
+.pileEndAction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: var(--ce-radius-10);
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.pileEndPrimary {
+  border: 0;
+  background: var(--ce-action-primary);
+  color: var(--ce-action-primary-text);
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+}
+
+// A fill, not just a border: the minimal theme takes button borders away.
+.pileEndAction {
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
+
+  &:hover {
+    color: var(--ce-control-text);
+    text-decoration: none;
+  }
+}
+
+// On a phone every question card has one height, most of the screen under the session title, so the arrows below
+// it stay put from card to card. The small viewport unit keeps that height still while Safari's toolbars move.
+// Choice and quadratic prompts take what they need up to 40% of the card, then scroll; the answers get the rest.
+@media (max-width: 768px) {
+  .pileInteractionUnit {
+    --pile-phone-card-height: max(380px, calc(100vh - 170px));
+    --pile-phone-card-height: max(380px, calc(100svh - 170px));
+  }
+
+  .pileCardContainer,
+  .pileEmptyState {
+    height: auto;
+    min-height: var(--pile-phone-card-height);
+  }
+
+  // The agent's question list shows a card outside the pile, where the height falls back to the old one.
+  .pileCardInner {
+    height: var(--pile-phone-card-height, 380px);
+    min-height: 0;
+  }
+
+  // On a phone the arrows take their own row, so Submit appearing beside the actions never moves them.
+  // Wider screens keep them beside the actions, where there is room for Submit too.
+  @media (max-width: 640px) {
+    .pileInteractionUnit .pileControls > .pileNav {
+      flex-basis: 100%;
+      max-width: none;
+    }
+  }
+
+  // A long unsent-answers notice wraps rather than widening the row.
+  .pileInteractionUnit .pileFooter {
+    min-width: 0;
+  }
+
+  .pileCardInner .pileCardBody:has(.multichoiceQuestionContainer, .quadraticQuestionContainer) {
+    .pileCardHeader {
+      flex: 0 1 auto;
+      max-height: 40%;
+    }
+
+    .pileCardMainContent {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+  }
+
+  // A free-text card gives its text box the room under the prompt: a small box under a tall gap read as broken.
+  // The box's own parts come from the shared audio input, so they are named by class fragment.
+  .pileCardInner .pileCardBody:has(.freeformQuestionContainer) {
+    .pileCardHeader {
+      flex: 0 1 auto;
+      max-height: 40%;
+    }
+
+    .pileCardMainContent {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+
+    // Only the text box grows: the microphone and the rewrite controls keep their size, so a tap beside the box
+    // never starts a recording. The footer's comment box is left alone.
+    .pileCardMainContent {
+      .freeformQuestionContainer {
+        align-items: stretch;
+        justify-content: flex-start;
+        height: 100%;
+      }
+
+      :global([class*='audioInputContainer']) {
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      :global([class*='inputRow']),
+      :global([class*='textareaWrap']) {
+        display: flex;
+        align-self: stretch;
+      }
+
+      :global([class*='audioTextarea']) {
+        height: auto;
+        resize: none;
+      }
+    }
+  }
+
+  // Choice options stack one per line and scroll up and down inside the answer area, never sideways, from the top
+  // (centring would push the first ones out of reach). When more are below, the area ends partway through an option
+  // (usePileHalfRowCut), and that edge fades a little; once scrolled, the top edge does too. The padding, and
+  // keyboard scrolling, keep the last option clear at the end.
+  .pileCardInner .pileCardMainContent:has(.multichoiceQuestionContainer) {
+    --pile-list-fade-top: black;
+    --pile-list-fade-bottom: black;
+
+    justify-content: flex-start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    padding-bottom: 28px;
+    scroll-padding-bottom: 28px;
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      var(--pile-list-fade-top),
+      black 20px,
+      black calc(100% - 20px),
+      var(--pile-list-fade-bottom)
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      var(--pile-list-fade-top),
+      black 20px,
+      black calc(100% - 20px),
+      var(--pile-list-fade-bottom)
+    );
+
+    &[data-list-cue='start'],
+    &[data-list-cue='middle'] {
+      --pile-list-fade-bottom: color-mix(in srgb, black 35%, transparent);
+    }
+
+    &[data-list-cue='middle'],
+    &[data-list-cue='end'] {
+      --pile-list-fade-top: color-mix(in srgb, black 35%, transparent);
+    }
+  }
+
+  .pileCardInner .multichoiceQuestionContainer {
+    flex: 0 0 auto;
+    height: auto;
+    overflow: visible;
+    padding: 2px 0;
+  }
+
+  .pileCardInner .multichoiceQuestionContainer #multiChoice {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    // Room for each option's focus ring, which reaches 5px outside it.
+    padding: 5px;
+  }
+
+  .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
+    width: 100%;
+    height: auto;
+    min-height: 44px;
+    margin: 0;
+    overflow: visible;
+    padding: 10px 14px;
+  }
+}
+
+// Once the card has an answer, Next reads as the step to take, in every theme.
+.pileNav .pileNavArrow.pileNavArrowPrimary {
+  gap: 6px;
+  width: auto;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: var(--ce-radius-pill);
+  background: var(--ce-action-primary) !important;
+  color: var(--ce-action-primary-text) !important;
+  font-size: 1.1rem;
+  opacity: 1 !important;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: var(--ce-action-primary) !important;
+    color: var(--ce-action-primary-text) !important;
+    transform: none;
+    filter: none;
+  }
+}
+
+.pileNavNextLabel {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+// The desktop rail is narrower than the word (64px in Classic 95): there the filled arrow alone marks the step.
+@media (min-width: 769px) {
+  .pileNav .pileNavArrow.pileNavArrowPrimary {
+    width: 44px;
+    padding: 0;
+  }
+
+  .pileNavNextLabel {
+    display: none;
   }
 }
 

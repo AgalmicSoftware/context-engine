@@ -141,6 +141,9 @@ const syncs = new Map<string, Promise<void>>();
  */
 export const syncDraftText = (plan: DraftTextPlan, context: WorkerContext): Promise<void> => {
   const key = pendingDeletesKey(context);
+  // Kept before anything is sent, even behind an earlier sync, so a page closed first still sends them on
+  // the next load.
+  if (plan.remove.length) writePendingDeletes(key, Array.from(new Set([...readPendingDeletes(key), ...plan.remove])));
   const run = async () => {
     const remove = Array.from(new Set([...readPendingDeletes(key), ...plan.remove]));
     try {

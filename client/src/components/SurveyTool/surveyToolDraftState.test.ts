@@ -13,7 +13,6 @@ import {
   parsePersistedDraftStorageValue,
   buildSurveyDraftLoadPlan,
   buildPersistedDraftPayload,
-  clearSurveyDraftsForAccount,
   buildPersistedDraftMapsForAllowedIds,
   buildPersistedDraftQuestionEntry,
   removeQuestionFromPersistedDraftPayload,
@@ -87,6 +86,14 @@ describe('surveyToolDraftState', () => {
         state: { modifiedCount: 0, encryptedModifiedCount: 0 },
       }),
     ).toBe('Submit');
+  });
+
+  it('counts the answers a Submit has saved, only while it runs', () => {
+    const stats = { total: 40, encrypted: 0, isSubmitting: true, submitCountText: '12 of 40' };
+    expect(computeSubmitLabel({ getPendingEditStats: () => stats })).toBe('Saving 12 of 40');
+    expect(computeSubmitLabel({ getPendingEditStats: () => ({ ...stats, isSubmitting: false }) })).toBe('Submit (40)');
+    // Before the first answer stores (reading saved answers, encrypting), or for a single answer.
+    expect(computeSubmitLabel({ getPendingEditStats: () => ({ ...stats, submitCountText: '' }) })).toBe('Saving');
   });
 
   it('does not auto-encrypt empty additional comments when answer audience changes', () => {
@@ -203,23 +210,6 @@ describe('surveyToolDraftState', () => {
         q2: { value: 'keep baseline' },
       },
     });
-  });
-
-  it("clears one account's drafts for every session, network and scope", () => {
-    const kept = ['dg:surveyDraft:edge:84532:anon:questions', 'dg:surveyDraft:edge:84532:0xdef:questions', 'unrelated'];
-    [
-      ...kept,
-      'dg:surveyDraft:edge:84532:0xabc:questions',
-      'dg:surveyDraft:edge:__pending__:0xabc:questions:q:q1',
-      'dg:surveyDraft:other:84532:0xabc:questions',
-    ].forEach((key) => sessionStorage.setItem(key, '{}'));
-
-    clearSurveyDraftsForAccount('');
-    clearSurveyDraftsForAccount('anon');
-    expect(Object.keys(sessionStorage)).toHaveLength(6);
-    clearSurveyDraftsForAccount('0xABC');
-    expect(Object.keys(sessionStorage).sort()).toEqual([...kept].sort());
-    sessionStorage.clear();
   });
 
   it('round-trips interview model provenance through the anonymous draft entry', () => {

@@ -99,6 +99,8 @@ describe('surveyGeneratorHelpers', () => {
 
     expect(scss).toMatch(/\$background-color:\s*var\(--ce-authoring-panel-bg\);/);
     expect(scss).toMatch(/\$text-color:\s*var\(--ce-authoring-panel-text\);/);
+    // The session document view sits on the same panel, so its inverse-coloured parts take the panel's text colour.
+    expect(scss).toMatch(/\.viewModeShell\s*{[\s\S]*?--ce-text-inverse:\s*#\{\$text-color\};/);
     expect(scss).toMatch(/\$question-background:\s*var\(--ce-authoring-section-bg\);/);
     expect(scss).toMatch(/\.urlInputField\s*{[\s\S]*?background:\s*var\(--ce-authoring-input-bg\)\s*!important;/);
     expect(scss).toMatch(/\.typeButton\s*{[\s\S]*?background:\s*var\(--ce-authoring-control-bg\);/);

@@ -926,7 +926,7 @@ describe('reading a large listing', () => {
       {
         sessionSlug: 'demo-sh',
         sessionConfig: workerConfig,
-        onRows: (_rows, { loaded }) => progress.push(loaded),
+        onRows: (rows, { loaded }) => rows.length && progress.push(loaded),
       },
       batchDeps(readBatch, listing),
     );
@@ -949,6 +949,28 @@ describe('reading a large listing', () => {
     expect(readBatch).toHaveBeenCalledTimes(PAGES);
     expect(progress).toHaveLength(PAGES);
     expect(Math.max(...progress)).toBe(PAGES * 100);
+  });
+
+  it('counts each listed page while a reload reuses its cached answers', async () => {
+    const readBatch = jest.fn(async ({ ids }: any) => ids.map(payload));
+    const progress: Array<[number, number, boolean]> = [];
+    // Every answer but the last page's is already cached, as after a reload.
+    const cachedStorageRefIds = new Set(Array.from({ length: (PAGES - 1) * 100 }, (_, i) => ref(i)));
+    await loadWorkerResponses(
+      {
+        sessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+        cachedStorageRefIds,
+        onRows: (_rows, { loaded, listed, listComplete }) => progress.push([loaded, listed, listComplete]),
+      },
+      batchDeps(readBatch),
+    );
+    // A count per page before the listing ends, then the one read.
+    expect(progress.slice(0, PAGES - 1)).toEqual(
+      Array.from({ length: PAGES - 1 }, (_, i) => [(i + 1) * 100, (i + 1) * 100, false]),
+    );
+    expect(progress[progress.length - 1]).toEqual([PAGES * 100, PAGES * 100, true]);
+    expect(readBatch).toHaveBeenCalledTimes(1);
   });
 
   it('reads a failed batch once more and keeps its rows', async () => {

@@ -70,6 +70,7 @@ import {
   type OnePageSessionAgentState,
 } from './onePageSessionAgentActions';
 import OnePageSessionStandardShell, { DEFAULT_CORPUS_VIEWER_LOAD_STATE } from './OnePageSessionStandardShell';
+import { SESSION_GROUPS_SECTION_ID } from './sessionSectionIds';
 import {
   buildInitialGeneratedResultsControllerState,
   shouldOfferGeneratedResultsAuthorization,
@@ -2154,6 +2155,12 @@ class OnePageSession extends Component<any, any> {
     );
   }
 
+  viewSessionGroups = () => {
+    this.setState({ showGroups: true }, () =>
+      document.getElementById(SESSION_GROUPS_SECTION_ID)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }),
+    );
+  };
+
   toggleGroups() {
     this.setState(
       (prevState: Readonly<OnePageSession['state']>) => ({ showGroups: !prevState.showGroups }),
@@ -2581,6 +2588,7 @@ class OnePageSession extends Component<any, any> {
         onLoadFullCorpusClick={this.handleLoadFullCorpusClick}
         onOpenResults={this.handleOpenResults}
         onViewSessionResults={this.viewSessionResults}
+        onViewSessionGroups={this.viewSessionGroups}
         resultsSectionRef={this.setResultsSectionRef}
         onPileSubmitRailVisibilityChange={this.handlePileSubmitRailVisibilityChange}
         onResultsModalClose={this.handleResultsModalClose}

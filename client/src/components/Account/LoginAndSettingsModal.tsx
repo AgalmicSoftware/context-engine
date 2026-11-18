@@ -12,8 +12,6 @@ import {
   toggleLoginModal,
   updateLoginInfo,
   changeFocusedTab,
-  toggleDemoMode,
-  setDemoSurfaceMode,
   toggleTooltips,
   changeActiveSessionSlug,
   updateGlobalSessionSelection,
@@ -47,7 +45,6 @@ import LoginModalDisplayBody from './LoginModalDisplayBody';
 import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
 import LoginPreLoginConfigPanel from './LoginPreLoginConfigPanel';
 import LoginPreLoginSettingsDisplay from './LoginPreLoginSettingsDisplay';
-import LoginDemoSurfaceToggleControl from './LoginDemoSurfaceToggleControl';
 import LoginThemeQuickControl from './LoginThemeQuickControl';
 import { DEFAULT_AUTO_REQUEST_TESTNET_FUNDS, DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import contractScripts, {
@@ -156,8 +153,6 @@ interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'n
   loginModalFocus: string;
   loginInProgress: boolean;
   loginComplete: boolean;
-  demoMode: RootState['sessionState']['demoMode'];
-  demoSurfaceMode: RootState['sessionState']['demoSurfaceMode'];
   focusedTab: number;
   activeSessionSlug: string;
   primarySessionSlug?: string;
@@ -168,8 +163,6 @@ interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'n
   changeAccount: (payload?: unknown) => void;
   toggleLoginModal: (payload?: unknown) => void;
   updateLoginInfo: (payload?: unknown) => void;
-  toggleDemoMode: (payload?: unknown) => void;
-  setDemoSurfaceMode: (payload?: unknown) => void;
   toggleTooltips: (payload?: unknown) => void;
   changeFocusedTab: (payload?: unknown) => void;
   changeActiveSessionSlug: (payload?: unknown) => void;
@@ -1701,7 +1694,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     configTestId = '',
     beforeConfig = null,
     betweenSessionAndTooltips = null,
-    afterDemo = null,
+    afterToggles = null,
     tooltipsInfoId = '',
     tooltipPlacement = 'top',
     containerClassName = '',
@@ -1716,16 +1709,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       configTestId,
       beforeConfig,
       betweenSessionAndTooltips,
-      afterDemo,
+      afterToggles,
       tooltipsControl: LoginTooltipsToggleControl({
         infoId: tooltipsInfoId,
         onToggle: () => this.props.toggleTooltips?.(),
         tooltipPlacement,
         tooltipsEnabled: this.props.tooltipsEnabled !== false,
-      }),
-      demoControl: LoginDemoSurfaceToggleControl({
-        demoSurfaceEnabled: this.props.demoSurfaceMode !== false,
-        onToggle: () => this.props.setDemoSurfaceMode?.(this.props.demoSurfaceMode === false),
       }),
       layout,
       containerClassName,
@@ -2341,7 +2330,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                   tooltipId: 'networkInfoTooltipInline',
                 })
               : null,
-          afterDemo:
+          afterToggles:
             cryptoTerminology && overview.capabilities.showNetworkControls && needsNetworkSwitch ? (
               <Button onClick={this.switchToCorrectNetwork} className={`${styles.networkSwitchButton} ${styles.glow}`}>
                 Switch to {overview.targetNetworkName}
@@ -2477,7 +2466,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       nextProps.primarySessionSlug !== this.props.primarySessionSlug ||
       nextProps.selectedSessionScope !== this.props.selectedSessionScope ||
       JSON.stringify(nextProps.selectedSessionSlugs || []) !== JSON.stringify(this.props.selectedSessionSlugs || []) ||
-      nextProps.demoSurfaceMode !== this.props.demoSurfaceMode ||
       nextProps.tooltipsEnabled !== this.props.tooltipsEnabled ||
       nextProps.sessionConfig !== this.props.sessionConfig ||
       nextProps.network?.id !== this.props.network?.id ||
@@ -2684,8 +2672,6 @@ const mapStateToProps = (state: RootState) => ({
   loginModalFocus: state.sessionState.loginModalFocus,
   loginInProgress: state.sessionState.loginInProgress,
   loginComplete: state.sessionState.loginComplete,
-  demoMode: state.sessionState.demoMode,
-  demoSurfaceMode: state.sessionState.demoSurfaceMode,
   focusedTab: state.sessionState.focusedTab,
   activeSessionSlug: state.sessionState.activeSessionSlug,
   primarySessionSlug: state.sessionState.primarySessionSlug,
@@ -2703,8 +2689,6 @@ export default connect(mapStateToProps, {
   changeAccount,
   toggleLoginModal,
   updateLoginInfo,
-  toggleDemoMode,
-  setDemoSurfaceMode,
   toggleTooltips,
   changeFocusedTab,
   changeActiveSessionSlug,

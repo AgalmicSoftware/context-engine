@@ -31,8 +31,6 @@ type AccountSectionProps = {
   loginComplete?: boolean;
   loginInProgress?: boolean;
   sendTestETH?: (amountToSend: unknown) => void;
-  demoMode?: unknown;
-  toggleDemoMode?: (demoModeOn: boolean) => void;
   sessionConfig?: unknown;
 };
 
@@ -123,8 +121,6 @@ class AccountSection extends Component<AccountSectionProps> {
           <Suspense fallback={null}>
             <LoginAndSettingsModal
               sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
-              demoMode={this.props.demoMode}
-              toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
               sessionConfig={this.props.sessionConfig}
             />
           </Suspense>

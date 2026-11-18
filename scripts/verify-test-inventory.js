@@ -116,7 +116,10 @@ function verifyRootScripts(rootDir, failures) {
     ['test:ci', 'scripts/run-ci-gates.mjs --profile ci'],
     ['test:wiring', 'scripts/verify-test-inventory.js'],
     ['tests', 'npm run test:ci'],
-    ['test:client', 'test:coverage:full-universe'],
+    ['test:client', 'npm run -s test:client:shards && npm run -s test:client:merge'],
+    ['test:client:shards', 'scripts/run-client-coverage.mjs --shards'],
+    ['test:client:shard', 'scripts/run-client-coverage.mjs --shard'],
+    ['test:client:merge', 'scripts/run-client-coverage.mjs --merge'],
     ['test:release:client', 'npm test -- --watchAll=false --runInBand'],
     ['typecheck:client-tests', 'scripts/check-client-test-types.mjs'],
     ['coverage-floor:check', 'scripts/check-client-coverage-floors.mjs'],
@@ -170,17 +173,18 @@ function verifyRootScripts(rootDir, failures) {
       }
     };
 
-    ['contracts', 'client', 'root-jest', 'workers', 'cecc-and-node'].forEach((gateName) => {
+    ['contracts', 'client-tests', 'client', 'root-jest', 'workers', 'cecc-and-node'].forEach((gateName) => {
       expectProfileGate('ci', ciProfile, gateName);
     });
-    ['contracts', 'client', 'root-jest', 'workers', 'e2e-smoke', 'cecc-and-node'].forEach((gateName) => {
+    ['contracts', 'client-tests', 'client', 'root-jest', 'workers', 'e2e-smoke', 'cecc-and-node'].forEach((gateName) => {
       expectProfileGate('hosted', hostedProfile, gateName);
     });
     [
       ['wiring-and-release', 'npm run test:wiring'],
       ['wiring-and-release', 'npm run typecheck:client-tests'],
       ['contracts', 'npm run test:contracts'],
-      ['client', 'npm run test:client'],
+      ['client-tests', 'npm run test:client:shards'],
+      ['client', 'npm run test:client:merge'],
       ['client', 'npm run coverage-floor:check'],
       ['root-jest', 'npm run test:root:jest'],
       ['workers', 'npm run test:worker:session-cors'],
@@ -208,6 +212,7 @@ function verifyRootScripts(rootDir, failures) {
     const workflow = fs.readFileSync(workflowPath, 'utf8');
     [
       ['contracts', 'run: npm run ci:gate -- contracts'],
+      ['client-tests', 'run: npm run test:client:shard -- ${{ matrix.shard }}'],
       ['client', 'run: npm run ci:gate -- client'],
       ['root-jest', 'run: npm run ci:gate -- root-jest'],
       ['workers', 'run: npm run ci:gate -- workers'],

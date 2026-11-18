@@ -1,4 +1,5 @@
 import { consentSignature } from './sessionInterviewConsent';
+import { normalizeQuestionIdKey } from './surveyToolSignatures';
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
 
 export type SurveyQuestionsDraftPersistenceRuntime = SurveyQuestionsLegacyRecord;
@@ -304,11 +305,19 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           )
           .map(([qid]) => qid);
         const dirtyQids: SurveyQuestionsLegacyValue = [...(inst._draftDirtyQids || []), ...pendingConsentQids];
+        // View all lists every question, but a stored draft for one it has not restored yet is
+        // not in the form, so this save keeps it unless the person has edited that question here.
+        const viewAllSync = inst._viewAllSync;
+        const kept = new Set(
+          [...dirtyQids, ...(viewAllSync?.restored || [])].map((questionId: string) =>
+            normalizeQuestionIdKey(questionId),
+          ),
+        );
         const allowed: SurveyQuestionsLegacyValue = buildPersistDraftAllowedQuestionIds({
           renderedQuestionIds: renderedIds,
           dirtyQuestionIds: dirtyQids,
           slice,
-        });
+        }).filter((questionId: string) => !viewAllSync || kept.has(questionId));
         // Start from previous draft answers/baseline so non-rendered QIDs survive,
         // then overwrite only the currently allowed question set with its edited fields.
         const { answersObj, baselineObj }: SurveyQuestionsLegacyValue = buildPersistedDraftMapsForAllowedIds({
