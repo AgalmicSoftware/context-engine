@@ -19,7 +19,7 @@ Session Workers need redeploying for the Worker changes below. A redeploy change
 - Results version picker on one row.
 - On phones, the risk matrix uses the full width and keeps its row and column labels in view.
 - Topic window close button easier to see.
-- The question count sits between the arrows.
+- The question count sits between the arrows. Its form follows the row's real room, so Submit keeps its whole label in a wider font.
 - One "?" beside "Voice mode".
 
 ### Workers — requires redeployment
