@@ -122,8 +122,16 @@ const runSalon = async (engineName) => {
     // Reading must overlap: batches while later pages are still being listed, and items within a batch.
     assert.ok(maxAtOnce(batches) >= 2, `Batches overlap in the browser (most at once: ${maxAtOnce(batches)})`);
     const workerBatches = session.requests.slice(seeded).filter(({ path }) => path === '/storage/read-batch');
-    const itemsAtOnce = Math.max(...workerBatches.map(({ kvAtOnce }) => kvAtOnce));
-    assert.ok(itemsAtOnce >= 4, `The Worker reads a batch's answers side by side (most at once: ${itemsAtOnce})`);
+    // Every batch reads its answers side by side, or in one bulk get it then serves them from; one item at
+    // a time fails either way. A batch that read fewer than four answers has nothing to overlap.
+    const together = ({ kvAtOnce, kvBulkPayloads, kvPayloadSingles }) => kvBulkPayloads + kvPayloadSingles < 4 ||
+      kvAtOnce >= 4 || (kvBulkPayloads >= 4 && kvPayloadSingles === 0);
+    const answered = workerBatches.filter(({ status }) => status === 200);
+    const apart = answered.filter((batch) => !together(batch));
+    assert.ok(answered.length > 0 && !apart.length, `The Worker reads each batch's answers together (${apart.length} of ${answered.length} did not; ` +
+      `first: ${JSON.stringify(apart[0] && { atOnce: apart[0].kvAtOnce, bulk: apart[0].kvBulkPayloads, single: apart[0].kvPayloadSingles })})`);
+    const bulk = answered.filter(({ kvBulkPayloads, kvPayloadSingles }) => kvBulkPayloads >= 4 && kvPayloadSingles === 0).length;
+    console.log(`[${engineName}] The Worker read ${answered.length} batches: ${bulk} in one bulk get, ${answered.length - bulk} side by side or under four answers.`);
     const mostOperations = Math.max(...session.requests.slice(seeded).map(({ kvOperations }) => kvOperations));
     assert.ok(mostOperations <= KV_OPERATIONS_PER_REQUEST, 'No Worker request passes Cloudflare\'s storage operation limit');
     console.log(`[${engineName}] A member's Results counted all ${PEOPLE * STATEMENTS} answers: ${answerLists.length} list pages, ${batches.length} batches, ${waited}ms from sign-in with ${REQUEST_MS}ms a request.`);

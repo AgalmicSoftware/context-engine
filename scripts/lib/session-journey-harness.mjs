@@ -29,7 +29,8 @@ const KV_BULK_GET_MAX = 100;
 export const KV_OPERATIONS_PER_REQUEST = 1000;
 
 // `network.kvDelayMs` makes each operation take time, as real storage does; only then can a request's
-// operations overlap, and the most that overlapped is recorded on the request.
+// operations overlap, and the most that overlapped is recorded on the request. So are its stored
+// payload reads: the most one bulk get asked for, and how many were read one key at a time.
 const createLimitedKv = (requestScope, network) => {
   const values = new Map();
   const metadata = new Map();
@@ -55,8 +56,16 @@ const createLimitedKv = (requestScope, network) => {
     values,
     async get(key, typeOrOptions) {
       await count();
-      if (!Array.isArray(key)) return read(key, typeOrOptions);
-      if (key.length > KV_BULK_GET_MAX) throw new Error(`KV bulk get takes at most ${KV_BULK_GET_MAX} keys, got ${key.length}`);
+      const request = requestScope.getStore();
+      const isPayload = (name) => String(name).startsWith('ce-storage-payload:');
+      if (!Array.isArray(key)) {
+        if (request && isPayload(key)) request.kvPayloadSingles += 1;
+        return read(key, typeOrOptions);
+      }
+      if (key.length < 1 || key.length > KV_BULK_GET_MAX) {
+        throw new Error(`KV bulk get takes 1 to ${KV_BULK_GET_MAX} keys, got ${key.length}`);
+      }
+      if (request) request.kvBulkPayloads = Math.max(request.kvBulkPayloads, key.filter(isPayload).length);
       return new Map(key.map((name) => [name, read(name, typeOrOptions)]));
     },
     async put(key, value, options) {
@@ -165,7 +174,7 @@ export const createJourneySession = ({ baseUrl, slug }) => {
   const requests = [];
   const workerFetch = async (url, init = {}) => {
     const request = init instanceof Request ? init : new Request(url, init);
-    const record = { method: request.method, path: new URL(request.url).pathname, kvOperations: 0, kvAtOnce: 0, status: 0 };
+    const record = { method: request.method, path: new URL(request.url).pathname, kvOperations: 0, kvAtOnce: 0, kvBulkPayloads: 0, kvPayloadSingles: 0, status: 0 };
     requests.push(record);
     const response = await requestScope.run(record, () => worker.fetch(request, env, { waitUntil: () => {} }));
     record.status = response.status;
