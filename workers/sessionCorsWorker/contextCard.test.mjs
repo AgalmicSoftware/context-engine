@@ -676,7 +676,7 @@ test('an adder gets one reading, whenever they ask again: during it, as it ends,
   let checked;
   h.state.aiAccess = new Promise((resolve) => { checked = () => resolve({ ok: true }); });
   const late = read();
-  await until(() => h.aiChecks.length === 2);
+  await until(() => h.aiChecks.length === 3);
   ai.release();
   assert.equal((await first).status, 200);
   checked();
