@@ -76,6 +76,7 @@ import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
 import { DRAFT_TEXT_PATHS, draftTextRoute } from './draftTextRoute.js';
+import { cardAfterContextUpload } from './contextCard.js';
 import { checkContextSourceUpload, contextSourceListFields } from './contextSourcePolicy.js';
 import { contextSourceRoute } from './contextSourceRoute.js';
 import { toStr } from './stringCoercion.js';
@@ -3197,10 +3198,13 @@ export const storageRoute = async ({
       return responseJson(deps, { error: 'Storage route upload is only available for Cloudflare storage.' }, 400, baseHeaders);
     }
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
-    return handleCloudflareUpload({
+    const uploaded = await handleCloudflareUpload({
       env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, parsedPayload: checked.payload || null, answersChecked,
       resourceId: checked.resourceId, baseHeaders, deps: routeDeps,
     });
+    // A text file added as context gets its card once it is stored.
+    if (payload.resource === 'docsContext') await cardAfterContextUpload({ response: uploaded, payload, env, config, slug, deps: routeDeps });
+    return uploaded;
   }
 
   const configuredBackend = resolveConfiguredStorageBackend({ config });

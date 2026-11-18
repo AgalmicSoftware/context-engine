@@ -1,4 +1,6 @@
+import { normalizeContextCard } from '../../shared/contextCards.mjs';
 import {
+  CONTEXT_ROLE,
   CONTEXT_TAGS,
   CONTEXT_TEXT_ROLE,
   contextAdderProblem,
@@ -53,14 +55,28 @@ export const checkContextSourceUpload = ({ payload = {}, config, uploader = '', 
   return { ok: true, role };
 };
 
-// What a list shows of a context source beyond its tags: the privacy level and who added it.
-export const contextSourceListFields = (metadata = {}) => (
-  metadata?.contextSource === true
+const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+
+// A card is plain text on its source's row. Only a file or link someone added
+// carries one, and never an item stored encrypted, whose row would then say
+// in the clear what its bytes do not.
+export const mayHaveContextCard = (row) =>
+  row?.contextSource === true && contextRoleOf(row.tags) === CONTEXT_ROLE &&
+  row.payloadEncrypted !== true && row.encrypted !== true && !isObj(row.envelope);
+
+/** A source's card within its limits, or null: read from its row alone, so it goes only where the row does. */
+export const contextCardOf = (row) => (mayHaveContextCard(row) ? normalizeContextCard(row.card) : null);
+
+// What a list shows of a context source beyond its tags: the privacy level, who added it and its card.
+export const contextSourceListFields = (metadata = {}) => {
+  const card = contextCardOf(metadata);
+  return metadata?.contextSource === true
     ? {
       contextSource: true,
       adminsOnly: isAdminsOnlyAccess(metadata.accessConditions),
       lockedGroupIds: lockedGroupsOf(metadata.accessConditions),
       addedBy: metadata.uploader || '',
+      ...(card ? { card } : {}),
     }
-    : {}
-);
+    : {};
+};

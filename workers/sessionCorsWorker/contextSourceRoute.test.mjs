@@ -694,7 +694,7 @@ test('a second read of a PDF already being read is refused, and the first keeps 
   assert.match((await second.json()).error, /already being read/);
   release();
   const reading = await idOf(await first);
-  assert.equal(h.providerCalls.length, 1);
+  assert.equal(h.pdfReads().length, 1);
   assert.equal(await (await h.read(reading, ADMIN)).text(), 'First text.');
   assert.equal(JSON.parse(await h.kv.get(`ce-storage:salon:docsContext:${pdf}`)).contextReadingId, reading);
   // The finished read frees the PDF, and the next reading replaces this one.

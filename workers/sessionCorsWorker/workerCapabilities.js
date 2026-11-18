@@ -9,6 +9,8 @@ export const FEATURES = Object.freeze([
   'agent_http_v1',
   // limits.aiPerWalletPerDay is honoured; older Workers store it and ignore it.
   'ai_daily_limit_v1',
+  // Context sources carry cards: /storage/context takes set-card and make-card, and lists show each card.
+  'context_cards_v1',
   // A context link may be locked to some of the session's groups, as a file may.
   'context_link_groups_v1',
   'context_sources_v1',

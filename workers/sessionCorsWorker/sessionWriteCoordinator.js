@@ -36,6 +36,7 @@ import {
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
 import { runQueuedAutomaticResultsAnalysisJob, valueLooksEncrypted } from './resultsAnalysisGeneration.js';
 import { publishCloudflareOwnedStorageMetadata, scanLegacyStorageOwnerIds, setCloudflareStorageResourceHidden } from './storageRouteExecution.js';
+import { storeContextCard } from './contextCard.js';
 import { finishContextPdfReading, removeContextSource } from './contextSourceRoute.js';
 import { dispatchResultsBuildStore } from './resultsBuildStore.js';
 import { nextResultsJobAt, readResultsJob, runResultsJobs, startResultsJob } from './resultsJobs.js';
@@ -2771,6 +2772,8 @@ export class SessionWriteCoordinator {
 
   // Context changes to a PDF's readings run one at a time per session, so a
   // reading, a removal and the PDF's pointer to its reading never interleave.
+  // A card is written to its source's row here too, and a refreshed link's old
+  // record is removed here, so a card write never undoes one of them.
   async executeContextSourceOperation(operation, payload) {
     const run = this.contextSourceTail.then(async () => {
       try {
@@ -2798,6 +2801,11 @@ export class SessionWriteCoordinator {
         if (operation === 'remove') {
           await assertNoActiveBackupImport(this);
           const result = await removeContextSource({ env: this.env, slug, id, readingIds: payload.readingIds, markWrite });
+          return jsonResponse(result.body, result.status);
+        }
+        if (operation === 'set-card') {
+          await assertNoActiveBackupImport(this);
+          const result = await storeContextCard({ env: this.env, slug, id, card: payload.card, markWrite });
           return jsonResponse(result.body, result.status);
         }
         return jsonResponse({ error: 'Not found.' }, 404);

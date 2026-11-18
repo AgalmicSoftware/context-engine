@@ -388,7 +388,7 @@ test('a context row whose access no longer matches the session’s is left out',
     storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate', encryption: 'none', accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] } } },
   };
   assert.deepEqual(await loadParticipantContextSources({ env: h.env, slug: 'salon', config: tightened, deps: h.deps }), {
-    sources: [], leftOut: 0, withheld: 0, unreadable: 0, failed: 0, unavailable: false,
+    sources: [], notRead: [], leftOut: 0, withheld: 0, unreadable: 0, failed: 0, unavailable: false,
   });
 });
 

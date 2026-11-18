@@ -6,7 +6,8 @@ import { installSessionCoordinatorBinding } from '../../tests/helpers/sessionCor
 // session coordinator, a session with the default access, pages from a scripted
 // network, and a scripted AI provider. Nothing here reaches a real network or service.
 // `state.scopes` are a signed-in caller's scopes, and `state.fetchAccess` is what
-// the dispatcher's fetch check answers.
+// the dispatcher's fetch check answers. Work a route leaves for after its reply
+// (a source's card) is held as the runtime holds it; `settled()` waits for it.
 export const ADMIN = `0x${'1'.repeat(40)}`;
 export const PARTICIPANT = `0x${'2'.repeat(40)}`;
 const ADMINS_ONLY = { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] };
@@ -97,13 +98,15 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
     return typeof page === 'function' ? page(init) : page;
   };
   const providerCalls = [];
+  const background = [];
   const { safeFetch, isBlockedOutboundUrl } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: network } });
   const deps = {
     json,
+    waitUntil: (work) => { background.push(work); },
     safeFetch,
     isBlockedOutboundUrl,
     fetch: async (url, init) => {
-      providerCalls.push({ url: String(url), init, body: JSON.parse(new TextDecoder().decode(init.body)) });
+      providerCalls.push({ url: String(url), init, body: JSON.parse(typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body)) });
       return provider ? provider(String(url), init) : json({ error: { message: 'no provider' } }, 500);
     },
     getSessionSecrets: async () => ({ anthropicKey: 'synthetic-anthropic-key', openaiKey: 'synthetic-openai-key' }),
@@ -161,7 +164,10 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
   const context = (body, address = ADMIN) => call('/storage/context', { method: 'POST', body, address });
   const list = async (address) => (await (await call('/storage/list?resource=docsContext&role=context', { address })).json()).items;
   const read = (id, address) => call(`/storage/read?id=${encodeURIComponent(id)}`, { address });
-  return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, fetchChecks, providerCalls };
+  const settled = async () => { while (background.length) await background.shift(); };
+  // The provider calls that read a PDF, apart from the calls that write cards.
+  const pdfReads = () => providerCalls.filter((made) => made.body?.messages?.[0]?.content?.[0]?.type === 'document' || made.body?.input?.[0]?.content?.[0]?.type === 'input_file');
+  return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, fetchChecks, providerCalls, pdfReads, settled };
 };
 
 export const idOf = async (response) => {

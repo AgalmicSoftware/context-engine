@@ -13,9 +13,12 @@ import {
   lockedGroupsOf,
   participantsMayAddContext,
 } from '../../shared/sessionContextSources.mjs';
+import { contextCardContent } from '../../shared/contextCards.mjs';
 import { looksSecret } from '../../shared/secretText.mjs';
 import { resolveSessionLifecycle } from '../shared/sessionLifecycle.mjs';
+import { cardAfterContextAdd, makeContextCard, readContextCardText, setContextCard } from './contextCard.js';
 import { readPdfWithSessionAi } from './contextDocumentRead.js';
+import { contextCardOf, mayHaveContextCard } from './contextSourcePolicy.js';
 import { fetchContextSnapshotText } from './fetchExecution.js';
 import {
   buildIndexKey,
@@ -98,7 +101,7 @@ const linkAccessOf = (body, replaces) => {
 // its text with the link. With `replaces`, a refresh of that link: the same
 // page read again, whose snapshot keeps the link's title, privacy and adder,
 // then the old record goes.
-const addLink = async ({ body, env, slug, deps, store, json, now }) => {
+const addLink = async ({ body, env, config, slug, deps, store, json, now }) => {
   const url = trim(body.url);
   let parsed = null;
   try { parsed = url.length <= LIMITS.urlChars ? new URL(url) : null; } catch { parsed = null; }
@@ -163,7 +166,18 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
     ],
   });
   if (stored.response) return stored.response;
-  if (replaces) await removeCloudflareStorageRecords({ env, slug, rows: [replaces] });
+  // The old record goes as any removal does, in the session coordinator, which hands back
+  // the card it held at that moment: a card someone wrote while the page was being read
+  // again is carried over, and none is written onto a record already gone.
+  const old = replaces ? await coordinate(deps, { env, slug, operation: 'remove', id: replaces.id }) : null;
+  if (old && !old.ok && old.status !== 404) {
+    // The old record stays, so the one just stored goes: a refresh that fails
+    // leaves the link as it was, not there twice.
+    await removeCloudflareStorageRecords({ env, slug, rows: [{ id: stored.id, resource: 'docsContext' }] }).catch(() => {});
+    return json(old.body, old.status);
+  }
+  // A refreshed link keeps a card a person wrote; otherwise the page just read gets a new one.
+  await cardAfterContextAdd({ env, config, slug, id: stored.id, text, carried: old?.body?.card || null, deps });
   return json({
     ok: true,
     source: {
@@ -232,7 +246,7 @@ const readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, jso
     ],
   });
   if (stored.response) return stored;
-  return { id: stored.id, model: read.model, readAt, chars: text.length, truncated: read.truncated || read.text.length > text.length };
+  return { id: stored.id, model: read.model, readAt, text, chars: text.length, truncated: read.truncated || read.text.length > text.length };
 };
 
 // A PDF: one reading at a time, replacing any earlier reading. A second read
@@ -259,6 +273,8 @@ const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now 
   if (reading.response) return reading.response;
   if (!ended.ok) return json(ended.body, ended.status);
   const { id, model, readAt, chars, truncated } = reading;
+  // The PDF's card is made from the text just read, and sits on the PDF's row.
+  await cardAfterContextAdd({ env, config, slug, id: pdf.id, text: reading.text, deps });
   return json({ ok: true, text: { id, derivedFrom: pdf.id, model, readAt, chars, truncated } });
 };
 
@@ -266,25 +282,65 @@ const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now 
 // AI read from it, readings first so a failure part way never leaves a reading
 // without its PDF.
 export const removeContextSource = async ({ env, slug, id, readingIds, markWrite }) => {
-  const row = await readContextSourceRow({ env, slug, id });
+  // A row that can't be read just now is an error, never "already gone".
+  const row = await readContextSourceRow({ env, slug, id, strict: true });
   if (!row) return { status: 404, body: { error: 'That item is no longer in the session.' } };
   const rows = [...await readingsOf({ env, slug, row, shownIds: readingIds }), row];
   await removeCloudflareStorageRecords({ env, slug, rows, markWrite });
-  return { status: 200, body: { ok: true, removed: rows.map((entry) => entry.id) } };
+  const card = contextCardOf(row);
+  // The card goes with the source; a link's refresh takes it for the new record.
+  return { status: 200, body: { ok: true, removed: rows.map((entry) => entry.id), ...(card ? { card } : {}) } };
 };
 
 const remove = async ({ body, env, slug, deps, json }) => {
   const removed = await coordinate(deps, { env, slug, operation: 'remove', id: trim(body.id), readingIds: body.readingIds });
-  return json(removed.body, removed.status);
+  const { card: _card, ...reply } = removed.body || {};
+  return json(reply, removed.status);
 };
 
-const ACTIONS = Object.freeze({ 'add-link': addLink, 'read-pdf': readPdf, remove });
+// A person writes a source's card, or with `card: null` takes it off.
+const setCard = async ({ body, env, slug, admin, isAdmin, deps, json, now }) => {
+  const content = body.card === null ? null : contextCardContent(body.card);
+  if (body.card !== null && !content) {
+    return json({ error: 'A card needs a summary, tags or names.', reason: 'context_card_invalid' }, 400);
+  }
+  if (content && looksSecret([content.summary, ...content.tags, ...content.names].join(' '))) {
+    return json({ error: 'This card looks like it holds a key, token or password. Remove it: secrets never go in context.' }, 400);
+  }
+  const set = await setContextCard({
+    env, slug, id: trim(body.id), deps, card: content && { ...content, by: isAdmin ? 'admin' : 'adder', at: now() },
+  });
+  return json(set.body, set.status);
+};
+
+// The session's AI writes the card of a source that has none, or only one it wrote before.
+const makeCard = async ({ body, env, config, slug, admin, deps, json }) => {
+  const row = await readContextSourceRow({ env, slug, id: body.id });
+  if (!row || contextRoleOf(row.tags) !== CONTEXT_ROLE) return json({ error: 'That item is no longer in the session.' }, 404);
+  if (!mayHaveContextCard(row)) return json({ error: 'An item stored encrypted has no card.', reason: 'context_card_unsupported' }, 409);
+  const current = contextCardOf(row);
+  if (current && current.by !== 'ai') return json({ ok: true, card: current, kept: true });
+  if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
+  const text = await readContextCardText({ env, config, slug, row, principal: admin, deps });
+  if (!text.trim()) {
+    return json({ error: 'This item has no text to describe. Read a PDF with the session’s AI first.', reason: 'context_card_no_text' }, 409);
+  }
+  const made = await makeContextCard({
+    env, config, secrets: (await deps?.getSessionSecrets?.(env, slug)) || {}, deps, text,
+    title: contextTagValue(row.tags, TAGS.name), kind: contextTagValue(row.tags, TAGS.kind),
+  });
+  if (!made.ok) return json({ error: 'The session’s AI could not write this card.', reason: made.reason }, made.reason === 'ai_disabled' ? 403 : 502);
+  const set = await setContextCard({ env, slug, id: row.id, card: made.card, deps });
+  return json(set.body, set.status);
+};
+
+const ACTIONS = Object.freeze({ 'add-link': addLink, 'read-pdf': readPdf, remove, 'set-card': setCard, 'make-card': makeCard });
 
 // POST /storage/context { action, ... }: admins change context sources. Anyone
-// else may remove what they added, and add a link while the session takes
+// else may remove what they added and write its card, and add a link while the session takes
 // additions and hasn't ended, when they may have the Worker fetch pages;
-// refreshing a link and having a PDF read stay with admins, as each makes the
-// Worker work again for an item already there. Files are added through
+// refreshing a link, having a PDF read and having the AI write a card stay
+// with admins, as each makes the Worker work again for an item already there. Files are added through
 // /storage/upload with a context role.
 export const contextSourceRoute = async ({
   request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, store, authorizeAdd, checkFetchAccess,
@@ -299,10 +355,18 @@ export const contextSourceRoute = async ({
   let body = null;
   try { body = await request.json(); } catch { body = null; }
   const name = isObj(body) ? trim(body.action) : '';
-  const participantMay = name === 'remove' || (name === 'add-link' && !trim(body.replaces));
+  const participantMay = ['remove', 'set-card'].includes(name) || (name === 'add-link' && !trim(body.replaces));
   if (!isAdmin && !participantMay) return refused();
   if (!isObj(body)) return json({ error: 'Invalid JSON.' }, 400);
   if (!Object.hasOwn(ACTIONS, name)) return json({ error: 'Unknown context action.' }, 400);
+  // A card is words the AI may be shown, so writing one is adding: not where
+  // the session limits context to admins, and not once it has ended.
+  if (!isAdmin && name === 'set-card') {
+    if (!participantsMayAddContext(config)) return refused();
+    if (resolveSessionLifecycle(config, { now: deps?.now }).ended) {
+      return json({ error: 'This session has ended.', code: 'session_ended' }, 410);
+    }
+  }
   // Checked before the Worker fetches anything; the upload path checks again as it stores.
   if (name === 'add-link') {
     if (!isAdmin && !participantsMayAddContext(config)) {
@@ -327,13 +391,13 @@ export const contextSourceRoute = async ({
       if (!fetchAccess?.ok) return fetchAccess?.response || json({ error: 'Fetch access could not be checked.' }, 403);
     }
   }
-  if (!isAdmin && name === 'remove') {
-    // A row that can't be read proves nothing, so it removes nothing.
+  if (!isAdmin && participantMay && name !== 'add-link') {
+    // A row that can't be read proves nothing, so it removes nothing, and its card stays as it is.
     const row = await readContextSourceRow({ env, slug, id: body.id });
     if (!row) return json({ error: 'That item is no longer in the session.' }, 404);
     if (trim(row.uploader).toLowerCase() !== admin) return refused();
   }
   const action = ACTIONS[name];
   const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
-  return action({ body, env, config, slug, admin, deps, store, json, now });
+  return action({ body, env, config, slug, admin, isAdmin, deps, store, json, now });
 };
