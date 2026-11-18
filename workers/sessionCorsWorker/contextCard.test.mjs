@@ -7,7 +7,7 @@ import { resolveInterviewStarter } from './interviewStarter.js';
 import { buildIndexKey } from './storageRouteExecution.js';
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionServiceBinding.js';
-import { projectPublicWorkerSessionConfig } from '../shared/workerSessionConfig.mjs';
+import { projectPublicWorkerSessionConfig, selectDeployWorkerSessionConfigFields } from '../shared/workerSessionConfig.mjs';
 import { classifySessionConfigEdits } from '../../shared/sessionConfigEdits.mjs';
 import { CONTEXT_CARD_LIMITS } from '../../shared/contextCards.mjs';
 import { buildSessionContextPrompt } from '../../shared/sessionContextText.mjs';
@@ -562,7 +562,7 @@ test('cards are off until an admin turns them on: nothing is made, written, list
   assert.deepEqual([kept.summary, kept.by, cardCalls(h).length], ['Written by an admin.', 'admin', 0]);
 });
 
-test('contextCardsEnabled is true or false, signs no one out, and the site can read it', () => {
+test('contextCardsEnabled is true or false, signs no one out, the site can read it and a redeploy keeps it', () => {
   const base = { slug: 's', sessionId: `0x${'ab'.repeat(16)}`, adminAddress: ADMIN };
   const save = (contextCardsEnabled) =>
     applySessionConfigMutation({ existingConfig: base, slug: 's', mutation: { kind: 'set-config', incomingConfig: { ...base, contextCardsEnabled } } });
@@ -570,6 +570,7 @@ test('contextCardsEnabled is true or false, signs no one out, and the site can r
   assert.deepEqual([save(true).ok, save(false).ok], [true, true]);
   assert.deepEqual(classifySessionConfigEdits(base, { ...base, contextCardsEnabled: true }), { content: ['contextCardsEnabled'], authority: [], signsParticipantsOut: false });
   assert.equal(projectPublicWorkerSessionConfig({ ...base, contextCardsEnabled: true }).contextCardsEnabled, true);
+  assert.equal(selectDeployWorkerSessionConfigFields({ ...base, contextCardsEnabled: true }).contextCardsEnabled, true);
 });
 
 test('an image gets its card from the AI’s reading of it, and none before it is read', async () => {
