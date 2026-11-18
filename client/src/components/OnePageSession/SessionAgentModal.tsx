@@ -5,7 +5,7 @@ import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
-import { dictationNeedsSignIn, dictationOffered } from '../../domains/worker/sessionFeedbackPorts';
+import { dictationNeedsSignIn, dictationOffered, sessionEnded } from '../../domains/worker/sessionFeedbackPorts';
 import CETooltip from '../Shared/CETooltip';
 import SessionAgentNotice from './SessionAgentNotice';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
@@ -189,13 +189,15 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   useEffect(() => {
     if (!mayAsk || speech !== null) return undefined;
     let active = true;
-    // A Worker that couldn't be read gives null, so the next check asks again.
-    void dictationOffered({ sessionSlug, sessionConfig, account }).then(async (value) => {
-      if (!active || value === null || shownFor.current !== person) return;
-      setSpeech(value);
-      if (value) return;
-      const afterSignIn = await dictationNeedsSignIn({ sessionSlug, sessionConfig, account });
-      if (active && shownFor.current === person) setSpeechAfterSignIn(afterSignIn);
+    const asker = { sessionSlug, sessionConfig, account };
+    void dictationOffered(asker).then(async (offered) => {
+      // A Worker that couldn't be read gives null, so the next check asks again.
+      if (offered === null) return;
+      // Both answers before either is set: setting the first ends this check.
+      const afterSignIn = !offered && (await dictationNeedsSignIn(asker));
+      if (!active || shownFor.current !== person) return;
+      setSpeech(offered);
+      setSpeechAfterSignIn(afterSignIn);
     });
     return () => {
       active = false;
@@ -212,6 +214,8 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     setCut(joined.length > SESSION_AGENT_LIMITS.questionChars);
   }, []);
 
+  // Asked when the dialog opened; a session that has ended since writes no more speech down.
+  const microphone = speech === true && !sessionEnded(sessionConfig);
   const hasAddress = status?.unattributed != null;
   const ask = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -443,13 +447,13 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
               ) : null}
             </div>
           ) : null}
-          <div className={styles.row}>
+          <div className={`${styles.row} ${microphone ? styles.withMic : ''}`}>
             <p id={`${baseId}-limits`} className={styles.hint}>
               Answers are at most {SESSION_AGENT_LIMITS.answerWords} words.{' '}
               {!status.recording ? 'Questions and answers aren’t kept.' : store ? '' : 'This chat won’t be kept.'}
               {speech === false && speechAfterSignIn ? ' Sign in to ask by voice.' : ''}
             </p>
-            {speech ? (
+            {microphone ? (
               <SessionDictation
                 options={{ sessionSlug, sessionConfig, account }}
                 onWords={addWords}

@@ -135,6 +135,19 @@
   .hint {
     flex: 1 1 200px;
   }
+
+  // A microphone error takes its own line under the row, so Ask keeps its place.
+  [role='alert'] {
+    order: 1;
+  }
+}
+
+// On a phone the three don't fit one line: the hint takes the line above, so the microphone and Ask stay
+// together on the right.
+@media (max-width: 420px) {
+  .withMic .hint {
+    flex-basis: 100%;
+  }
 }
 
 // The accent pair, which every theme keeps readable, in each state.

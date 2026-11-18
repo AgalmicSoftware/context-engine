@@ -124,6 +124,12 @@ describe('sessionFeedbackPorts', () => {
     const membersOnly = { ...WORKER_RUN, workerAuthority: { ...AUTHORITY, anonymousScopes: ['ai'] } };
     presence.mockResolvedValue({ ai: true, arweave: false, rpc: false, txGas: false });
     await expect(dictationNeedsSignIn({ ...VISITOR, sessionConfig: membersOnly })).resolves.toBe(true);
+    // A sign-in condition alone stops a visitor too, though visitors are listed for transcription.
+    const gated = {
+      ...WORKER_RUN,
+      workerAuthority: { ...AUTHORITY, loginGate: { conditions: [{ kind: 'worker_group', groupIds: ['salon'] }] } },
+    };
+    await expect(dictationNeedsSignIn({ ...VISITOR, sessionConfig: gated })).resolves.toBe(true);
     // Not where a visitor may already speak, a member couldn't either, the person is signed in, or it has ended.
     presence.mockClear();
     const ended = { ...membersOnly, sessionEndsAt: new Date(Date.now() - 60_000).toISOString() };
