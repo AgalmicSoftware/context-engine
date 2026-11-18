@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { Wallet } from 'ethers';
-import { SESSION_ID, SLUG, createSessionEnv, login, signedAdminRequest, uploadJson } from './sessionWorkerRuntimeFixture.mjs';
+import {
+  APP_ORIGIN, SESSION_ID, SLUG, WORKER_ORIGIN, createSessionEnv, fetchWorker, login, readJson, signedAdminRequest, uploadJson,
+} from './sessionWorkerRuntimeFixture.mjs';
 
 const session = { sessionId: SESSION_ID, sessionSlug: SLUG };
 
@@ -42,6 +44,32 @@ test('one person stores at most 20 versions of an answer; replays and other ques
   assert.equal((await uploadJson({ env, token, resource: 'responses', data: answer('q-1') })).status, 200);
   // The limit is one person's: someone else answers freely.
   assert.equal((await uploadJson({ env, token: await person(), resource: 'responses', data: answer('q-0') })).status, 200);
+});
+
+// The site sends an answer held as a file (an encrypted one, say) in a form, with the same request id on a retry.
+const uploadAnswerFile = async ({ env, token, data, requestId }) => {
+  const form = new FormData();
+  form.append('file', new Blob([JSON.stringify(data)], { type: 'application/json' }), 'payload.bin');
+  form.append('backend', 'cloudflare');
+  form.append('resource', 'responses');
+  form.append('contentType', 'application/json');
+  form.append('payloadEncrypted', 'false');
+  form.append('requestId', requestId);
+  return readJson(await fetchWorker(new Request(`${WORKER_ORIGIN}/storage/upload`, {
+    method: 'POST', headers: { Origin: APP_ORIGIN, Authorization: `Bearer ${token}` }, body: form,
+  }), env));
+};
+
+test('an answer sent as a file replays by its request id, as one sent as JSON does', async () => {
+  const { env, person } = await setup(['q-0']);
+  const token = await person();
+  const first = await uploadAnswerFile({ env, token, data: answer('q-0'), requestId: 'file-1' });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.notEqual(first.body.replayed, true);
+  const again = await uploadAnswerFile({ env, token, data: answer('q-0'), requestId: 'file-1' });
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+  assert.equal(again.body.replayed, true);
+  assert.equal(again.body.id, first.body.id);
 });
 
 test('one person stores at most five answers per question the session has', async () => {
