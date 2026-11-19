@@ -343,6 +343,8 @@ const assertWorkerKeepsContextCards = async (
       method: 'GET',
       credentials: 'omit',
       redirect: 'error',
+      // Asked afresh each time, so a Worker just updated is not judged by an earlier answer.
+      cache: 'no-store',
       headers: { Accept: 'application/json' },
     });
     // A Worker from before capabilities answers 404: it keeps no cards.

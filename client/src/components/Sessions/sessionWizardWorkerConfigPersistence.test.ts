@@ -377,6 +377,65 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     expect(lacks.written()).toHaveProperty('agentInstructions', 'Join the open group.');
   });
 
+  it('makes a session with Context cards on only after the Worker says it keeps them, and reads them back', async () => {
+    const persist = (features: string[]) => {
+      let stored: Record<string, unknown> | null = null;
+      const fetchImpl = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+        if (String(url).includes('/capabilities')) return jsonResponse(200, { features });
+        if (init?.method !== 'POST') return stored ? jsonResponse(200, { config: stored }) : jsonResponse(404, {});
+        stored = JSON.parse(String(init.body)).config;
+        return jsonResponse(200, { ok: true });
+      });
+      const saved = persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: { ...baseConfig(), contextCardsEnabled: true },
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        retryDelaysMs: [],
+      });
+      return { saved, fetchImpl, written: () => stored };
+    };
+    const keeps = persist(['context_cards_v1']);
+    await expect(keeps.saved).resolves.toMatchObject({ publicConfig: { contextCardsEnabled: true } });
+    expect(String(keeps.fetchImpl.mock.calls[0][0])).toBe(`${WORKER_ORIGIN}/capabilities?slug=worker-session`);
+    expect(keeps.fetchImpl.mock.calls[0][1]).toMatchObject({ method: 'GET', cache: 'no-store' });
+    expect(keeps.written()).toHaveProperty('contextCardsEnabled', true);
+    const older = persist(['worker_groups']);
+    await expect(older.saved).rejects.toThrow('too old to keep Context cards');
+    expect(older.written()).toBeNull();
+  });
+
+  it('turns off Context cards an earlier attempt stored, with the same revision on a retry', async () => {
+    const withoutCards = ({ contextCardsEnabled: _off, ...rest }: Record<string, unknown>) => rest;
+    const persist = (fetchImpl: SessionWizardWorkerConfigFetchPort) =>
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: withoutCards(baseConfig()),
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        retryDelaysMs: [],
+      });
+    const has = createWorkerFetch(async () =>
+      jsonResponse(200, { config: verifiedConfig('earlier', { contextCardsEnabled: true }) }),
+    );
+    const first = await persist(has.fetchImpl);
+    expect(has.written()).toHaveProperty('contextCardsEnabled', false);
+    expect(first.publicConfig).toHaveProperty('contextCardsEnabled', false);
+    // The stored false is sent again, so a retry signs the revision the first write claimed.
+    const second = await persist(has.fetchImpl);
+    expect(second.configRevision).toBe(first.configRevision);
+    // A Worker whose config never had the setting is not sent it.
+    const lacks = createWorkerFetch(async () => jsonResponse(200, { config: withoutCards(verifiedConfig('earlier')) }));
+    await persist(lacks.fetchImpl);
+    expect(lacks.written()).not.toHaveProperty('contextCardsEnabled');
+  });
+
   // Older Workers refuse the field, and none of them has stored it.
   it.each([
     ['has none', async () => jsonResponse(200, { config: withoutInstructions(verifiedConfig('earlier')) })],
