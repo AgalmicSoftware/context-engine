@@ -3,6 +3,7 @@ import { Input } from 'reactstrap';
 
 import {
   CONTEXT_SOURCE_LIMITS,
+  contextCardsOn,
   contextFileIsReadByAi,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
@@ -97,14 +98,16 @@ type FilesProps = {
   pending: PendingContextFiles;
   /** Before Create, the groups set up so far; after it, the groups Create made. */
   groups?: SetupGroupOption[];
+  /** The session's public config once it exists: its Context cards setting then decides, not the draft's. */
+  sessionConfig?: Record<string, unknown> | null;
 };
 
 // Before Create: the files to add. A name without its file (from a template
 // or a reload) asks for the file again.
-export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: FilesProps) => {
+export const SetupContextFiles = ({ draft, onChange, pending, groups = [], sessionConfig = null }: FilesProps) => {
   const entries = readContextFiles(draft);
-  // As the session will: images only with Context cards on.
-  const cards = draft.contextCardsEnabled === true;
+  // As the session will: images only with Context cards on. Once it exists, Settings changes the setting.
+  const cards = sessionConfig ? contextCardsOn(sessionConfig) : draft.contextCardsEnabled === true;
   const named = groups.flatMap(({ groupId, label }) => (label.trim() ? [{ groupId, label: label.trim() }] : []));
   const [problem, setProblem] = useState('');
   const save = (next: ContextFileEntry[]) => onChange(['contextFiles'], next);
@@ -124,8 +127,11 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
       <SetupCheck
         id="ce-setup-context-cards"
         label="Context cards"
-        help={CONTEXT_CARDS_HELP}
+        help={
+          sessionConfig ? `${CONTEXT_CARDS_HELP} The session is made: change this in its Settings.` : CONTEXT_CARDS_HELP
+        }
         checked={cards}
+        disabled={!!sessionConfig}
         testId="ce-setup-context-cards"
         onChange={(checked) => onChange(['contextCardsEnabled'], checked)}
       />
@@ -201,7 +207,7 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
   );
 };
 
-type PublisherProps = FilesProps & {
+type PublisherProps = Omit<FilesProps, 'sessionConfig'> & {
   /** The session's public config once it exists; null before creation. */
   sessionConfig: Record<string, unknown> | null;
   sessionSlug: string;

@@ -28,11 +28,13 @@ const Harness = ({
   created = false,
   groups = [],
   made = [],
+  config = { slug: 'salon' },
 }: {
   initial: SetupDraft;
   created?: boolean;
   groups?: SetupGroupOption[];
   made?: SetupGroupOption[];
+  config?: Record<string, unknown>;
 }) => {
   const [draft, setDraft] = useState<SetupDraft>(initial);
   const pending = usePendingContextFiles();
@@ -40,12 +42,18 @@ const Harness = ({
   const onChange = ([key]: string[], value: unknown) => setDraft((prev) => ({ ...prev, [key]: value }));
   return (
     <>
-      <SetupContextFiles draft={draft} onChange={onChange} pending={pending} groups={created ? made : groups} />
+      <SetupContextFiles
+        draft={draft}
+        onChange={onChange}
+        pending={pending}
+        groups={created ? made : groups}
+        sessionConfig={created ? config : null}
+      />
       <SetupContextPublisher
         draft={draft}
         onChange={onChange}
         pending={pending}
-        sessionConfig={created ? { slug: 'salon' } : null}
+        sessionConfig={created ? config : null}
         sessionSlug="salon"
         account="0xadmin"
         groups={made}
@@ -118,6 +126,19 @@ describe('setup context files', () => {
     expect(screen.getByLabelText('Analyze with the session’s AI')).toBeChecked();
     fireEvent.click(screen.getByTestId('ce-setup-context-cards'));
     expect(latest.contextCardsEnabled).toBe(false);
+    expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).not.toMatch(/image/);
+  });
+
+  it('after Create, the session’s own setting decides on images, and the tick box is fixed', () => {
+    const made = render(<Harness initial={{}} created config={{ slug: 'salon', contextCardsEnabled: true }} />);
+    expect(screen.getByTestId('ce-setup-context-cards')).toBeChecked();
+    expect(screen.getByTestId('ce-setup-context-cards')).toBeDisabled();
+    expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).toMatch(/image\/png/);
+    made.unmount();
+    // A draft ticked after a session was made without cards changes nothing: Settings does.
+    render(<Harness initial={{ contextCardsEnabled: true }} created />);
+    expect(screen.getByTestId('ce-setup-context-cards')).not.toBeChecked();
+    expect(screen.getByTestId('ce-setup-context-cards')).toBeDisabled();
     expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).not.toMatch(/image/);
   });
 
