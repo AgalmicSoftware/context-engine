@@ -663,10 +663,12 @@ describe('UserPage analysis cache and routing', () => {
     expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
   });
 
-  it("reads and saves no card in a session other than the page's own", async () => {
+  it("shows and saves no saved card in a session other than the page's own", async () => {
     const own = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: 'active-slug' });
     matchedAnalysis();
+    // The Worker that will write the card is asked whether the card is on; a card saved there is not this page's.
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'ready', card: SAVED_CARD, savedAt: 1763460000000 });
     analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['active-slug', 'open-slug']);
     jest
@@ -682,7 +684,8 @@ describe('UserPage analysis cache and routing', () => {
     await waitFor(() => expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans'));
 
     expect(analyzeUserCard.mock.calls[0][2].sessionSlug).toBe('open-slug');
-    expect(readSavedAnalysisCard).not.toHaveBeenCalled();
+    expect(readSavedAnalysisCard.mock.calls.map(([, options]) => options.sessionSlug)).toEqual(['open-slug']);
+    expect(instance.state.analysisCardSavedAt).toBeNull();
     expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
     expect(instance.state.analysisCardPublish).toBeNull();
     await expect(instance.resolveSavedAnalysisCardOptions()).resolves.toBeNull();
@@ -702,6 +705,8 @@ describe('UserPage analysis cache and routing', () => {
             : null,
         );
       matchedAnalysis();
+      // Nothing is saved yet: in a session with public answers this is where my card would be saved.
+      readSavedAnalysisCard.mockResolvedValueOnce({ status: 'none' });
       analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
 
       await instance.analyzeUser();
@@ -709,11 +714,53 @@ describe('UserPage analysis cache and routing', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       // The card quotes answers only I and the admins may read: it never leaves this window.
-      expect(readSavedAnalysisCard).not.toHaveBeenCalled();
       expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
       expect(instance.state.analysisCardPublish).toBeNull();
     },
   );
+
+  it.each([
+    ['its own session', { activeSessionSlug: undefined }],
+    ['another session the AI answers from', { activeSessionSlug: '' }],
+  ])('a page loaded before the card was turned off pays for no card, in %s', async (_where, props) => {
+    const own = '0x00000000000000000000000000000000000000e5';
+    const { instance } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+    if (props.activeSessionSlug === '') instance.props = { ...instance.props, activeSessionSlug: '', sessionSlug: '' };
+    matchedAnalysis();
+    // This page's copy of the session still says the card is on; the Worker knows better.
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'off' });
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.aiAnalysis).toBe('summary'));
+    await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+
+    expect(readSavedAnalysisCard).toHaveBeenCalledTimes(1);
+    // Neither the card's words (an AI call on the session's key) nor its picture is asked for.
+    expect(analyzeUserCard).not.toHaveBeenCalled();
+    expect(fetchAnalysisCardPicture).not.toHaveBeenCalled();
+    expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
+    expect(instance.state.analysisCard).toBeNull();
+    expect(instance.state.analysisCardPublish).toBeNull();
+  });
+
+  it('leaves the card out when its picture is refused because the card is off', async () => {
+    const own = '0x00000000000000000000000000000000000000f6';
+    const { instance } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+    matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce(null);
+    fetchAnalysisCardPicture.mockReset().mockRejectedValue(new Error('analysis_card_off'));
+    let finishWords = () => {};
+    analyzeUserCard.mockReturnValueOnce(new Promise((resolve) => (finishWords = resolve)));
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(fetchAnalysisCardPicture).toHaveBeenCalled());
+    finishWords({ title: 'Trusts plain tools over grand plans' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(instance.state.analysisCard).toBeNull();
+    expect(instance.state.analysisCardPending).toBe(false);
+    expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
+  });
 
   it("makes no card where the page's own session turned it off, though the AI answers from another", async () => {
     const own = '0x00000000000000000000000000000000000000c3';
@@ -740,11 +787,12 @@ describe('UserPage analysis cache and routing', () => {
     expect(instance.state.analysisCard).toBeNull();
   });
 
-  it('reads and saves no card on a page with no session of its own', async () => {
+  it('shows and saves no saved card on a page with no session of its own', async () => {
     // Not the account above, whose analysis in this session is cached by now.
     const own = '0x00000000000000000000000000000000000000dd';
     const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: '' });
     matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'ready', card: SAVED_CARD, savedAt: 1763460000000 });
     analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['open-slug']);
     jest
@@ -756,7 +804,7 @@ describe('UserPage analysis cache and routing', () => {
     await waitFor(() => expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans'));
 
     expect(analyzeUserCard.mock.calls[0][2].sessionSlug).toBe('open-slug');
-    expect(readSavedAnalysisCard).not.toHaveBeenCalled();
+    expect(instance.state.analysisCardSavedAt).toBeNull();
     expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
     await expect(instance.resolveSavedAnalysisCardOptions()).resolves.toBeNull();
   });

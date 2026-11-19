@@ -19,7 +19,10 @@ import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolutio
 export type SavedAnalysisCardState =
   { status: 'ready'; card: SavedAnalysisCard; savedAt: number } | { status: 'withdrawn' } | { status: 'none' };
 
-const known = new Map<string, Promise<SavedAnalysisCardState | null>>();
+// What a read can also say: the session has turned the card off since this page loaded it.
+export type SavedAnalysisCardRead = SavedAnalysisCardState | { status: 'off' };
+
+const known = new Map<string, Promise<SavedAnalysisCardRead | null>>();
 const listeners = new Set<() => void>();
 
 // A read, and a save or withdrawal, give up after this long (finding the Worker and a silent sign-in included), so
@@ -95,19 +98,23 @@ const askWorker = async (
 
 /**
  * A person's saved card in the session the options name, or null when it cannot be read (signed out, an older
- * Worker, a network failure, no answer in time). A read that fails is asked again the next time.
+ * Worker, a network failure, no answer in time). A read that fails is asked again the next time. `off` is the
+ * Worker saying an admin turned the card off: the page's own copy of the session may be older than that, so the
+ * page asks here before it pays for a card. It is asked again the next time too, as the card may be back on.
  */
-export const readSavedAnalysisCard = (account: string, opts: unknown): Promise<SavedAnalysisCardState | null> => {
+export const readSavedAnalysisCard = (account: string, opts: unknown): Promise<SavedAnalysisCardRead | null> => {
   const key = keyOf(opts, account);
   const kept = known.get(key);
   if (kept) return kept;
   const read = bounded(
     (signal) => askWorker('/analysis-card/published', { account }, opts, { signal }),
     SAVED_CARD_READ_TIMEOUT_MS,
-  ).catch(() => null);
+  ).catch((error: unknown): SavedAnalysisCardRead | null =>
+    error instanceof Error && error.message === 'analysis_card_off' ? { status: 'off' } : null,
+  );
   known.set(key, read);
   void read.then((state) => {
-    if (!state && known.get(key) === read) known.delete(key);
+    if ((!state || state.status === 'off') && known.get(key) === read) known.delete(key);
   });
   return read;
 };

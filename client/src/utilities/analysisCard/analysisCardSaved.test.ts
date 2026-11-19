@@ -74,6 +74,20 @@ it('reads as unknown, and asks again next time, when the card cannot be read', a
   expect(mockedFetch).toHaveBeenCalledTimes(3);
 });
 
+it('says when the session has turned the card off, and asks again next time', async () => {
+  mockedFetch.mockResolvedValue({
+    ok: false,
+    status: 403,
+    json: async () => ({ error: 'analysis_card_off' }),
+  } as unknown as Response);
+  const opts = options();
+
+  await expect(readSavedAnalysisCard(PERSON, opts)).resolves.toEqual({ status: 'off' });
+  // Not kept: an admin may turn the card back on.
+  mockedFetch.mockResolvedValue(reply({ published: null }));
+  await expect(readSavedAnalysisCard(PERSON, opts)).resolves.toEqual({ status: 'none' });
+});
+
 it("saves only the card's words, and tells the page at once", async () => {
   const opts = options();
   const shown = normalizeAnalysisCard({ ...CARD, own: true, link: 'contextengine.sh/session/x', account: PERSON });

@@ -323,14 +323,24 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
           }
         : null,
     );
+    // Set once the Worker says an admin turned the card off: nothing more of the card is then shown or saved.
+    let turnedOff = false;
     const showPicture = (pictureFigure: string): void => {
       fetchAnalysisCardPicture(pictureFigure, aiOptions)
         .then((picture) =>
-          this.setState(() => (isCurrent() ? { analysisCardPicture: { status: 'ready', ...picture } } : null)),
+          this.setState(() =>
+            isCurrent() && !turnedOff ? { analysisCardPicture: { status: 'ready', ...picture } } : null,
+          ),
         )
         .catch((pictureError: unknown) => {
-          accountLog.warn('[UserPage] analysis card picture unavailable:', getUserPageErrorMessage(pictureError, ''));
-          this.setState(() => (isCurrent() ? { analysisCardPicture: { status: 'none' } } : null));
+          const reason = getUserPageErrorMessage(pictureError, '');
+          accountLog.warn('[UserPage] analysis card picture unavailable:', reason);
+          if (reason === 'analysis_card_off') {
+            turnedOff = true;
+            if (isCurrent()) leaveCardOut();
+            return;
+          }
+          this.setState(() => (isCurrent() && !turnedOff ? { analysisCardPicture: { status: 'none' } } : null));
         });
     };
     const writeCard = async (): Promise<AnalysisCard | null> => {
@@ -355,10 +365,14 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
     // Where the session keeps each person's answers to them and its admins, my card is made for me alone: it
     // quotes those answers, so it is not saved on my page and no box offers to (the Worker refuses it too).
     const keptToMe = ownProfile && analysisCardAnswersArePrivate(this._getSessionConfigForSlugExact(pageSlug));
-    const savedRead =
-      isPageSession(this, aiOptions) && !keptToMe ? readSavedAnalysisCard(addressLower, aiOptions) : null;
-    void Promise.resolve(savedRead).then(async (saved) => {
+    // The Worker is asked before anything is paid for. This page's copy of the session may be from before an
+    // admin turned the card off, and the card's words are an ordinary AI call the Worker cannot tell from any
+    // other: so when it answers that the card is off, the card is left out, words and picture unasked. The same
+    // request reads the saved card, which counts only in the page's own session.
+    void readSavedAnalysisCard(addressLower, aiOptions).then(async (answer) => {
       if (!isCurrent()) return;
+      if (answer?.status === 'off') return leaveCardOut();
+      const saved = isPageSession(this, aiOptions) ? answer : null;
       if (!ownProfile && saved?.status === 'ready') {
         const card = normalizeAnalysisCard({ ...saved.card, ...place });
         if (card) showPicture(card.figure);
@@ -382,7 +396,7 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
       // The box is ticked unless I withdrew my card. When the saved card could not be read the box is left out
       // and nothing is saved, so a "no" given on another device is never overridden.
       const publish: CardPublishContext | null =
-        ownProfile && saved ? { account: addressLower, aiOptions, isCurrent, stored: saved.status } : null;
+        ownProfile && saved && !keptToMe ? { account: addressLower, aiOptions, isCurrent, stored: saved.status } : null;
       if (publish) publishContexts.set(this, publish);
       else publishContexts.delete(this);
       const shown = saved?.status !== 'withdrawn';
@@ -390,6 +404,7 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
         isCurrent() ? { analysisCardPublish: publish ? { shown, saving: false, note: '' } : null } : null,
       );
       const card = kept ? normalizeAnalysisCard({ ...kept, ...place }) : await writeCard();
+      if (turnedOff) return;
       this.setState(() => (isCurrent() ? { analysisCard: card, analysisCardPending: false } : null));
       if (!card) return;
       // Kept with the analysis, so reopening it does not write the card again. Started now and awaited after the
