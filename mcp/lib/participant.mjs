@@ -18,6 +18,7 @@ import {
   CONTEXT_DATA_NOTE, CONTEXT_LIST_MAX, contextEntries, contextEntryMatches, contextTextOf, contextTextPart, publicContextEntry,
 } from './contextLibrary.mjs';
 import { createKnownSessions } from './knownSessions.mjs';
+import { createInterviewPrefill } from './interviewPrefill.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
@@ -1053,7 +1054,20 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     resultsPublic: sessionConfig?.sessionModeProfile?.results?.visibility === PUBLIC_RESULTS,
   });
 
+  // Suggested answers for the person to review need no sign-in or join.
+  const prefill = createInterviewPrefill({
+    fetchImpl,
+    resolveLink,
+    profile: async () => {
+      await loadState();
+      return profile();
+    },
+  });
+
   const methods = {
+    getInterviewCatalog: prefill.getInterviewCatalog,
+    makeReviewLink: prefill.makeReviewLink,
+
     async whoami() {
       await loadState();
       return {

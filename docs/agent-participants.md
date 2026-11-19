@@ -39,7 +39,10 @@ API)** on. **Make a key** puts the key, which ends with the person's sign-in
 the prompt names the session, tells the agent never to repeat the key, and
 gives the MCP install line in case the agent wants it. Its other choice,
 **Suggest answers for me to review**, copies the session's draft-your-answers
-prompt, named for the session, with the same MCP line and no key. When a session lets
+prompt, named for the session, with the same MCP line and no key. From the
+link alone, an agent can also suggest answers for a public session: the guide
+says how, and the MCP's `get_interview_catalog` and `make_review_link` do it
+without web access. When a session lets
 participants add context, it invites agents to add a file, a link or text that
 every participant sees.
 

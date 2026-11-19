@@ -2079,3 +2079,47 @@ test('the Session Agent answers a member from stored answers through the real Wo
   assert.deepEqual([(await statusOf(bobClient)).optedOut, (await statusOf(bobClient)).unattributed], [true, true]);
   assert.deepEqual([(await statusOf(client)).optedOut, (await statusOf(client)).unattributed], [false, false]);
 });
+
+test('an agent that never joins drafts suggested answers into a review link from a public session’s link alone', async () => {
+  const env = createEnv([sessionConfig()]);
+  const alice = await createAgent(env, 'alice.delve.town', []);
+  await alice.participant.joinSession({ link: LINK });
+  const binary = await alice.participant.addStatement({ prompt: STATEMENT });
+  const quadratic = await alice.participant.addStatement({ prompt: 'Spend your credits.', type: 'quadratic', options: ['Parks', 'Roads'], voiceCredits: 16 });
+
+  const seen = [];
+  const carol = await createAgent(env, 'carol', seen);
+  const linkWithInvite = `${LINK}&src=flyer#groupInvite=never-shown`;
+  const found = await carol.participant.getInterviewCatalog({ link: linkWithInvite });
+  assert.deepEqual(found.questions.map((question) => question.id).sort(), [binary.questionId, quadratic.questionId].sort());
+  assert.equal(found.questions.find((question) => question.type === 'quadratic').voiceCredits, 16);
+  const made = await carol.participant.makeReviewLink({
+    link: linkWithInvite,
+    responses: [
+      { questionId: binary.questionId, answer: 'Agree', confidence: 0.7, evidence: 'stated' },
+      { questionId: quadratic.questionId, answer: [3, -2], confidence: 0.4, evidence: 'inferred' },
+      { questionId: quadratic.questionId.toUpperCase(), answer: [4, 1], confidence: 0.4, evidence: 'over budget' },
+    ],
+  });
+  assert.equal(made.drafts, 2);
+  assert.equal(made.leftOut.length, 1);
+  const review = new URL(made.reviewLink);
+  assert.equal(`${review.origin}${review.pathname}`, `https://contextengine.sh/session/${SLUG}`);
+  assert.deepEqual(Object.fromEntries(review.searchParams), { src: 'flyer', worker: WORKER_ORIGIN, mode: 'interview' });
+  assert.doesNotMatch(made.reviewLink, /never-shown/);
+  const packet = JSON.parse(Buffer.from(review.hash.slice('#prefill='.length), 'base64url').toString('utf8'));
+  assert.equal(packet.sessionSlug, SLUG);
+  assert.match(packet.questionSetHash, /^[0-9a-f]{64}$/);
+  assert.equal(packet.source.modelId, 'test-model');
+  // No sign-in, no join, nothing stored: only the public catalog was read.
+  assert.ok(seen.length >= 2 && seen.every((call) => call.method === 'GET' && call.url.startsWith(`${WORKER_ORIGIN}/agent/interview-catalog?`)));
+  assert.equal((await carol.participant.whoami()).sessions.length, 0);
+});
+
+test('a private session’s catalog refuses the link way and points to the copied prompt', async () => {
+  const config = sessionConfig();
+  config.storageProfile.payloadAccessControl.conditions = { match: 'any', conditions: [{ kind: 'worker_group', groupId: 'invited' }] };
+  const env = createEnv([config]);
+  const carol = await createAgent(env, 'carol', []);
+  await assert.rejects(carol.participant.getInterviewCatalog({ link: LINK }), /Let your AI draft your answers.*Never ask them for an invite code/);
+});
