@@ -317,6 +317,8 @@ export interface FlatNodeProps {
   readOnly?: boolean;
   onBookmark: (nodeId: string) => void;
   bookmarkedNodes: string[];
+  // What a session atlas's list was ranked by, for this row.
+  rankNote?: string;
 }
 
 export interface ModalProps {

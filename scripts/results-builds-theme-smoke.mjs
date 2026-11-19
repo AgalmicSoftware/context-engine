@@ -459,6 +459,30 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
     assert(![category, topicChip].includes(plain), `A List level has no colour of its own: ${category}, ${topicChip}`);
   });
   if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-list-${tag}.png` });
+  // The list can be ranked by how people split or by how many answered; each row then says what it was ranked by.
+  const sort = atlas.getByTestId('ce-atlas-list-sort');
+  await step('list sort', async () => {
+    const rowNames = () =>
+      atlas.locator('[class*="flatNodeContainer"]').evaluateAll((rows) =>
+        rows.map((row) => row.querySelector('[class*="pathContainer"] button:last-of-type')?.textContent?.trim()),
+      );
+    const atlasOrder = await rowNames();
+    assert.equal(await atlas.locator('[class*="rankNote"]').count(), 0, 'Atlas order shows no rank note');
+    await sort.selectOption('split');
+    await atlas.locator('[class*="rankNote"]').first().waitFor();
+    const notes = await atlas.locator('[class*="rankNote"]').allTextContents();
+    assert(notes.every((note) => /^\d+ of \d+ in the largest position$/.test(note)), `Rank notes read oddly: ${notes}`);
+    assert.deepEqual([...(await rowNames())].sort(), [...atlasOrder].sort(), 'Sorting keeps every row');
+    await assertReadable(atlas);
+    const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
+    assert(overflow <= 1, `The sorted list scrolls sideways by ${overflow}px`);
+    if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-list-split-${tag}.png` });
+    await sort.selectOption('answered');
+    await atlas.locator('[class*="rankNote"]').first().waitFor();
+    assert((await atlas.locator('[class*="rankNote"]').allTextContents()).every((note) => /^\d+ answered$/.test(note)));
+    await sort.selectOption('atlas');
+    assert.deepEqual(await rowNames(), atlasOrder, 'Atlas order comes back as it was');
+  });
   await atlas.locator('[data-testid="ce-debate-view-mode"][data-ce-view-mode="tree"]').click();
   await step('tree categories', () => assertReadable(atlas));
   await atlas.getByRole('button', { name: 'Transport', exact: true }).first().click();

@@ -554,6 +554,43 @@ const useAtlasContainerDimensions = (measureKey: AtlasLayoutMode) => {
   return { containerRef, dimensions };
 };
 
+// How a session atlas's list can be ranked, from what each node already carries: its positions with how many
+// hold each, and how many answered. "Split" is how far the largest position is from holding everyone: 0 when
+// all share one position, higher the more evenly people divide. A node without two positions has no split.
+export type DebateListSort = 'atlas' | 'split' | 'answered';
+export const measureDebateNode = (
+  node: DebateNode,
+): { split: number | null; largest: number; held: number; answered: number } => {
+  const positions = (node.comments || []).filter((entry) => String(entry.label || '').trim());
+  const counts = positions.map((entry) => Math.max(0, Number(entry.participantCount) || 0));
+  const held = counts.reduce((sum, count) => sum + count, 0);
+  const largest = Math.max(0, ...counts);
+  // Everyone who answered under the node where the build says so; otherwise those the positions account for.
+  const stated = Math.max(0, ...positions.map((entry) => Number(entry.participantTotal) || 0));
+  const answered = stated > 0 ? Math.max(stated, largest) : held;
+  // Split is among those the positions account for, so a node where few were placed does not read as divided.
+  return { split: counts.length > 1 && held > 0 ? 1 - largest / held : null, largest, held, answered };
+};
+// The number a row was ranked by, in words, so the order is not a black box.
+export const describeDebateListRank = (node: DebateNode, sort: DebateListSort): string => {
+  const { split, largest, held, answered } = measureDebateNode(node);
+  if (sort === 'split') return split === null ? '' : `${largest} of ${held} in the largest position`;
+  if (sort === 'answered') return answered > 0 ? `${answered} answered` : '';
+  return '';
+};
+export const sortDebateList = <T extends DebateNode>(nodes: T[], sort: DebateListSort): T[] => {
+  if (sort === 'atlas') return nodes;
+  const score = (node: T) => {
+    const { split, answered } = measureDebateNode(node);
+    return sort === 'split' ? split : answered > 0 ? answered : null;
+  };
+  // Highest first; a node with nothing to rank by goes last; equals keep the atlas's own order.
+  return nodes
+    .map((node, index) => ({ node, index, score: score(node) }))
+    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || a.index - b.index)
+    .map(({ node }) => node);
+};
+
 // A session's atlas keeps its Tree and List as they were before its topics gained question circles: those two
 // views show topics and subtopics, and the circles are where the questions sit.
 const withoutQuestionCircles = (node: DebateNode): DebateNode => ({
@@ -1164,6 +1201,7 @@ const FlatNode = ({
   readOnly = false,
   onBookmark,
   bookmarkedNodes,
+  rankNote = '',
 }: FlatNodeProps) => {
   const netUpvotes = calculateNetUpvotes(node.votes);
   const nodeId = String(node.id || '').trim();
@@ -1190,6 +1228,7 @@ const FlatNode = ({
       </div>
 
       <div className={styles.metaInfo}>
+        {rankNote && <span className={styles.rankNote}>{rankNote}</span>}
         {!readOnly && (
           <span className={styles.upvotes}>
             <FontAwesomeIcon icon={faThumbsUp} /> {netUpvotes}
@@ -2342,6 +2381,8 @@ const DebateMap = ({
   );
   const [localVoteDeltas, setLocalVoteDeltas] = useState<LocalVoteDeltas>({});
   const [nodeTypeFilter, setNodeTypeFilter] = useState('all');
+  const [listSort, setListSort] = useState<DebateListSort>('atlas');
+  const listSortId = `ce-atlas-list-sort-${React.useId().replace(/:/g, '')}`;
   const [copied, setCopied] = useState(false);
 
   // Suggest Modal State
@@ -2557,7 +2598,7 @@ const DebateMap = ({
     // Only process sorting if in LIST mode
     if (visualMode !== DEBATE_VISUAL_MODES.LIST) return [];
 
-    return treeDataState
+    const filtered = treeDataState
       .flatMap((c) => flattenTree(c))
       .filter((n) => {
         // A session's question circles stay out of the list (see withoutQuestionCircles).
@@ -2568,7 +2609,8 @@ const DebateMap = ({
         return true;
       })
       .sort((a, b) => (orderByUpvotes && !readOnly ? calculateNetUpvotes(b.votes) - calculateNetUpvotes(a.votes) : 0));
-  }, [treeDataState, orderByUpvotes, flattenTree, nodeTypeFilter, readOnly, visualMode]);
+    return readOnly ? sortDebateList(filtered, listSort) : filtered;
+  }, [treeDataState, orderByUpvotes, flattenTree, nodeTypeFilter, readOnly, visualMode, listSort]);
 
   const updateTreeFit = useCallback(() => {
     if (visualMode !== DEBATE_VISUAL_MODES.TREE || !selectedCategory) {
@@ -2724,6 +2766,24 @@ const DebateMap = ({
                   <option value="category">{levelLabels[0]}</option>
                   <option value="subcategory">{levelLabels[1]}</option>
                 </select>
+                {/* A session's atlas can be ranked by what its nodes hold; the demo atlas has its own vote order. */}
+                {readOnly && (
+                  <span className={styles.filterPair}>
+                    <label className={styles.filterLabel} htmlFor={listSortId}>
+                      Sort by:
+                    </label>
+                    <select
+                      id={listSortId}
+                      value={listSort}
+                      onChange={(e) => setListSort(e.target.value as DebateListSort)}
+                      data-testid="ce-atlas-list-sort"
+                    >
+                      <option value="atlas">Atlas order</option>
+                      <option value="split">Most split</option>
+                      <option value="answered">Most answered</option>
+                    </select>
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -2755,6 +2815,7 @@ const DebateMap = ({
                   readOnly={readOnly}
                   onBookmark={handleBookmark}
                   bookmarkedNodes={bookmarkedNodes}
+                  rankNote={readOnly ? describeDebateListRank(node, listSort) : ''}
                 />
               ))}
             </div>
