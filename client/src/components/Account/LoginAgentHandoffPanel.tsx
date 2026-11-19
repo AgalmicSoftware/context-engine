@@ -301,6 +301,9 @@ const LoginAgentHandoffPanel = ({
               onChange={(event) => {
                 setAskFirst(event.target.checked);
                 setCopyStatus('');
+                // The prompt just changed, so an earlier "Copied" no longer describes it.
+                clearTimeout(copiedTimer.current);
+                setCopiedStep('');
               }}
               aria-describedby="ce-agent-handoff-ask-help-about"
             />
@@ -337,9 +340,9 @@ const LoginAgentHandoffPanel = ({
         </button>
         <Help id="ce-agent-handoff-key-about" placement="bottom">
           The key goes into the prompt you copy. With it, your agent reads this session&apos;s questions and submits
-          answers as you, where the session lets agents submit; otherwise it shows you drafts. It stops when your
-          sign-in ends (within 4 hours) or when you make a new one. It needs an agent that can send web requests, such
-          as Claude Code or Codex.
+          answers as you (once you say yes in the chat, while Ask me if I approve is ticked), where the session lets
+          agents submit; otherwise it shows you drafts. It stops when your sign-in ends (within 4 hours) or when you
+          make a new one. It needs an agent that can send web requests, such as Claude Code or Codex.
         </Help>
       </div>
     </>

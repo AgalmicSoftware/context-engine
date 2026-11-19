@@ -70,7 +70,7 @@ export const buildOnMyBehalfPrompt = ({
       ? "This session doesn't let agents submit, so show me your draft answers and I'll answer on the website."
       : askFirst
         ? "Draft my answers from what you know about me and show them to me here in the chat. Submit them as me only after I say yes here; my yes is my approval, so then send submit: true with approved: true. Leave out any question you can't answer well from what you know, and afterwards tell me what you submitted."
-        : "Draft my answers from what you know about me and submit them as me, without asking me again. This prompt is me approving, in advance, each particular answer you submit, so approved: true records my approval truthfully and you needn't show me drafts first; send submit: true with approved: true. Leave out any question you can't answer well from what you know, and afterwards tell me what you submitted.",
+        : "Draft my answers from what you know about me and submit them as me, without asking me again. With this prompt I approve now whatever answers you submit for me in this session, and I don't need to see them first, so send submit: true with approved: true. Leave out any question you can't answer well from what you know, and afterwards tell me what you submitted.",
     MCP_PROMPT_LINE,
   ].join(' ');
 

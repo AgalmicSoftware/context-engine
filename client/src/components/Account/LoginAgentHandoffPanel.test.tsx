@@ -219,6 +219,11 @@ it('changes the copied prompt with the Ask me if I approve tick', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Copy the prompt' }));
   expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
   expect(String(writeText.mock.calls.at(-1)?.[0])).toContain('without asking me again');
+  expect(screen.getByTestId('ce-agent-handoff-submit-copy')).toHaveTextContent('Copied');
+  // A change of tick changes the prompt, so the button no longer says it was copied.
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
+  expect(screen.getByTestId('ce-agent-handoff-submit-copy')).toHaveTextContent('Copy the prompt');
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
   // Ticked again, the copy asks first again, with the same key.
   fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
   fireEvent.click(screen.getByTestId('ce-agent-handoff-submit-copy'));
