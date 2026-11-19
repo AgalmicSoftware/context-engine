@@ -5,7 +5,11 @@ import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { analyzeUserCard, analyzeUserOpinions, fetchAnalysisCardPicture } from 'utilities/ai/aiClient.js';
-import { publishSavedAnalysisCard, readSavedAnalysisCard } from 'utilities/analysisCard/analysisCardSaved';
+import {
+  analysisCardAvailableFor,
+  publishSavedAnalysisCard,
+  readSavedAnalysisCard,
+} from 'utilities/analysisCard/analysisCardSaved';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
@@ -180,6 +184,7 @@ const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 
 describe('UserPage analysis cache and routing', () => {
   beforeEach(() => {
+    mockWorkerHasCard = true;
     analyzeUserOpinions
       .mockReset()
       .mockResolvedValue({ summary: 'summary', details: 'details', name: 'name', historicalAlignment: {} });
@@ -780,7 +785,6 @@ describe('UserPage analysis cache and routing', () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       cardCalls.forEach((mock) => expect(mock).not.toHaveBeenCalled());
     }
-    mockWorkerHasCard = true;
 
     // A new analysis in a session with the card off asks for no card either.
     const other = makeAnalysisCacheInstance({ viewAddress: '0x00000000000000000000000000000000000000f2' });
@@ -796,6 +800,27 @@ describe('UserPage analysis cache and routing', () => {
     expect(other.instance.state.analysisHistoricalFigure).toBe('Grace Hopper (1906–1992)');
     expect(other.instance.state.analysisCard).toBeNull();
     cardCalls.slice(1).forEach((mock) => expect(mock).not.toHaveBeenCalled());
+  });
+
+  it('shows a kept card only once its session and Worker are known to have the card', async () => {
+    const own = '0x00000000000000000000000000000000000000f3';
+    const { instance } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+    matchedAnalysis();
+    analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans'));
+
+    // Read back from the cache while the Worker is still being asked: the analysis shows, its card does not yet.
+    let answer;
+    analysisCardAvailableFor.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+    analyzeUserCard.mockClear();
+    await instance.analyzeUser();
+    expect(instance.state.aiAnalysis).toBe('summary');
+    expect(instance.state.analysisServedFromCache).toBe(true);
+    expect(instance.state.analysisCard).toBeNull();
+    answer(true);
+    await waitFor(() => expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans'));
+    expect(analyzeUserCard).not.toHaveBeenCalled();
   });
 
   it('on my own page never saves over a "no", nor when the saved card cannot be read', async () => {

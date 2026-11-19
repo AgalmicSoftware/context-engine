@@ -329,7 +329,9 @@ export const buildUserPageAnalysisResultStatePatch = ({
     analysisName: normalizedResult.name,
     analysisHistoricalFigure: normalizedResult.historicalAlignment.figure,
     analysisHistoricalReasoning: normalizedResult.historicalAlignment.reasoning,
-    analysisCard: normalizedResult.card,
+    // A card kept with the analysis is shown by the card step, once the session and its Worker are known to
+    // have the card: shown here, it would flash up where the card is off.
+    analysisCard: null,
     analysisCardPending: false,
     analysisCardPicture: null,
     analysisCardPublish: null,

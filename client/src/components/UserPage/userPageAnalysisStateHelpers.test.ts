@@ -156,16 +156,15 @@ describe('userPageAnalysisStateHelpers', () => {
       analysisServedFromCache: true,
       analysisCachedAt: 1710000000000,
     });
-    // A stored picture card comes back with the result; its picture is always asked for afresh.
+    // A card stored with the result is left for the card step, which shows it only where the card is on.
     const card = { title: 'Wants AI doing paperwork', figure: 'Elinor Ostrom (1933–2012)' };
     expect(buildUserPageAnalysisResultStatePatch({ result: { card } })).toMatchObject({
-      analysisCard: { title: 'Wants AI doing paperwork', figureName: 'Elinor Ostrom', years: '1933–2012' },
+      analysisCard: null,
       analysisCardPending: false,
       analysisCardPicture: null,
       analysisCardPublish: null,
       analysisCardSavedAt: null,
     });
-    expect(buildUserPageAnalysisResultStatePatch({ result: { card: { title: 'No figure' } } }).analysisCard).toBeNull();
     expect(buildUserPageAnalysisResetStatePatch()).toMatchObject({
       analysisCard: null,
       analysisCardPending: false,
