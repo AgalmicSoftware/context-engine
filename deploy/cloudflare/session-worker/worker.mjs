@@ -106974,7 +106974,7 @@ var FEATURES = Object.freeze([
   "worker_groups"
 ]);
 var WORKERS_AI_FEATURE = "workers_ai_v1";
-var workerRelease = () => "0.9.17" ? "0.9.17" : null;
+var workerRelease = () => "0.9.18" ? "0.9.18" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const body = {
     type: "ce_worker_capabilities",

@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.18] - 2026-11-19
+
 ## [0.9.17] - 2026-11-18
 
 Session Workers need redeploying for the Worker changes below. A redeploy changes no stored data and signs no one out; with names on, people can set a name others in the session see.
