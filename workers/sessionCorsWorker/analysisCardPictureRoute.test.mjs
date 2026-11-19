@@ -77,9 +77,12 @@ const createUpstream = ({ look = LOOK, pictures = [DRAWN], lookStatus = 200 } = 
 
 const lookPromptOf = (call) => (call.body.input || call.body.messages)[0].content;
 
+// The card is off unless a session has it on; a test says `analysisCardEnabled` itself to try it off or unsaved.
+const withCardOn = (config) => (Object.hasOwn(config, 'analysisCardEnabled') || config.unsaved ? config : { ...config, analysisCardEnabled: true });
+
 const run = async ({
   figure = FIGURE,
-  // A session that never saved the switch has the card on.
+  // A session with the card on, as one made on /new is. Anything a test adds is added to this.
   config = {},
   kv = createKv(),
   env = { GROUP_KV: kv },
@@ -91,7 +94,7 @@ const run = async ({
   const counted = [];
   const response = await dispatchAnalysisCardPictureRoute({
     body: { figure },
-    config,
+    config: withCardOn(config),
     slug: 'salon',
     address: '0xabc',
     env,
@@ -443,7 +446,7 @@ test('the signed-in dispatcher answers the path itself, whatever action the body
     path: ANALYSIS_CARD_PICTURE_PATH,
     action: 'ai',
     body: { action: 'ai', figure: 'not a figure', prompt: 'ping' },
-    config: {},
+    config: { analysisCardEnabled: true },
     slug: 'salon',
     address: '0xabc',
     env: {},
@@ -462,15 +465,16 @@ test('the signed-in dispatcher answers the path itself, whatever action the body
   assert.deepEqual(await result.response.json(), { error: 'invalid_figure' });
 });
 
-test('the picture is on unless an admin turns it off: off, nothing is counted, read, stored or asked', async () => {
+test('the picture is off unless the session has the card on: off, nothing is counted, read, stored or asked', async () => {
   const drawn = await run({ config: { analysisCardEnabled: true } });
   assert.equal(drawn.response.status, 200);
   const { kv } = drawn;
   const rows = [...kv.rows.entries()];
   kv.gets.length = 0;
   kv.puts.length = 0;
-  // A picture already drawn is not given either.
-  for (const config of [{ analysisCardEnabled: false }]) {
+  // A picture already drawn is not given either. Off is a saved `false` or, as in every session from before the
+  // card, a switch that was never saved.
+  for (const config of [{ analysisCardEnabled: false }, { unsaved: true }, { unsaved: true, sessionName: 'Older' }]) {
     const off = await run({ config, kv });
     assert.equal(off.response.status, 403);
     assert.deepEqual(off.body, { error: 'analysis_card_off' });

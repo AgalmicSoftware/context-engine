@@ -443,7 +443,7 @@ const SessionSettingsPage = ({
       next.contextCardsEnabled = template.contextCardsEnabled === true;
     }
     if (workerHasAnalysisCard && !onChain && named.includes('analysisCardEnabled')) {
-      next.analysisCardEnabled = template.analysisCardEnabled !== false;
+      next.analysisCardEnabled = template.analysisCardEnabled === true;
     }
     setDraft(next);
     setStatus(

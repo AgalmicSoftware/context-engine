@@ -123,29 +123,63 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
     expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)).config.agentInstructions).toBe(expected);
   });
 
-  it.each([
-    // A switch left at its default says nothing: a session that turned cards on in Settings keeps them on.
-    ['keeps Context cards on where a Worker config has them on', { contextCardsEnabled: true }, true],
-    ['keeps Context cards off where a Worker config says so', { contextCardsEnabled: false }, false],
-    ['leaves Context cards out for a Worker config without them', {}, undefined],
-  ])('%s when the config leaves them out', async (_label, stored, expected) => {
-    const fetchImpl = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({
+  // The sync /new makes after a deploy, onto what the Worker holds for the session.
+  const synced = async (page: Record<string, unknown>, stored: Record<string, unknown>, features?: string[]) => {
+    const fetchImpl = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => ({
       ok: true,
-      json: async () => (init?.method === 'POST' ? { ok: true } : { config: { slug: 'lit-session', ...stored } }),
+      status: 200,
+      json: async () => {
+        if (String(url).includes('/capabilities')) return { features };
+        return init?.method === 'POST' ? { ok: true } : { config: { slug: 'card-session', ...stored } };
+      },
     }));
     const ensureSessionConfig = createSessionWizardEnsureWorkerSessionConfig({
       getWorkerConfig: () => ({
-        slug: 'lit-session',
+        slug: 'card-session',
         sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        ...page,
       }),
       getAdminAddress: () => '0xadmin',
       signTypedAdminAction: async () => ({ address: '0xadmin', signature: '0xsig' }),
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
+    await ensureSessionConfig({ workerUrl: 'https://worker.example.test', slug: 'card-session' });
+    const [, init] = fetchImpl.mock.calls.find(([, sent]) => sent?.method === 'POST') || [];
+    const { contextCardsEnabled, analysisCardEnabled } = JSON.parse(String(init?.body)).config;
+    return { contextCardsEnabled, analysisCardEnabled };
+  };
+  const PUBLISHED = { workerCanonicalPublicationRevision: 'config:published' };
+  const HAS_BOTH = ['context_cards_v1', 'analysis_card_v1'];
 
-    await ensureSessionConfig({ workerUrl: 'https://worker.example.test', slug: 'lit-session' });
+  it('never changes a published session’s card switches, though the /new draft says otherwise', async () => {
+    // As the real session: the analysis card never turned on, and /new's box ticked as it always starts.
+    expect(await synced({ analysisCardEnabled: true }, { ...PUBLISHED }, HAS_BOTH)).toEqual({});
+    expect(await synced({ analysisCardEnabled: true }, { ...PUBLISHED, analysisCardEnabled: false }, HAS_BOTH)).toEqual(
+      {
+        analysisCardEnabled: false,
+      },
+    );
+    // And Context cards an admin turned on in Settings stay on though the draft's box is unticked.
+    expect(await synced({}, { ...PUBLISHED, contextCardsEnabled: true, analysisCardEnabled: true }, HAS_BOTH)).toEqual({
+      contextCardsEnabled: true,
+      analysisCardEnabled: true,
+    });
+    expect(await synced({ contextCardsEnabled: true }, { ...PUBLISHED }, HAS_BOTH)).toEqual({});
+  });
 
-    expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)).config.contextCardsEnabled).toBe(expected);
+  it('makes a session as the page says while it is still being made', async () => {
+    // The first sync after a deploy: the analysis card on, as its box starts; Context cards as ticked.
+    expect(await synced({ analysisCardEnabled: true }, {}, HAS_BOTH)).toEqual({ analysisCardEnabled: true });
+    expect(await synced({ analysisCardEnabled: true, contextCardsEnabled: true }, {}, HAS_BOTH)).toEqual({
+      contextCardsEnabled: true,
+      analysisCardEnabled: true,
+    });
+    // A box unticked since an earlier attempt is turned off.
+    expect(await synced({}, { contextCardsEnabled: true, analysisCardEnabled: true }, HAS_BOTH)).toEqual({
+      contextCardsEnabled: false,
+      analysisCardEnabled: false,
+    });
+    expect(await synced({}, {}, HAS_BOTH)).toEqual({});
   });
 
   it('sends Context cards on only to a Worker that says it keeps them', async () => {
@@ -223,32 +257,7 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
     });
   });
 
-  it.each([
-    // A session that turned the card off in Settings keeps it off: a /new sync never turns it back on.
-    ['keeps the analysis card off where a Worker config has it off', { analysisCardEnabled: false }, false],
-    ['keeps the analysis card on where a Worker config says so', { analysisCardEnabled: true }, true],
-    ['leaves the analysis card out for a Worker config without it', {}, undefined],
-  ])('%s when the config leaves it out', async (_label, stored, expected) => {
-    const fetchImpl = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({
-      ok: true,
-      json: async () => (init?.method === 'POST' ? { ok: true } : { config: { slug: 'card-session', ...stored } }),
-    }));
-    const ensureSessionConfig = createSessionWizardEnsureWorkerSessionConfig({
-      getWorkerConfig: () => ({
-        slug: 'card-session',
-        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-      }),
-      getAdminAddress: () => '0xadmin',
-      signTypedAdminAction: async () => ({ address: '0xadmin', signature: '0xsig' }),
-      fetchImpl: fetchImpl as unknown as typeof fetch,
-    });
-
-    await ensureSessionConfig({ workerUrl: 'https://worker.example.test', slug: 'card-session' });
-
-    expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)).config.analysisCardEnabled).toBe(expected);
-  });
-
-  it('sends the analysis card off only to a Worker that has the card', async () => {
+  it('sends the analysis card on only to a Worker that has it, and makes the session without it otherwise', async () => {
     const save = async (capabilities: () => unknown) => {
       const fetchImpl = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
         if (String(url).includes('/capabilities')) return capabilities();
@@ -257,7 +266,7 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
       const ensureSessionConfig = createSessionWizardEnsureWorkerSessionConfig({
         getWorkerConfig: () => ({
           slug: 'card-session',
-          analysisCardEnabled: false,
+          analysisCardEnabled: true,
           sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
         }),
         getAdminAddress: () => '0xadmin',
@@ -272,23 +281,31 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
         (error: Error) => error.message,
       );
       const posts = fetchImpl.mock.calls.filter(([, init]) => init?.method === 'POST');
-      return { outcome, sent: posts.map(([, init]) => JSON.parse(String(init?.body)).config.analysisCardEnabled) };
+      return {
+        outcome,
+        sent: posts.map(([, init]) => JSON.parse(String(init?.body)).config.analysisCardEnabled ?? 'left out'),
+      };
     };
     const answers = (features: string[]) => () => ({ ok: true, status: 200, json: async () => ({ features }) });
 
-    expect(await save(answers(['worker_groups', 'analysis_card_v1']))).toEqual({ outcome: 'saved', sent: [false] });
-    // An older Worker, and one from before capabilities, have no card and are never sent the setting.
-    const tooOld = expect.stringContaining('too old to have the Analysis card');
-    expect(await save(answers(['worker_groups']))).toEqual({ outcome: tooOld, sent: [] });
+    expect(await save(answers(['worker_groups', 'analysis_card_v1']))).toEqual({ outcome: 'saved', sent: [true] });
+    // The box starts ticked, so an older Worker, or one from before capabilities, must not stop Create: the
+    // session is made without the card, and the setting it would refuse is never sent.
+    expect(await save(answers(['worker_groups']))).toEqual({ outcome: 'saved', sent: ['left out'] });
     expect(await save(() => ({ ok: false, status: 404, json: async () => ({}) }))).toEqual({
-      outcome: tooOld,
-      sent: [],
+      outcome: 'saved',
+      sent: ['left out'],
     });
-    // Nor is a Worker that could not be asked.
+    // A Worker that could not be asked is sent nothing.
     const unchecked = expect.stringContaining('be checked for the Analysis card');
     expect(await save(() => ({ ok: false, status: 503, json: async () => ({}) }))).toEqual({
       outcome: unchecked,
       sent: [],
     });
+    expect(
+      await save(() => {
+        throw new Error('offline');
+      }),
+    ).toEqual({ outcome: unchecked, sent: [] });
   });
 });

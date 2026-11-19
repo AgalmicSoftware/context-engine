@@ -44,7 +44,7 @@ jest.mock('utilities/analysisCard/analysisCardSaved', () => ({
     async (opts) =>
       mockWorkerHasCard &&
       jest.requireActual('utilities/ai/aiClientRequestOptions').resolveAiSessionOptions(opts).sessionConfig
-        ?.analysisCardEnabled !== false,
+        ?.analysisCardEnabled === true,
   ),
   readSavedAnalysisCard: jest.fn(),
   publishSavedAnalysisCard: jest.fn(),
@@ -819,12 +819,11 @@ describe('UserPage analysis cache and routing', () => {
     const on = instance._getSessionConfigForSlugExact(slug);
     expect(on.analysisCardEnabled).toBe(true);
     const { analysisCardEnabled: _unused, ...absent } = on;
-    let config = absent;
+    let config = on;
     jest
       .spyOn(instance, '_getSessionConfigForSlugExact')
       .mockImplementation((candidate) => (candidate === slug ? config : null));
-    // A session that never saved the switch, as every session from before it, has the card on: a card is made,
-    // saved and kept with the analysis.
+    // With the card on, as in a session made on /new: a card is made, saved and kept with the analysis.
     matchedAnalysis();
     readSavedAnalysisCard.mockResolvedValueOnce({ status: 'none' });
     analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
@@ -832,8 +831,8 @@ describe('UserPage analysis cache and routing', () => {
     await waitFor(() => expect(publishSavedAnalysisCard).toHaveBeenCalledTimes(1));
     expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans');
 
-    // Turned off by an admin, or a Worker from before the card (setting or not): the kept analysis shows without
-    // its card.
+    // Turned off by an admin, never turned on (as in every session from before the card), or a Worker from
+    // before the card whatever the setting: the kept analysis shows without its card.
     const cardCalls = [
       analyzeUserOpinions,
       analyzeUserCard,
@@ -843,7 +842,8 @@ describe('UserPage analysis cache and routing', () => {
     ];
     for (const [off, workerHasCard] of [
       [{ ...on, analysisCardEnabled: false }, true],
-      [absent, false],
+      [absent, true],
+      [on, false],
     ]) {
       config = off;
       mockWorkerHasCard = workerHasCard;

@@ -226,25 +226,25 @@ it('a card the page builds is a card the Worker keeps, and reads back the same',
   expect(normalizeAnalysisCard({ ...saved, ...place })).toEqual(built);
 });
 
-it('is on unless the session turned it off, and only where its Worker has the card', async () => {
+it('is off unless the session has it on, and on only where its Worker has the card', async () => {
   const available = (sessionConfig: unknown) => analysisCardAvailableFor({ sessionSlug: 's', sessionConfig });
   const has = (features: string[]) => mockedCapabilities.mockResolvedValue({ legacy: false, features });
   has(['analysis_card_v1']);
-  // A session that never saved the setting, as every session from before it, has the card on.
-  for (const sessionConfig of [{}, { analysisCardEnabled: true }, null, undefined]) {
-    await expect(available(sessionConfig)).resolves.toBe(true);
-  }
+  const ON = { analysisCardEnabled: true };
+  await expect(available(ON)).resolves.toBe(true);
   expect(mockedCapabilities).toHaveBeenLastCalledWith('https://worker.example', 's');
-  // Turned off, the Worker is not even asked.
+  // Off, or never saved as in every session from before the card: the Worker is not even asked.
   mockedCapabilities.mockClear();
-  await expect(available({ analysisCardEnabled: false })).resolves.toBe(false);
+  for (const sessionConfig of [{ analysisCardEnabled: false }, {}, null, undefined]) {
+    await expect(available(sessionConfig)).resolves.toBe(false);
+  }
   expect(mockedCapabilities).not.toHaveBeenCalled();
   // A Worker from before the card, one that can't be asked, or none found: nothing of the card shows.
   has(['worker_groups']);
-  await expect(available({})).resolves.toBe(false);
+  await expect(available(ON)).resolves.toBe(false);
   mockedCapabilities.mockResolvedValue({ legacy: false, features: [], unavailable: true });
-  await expect(available({})).resolves.toBe(false);
+  await expect(available(ON)).resolves.toBe(false);
   has(['analysis_card_v1']);
   mockedProxy.mockRejectedValueOnce(new Error('no worker'));
-  await expect(available({})).resolves.toBe(false);
+  await expect(available(ON)).resolves.toBe(false);
 });

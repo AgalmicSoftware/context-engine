@@ -94,11 +94,13 @@ export const normalizeSavedAnalysisCard = (value) => {
 export const ANALYSIS_CARD_FEATURE = 'analysis_card_v1';
 
 /**
- * The analysis card is on unless an admin turns it off for the session (`analysisCardEnabled: false`); a session
- * that never saved the setting has it on. Off, the Worker refuses the card's picture and saved card before
- * counting, reading or storing anything, and the page neither makes nor shows a card.
+ * The analysis card is off unless the session has it on (`analysisCardEnabled: true`). A session made on /new
+ * starts with it on, because the box there starts ticked; one that never saved the setting, as every session
+ * from before the card, has it off until an admin turns it on in Settings. Off, the Worker refuses the card's
+ * picture and saved card before counting, reading or storing anything, and the page neither makes nor shows a
+ * card. This is the one place that reads the switch.
  */
-export const analysisCardOn = (config) => config?.analysisCardEnabled !== false;
+export const analysisCardOn = (config) => config?.analysisCardEnabled === true;
 
 /**
  * Whether the session keeps each person's answers to that person and its admins (results shown as totals only,

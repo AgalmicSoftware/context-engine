@@ -330,46 +330,80 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
 // set-config replaces limits whole and /new has no AI daily limit, so the one
 // stored (set in Settings) is kept the same way.
 const CLEARED_WHEN_LEFT_OUT = { agentInstructions: '', sessionAgent: null } as const;
-// The two card switches are a session's own choice, made in Settings as well as
-// on /new, and each is left out of a config at its default. Left out, a switch
-// is not a choice of this page: the one the Worker holds is sent back as it is,
-// so it stays and the readback agrees. Otherwise a /new sync onto a session
-// that exists would turn its analysis card back on, or its Context cards off.
-const KEPT_WHEN_LEFT_OUT = ['contextCardsEnabled', 'analysisCardEnabled'] as const;
+// The two card switches. Each is off unless true, and a config leaves it out
+// when off.
+// - A session still being made takes what the page says. A switch the page
+//   leaves out is turned off where an earlier attempt stored it, so Create
+//   makes the session match the page.
+// - A published session keeps its own. Its switches are changed in Settings:
+//   a /new sync onto it sends back what it holds, and nothing for a switch it
+//   never saved, whatever this page's draft says. Otherwise pointing /new at a
+//   session that exists would turn its analysis card on (the box on /new
+//   starts ticked) or its Context cards off.
+const CARD_SWITCHES = ['contextCardsEnabled', 'analysisCardEnabled'] as const;
 
-// A session made with Context cards on is sent only to a Worker that says it
-// keeps them: an older one would refuse the whole save, naming only the field.
-const assertWorkerKeepsContextCards = async (
+// What the Worker says it has; null when it cannot be asked. Asked afresh each
+// time, so a Worker just updated is not judged by an earlier answer. A Worker
+// from before capabilities answers 404: it has neither kind of card.
+const readWorkerFeatures = async (
   workerOrigin: string,
   slug: string,
   fetchImpl: SessionWizardWorkerConfigFetchPort,
-): Promise<void> => {
-  let features: unknown;
+): Promise<unknown[] | null> => {
   try {
     const response = await fetchImpl(`${workerOrigin}/capabilities?slug=${encodeURIComponent(slug)}`, {
       method: 'GET',
       credentials: 'omit',
       redirect: 'error',
-      // Asked afresh each time, so a Worker just updated is not judged by an earlier answer.
       cache: 'no-store',
       headers: { Accept: 'application/json' },
     });
-    // A Worker from before capabilities answers 404: it keeps no cards.
-    features = response.ok ? (await readResponseJson(response)).features : response.status === 404 ? [] : undefined;
+    const features = response.ok ? (await readResponseJson(response)).features : response.status === 404 ? [] : null;
+    return Array.isArray(features) ? features : null;
   } catch {
-    features = undefined;
-  }
-  if (!Array.isArray(features)) {
-    throw new Error(
-      "The Session Worker couldn't be checked for Context cards, so the settings weren't saved. Try again.",
-    );
-  }
-  if (!features.includes('context_cards_v1')) {
-    throw new Error(
-      'This Session Worker is too old to keep Context cards. Untick Context cards under Context, or update the Worker, then try again.',
-    );
+    return null;
   }
 };
+
+// A switch this page turns on is sent only to a Worker that says it has the
+// feature: an older one would refuse the whole save, naming only the field.
+// Context cards are a choice the admin made on the page, so a Worker too old
+// for them stops the save and says so. The analysis card is on because its box
+// starts ticked: on a Worker without it there is simply no card, so the switch
+// is left out and the session is made.
+const withSwitchesTheWorkerHas = async <T extends UnknownRecord>(
+  config: T,
+  fromPage: ReadonlyArray<(typeof CARD_SWITCHES)[number]>,
+  workerOrigin: string,
+  slug: string,
+  fetchImpl: SessionWizardWorkerConfigFetchPort,
+): Promise<T> => {
+  const asked = fromPage.filter((field) => config[field] === true);
+  if (!asked.length) return config;
+  const features = await readWorkerFeatures(workerOrigin, slug, fetchImpl);
+  if (asked.includes('contextCardsEnabled')) {
+    if (!features) {
+      throw new Error(
+        "The Session Worker couldn't be checked for Context cards, so the settings weren't saved. Try again.",
+      );
+    }
+    if (!features.includes('context_cards_v1')) {
+      throw new Error(
+        'This Session Worker is too old to keep Context cards. Untick Context cards under Context, or update the Worker, then try again.',
+      );
+    }
+  }
+  if (!asked.includes('analysisCardEnabled')) return config;
+  if (!features) {
+    throw new Error(
+      "The Session Worker couldn't be checked for the Analysis card, so the settings weren't saved. Try again.",
+    );
+  }
+  if (features.includes(ANALYSIS_CARD_FEATURE)) return config;
+  const { analysisCardEnabled: _none, ...rest } = config;
+  return rest as T;
+};
+
 export const withStoredConfigKept = async <T extends UnknownRecord>({
   config,
   workerOrigin,
@@ -382,21 +416,16 @@ export const withStoredConfigKept = async <T extends UnknownRecord>({
   fetchImpl: SessionWizardWorkerConfigFetchPort;
 }): Promise<T> => {
   const profile = config.sessionModeProfile as { authority?: { mode?: unknown } } | undefined;
-  if (config.contextCardsEnabled === true && profile?.authority?.mode === 'worker_canonical') {
-    await assertWorkerKeepsContextCards(workerOrigin, slug, fetchImpl);
-  }
-  const leftOut = Object.keys(CLEARED_WHEN_LEFT_OUT).filter(
-    (field) => !Object.prototype.hasOwnProperty.call(config, field),
-  ) as Array<keyof typeof CLEARED_WHEN_LEFT_OUT>;
-  if (config.analysisCardEnabled === false && profile?.authority?.mode === 'worker_canonical') {
-    await assertWorkerHasAnalysisCard(workerOrigin, slug, fetchImpl);
-  }
-  const keptOut = KEPT_WHEN_LEFT_OUT.filter((field) => !Object.prototype.hasOwnProperty.call(config, field));
+  if (profile?.authority?.mode !== 'worker_canonical') return config;
+  const has = (field: string): boolean => Object.prototype.hasOwnProperty.call(config, field);
+  const leftOut = Object.keys(CLEARED_WHEN_LEFT_OUT).filter((field) => !has(field)) as Array<
+    keyof typeof CLEARED_WHEN_LEFT_OUT
+  >;
+  // A switch stated as off needs no look at what is stored: off is sent as it is.
+  const switches = CARD_SWITCHES.filter((field) => !has(field) || config[field] === true);
   const limits = config.limits && typeof config.limits === 'object' ? (config.limits as UnknownRecord) : null;
   const keepsAiLimit = !!limits && !Object.prototype.hasOwnProperty.call(limits, 'aiPerWalletPerDay');
-  if ((!leftOut.length && !keptOut.length && !keepsAiLimit) || profile?.authority?.mode !== 'worker_canonical') {
-    return config;
-  }
+  if (!leftOut.length && !switches.length && !keepsAiLimit) return config;
   let response: Response;
   try {
     response = await fetchImpl(`${workerOrigin}/session-config`, {
@@ -408,7 +437,8 @@ export const withStoredConfigKept = async <T extends UnknownRecord>({
   } catch {
     throw new Error("The Session Worker couldn't be reached, so the settings weren't saved. Try again.");
   }
-  if (response.status === 404) return config;
+  // No session there yet: it is made as the page says.
+  if (response.status === 404) return withSwitchesTheWorkerHas(config, switches, workerOrigin, slug, fetchImpl);
   if (!response.ok) {
     throw new Error(
       `The Session Worker's settings couldn't be read (${response.status}), so the settings weren't saved. Try again.`,
@@ -416,51 +446,27 @@ export const withStoredConfigKept = async <T extends UnknownRecord>({
   }
   const stored = getPublicConfigFromResponse(await readResponseJson(response));
   const storedAiLimit = (stored.limits as UnknownRecord | undefined)?.aiPerWalletPerDay;
-  const withAiLimit =
+  const next: UnknownRecord =
     keepsAiLimit && storedAiLimit != null
       ? { ...config, limits: { ...limits, aiPerWalletPerDay: storedAiLimit } }
-      : config;
-  const withSwitches = keptOut
-    .filter((field) => typeof stored[field] === 'boolean')
-    .reduce<T>((kept, field) => ({ ...kept, [field]: stored[field] }), withAiLimit);
-  return leftOut
+      : { ...config };
+  const published = !!toTrimmedString(stored[WORKER_CANONICAL_PUBLICATION_REVISION_KEY]);
+  switches.forEach((field) => {
+    const kept = typeof stored[field] === 'boolean' ? stored[field] : undefined;
+    if (published) {
+      if (kept === undefined) delete next[field];
+      else next[field] = kept;
+    } else if (!has(field) && kept !== undefined) {
+      next[field] = false;
+    }
+  });
+  leftOut
     .filter((field) => Object.prototype.hasOwnProperty.call(stored, field))
-    .reduce<T>((cleared, field) => ({ ...cleared, [field]: CLEARED_WHEN_LEFT_OUT[field] }), withSwitches);
-};
-
-// A session made with the analysis card off is sent only to a Worker that has
-// the card: an older one has none, and would refuse the whole save, naming only
-// the field.
-const assertWorkerHasAnalysisCard = async (
-  workerOrigin: string,
-  slug: string,
-  fetchImpl: SessionWizardWorkerConfigFetchPort,
-): Promise<void> => {
-  let features: unknown;
-  try {
-    const response = await fetchImpl(`${workerOrigin}/capabilities?slug=${encodeURIComponent(slug)}`, {
-      method: 'GET',
-      credentials: 'omit',
-      redirect: 'error',
-      // Asked afresh each time, so a Worker just updated is not judged by an earlier answer.
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
+    .forEach((field) => {
+      next[field] = CLEARED_WHEN_LEFT_OUT[field];
     });
-    // A Worker from before capabilities answers 404: it has no card.
-    features = response.ok ? (await readResponseJson(response)).features : response.status === 404 ? [] : undefined;
-  } catch {
-    features = undefined;
-  }
-  if (!Array.isArray(features)) {
-    throw new Error(
-      "The Session Worker couldn't be checked for the Analysis card, so the settings weren't saved. Try again.",
-    );
-  }
-  if (!features.includes(ANALYSIS_CARD_FEATURE)) {
-    throw new Error(
-      'This Session Worker is too old to have the Analysis card, so there is nothing to turn off. Tick Analysis card under AI again, or update the Worker, then try again.',
-    );
-  }
+  // What a published session holds it was already able to take.
+  return withSwitchesTheWorkerHas(next as T, published ? [] : switches, workerOrigin, slug, fetchImpl);
 };
 
 const assertReachableWorkerCanonicalProfile = (profile: unknown, context: string): SessionModeProfile => {

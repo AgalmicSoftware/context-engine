@@ -306,7 +306,8 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
   // The card is left out where an admin turned it off, in the session the AI answers from or the page's own, and
   // where that session's Worker is from before the card.
   const showAnalysisCard = (result: ProfileRecord, aiOptions: ProfileRecord, cardCache: CacheContext): void => {
-    if (!analysisCardOn(this._getSessionConfigForSlugExact(pageSlug))) return leaveCardOut();
+    // A page with no session of its own has no switch of its own: the session the AI answers from decides.
+    if (pageSlug && !analysisCardOn(this._getSessionConfigForSlugExact(pageSlug))) return leaveCardOut();
     void analysisCardAvailableFor(aiOptions).then((available) => {
       if (!isCurrent()) return;
       if (available) makeAnalysisCard(result, aiOptions, cardCache);

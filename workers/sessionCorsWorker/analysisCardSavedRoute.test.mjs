@@ -14,7 +14,7 @@ import { json } from './responseKvHelpers.js';
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import { FEATURES } from './workerCapabilities.js';
 import { projectPublicWorkerSessionConfig, selectDeployWorkerSessionConfigFields } from '../shared/workerSessionConfig.mjs';
-import { analysisCardAnswersArePrivate } from '../../shared/analysisCardSaved.mjs';
+import { analysisCardAnswersArePrivate, analysisCardOn } from '../../shared/analysisCardSaved.mjs';
 import { classifySessionConfigEdits } from '../../shared/sessionConfigEdits.mjs';
 
 const OWNER = `0x${'a1'.repeat(20)}`;
@@ -33,12 +33,12 @@ const CARD = {
   },
 };
 
-// A session that never saved the switch has the card on, as every session from before the switch does. Its
-// answers are public, as a new session's are, so every signed-in visitor may read a saved card.
+// A session with the card on, as one made on /new is. Its answers are public, as a new session's are, so every
+// signed-in visitor may read a saved card.
 const PUBLIC_SESSION = JSON.parse(
   readFileSync(new URL('../../tests/fixtures/worker-compat/previous-minor.json', import.meta.url), 'utf8'),
 ).config;
-const ON = { ...PUBLIC_SESSION, adminAddress: ADMIN };
+const ON = { ...PUBLIC_SESSION, adminAddress: ADMIN, analysisCardEnabled: true };
 // The same session with its results shown another way.
 const showing = (visibility) => ({
   ...ON,
@@ -323,14 +323,15 @@ test('a card goes only where its owner\'s answers go: not saved where answers ar
   assert.deepEqual(broken.body, { published: null });
 });
 
-test('the card is on unless an admin turns it off: off, nothing is counted, read or stored', async () => {
+test('the card is off unless the session has it on: off, nothing is counted, read or stored', async () => {
   const kv = createKv();
   await run({ kv, config: { ...ON, analysisCardEnabled: true } });
   const before = [...kv.rows.entries()];
   assert.equal(before.length, 1);
   kv.gets.length = 0;
   kv.puts.length = 0;
-  for (const config of [{ analysisCardEnabled: false }]) {
+  // Off is a saved `false` or, as in every session from before the card, a switch that was never saved.
+  for (const config of [{ analysisCardEnabled: false }, {}, { ...PUBLIC_SESSION, adminAddress: ADMIN }]) {
     for (const [path, body] of [
       [ANALYSIS_CARD_PUBLISH_PATH, { published: true, card: CARD }],
       [ANALYSIS_CARD_PUBLISH_PATH, { published: false }],
@@ -346,6 +347,8 @@ test('the card is on unless an admin turns it off: off, nothing is counted, read
   // A card saved while it was on is left in storage, and is there again once the card is back on.
   assert.deepEqual([...kv.rows.entries()], before);
   assert.deepEqual((await read(kv)).body, { published: true, card: CARD, savedAt: NOW });
+  assert.equal(analysisCardOn({ analysisCardEnabled: true }), true);
+  assert.deepEqual([{}, null, undefined, { analysisCardEnabled: false }, { analysisCardEnabled: 'true' }].map(analysisCardOn), [false, false, false, false, false]);
 
   const viaDispatcher = await dispatchAuthenticatedSecretActionRoute({
     path: ANALYSIS_CARD_PUBLISHED_PATH,
@@ -374,8 +377,8 @@ test('analysisCardEnabled is true or false, set when made or later, signs no one
   const save = (analysisCardEnabled, existingConfig = base) =>
     applySessionConfigMutation({ existingConfig, slug: 's', mutation: { kind: 'set-config', incomingConfig: { ...base, analysisCardEnabled } } });
   assert.deepEqual([save(true).ok, save(false).ok], [true, true]);
-  // A session's first save, as /new makes it.
-  assert.equal(save(false, null).config.analysisCardEnabled, false);
+  // A session's first save, as /new makes it: the box there starts ticked.
+  assert.equal(save(true, null).config.analysisCardEnabled, true);
   assert.deepEqual([save('yes').ok, save('yes').error], [false, 'analysisCardEnabled must be true or false.']);
   assert.deepEqual(classifySessionConfigEdits(base, { ...base, analysisCardEnabled: true }), { content: ['analysisCardEnabled'], authority: [], signsParticipantsOut: false });
   assert.equal(projectPublicWorkerSessionConfig({ ...base, analysisCardEnabled: true }).analysisCardEnabled, true);

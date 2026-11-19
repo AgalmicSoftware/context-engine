@@ -24,7 +24,7 @@ import { rateLimitRefusal } from './rateLimitRefusal.js';
 // style of their own time. The page sends only the figure's name. One request to the session's OpenAI key
 // art-directs the picture (the "look"), a second draws it from that look alone, and the result is kept per figure
 // so each figure is drawn once per session. Neither request sees an answer, a participant's name or an address.
-// It answers nothing where an admin has turned the card off (`analysisCardEnabled: false`).
+// It answers only where the session has the card on (`analysisCardEnabled: true`; a session that never saved it has none).
 export const ANALYSIS_CARD_PICTURE_PATH = '/analysis-card/picture';
 
 // New pictures a session may draw in a day, whoever asks, as Wrapped bounds its posters.

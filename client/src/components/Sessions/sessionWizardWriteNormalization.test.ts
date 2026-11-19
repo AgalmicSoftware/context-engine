@@ -1275,7 +1275,7 @@ describe('sessionWizardWriteNormalization', () => {
   });
 });
 
-test('buildSessionWizardWorkerConfigPayload sends the analysis card only when the draft turns it off', () => {
+test('buildSessionWizardWorkerConfigPayload sends the analysis card on unless the draft unticks it', () => {
   const build = (analysisCardEnabled: unknown) =>
     buildSessionWizardWorkerConfigPayload({
       slug: 'analysis-card',
@@ -1286,11 +1286,22 @@ test('buildSessionWizardWorkerConfigPayload sends the analysis card only when th
       workerUrl: 'https://worker.example',
     });
 
-  expect(build(false)).toHaveProperty('analysisCardEnabled', false);
-  // On is left out: a Worker without the setting takes the session, and a session without it has the card on.
-  expect(build(true)).not.toHaveProperty('analysisCardEnabled');
-  expect(build(undefined)).not.toHaveProperty('analysisCardEnabled');
-  expect(build('false')).not.toHaveProperty('analysisCardEnabled');
+  // The box on /new starts ticked, so a new session has the card: a draft that says nothing means on.
+  expect(build(true)).toHaveProperty('analysisCardEnabled', true);
+  expect(build(undefined)).toHaveProperty('analysisCardEnabled', true);
+  // Off is the resting state and is left out, as a Worker without the setting would refuse it.
+  expect(build(false)).not.toHaveProperty('analysisCardEnabled');
+  // The card is a Session Worker's: an on-chain session's Worker config never carries the switch.
+  expect(
+    buildSessionWizardWorkerConfigPayload({
+      slug: 'analysis-card',
+      draft: {
+        analysisCardEnabled: true,
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      },
+      workerUrl: 'https://worker.example',
+    }),
+  ).not.toHaveProperty('analysisCardEnabled');
 });
 
 it('rejects a blank owner opening before either publication write', () => {

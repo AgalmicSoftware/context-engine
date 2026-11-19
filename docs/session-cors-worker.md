@@ -3214,12 +3214,15 @@ Signed login/bootstrap requests:
   - Route scope disables fail before the request-`apiKey` bypass.
   - Provider inference:
     omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI. When both provider and model are omitted on a session-funded request, the Worker selects the saved fast model (or thinking model when `modelType: thinking`), including its provider.
-- The personal analysis card's routes below answer in every session unless an
-  admin has turned the card off (`analysisCardEnabled: false`; absent or true
-  means on; Workers that have the routes advertise `analysis_card_v1`, and the
-  site makes and shows no card on a Worker that does not). Off, each answers
-  403 `analysis_card_off` before it counts, reads or stores anything, and
-  pictures and cards already stored stay where they are, unread.
+- The personal analysis card's routes below answer only in a session that has
+  the card on (`analysisCardEnabled: true`; absent or false means off). A
+  session made on `/new` starts with it on, because the box there starts
+  ticked; one that never saved the setting, as every session from before the
+  card, has it off until an admin turns it on in Settings. Workers that have
+  the routes advertise `analysis_card_v1`, and the site makes and shows no card
+  on a Worker that does not. Off, each answers 403 `analysis_card_off` before
+  it counts, reads or stores anything, and pictures and cards already stored
+  stay where they are, unread.
 - `POST /analysis-card/picture` returns the picture on a personal analysis
   card: an illustration of the historical figure the analysis matched, in a
   style of the figure's own time. It takes `{ "figure": "Name (years)" }` under
