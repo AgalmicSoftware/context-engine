@@ -42,7 +42,7 @@ Session Workers need redeploying for the Worker changes below. A redeploy change
 ### Local tooling
 
 - A test drills the way back: data, names and a backup made by this release's Worker are read, restored and edited under the published 0.9.12 Worker bundle.
-- Two browser journeys run as a hosted job in Chromium and WebKit: a phone participant's visit with a look pass in three themes, and Results at 50 people by 40 statements.
+- Two browser journeys run as a hosted job in Chromium and WebKit: a phone participant's visit with a look pass in three themes, and Results at 50 people by 40 statements. If WebKit cannot be installed in time, that leg ends with a warning and its journeys are skipped.
 - New Session Worker tests: every route asked from an unlisted origin, a results admin refused other admin actions, members-only answer batches kept uncached, and a file-form answer replayed by request id.
 
 ## [0.9.16] - 2026-11-18
