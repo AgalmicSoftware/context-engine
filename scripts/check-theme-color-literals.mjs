@@ -16,6 +16,10 @@ const approvedLiteralFiles = [
   path.resolve(sourceRoot, 'utilities', 'sessionResultsExport', 'sessionResultsExport.ts'),
   path.resolve(sourceRoot, 'utilities', 'ui', 'fixedMediaColors.ts'),
   path.resolve(sourceRoot, 'utilities', 'ui', 'blockieAvatars.ts'),
+  // The analysis card is drawn to a downloaded picture, GIF or video: the same
+  // pixels for every viewer in every theme, from the session's scheme colours
+  // with fixed fallbacks and the export's vote colours.
+  path.resolve(sourceRoot, 'utilities', 'analysisCard', 'analysisCardCanvas.ts'),
 ];
 const colorLiteralPattern = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\([^)]*\)/gi;
 const namedColorPattern =
