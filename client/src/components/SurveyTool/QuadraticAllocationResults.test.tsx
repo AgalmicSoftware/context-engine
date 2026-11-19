@@ -46,3 +46,13 @@ it('draws each option as oppose and support bars around zero, with its net', () 
   ]);
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
 });
+
+it('ranks the options by net, most supported first', () => {
+  const three = { options: ['Low', 'Mid', 'High'], voiceCredits: 99 };
+  render(<QuadraticAllocationResults question={three} responses={[{ answer: { value: [-2, 1, 3] } }]} />);
+  expect(screen.getAllByRole('listitem').map((row) => row.firstElementChild?.textContent)).toEqual([
+    'High: support 3, oppose 0, net +3',
+    'Mid: support 1, oppose 0, net +1',
+    'Low: support 0, oppose 2, net −2',
+  ]);
+});

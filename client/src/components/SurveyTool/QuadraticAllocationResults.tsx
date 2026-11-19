@@ -15,6 +15,8 @@ export default function QuadraticAllocationResults({
   const summary = summarizeQuadraticAllocations(responses, question);
   const largest = Math.max(1, ...summary.options.flatMap((option) => [option.positive, -option.negative]));
   const share = (votes: number) => `${(Math.abs(votes) / largest) * 100}%`;
+  // Most supported first; options with the same net keep the question's own order.
+  const ranked = [...summary.options].sort((a, b) => b.net - a.net);
   const tone = (value: number) => (value > 0 ? styles.positiveVotes : value < 0 ? styles.negativeVotes : undefined);
   return (
     <div className={styles.results} data-testid="ce-quadratic-results">
@@ -25,7 +27,7 @@ export default function QuadraticAllocationResults({
         <span>Net</span>
       </div>
       <ul aria-label="Quadratic allocation results">
-        {summary.options.map((option, index) => (
+        {ranked.map((option, index) => (
           <li key={index}>
             {/* Read out as one sentence; the name, bars and numbers beside it are for the eye. */}
             <span className={styles.resultsSpoken}>
