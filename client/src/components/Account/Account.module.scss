@@ -667,31 +667,36 @@ h1 {
     max-width: none;
   }
 
+  // Match the 44px buttons beside it; left-aligned like the other cells.
+  .settingsSessionSummary,
   .settingsSessionRoute {
-    min-height: 40px;
+    justify-content: flex-start;
+  }
+
+  .settingsSessionRoute {
+    min-height: 44px;
     padding-block: 0;
   }
 
   .globalSessionSelector .globalSessionSelectField > select {
-    min-height: 38px;
+    min-height: 42px;
   }
 
   .settingsConfigToggleButton {
     flex: 0 0 auto;
     width: 100%;
-    min-height: 40px;
     justify-content: space-between;
   }
 
   .tooltipsToggleControl {
     width: auto;
-    min-height: 40px;
     justify-content: flex-start;
   }
 
+  // Older narrow-screen rules stretch this button; in a cell it keeps its size.
   .tooltipsToggleButton {
     flex: 0 0 auto;
-    min-height: 40px;
+    width: auto;
     padding: 6px 10px;
   }
 }
@@ -1129,8 +1134,8 @@ h1 {
   }
 }
 
-@media (max-width: 640px) {
-  // Phone: session first, then Config and Explainers, then Appearance.
+@media (max-width: 768px) {
+  // Phones and narrow tablets: session first, then Config and Explainers, then Appearance.
   .settingsStrip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:

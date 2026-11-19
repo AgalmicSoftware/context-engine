@@ -124,10 +124,16 @@ const LoginSettingsStrip = ({
       key: 'appearance',
       label: 'Appearance',
       control: showAppearance
-        ? disclosure('appearance', themeLabel, appearanceOpen, () => setAppearanceOpen((open) => !open), {
-            testId: E2E_TESTIDS.SETTINGS_APPEARANCE_TOGGLE,
-            controls: `${id}-appearance-panel`,
-          })
+        ? disclosure(
+            'appearance',
+            CE_THEME_SELECTOR_ENABLED ? themeLabel : 'Colors',
+            appearanceOpen,
+            () => setAppearanceOpen((open) => !open),
+            {
+              testId: E2E_TESTIDS.SETTINGS_APPEARANCE_TOGGLE,
+              controls: `${id}-appearance-panel`,
+            },
+          )
         : null,
     },
   ];

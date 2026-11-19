@@ -8,6 +8,11 @@ import { clearStoredThemePreference, setStoredThemePreference } from '../../util
 import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './LoginSettingsControlRow';
 
 describe('LoginSettingsControlRow', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    clearStoredThemePreference();
+  });
+
   it('renders the config toggle state and click handler', () => {
     const onToggle = jest.fn();
     render(<LoginSettingsConfigToggleControl expanded onToggle={onToggle} testId="config-toggle" />);
@@ -104,7 +109,6 @@ describe('LoginSettingsControlRow', () => {
     expect(screen.queryByTestId('ce-settings-appearance-panel')).not.toBeInTheDocument();
     // Opening and closing is not remembered anywhere.
     expect(setItem).not.toHaveBeenCalled();
-    setItem.mockRestore();
   });
 
   it('names the Appearance button after the theme in use', () => {
@@ -112,7 +116,6 @@ describe('LoginSettingsControlRow', () => {
     const appearance = screen.getByRole('button', { name: /^Appearance / });
     act(() => setStoredThemePreference('civic'));
     expect(appearance).toHaveAccessibleName(`Appearance ${getThemeMetadata('civic').label}`);
-    act(() => clearStoredThemePreference());
   });
 
   it('leaves Appearance out when the row does not ask for it', () => {

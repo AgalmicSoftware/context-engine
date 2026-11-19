@@ -51,12 +51,12 @@ describe('LoginButton', () => {
     );
   });
 
-  it('keeps the Settings strip on one row on desktop and stacks the session first on phones', () => {
+  it('keeps the Settings strip on one row on desktop and stacks the session first up to 768px', () => {
     expect(compiledAccountStylesheet).toMatch(
       /\.settingsStrip\s*\{[^}]*grid-template-areas:\s*"config session explainers appearance";/,
     );
     const phoneStrip = compiledAccountStylesheet.match(
-      /@media \(max-width: 640px\)\s*\{[\s\S]*?\.settingsStrip\s*\{([^}]+)\}/,
+      /@media \(max-width: 768px\)\s*\{[\s\S]*?\.settingsStrip\s*\{([^}]+)\}/,
     )?.[1];
     expect(phoneStrip).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
     expect(phoneStrip).toMatch(/"session session"\s*"config explainers"\s*"appearance appearance"/);
