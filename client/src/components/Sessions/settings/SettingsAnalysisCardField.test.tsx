@@ -64,6 +64,19 @@ describe('Session settings Analysis card', () => {
     expect(await screen.findByLabelText('Analysis card')).not.toBeChecked();
   });
 
+  it('takes the Analysis card choice of an imported template', async () => {
+    renderPage('https://card-import.example.workers.dev', ['analysis_card_v1']);
+    await openAi();
+    expect(await screen.findByLabelText('Analysis card')).toBeChecked();
+    fireEvent.click(screen.getByTestId('ce-template-import'));
+    fireEvent.change(screen.getByTestId('ce-template-paste'), {
+      target: { value: JSON.stringify({ format: 'ce.session-template/v1', analysisCardEnabled: false }) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+    fireEvent.click(screen.getByTestId('ce-template-import-apply'));
+    expect(screen.getByLabelText('Analysis card')).not.toBeChecked();
+  });
+
   it('offers no such setting for a Worker too old to have the card, which would refuse it', async () => {
     renderPage('https://card-old.example.workers.dev', ['worker_groups']);
     await openAi();

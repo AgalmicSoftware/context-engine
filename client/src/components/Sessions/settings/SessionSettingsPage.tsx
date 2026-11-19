@@ -437,6 +437,8 @@ const SessionSettingsPage = ({
     if (onChain) next.questions = draft.questions;
     // Context cards follow the template only where this page offers the setting.
     if (workerKeepsCards && !onChain) next.contextCardsEnabled = template.contextCardsEnabled === true;
+    // So does the analysis card, which is on unless a template turns it off.
+    if (workerHasAnalysisCard && !onChain) next.analysisCardEnabled = template.analysisCardEnabled !== false;
     setDraft(next);
     setStatus(
       keptHosting
