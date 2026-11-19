@@ -60,6 +60,19 @@ describe('Session settings Context cards', () => {
     expect(await screen.findByLabelText('Context cards')).toBeChecked();
   });
 
+  it('takes the Context cards choice of an imported template, as its list of changes says', async () => {
+    renderPage('https://cards-import.example.workers.dev', ['context_cards_v1']);
+    await openContext();
+    expect(await screen.findByLabelText('Context cards')).not.toBeChecked();
+    fireEvent.click(screen.getByTestId('ce-template-import'));
+    fireEvent.change(screen.getByTestId('ce-template-paste'), {
+      target: { value: JSON.stringify({ format: 'ce.session-template/v1', contextCardsEnabled: true }) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+    fireEvent.click(screen.getByTestId('ce-template-import-apply'));
+    expect(screen.getByLabelText('Context cards')).toBeChecked();
+  });
+
   it('offers no such setting for a Worker too old to keep cards, which would refuse it', async () => {
     renderPage('https://cards-old.example.workers.dev', ['worker_groups']);
     await openContext();

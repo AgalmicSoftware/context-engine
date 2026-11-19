@@ -427,6 +427,8 @@ const SessionSettingsPage = ({
     const { draft: next, keptHosting } = applyTemplateToSessionSettingsDraft(draft, template);
     // An on-chain session's questions are published from its session page.
     if (onChain) next.questions = draft.questions;
+    // Context cards follow the template only where this page offers the setting.
+    if (workerKeepsCards && !onChain) next.contextCardsEnabled = template.contextCardsEnabled === true;
     setDraft(next);
     setStatus(
       keptHosting
