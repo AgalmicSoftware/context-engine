@@ -544,18 +544,31 @@ describe('OnePageSession results routing', () => {
     await subject.handleSessionAgentUpdate();
     expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledWith(true);
 
-    // Proving the admin waited out a build already under way: the fresh one is not built again.
-    subject.state = { ...subject.state, generatedResultsAnalysis: { adminAuthorized: false, lastGoodDraftId: 'a' } };
-    authorizeTo({ adminAuthorized: true, canGenerate: true, lastGoodDraftId: 'b' });
+    // The same build read twice: the public read before the proof has no draft id, the status read after it has.
+    // That is not a new build, so the press builds.
+    subject.state = {
+      ...subject.state,
+      generatedResultsAnalysis: { adminAuthorized: false, lastGoodDraftId: '', lastGoodGeneratedAt: 't1' },
+    };
+    authorizeTo({ adminAuthorized: true, canGenerate: true, lastGoodDraftId: 'abc', lastGoodGeneratedAt: 't1' });
     await subject.handleSessionAgentUpdate();
-    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(1);
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(2);
+
+    // Proving the admin waited out a build already under way: the fresh one is not built again.
+    subject.state = {
+      ...subject.state,
+      generatedResultsAnalysis: { adminAuthorized: false, lastGoodDraftId: '', lastGoodGeneratedAt: 't1' },
+    };
+    authorizeTo({ adminAuthorized: true, canGenerate: true, lastGoodDraftId: 'b', lastGoodGeneratedAt: 't2' });
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(2);
 
     // Already proven: no second signature.
     authorizeTo({});
     subject.state = { ...subject.state, generatedResultsAnalysis: { adminAuthorized: true, canGenerate: true } };
     await subject.handleSessionAgentUpdate();
     expect(subject.handleGeneratedResultsAuthorize).not.toHaveBeenCalled();
-    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(2);
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(3);
   });
 
   it('rebuilds a reopened report when the session hidden list changed', () => {

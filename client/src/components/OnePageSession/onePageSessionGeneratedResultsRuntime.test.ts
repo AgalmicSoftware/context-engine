@@ -430,6 +430,47 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(host.state.generatedResultsAnalysis?.lastGoodDraftId).toBe('');
   });
 
+  it('reads one build as the same build from the public read and the admin status read', async () => {
+    const generatedAt = '2026-11-19T10:00:00.000Z';
+    const host = buildHost({ ok: false });
+    // The Worker's public artifact reply: the build's time, no draft id.
+    const readArtifact = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      sessionSlug: 'edge',
+      sessionId: `0x${'1'.repeat(32)}`,
+      jobState: 'succeeded',
+      generatedAt,
+      source: { responseCount: 2, participantCount: 2 },
+      artifact,
+    }));
+    await loadGeneratedResultsArtifactForHost(host, { ports: { readQuestionsCache: () => ({}), readArtifact } });
+    const fromPublic = host.state.generatedResultsAnalysis;
+    // The admin status reply for the same build: its draft id as well.
+    const fromStatus = resolveGeneratedResultsControllerState({
+      statusBody: {
+        ok: true,
+        adminAuthorized: true,
+        settings,
+        state: {
+          jobState: 'succeeded',
+          lastGood: {
+            draftId: 'draft-1',
+            generatedAt,
+            source: {},
+            artifact,
+            snapshot: { questions: [], responses: [] },
+          },
+        },
+      },
+    });
+
+    expect(fromPublic?.lastGoodDraftId).toBe('');
+    expect(fromStatus.lastGoodDraftId).toBe('draft-1');
+    expect(fromPublic?.lastGoodGeneratedAt).toBe(generatedAt);
+    expect(fromStatus.lastGoodGeneratedAt).toBe(generatedAt);
+  });
+
   it('allows a second non-admin viewer to load the latest artifact without admin controls', async () => {
     const firstViewer = buildHost({ ok: false });
     const secondViewer = buildHost({ ok: false });

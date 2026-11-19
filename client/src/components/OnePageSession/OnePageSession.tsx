@@ -700,12 +700,13 @@ class OnePageSession extends Component<any, any> {
   async handleSessionAgentUpdate() {
     if (this.state.generatedResultsAnalysis?.canCheckStatus) return this.loadGeneratedResultsArtifact();
     if (this.state.generatedResultsAnalysis?.adminAuthorized !== true) {
-      const buildBefore = this.state.generatedResultsAnalysis?.lastGoodDraftId || '';
+      // Compared by the build's time: the public read before the proof has no draft id, the status read after it does.
+      const buildBefore = this.state.generatedResultsAnalysis?.lastGoodGeneratedAt || '';
       await this.handleGeneratedResultsAuthorize();
       // The status just read is in a pending state update; wait for it before reading it back.
       await new Promise<void>((resolve) => this.setState({}, resolve));
       // Proving the admin waits out a build already under way; a fresh one needs no second paid build.
-      if ((this.state.generatedResultsAnalysis?.lastGoodDraftId || '') !== buildBefore) return undefined;
+      if ((this.state.generatedResultsAnalysis?.lastGoodGeneratedAt || '') !== buildBefore) return undefined;
     }
     if (this.state.generatedResultsAnalysis?.canGenerate !== true) return undefined;
     return this.handleGeneratedResultsGenerate(true);
