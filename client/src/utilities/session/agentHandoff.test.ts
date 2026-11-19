@@ -1,9 +1,6 @@
 import {
   AgentDelegateKeyError,
-  agentDisplayName,
   buildAgentKeyCommand,
-  buildMcpAddCommand,
-  buildMcpJoinPrompt,
   buildOnMyBehalfPrompt,
   requestAgentDelegateKey,
 } from './agentHandoff';
@@ -17,51 +14,31 @@ const key = {
 };
 
 describe('agent hand-off texts', () => {
-  it('names the agent after its person, without anything a shell reads in double quotes', () => {
-    expect(agentDisplayName('  Audrey  ')).toBe("Audrey's Agent");
-    expect(agentDisplayName('Au"d$r`e\\y!\u0007')).toBe("Audrey's Agent");
-    // The whole name fits the session's 32-character rule, and keeps only what that rule allows.
-    expect(agentDisplayName('x'.repeat(80))).toBe(`${'x'.repeat(24)}'s Agent`);
-    expect([...agentDisplayName('x'.repeat(80))]).toHaveLength(32);
-    expect(agentDisplayName('Zoë (she/her) @ 4th & Main, #2')).toBe("Zoë sheher 4th Main 2's Agent");
-    expect(agentDisplayName('Ｆｕｌｌ　ｗｉｄｔｈ')).toBe("Full width's Agent");
-    // An emoji goes, and so does the unseen selector that follows it.
-    expect(agentDisplayName('Zoë ❤️')).toBe("Zoë's Agent");
-    expect(agentDisplayName('   ')).toBe('');
-  });
-
-  it('adds the MCP for every project, named when the person gave a name', () => {
-    expect(buildMcpAddCommand("Audrey's Agent")).toBe(
-      'claude mcp add context-engine --scope user -e CE_MCP_DISPLAY_NAME="Audrey\'s Agent" -- npx -y --prefer-online @agalmic/contextengine@latest',
-    );
-    expect(buildMcpAddCommand('')).toBe(
-      'claude mcp add context-engine --scope user -- npx -y --prefer-online @agalmic/contextengine@latest',
-    );
-  });
-
-  it('asks the agent to join as itself with the session link', () => {
-    const prompt = buildMcpJoinPrompt({
-      sessionUrl: 'https://site.example/session/salon',
-      displayName: "Audrey's Agent",
-    });
-    expect(prompt).toContain('https://site.example/session/salon with join_session');
-    expect(prompt).toContain('Set your display name to "Audrey\'s Agent".');
-    expect(prompt).toContain('never claim to be a person');
-    expect(prompt).toContain('Where the session invites it, you may add links or files to its context.');
-    // Without a name, nothing asks for one.
-    const unnamed = buildMcpJoinPrompt({ sessionUrl: 'https://site.example/session/salon', displayName: '' });
-    expect(unnamed).not.toContain('display name');
-    expect(unnamed).toContain('add links or files');
-  });
+  const sessionUrl = 'https://site.example/session/salon?worker=https%3A%2F%2Fce-salon.example.workers.dev';
 
   it('keeps the key out of the prompt that goes into the chat', () => {
-    const prompt = buildOnMyBehalfPrompt(key);
+    // Given the whole key, the prompt still names only the variable that holds it.
+    const prompt = buildOnMyBehalfPrompt({ key, sessionName: 'Salon', sessionUrl });
     expect(prompt).not.toContain('ceagt_');
+    expect(prompt).not.toContain(key.token);
     expect(prompt).toContain('"Authorization: Bearer $CE_AGENT_TOKEN"');
     expect(prompt).toContain('https://ce-salon.example.workers.dev/api/agent/skill');
-    expect(prompt).toContain('submit only the ones I approve');
-    expect(buildOnMyBehalfPrompt({ ...key, submitAnswers: false })).toContain("doesn't let agents submit");
+    expect(prompt).toContain('submit as me only the ones I approve');
+    expect(prompt).not.toMatch(/mcp|join_session/i);
     expect(buildAgentKeyCommand(key.token)).toBe(`export CE_AGENT_TOKEN='${key.token}'`);
+  });
+
+  it('names this session by name, link and slug, and no other', () => {
+    const prompt = buildOnMyBehalfPrompt({ key, sessionName: 'Salon "two"', sessionUrl });
+    expect(prompt).toContain(`session "Salon \\"two\\"" (${sessionUrl}, slug "salon"), and in no other session`);
+    // Without a title, the slug names it.
+    expect(buildOnMyBehalfPrompt({ key, sessionName: '', sessionUrl })).toContain('session "salon" (');
+  });
+
+  it('asks for drafts only where the session does not let agents submit', () => {
+    const prompt = buildOnMyBehalfPrompt({ key: { ...key, submitAnswers: false }, sessionName: 'Salon', sessionUrl });
+    expect(prompt).toContain("doesn't let agents submit");
+    expect(prompt).not.toContain('submit as me');
   });
 });
 

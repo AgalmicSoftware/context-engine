@@ -3752,6 +3752,14 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     line-height: 1.25;
   }
 
+  // The copy button form, which a caller styles: its messages sit under the button.
+  .sessionAgentKickoffButtonForm {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+
   .sessionAgentKickoff {
     padding: 0;
     border: 0;

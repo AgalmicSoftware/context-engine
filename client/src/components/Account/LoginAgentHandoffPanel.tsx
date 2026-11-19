@@ -5,15 +5,13 @@ import { faCaretDown, faCaretUp, faCheck, faCopy, faQuestionCircle } from '@fort
 import {
   AGENT_KEY_ENV,
   AgentDelegateKeyError,
-  MCP_SERVER_COMMAND,
-  agentDisplayName,
   buildAgentKeyCommand,
-  buildMcpAddCommand,
-  buildMcpJoinPrompt,
   buildOnMyBehalfPrompt,
   type AgentDelegateKey,
 } from '../../utilities/session/agentHandoff';
 import { copyText, selectText } from '../../utilities/ui/copyText';
+import SessionInterviewMemoryKickoffCard from '../SurveyTool/SessionInterviewMemoryKickoffCard';
+import { useSessionPrefillKickoff } from '../SurveyTool/useSessionPrefillKickoff';
 import styles from './Account.module.scss';
 
 export type LoginAgentHandoffPanelProps = {
@@ -21,8 +19,15 @@ export type LoginAgentHandoffPanelProps = {
   sessionUrl: string;
   // The session's title, or its slug where it has none.
   sessionName: string;
+  sessionSlug: string;
+  // What the suggestions prompt needs to read the session's questions as this person.
+  sessionConfig?: Record<string, unknown> | null;
+  context?: unknown;
+  workerUrl?: string;
   requestKey: () => Promise<AgentDelegateKey>;
 };
+
+type Way = 'suggest' | 'submit';
 
 const MASKED_KEY = 'ceagt_••••••••';
 
@@ -32,6 +37,14 @@ const keyErrorMessage = (error: unknown): string => {
   if (reason === 'agent_delegate_person_required') return 'Sign in as yourself to make a key.';
   if (status === 401) return 'Sign in again, then make a key.';
   return "Couldn't make a key. Try again.";
+};
+
+// Drafts come back to this page when it is the session's own, which keeps its join link; else to the session.
+const suggestReturnUrl = (sessionSlug: string, sessionUrl: string): string | undefined => {
+  if (typeof window === 'undefined') return sessionUrl;
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  const onSessionPage = parts.at(-2) === 'session' && decodeURIComponent(parts.at(-1) || '') === sessionSlug;
+  return onSessionPage ? undefined : sessionUrl;
 };
 
 // A short label's "?": its words show on hover and focus, and describe the button. Below, where above would
@@ -110,16 +123,133 @@ const Step = ({ id, label, shown, copyLabel, copied, onCopy, children }: StepPro
   </div>
 );
 
+const OPTIONS: Array<{ way: Way; title: string; detail: string }> = [
+  {
+    way: 'suggest',
+    title: 'Suggest answers for me to review',
+    detail: 'You get a link with its suggestions filled in. Nothing is submitted until you submit.',
+  },
+  { way: 'submit', title: 'Answer and submit for me', detail: 'Your agent submits as you.' },
+];
+
+// The two things the agent may do, as a radio group: arrow keys move between them, and each card is its label.
+const WayChoice = ({ way, onChange }: { way: Way; onChange: (next: Way) => void }) => (
+  <fieldset className={styles.agentHandoffOptions}>
+    <legend className={styles.agentHandoffLegend}>What should it do?</legend>
+    {OPTIONS.map((option) => {
+      const checked = way === option.way;
+      return (
+        <label
+          key={option.way}
+          className={`${styles.agentHandoffOption} ${checked ? styles.agentHandoffOptionChecked : ''}`}
+          data-testid={`ce-agent-handoff-way-${option.way}`}
+        >
+          <span className={styles.agentHandoffRadio}>
+            <input
+              type="radio"
+              name="ce-agent-handoff-way"
+              value={option.way}
+              checked={checked}
+              onChange={() => onChange(option.way)}
+              aria-labelledby={`ce-agent-handoff-way-${option.way}-title`}
+              aria-describedby={`ce-agent-handoff-way-${option.way}-detail`}
+            />
+            {checked ? <FontAwesomeIcon icon={faCheck} className={styles.agentHandoffRadioTick} /> : null}
+          </span>
+          <span className={styles.agentHandoffOptionText}>
+            <span id={`ce-agent-handoff-way-${option.way}-title`} className={styles.agentHandoffOptionTitle}>
+              {option.title}
+            </span>
+            <span id={`ce-agent-handoff-way-${option.way}-detail`} className={styles.agentHandoffOptionDetail}>
+              {option.detail}
+            </span>
+          </span>
+        </label>
+      );
+    })}
+  </fieldset>
+);
+
+// "Suggest answers": the voice dialog's prefill prompt, named for this session, behind one copy button.
+const SuggestAnswers = ({
+  sessionSlug,
+  sessionUrl,
+  sessionName,
+  sessionConfig,
+  context,
+  workerUrl,
+  onCopied,
+}: Pick<
+  LoginAgentHandoffPanelProps,
+  'sessionSlug' | 'sessionUrl' | 'sessionName' | 'sessionConfig' | 'context' | 'workerUrl'
+> & { onCopied: () => void }) => {
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(copiedTimer.current), []);
+  const { ready, kickoff } = useSessionPrefillKickoff({
+    sessionSlug,
+    sessionConfig,
+    context,
+    workerUrl,
+    sessionUrl: suggestReturnUrl(sessionSlug, sessionUrl),
+    sessionName,
+  });
+  if (!ready) return <p className={styles.agentHandoffHint}>Checking {sessionName}…</p>;
+  if (!kickoff) {
+    return (
+      <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-suggest-off">
+        Not available in {sessionName}
+        <Help id="ce-agent-handoff-suggest-off-about" placement="bottom">
+          Suggestions read the session&apos;s questions from its Worker, and this session has none.
+        </Help>
+      </p>
+    );
+  }
+  const copyPrompt = async (prompt: string) => {
+    setCopied(false);
+    if (!(await copyText(prompt))) return false;
+    setCopied(true);
+    onCopied();
+    clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), 1800);
+    return true;
+  };
+  return (
+    <div className={styles.agentHandoffSuggest}>
+      <div className={styles.agentHandoffCopyRow}>
+        <SessionInterviewMemoryKickoffCard
+          // Another account is checked afresh, for its own ticket.
+          key={kickoff.accountKey}
+          kickoff={kickoff.kickoff}
+          validateKickoff={kickoff.validateKickoff}
+          promptCopied={copied}
+          showAgentPrompt={false}
+          onCopyPrompt={copyPrompt}
+          onTogglePrompt={() => undefined}
+          copyButton={{ className: styles.agentHandoffPrimary, testId: 'ce-agent-handoff-suggest-copy' }}
+        />
+        <Help id="ce-agent-handoff-suggest-about" placement="bottom">
+          Paste it into ChatGPT, Claude or another AI. It reads this session&apos;s questions, drafts answers from what
+          it knows about you, and gives back a link that opens them here for you to review. No key is needed.
+        </Help>
+      </div>
+    </div>
+  );
+};
+
 const LoginAgentHandoffPanel = ({
   agentHttpEnabled,
   sessionUrl,
   sessionName,
+  sessionSlug,
+  sessionConfig,
+  context,
+  workerUrl,
   requestKey,
 }: LoginAgentHandoffPanelProps) => {
   // Starts closed so the sign-in dialog stays short; closing only hides it, so a key or choice survives.
   const [open, setOpen] = useState(false);
-  const [way, setWay] = useState<'self' | 'behalf'>('self');
-  const [ownerName, setOwnerName] = useState('');
+  const [way, setWay] = useState<Way>('suggest');
   // The key lives only here, never in browser storage, and goes when the dialog closes.
   const [key, setKey] = useState<AgentDelegateKey | null>(null);
   const [keyShown, setKeyShown] = useState(false);
@@ -134,22 +264,25 @@ const LoginAgentHandoffPanel = ({
   const [selectStep, setSelectStep] = useState('');
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
-  const displayName = agentDisplayName(ownerName);
+
+  const announce = (message: string) => {
+    setCopyStatus(message);
+    setCopyCount((count) => count + 1);
+  };
 
   const copy = async (step: string, what: string, text: string) => {
     clearTimeout(copiedTimer.current);
     setCopiedStep('');
     if (await copyText(text)) {
-      setCopyStatus(`Copied the ${what}.`);
+      announce(`Copied the ${what}.`);
       setCopiedStep(step);
       copiedTimer.current = setTimeout(() => setCopiedStep(''), 1800);
     } else {
-      setCopyStatus(`Copying isn't allowed here, so the ${what} is selected. Copy it yourself.`);
+      announce(`Copying isn't allowed here, so the ${what} is selected. Copy it yourself.`);
       // A hidden key is shown, since the masked one is no use to copy.
       if (step === 'key') setKeyShown(true);
       setSelectStep(step);
     }
-    setCopyCount((count) => count + 1);
   };
   useLayoutEffect(() => {
     if (!selectStep) return;
@@ -170,15 +303,84 @@ const LoginAgentHandoffPanel = ({
     }
   };
 
-  const chooseWay = (next: 'self' | 'behalf') => {
+  const chooseWay = (next: Way) => {
     setWay(next);
     setCopyStatus('');
     setError('');
   };
 
-  const mcpCommand = buildMcpAddCommand(displayName);
-  const joinPrompt = buildMcpJoinPrompt({ sessionUrl, displayName });
   const expiry = key ? new Date(key.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const submitPrompt = key ? buildOnMyBehalfPrompt({ key, sessionName, sessionUrl }) : '';
+
+  const submitSteps = !agentHttpEnabled ? (
+    <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-submit-off">
+      Not on in {sessionName}
+      <Help id="ce-agent-handoff-off-about" placement="bottom">
+        Session admins can turn on Agents (HTTP API).
+      </Help>
+    </p>
+  ) : !key ? (
+    <div className={styles.agentHandoffActions}>
+      <button
+        type="button"
+        className={styles.agentHandoffPrimary}
+        onClick={makeKey}
+        disabled={making}
+        data-testid="ce-agent-handoff-make-key"
+      >
+        {making ? 'Making a key…' : 'Make a key'}
+      </button>
+      <Help id="ce-agent-handoff-key-about" placement="bottom">
+        The key lets your agent read the questions, save drafts and submit the answers you approve, as you. It stops
+        when your sign-in ends or when you make a new one. It needs an agent that runs commands on your computer, such
+        as Claude Code or Codex.
+      </Help>
+    </div>
+  ) : (
+    <>
+      <Step
+        id="key"
+        label={
+          <>
+            1. Run in your terminal
+            <Help id="ce-agent-handoff-terminal-about">
+              Then start your agent from the same terminal. It reads the key from {AGENT_KEY_ENV}, so the key never goes
+              into the chat. In PowerShell: $env:{AGENT_KEY_ENV} = &apos;…&apos;
+            </Help>
+          </>
+        }
+        shown={buildAgentKeyCommand(keyShown ? key.token : MASKED_KEY)}
+        copyLabel="Copy the key command"
+        copied={copiedStep === 'key'}
+        onCopy={() => copy('key', 'command', buildAgentKeyCommand(key.token))}
+      >
+        <button
+          type="button"
+          className={styles.agentHandoffButton}
+          aria-pressed={keyShown}
+          aria-label="Show the key"
+          onClick={() => setKeyShown(!keyShown)}
+          data-testid="ce-agent-handoff-key-show"
+        >
+          Show
+        </button>
+      </Step>
+      <p className={styles.agentHandoffHint}>Works until {expiry}</p>
+      {key.submitAnswers ? null : (
+        <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-drafts-only">
+          {sessionName} doesn&apos;t let agents submit, so your agent shows you drafts.
+        </p>
+      )}
+      <Step
+        id="submit-prompt"
+        label="2. Ask your agent"
+        shown={submitPrompt}
+        copyLabel="Copy the prompt"
+        copied={copiedStep === 'submit-prompt'}
+        onCopy={() => copy('submit-prompt', 'prompt', submitPrompt)}
+      />
+    </>
+  );
 
   return (
     <section
@@ -201,134 +403,29 @@ const LoginAgentHandoffPanel = ({
           </button>
         </h3>
         <Help id="ce-agent-handoff-about">
-          Bring your AI agent to this session. As itself, it takes part with its own key and name, shown as an agent. On
-          your behalf, it answers as you, and submits only the answers you approve.
+          Your AI agent can work for you in this session. It can suggest answers, which come back to you as a link to
+          review and submit yourself, or, with a key you make here, answer and submit as you.
         </Help>
       </div>
       <div id="ce-agent-handoff-body" hidden={!open}>
-        <div className={styles.agentHandoffChoices} role="group" aria-label="How your agent takes part">
-          <button
-            type="button"
-            className={styles.agentHandoffChoice}
-            aria-pressed={way === 'self'}
-            onClick={() => chooseWay('self')}
-            data-testid="ce-agent-handoff-self"
-          >
-            As itself
-          </button>
-          <button
-            type="button"
-            className={styles.agentHandoffChoice}
-            aria-pressed={way === 'behalf'}
-            onClick={() => chooseWay('behalf')}
-            data-testid="ce-agent-handoff-behalf"
-          >
-            On my behalf
-          </button>
-        </div>
+        <p className={styles.agentHandoffLead}>Your agent works for you in this session.</p>
+        <WayChoice way={way} onChange={chooseWay} />
 
-        {way === 'self' ? (
-          <>
-            <label className={styles.agentHandoffLabel}>
-              <span>Your name</span>
-              <input
-                type="text"
-                value={ownerName}
-                onChange={(event) => setOwnerName(event.target.value)}
-                maxLength={60}
-                autoComplete="given-name"
-                className={styles.agentHandoffInput}
-                data-testid="ce-agent-handoff-name"
-              />
-            </label>
-            <Step
-              id="mcp"
-              label={
-                <>
-                  1. Add the MCP
-                  <Help id="ce-agent-handoff-mcp-about">
-                    For Claude Code. In another MCP host, add the server {MCP_SERVER_COMMAND}
-                    {displayName ? `, with CE_MCP_DISPLAY_NAME set to ${displayName}` : ''}.
-                  </Help>
-                </>
-              }
-              shown={mcpCommand}
-              copyLabel="Copy the MCP command"
-              copied={copiedStep === 'mcp'}
-              onCopy={() => copy('mcp', 'command', mcpCommand)}
+        {/* Mounted only once opened: its check may ask to sign in to the session, which only an open box should. */}
+        {way === 'suggest' ? (
+          open ? (
+            <SuggestAnswers
+              sessionSlug={sessionSlug}
+              sessionUrl={sessionUrl}
+              sessionName={sessionName}
+              sessionConfig={sessionConfig}
+              context={context}
+              workerUrl={workerUrl}
+              onCopied={() => announce('Copied the prompt.')}
             />
-            <Step
-              id="join"
-              label="2. Ask your agent"
-              shown={joinPrompt}
-              copyLabel="Copy the prompt"
-              copied={copiedStep === 'join'}
-              onCopy={() => copy('join', 'prompt', joinPrompt)}
-            />
-          </>
-        ) : !agentHttpEnabled ? (
-          <p className={styles.agentHandoffHint}>
-            Not on in {sessionName}
-            <Help id="ce-agent-handoff-off-about" placement="bottom">
-              Session admins can turn on Agents (HTTP API).
-            </Help>
-          </p>
-        ) : !key ? (
-          <div className={styles.agentHandoffActions}>
-            <button
-              type="button"
-              className={styles.agentHandoffButton}
-              onClick={makeKey}
-              disabled={making}
-              data-testid="ce-agent-handoff-make-key"
-            >
-              {making ? 'Making a key…' : 'Make a key'}
-            </button>
-            <Help id="ce-agent-handoff-key-about" placement="bottom">
-              The key lets your agent read the questions, save drafts and submit the answers you approve, as you. It
-              stops when your sign-in ends or when you make a new one. It needs an agent that runs commands on your
-              computer, such as Claude Code or Codex.
-            </Help>
-          </div>
+          ) : null
         ) : (
-          <>
-            <Step
-              id="key"
-              label={
-                <>
-                  1. Run in your terminal
-                  <Help id="ce-agent-handoff-terminal-about">
-                    Then start your agent from the same terminal. It reads the key from {AGENT_KEY_ENV}, so the key
-                    never goes into the chat. In PowerShell: $env:{AGENT_KEY_ENV} = &apos;…&apos;
-                  </Help>
-                </>
-              }
-              shown={buildAgentKeyCommand(keyShown ? key.token : MASKED_KEY)}
-              copyLabel="Copy the key command"
-              copied={copiedStep === 'key'}
-              onCopy={() => copy('key', 'command', buildAgentKeyCommand(key.token))}
-            >
-              <button
-                type="button"
-                className={styles.agentHandoffButton}
-                aria-pressed={keyShown}
-                aria-label="Show the key"
-                onClick={() => setKeyShown(!keyShown)}
-                data-testid="ce-agent-handoff-key-show"
-              >
-                Show
-              </button>
-            </Step>
-            <p className={styles.agentHandoffHint}>Works until {expiry}</p>
-            <Step
-              id="behalf-prompt"
-              label="2. Ask your agent"
-              shown={buildOnMyBehalfPrompt(key)}
-              copyLabel="Copy the prompt"
-              copied={copiedStep === 'behalf-prompt'}
-              onCopy={() => copy('behalf-prompt', 'prompt', buildOnMyBehalfPrompt(key))}
-            />
-          </>
+          submitSteps
         )}
 
         {/* Live regions stay mounted, so screen readers hear their first message too. */}

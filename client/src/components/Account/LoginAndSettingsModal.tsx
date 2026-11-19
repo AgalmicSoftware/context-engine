@@ -1550,6 +1550,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
           workerOrigin: workerCanonical ? agentWorkerUrl : '',
         })}
         sessionName={toStr((sessionConfig as { sessionName?: unknown } | null)?.sessionName).trim() || sessionSlug}
+        sessionSlug={sessionSlug}
+        sessionConfig={sessionConfig as Record<string, unknown> | null}
+        context={this.getWorkerTokenContext()}
+        workerUrl={agentWorkerUrl}
         requestKey={this.requestAgentKey}
       />
     );
