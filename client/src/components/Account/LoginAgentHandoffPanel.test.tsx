@@ -68,11 +68,11 @@ it('sets up the MCP as itself, named after its person', async () => {
   renderPanel();
   expect(screen.getByRole('button', { name: 'As itself' })).toHaveAttribute('aria-pressed', 'true');
   fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Audrey' } });
-  expect(screen.getByTestId('ce-agent-handoff-mcp')).toHaveTextContent('CE_MCP_DISPLAY_NAME="Audrey\'s Kami"');
+  expect(screen.getByTestId('ce-agent-handoff-mcp')).toHaveTextContent('CE_MCP_DISPLAY_NAME="Audrey\'s Agent"');
   fireEvent.click(screen.getByRole('button', { name: 'Copy the prompt' }));
   expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
   expect(writeText).toHaveBeenCalledWith(expect.stringContaining(`${sessionUrl} with join_session`));
-  expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Set your display name to "Audrey\'s Kami".'));
+  expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Set your display name to "Audrey\'s Agent".'));
 });
 
 it('copies with an icon in each box, which shows a tick for a moment', async () => {

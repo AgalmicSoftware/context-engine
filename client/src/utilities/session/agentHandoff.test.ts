@@ -18,15 +18,21 @@ const key = {
 
 describe('agent hand-off texts', () => {
   it('names the agent after its person, without anything a shell reads in double quotes', () => {
-    expect(agentDisplayName('  Audrey  ')).toBe("Audrey's Kami");
-    expect(agentDisplayName('Au"d$r`e\\y!\u0007')).toBe("Audrey's Kami");
-    expect(agentDisplayName('x'.repeat(80))).toBe(`${'x'.repeat(40)}'s Kami`);
+    expect(agentDisplayName('  Audrey  ')).toBe("Audrey's Agent");
+    expect(agentDisplayName('Au"d$r`e\\y!\u0007')).toBe("Audrey's Agent");
+    // The whole name fits the session's 32-character rule, and keeps only what that rule allows.
+    expect(agentDisplayName('x'.repeat(80))).toBe(`${'x'.repeat(24)}'s Agent`);
+    expect([...agentDisplayName('x'.repeat(80))]).toHaveLength(32);
+    expect(agentDisplayName('Zoë (she/her) @ 4th & Main, #2')).toBe("Zoë sheher 4th Main 2's Agent");
+    expect(agentDisplayName('Ｆｕｌｌ　ｗｉｄｔｈ')).toBe("Full width's Agent");
+    // An emoji goes, and so does the unseen selector that follows it.
+    expect(agentDisplayName('Zoë ❤️')).toBe("Zoë's Agent");
     expect(agentDisplayName('   ')).toBe('');
   });
 
   it('adds the MCP for every project, named when the person gave a name', () => {
-    expect(buildMcpAddCommand("Audrey's Kami")).toBe(
-      'claude mcp add context-engine --scope user -e CE_MCP_DISPLAY_NAME="Audrey\'s Kami" -- npx -y --prefer-online @agalmic/contextengine@latest',
+    expect(buildMcpAddCommand("Audrey's Agent")).toBe(
+      'claude mcp add context-engine --scope user -e CE_MCP_DISPLAY_NAME="Audrey\'s Agent" -- npx -y --prefer-online @agalmic/contextengine@latest',
     );
     expect(buildMcpAddCommand('')).toBe(
       'claude mcp add context-engine --scope user -- npx -y --prefer-online @agalmic/contextengine@latest',
@@ -36,10 +42,10 @@ describe('agent hand-off texts', () => {
   it('asks the agent to join as itself with the session link', () => {
     const prompt = buildMcpJoinPrompt({
       sessionUrl: 'https://site.example/session/salon',
-      displayName: "Audrey's Kami",
+      displayName: "Audrey's Agent",
     });
     expect(prompt).toContain('https://site.example/session/salon with join_session');
-    expect(prompt).toContain('Set your display name to "Audrey\'s Kami".');
+    expect(prompt).toContain('Set your display name to "Audrey\'s Agent".');
     expect(prompt).toContain('never claim to be a person');
     expect(prompt).toContain('Where the session invites it, you may add links or files to its context.');
     // Without a name, nothing asks for one.
