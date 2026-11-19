@@ -110,9 +110,12 @@ test('index.html tells a fetching agent where the guide is, in body text people 
   assert.match(guide, /\*\*Answer and submit for them\*\*, with their permission/);
   assert.match(guide, /\*\*Prepare suggested answers and hand back a link\.\*\*/);
   assert.match(guide, /Nothing is submitted until they review the drafts and submit them, as themselves/);
-  // The link is made from a prompt the person copies in the session, never guessed from the session link.
-  assert.match(plain, /from a prompt they copy for you in the session's interview choices/);
-  assert.match(guide, /it starts with a prompt they copy for you in the session's interview choices/);
+  // A public session's link is enough; a private one needs the prompt the person copies in the session.
+  assert.match(plain, /from the session link alone on a public session, otherwise from a prompt they copy for you in the session's interview choices/);
+  assert.match(guide, /For a public session the session link is enough; for a private one it starts with a prompt they copy for you in the session's interview choices/);
+  assert.match(guide, /### A public session: from the session link alone/);
+  assert.match(guide, /<worker>\/agent\/interview-catalog\?slug=<slug>&sessionUrl=<session page>/);
+  assert.match(guide, /never ask them for an invite code or a password/);
   assert.match(guide, /Unless they have already said, ask them\./);
   assert.match(llmsTxt.replace(/\s+/g, ' '), /prepare suggested answers and hand back a link they review and submit themselves/);
   assert.ok(mcpTools.includes("name: 'join_session'"));
