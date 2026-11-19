@@ -7,9 +7,12 @@ const require = createRequire(import.meta.url);
 const sessions = require('../client/src/variables/demo/demo_sessions.json');
 const demoSlugs = Object.keys(sessions);
 // A known session takes every setting from its Worker, whose replies are mocked below.
-const { eddy26 } = require('../known-sessions.json');
-sessions.eddy26 = { slug: 'eddy26', sessionId: eddy26.sessionId, sessionName: eddy26.name, corsWorkerUrl: `${eddy26.worker}/` };
-const voiceSlugs = ['demo-sh', 'demo-interview', 'eddy26'];
+const knownSessions = require('../known-sessions.json');
+for (const slug of ['eddy26', 'rxc-ra-agent-test-1']) {
+  const { sessionId, name, worker } = knownSessions[slug];
+  sessions[slug] = { slug, sessionId, sessionName: name, corsWorkerUrl: `${worker}/` };
+}
+const voiceSlugs = ['demo-sh', 'rxc-ra-agent-test-1', 'eddy26'];
 for (const slug of voiceSlugs) {
   const config = sessions[slug];
   sessions[slug] = {
@@ -112,7 +115,7 @@ try {
     assert.equal(await page.getByText('Worker URL is not configured.', { exact: true }).count(), 0);
   };
 
-  for (const slug of ['demo-interview', 'eddy26']) {
+  for (const slug of ['rxc-ra-agent-test-1', 'eddy26']) {
     await selector.selectOption(slug);
     await record(slug);
   }

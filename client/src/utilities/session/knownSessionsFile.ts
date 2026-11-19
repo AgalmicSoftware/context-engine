@@ -3,11 +3,13 @@ import knownSessions from '../../../../known-sessions.json';
 // One entry in the repo's known-sessions.json: a session the hosted site opens
 // from a normal link, without `worker=`. It only says where the session's
 // Worker is. The Worker's verified config supplies every setting, and the
-// session opens only when that config carries this sessionId.
+// session opens only when that config carries this sessionId. `title` is only
+// the session's label in the site's session lists (see sessionListing.ts).
 export type KnownSession = {
   worker: string;
   sessionId: string;
   name?: string;
+  title?: string;
 };
 
 export const KNOWN_SESSIONS: Readonly<Record<string, KnownSession>> = knownSessions;

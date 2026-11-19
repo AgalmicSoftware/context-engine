@@ -11,6 +11,7 @@ import {
   type GlobalSessionSelection,
 } from '../../utilities/session/globalSessionState';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming';
+import { buildSessionListOptions, sessionListName } from '../../utilities/session/sessionListing';
 import styles from '../Account/Account.module.scss';
 
 type GlobalSessionSelectorProps = {
@@ -83,20 +84,6 @@ const GlobalSessionSelector = ({
       ),
     ),
   );
-  const options = slugs
-    .map((slug) => {
-      const supplied =
-        sessionConfig &&
-        typeof sessionConfig === 'object' &&
-        'slug' in sessionConfig &&
-        normalizeSessionSlug(sessionConfig.slug) === slug
-          ? (sessionConfig as Record<string, unknown>)
-          : null;
-      const registeredName = catalog.find((entry) => entry.slug === slug)?.name;
-      const name = slug ? String(supplied?.sessionName || registeredName || '').trim() || slug : 'General';
-      return { slug, label: slug && name.toLowerCase() !== slug ? `${name} (${slug})` : name };
-    })
-    .sort((a, b) => (!a.slug ? -1 : !b.slug ? 1 : a.label.localeCompare(b.label)));
   // Sentinels must not hide real sessions with the same slug.
   let allValue = '__ce_all_sessions__';
   while (slugs.includes(allValue)) allValue += '_';
@@ -113,6 +100,21 @@ const GlobalSessionSelector = ({
           : selection.selectedSessionScope === 'list'
             ? selection.selectedSessionSlugs[0]
             : selection.primarySessionSlug;
+  // The current choice stays listed even when the list would leave it off.
+  const options = buildSessionListOptions({
+    slugs,
+    keep: value === allValue || value === listValue ? [] : [value],
+    nameOf: (slug) => {
+      const supplied =
+        sessionConfig &&
+        typeof sessionConfig === 'object' &&
+        'slug' in sessionConfig &&
+        normalizeSessionSlug(sessionConfig.slug) === slug
+          ? (sessionConfig as Record<string, unknown>)
+          : null;
+      return String(supplied?.sessionName || catalog.find((entry) => entry.slug === slug)?.name || '');
+    },
+  });
   const selectedLabel =
     value === allValue
       ? 'ALL'
@@ -144,7 +146,7 @@ const GlobalSessionSelector = ({
     );
   };
   const labelFor = (slug: string) =>
-    slug ? exactConfigEntryFor(slug)?.name || catalog.find((entry) => entry.slug === slug)?.name || slug : 'General';
+    sessionListName(slug, exactConfigEntryFor(slug)?.name || catalog.find((entry) => entry.slug === slug)?.name || '');
   const sessionHref = hasConcreteSelection ? currentHref || hrefFor(value) : null;
   const sessionLabel = labelFor(value);
   const openInNewTab = (slug: string) => {

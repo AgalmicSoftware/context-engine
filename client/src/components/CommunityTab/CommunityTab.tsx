@@ -79,6 +79,7 @@ import {
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
 import { readKnownSessionCatalog } from '../../utilities/session/sessionCatalog';
+import { compareSessionListEntries, isListedSession, sessionListName } from '../../utilities/session/sessionListing';
 import { SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT } from '../../utilities/session/sessionWorkerConfigCache';
 import {
   countCommunitySessions,
@@ -2440,8 +2441,17 @@ export class CommunityTab extends Component<any, any> {
       onClear: () => this.setState({ sessionFilters: createCommunitySessionFilters() }),
     });
 
+  // The directory shows what the session lists show; scans still read every session.
+  _listedSessions = (): CommunitySessionEntry[] =>
+    this.state.sessions
+      .filter(({ slug }: CommunitySessionEntry) => isListedSession(slug))
+      .map((session: CommunitySessionEntry) => ({ ...session, name: sessionListName(session.slug, session.name) }))
+      .sort((a: CommunitySessionEntry, b: CommunitySessionEntry) =>
+        compareSessionListEntries({ slug: a.slug, label: a.name }, { slug: b.slug, label: b.name }),
+      );
+
   renderSessionsModalContent = () => {
-    const allSessions: CommunitySessionEntry[] = this.state.sessions;
+    const allSessions: CommunitySessionEntry[] = this._listedSessions();
     const sessions = filterCommunitySessions(allSessions, this.state.sessionFilters);
     const counts = countCommunitySessions(sessions);
     const hasFilters = Object.values(this.state.sessionFilters).some((value) => String(value).trim());
@@ -2665,7 +2675,7 @@ export class CommunityTab extends Component<any, any> {
       (stat.label !== 'Sessions' && (!selectionPublished || (!initialLoadDone && !stat.count))) ||
       (stat.label === 'Groups' && loadingSbtsCreated);
     const displayStats = this._isUniverseEnabled()
-      ? [...stats, { icon: faLayerGroup, count: this.state.sessions.length, label: 'Sessions' }]
+      ? [...stats, { icon: faLayerGroup, count: this._listedSessions().length, label: 'Sessions' }]
       : stats;
     const sessionFiltersActive = Object.values(this.state.sessionFilters).some((value) => String(value).trim());
     return (

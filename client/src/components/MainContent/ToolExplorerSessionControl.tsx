@@ -10,6 +10,7 @@ import {
 } from '../../utilities/session/sessionCatalog';
 import { SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT } from '../../utilities/session/sessionWorkerConfigCache';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { compareSessionListEntries, isListedSession, sessionListName } from '../../utilities/session/sessionListing';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSettingsSessionHref } from '../Account/loginSettingsRouteHelpers';
@@ -69,14 +70,20 @@ const ToolExplorerSessionControl = ({
       ].map(normalizeSessionSlug),
     ),
   );
-  const options = slugs.map((slug) => {
-    const config = resolveToolSessionConfig(slug, slug === activeSessionSlug ? sessionConfig : null);
-    const name = slug
-      ? toStr(config?.sessionName).trim() || catalog.find((entry) => entry.slug === slug)?.name || slug
-      : 'General';
-    const description = slug ? `${name} (${slug})` : name;
-    return { slug, name, description };
-  });
+  // General stays: here it is a per-tool choice. Sessions the site's lists
+  // leave off show only while this tool or the global choice uses them.
+  const options = slugs
+    .filter((slug) => !slug || slug === activeSessionSlug || slug === inheritedSessionSlug || isListedSession(slug))
+    .map((slug) => {
+      const config = resolveToolSessionConfig(slug, slug === activeSessionSlug ? sessionConfig : null);
+      const name = sessionListName(
+        slug,
+        toStr(config?.sessionName).trim() || catalog.find((entry) => entry.slug === slug)?.name || '',
+      );
+      const description = slug ? `${name} (${slug})` : name;
+      return { slug, name, description, label: description };
+    })
+    .sort(compareSessionListEntries);
 
   let inheritedOptionValue = '__ce_inherited_session__';
   while (slugs.includes(inheritedOptionValue)) inheritedOptionValue += '_';

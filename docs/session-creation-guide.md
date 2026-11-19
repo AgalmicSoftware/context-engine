@@ -1423,7 +1423,8 @@ where the session's Worker is:
   "<slug>": {
     "worker": "https://<worker-origin>",
     "sessionId": "0x<32 hex digits>",
-    "name": "<session name>"
+    "name": "<session name>",
+    "title": "<label in session lists>"
   }
 }
 ```
@@ -1432,6 +1433,9 @@ where the session's Worker is:
 - `sessionId` is the ID the Worker reports: `0x` and 32 lowercase hex digits.
   The session opens only when the Worker's verified config carries this ID.
 - `name` is optional; the Worker's config supplies every setting.
+- `title` is optional: the session's label in the site's session lists, such
+  as the Session drop-down. It changes nothing else; the session keeps its own
+  name everywhere else.
 
 Add the entry with a pull request. Normal links work once it's on `main` and the
 site has deployed; until then, share the `worker=` link. Any other session opens
@@ -1440,13 +1444,25 @@ only from its `worker=` link, except the site's built-in demos, such as
 also serves the file at `/known-sessions.json`, so agents can find a session's
 Worker from its slug.
 
-The file lists EDDY 2026 (`eddy26`), the demo session (`demo-sh`), the Reverse
-Alignment salon (`rxc-ra-2`) and `rxc-ra-test-5`. The About page's **Demo**
-button opens `rxc-ra-test-5`, and the films, stills, promo slides and writeup
-carry its link. Delete its entry only once those links switch to another listed
-session and the button opens it. A listed session that also has
-demo data in `demo_sessions.json`, as `demo-sh` does, keeps that data; the list
-sets only its Worker, its session ID and its normal link.
+The file lists EDDY 2026 (`eddy26`), the Reverse Alignment salon (`rxc-ra-2`),
+the test sessions `rxc-ra-test-5` and `rxc-ra-agent-test-1`, and the demo
+session (`demo-sh`). The About page's **Demo** button opens `rxc-ra-test-5`,
+and the films, stills, promo slides and writeup carry its link. Delete its
+entry only once those links switch to another listed session and the button
+opens it. A listed session that also has demo data in `demo_sessions.json`, as
+`demo-sh` does, keeps that data; the list sets only its Worker, its session ID
+and its normal link.
+
+The site's session lists (the Session drop-down in Stats, Users and the log-in
+dialog, the Tools and Groups session pickers, and the Sessions directory) show
+the listed sessions first, in the file's order, then any other session the
+browser knows of, by name. They leave out, for now, sessions whose slugs match
+`UNLISTED_SESSION_PATTERNS` in `client/src/utilities/session/sessionListing.ts`:
+automated test runs (`cloudflare-`, `e2e-`, `live-gates-` and similar) and the
+older demos (`demo-sh`, `demo-interview`, `demo-1`, the Telegram and dweb
+demos). That is a display filter only: each still opens from its link, and a
+session a person has chosen stays shown. The Session drop-down shows **General**
+(content in no session) only while it is the current choice.
 
 ## Troubleshooting
 

@@ -8,6 +8,7 @@ import {
 } from '../../utilities/session/sessionCatalog';
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
 import { SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT } from '../../utilities/session/sessionWorkerConfigCache';
+import { compareSessionListEntries, isListedSession, sessionListName } from '../../utilities/session/sessionListing';
 import { workerGroupNavigationPort } from '../../domains/worker/workerGroupNavigationPort';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -50,10 +51,16 @@ const WorkerGroupsSessionSelector = ({
   const sessionHref =
     (exactEntry?.href.includes('?worker=') ? exactEntry.href : knownEntry?.href || exactEntry?.href) ||
     buildPublicRoute(`/session/${encodeURIComponent(sessionSlug)}`);
+  // The current session always shows; others only when the site's lists show them.
   const options = [
     { slug: sessionSlug, name: sessionName, href: sessionHref },
-    ...catalog.filter((entry) => entry.slug && entry.slug !== sessionSlug),
-  ].sort((a, b) => a.name.localeCompare(b.name));
+    ...catalog.filter((entry) => entry.slug && entry.slug !== sessionSlug && isListedSession(entry.slug)),
+  ]
+    .map((entry) => {
+      const name = sessionListName(entry.slug, entry.name);
+      return { ...entry, name, label: name };
+    })
+    .sort(compareSessionListEntries);
 
   return (
     <section className={styles.workerRouteSessionHero} data-testid="ce-worker-groups-session-hero">

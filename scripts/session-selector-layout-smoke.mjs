@@ -175,7 +175,8 @@ export async function runSmoke() {
         const stats = page.getByTestId('ce-community-session-select');
         await stats.waitFor({ state: 'visible' });
         await page.evaluate(() => document.fonts.ready);
-        for (const label of ['ALL', 'General', 'Demo Session (demo-sh)']) {
+        // demo-sh is left off the list once another choice replaces it; General shows only while chosen.
+        for (const label of ['Demo Session (demo-sh)', 'ALL']) {
           await stats.selectOption({ label });
           await inspectSessionSelectorLayout(stats, 'center');
         }

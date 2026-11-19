@@ -180,9 +180,9 @@ describe('GlobalSessionSelector', () => {
     );
   });
 
-  it('offers ALL, General and named sessions, keeping a partial exact config from masking the catalog name', () => {
+  it('offers ALL and named sessions, keeping a partial exact config from masking the catalog name', () => {
     const onChange = jest.fn();
-    render(
+    const view = render(
       <GlobalSessionSelector
         selection={selection}
         sessionConfig={{ slug: 'alpha' }}
@@ -193,8 +193,19 @@ describe('GlobalSessionSelector', () => {
     const control = screen.getByRole('combobox', { name: 'Session' });
     expect(screen.getByRole('option', { name: 'ALL' })).toHaveProperty('selected', true);
     expect(screen.getByRole('option', { name: 'alpha discussion (alpha)' })).toBeInTheDocument();
+    // General shows only while it is the current choice.
+    expect(screen.queryByRole('option', { name: 'General' })).not.toBeInTheDocument();
     fireEvent.change(control, { target: { value: 'beta' } });
     expect(onChange).toHaveBeenLastCalledWith({ primarySessionSlug: 'beta', selectedSessionScope: 'active' });
+    view.rerender(
+      <GlobalSessionSelector
+        selection={{ ...selection, selectedSessionScope: 'general' }}
+        sessionConfig={{ slug: 'alpha' }}
+        onChange={onChange}
+        testId="selector"
+      />,
+    );
+    expect(screen.getByRole('option', { name: 'General' })).toHaveProperty('selected', true);
     fireEvent.change(control, { target: { value: '' } });
     expect(onChange).toHaveBeenLastCalledWith({ primarySessionSlug: '', selectedSessionScope: 'general' });
     fireEvent.change(control, { target: { value: screen.getByRole('option', { name: 'ALL' }).getAttribute('value') } });
@@ -322,6 +333,72 @@ describe('GlobalSessionSelector', () => {
     expect(screen.getAllByRole('option', { name: 'Discovered Worker (worker-discovered)' })).toHaveLength(2);
     view.unmount();
   });
+  it('leaves test runs off as the registry loads, keeping the list steady and the current one shown', () => {
+    jest.mocked(getAllSessionSlugs).mockReturnValue([]);
+    jest.mocked(getSessionConfigBySlug).mockImplementation((slug: unknown) => ({ slug, sessionName: slug }));
+    jest.mocked(getAllDemoSessionConfigs).mockReturnValue([
+      [
+        'demo-sh',
+        {
+          slug: 'demo-sh',
+          sessionName: 'Demo Session',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        },
+      ],
+      [
+        'rxc-ra-2',
+        {
+          slug: 'rxc-ra-2',
+          sessionName: 'Reverse Alignment',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        },
+      ],
+      [
+        'eddy26',
+        {
+          slug: 'eddy26',
+          sessionName: 'EDDY 2026 - Bridging theory and practice',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        },
+      ],
+    ]);
+    const labels = () => screen.getAllByRole('option').map((option) => option.textContent);
+    const view = render(
+      <GlobalSessionSelector
+        selection={{ ...selection, primarySessionSlug: '', selectedSessionSlugs: [] }}
+        onChange={jest.fn()}
+        testId="selector"
+      />,
+    );
+    const before = labels();
+    expect(before).toEqual([
+      'ALL',
+      'EDDY 2026 - Bridging theory and practice (eddy26)',
+      'Reverse Alignment Salon (rxc-ra-2)',
+    ]);
+    jest
+      .mocked(getAllSessionSlugs)
+      .mockReturnValue(['cloudflare-wg-20260825-180530', 'e2e-custom-20260702-234338', 'live-gates-mvhf6mkw']);
+    act(() => window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT)));
+    expect(labels()).toEqual(before);
+    jest.mocked(getAllSessionSlugs).mockReturnValue(['cloudflare-wg-20260825-180530', 'town-hall']);
+    act(() => window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT)));
+    expect(labels()).toEqual([...before, 'town-hall']);
+    // A session left off the list still shows, and links, while it is the current choice.
+    view.rerender(
+      <GlobalSessionSelector
+        selection={{
+          ...selection,
+          selectedSessionScope: 'active',
+          primarySessionSlug: 'cloudflare-wg-20260825-180530',
+        }}
+        onChange={jest.fn()}
+        testId="selector"
+      />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('cloudflare-wg-20260825-180530');
+    expect(screen.getByTestId('selector-link')).toHaveAttribute('href', '/session/cloudflare-wg-20260825-180530');
+  });
 
   describe('as the Settings session picker', () => {
     const worker = (slug: string, sessionName: string) => [
@@ -377,13 +454,7 @@ describe('GlobalSessionSelector', () => {
         sessionName: { quarry: 'Quarry Talks', lantern: 'Lantern Forum', meadow: 'Meadow Circle' }[slug as string],
       }));
       renderPicker('meadow');
-      expect(names()).toEqual([
-        'ALL',
-        'General',
-        'Lantern Forum (lantern)',
-        'Meadow Circle (meadow)',
-        'Quarry Talks (quarry)',
-      ]);
+      expect(names()).toEqual(['ALL', 'Lantern Forum (lantern)', 'Meadow Circle (meadow)', 'Quarry Talks (quarry)']);
       expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('meadow');
     });
 
