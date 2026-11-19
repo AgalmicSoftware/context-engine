@@ -10,6 +10,7 @@ import {
   normalizeAnalysisCardLook,
   parseAnalysisCardFigure,
 } from '../../shared/analysisCardPicture.mjs';
+import { analysisCardOn } from '../../shared/analysisCardSaved.mjs';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { assertNoSecretShape } from './agent/redaction.mjs';
 import { boundedAgentFetch } from './agent/transport.mjs';
@@ -23,6 +24,7 @@ import { rateLimitRefusal } from './rateLimitRefusal.js';
 // style of their own time. The page sends only the figure's name. One request to the session's OpenAI key
 // art-directs the picture (the "look"), a second draws it from that look alone, and the result is kept per figure
 // so each figure is drawn once per session. Neither request sees an answer, a participant's name or an address.
+// It answers nothing where an admin has turned the card off (`analysisCardEnabled: false`).
 export const ANALYSIS_CARD_PICTURE_PATH = '/analysis-card/picture';
 
 // New pictures a session may draw in a day, whoever asks, as Wrapped bounds its posters.
@@ -165,6 +167,8 @@ export const dispatchAnalysisCardPictureRoute = async ({
   noStore.set('cache-control', 'no-store');
   const send = (data, status) => deps?.json?.(data, status, noStore);
 
+  // Turned off by an admin: nothing is then counted, read, stored or asked of a model.
+  if (!analysisCardOn(config)) return send({ error: 'analysis_card_off' }, 403);
   // Who may ask, and when, is the signed-in /ai route's rule.
   const ended = buildSessionEndedResponse({ config, headers: noStore, json: deps?.json, now: deps?.now });
   if (ended) return ended;

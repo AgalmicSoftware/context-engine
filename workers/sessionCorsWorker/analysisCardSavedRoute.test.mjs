@@ -10,6 +10,10 @@ import {
 import { evaluateAuthenticatedRoutePreflight } from './authenticatedRoutePreflight.js';
 import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretActionRouteDispatch.js';
 import { json } from './responseKvHelpers.js';
+import { applySessionConfigMutation } from './sessionConfigMutation.js';
+import { FEATURES } from './workerCapabilities.js';
+import { projectPublicWorkerSessionConfig, selectDeployWorkerSessionConfigFields } from '../shared/workerSessionConfig.mjs';
+import { classifySessionConfigEdits } from '../../shared/sessionConfigEdits.mjs';
 
 const OWNER = `0x${'a1'.repeat(20)}`;
 const VISITOR = `0x${'b2'.repeat(20)}`;
@@ -26,13 +30,21 @@ const CARD = {
   },
 };
 
+// A session that never saved the switch has the card on, as every session from before the switch does.
+const ON = {};
+
 const createKv = () => {
   const rows = new Map();
   const puts = [];
+  const gets = [];
   return {
     rows,
     puts,
-    get: async (key) => rows.get(key) ?? null,
+    gets,
+    get: async (key) => {
+      gets.push(key);
+      return rows.get(key) ?? null;
+    },
     put: async (key, value, options) => {
       puts.push({ key, value, options });
       rows.set(key, value);
@@ -44,7 +56,7 @@ const run = async ({
   path = ANALYSIS_CARD_PUBLISH_PATH,
   body = { published: true, card: CARD },
   address = OWNER,
-  config = {},
+  config = ON,
   kv = createKv(),
   env = { GROUP_KV: kv },
   scopes = { ai: true },
@@ -167,7 +179,7 @@ test('who may save or read is the card picture\'s rule: the ai scope, now, in a 
     assert.equal(noScope.response.status, 403, path);
     const revoked = await run({ path, body, currentScopes: { ai: false } });
     assert.equal(revoked.response.status, 403, path);
-    const ended = await run({ path, body, config: { sessionEndsAt: '2026-11-16T00:00:00Z' } });
+    const ended = await run({ path, body, config: { ...ON, sessionEndsAt: '2026-11-16T00:00:00Z' } });
     assert.equal(ended.response.status, 410, path);
     assert.equal(ended.body.code, 'session_ended');
     for (const result of [noScope, revoked, ended]) assert.equal(result.kv.puts.length, 0);
@@ -220,7 +232,7 @@ test('the signed-in dispatcher answers both paths itself, whatever action the bo
       path,
       action: 'ai',
       body,
-      config: {},
+      config: ON,
       slug: 'salon',
       address: OWNER,
       env: { GROUP_KV: kv },
@@ -238,4 +250,63 @@ test('the signed-in dispatcher answers both paths itself, whatever action the bo
     assert.equal(result.response.status, 200, path);
     assert.equal((await result.response.json()).published, true, path);
   }
+});
+
+test('the card is on unless an admin turns it off: off, nothing is counted, read or stored', async () => {
+  const kv = createKv();
+  await run({ kv, config: { analysisCardEnabled: true } });
+  const before = [...kv.rows.entries()];
+  assert.equal(before.length, 1);
+  kv.gets.length = 0;
+  kv.puts.length = 0;
+  for (const config of [{ analysisCardEnabled: false }]) {
+    for (const [path, body] of [
+      [ANALYSIS_CARD_PUBLISH_PATH, { published: true, card: CARD }],
+      [ANALYSIS_CARD_PUBLISH_PATH, { published: false }],
+      [ANALYSIS_CARD_PUBLISHED_PATH, { account: OWNER }],
+    ]) {
+      const off = await run({ path, body, config, kv });
+      assert.equal(off.response.status, 403, path);
+      assert.deepEqual(off.body, { error: 'analysis_card_off' });
+      assert.deepEqual(off.counted, []);
+    }
+  }
+  assert.deepEqual([kv.gets.length, kv.puts.length], [0, 0]);
+  // A card saved while it was on is left in storage, and is there again once the card is back on.
+  assert.deepEqual([...kv.rows.entries()], before);
+  assert.deepEqual((await read(kv)).body, { published: true, card: CARD, savedAt: NOW });
+
+  const viaDispatcher = await dispatchAuthenticatedSecretActionRoute({
+    path: ANALYSIS_CARD_PUBLISHED_PATH,
+    action: 'ai',
+    body: { account: OWNER },
+    config: { analysisCardEnabled: false },
+    slug: 'salon',
+    address: OWNER,
+    env: { GROUP_KV: kv },
+    headers: {},
+    scopes: { ai: true },
+    deps: {
+      json,
+      evaluateAuthenticatedRoutePreflight,
+      computeScopesForLogin: async () => { throw new Error('nothing is checked while the card is off'); },
+      checkRateLimit: async () => { throw new Error('nothing is counted while the card is off'); },
+      proxyOpenAI: async () => { throw new Error('the /ai route must not answer'); },
+    },
+  });
+  assert.equal(viaDispatcher.handled, true);
+  assert.equal(viaDispatcher.response.status, 403);
+});
+
+test('analysisCardEnabled is true or false, signs no one out, the site can read it and a redeploy keeps it', () => {
+  const base = { slug: 's', sessionId: `0x${'ab'.repeat(16)}`, adminAddress: OWNER };
+  const save = (analysisCardEnabled) =>
+    applySessionConfigMutation({ existingConfig: base, slug: 's', mutation: { kind: 'set-config', incomingConfig: { ...base, analysisCardEnabled } } });
+  assert.deepEqual([save(true).ok, save(false).ok], [true, true]);
+  assert.deepEqual([save('yes').ok, save('yes').error], [false, 'analysisCardEnabled must be true or false.']);
+  assert.deepEqual(classifySessionConfigEdits(base, { ...base, analysisCardEnabled: true }), { content: ['analysisCardEnabled'], authority: [], signsParticipantsOut: false });
+  assert.equal(projectPublicWorkerSessionConfig({ ...base, analysisCardEnabled: true }).analysisCardEnabled, true);
+  assert.equal(selectDeployWorkerSessionConfigFields({ ...base, analysisCardEnabled: true }).analysisCardEnabled, true);
+  // The site offers the switch only where the Worker says it has the card.
+  assert.ok(FEATURES.includes('analysis_card_v1'));
 });

@@ -1,4 +1,4 @@
-import { normalizeSavedAnalysisCard } from '../../shared/analysisCardSaved.mjs';
+import { analysisCardOn, normalizeSavedAnalysisCard } from '../../shared/analysisCardSaved.mjs';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 
 // One personal analysis card per person, saved on their page so every visitor sees the same card without pressing
@@ -10,7 +10,7 @@ import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 // - POST /analysis-card/published { account } answers { published: true, card, savedAt }, { published: false }
 //   (withdrawn) or { published: null } (nothing saved).
 // Both need what the card's picture needs: a sign-in with the `ai` scope, rechecked against the session's current
-// rules, in a session that has not ended. Neither calls a model or counts an AI call.
+// rules, in a session that has not ended and has not turned the card off. Neither calls a model or counts an AI call.
 export const ANALYSIS_CARD_PUBLISH_PATH = '/analysis-card/publish';
 export const ANALYSIS_CARD_PUBLISHED_PATH = '/analysis-card/published';
 export const ANALYSIS_CARD_SAVED_PATHS = [ANALYSIS_CARD_PUBLISH_PATH, ANALYSIS_CARD_PUBLISHED_PATH];
@@ -49,6 +49,9 @@ export const dispatchAnalysisCardSavedRoute = async ({
   noStore.set('cache-control', 'no-store');
   const send = (data, status) => deps?.json?.(data, status, noStore);
 
+  // Turned off by an admin: nothing is then counted, read or stored. A card saved while it was on stays in storage,
+  // unread, until the switch is on again or the card expires.
+  if (!analysisCardOn(config)) return send({ error: 'analysis_card_off' }, 403);
   const ended = buildSessionEndedResponse({ config, headers: noStore, json: deps?.json, now: deps?.now });
   if (ended) return ended;
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({

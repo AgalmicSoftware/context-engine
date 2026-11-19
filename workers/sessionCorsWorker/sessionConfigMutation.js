@@ -76,6 +76,9 @@ const validResultsAnalysisSettingsConfig = (config) => {
 
 const validPileAutoAdvanceConfig = (config) =>
   !hasOwn(config, 'pileAutoAdvanceEnabled') || typeof config.pileAutoAdvanceEnabled === 'boolean';
+// The personal analysis card: absent means on.
+const validAnalysisCardConfig = (config) =>
+  !hasOwn(config, 'analysisCardEnabled') || typeof config.analysisCardEnabled === 'boolean';
 // The Feedback box: absent means on.
 const validFeedbackConfig = (config) =>
   !hasOwn(config, 'feedbackEnabled') || typeof config.feedbackEnabled === 'boolean';
@@ -285,6 +288,7 @@ const SETTINGS_CHECKS = Object.freeze([
   [validGroupMemberCeiling, `groupMemberCeiling must be a whole number from 1 to ${WORKER_GROUP_MEMBER_CEILING_MAX}.`],
   [validAppearanceConfig, 'Invalid session appearance config.'],
   [validPileAutoAdvanceConfig, 'Invalid pile auto-advance config.'],
+  [validAnalysisCardConfig, 'analysisCardEnabled must be true or false.'],
   [validFeedbackConfig, 'feedbackEnabled must be true or false.'],
   [validNamesConfig, 'namesEnabled must be true or false.'],
   [validContextCardsConfig, 'contextCardsEnabled must be true or false.'],

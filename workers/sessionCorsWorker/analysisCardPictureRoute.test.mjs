@@ -35,10 +35,15 @@ const DRAWN = { status: 200, body: { data: [{ b64_json: IMAGE }] } };
 const createKv = () => {
   const rows = new Map();
   const puts = [];
+  const gets = [];
   return {
     rows,
     puts,
-    get: async (key) => rows.get(key) ?? null,
+    gets,
+    get: async (key) => {
+      gets.push(key);
+      return rows.get(key) ?? null;
+    },
     put: async (key, value, options) => {
       puts.push({ key, options });
       rows.set(key, value);
@@ -74,6 +79,7 @@ const lookPromptOf = (call) => (call.body.input || call.body.messages)[0].conten
 
 const run = async ({
   figure = FIGURE,
+  // A session that never saved the switch has the card on.
   config = {},
   kv = createKv(),
   env = { GROUP_KV: kv },
@@ -454,4 +460,24 @@ test('the signed-in dispatcher answers the path itself, whatever action the body
   assert.equal(result.handled, true);
   assert.equal(result.response.status, 400);
   assert.deepEqual(await result.response.json(), { error: 'invalid_figure' });
+});
+
+test('the picture is on unless an admin turns it off: off, nothing is counted, read, stored or asked', async () => {
+  const drawn = await run({ config: { analysisCardEnabled: true } });
+  assert.equal(drawn.response.status, 200);
+  const { kv } = drawn;
+  const rows = [...kv.rows.entries()];
+  kv.gets.length = 0;
+  kv.puts.length = 0;
+  // A picture already drawn is not given either.
+  for (const config of [{ analysisCardEnabled: false }]) {
+    const off = await run({ config, kv });
+    assert.equal(off.response.status, 403);
+    assert.deepEqual(off.body, { error: 'analysis_card_off' });
+    assert.equal(off.response.headers.get('cache-control'), 'no-store');
+    assert.equal(off.upstream.calls.length, 0);
+    assert.deepEqual(off.counted, []);
+  }
+  assert.deepEqual([kv.gets.length, kv.puts.length], [0, 0]);
+  assert.deepEqual([...kv.rows.entries()], rows);
 });

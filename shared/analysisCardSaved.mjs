@@ -89,3 +89,13 @@ export const normalizeSavedAnalysisCard = (value) => {
   };
   return new TextEncoder().encode(JSON.stringify(saved)).length <= ANALYSIS_CARD_SAVED_MAX_BYTES ? saved : null;
 };
+
+/** What a Session Worker with the analysis card advertises; an older one has neither its picture nor saved card. */
+export const ANALYSIS_CARD_FEATURE = 'analysis_card_v1';
+
+/**
+ * The analysis card is on unless an admin turns it off for the session (`analysisCardEnabled: false`); a session
+ * that never saved the setting has it on. Off, the Worker refuses the card's picture and saved card before
+ * counting, reading or storing anything, and the page neither makes nor shows a card.
+ */
+export const analysisCardOn = (config) => config?.analysisCardEnabled !== false;

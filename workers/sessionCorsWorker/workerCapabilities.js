@@ -7,6 +7,8 @@ import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRo
 
 export const FEATURES = Object.freeze([
   'agent_http_v1',
+  // The personal analysis card's picture and saved card; analysisCardEnabled: false turns them off.
+  'analysis_card_v1',
   // limits.aiPerWalletPerDay is honoured; older Workers store it and ignore it.
   'ai_daily_limit_v1',
   // Context sources carry cards: /storage/context takes set-card and make-card, and lists show each card.

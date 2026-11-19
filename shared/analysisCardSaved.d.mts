@@ -13,3 +13,5 @@ export type SavedAnalysisCard = {
 
 export const ANALYSIS_CARD_SAVED_MAX_BYTES: number;
 export function normalizeSavedAnalysisCard(value: unknown): SavedAnalysisCard | null;
+export const ANALYSIS_CARD_FEATURE: 'analysis_card_v1';
+export function analysisCardOn(config: unknown): boolean;
