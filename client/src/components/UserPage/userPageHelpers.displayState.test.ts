@@ -217,7 +217,7 @@ describe('userPageHelpers display state helpers', () => {
       isOwner: true,
       notOwnPage: false,
       showPen: false,
-      showUsernamePen: true,
+      showUsernameButton: true,
     });
     expect(
       buildUserPageProfileEditVisibility({
@@ -230,7 +230,7 @@ describe('userPageHelpers display state helpers', () => {
       isOwner: false,
       notOwnPage: true,
       showPen: true,
-      showUsernamePen: false,
+      showUsernameButton: false,
     });
     expect(
       buildUserPageProfileEditVisibility({
@@ -241,7 +241,7 @@ describe('userPageHelpers display state helpers', () => {
       }),
     ).toMatchObject({
       showPen: false,
-      showUsernamePen: false,
+      showUsernameButton: false,
     });
     expect(
       resolveUserPageHeaderActionVisibility({

@@ -52,7 +52,7 @@ export type UserPageProfileEditVisibility = {
   isOwner: boolean;
   notOwnPage: boolean;
   showPen: boolean;
-  showUsernamePen: boolean;
+  showUsernameButton: boolean;
 };
 
 export type UserPageHeaderActionVisibility = {
@@ -97,7 +97,7 @@ export const buildUserPageProfileEditVisibility = ({
     notOwnPage,
     showPen: !minimized && notOwnPage && !isEditingNickname,
     // The account dialog shows the page minimized; its owner can still set a username there.
-    showUsernamePen: isOwner && !isEditingUsername,
+    showUsernameButton: isOwner && !isEditingUsername,
   };
 };
 

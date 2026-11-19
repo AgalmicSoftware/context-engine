@@ -102,7 +102,7 @@ type UserPageHeaderProps = {
   onUsernameEdit: React.MouseEventHandler<HTMLButtonElement>;
   onUsernameKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
   showPen?: boolean;
-  showUsernamePen?: boolean;
+  showUsernameButton?: boolean;
   username?: string;
   usernameEnteredIndicatorDisplayState: UserPageInlineEnteredIndicatorDisplayState;
   usernameErrorDisplayState: UserPageUsernameErrorDisplayState;
@@ -143,7 +143,7 @@ const UserPageHeader = ({
   onUsernameEdit,
   onUsernameKeyDown,
   showPen = false,
-  showUsernamePen = false,
+  showUsernameButton = false,
   username = '',
   usernameEnteredIndicatorDisplayState,
   usernameErrorDisplayState,
@@ -159,87 +159,86 @@ const UserPageHeader = ({
             role="img"
           ></div>
         </div>
-        <h1 id={styles.userPageAddress}>
-          {addressDisplay}
-          {privateLabelTag && (
-            <span className={styles.privateLabelTag} title={PRIVATE_LABEL_NOTE}>
-              <span className={styles.visuallyHidden}>, </span>
-              {privateLabelTag}
-            </span>
-          )}
-          {showPen && (
+        <div className={styles.addressColumn}>
+          <h1 id={styles.userPageAddress}>
+            {addressDisplay}
+            {privateLabelTag && (
+              <span className={styles.privateLabelTag} title={PRIVATE_LABEL_NOTE}>
+                <span className={styles.visuallyHidden}>, </span>
+                {privateLabelTag}
+              </span>
+            )}
+            {showPen && (
+              <button
+                onClick={onNicknameEdit}
+                className={styles.copyButton}
+                data-ce-control-appearance="frameless"
+                aria-label="Edit private label"
+                title={PRIVATE_LABEL_NOTE}
+              >
+                <FontAwesomeIcon icon={faPen} />
+              </button>
+            )}
+            {headerActionVisibility.showSimulatedBadge && (
+              <span className={styles.simulatedBadge} id="simulatedUserTooltip">
+                <FontAwesomeIcon icon={faExclamationTriangle} />
+              </span>
+            )}
+            {headerActionVisibility.showSimulatedBadge && (
+              <CETooltip placement="right" target="simulatedUserTooltip">
+                This is a simulated user whose answers are generated based on documents.
+              </CETooltip>
+            )}
+            {headerActionVisibility.showCopyAddressButton && (
+              <button
+                onClick={onCopyAddress}
+                className={styles.copyButton}
+                data-ce-control-appearance="frameless"
+                aria-label="Copy address"
+              >
+                <FontAwesomeIcon icon={faCheck} style={copyIconDisplayState.copiedIconStyle} />
+                <FontAwesomeIcon icon={faCopy} style={copyIconDisplayState.defaultIconStyle} />
+              </button>
+            )}
+            {headerActionVisibility.showExplorerLink && (
+              <a
+                href={explorerUrl || undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.expandButton}
+                data-ce-control-appearance="frameless"
+                aria-label="View address on explorer"
+                title="View address on explorer"
+              >
+                <FontAwesomeIcon icon={faExternalLinkAlt} />
+              </a>
+            )}
+            {headerActionVisibility.showBookmarkButton && (
+              <button
+                onClick={onBookmark}
+                className={headerBookmarkClassName}
+                data-ce-control-appearance="frameless"
+                style={bookmarkButtonDisplayState.iconStyle}
+                aria-label={bookmarkButtonDisplayState.ariaLabel}
+                title={bookmarkButtonDisplayState.title}
+              >
+                <FontAwesomeIcon icon={faBookmark} />
+              </button>
+            )}
+          </h1>
+          {showUsernameButton && (
             <button
-              onClick={onNicknameEdit}
-              className={styles.copyButton}
-              data-ce-control-appearance="frameless"
-              aria-label="Edit private label"
-              title={PRIVATE_LABEL_NOTE}
-            >
-              <FontAwesomeIcon icon={faPen} />
-            </button>
-          )}
-          {showUsernamePen && (
-            <button
+              type="button"
               onClick={onUsernameEdit}
-              className={styles.copyButton}
-              data-ce-control-appearance="frameless"
-              aria-label="Set username"
+              className={styles.usernameButton}
               title={
-                usernameSavedTo === 'session'
-                  ? 'Set your name in this session'
-                  : 'Set username, saved on this device only'
+                usernameSavedTo === 'session' ? 'Your name in this session' : 'Your username, saved on this device only'
               }
             >
-              <FontAwesomeIcon icon={faPen} />
+              {username.trim() ? 'Change username' : 'Set username'}
             </button>
           )}
-          {headerActionVisibility.showSimulatedBadge && (
-            <span className={styles.simulatedBadge} id="simulatedUserTooltip">
-              <FontAwesomeIcon icon={faExclamationTriangle} />
-            </span>
-          )}
-          {headerActionVisibility.showSimulatedBadge && (
-            <CETooltip placement="right" target="simulatedUserTooltip">
-              This is a simulated user whose answers are generated based on documents.
-            </CETooltip>
-          )}
-          {headerActionVisibility.showCopyAddressButton && (
-            <button
-              onClick={onCopyAddress}
-              className={styles.copyButton}
-              data-ce-control-appearance="frameless"
-              aria-label="Copy address"
-            >
-              <FontAwesomeIcon icon={faCheck} style={copyIconDisplayState.copiedIconStyle} />
-              <FontAwesomeIcon icon={faCopy} style={copyIconDisplayState.defaultIconStyle} />
-            </button>
-          )}
-          {headerActionVisibility.showExplorerLink && (
-            <a
-              href={explorerUrl || undefined}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.expandButton}
-              data-ce-control-appearance="frameless"
-              aria-label="View address on explorer"
-              title="View address on explorer"
-            >
-              <FontAwesomeIcon icon={faExternalLinkAlt} />
-            </a>
-          )}
-          {headerActionVisibility.showBookmarkButton && (
-            <button
-              onClick={onBookmark}
-              className={headerBookmarkClassName}
-              data-ce-control-appearance="frameless"
-              style={bookmarkButtonDisplayState.iconStyle}
-              aria-label={bookmarkButtonDisplayState.ariaLabel}
-              title={bookmarkButtonDisplayState.title}
-            >
-              <FontAwesomeIcon icon={faBookmark} />
-            </button>
-          )}
-        </h1>
+        </div>
 
         {headerActionVisibility.showBookmarksLink && (
           <a

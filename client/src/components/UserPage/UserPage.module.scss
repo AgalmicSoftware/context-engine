@@ -272,6 +272,32 @@ $icon-size-standard: 1.25rem;
   }
 }
 
+/* The address, with "Set username" on its own line under it. */
+.addressColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.usernameButton {
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 6px 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  // The look of the header's Compare and Analyze buttons, a size down.
+  background: var(--ce-document-border);
+  color: var(--ce-document-text);
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-10);
+  cursor: pointer;
+  // The text keeps its colour on hover, so only the edge changes.
+  &:hover {
+    border-color: var(--ce-document-text);
+  }
+}
+
 /* Says where a name typed in the header is kept; the address text's colour keeps its contrast. */
 .usernameHint {
   margin-left: 8px;
