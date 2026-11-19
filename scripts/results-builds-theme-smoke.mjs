@@ -340,21 +340,34 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
     assert.equal(reach.underBar, 0, `The close button takes taps ${reach.underBar}px below its title bar`);
   });
 
-  // The summary leads short; its positions open on request.
-  const more = panel.getByRole('button', { name: 'Show more' });
-  await more.hover();
-  await step('summary toggle hovered', () => assertReadable(panel));
-  await more.focus();
-  await step('summary toggle focused', () => assertReadable(panel));
-  await more.click();
+  // The positions show at once, each on its own card. A long summary leads short and opens on request.
   await step('summary positions', async () => {
-    await panel.getByRole('listitem').filter({ hasText: 'Pilot it locally first' }).waitFor();
+    await panel.getByRole('listitem').filter({ hasText: 'Pilot it locally first' }).first().waitFor();
     await assertReadable(panel);
     const overflowing = await panel
       .getByRole('listitem')
       .evaluateAll((items) => items.filter((item) => item.scrollWidth > item.clientWidth + 1).map((item) => item.textContent));
     assert.deepEqual(overflowing, [], 'A position overflows its card');
   });
+  // Where its positions sit at both ends of the first axis, they are set side by side under the axis's own words.
+  await step('where people split', async () => {
+    const split = panel.getByRole('region', { name: 'Where people split' });
+    await split.waitFor();
+    const ends = await split.getByRole('heading', { level: 4 }).allTextContents();
+    assert.deepEqual(ends, ['Slow and careful', 'Fast and bold']);
+    assert.equal(await split.getByRole('listitem').count(), 3);
+    await assertReadable(split);
+  });
+  if (screenshotDir) await panel.screenshot({ path: `${screenshotDir}/debate-atlas-node-top-${tag}.png` });
+  const more = panel.getByRole('button', { name: 'See more' });
+  if (await more.count()) {
+    await more.hover();
+    await step('summary toggle hovered', () => assertReadable(panel));
+    await more.focus();
+    await step('summary toggle focused', () => assertReadable(panel));
+    await more.click();
+    await step('whole summary', () => assertReadable(panel));
+  }
 
   // Hovering a participant names them, in the tooltip's own colours.
   await page.locator('[data-testid$="-avatar"]').first().waitFor();
@@ -390,8 +403,29 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   }
   if (screenshotDir) await cards.last().screenshot({ path: `${screenshotDir}/debate-atlas-question-${tag}.png` });
 
-  // The category behind it has a compass of its own, with the same legend.
+  // Behind its window the subtopic's questions are circles of their own; one opens to that question, ready to
+  // read, and Up Level goes back to the subtopic's siblings.
   await panel.getByTitle('Close').click();
+  const questionCircles = page.getByTestId('ce-atlas-node');
+  await step('question circles', async () => {
+    await questionCircles.first().waitFor({ timeout: 15000 });
+    assert.equal(await questionCircles.count(), 2, 'A subtopic with two questions shows two question circles');
+    // The circles' own text; the level's title above them is not judged here.
+    for (const circle of await questionCircles.all()) await assertReadable(circle);
+  });
+  if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-questions-${tag}.png` });
+  await questionCircles.first().click();
+  const questionPanel = page.locator('[class*="modalContent"]').last();
+  await step('question window', async () => {
+    await questionPanel.getByRole('link', { name: /^Answer: / }).waitFor({ timeout: 15000 });
+    assert.equal(await questionPanel.getByRole('link', { name: /^Answer: / }).count(), 1);
+    await assertReadable(questionPanel);
+  });
+  if (screenshotDir) await questionPanel.screenshot({ path: `${screenshotDir}/debate-atlas-question-window-${tag}.png` });
+  await questionPanel.getByTitle('Close').click();
+  await page.getByRole('button', { name: /up level/i }).click();
+
+  // The category behind it has a compass of its own, with the same legend.
   await page.getByLabel('Open Transport').click();
   const categoryPanel = page.locator('[class*="modalContent"]').last();
   await step('open category', () => categoryPanel.getByText('Topic', { exact: true }).waitFor({ timeout: 15000 }));
