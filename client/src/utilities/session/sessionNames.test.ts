@@ -1,6 +1,7 @@
 import {
   normalizeSessionName,
   resolveSessionNamesSource,
+  findSessionNameMatches,
   sessionNameLabels,
   subscribeSessionNames,
   SESSION_NAMES_FEATURE,
@@ -38,6 +39,19 @@ it('shows the short address in brackets after every name', () => {
     [B]: 'sam (0x000…00bb)',
     [C]: 'Ada (0x000…00cc)',
   });
+});
+
+it('finds accounts by a part of their name, whatever its case, one match per account', () => {
+  const names = { [A]: 'Sam', [B]: 'sam', [C]: 'Ada Sampson' };
+  expect(findSessionNameMatches(names, '  SAM ')).toEqual([
+    { address: A, name: 'Sam', label: 'Sam (0x000…00aa)' },
+    { address: B, name: 'sam', label: 'sam (0x000…00bb)' },
+    { address: C, name: 'Ada Sampson', label: 'Ada Sampson (0x000…00cc)' },
+  ]);
+  expect(findSessionNameMatches(names, 'ada  s').map((match) => match.address)).toEqual([C]);
+  expect(findSessionNameMatches(names, 'sam', 2)).toHaveLength(2);
+  expect(findSessionNameMatches(names, '')).toEqual([]);
+  expect(findSessionNameMatches(names, 'zed')).toEqual([]);
 });
 
 it('has no source for an on-chain session or a Worker from before names', async () => {

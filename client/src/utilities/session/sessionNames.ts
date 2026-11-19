@@ -162,3 +162,26 @@ export const sessionNameLabels = (names: SessionNames): Record<string, string> =
   for (const [address, name] of Object.entries(names)) labels[address] = `${name} (${shortSessionAddress(address)})`;
   return labels;
 };
+
+export type SessionNameMatch = { address: string; name: string; label: string };
+
+/**
+ * The named accounts whose name contains what was typed, ignoring case and spacing; names that start with it
+ * come first. Two accounts with one name are two matches, told apart by their short address.
+ */
+export const findSessionNameMatches = (names: SessionNames, typed: string, limit = 6): SessionNameMatch[] => {
+  const query = normalizeSessionName(typed).toLocaleLowerCase();
+  if (!query) return [];
+  const labels = sessionNameLabels(names);
+  return Object.entries(names)
+    .map(([address, name]) => ({ address, name, label: labels[address], at: name.toLocaleLowerCase().indexOf(query) }))
+    .filter((match) => match.at >= 0)
+    .sort(
+      (a, b) =>
+        Math.min(a.at, 1) - Math.min(b.at, 1) ||
+        a.name.toLocaleLowerCase().localeCompare(b.name.toLocaleLowerCase()) ||
+        (a.address < b.address ? -1 : 1),
+    )
+    .slice(0, limit)
+    .map(({ address, name, label }) => ({ address, name, label }));
+};
