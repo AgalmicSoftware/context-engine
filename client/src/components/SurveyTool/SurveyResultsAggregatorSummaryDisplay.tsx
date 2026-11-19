@@ -85,6 +85,12 @@ export const SurveyResultsMultichoiceDistributionDisplay = ({
             <span className={styles.surveyResultsMultichoiceOptionStats}>
               {option.count} ({percent}%)
             </span>
+            {/* How many of the responders chose it, as a bar; the numbers beside it say the same. */}
+            <span className={styles.surveyResultsMultichoiceOptionBar} aria-hidden="true">
+              <i
+                style={{ width: `${totalResponders > 0 ? Math.min(100, (option.count / totalResponders) * 100) : 0}%` }}
+              />
+            </span>
           </div>
         );
       })}

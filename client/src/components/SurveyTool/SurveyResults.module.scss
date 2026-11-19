@@ -1049,6 +1049,22 @@
   font-size: 0.95em;
 }
 
+// Chosen by this share of the responders: a bar on its own line under the option's name and numbers.
+.surveyResultsMultichoiceOptionBar {
+  flex: 1 1 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ce-overlay-text) 16%, transparent);
+
+  i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--ce-data-series-1);
+  }
+}
+
 .questionSummaries {
   margin-top: 1rem;
 }

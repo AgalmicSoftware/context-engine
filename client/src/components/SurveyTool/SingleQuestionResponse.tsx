@@ -593,6 +593,14 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
             <span className={styles.optionStats}>
               {multichoiceSummary.counts[label]} ({percent(multichoiceSummary.counts[label])}%)
             </span>
+            {/* How many of the responders chose it, as a bar; the numbers beside it say the same. */}
+            <span className={styles.optionBar} aria-hidden="true">
+              <i
+                style={{
+                  width: `${Math.min(100, (multichoiceSummary.counts[label] / multichoiceSummary.totalResponders) * 100)}%`,
+                }}
+              />
+            </span>
           </div>
         ))}
       </div>

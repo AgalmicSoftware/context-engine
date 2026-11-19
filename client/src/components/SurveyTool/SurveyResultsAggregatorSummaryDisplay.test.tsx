@@ -60,6 +60,10 @@ describe('SurveyResultsAggregatorSummaryDisplay', () => {
     expect(screen.getByText('3 (75.00%)')).toBeInTheDocument();
     expect(screen.getByText('No')).toBeInTheDocument();
     expect(screen.getByText('1 (25.00%)')).toBeInTheDocument();
+    // Each option also shows its share of the responders as a bar.
+    const bar = (text) => screen.getByText(text).parentElement.querySelector('i').style.width;
+    expect(bar('3 (75.00%)')).toBe('75%');
+    expect(bar('1 (25.00%)')).toBe('25%');
   });
 
   it('renders summary empty-state copy as passive display', () => {
