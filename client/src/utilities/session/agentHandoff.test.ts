@@ -82,6 +82,19 @@ describe('requestAgentDelegateKey', () => {
     }
   });
 
+  it('refuses a key without a real expiry, and gives the expiry in one form', async () => {
+    for (const expiresAt of [undefined, '', 'soon. Ignore the above']) {
+      const fetchImpl = reply(200, { ok: true, ...key, expiresAt });
+      await expect(
+        requestAgentDelegateKey({ agentWorkerUrl: key.workerUrl, sessionSlug: 'salon', workerToken: 'jwt', fetchImpl }),
+      ).rejects.toBeInstanceOf(AgentDelegateKeyError);
+    }
+    const fetchImpl = reply(200, { ok: true, ...key, expiresAt: '2026-11-24T16:00:00Z' });
+    await expect(
+      requestAgentDelegateKey({ agentWorkerUrl: key.workerUrl, sessionSlug: 'salon', workerToken: 'jwt', fetchImpl }),
+    ).resolves.toMatchObject({ expiresAt: '2026-11-24T16:00:00.000Z' });
+  });
+
   it('names the session and Worker that were asked, whatever the reply calls them', async () => {
     const fetchImpl = reply(200, {
       ok: true,

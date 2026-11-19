@@ -80,13 +80,15 @@ export const requestAgentDelegateKey = async ({
   });
   const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
   const token = toStr(body?.token);
-  if (!response.ok || body?.ok !== true || !AGENT_KEY_RE.test(token)) {
+  // The expiry goes into the prompt, so only a real date is taken, in one fixed form.
+  const expiresMs = Date.parse(toStr(body?.expiresAt));
+  if (!response.ok || body?.ok !== true || !AGENT_KEY_RE.test(token) || !Number.isFinite(expiresMs)) {
     throw new AgentDelegateKeyError(toStr(body?.reason), response.status);
   }
   // The prompt names the session and Worker that were asked, not what the reply calls them.
   return {
     token,
-    expiresAt: toStr(body.expiresAt),
+    expiresAt: new Date(expiresMs).toISOString(),
     sessionSlug,
     workerUrl: agentWorkerUrl,
     submitAnswers: body.submitAnswers === true,

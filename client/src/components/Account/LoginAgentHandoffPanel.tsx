@@ -348,7 +348,7 @@ const LoginAgentHandoffPanel = ({
           onClick={() => setKeyShown(!keyShown)}
           data-testid="ce-agent-handoff-key-show"
         >
-          Show
+          {keyShown ? 'Hide' : 'Show'}
         </button>
       </div>
     </>

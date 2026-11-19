@@ -179,6 +179,10 @@ it('puts the key into the one prompt, masked on screen, which names the session 
   expect(prompt).not.toHaveTextContent('ceagt_secret');
   fireEvent.click(screen.getByRole('button', { name: 'Show the key' }));
   expect(prompt).toHaveTextContent('Your key is ceagt_secret;');
+  expect(screen.getByRole('button', { name: 'Show the key' })).toHaveTextContent('Hide');
+  fireEvent.click(screen.getByRole('button', { name: 'Show the key' }));
+  expect(prompt).not.toHaveTextContent('ceagt_secret');
+  expect(screen.getByRole('button', { name: 'Show the key' })).toHaveTextContent('Show');
 });
 
 it("says when a session doesn't let agents submit, and the prompt asks for drafts only", async () => {
