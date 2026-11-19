@@ -14,8 +14,9 @@ import { createRequesterAccessChecks } from './storageRouteExecution.js';
 // rules, in a session that has not ended and has not turned the card off. Neither calls a model or counts an AI call.
 // A card is made from its owner's answers and quotes up to three of them, so it goes only where those answers go.
 // Where the session keeps answers to their author and its admins, none is saved, and one saved before the rules
-// were tightened is deleted by the first request that meets it, so it cannot come back if they are loosened
-// again. Elsewhere a saved card is given only to its owner and to someone who may read that person's answers.
+// were tightened is deleted by the first save or read that meets it while the card is on and the session runs,
+// so it does not come back if they are loosened again. (A card no request met in that time is still there, and
+// is then given, as always, only to its owner and to someone who may read that person's answers.)
 export const ANALYSIS_CARD_PUBLISH_PATH = '/analysis-card/publish';
 export const ANALYSIS_CARD_PUBLISHED_PATH = '/analysis-card/published';
 export const ANALYSIS_CARD_SAVED_PATHS = [ANALYSIS_CARD_PUBLISH_PATH, ANALYSIS_CARD_PUBLISHED_PATH];

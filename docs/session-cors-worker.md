@@ -3272,8 +3272,10 @@ Signed login/bootstrap requests:
   `publish` refuses a card with 403 `analysis_card_answers_private`, and the
   page neither saves one nor offers to. A card saved before the session's
   rules were tightened is deleted by the first `publish` or `published`
-  request that meets it, so it cannot come back if they are loosened again;
-  a withdrawal's marker holds none of the card's words and stays. Elsewhere
+  request that meets it while the card is on and the session runs, so it
+  does not come back if they are loosened again; one that no request met in
+  that time is still stored. A withdrawal's marker holds none of the card's
+  words and stays. Elsewhere
   `published` gives a saved card only to its owner and to a reader who may
   read that person's answers, as a read of one would decide; to anyone else
   it answers `{ published: null }`.
