@@ -264,20 +264,28 @@ describe('putting a session back on a released Worker bundle', () => {
   // their two switches, saved one way and then the other.
   const sides = [['the live bundle', live], ['the pinned bundle', pinned]];
   const switchSets = [{ contextCardsEnabled: true, analysisCardEnabled: false }, { contextCardsEnabled: false, analysisCardEnabled: true }];
+  // This Worker's AI: a card for a source, a reading for a PDF.
+  const provider = async (url, init) => {
+    const body = JSON.parse(typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body));
+    const pdf = JSON.stringify(body.messages?.[0]?.content ?? '').includes('"type":"document"');
+    const text = pdf ? 'Slide 1: Coalition goals.' : JSON.stringify({ summary: 'Minutes of the salon.', tags: ['minutes'], names: ['Ada'] });
+    return new Response(JSON.stringify({ content: [{ type: 'text', text }], stop_reason: 'end_turn' }), { headers: { 'content-type': 'application/json' } });
+  };
+  const aiConfig = config => ({ ...config, workerAuthority: { version: 1, participantScopes: ['storage', 'ai'] },
+    ai: { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' }, thinking: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } } });
+  const card = { title: 'A patient builder of shared rules', matchNote: 'Both trust people closest to a problem.',
+    figure: 'Elinor Ostrom (1933–2012)', tastes: { book: { title: 'Governing the Commons', by: 'Elinor Ostrom' }, game: null, film: null, song: null },
+    answers: { yesNo: { prompt: 'Should towns run their own water?', text: 'Agree' }, ownWords: null, vote: null } };
+  // Drawing a picture needs OpenAI, so one is stored as the picture route stores it.
+  const keepPicture = session => session.kv.put(`session:${slug}:analysis-card-picture:v1:figure:${analysisCardFigureKey(card.figure)}`,
+    JSON.stringify({ figure: card.figure, name: 'Elinor Ostrom', portrait: 'A woman at a desk.', look: { era: '1990s', ground: 'paper', accentHex: '#aa3311' },
+      image: { mime: 'image/jpeg', base64: 'aW1hZ2U=' } }));
   describe.each(sides)('context cards and the saved analysis card on %s', (_name, ref) => {
     (ref ? it.each(switchSets) : it.skip.each(switchSets))('with %o saved: read, restored, saved and back again', async (switches) => {
       const released = bundles[ref];
-      // This Worker's AI: a card for a source, a reading for a PDF.
-      const provider = async (url, init) => {
-        const body = JSON.parse(typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body));
-        const pdf = JSON.stringify(body.messages?.[0]?.content ?? '').includes('"type":"document"');
-        const text = pdf ? 'Slide 1: Coalition goals.' : JSON.stringify({ summary: 'Minutes of the salon.', tags: ['minutes'], names: ['Ada'] });
-        return new Response(JSON.stringify({ content: [{ type: 'text', text }], stop_reason: 'end_turn' }), { headers: { 'content-type': 'application/json' } });
-      };
       const session = await drill({ provider });
       try {
-        const config = { ...session.config, workerAuthority: { version: 1, participantScopes: ['storage', 'ai'] },
-          ai: { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' }, thinking: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } } };
+        const config = aiConfig(session.config);
         await session.kv.put(`session:${slug}:config`, JSON.stringify(config));
         const [admin, person] = [session.client(owner), session.client(member)];
         const contextList = async (client = admin) => (await client.request('/storage/list?resource=docsContext&role=context', { auth: true })).items;
@@ -309,15 +317,10 @@ describe('putting a session back on a released Worker bundle', () => {
         const cards = { [notes]: 'Minutes of the salon.', [deck]: 'Minutes of the salon.', [reading]: null };
         expect(cardsOf(await contextList())).toEqual(cards);
         expect(await readText(admin, reading)).toBe('Slide 1: Coalition goals.');
-        const card = { title: 'A patient builder of shared rules', matchNote: 'Both trust people closest to a problem.',
-          figure: 'Elinor Ostrom (1933–2012)', tastes: { book: { title: 'Governing the Commons', by: 'Elinor Ostrom' }, game: null, film: null, song: null },
-          answers: { yesNo: { prompt: 'Should towns run their own water?', text: 'Agree' }, ownWords: null, vote: null } };
         expect(await person.request('/analysis-card/publish', { method: 'POST', auth: true, body: { published: true, card } })).toMatchObject({ published: true, card });
         expect(await savedCard(admin)).toMatchObject({ published: true, card });
-        // Drawing a picture needs OpenAI, so one is stored as the picture route stores it.
-        await session.kv.put(`session:${slug}:analysis-card-picture:v1:figure:${analysisCardFigureKey(card.figure)}`,
-          JSON.stringify({ image: { base64: 'aW1hZ2U=', mimeType: 'image/jpeg' }, accentHex: '#aa3311' }));
-        expect(await picture(person)).toMatchObject({ cached: true, image: { base64: 'aW1hZ2U=' } });
+        await keepPicture(session);
+        expect(await picture(person)).toMatchObject({ cached: true, image: { mime: 'image/jpeg', base64: 'aW1hZ2U=' } });
         const cardRowsBefore = cardRows();
         expect(cardRowsBefore).toHaveLength(2);
         // Then the switches as this case saves them, and a backup.
@@ -395,7 +398,110 @@ describe('putting a session back on a released Worker bundle', () => {
           config: { ...config, sessionName: 'Renamed on the way back', contextCardsEnabled: true, analysisCardEnabled: true } })).toMatchObject({ status: 200 });
         expect(await shown.cards()).toEqual(cards);
         expect(await savedCard(admin)).toMatchObject({ published: true, card });
-        expect(await picture(person)).toMatchObject({ cached: true, image: { base64: 'aW1hZ2U=' } });
+        expect(await picture(person)).toMatchObject({ cached: true, image: { mime: 'image/jpeg', base64: 'aW1hZ2U=' } });
+        expect(session.signIns).toBe(signedInBack);
+      } finally {
+        session.end();
+      }
+    }, 120000);
+
+    // A session made before 0.9.18 has neither switch. Turning the analysis card
+    // off there saves only that one, so the context cards switch stays absent.
+    (ref ? it : it.skip)('with only analysisCardEnabled: false saved: read, restored, saved and back again', async () => {
+      const released = bundles[ref];
+      const session = await drill({ provider });
+      try {
+        const config = aiConfig(session.config);
+        expect(config).not.toHaveProperty('analysisCardEnabled');
+        expect(config).not.toHaveProperty('contextCardsEnabled');
+        await session.kv.put(`session:${slug}:config`, JSON.stringify(config));
+        const [admin, person] = [session.client(owner), session.client(member)];
+        const savedCard = client => client.request('/analysis-card/published', { method: 'POST', auth: true, body: { account: member.address } });
+        const picture = client => client.request('/analysis-card/picture', { method: 'POST', auth: true, body: { figure: card.figure } });
+        const refusal = request => request.then(() => null, error => [error.status, error.code]);
+        const storedConfig = store => JSON.parse(store.values.get(`session:${slug}:config`));
+        const cardRows = () => [...session.kv.values].filter(([key]) => key.includes(':analysis-card-'));
+        const off = { analysisCardEnabled: false };
+
+        // On this Worker, neither switch saved: the card is on, so a member saves
+        // one and has a picture. A context file gets no card, as cards are off.
+        const current = session.current();
+        expect(await session.signed(current, 'set-secrets', { secrets: { anthropicKey: 'synthetic-anthropic-key' } })).toMatchObject({ status: 200 });
+        const form = new FormData();
+        form.append('file', new Blob([new TextEncoder().encode('# Minutes\nWe agreed.')], { type: 'text/markdown' }), 'notes.md');
+        form.append('resource', 'docsContext');
+        form.append('contentType', 'text/markdown');
+        form.append('tags', JSON.stringify([{ name: 'CE-DocLibrary', value: '1' }, { name: 'CE-DocKind', value: 'file' },
+          { name: 'CE-DocStorage', value: 'cloudflare' }, { name: 'CE-DocRole', value: 'context' }, { name: 'CE-DocName', value: 'notes.md' }]));
+        const notes = (await admin.request('/storage/upload', { method: 'POST', auth: true, form })).id;
+        const context = async (client = admin) => (await client.request('/storage/list?resource=docsContext&role=context', { auth: true }))
+          .items.map(item => [item.storageRef.id, item.metadata.card ?? null]);
+        expect(await context()).toEqual([[notes, null]]);
+        const reads = async client => client.request(`/storage/read?id=${encodeURIComponent(notes)}`, { auth: true, raw: true });
+        expect(await person.request('/analysis-card/publish', { method: 'POST', auth: true, body: { published: true, card } })).toMatchObject({ published: true, card });
+        await keepPicture(session);
+        expect(await picture(person)).toMatchObject({ cached: true, image: { mime: 'image/jpeg', base64: 'aW1hZ2U=' } });
+        const cardRowsBefore = cardRows();
+        expect(cardRowsBefore).toHaveLength(2);
+        // The admin page turns the card off: only that field, as the page sends it.
+        expect(await session.signed(current, 'set-config', { config: off })).toMatchObject({ status: 200 });
+        expect(storedConfig(session.kv)).toMatchObject(off);
+        expect(storedConfig(session.kv)).not.toHaveProperty('contextCardsEnabled');
+        expect(await refusal(savedCard(admin))).toEqual([403, 'analysis_card_off']);
+        expect(await refusal(picture(person))).toEqual([403, 'analysis_card_off']);
+        const pages = await session.backup();
+        expect(JSON.stringify(pages)).toContain('analysisCardEnabled');
+        expect(JSON.stringify(pages)).not.toContain('contextCardsEnabled');
+        expect(JSON.stringify(pages)).not.toContain(card.title);
+
+        // (a) The released bundle reads the file, serves no switch, and has no
+        // card routes; the saved card and the off switch stay stored.
+        const signedInBefore = session.signIns;
+        const previous = session.released(released);
+        expect(await session.readConfig()).not.toHaveProperty('analysisCardEnabled');
+        expect(await reads(person)).toBe('# Minutes\nWe agreed.');
+        for (const ask of [savedCard, picture]) expect(await refusal(ask(person))).toEqual([404, expect.anything()]);
+        expect(storedConfig(session.kv)).toMatchObject(off);
+        expect(session.signIns).toBe(signedInBefore);
+        // (b) A backup restores there, keeping the off switch unseen: this Worker
+        // on the restored session finds the card off, and no saved card.
+        const { fresh, results } = await session.restore(pages, released.createWorkerRuntime, released.SessionWriteCoordinator);
+        results.forEach((result, index) => expect(result).toMatchObject({ status: 200, body: { complete: pages[index].manifest.complete, counts: { conflicts: 0 } } }));
+        const restorer = fresh.client(owner);
+        expect(await reads(restorer)).toBe('# Minutes\nWe agreed.');
+        expect(await fresh.readConfig()).not.toHaveProperty('analysisCardEnabled');
+        expect([...fresh.store.values.keys()].filter(key => key.includes('analysis-card'))).toEqual([]);
+        fresh.deploy(createWorkerRuntime, SessionWriteCoordinator, provider);
+        expect(await fresh.readConfig()).toMatchObject(off);
+        expect(await fresh.readConfig()).not.toHaveProperty('contextCardsEnabled');
+        expect(await refusal(savedCard(restorer))).toEqual([403, 'analysis_card_off']);
+        // (c) A settings page reloaded on the released bundle saves a rename; a
+        // page loaded before, still carrying the off switch, is refused whole.
+        expect(await session.signed(previous, 'set-config', { config: { sessionName: 'Renamed on the way back' } }))
+          .toEqual({ status: 200, body: { ok: true } });
+        expect(await session.signed(previous, 'set-config', { config: { ...off, sessionName: 'Refused' } })).toEqual({
+          status: 400, body: { error: 'Unsupported worker-canonical session config field: analysisCardEnabled.' },
+        });
+        expect(storedConfig(session.kv)).toMatchObject({ ...off, sessionName: 'Renamed on the way back', ai: { models: config.ai.models } });
+        expect(storedConfig(session.kv)).not.toHaveProperty('contextCardsEnabled');
+        expect(cardRows()).toEqual(cardRowsBefore);
+
+        // (d) This Worker again: the card is still off and context cards still
+        // unsaved; turning the card on brings back the saved card and its picture.
+        const signedInBack = session.signIns;
+        session.current();
+        expect(await session.readConfig()).toMatchObject({ ...off, sessionName: 'Renamed on the way back' });
+        expect(await session.readConfig()).not.toHaveProperty('contextCardsEnabled');
+        expect(await reads(admin)).toBe('# Minutes\nWe agreed.');
+        expect(await context()).toEqual([[notes, null]]);
+        const makeCard = () => refusal(admin.request('/storage/context', { method: 'POST', auth: true, body: { action: 'make-card', id: notes } }));
+        expect(await makeCard()).toEqual([409, expect.anything()]);
+        expect(await refusal(savedCard(admin))).toEqual([403, 'analysis_card_off']);
+        expect(await session.signed(session.deployed, 'set-config', { config: { analysisCardEnabled: true } })).toMatchObject({ status: 200 });
+        expect(await session.readConfig()).not.toHaveProperty('contextCardsEnabled');
+        expect(await makeCard()).toEqual([409, expect.anything()]);
+        expect(await savedCard(admin)).toMatchObject({ published: true, card });
+        expect(await picture(person)).toMatchObject({ cached: true, image: { mime: 'image/jpeg', base64: 'aW1hZ2U=' } });
         expect(session.signIns).toBe(signedInBack);
       } finally {
         session.end();
