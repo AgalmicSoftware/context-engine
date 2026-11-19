@@ -4,6 +4,46 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.18] - 2026-11-19
 
+Session Workers need redeploying for the Worker changes below. A redeploy changes no stored record and signs no one out, and turns nothing on: on a session from before this release Context cards and the analysis card are both off until an admin turns them on. A session made on `/new` starts with the analysis card on and Context cards off; both can be set there.
+
+### Client — available when the site deploys
+
+- Settings → AI and the AI section of `/new` have **Analysis card**, shown where the session's Worker has the card, with a **?** on what it does and costs. On `/new` it starts ticked; against a Session Worker without the card the session is made without one. In Settings it is off on a session from before this release until an admin ticks it. Session templates and "Set up with your AI" can set it (`analysisCardEnabled`).
+- The analysis window shows a two-page picture card: a short description of the person, the matched figure with a portrait in a style of their time and why they match, a guessed book, game, film and song, and one answer of each kind. **Download** saves it as a picture (both pages or one), a GIF or a video. The card is made after the analysis appears, so the analysis is not held up. Nothing of it shows where the card is off or the session's Worker is older than this release.
+- A card is made only by its own person, signed in, on their own page. It is saved there and shown to people signed in to the session who may read that person's answers, without pressing Analyze. "Show this card on my page" (on by default) in the analysis window and "Take it off my page" under the card remove it. On someone else's page there is the card that person chose to show, or none.
+- A page asks the Session Worker whether the analysis card is on before it makes one, so a tab opened before an admin turned the card off does not pay for a card.
+- Importing a template in Settings changes **Analysis card** or **Context cards** only when the template names it. A `/new` sync onto a session that exists never turns its analysis card on, and keeps its Context cards as they are.
+- The personal analysis picks the historical figure that fits the person's own mix of answers, instead of the best-known name for the session's subject: always a real person who has died, shown with their years, with a longer explanation. This is not behind the switch and applies to every session when the site deploys.
+- Settings → Context has **Context cards**, shown where the session's Worker keeps them, with a **?** on what they do and cost.
+- Context items show their card's tags; admins, and whoever added an item, can edit its card. **Make missing cards** writes cards for items without one, after showing the cost.
+- Adding a PDF or image where cards are on offers **Analyze with the session's AI**, ticked to start.
+- File pickers offer images only where the session takes them.
+- `/new` has a **Context cards** tick box in its Context section, off to start. Ticked, the session is made with cards on and the file picker there takes images; Create first checks that the Session Worker keeps cards, and says so if it is too old. A session template, a share link and **Set up with your AI** can carry `contextCardsEnabled`; importing a template in Settings applies its choice where the session's Worker keeps cards.
+
+### Workers — requires redeployment
+
+- **Context cards**, off unless an admin turns them on in Settings → Context. On, the session's AI writes a short card for each file and link added to the session's context: a summary, topic tags and key names. A card is stored with its item and reaches only those who may read the item; encrypted items get none. Workers that keep cards advertise `context_cards_v1`.
+- With cards on, the AI's context names the sources it had no room to read, with their cards, so it can say what it left out.
+- With cards on, a session takes PNG, JPEG and WebP images up to 5 MB as context. The session's AI reads an image as it reads a PDF, and its reading is context for whoever can see the image. With cards off, images are refused (`415 context_images_off`), from admins too; images already stored stay.
+- With cards on, whoever added a PDF or image may have the session's AI read it once. It needs the `ai` scope of their sign-in and counts as one of their AI calls for the day, counted once the reading begins: a request refused before that (AI off, a provider that can't read files, no key, a file too large, a reading already running or stored) costs nothing.
+- Changing **Context cards** signs no one out.
+- **Analysis card**, off unless a session has it on (`analysisCardEnabled: true`). A session made on `/new` starts with it on; a session from before 0.9.18 has none until an admin turns it on in Settings → AI. `POST /analysis-card/picture` draws the portrait on a person's analysis card from the matched figure's name alone, with the session's OpenAI key, and keeps one per figure for 30 days; a new portrait counts as one of the person's AI calls a day, and a session draws at most 60 a day. `POST /analysis-card/publish` and `POST /analysis-card/published` keep one card per person on their page, read by anyone signed in with AI access; withdrawing deletes the card's words; up to 20 saves a person a day; kept a year; not in backups. Off, or never set, all three answer 403 `analysis_card_off` and count, read and store nothing. Workers with the card advertise `analysis_card_v1`.
+- A saved analysis card goes only where its owner's answers go. `POST /analysis-card/publish` refuses a request that names another account (403 `analysis_card_own_only`). No card is saved in a session that shows results as totals only or to admins only (403 `analysis_card_answers_private`), and a saved card is given only to its owner and to a reader who may read that person's answers.
+- The analysis card is for Worker-hosted sessions. A session whose settings live on-chain has no Analysis card switch and so has no card.
+- Changing **Analysis card** signs no one out.
+
+### Agents and MCP
+
+- MCP 0.7.0. An agent's display name is now saved in a session that keeps names with its next answer when it wasn't saved on joining (it joined before the session's Worker was upgraded, or that save failed). Once saved, answers don't save it again, so an admin's clear stands. A save that fails leaves the answers stored and says why. The `set_profile` step given for 0.6.0 is no longer needed.
+- `set_profile` and `join_session` state a session's rule for names (at most 32 characters; letters, numbers, spaces and . - _ '), and a refused name's reply carries it.
+- `list_context` lists the files and links in a session's context that the agent may read, oldest first, each with its card where it has one; `query` keeps those whose title, link or card holds every word given, with no AI call. `read_context` returns one source's text, 20,000 characters at a time.
+- `add_context` takes PNG, JPEG and WebP images where the session has cards on, and there has the session's AI read a PDF or image as it is added (`analyze`, true by default with cards on), saying in `analysis` whether it was read, is still being read, or could not be. With cards off it asks only for an admin's agent that sets `analyze` to true.
+
+### Local tooling
+
+- The way-back test now drills a session put back on the 0.9.17 and the 0.9.12 Worker bundles: one from before this release that never saved either switch, and one with both switches saved, cards and a saved analysis card present.
+- The participant journey taps Next as a finger does, so a button that grows under the pointer no longer makes the look pass scroll the page.
+
 ## [0.9.17] - 2026-11-18
 
 Session Workers need redeploying for the Worker changes below. A redeploy changes no stored data and signs no one out; with names on, people can set a name others in the session see.
