@@ -1738,7 +1738,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       }
 
       > span:first-of-type {
-        font-size: 1.1rem;
+        font-size: 1.25rem;
         font-weight: 600;
         color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);
       }
@@ -1860,25 +1860,36 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       border-radius: var(--ce-radius-10);
       background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
 
+      // Larger text throughout the node (owner: "mostly use bigger text").
       p {
         margin: 6px 0 0;
         color: $text-main;
-        font-size: 0.95rem;
+        font-size: 1.0625rem;
         line-height: 1.55;
       }
+    }
+
+    // "Positions", with how many there are.
+    .generatedSummaryHeading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: $text-main;
+      font-size: 1.25rem;
+      font-weight: 800;
     }
 
     .generatedSummaryEyebrow {
       // Lightened, so the info colour reads on the dark panel.
       color: color-mix(in srgb, var(--ce-status-info) 50%, var(--ce-text-inverse));
-      font-size: 0.72rem;
+      font-size: 0.8125rem;
       font-weight: 800;
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
 
     .generatedSummarySection .generatedSummaryLead {
-      font-size: 1rem;
+      font-size: 1.125rem;
       font-weight: 600;
     }
 
@@ -1891,7 +1902,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       border: 0;
       background: none;
       color: color-mix(in srgb, var(--ce-status-info) 50%, var(--ce-text-inverse));
-      font-size: 0.75rem;
+      font-size: 0.875rem;
       font-weight: 800;
       letter-spacing: 0.06em;
       text-transform: uppercase;
@@ -1908,13 +1919,14 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     }
 
     .generatedSummaryPosition {
-      padding: 10px 12px;
+      padding: 12px 14px;
+      border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
       border-left: 3px solid var(--ce-status-info);
       border-radius: var(--ce-radius-6);
       background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
 
       p {
-        font-size: 0.9rem;
+        font-size: 1rem;
       }
     }
 
@@ -1925,6 +1937,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       justify-content: space-between;
       gap: 4px 12px;
       color: $text-main;
+      font-size: 1.0625rem;
       line-height: 1.4;
 
       strong {
@@ -1938,15 +1951,15 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       border-radius: var(--ce-radius-pill);
       background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
       color: $text-main;
-      font-size: 0.75rem;
+      font-size: 0.875rem;
       font-weight: 700;
       white-space: nowrap;
     }
 
     // How much of the compass holds the position, beside its count.
     .generatedSummaryShare {
-      height: 4px;
-      margin-top: 6px;
+      height: 8px;
+      margin-top: 8px;
       overflow: hidden;
       border-radius: var(--ce-radius-pill);
       background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
@@ -1959,7 +1972,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     }
 
     .argumentClaim {
-      font-size: 0.95rem;
+      font-size: 1.0625rem;
       line-height: 1.45;
       color: var(--ce-color-white);
     }
@@ -3123,6 +3136,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     }
 
     .generatedSummaryPositionHeader,
+    .generatedSummaryHeading,
     .generatedSummaryCount {
       color: var(--ce-document-text);
     }

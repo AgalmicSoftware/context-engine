@@ -39,22 +39,44 @@ type Props = {
   entries: DebateComment[];
 };
 
-// The AI's summary of a node: a short lead, then on request the whole summary
-// and each position, with how many participants hold it.
+// The AI's summary of a node: a short lead (the whole summary on request), then every position with how many
+// participants hold it. The positions show straight away: they are what a reader opens the node for.
 export default function DebateMapGeneratedSummary({ entries }: Props) {
   const [open, setOpen] = useState(false);
   const detailsId = `generated-summary-${useId().replace(/:/g, '')}`;
   const summary = String(entries.find((entry) => !entry.label)?.comment || '').trim();
   const positions = entries.filter((entry) => String(entry.label || '').trim());
   const lead = shortenSummary(summary);
-  const hasMore = positions.length > 0 || lead !== summary;
+  const hasMore = lead !== summary;
 
   return (
-    <section className={styles.generatedSummarySection} aria-label="AI-generated summary">
-      <div className={styles.generatedSummaryEyebrow}>AI-generated summary</div>
-      <div id={detailsId}>
-        {summary && <p className={styles.generatedSummaryLead}>{open ? summary : lead}</p>}
-        {open && positions.length > 0 && (
+    <>
+      {summary && (
+        <section className={styles.generatedSummarySection} aria-label="AI-generated summary">
+          <div className={styles.generatedSummaryEyebrow}>AI-generated summary</div>
+          <p id={detailsId} className={styles.generatedSummaryLead}>
+            {open ? summary : lead}
+          </p>
+          {hasMore && (
+            <button
+              type="button"
+              className={styles.generatedSummaryToggle}
+              data-ce-control-appearance="frameless"
+              aria-expanded={open}
+              aria-controls={detailsId}
+              onClick={() => setOpen((value) => !value)}
+            >
+              {open ? 'See less' : 'See more'}{' '}
+              <FontAwesomeIcon icon={open ? faCaretUp : faCaretDown} aria-hidden="true" />
+            </button>
+          )}
+        </section>
+      )}
+      {positions.length > 0 && (
+        <section className={styles.generatedSummarySection} aria-label="Positions">
+          <div className={styles.generatedSummaryHeading}>
+            Positions <span className={styles.generatedSummaryCount}>{positions.length}</span>
+          </div>
           <ul className={styles.generatedSummaryPositions}>
             {positions.map((position, index) => {
               const count = Number(position.participantCount) || 0;
@@ -78,21 +100,8 @@ export default function DebateMapGeneratedSummary({ entries }: Props) {
               );
             })}
           </ul>
-        )}
-      </div>
-      {hasMore && (
-        <button
-          type="button"
-          className={styles.generatedSummaryToggle}
-          data-ce-control-appearance="frameless"
-          aria-expanded={open}
-          aria-controls={detailsId}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? 'Show less' : 'Show more'}{' '}
-          <FontAwesomeIcon icon={open ? faCaretUp : faCaretDown} aria-hidden="true" />
-        </button>
+        </section>
       )}
-    </section>
+    </>
   );
 }

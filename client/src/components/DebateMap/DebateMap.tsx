@@ -1447,7 +1447,10 @@ const Modal = ({
   const totalArgumentCount = proArguments.length + conArguments.length;
   const questionCount = questions.length;
   const historicalCaseCount = historicalCases.length;
-  const compassTitle = content?.compass?.xAxis?.label || content?.name || 'Compass';
+  // A session's own atlas says what the chart is for; the demo atlas keeps its chart's name.
+  const compassTitle = readOnly
+    ? 'Where participants stand'
+    : content?.compass?.xAxis?.label || content?.name || 'Compass';
 
   // Logic for Depth Label and Styling
   const depthIndex = content.depth !== undefined ? content.depth : content.parentPath ? content.parentPath.length : 0;
