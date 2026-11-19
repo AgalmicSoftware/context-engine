@@ -1259,6 +1259,24 @@ describe('sessionWizardWriteNormalization', () => {
   });
 });
 
+test('buildSessionWizardWorkerConfigPayload sends the analysis card only when the draft turns it off', () => {
+  const build = (analysisCardEnabled: unknown) =>
+    buildSessionWizardWorkerConfigPayload({
+      slug: 'analysis-card',
+      draft: {
+        analysisCardEnabled,
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+      workerUrl: 'https://worker.example',
+    });
+
+  expect(build(false)).toHaveProperty('analysisCardEnabled', false);
+  // On is left out: a Worker without the setting takes the session, and a session without it has the card on.
+  expect(build(true)).not.toHaveProperty('analysisCardEnabled');
+  expect(build(undefined)).not.toHaveProperty('analysisCardEnabled');
+  expect(build('false')).not.toHaveProperty('analysisCardEnabled');
+});
+
 it('rejects a blank owner opening before either publication write', () => {
   const draft = { interviewMode: { openingMode: 'owner', openingPrompt: ' ' } };
   expect(() => sanitizeSessionWizardMetadataPayload(draft)).toThrow(/owner opening question/i);

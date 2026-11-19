@@ -130,4 +130,13 @@ describe('session templates and the setup draft', () => {
       sessionModeProfile: local.sessionModeProfile,
     });
   });
+  it('a template turns the analysis card off for the session it sets up, through a reload and an export', () => {
+    const shared = template({ format: SESSION_TEMPLATE_FORMAT, sessionName: 'Salon', analysisCardEnabled: false });
+    const imported = applySessionTemplateToDraft(shared);
+    expect(imported.analysisCardEnabled).toBe(false);
+    expect(exportDraft(reload(imported)).analysisCardEnabled).toBe(false);
+    // A template that doesn't say leaves a draft's card on, an earlier choice included.
+    const plain = template({ format: SESSION_TEMPLATE_FORMAT, sessionName: 'Plain' });
+    expect(applySessionTemplateToDraft(plain, imported).analysisCardEnabled).toBe(true);
+  });
 });

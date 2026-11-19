@@ -24,6 +24,8 @@ const baseConfig = () => ({
   interviewMode: { enabled: true, provider: 'openai', realtimeModel: 'gpt-live-1' },
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
   storageProfile: { backend: 'cloudflare' },
+  // Stated, as a config that leaves it out first reads the stored one.
+  analysisCardEnabled: true,
   ai: { models: { fast: { provider: 'openai', model: 'gpt-test' } } },
   // A config that states its instructions for AI agents, Session Agent and Context cards is written without first reading the stored one.
   agentInstructions: 'Join the open group.',

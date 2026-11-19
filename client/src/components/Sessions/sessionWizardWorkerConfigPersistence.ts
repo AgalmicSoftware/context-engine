@@ -1,3 +1,4 @@
+import { ANALYSIS_CARD_FEATURE } from '@ce-shared/analysisCardSaved.mjs';
 import {
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
@@ -327,8 +328,14 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
 // answers 404. Any other failed read stops before signing: leaving a field out
 // could keep what is stored, and would change the revision a retry signs.
 // set-config replaces limits whole and /new has no AI daily limit, so the one
-// stored (set in Settings) is kept the same way.
-const CLEARED_WHEN_LEFT_OUT = { agentInstructions: '', sessionAgent: null, contextCardsEnabled: false } as const;
+// stored (set in Settings) is kept the same way. The analysis card is on unless
+// turned off, so leaving it out sends true where the Worker has it stored.
+const CLEARED_WHEN_LEFT_OUT = {
+  agentInstructions: '',
+  sessionAgent: null,
+  contextCardsEnabled: false,
+  analysisCardEnabled: true,
+} as const;
 
 // A session made with Context cards on is sent only to a Worker that says it
 // keeps them: an older one would refuse the whole save, naming only the field.
@@ -381,6 +388,9 @@ export const withStoredConfigKept = async <T extends UnknownRecord>({
   const leftOut = Object.keys(CLEARED_WHEN_LEFT_OUT).filter(
     (field) => !Object.prototype.hasOwnProperty.call(config, field),
   ) as Array<keyof typeof CLEARED_WHEN_LEFT_OUT>;
+  if (config.analysisCardEnabled === false && profile?.authority?.mode === 'worker_canonical') {
+    await assertWorkerHasAnalysisCard(workerOrigin, slug, fetchImpl);
+  }
   const limits = config.limits && typeof config.limits === 'object' ? (config.limits as UnknownRecord) : null;
   const keepsAiLimit = !!limits && !Object.prototype.hasOwnProperty.call(limits, 'aiPerWalletPerDay');
   if ((!leftOut.length && !keepsAiLimit) || profile?.authority?.mode !== 'worker_canonical') return config;
@@ -410,6 +420,41 @@ export const withStoredConfigKept = async <T extends UnknownRecord>({
   return leftOut
     .filter((field) => Object.prototype.hasOwnProperty.call(stored, field))
     .reduce<T>((cleared, field) => ({ ...cleared, [field]: CLEARED_WHEN_LEFT_OUT[field] }), withAiLimit);
+};
+
+// A session made with the analysis card off is sent only to a Worker that has
+// the card: an older one has none, and would refuse the whole save, naming only
+// the field.
+const assertWorkerHasAnalysisCard = async (
+  workerOrigin: string,
+  slug: string,
+  fetchImpl: SessionWizardWorkerConfigFetchPort,
+): Promise<void> => {
+  let features: unknown;
+  try {
+    const response = await fetchImpl(`${workerOrigin}/capabilities?slug=${encodeURIComponent(slug)}`, {
+      method: 'GET',
+      credentials: 'omit',
+      redirect: 'error',
+      // Asked afresh each time, so a Worker just updated is not judged by an earlier answer.
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    // A Worker from before capabilities answers 404: it has no card.
+    features = response.ok ? (await readResponseJson(response)).features : response.status === 404 ? [] : undefined;
+  } catch {
+    features = undefined;
+  }
+  if (!Array.isArray(features)) {
+    throw new Error(
+      "The Session Worker couldn't be checked for the Analysis card, so the settings weren't saved. Try again.",
+    );
+  }
+  if (!features.includes(ANALYSIS_CARD_FEATURE)) {
+    throw new Error(
+      'This Session Worker is too old to have the Analysis card, so there is nothing to turn off. Tick Analysis card under AI again, or update the Worker, then try again.',
+    );
+  }
 };
 
 const assertReachableWorkerCanonicalProfile = (profile: unknown, context: string): SessionModeProfile => {

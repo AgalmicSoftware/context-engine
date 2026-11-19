@@ -518,6 +518,10 @@ export const buildSessionWizardWorkerConfigPayload = ({
       }
       next.groupMemberCeiling = Number(ceiling);
     }
+    // The analysis card. On is left out, as older Workers refuse the field and
+    // a session without it has the card on; the config writers send true when
+    // the Worker's config already has it.
+    if (resolvedDraft.analysisCardEnabled === false) next.analysisCardEnabled = false;
     if (usesOnChainSbt) {
       next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
       next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(resolvedDraft.defaultFeaturedSBTs);

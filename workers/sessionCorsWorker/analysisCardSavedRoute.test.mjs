@@ -298,11 +298,13 @@ test('the card is on unless an admin turns it off: off, nothing is counted, read
   assert.equal(viaDispatcher.response.status, 403);
 });
 
-test('analysisCardEnabled is true or false, signs no one out, the site can read it and a redeploy keeps it', () => {
+test('analysisCardEnabled is true or false, set when made or later, signs no one out, is public and kept on redeploy', () => {
   const base = { slug: 's', sessionId: `0x${'ab'.repeat(16)}`, adminAddress: OWNER };
-  const save = (analysisCardEnabled) =>
-    applySessionConfigMutation({ existingConfig: base, slug: 's', mutation: { kind: 'set-config', incomingConfig: { ...base, analysisCardEnabled } } });
+  const save = (analysisCardEnabled, existingConfig = base) =>
+    applySessionConfigMutation({ existingConfig, slug: 's', mutation: { kind: 'set-config', incomingConfig: { ...base, analysisCardEnabled } } });
   assert.deepEqual([save(true).ok, save(false).ok], [true, true]);
+  // A session's first save, as /new makes it.
+  assert.equal(save(false, null).config.analysisCardEnabled, false);
   assert.deepEqual([save('yes').ok, save('yes').error], [false, 'analysisCardEnabled must be true or false.']);
   assert.deepEqual(classifySessionConfigEdits(base, { ...base, analysisCardEnabled: true }), { content: ['analysisCardEnabled'], authority: [], signsParticipantsOut: false });
   assert.equal(projectPublicWorkerSessionConfig({ ...base, analysisCardEnabled: true }).analysisCardEnabled, true);

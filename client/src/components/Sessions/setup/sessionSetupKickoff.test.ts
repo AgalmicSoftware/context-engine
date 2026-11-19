@@ -32,6 +32,7 @@ const PROMPT_FIELDS = new Set([
   'groupCreationPolicy',
   'contextCardsEnabled',
   'interviewModeEnabled',
+  'analysisCardEnabled',
   'interviewMode',
   'openingMode',
   'openingPrompt',

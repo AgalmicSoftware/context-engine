@@ -261,6 +261,8 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
     realtimeModel: DEFAULT_REALTIME_INTERVIEW_MODEL,
   };
   draft.resultsAnalysis = normalizeResultsAnalysisSettings();
+  // The personal analysis card is on unless turned off.
+  draft.analysisCardEnabled = true;
   draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   draft.litCredentials = {};
   draft.perMemberSpendLimits = draft.perMemberSpendLimits || { ai: '', arweave: '', txGas: '' };

@@ -1257,7 +1257,8 @@ portable fields: names, prompts, questions, the session mode profile, context
 text and its URLs, and whether the session starts with Context cards on
 (`contextCardsEnabled`, off unless set). It never carries keys, tokens, files or deployment
 identifiers, and unknown fields are rejected. Before an import is used, the page
-lists every field it would change.
+lists every field it would change. A template also says whether the session has
+the personal analysis card (`analysisCardEnabled`, on unless set to `false`).
 
 **Copy share link** puts the draft in a `/new#template=` link. Someone who
 opens it sees **This draft came from a link** and the differences from their
@@ -1303,7 +1304,9 @@ questions, the question-generation prompt, who may create groups, Context
 cards, and the interview switch and prompts. It leaves out models, AI providers, hosting,
 sign-in, encryption and anything secret, so the page's defaults apply, and you
 add keys on the page, never in the chat. Who sees results and encryption are
-set on the page; the AI tells you which options to pick.
+set on the page; the AI tells you which options to pick. The template may also
+turn the personal analysis card off (`"analysisCardEnabled": false`); left out,
+the session has it.
 
 The AI returns one of two things:
 

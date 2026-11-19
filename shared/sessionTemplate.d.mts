@@ -52,6 +52,8 @@ export type SessionTemplate = {
   };
   /** Shape-checked only; validateSessionModeProfile judges it. null keeps the page's default profile. */
   sessionModeProfile: Record<string, unknown> | null;
+  /** Whether the new session has the personal analysis card; on by default. */
+  analysisCardEnabled: boolean;
 };
 
 export type SessionTemplateError = { path: string; message: string };

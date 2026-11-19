@@ -44,6 +44,7 @@ export type DraftState = UnknownRecord &
     lit?: UnknownRecord;
     rpc?: UnknownRecord;
     sponsored?: DraftSponsoredState;
+    analysisCardEnabled?: boolean;
     sessionModeProfile?: UnknownRecord;
     groupCreationPolicy?: string;
     interviewModeEnabled?: boolean;

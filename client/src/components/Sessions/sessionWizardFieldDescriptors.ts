@@ -96,6 +96,7 @@ const FIELD_LABELS: Record<string, string> = {
   contextCardsEnabled: 'Context cards',
   interviewMode: 'Interview settings',
   resultsAnalysis: 'Results analysis',
+  analysisCardEnabled: 'Analysis card',
   'interviewMode.realtimeModel': 'Interview voice model',
   corsWorkerUrl: 'Worker URL',
   sessionHeader: 'Header Image',

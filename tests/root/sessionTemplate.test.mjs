@@ -91,6 +91,7 @@ test('a template with only its format takes every default', () => {
     'format', 'draftId', 'sessionName', 'sessionInfo', 'sessionHeader', 'sessionEndsAt', 'appearance',
     'sessionContext', 'contextFiles', 'contextCardsEnabled', 'questionsGenPrompt', 'questions', 'defaultTags', 'defaultGroupTags', 'groupCreationPolicy',
     'interviewModeEnabled', 'interviewMode', 'resultsAnalysis', 'ai', 'sessionModeProfile',
+    'analysisCardEnabled',
   ]);
   assert.equal(template.format, format);
   assert.equal(template.sessionName, '');
@@ -109,6 +110,9 @@ test('a template with only its format takes every default', () => {
     transcription: { provider: 'openai', model: 'gpt-transcribe' },
   });
   assert.equal(template.sessionModeProfile, null);
+  // The analysis card is on unless a template turns it off.
+  assert.equal(template.analysisCardEnabled, true);
+  assert.equal(valid({ format, analysisCardEnabled: false }).analysisCardEnabled, false);
 });
 
 test('missing nested fields take defaults; a mode profile is taken whole', () => {
@@ -162,6 +166,7 @@ test('types are checked, and the format is required', () => {
     contextFiles: [{ name: null }],
     contextCardsEnabled: 'yes',
     sessionModeProfile: { ...workerProfile(), evm: { registryChainId: '11155420' } },
+    analysisCardEnabled: 'no',
   });
   assert.deepEqual(errors.map((error) => error.path), [
     'format',
@@ -172,6 +177,7 @@ test('types are checked, and the format is required', () => {
     'interviewModeEnabled',
     'interviewMode.groupSuggestionData',
     'sessionModeProfile.evm.registryChainId',
+    'analysisCardEnabled',
   ]);
   assert.deepEqual(errorsOf({ format: 'ce.session-template/v2' }).map((error) => error.path), ['format']);
   assert.deepEqual(errorsOf(['not', 'a', 'template']), [{ path: '', message: 'A session template must be a JSON object.' }]);
