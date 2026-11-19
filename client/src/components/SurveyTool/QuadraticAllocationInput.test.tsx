@@ -78,9 +78,9 @@ it('respects disabled state and excludes encrypted or invalid results', () => {
       ]}
     />,
   );
-  expect(screen.getByRole('table', { name: 'Quadratic allocation results' })).toBeInTheDocument();
+  expect(screen.getByRole('list', { name: 'Quadratic allocation results' })).toBeInTheDocument();
   expect(screen.getByTestId('ce-quadratic-results')).toHaveTextContent('2 encrypted or invalid');
-  expect(screen.getAllByRole('row')[1]).toHaveTextContent('Parks3-21');
+  expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('Parks: support 3, oppose 2, net +1');
 });
 
 it('uses a centered slider, shows signed vote costs, and explains the shared budget', async () => {
@@ -121,7 +121,7 @@ it('includes decrypted allocations even when the persisted encryption flag remai
     <QuadraticAllocationResults question={question} responses={[{ answer: { value: [3, -4], encrypted: true } }]} />,
   );
   expect(screen.getByTestId('ce-quadratic-results')).not.toHaveTextContent('encrypted or invalid');
-  expect(screen.getAllByRole('row')[1]).toHaveTextContent('Parks303');
+  expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('Parks: support 3, oppose 0, net +3');
 });
 
 it.each([undefined, null, '', [0, 0]])('does not create a pending answer when resetting %p', (value) => {

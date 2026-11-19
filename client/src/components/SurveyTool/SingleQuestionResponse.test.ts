@@ -628,8 +628,8 @@ describe('SingleQuestionResponse aggregator memoization', () => {
     });
     const markup = renderToStaticMarkup(subject.renderAggregatorByType());
     expect(markup).toContain('2 encrypted or invalid responses excluded.');
-    expect(markup).toMatch(/Parks<\/th><td[^>]*>3<\/td><td[^>]*>-2<\/td><td[^>]*>1<\/td>/);
-    expect(markup).toMatch(/Transit<\/th><td[^>]*>4<\/td><td[^>]*>-4<\/td><td[^>]*>0<\/td>/);
+    expect(markup).toContain('>Parks: support 3, oppose 2, net +1<');
+    expect(markup).toContain('>Transit: support 4, oppose 4, net 0<');
   });
 
   it('applies custom SurveyResults aggregator card classes without affecting the default component styles', () => {
