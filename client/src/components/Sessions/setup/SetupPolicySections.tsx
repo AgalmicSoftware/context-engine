@@ -89,9 +89,10 @@ const chainLabel = (chainId: number | null | undefined) =>
 
 export const summarizeResults = (draft: SetupSectionProps['draft']): string => {
   const profile = profileOf(draft);
-  const analysis = text(asRecord(draft.resultsAnalysis).generationMode) || 'manual';
+  // AI Views has no settings here any more; only a session still building automatically says so.
+  const analysis = text(asRecord(draft.resultsAnalysis).generationMode);
   const visibility = profile ? VISIBILITY_LABELS[profile.results.visibility] || profile.results.visibility : '';
-  return [visibility, `analysis ${analysis === 'both' ? 'manual and automatic' : analysis}`]
+  return [visibility, analysis === 'automatic' || analysis === 'both' ? 'automatic AI Views builds' : '']
     .filter(Boolean)
     .join(' · ');
 };

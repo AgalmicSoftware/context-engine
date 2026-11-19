@@ -48,9 +48,6 @@ const SessionContextHtml = React.lazy(() => import('./SessionContextHtml'));
 const SessionDebateAtlasView = React.lazy(() => import('../DebateAtlas/SessionDebateAtlasView'));
 const SessionRiskMatrixView = React.lazy(() => import('../ResultsBuilds/SessionRiskMatrixView'));
 const SessionAgentModal = React.lazy(() => import('./SessionAgentModal'));
-
-const AI_VIEWS_HELP =
-  "AI Views is a summary of the responses that this session's Session Agent reads to answer questions; it has no page of its own. Generating it is a paid AI call on the session's AI key. A session set to build it automatically does so whether or not the Session Agent is on.";
 const SessionFeedback = React.lazy(() => import('./SessionFeedback'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
@@ -108,6 +105,7 @@ type OnePageSessionStandardShellProps = {
   embeddedQuestionSessionSlug: string;
   expandedImages: OnePageSessionAutoMintAlertsProps['expandedImages'];
   filterState: UnknownRecord | null;
+  // AI Views has no controls on the site any more; its host still passes these, and the shell ignores them.
   generatedResultsAnalysis?: UnknownRecord | null;
   generatedResultsAuthAvailable?: boolean;
   isDemoSlug: boolean;
@@ -276,8 +274,6 @@ export default function OnePageSessionStandardShell({
   embeddedQuestionSessionSlug,
   expandedImages,
   filterState,
-  generatedResultsAnalysis,
-  generatedResultsAuthAvailable = false,
   isDemoSlug,
   isQuestionCacheReady,
   isResponsesCacheReady,
@@ -330,9 +326,6 @@ export default function OnePageSessionStandardShell({
   onEmbeddedAtlasModalClose,
   onFilterChange,
   onGroupsViewAll,
-  onGeneratedResultsAuthorize,
-  onGeneratedResultsCheck,
-  onGeneratedResultsGenerate,
   onKickoffAutoMintIfNeeded,
   onLoadFullCorpusClick,
   onOpenResults,
@@ -378,8 +371,6 @@ export default function OnePageSessionStandardShell({
     ...(riskMatrix.build || riskMatrix.canBuild ? [RISK_MATRIX_VIEW_OPTION] : []),
   ];
   const builtViewKeys = new Set(builtViewOptions.map(({ key }) => key));
-  const aiViewsCheckHelpId = `ai-views-check-help-${React.useId().replace(/:/g, '')}`;
-  const aiViewsGenerateHelpId = `ai-views-generate-help-${React.useId().replace(/:/g, '')}`;
   const buildAtlasHelpId = `build-atlas-help-${React.useId().replace(/:/g, '')}`;
   const buildRiskMatrixHelpId = `build-risk-matrix-help-${React.useId().replace(/:/g, '')}`;
   // The views admins build, each pressed from the open Results menu.
@@ -404,10 +395,6 @@ export default function OnePageSessionStandardShell({
     },
   ].map((entry) => ({ ...entry, busy: entry.results.building || entry.results.activeSinceMs !== null }));
   const showDemoAnalysisView = isDemoSlug && hasDemoAnalysisFixture(displaySessionSlug);
-  const generatedState = (
-    generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}
-  ) as UnknownRecord;
-  const generatedHasArtifact = !!generatedState.artifact;
   const requestedResultsViewMode = resultsViewMode;
   const effectiveResultsViewMode = isDemoSlug
     ? requestedResultsViewMode === 'analysis' && !showDemoAnalysisView
@@ -417,25 +404,6 @@ export default function OnePageSessionStandardShell({
       ? requestedResultsViewMode
       : 'polis';
   const resultsViewOptions = buildResultsViewOptions(isDemoSlug, showDemoAnalysisView, builtViewOptions);
-  const generatedStatus = String(generatedState.status || 'idle');
-  const generatedIsRunning = generatedState.isRunning === true || generatedStatus === 'running';
-  const generatedCanCheckStatus = generatedState.canCheckStatus === true;
-  const generatedCanGenerate = generatedState.canGenerate === true && !generatedIsRunning;
-  const showGeneratedCheckAction =
-    generatedCanCheckStatus || (generatedResultsAuthAvailable && generatedState.adminAuthorized !== true);
-  const showGeneratedGenerateAction =
-    generatedState.adminAuthorized === true &&
-    Array.isArray(generatedState.viewOptions) &&
-    generatedState.viewOptions.length > 0 &&
-    !generatedCanCheckStatus;
-  const generatedCheckActionLabel = generatedCanCheckStatus ? 'Recheck AI Views' : 'Check AI Views';
-  const generatedActionLabel = generatedIsRunning
-    ? 'Generating AI Views…'
-    : generatedState.lastFailure
-      ? 'Retry AI Views'
-      : generatedHasArtifact
-        ? 'Refresh AI Views'
-        : 'Generate AI Views';
   const sessionInfoTooltipId = `session-info-${React.useId().replace(/:/g, '')}`;
   const sessionInfoTooltip =
     typeof sessionInfo === 'string' ? formatPolisReportSessionInfo(sessionInfo, displaySessionSlug) : sessionInfo;
@@ -460,16 +428,6 @@ export default function OnePageSessionStandardShell({
     ? null
     : sessionAgentSettingOf((resolvedSessionConfig as UnknownRecord | null)?.sessionAgent);
   const sessionAgentOn = !!sessionAgentSetting;
-  // AI Views has no page of its own: the Session Agent is its one reader. With the agent off, its buttons
-  // (and a failed build's notice, which points at them) would only spend on the AI key for nothing seen.
-  // A session set to build automatically is the exception: its Worker goes on building whether or not the
-  // agent is on, so its admin keeps the notice of a failed build and the way to retry or check.
-  const aiViewsMode = String(
-    generatedState.generationMode ||
-      ((resolvedSessionConfig as UnknownRecord | null)?.resultsAnalysis as UnknownRecord | undefined)?.generationMode ||
-      '',
-  );
-  const showAiViewsActions = sessionAgentOn || aiViewsMode === 'automatic' || aiViewsMode === 'both';
   const viewerAccount = loginComplete && typeof account === 'string' ? account : '';
   const showSessionAgent = sessionAgentOn && (!!viewerAccount || sessionAgentOpenToAnyone(sessionAgentSetting));
   const [sessionAgentOpen, setSessionAgentOpen] = React.useState(false);
@@ -925,65 +883,12 @@ export default function OnePageSessionStandardShell({
                       </React.Fragment>
                     ) : null,
                   )}
-                  {showAiViewsActions && showGeneratedCheckAction && (
-                    <button
-                      type="button"
-                      id={aiViewsCheckHelpId}
-                      onClick={(event: React.MouseEvent<HTMLElement>) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        if (generatedCanCheckStatus) {
-                          onGeneratedResultsCheck?.();
-                        } else {
-                          onGeneratedResultsAuthorize?.();
-                        }
-                      }}
-                      className={styles.sectionHeaderViewModeButton}
-                      disabled={generatedStatus === 'loading'}
-                      data-testid="ce-session-generated-results-check"
-                    >
-                      {generatedCheckActionLabel}
-                      <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
-                    </button>
-                  )}
-                  {showAiViewsActions && showGeneratedCheckAction && (
-                    <CETooltip target={aiViewsCheckHelpId} placement="bottom" trigger="hover focus" autohide={false}>
-                      {AI_VIEWS_HELP}
-                    </CETooltip>
-                  )}
-                  {showAiViewsActions && showGeneratedGenerateAction && (
-                    <button
-                      type="button"
-                      id={aiViewsGenerateHelpId}
-                      onClick={(event: React.MouseEvent<HTMLElement>) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onGeneratedResultsGenerate?.(true);
-                      }}
-                      className={styles.sectionHeaderViewModeButton}
-                      disabled={!generatedCanGenerate}
-                      data-testid="ce-session-generated-results-generate"
-                    >
-                      {generatedActionLabel}
-                      <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
-                    </button>
-                  )}
-                  {showAiViewsActions && showGeneratedGenerateAction && (
-                    <CETooltip target={aiViewsGenerateHelpId} placement="bottom" trigger="hover focus" autohide={false}>
-                      {AI_VIEWS_HELP}
-                    </CETooltip>
-                  )}
                 </div>
               </div>
             )}
           </div>
           {showResults && (
             <div className={styles.miniSectionContent}>
-              {showAiViewsActions && generatedState.adminAuthorized === true && generatedState.lastFailure ? (
-                <div className={styles.generatedResultsStatus} role="status">
-                  {String(generatedState.lastFailure)}
-                </div>
-              ) : null}
               {resultsBuilds.map(({ kind, results, busy }) =>
                 results.canBuild && (busy || results.error) ? (
                   <ResultsBuildStatus

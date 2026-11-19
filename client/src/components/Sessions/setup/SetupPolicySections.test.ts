@@ -9,9 +9,10 @@ const summaryFor = (generationMode?: string) =>
 
 describe('summarizeResults', () => {
   it('reports the saved results analysis choice', () => {
-    expect(summaryFor()).toContain('analysis manual');
-    expect(summaryFor('manual')).toContain('analysis manual');
-    expect(summaryFor('automatic')).toContain('analysis automatic');
-    expect(summaryFor('both')).toContain('analysis manual and automatic');
+    // Nothing about AI Views unless the session still builds it automatically.
+    expect(summaryFor()).not.toMatch(/analysis|AI Views/);
+    expect(summaryFor('manual')).not.toMatch(/analysis|AI Views/);
+    expect(summaryFor('automatic')).toContain('automatic AI Views builds');
+    expect(summaryFor('both')).toContain('automatic AI Views builds');
   });
 });

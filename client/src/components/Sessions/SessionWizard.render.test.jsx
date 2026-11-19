@@ -635,10 +635,12 @@ describe('SessionWizard rendered validation', () => {
     fireEvent.click(interviewToggle);
     expect(within(participation).queryByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).not.toBeInTheDocument();
     expect(policy).toBeInTheDocument();
-    // Results analysis lives in its own section, apart from the interview settings.
+    // AI Views has no settings on a new session any more, under Participation or under Results.
     expect(within(participation).queryByText('Results analysis')).not.toBeInTheDocument();
     openSetupSection('results');
-    expect(within(screen.getByTestId('ce-setup-section-results')).getByText('Results analysis')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('ce-setup-section-results')).queryByText(/Results analysis|Generation mode/),
+    ).not.toBeInTheDocument();
     fireEvent.click(interviewToggle);
     expect(within(participation).getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).toHaveValue(
       'gpt-realtime-2',
