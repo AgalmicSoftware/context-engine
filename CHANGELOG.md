@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.20] - 2026-11-19
+
 ## [0.9.19] - 2026-11-19
 
 A website release: no Session Worker or MCP change, and nothing needs redeploying for it. Its merge also publishes what 0.9.18 could not: the Session Worker bundle with 0.9.18's Worker code (a Worker made from it reports release 0.9.19), under this release's commit, and MCP 0.7.0.
