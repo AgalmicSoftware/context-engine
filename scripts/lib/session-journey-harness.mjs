@@ -311,6 +311,24 @@ export const openPersonContext = async (browser, session, { fixture, viewport, o
   return { context, browserRequests };
 };
 
+// After a load the page is still moving: fonts arrive, the session title fades out, the card grows into its
+// room. A click on a control that is covered or moving is retried by Playwright, and its retries scroll the
+// control to the middle of the screen, which a person's tap never does. So wait until the page is still. The
+// wait itself never fails a run: a page that stays busy is clicked as before.
+export const settled = async (page) => {
+  await page.evaluate(() => document.fonts.ready);
+  await page
+    .waitForFunction(
+      () =>
+        document
+          .getAnimations()
+          .every((animation) => animation.playState !== 'running' || animation.effect?.getTiming().iterations === Infinity),
+      null,
+      { polling: 250, timeout: 20000 },
+    )
+    .catch(() => console.log('  the page was still animating 20s after a load; went on'));
+};
+
 // A returning person's theme choice. A first visit resets any stored choice, so it is set on a loaded page
 // and applied by the reload, as the theme picker leaves it.
 export const chooseTheme = async (page, theme) => {

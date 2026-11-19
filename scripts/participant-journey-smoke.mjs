@@ -4,7 +4,7 @@ import { chromium, webkit } from 'playwright';
 import {
   PHONES, THEMES, WORKER_ORIGIN,
   assertNoHiddenFaults, assertNoSidewaysScroll, assertReachable, assertReadableText,
-  chooseTheme, createJourneySession, createPasskey, maxAtOnce, openLoginDialog, openPersonContext, outage, passkeyFixture,
+  chooseTheme, createJourneySession, createPasskey, maxAtOnce, openLoginDialog, openPersonContext, outage, passkeyFixture, settled,
 } from './lib/session-journey-harness.mjs';
 
 // A participant's whole visit on a phone, in the built client against the real Session Worker code:
@@ -182,6 +182,7 @@ const runJourney = async (engineName, phoneName) => {
     // 1. The invite link, signed out, then a new passkey.
     await page.goto(`${session.sessionUrl}&joinGroup=${groupId}#groupInvite=${inviteCode}`, { waitUntil: 'domcontentloaded' });
     await activeCard(page).waitFor();
+    await settled(page);
     await assertNoSidewaysScroll(page, 'The session page');
     const dialog = await openLoginDialog(page);
     await assertReachable(page.getByTestId('ce-passkey-wallet-create'), 'Create passkey, in the log-in dialog,');
@@ -373,6 +374,7 @@ const runLookPass = async (engineName) => {
         await activeCard(page).waitFor();
         await chooseTheme(page, theme);
         await activeCard(page).waitFor();
+        await settled(page);
         // Listen from here: the theme's reload cuts off requests in flight, which WebKit reports as errors.
         const pageErrors = [];
         page.on('pageerror', (error) => pageErrors.push(error.message));
