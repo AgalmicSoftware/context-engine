@@ -20,6 +20,8 @@ type SessionInterviewMemoryKickoffCardProps = {
   /** Resolves false when the prompt could not be copied, so it is shown selected instead. */
   onCopyPrompt: (prompt: string) => Promise<boolean>;
   onTogglePrompt: () => void;
+  /** Shows one copy button in place of the card's copy row and its prompt toggle. */
+  copyButton?: { className: string; testId: string };
 };
 
 // A renewal never runs sooner than this, so a link that can't be renewed isn't checked in a loop.
@@ -32,6 +34,7 @@ export default function SessionInterviewMemoryKickoffCard({
   showAgentPrompt,
   onCopyPrompt,
   onTogglePrompt,
+  copyButton,
 }: SessionInterviewMemoryKickoffCardProps) {
   const [attempt, setAttempt] = useState(0);
   const [validation, setValidation] = useState({ kickoff: '', pending: true, error: '', prompt: '', renewAtMs: 0 });
@@ -139,6 +142,63 @@ export default function SessionInterviewMemoryKickoffCard({
     const field = manualCopyRef.current;
     if (field && document.activeElement === field) field.setSelectionRange(0, field.value.length);
   }, [manualPrompt]);
+  const status = (
+    <>
+      {checking ? (
+        <div role="status">
+          <InterviewBusyLabel
+            label={
+              copyWaiting
+                ? 'Checking the session. Tap Copy again when this finishes.'
+                : 'Checking session compatibility…'
+            }
+          />
+        </div>
+      ) : null}
+      {validationError ? (
+        <div role="alert">
+          {validationError}{' '}
+          <button
+            type="button"
+            onClick={() => {
+              retryRef.current = true;
+              setAttempt((value) => value + 1);
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+      {copyError ? <div role="alert">{copyError}</div> : null}
+      {manualPrompt && !validationError ? (
+        <textarea
+          ref={manualCopyRef}
+          className={styles.sessionAgentKickoffManualCopy}
+          readOnly
+          rows={6}
+          value={manualPrompt}
+          aria-label="Memory augmentation prompt to copy"
+        />
+      ) : null}
+    </>
+  );
+  if (copyButton) {
+    return (
+      <div className={styles.sessionAgentKickoffButtonForm}>
+        <button
+          type="button"
+          className={copyButton.className}
+          onClick={copyPrompt}
+          aria-disabled={!compatible}
+          data-testid={copyButton.testId}
+        >
+          <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
+          {promptCopied ? 'Copied' : 'Copy the prompt'}
+        </button>
+        {status}
+      </div>
+    );
+  }
   return (
     <div
       className={styles.sessionAgentKickoff}
@@ -197,42 +257,7 @@ export default function SessionInterviewMemoryKickoffCard({
           </button>
         </div>
       </div>
-      {checking ? (
-        <div role="status">
-          <InterviewBusyLabel
-            label={
-              copyWaiting
-                ? 'Checking the session. Tap Copy again when this finishes.'
-                : 'Checking session compatibility…'
-            }
-          />
-        </div>
-      ) : null}
-      {validationError ? (
-        <div role="alert">
-          {validationError}{' '}
-          <button
-            type="button"
-            onClick={() => {
-              retryRef.current = true;
-              setAttempt((value) => value + 1);
-            }}
-          >
-            Retry
-          </button>
-        </div>
-      ) : null}
-      {copyError ? <div role="alert">{copyError}</div> : null}
-      {manualPrompt && !validationError ? (
-        <textarea
-          ref={manualCopyRef}
-          className={styles.sessionAgentKickoffManualCopy}
-          readOnly
-          rows={6}
-          value={manualPrompt}
-          aria-label="Memory augmentation prompt to copy"
-        />
-      ) : null}
+      {status}
       {promptShown ? (
         <div
           id="ce-session-interview-agent-prompt"

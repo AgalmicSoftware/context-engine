@@ -259,3 +259,22 @@ it.each([1, 2, 3, 4, 5, 6])(
     ).toEqual(questions);
   },
 );
+
+it('names the session, when given its name, so an AI that knows several keeps to this one', () => {
+  const sessionUrl = 'https://client.example/session/demo';
+  const named = buildExternalInterviewKickoff({
+    workerUrl: 'https://worker.example',
+    sessionSlug: 'demo',
+    sessionUrl,
+    sessionName: ' Riverside "forum" ',
+  });
+  expect(named).toContain(
+    `It is only for the session "Riverside \\"forum\\"" at ${sessionUrl}. If you know other Context Engine sessions, leave them out.`,
+  );
+  const unnamed = buildExternalInterviewKickoff({
+    workerUrl: 'https://worker.example',
+    sessionSlug: 'demo',
+    sessionUrl,
+  });
+  expect(unnamed).not.toContain('It is only for the session');
+});

@@ -50,7 +50,8 @@ test('proxyOpenAiRealtimeCall keeps the API key server-side and pins current rea
   const body = JSON.parse(outbound.init.body);
   assert.deepEqual(body.transport, { type: 'webrtc', sdp: 'v=0\r\no=test\r\n' });
   const session = body.session;
-  assert.deepEqual(session, { model: 'gpt-live-1', instructions: 'Ask one question.', store: false, delegation: { type: 'client' } });
+  // No model set: the default, gpt-live-1.1.
+  assert.deepEqual(session, { model: 'gpt-live-1.1', instructions: 'Ask one question.', store: false, delegation: { type: 'client' } });
   assert.equal(response.headers.get('x-interview-protocol'), 'live');
   assert.match(response.headers.get('access-control-expose-headers'), /x-interview-protocol/);
   assert.equal(await response.text(), 'v=0\r\no=answer');
@@ -76,12 +77,29 @@ for (const model of ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gpt-realtime-
   });
 }
 
-for (const model of ['gpt-live-1', 'gpt-realtime-invented', 'gpt-realtime', 'gpt-5']) {
+// Both Live models go to the Live API under their own names, in the same session
+// shape; near misses are no model, so they take the default.
+for (const model of ['gpt-live-1.1', 'gpt-live-1']) {
+  test(`sends ${model} to the Live API as itself, in the same session shape`, async () => {
+    let outbound;
+    const response = await proxyOpenAiRealtimeCall({
+      payload: { sdp: 'v=0\r\n', instructions: 'Interview.' }, secrets: { openaiKey: 'fixture-key' },
+      config: { interviewMode: { realtimeModel: model } }, deps: { json, fetch: async (url, init) => {
+        outbound = { url, body: JSON.parse(init.body) }; return Response.json({ transport: { sdp: 'v=0\r\n' } });
+      } },
+    });
+    assert.equal(outbound.url, 'https://api.openai.com/v1/live/sessions');
+    assert.deepEqual(outbound.body.session, { model, instructions: 'Interview.', store: false, delegation: { type: 'client' } });
+    assert.equal(response.headers.get('x-interview-protocol'), 'live');
+  });
+}
+
+for (const model of ['gpt-realtime-invented', 'gpt-realtime', 'gpt-5', 'gpt-live-1.10', 'gpt-live-1.1-mini', 'GPT-LIVE-1.1', 'gpt-live-2']) {
   test(`resolves ${model} to the Live outbound request`, async () => {
     await proxyOpenAiRealtimeCall({
       payload: { sdp: 'v=0\r\n', instructions: 'Interview.' }, secrets: { openaiKey: 'fixture-key' },
       config: { interviewMode: { realtimeModel: model } }, deps: { json, fetch: async (url, init) => {
-        assert.equal(url, 'https://api.openai.com/v1/live/sessions'); assert.equal(JSON.parse(init.body).session.model, 'gpt-live-1');
+        assert.equal(url, 'https://api.openai.com/v1/live/sessions'); assert.equal(JSON.parse(init.body).session.model, 'gpt-live-1.1');
         return Response.json({ transport: { sdp: 'v=0\r\n' } });
       } },
     });

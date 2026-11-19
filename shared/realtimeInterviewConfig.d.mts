@@ -1,5 +1,10 @@
 export const REALTIME_INTERVIEW_PROVIDER: 'openai';
-export const DEFAULT_REALTIME_INTERVIEW_MODEL: 'gpt-live-1';
+export const DEFAULT_REALTIME_INTERVIEW_MODEL: 'gpt-live-1.1';
+export const PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL: 'gpt-live-1';
+export const GPT_LIVE_1_1_MODEL: 'gpt-live-1.1';
+export const GPT_LIVE_1_1_FEATURE: 'interview_gpt_live_1_1_v1';
+export const REALTIME_INTERVIEW_MODELS: readonly string[];
 export function isRealtimeInterviewModel(value: unknown): boolean;
+export function isLiveInterviewModel(value: unknown): boolean;
 export function normalizeRealtimeInterviewModel(value: unknown): string;
 export function resolveRealtimeInterviewModel(config?: unknown): string;

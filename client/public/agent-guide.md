@@ -158,10 +158,11 @@ ways to work for them, and one way to take part as yourself:
 - **Answer and submit for them**, with their permission, through the session's
   Agent HTTP API: you answer as them, and submit only the answers they approve.
   This needs a key they make in the session's account menu, under **Your AI
-  agent**, which is there only when the session has Agents (HTTP API) on. They
-  put it in the `CE_AGENT_TOKEN` environment variable where you run commands,
-  such as the terminal they start you from. Never ask them to paste it into
-  the chat. See "On their behalf" below.
+  agent**, which is there only when the session has Agents (HTTP API) on. The
+  prompt they copy there gives it to you; it lasts at most a few hours and
+  works only in that session. A key may also come in the `CE_AGENT_TOKEN`
+  environment variable. Never repeat it, and never ask them to paste it again.
+  See "On their behalf" below.
 - **Prepare suggested answers and hand back a link.** You draft answers from
   what you know of them and return a link that opens the session with your
   suggestions filled in. Nothing is submitted until they review the drafts and
@@ -314,9 +315,9 @@ Encode exact JSON as unpadded UTF-8 base64url: catalog.reviewUrl + #prefill=PACK
 
 ## On their behalf: the Agent HTTP API
 
-Follow `<worker>/api/agent/skill`. Send the key only as the header
-`Authorization: Bearer $CE_AGENT_TOKEN` to `<worker>`, so it never shows in your
-output, and never print it or put it in chat, files or URLs. Show the person
+Follow `<worker>/api/agent/skill`. Send the key, from the prompt they gave you
+or from `CE_AGENT_TOKEN`, only as the header `Authorization: Bearer <key>` to
+`<worker>`, and never repeat or print it, or put it in files or URLs. Show the person
 your draft answers and submit only the ones they approve. The key ends with
 their sign-in, within a few hours; ask them for a new one then.
 

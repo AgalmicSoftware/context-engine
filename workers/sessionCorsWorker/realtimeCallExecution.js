@@ -1,4 +1,4 @@
-import { resolveRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
+import { isLiveInterviewModel, resolveRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
 
 const OPENAI_LIVE_SESSIONS_URL = 'https://api.openai.com/v1/live/sessions';
 const OPENAI_REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
@@ -71,7 +71,7 @@ export const proxyOpenAiRealtimeCall = async ({
   if (!key) {
     return deps?.json?.({ error: 'Server misconfigured: openaiKey is missing.' }, 401, baseHeaders);
   }
-  const live = realtime.model === 'gpt-live-1';
+  const live = isLiveInterviewModel(realtime.model);
   const session = live ? {
     model: realtime.model,
     instructions: payload.instructions,

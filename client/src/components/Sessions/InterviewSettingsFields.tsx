@@ -11,7 +11,13 @@ import {
   normalizeInterviewSettings,
   type GroupSuggestionDataKind,
 } from '../../../../shared/interviewSettings.mjs';
-import { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
+import {
+  DEFAULT_REALTIME_INTERVIEW_MODEL,
+  GPT_LIVE_1_1_MODEL,
+  PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL,
+  REALTIME_INTERVIEW_MODELS,
+  isRealtimeInterviewModel,
+} from '../../utilities/audio/realtimeInterviewConfig';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SetupHelp, setupHelpId } from './setup/SetupPrimitives';
 
@@ -62,7 +68,8 @@ const HIDDEN_DRAFTS_HELP =
   'Hides this share of each participant’s AI prefill drafts until they answer, to measure how much seeing a draft sways answers. Only for participants sharing draft changes for research.';
 const DATA_NOTE_HELP =
   'Optional. A sentence or two shown to participants beside research sharing and hidden AI drafts, such as who funds the study and where the data goes. Plain text; https links open in a new tab. Up to 300 characters, saved in the session’s public settings.';
-const VOICE_MODEL_HELP = `The OpenAI live model that holds voice interviews. Keep ${DEFAULT_REALTIME_INTERVIEW_MODEL} unless you need another; the session’s OpenAI key must have access to it.`;
+const VOICE_MODEL_HELP = `The OpenAI model that holds voice interviews; each costs the same per minute. ${GPT_LIVE_1_1_MODEL} is the default: OpenAI says it pronounces, keeps its accent and transcribes better than ${PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL} in multilingual conversations. A session’s Worker that is too old for ${GPT_LIVE_1_1_MODEL} doesn’t list it and runs ${PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL} by default. The gpt-realtime models are older. The session’s OpenAI key must have access to the model.`;
+export const GPT_LIVE_1_1_NEEDS_NEWER_WORKER = `This session’s Worker doesn’t take ${GPT_LIVE_1_1_MODEL} and refuses every save while it is set. Choose ${PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL}, then save.`;
 const OPENING_HELP =
   'How each voice interview starts. Generate: the AI writes an opening from the session’s information and questions once there are questions it can use, and reuses it until it is regenerated. Owner-written: every interview opens with your question.';
 const OWNER_OPENING_HELP = 'The question every voice interview opens with, up to 1,200 characters.';
@@ -127,6 +134,9 @@ type Props = {
   draftTextUnavailable?: string;
   // False where the session's Worker predates the data note: it would refuse the whole save, so the field is hidden.
   dataNoteSupported?: boolean;
+  // False where the session's Worker predates gpt-live-1.1: it refuses the model, so it isn't listed.
+  // Null while that is unknown: not listed, and no warning yet.
+  gptLive11Supported?: boolean | null;
 };
 export const DRAFT_TEXT_NEEDS_WORKER = 'Needs a session hosted on a Session Worker.';
 export const DRAFT_TEXT_NEEDS_NEWER_WORKER = 'Needs a newer Session Worker (0.9.6 or later).';
@@ -137,12 +147,25 @@ export default function InterviewSettingsFields({
   onTurnOnInterviews,
   draftTextUnavailable = '',
   dataNoteSupported = true,
+  gptLive11Supported = true,
 }: Props) {
   const id = useId();
   const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
   const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   const settings = normalizeInterviewSettings(value);
   const validationError = getSessionWizardInterviewValidationError(value);
+  // With no model set, or one no Worker takes, interviews run the Worker's default:
+  // gpt-live-1 on a Worker too old for gpt-live-1.1 (or not yet known to take it).
+  const workerDefault =
+    gptLive11Supported === true ? DEFAULT_REALTIME_INTERVIEW_MODEL : PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL;
+  const storedModel = String(raw.realtimeModel || '');
+  const model = isRealtimeInterviewModel(storedModel) ? storedModel : workerDefault;
+  const modelRefused = storedModel === GPT_LIVE_1_1_MODEL && gptLive11Supported === false;
+  // A model already set stays listed, so the field shows the truth.
+  const models = REALTIME_INTERVIEW_MODELS.filter(
+    (option) => option !== GPT_LIVE_1_1_MODEL || gptLive11Supported === true || option === model,
+  );
+  const modelLabel = (option: string) => (option === workerDefault ? `${option} (default)` : option);
   const change = (key: string, next: unknown) => onChange({ ...raw, ...settings, [key]: next });
   // On while all of its settings are, even after the hidden share is changed.
   const measuring = settings.shareDraftChangesByDefault && settings.hiddenDraftShare > 0 && settings.showFidelityScore;
@@ -256,11 +279,26 @@ export default function InterviewSettingsFields({
       <HelpField htmlFor={`${id}-model`} label="Interview voice model" help={VOICE_MODEL_HELP}>
         <Input
           id={`${id}-model`}
+          type="select"
           data-testid={E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL}
-          value={String(raw.realtimeModel || DEFAULT_REALTIME_INTERVIEW_MODEL)}
-          aria-describedby={setupHelpId(`${id}-model`)}
+          value={model}
+          invalid={modelRefused}
+          aria-describedby={[setupHelpId(`${id}-model`), modelRefused ? `${id}-model-refused` : '']
+            .filter(Boolean)
+            .join(' ')}
           onChange={(e) => change('realtimeModel', e.target.value)}
-        />
+        >
+          {models.map((option) => (
+            <option key={option} value={option}>
+              {modelLabel(option)}
+            </option>
+          ))}
+        </Input>
+        {modelRefused ? (
+          <p id={`${id}-model-refused`} role="alert">
+            {GPT_LIVE_1_1_NEEDS_NEWER_WORKER}
+          </p>
+        ) : null}
       </HelpField>
       <HelpField htmlFor={`${id}-mode`} label="Opening question" help={OPENING_HELP}>
         <Input

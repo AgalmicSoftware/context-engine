@@ -2,7 +2,10 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
-import InterviewSettingsFields, { DRAFT_TEXT_NEEDS_NEWER_WORKER } from './InterviewSettingsFields';
+import InterviewSettingsFields, {
+  DRAFT_TEXT_NEEDS_NEWER_WORKER,
+  GPT_LIVE_1_1_NEEDS_NEWER_WORKER,
+} from './InterviewSettingsFields';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 it('exposes conservative generation defaults and an editable owner opening', () => {
   const onChange = jest.fn();
@@ -440,7 +443,7 @@ it('explains each setting behind its own "?", not in text under it', () => {
     'AI draft research detail': /Minimal keeps none of the AI’s notes/,
     'Keep AI draft text for admins': /stays until each person withdraws it\. Session backups leave it out/,
     'Hidden AI drafts': /how much seeing a draft sways answers/,
-    'Interview voice model': /OpenAI live model/,
+    'Interview voice model': /OpenAI model that holds voice interviews/,
     'Opening question': /Owner-written: every interview opens with your question/,
     'Owner opening question': /up to 1,200 characters/,
     'Interview steering prompt': /public settings, so anyone can read them/,
@@ -487,5 +490,91 @@ describe('keeping AI draft text for admins', () => {
       />,
     );
     expect(screen.getByLabelText(label)).toBeEnabled();
+  });
+});
+
+// An older Worker refuses gpt-live-1.1 on save, so the list offers it only
+// where the session's Worker says it takes it.
+describe('the interview voice model', () => {
+  const options = () =>
+    Array.from((screen.getByLabelText('Interview voice model') as HTMLSelectElement).options).map(
+      (option) => option.value,
+    );
+
+  const labels = () =>
+    Array.from((screen.getByLabelText('Interview voice model') as HTMLSelectElement).options).map(
+      (option) => option.textContent,
+    );
+
+  it('lists gpt-live-1.1 as the default where the Worker takes it, and sets it', () => {
+    const onChange = jest.fn();
+    const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} gptLive11Supported />);
+    expect(screen.getByLabelText('Interview voice model')).toHaveValue('gpt-live-1.1');
+    expect(labels().slice(0, 2)).toEqual(['gpt-live-1.1 (default)', 'gpt-live-1']);
+    rerender(
+      <InterviewSettingsFields value={{ realtimeModel: 'gpt-live-1' }} onChange={onChange} gptLive11Supported />,
+    );
+    expect(screen.getByLabelText('Interview voice model')).toHaveValue('gpt-live-1');
+    expect(options()).toEqual([
+      'gpt-live-1.1',
+      'gpt-live-1',
+      'gpt-realtime-2.1',
+      'gpt-realtime-2.1-mini',
+      'gpt-realtime-2',
+      'gpt-realtime-1.5',
+    ]);
+    fireEvent.change(screen.getByLabelText('Interview voice model'), { target: { value: 'gpt-live-1.1' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ realtimeModel: 'gpt-live-1.1' }));
+  });
+
+  it.each([false, null])(
+    'leaves gpt-live-1.1 out where the Worker support is %p, and shows its default',
+    (supported) => {
+      render(<InterviewSettingsFields value={{}} onChange={jest.fn()} gptLive11Supported={supported} />);
+      expect(screen.getByLabelText('Interview voice model')).toHaveValue('gpt-live-1');
+      expect(labels()[0]).toBe('gpt-live-1 (default)');
+      expect(options()).not.toContain('gpt-live-1.1');
+      expect(screen.queryByText(GPT_LIVE_1_1_NEEDS_NEWER_WORKER)).not.toBeInTheDocument();
+    },
+  );
+
+  it('shows gpt-live-1.1 already set on a Worker that refuses it, and says to choose gpt-live-1', () => {
+    const { rerender } = render(
+      <InterviewSettingsFields
+        value={{ realtimeModel: 'gpt-live-1.1' }}
+        onChange={jest.fn()}
+        gptLive11Supported={false}
+      />,
+    );
+    expect(screen.getByLabelText('Interview voice model')).toHaveValue('gpt-live-1.1');
+    expect(screen.getByRole('alert')).toHaveTextContent(GPT_LIVE_1_1_NEEDS_NEWER_WORKER);
+    expect(screen.getByLabelText('Interview voice model')).toHaveAccessibleDescription(
+      expect.stringContaining('refuses every save'),
+    );
+    // While support is still being read, it stays listed with no warning yet.
+    rerender(
+      <InterviewSettingsFields
+        value={{ realtimeModel: 'gpt-live-1.1' }}
+        onChange={jest.fn()}
+        gptLive11Supported={null}
+      />,
+    );
+    expect(screen.getByLabelText('Interview voice model')).toHaveValue('gpt-live-1.1');
+    expect(screen.queryByText(GPT_LIVE_1_1_NEEDS_NEWER_WORKER)).not.toBeInTheDocument();
+  });
+
+  it('shows a model no Worker takes as that Worker’s default, as interviews run it', () => {
+    const { rerender } = render(
+      <InterviewSettingsFields value={{ realtimeModel: 'gpt-live-invented' }} onChange={jest.fn()} />,
+    );
+    expect(screen.getByLabelText('Interview voice model')).toHaveValue('gpt-live-1.1');
+    rerender(
+      <InterviewSettingsFields
+        value={{ realtimeModel: 'gpt-live-invented' }}
+        onChange={jest.fn()}
+        gptLive11Supported={false}
+      />,
+    );
+    expect(screen.getByLabelText('Interview voice model')).toHaveValue('gpt-live-1');
   });
 });

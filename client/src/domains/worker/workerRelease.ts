@@ -1,4 +1,5 @@
 import { ANALYSIS_CARD_FEATURE } from '@ce-shared/analysisCardSaved.mjs';
+import { GPT_LIVE_1_1_FEATURE } from '@ce-shared/realtimeInterviewConfig.mjs';
 
 import { readWorkerCapabilities } from '../../utilities/worker/workerCapabilities';
 
@@ -58,6 +59,17 @@ export const readWorkerTakesDataNote = async (
   if (!workerOrigin) return false;
   const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
   return found.features.includes('interview_data_note_v1');
+};
+
+/** Whether the Session Worker takes gpt-live-1.1 as the interview voice model; null when it can't be read. */
+export const readWorkerTakesGptLive11 = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean | null> => {
+  if (!workerOrigin) return null;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.unavailable ? null : found.features.includes(GPT_LIVE_1_1_FEATURE);
 };
 
 /** Which Session Agent options the Session Worker accepts (0.9.11 on); neither when it can't be read. */

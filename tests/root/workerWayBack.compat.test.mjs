@@ -282,7 +282,10 @@ describe('putting a session back on a released Worker bundle', () => {
   const keepPicture = session => session.kv.put(`session:${slug}:analysis-card-picture:v1:figure:${analysisCardFigureKey(card.figure)}`,
     JSON.stringify({ figure: card.figure, name: 'Elinor Ostrom', portrait: 'A woman at a desk.', look: { era: '1990s', ground: 'paper', accentHex: '#aa3311' },
       image: { mime: 'image/jpeg', base64: 'aW1hZ2U=' } }));
-  describe.each(sides)('context cards and the saved analysis card on %s', (_name, ref) => {
+  // Only bundles from before 0.9.18 lack both features; the pinned bundle has
+  // them since 0.9.19's pin, so the drill runs on the live (0.9.17) bundle.
+  const beforeCards = [['the live bundle', live]];
+  describe.each(beforeCards)('context cards and the saved analysis card on %s', (_name, ref) => {
     (ref ? it.each(switchSets) : it.skip.each(switchSets))('with %o saved: read, restored, saved and back again', async (switches) => {
       const released = bundles[ref];
       const session = await drill({ provider });
@@ -503,5 +506,94 @@ describe('putting a session back on a released Worker bundle', () => {
         session.end();
       }
     }, 120000);
+  });
+
+  // gpt-live-1.1, the default here, under a released Worker that knows only gpt-live-1.
+  describe.each(sides)('the interview voice model on %s', (_name, ref) => {
+    // One session, its OpenAI calls answered by the Live API stand-in.
+    const voiceDrill = async (body) => {
+      const released = bundles[ref];
+      const session = await drill();
+      const calls = [];
+      const realFetch = globalThis.fetch;
+      // Each Worker calls OpenAI with the platform's fetch: the Live API answers here.
+      globalThis.fetch = async (url, init) => {
+        if (!String(url).startsWith('https://api.openai.com/')) return realFetch(url, init);
+        calls.push({ url: String(url), model: JSON.parse(init.body).session.model });
+        return Response.json({ transport: { type: 'webrtc', sdp: 'v=0\r\no=answer' } });
+      };
+      try {
+        // Interviews are open to anyone here, so the call needs no sign-in.
+        const config = { ...session.config, workerAuthority: { ...session.config.workerAuthority, anonymousScopes: ['ai'] },
+          interviewModeEnabled: true, interviewMode: { enabled: true, provider: 'openai' } };
+        await session.kv.put(`session:${slug}:config`, JSON.stringify(config));
+        const interview = async () => {
+          const response = await session.deployed.worker.fetch(new Request(`${origin}/realtime/call?slug=${slug}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Session-Slug': slug, Origin: site },
+            body: JSON.stringify({ sdp: 'v=0\r\no=offer\r\n', instructions: 'Ask one question.' }),
+          }), session.deployed.env);
+          return { status: response.status, protocol: response.headers.get('x-interview-protocol'), model: calls.at(-1)?.model };
+        };
+        const withModel = (realtimeModel, extra = {}) => ({ config: { ...config, ...extra,
+          interviewMode: { ...config.interviewMode, ...(realtimeModel ? { realtimeModel } : {}) } } });
+        const current = session.current();
+        expect(await session.signed(current, 'set-secrets', { secrets: { openaiKey: 'synthetic-openai-key' } })).toMatchObject({ status: 200 });
+        await body({ session, released, current, interview, withModel, calls });
+      } finally {
+        globalThis.fetch = realFetch;
+        session.end();
+      }
+    };
+
+    (ref ? it : it.skip)('with no model saved: gpt-live-1.1 here, gpt-live-1 there, and saves go through both ways', () => voiceDrill(async ({ session, released, interview, withModel }) => {
+      expect(await interview()).toEqual({ status: 200, protocol: 'live', model: 'gpt-live-1.1' });
+      const previous = session.released(released);
+      expect(await interview()).toEqual({ status: 200, protocol: 'live', model: 'gpt-live-1' });
+      expect(await session.signed(previous, 'set-config', withModel(undefined, { sessionName: 'Renamed on the way back' })))
+        .toEqual({ status: 200, body: { ok: true } });
+      session.current();
+      expect(await session.readConfig()).toMatchObject({ sessionName: 'Renamed on the way back' });
+      expect(await interview()).toEqual({ status: 200, protocol: 'live', model: 'gpt-live-1.1' });
+    }), 120000);
+
+    (ref ? it : it.skip)('with gpt-live-1 saved: it stays on gpt-live-1 here and there', () => voiceDrill(async ({ session, released, current, interview, withModel }) => {
+      expect(await session.signed(current, 'set-config', withModel('gpt-live-1'))).toMatchObject({ status: 200 });
+      expect(await interview()).toEqual({ status: 200, protocol: 'live', model: 'gpt-live-1' });
+      session.released(released);
+      expect(await interview()).toEqual({ status: 200, protocol: 'live', model: 'gpt-live-1' });
+    }), 120000);
+
+    // The site never saves the default, but a script or an agent can.
+    (ref ? it : it.skip)('with gpt-live-1.1 saved by hand: interviews run on gpt-live-1 there, and saves wait for gpt-live-1', () => voiceDrill(async ({ session, released, current, interview, withModel, calls }) => {
+      expect(await session.signed(current, 'set-config', withModel('gpt-live-1.1'))).toMatchObject({ status: 200 });
+      expect((await session.readConfig()).interviewMode.realtimeModel).toBe('gpt-live-1.1');
+      expect(await interview()).toEqual({ status: 200, protocol: 'live', model: 'gpt-live-1.1' });
+
+      // Back on the released bundle. (a) Interviews still run, on gpt-live-1,
+      // the model it falls back to for one it doesn't know.
+      const previous = session.released(released);
+      expect(await interview()).toEqual({ status: 200, protocol: 'live', model: 'gpt-live-1' });
+      expect(calls.map(call => call.url)).toEqual(Array(2).fill('https://api.openai.com/v1/live/sessions'));
+      // (b) It refuses every settings save while gpt-live-1.1 is stored, even
+      // one that doesn't touch interviews; nothing stored changes.
+      expect(await session.signed(previous, 'set-config', withModel('gpt-live-1.1', { sessionName: 'Refused' }))).toEqual({
+        status: 400, body: { error: 'Invalid interview mode config.' },
+      });
+      expect(await session.signed(previous, 'set-config', { config: { sessionName: 'Refused' } })).toEqual({
+        status: 400, body: { error: 'Invalid interview mode config.' },
+      });
+      expect((await session.readConfig()).interviewMode.realtimeModel).toBe('gpt-live-1.1');
+      // (c) The way out: save interview settings without it (as the site does)
+      // or with gpt-live-1, and saves go through again.
+      expect(await session.signed(previous, 'set-config', withModel(undefined, { sessionName: 'Renamed on the way back' })))
+        .toEqual({ status: 200, body: { ok: true } });
+      expect(await session.readConfig()).toMatchObject({ sessionName: 'Renamed on the way back' });
+      expect((await session.readConfig()).interviewMode).not.toHaveProperty('realtimeModel');
+
+      // This Worker again: the edit stands, on the default.
+      session.current();
+      expect(await session.readConfig()).toMatchObject({ sessionName: 'Renamed on the way back' });
+      expect(await interview()).toEqual({ status: 200, protocol: 'live', model: 'gpt-live-1.1' });
+    }), 120000);
   });
 });

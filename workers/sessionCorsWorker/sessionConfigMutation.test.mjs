@@ -892,18 +892,18 @@ test('non-authorization config mutation preserves the current epoch', () => {
   assert.equal(result.config.limits.perWalletPerDay, 3);
 });
 
-test('accepts gpt-live-1 and documented legacy models while rejecting invented or retired values', () => {
-  for (const model of ['gpt-live-1', 'gpt-realtime-2.1', 'gpt-realtime-2', 'gpt-realtime-1.5']) {
+test('accepts gpt-live-1, gpt-live-1.1 and documented legacy models while rejecting invented or retired values', () => {
+  for (const model of ['gpt-live-1', 'gpt-live-1.1', 'gpt-realtime-2.1', 'gpt-realtime-2', 'gpt-realtime-1.5']) {
     const result = applySessionConfigMutation({ existingConfig: cloneJson(profileBearingConfig), mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true, provider: 'openai', realtimeModel: model } } }, slug: 'session-a' });
     assert.equal(result.ok, true); assert.equal(result.config.interviewMode.realtimeModel, model);
   }
-  for (const model of ['gpt-realtime-custom', 'gpt-realtime', 'gpt-live-invented', 'GPT-LIVE-1']) {
+  for (const model of ['gpt-realtime-custom', 'gpt-realtime', 'gpt-live-invented', 'GPT-LIVE-1', 'gpt-live-1.10', 'gpt-live-1.1-mini', ' gpt-live-1.1', 'gpt-live-2']) {
     const result = applySessionConfigMutation({ existingConfig: cloneJson(profileBearingConfig), mutation: { kind: 'set-config', incomingConfig: { interviewMode: { realtimeModel: model } } }, slug: 'session-a' });
     assert.equal(result.ok, false); assert.equal(result.status, 400);
   }
 });
 
-test('unrelated mutations migrate only previously accepted stored realtime models', () => {
+test('unrelated mutations drop only previously accepted stored realtime aliases', () => {
   for (const legacyModel of ['gpt-realtime', 'gpt-realtime-preview', 'GPT-REALTIME']) {
     const existingConfig = { ...cloneJson(baseConfig), interviewMode: { enabled: true, realtimeModel: legacyModel } };
     for (const mutation of [
@@ -915,10 +915,9 @@ test('unrelated mutations migrate only previously accepted stored realtime model
     ]) {
       const result = applySessionConfigMutation({ existingConfig, mutation, slug: 'session-a' });
       assert.equal(result.ok, true, JSON.stringify({ legacyModel, mutation, result }));
-      assert.equal(resolveRealtimeInterviewModel(result.config), 'gpt-live-1');
-      if (mutation.incomingConfig?.interviewMode?.enabled !== false) {
-        assert.equal(result.config.interviewMode.realtimeModel, 'gpt-live-1');
-      }
+      assert.equal(resolveRealtimeInterviewModel(result.config), 'gpt-live-1.1');
+      // Dropped, never written as the default: older Workers refuse gpt-live-1.1.
+      assert.equal(Object.hasOwn(result.config.interviewMode || {}, 'realtimeModel'), false);
       assert.equal(existingConfig.interviewMode.realtimeModel, legacyModel);
     }
     const replacement = applySessionConfigMutation({ existingConfig, slug: 'session-a',

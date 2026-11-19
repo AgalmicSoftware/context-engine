@@ -33,9 +33,13 @@ join; it can draft the person's answers for them to review, from the session's
 the person it works for which way to take part. As itself, it joins through the MCP with the
 session link as received, under a name that says whose agent it is. On their
 behalf, it answers as them with a key they make in the account menu under
-**Your AI agent**, which needs **Agents (HTTP API)** on. The menu gives the key
-inside a terminal command that sets `CE_AGENT_TOKEN`, and a separate prompt for
-the chat that names the variable but holds no key. When a session lets
+**Your AI agent**, **Answer and submit for me**, which needs **Agents (HTTP
+API)** on. **Make a key** puts the key, which ends with the person's sign-in
+(within 4 hours) and works only in that session, into the one prompt they copy;
+the prompt names the session, tells the agent never to repeat the key, and
+gives the MCP install line in case the agent wants it. Its other choice,
+**Suggest answers for me to review**, copies the session's draft-your-answers
+prompt, named for the session, with the same MCP line and no key. When a session lets
 participants add context, it invites agents to add a file, a link or text that
 every participant sees.
 

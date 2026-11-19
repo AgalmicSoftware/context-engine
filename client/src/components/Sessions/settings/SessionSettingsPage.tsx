@@ -48,6 +48,7 @@ import {
   readWorkerSessionAgentOptions,
   readWorkerKeepsDraftText,
   readWorkerTakesDataNote,
+  readWorkerTakesGptLive11,
   readWorkerReleaseLabel,
   readWorkerKeepsContextCards,
   readWorkerTakesFeedback,
@@ -249,6 +250,9 @@ const SessionSettingsPage = ({
   // Whether it accepts the note on where research data goes; an older one would refuse the whole save.
   // On-chain sessions save to the registry, which takes it.
   const [workerTakesDataNote, setWorkerTakesDataNote] = useState(false);
+  // Whether it takes gpt-live-1.1 for interviews; an older one would refuse the whole save, so it isn't listed there.
+  // Null while unknown.
+  const [workerTakesGptLive11, setWorkerTakesGptLive11] = useState<boolean | null>(null);
   // Which Session Agent options it accepts; an older one would refuse the whole save, so they aren't offered there.
   const [workerAgentOptions, setWorkerAgentOptions] = useState({ recordChats: false, anyoneCanAsk: false });
   useEffect(() => {
@@ -261,6 +265,7 @@ const SessionSettingsPage = ({
     setWorkerRunsWorkersAi(false);
     setWorkerHasAnalysisCard(false);
     setWorkerTakesDataNote(false);
+    setWorkerTakesGptLive11(null);
     setWorkerAgentOptions({ recordChats: false, anyoneCanAsk: false });
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
       if (!stale) setWorkerRelease(release);
@@ -285,6 +290,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerTakesDataNote(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesDataNote(takes);
+    });
+    void readWorkerTakesGptLive11(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
+      if (!stale) setWorkerTakesGptLive11(takes);
     });
     void readWorkerSessionAgentOptions(workerOrigin, sessionSlug, fetchImpl).then((options) => {
       if (!stale) setWorkerAgentOptions(options);
@@ -643,6 +651,7 @@ const SessionSettingsPage = ({
           groupCeilingSupported={workerOffersGroupJoinChoices(saved)}
           draftTextSupported={workerKeepsDraftText !== false}
           dataNoteSupported={onChain || workerTakesDataNote}
+          gptLive11Supported={onChain ? null : workerTakesGptLive11}
         />
         <SetupResultsSection
           {...section('results')}

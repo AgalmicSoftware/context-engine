@@ -101,7 +101,7 @@ test('a template with only its format takes every default', () => {
   // Context cards are off unless a template turns them on.
   assert.equal(template.contextCardsEnabled, false);
   assert.equal(valid({ format, contextCardsEnabled: true }).contextCardsEnabled, true);
-  assert.deepEqual(template.interviewMode, { ...DEFAULT_INTERVIEW_SETTINGS, realtimeModel: 'gpt-live-1' });
+  assert.deepEqual(template.interviewMode, { ...DEFAULT_INTERVIEW_SETTINGS, realtimeModel: 'gpt-live-1.1' });
   assert.deepEqual(template.resultsAnalysis, DEFAULT_RESULTS_ANALYSIS_SETTINGS);
   // New sessions default to the current models: Terra and Sol, and gpt-transcribe.
   assert.deepEqual(template.ai.models, {

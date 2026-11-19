@@ -92,7 +92,7 @@ import {
 } from '../../utilities/session/globalSessionState.js';
 import { isHostedAgentSessionConfig } from '../../utilities/session/sessionBackendKind';
 import { isSessionModeProfileAgentHttpEnabled } from '../../utilities/session/sessionModeProfile';
-import { requestAgentDelegateKey } from '../../utilities/session/agentHandoff';
+import { agentHandoffPanelKey, requestAgentDelegateKey } from '../../utilities/session/agentHandoff';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
   exchangeAgentClientLogin,
@@ -1543,13 +1543,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       return null;
     return (
       <LoginAgentHandoffPanel
-        key={sessionSlug}
+        key={agentHandoffPanelKey(sessionSlug, this.props.account)}
         agentHttpEnabled={!!agentWorkerUrl && isSessionModeProfileAgentHttpEnabled(sessionConfig)}
         sessionUrl={buildSessionWizardSessionUrl({
           slug: sessionSlug,
           workerOrigin: workerCanonical ? agentWorkerUrl : '',
         })}
         sessionName={toStr((sessionConfig as { sessionName?: unknown } | null)?.sessionName).trim() || sessionSlug}
+        sessionSlug={sessionSlug}
+        sessionConfig={sessionConfig as Record<string, unknown> | null}
+        context={this.getWorkerTokenContext()}
+        workerUrl={agentWorkerUrl}
         requestKey={this.requestAgentKey}
       />
     );

@@ -144,7 +144,10 @@ turning it off hides them and keeps their values.
 
 Interview settings for the call:
 
-- **Interview voice model** is the OpenAI voice model, `gpt-live-1` by default.
+- **Interview voice model** is the OpenAI voice model, `gpt-live-1.1` by
+  default; `gpt-live-1` stays a choice. The default isn't saved, so a session
+  left on it runs its Worker's default (`gpt-live-1` on a Worker too old for
+  `gpt-live-1.1`, which isn't listed there).
   `/new` publishes it as `interviewMode.realtimeModel` for both Worker-canonical
   and Arweave-backed sessions.
 
@@ -591,8 +594,8 @@ AI configuration also lives in the session metadata draft:
 - `ai.models.fast`
 - `ai.models.thinking`
 - `ai.models.transcription`
-- `interviewMode.realtimeModel` (OpenAI interview voice; defaults to
-  `gpt-live-1`)
+- `interviewMode.realtimeModel` (OpenAI interview voice; when absent, the
+  Worker's default: `gpt-live-1.1`, or `gpt-live-1` on older Workers)
 - `interviewMode.steeringPrompt` (optional owner-authored interview guidance;
   defaults to empty and is capped at 3000 characters)
 

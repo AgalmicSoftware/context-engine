@@ -1,10 +1,19 @@
 import { toStr } from '../shared/primitives';
 
-// Two ways a person brings their AI agent to a session: as itself, through the
-// MCP with its own key, or on their behalf, with a key that answers as them.
+// A person's AI agent working for them in a session: suggesting answers, or answering as them with a
+// short-lived key that the one prompt carries.
 
-export const AGENT_KEY_ENV = 'CE_AGENT_TOKEN';
-export const MCP_SERVER_COMMAND = 'npx -y --prefer-online @agalmic/contextengine@latest';
+export const MCP_ADD_COMMAND =
+  'claude mcp add --scope user context-engine -- npx -y --prefer-online @agalmic/contextengine@latest';
+
+// The MCP, in the prompt rather than a box of its own, so the person copies one thing. Its tools act as the
+// agent itself, so neither task needs it.
+export const MCP_PROMPT_LINE = `If you run commands and want the Context Engine MCP for later, add it with: ${MCP_ADD_COMMAND} This task does not need it.`;
+
+// The agent box is remounted per session and per account, so a key made for one
+// account never stays on screen, or in the prompt, for the next.
+export const agentHandoffPanelKey = (sessionSlug: string, account: unknown) =>
+  `${sessionSlug}\n${toStr(account).toLowerCase()}`;
 
 export type AgentDelegateKey = {
   token: string;
@@ -25,58 +34,35 @@ export class AgentDelegateKeyError extends Error {
   }
 }
 
-// The agent saves this as its name in the session, so it must pass the session's name rule: at most 32
-// characters, of letters, numbers, spaces and . _ ' - only. A name the Worker would refuse is shortened or
-// cleaned here, where the person can see it, not left for the agent to find out. That set also holds none of
-// the characters a shell reads inside the double-quoted argument the name is pasted in.
-const AGENT_NAME_SUFFIX = "'s Agent";
-const SESSION_NAME_CHARS = 32;
-
-export const agentDisplayName = (ownerName: unknown): string => {
-  const cleaned = toStr(ownerName)
-    .normalize('NFKC')
-    // Characters drawn as nothing (an emoji's variation selector, joiners, fillers) are refused by the rule too.
-    .replace(/[^\p{L}\p{M}\p{N} ._'-]|[\p{Default_Ignorable_Code_Point}\u{16FE4}]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const name = [...cleaned]
-    .slice(0, SESSION_NAME_CHARS - AGENT_NAME_SUFFIX.length)
-    .join('')
-    .trim();
-  return name ? `${name}${AGENT_NAME_SUFFIX}` : '';
-};
-
-export const buildMcpAddCommand = (displayName: string): string =>
-  `claude mcp add context-engine --scope user${
-    displayName ? ` -e CE_MCP_DISPLAY_NAME="${displayName}"` : ''
-  } -- ${MCP_SERVER_COMMAND}`;
-
-export const buildMcpJoinPrompt = ({ sessionUrl, displayName }: { sessionUrl: string; displayName: string }): string =>
-  [
-    `Join the Context Engine session ${sessionUrl} with join_session and take part as yourself, an AI agent.`,
-    displayName ? `Set your display name to "${displayName}".` : '',
-    "Read the session's instructions first, answer honestly in your own voice, and never claim to be a person.",
-    'Where the session invites it, you may add links or files to its context.',
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-// A key is `ceagt_` and base64url characters, so it holds nothing a shell
-// reads. The command is copied with the key masked on screen, so a reply
-// with any other text in its place is refused, never pasted.
+// A key is `ceagt_` and base64url characters, so a reply with any other text in its place is refused.
 const AGENT_KEY_RE = /^ceagt_[A-Za-z0-9_-]{16,}$/;
 
-export const buildAgentKeyCommand = (token: string): string => `export ${AGENT_KEY_ENV}='${token}'`;
-
-// Names the variable, never the key, so the prompt is safe to paste into a chat.
-export const buildOnMyBehalfPrompt = (key: Pick<AgentDelegateKey, 'sessionSlug' | 'workerUrl' | 'submitAnswers'>) =>
+// The one prompt for "Answer and submit": it carries the key, which lives only as long as the person's
+// sign-in and works only in this session, and tells the agent never to repeat it. `shownToken` lets the box
+// show the prompt with the key masked. It names the session by name, link and slug, so an agent that knows
+// several can't take another for it.
+export const buildOnMyBehalfPrompt = ({
+  key,
+  sessionName,
+  sessionUrl,
+  shownToken = key.token,
+}: {
+  key: AgentDelegateKey;
+  sessionName: string;
+  sessionUrl: string;
+  shownToken?: string;
+}) =>
   [
-    `Take part in the Context Engine session "${key.sessionSlug}" at ${key.workerUrl} on my behalf.`,
-    `Your key is in the ${AGENT_KEY_ENV} environment variable. Send it only as the header "Authorization: Bearer $${AGENT_KEY_ENV}" to that address, and never print it or put it in chat, files or URLs.`,
+    `Take part on my behalf in the Context Engine session ${JSON.stringify(sessionName || key.sessionSlug)}`,
+    `(${sessionUrl}, slug "${key.sessionSlug}"), and in no other session you may know.`,
+    `Its agent address is ${key.workerUrl}. Your key is ${shownToken}; it works only for this session, until ${key.expiresAt}.`,
+    'I give it to you here on purpose, in place of the CE_AGENT_TOKEN variable the skill mentions, as it is short-lived.',
+    'Send it only as the header "Authorization: Bearer <key>" to that address. Never repeat or print it, and never put it in files, URLs or later messages.',
     `Follow ${key.workerUrl}/api/agent/skill.`,
     key.submitAnswers
-      ? 'Show me your draft answers, and submit only the ones I approve.'
+      ? 'Draft my answers, show them to me, and submit as me only the ones I approve.'
       : "This session doesn't let agents submit, so show me your draft answers and I'll answer on the website.",
+    MCP_PROMPT_LINE,
   ].join(' ');
 
 export const requestAgentDelegateKey = async ({
@@ -99,13 +85,15 @@ export const requestAgentDelegateKey = async ({
   });
   const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
   const token = toStr(body?.token);
-  if (!response.ok || body?.ok !== true || !AGENT_KEY_RE.test(token)) {
+  // The expiry goes into the prompt, so only a real date is taken, in one fixed form.
+  const expiresMs = Date.parse(toStr(body?.expiresAt));
+  if (!response.ok || body?.ok !== true || !AGENT_KEY_RE.test(token) || !Number.isFinite(expiresMs)) {
     throw new AgentDelegateKeyError(toStr(body?.reason), response.status);
   }
   // The prompt names the session and Worker that were asked, not what the reply calls them.
   return {
     token,
-    expiresAt: toStr(body.expiresAt),
+    expiresAt: new Date(expiresMs).toISOString(),
     sessionSlug,
     workerUrl: agentWorkerUrl,
     submitAnswers: body.submitAnswers === true,
