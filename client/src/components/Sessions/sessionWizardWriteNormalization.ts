@@ -190,6 +190,8 @@ export const sanitizeSessionWizardMetadataPayload = (
   let next = cloneValue(metadata) as AnyRecord;
   next = stripAuthoritativeSessionGateFields(next) as AnyRecord;
   next = stripWorkerOnlyMetadataFields(next) as AnyRecord;
+  // Context cards are a Session Worker setting; no published metadata carries the switch.
+  delete next.contextCardsEnabled;
   next = normalizeLitMetadataNetwork(next) as AnyRecord;
   next = normalizeSessionNaming(next) as AnyRecord;
   next.sessionName = trimString(next.sessionName);

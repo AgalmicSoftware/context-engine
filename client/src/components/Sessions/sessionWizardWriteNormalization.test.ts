@@ -804,6 +804,22 @@ describe('sessionWizardWriteNormalization', () => {
     expect(build(false)).not.toHaveProperty('contextCardsEnabled');
     expect(build(undefined)).not.toHaveProperty('contextCardsEnabled');
     expect(build('true')).not.toHaveProperty('contextCardsEnabled');
+    // Cards are a Session Worker feature: an on-chain session's Worker config and metadata never carry the switch.
+    const onChain = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    expect(
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'context-cards',
+        draft: { contextCardsEnabled: true, sessionModeProfile: onChain },
+        workerUrl: 'https://worker.example',
+      }),
+    ).not.toHaveProperty('contextCardsEnabled');
+    expect(
+      sanitizeSessionWizardMetadataPayload({
+        slug: 'context-cards',
+        contextCardsEnabled: true,
+        sessionModeProfile: onChain,
+      }),
+    ).not.toHaveProperty('contextCardsEnabled');
   });
 
   test('buildSessionWizardWorkerConfigPayload sends the Session Agent as the Worker stores it, and leaves it out when off', () => {
