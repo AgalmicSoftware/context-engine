@@ -30543,12 +30543,24 @@ var init_siweMessage = __esm({
 });
 
 // shared/realtimeInterviewConfig.mjs
-var DEFAULT_REALTIME_INTERVIEW_MODEL, models, isRealtimeInterviewModel, normalizeRealtimeInterviewModel, resolveRealtimeInterviewModel;
+var GPT_LIVE_1_1_MODEL, GPT_LIVE_1_1_FEATURE, DEFAULT_REALTIME_INTERVIEW_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL, liveModels, REALTIME_INTERVIEW_MODELS, models, isRealtimeInterviewModel, isLiveInterviewModel, normalizeRealtimeInterviewModel, resolveRealtimeInterviewModel;
 var init_realtimeInterviewConfig = __esm({
   "shared/realtimeInterviewConfig.mjs"() {
-    DEFAULT_REALTIME_INTERVIEW_MODEL = "gpt-live-1";
-    models = /* @__PURE__ */ new Set(["gpt-live-1", "gpt-realtime-2.1", "gpt-realtime-2.1-mini", "gpt-realtime-2", "gpt-realtime-1.5"]);
+    GPT_LIVE_1_1_MODEL = "gpt-live-1.1";
+    GPT_LIVE_1_1_FEATURE = "interview_gpt_live_1_1_v1";
+    DEFAULT_REALTIME_INTERVIEW_MODEL = GPT_LIVE_1_1_MODEL;
+    PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL = "gpt-live-1";
+    liveModels = /* @__PURE__ */ new Set([GPT_LIVE_1_1_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL]);
+    REALTIME_INTERVIEW_MODELS = Object.freeze([
+      ...liveModels,
+      "gpt-realtime-2.1",
+      "gpt-realtime-2.1-mini",
+      "gpt-realtime-2",
+      "gpt-realtime-1.5"
+    ]);
+    models = new Set(REALTIME_INTERVIEW_MODELS);
     isRealtimeInterviewModel = (value) => typeof value === "string" && models.has(value);
+    isLiveInterviewModel = (value) => typeof value === "string" && liveModels.has(value);
     normalizeRealtimeInterviewModel = (value) => {
       const model = String(value ?? "").trim();
       return isRealtimeInterviewModel(model) ? model : DEFAULT_REALTIME_INTERVIEW_MODEL;
@@ -107434,6 +107446,7 @@ init_sessionConfigAuthority();
 init_sessionConfigSecretsStore();
 init_sessionSlugResolution();
 init_storageRouteExecution();
+init_realtimeInterviewConfig();
 var FEATURES = Object.freeze([
   "agent_http_v1",
   // limits.aiPerWalletPerDay is honoured; older Workers store it and ignore it.
@@ -107449,6 +107462,8 @@ var FEATURES = Object.freeze([
   "envelope_export_identity_v1",
   // interviewMode.dataNote, the session's note on where research data goes; older Workers reject the key.
   "interview_data_note_v1",
+  // interviewMode.realtimeModel may be gpt-live-1.1; older Workers refuse it on save.
+  GPT_LIVE_1_1_FEATURE,
   "participant_context_links_v1",
   "participant_context_v1",
   "recovery_key_export",
@@ -108540,7 +108555,7 @@ var proxyOpenAiRealtimeCall = async ({
   if (!key) {
     return deps?.json?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
-  const live = realtime.model === "gpt-live-1";
+  const live = isLiveInterviewModel(realtime.model);
   const session = live ? {
     model: realtime.model,
     instructions: payload.instructions,
