@@ -1,0 +1,72 @@
+// The small picture of a quadratic question: a step down, a vote of +2, a step up, and the four credits
+// (2 x 2) that vote costs. Shown wherever the question types are listed.
+.preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-inline: auto;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--ce-radius-round);
+  &[data-step='down'] {
+    color: var(--ce-response-disagree-text);
+    background: var(--ce-response-disagree-bg);
+    box-shadow: inset 0 0 0 1px var(--ce-response-disagree-text);
+  }
+  &[data-step='up'] {
+    color: var(--ce-response-agree-text);
+    background: var(--ce-response-agree-bg);
+    box-shadow: inset 0 0 0 1px var(--ce-response-agree-text);
+    &[data-active='true'] {
+      background: var(--ce-response-agree-text);
+      color: var(--ce-surface);
+    }
+  }
+}
+.vote {
+  min-width: 1.6em;
+  text-align: center;
+  color: var(--ce-panel-text);
+}
+// +2 votes cost 2×2 = 4 credits.
+.squares {
+  display: inline-grid;
+  grid-template-columns: repeat(2, 6px);
+  gap: 1px;
+  margin-left: 2px;
+  i {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    background: var(--ce-response-agree-text);
+  }
+}
+
+// In the tile's own text colour: outlined steps, the step up filled, and the squares.
+.plain {
+  .vote {
+    color: inherit;
+  }
+  .step[data-step] {
+    color: inherit;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px currentColor;
+  }
+  .step[data-step='up'][data-active='true'] {
+    background: color-mix(in srgb, currentColor 28%, transparent);
+    color: inherit;
+  }
+  .squares i {
+    background: currentColor;
+  }
+}
