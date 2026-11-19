@@ -73,12 +73,15 @@ describe('resolveSessionWizardMetadataPayloadBase', () => {
         draftId: 'draft-1',
         contextFiles: [{ name: 'deck.pdf' }],
         questions: [{ prompt: 'Added after creation.', type: 'binary' }],
+        analysisCardEnabled: false,
       },
     });
     expect(metadata.sessionName).toBe('Template session');
     expect(metadata).not.toHaveProperty('draftId');
     expect(metadata).not.toHaveProperty('contextFiles');
     expect(metadata).not.toHaveProperty('questions');
+    // A box left unticked before the hosting became on-chain never reaches the chain.
+    expect(metadata).not.toHaveProperty('analysisCardEnabled');
   });
 
   it('clears stale session hex when no valid session id is available', () => {

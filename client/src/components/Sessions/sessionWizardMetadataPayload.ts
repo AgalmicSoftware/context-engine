@@ -71,6 +71,9 @@ export const resolveSessionWizardMetadataPayloadBase = ({
   delete metadata.draftId;
   delete metadata.contextFiles;
   delete metadata.questions;
+  // The analysis card's switch is a Session Worker setting, sent with its
+  // config; an on-chain session keeps none.
+  delete metadata.analysisCardEnabled;
   if (metadata.defaultFeaturedSBTs != null) {
     metadata.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(metadata.defaultFeaturedSBTs);
   }
