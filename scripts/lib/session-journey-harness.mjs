@@ -406,14 +406,25 @@ export const assertNoSidewaysScroll = async (page, label) => {
 const UNREADABLE_BELOW = 3;
 export const assertReadableText = async (locator, label) => {
   await locator.waitFor({ state: 'visible' });
+  // Text is judged as a person sees it, so wait until it is drawn: fonts in, any fade finished, and a frame
+  // painted since. A cold or busy browser (Linux WebKit, first run) can hold a fade at its first frame long
+  // enough for two looks to agree on text still the colour of its background.
+  const page = locator.page();
+  await settled(page);
+  // A page that paints no frames (hidden, say) must not hold the run: go on after a moment.
+  await page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+    setTimeout(resolve, 500);
+  }));
   const unreadable = (result) => result.failures.filter(({ ratio }) => !(ratio >= UNREADABLE_BELOW));
-  // A card or dialog fades in; judge it once two looks in a row agree.
+  // Judge it once two looks in a row agree. Text that reads as unreadable is looked at again until the time
+  // is up: a fade clears, and text that really is unreadable stays so and fails.
   let result = await locator.evaluate(auditPanelContrast, 0);
-  const deadline = Date.now() + 3000;
-  for (let settled = false; !settled && Date.now() < deadline;) {
+  const deadline = Date.now() + 5000;
+  for (let steady = false; (!steady || unreadable(result).length) && Date.now() < deadline;) {
     await new Promise((resolve) => setTimeout(resolve, 120));
     const again = await locator.evaluate(auditPanelContrast, 0);
-    settled = again.checked > 0 && JSON.stringify(again) === JSON.stringify(result);
+    steady = again.checked > 0 && JSON.stringify(again) === JSON.stringify(result);
     result = again;
   }
   assert.ok(result.checked > 0, `${label}: nothing to read`);
