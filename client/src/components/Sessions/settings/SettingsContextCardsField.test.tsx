@@ -73,6 +73,44 @@ describe('Session settings Context cards', () => {
     expect(screen.getByLabelText('Context cards')).toBeChecked();
   });
 
+  it('leaves both card switches as saved when an imported template names neither', async () => {
+    // As every template made before the switches existed: its missing fields are not a choice.
+    renderPage('https://cards-kept.example.workers.dev', ['context_cards_v1', 'analysis_card_v1'], {
+      contextCardsEnabled: true,
+      analysisCardEnabled: false,
+    });
+    await openContext();
+    expect(await screen.findByLabelText('Context cards')).toBeChecked();
+    fireEvent.click(screen.getByTestId('ce-template-import'));
+    fireEvent.change(screen.getByTestId('ce-template-paste'), {
+      target: { value: JSON.stringify({ format: 'ce.session-template/v1', sessionName: 'An older template' }) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+    // The list of changes names neither switch, as neither will change.
+    expect(screen.getByTestId('ce-template-changes').textContent).toMatch(/sessionName/);
+    expect(screen.getByTestId('ce-template-changes').textContent).not.toMatch(/CardsEnabled|CardEnabled/);
+    fireEvent.click(screen.getByTestId('ce-template-import-apply'));
+    expect(screen.getByLabelText('Context cards')).toBeChecked();
+    expect(screen.getByTestId('ce-settings-content-changes').textContent).not.toMatch(/Context cards|Analysis card/);
+    // A template that does name them is followed, off as well as on.
+    fireEvent.click(screen.getByTestId('ce-template-import'));
+    fireEvent.change(screen.getByTestId('ce-template-paste'), {
+      target: {
+        value: JSON.stringify({
+          format: 'ce.session-template/v1',
+          contextCardsEnabled: false,
+          analysisCardEnabled: true,
+        }),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+    expect(screen.getByTestId('ce-template-changes').textContent).toMatch(/contextCardsEnabled/);
+    expect(screen.getByTestId('ce-template-changes').textContent).toMatch(/analysisCardEnabled/);
+    fireEvent.click(screen.getByTestId('ce-template-import-apply'));
+    expect(screen.getByLabelText('Context cards')).not.toBeChecked();
+    expect(screen.getByTestId('ce-settings-content-changes').textContent).toMatch(/Analysis card/);
+  });
+
   it('offers no such setting for a Worker too old to keep cards, which would refuse it', async () => {
     renderPage('https://cards-old.example.workers.dev', ['worker_groups']);
     await openContext();

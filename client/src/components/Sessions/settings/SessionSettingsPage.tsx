@@ -119,6 +119,8 @@ const SESSION_AGENT_LOCKED_REASON =
 const LISTS_LOCKED_REASON =
   'The ID lists are read-only here: this Session Worker is older and refuses them. Update the Worker to edit them.';
 
+// Settings a template changes only when it names them (see importTemplate).
+const CARD_SWITCHES = ['contextCardsEnabled', 'analysisCardEnabled'] as const;
 const lower = (value: unknown) => toStr(value).trim().toLowerCase();
 const sameJson = (left: unknown, right: unknown) =>
   JSON.stringify(canonicalizeSessionWizardJson(left ?? null)) ===
@@ -431,14 +433,18 @@ const SessionSettingsPage = ({
     }
   };
 
-  const importTemplate = (template: Record<string, unknown>) => {
+  const importTemplate = (template: Record<string, unknown>, named: string[] = []) => {
     const { draft: next, keptHosting } = applyTemplateToSessionSettingsDraft(draft, template);
     // An on-chain session's questions are published from its session page.
     if (onChain) next.questions = draft.questions;
-    // Context cards follow the template only where this page offers the setting.
-    if (workerKeepsCards && !onChain) next.contextCardsEnabled = template.contextCardsEnabled === true;
-    // So does the analysis card, which is on unless a template turns it off.
-    if (workerHasAnalysisCard && !onChain) next.analysisCardEnabled = template.analysisCardEnabled !== false;
+    // Context cards and the analysis card follow a template only where this page offers the setting, and only
+    // when the template names it: one made before the switch existed says nothing, so what is saved stays.
+    if (workerKeepsCards && !onChain && named.includes('contextCardsEnabled')) {
+      next.contextCardsEnabled = template.contextCardsEnabled === true;
+    }
+    if (workerHasAnalysisCard && !onChain && named.includes('analysisCardEnabled')) {
+      next.analysisCardEnabled = template.analysisCardEnabled !== false;
+    }
     setDraft(next);
     setStatus(
       keptHosting
@@ -459,6 +465,7 @@ const SessionSettingsPage = ({
             })
           }
           onImport={importTemplate}
+          keptUnlessNamed={CARD_SWITCHES}
           fromLink={false}
           fileName={sessionSlug}
           linkBase={`${typeof window === 'undefined' ? '' : window.location.origin}/new`}
