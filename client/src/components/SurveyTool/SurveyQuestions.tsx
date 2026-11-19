@@ -2172,8 +2172,10 @@ const SurveyQuestionsInner = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The header's Submit and Clear (the x beside it) in All questions act through this handle.
   useImperativeHandle(ref, () => ({
     handlePrimarySubmitClick,
+    handleRevertPendingChanges,
     state: stateRef.current,
   }));
 

@@ -311,6 +311,12 @@ $text-color: var(--ce-border);
   margin-bottom: 6px;
 }
 
+// A preview drawn in the tile's text colour (the quadratic one) follows the title's colour in every theme
+// and in the pressed state.
+.typePreviewInk {
+  color: var(--ce-overlay-surface);
+}
+
 .typePreviewRow {
   display: flex;
   gap: 4px;
@@ -977,7 +983,8 @@ $text-color: var(--ce-border);
   .filterSection .sectionContent,
   .filterOption,
   .filterBubble,
-  .typeTitle {
+  .typeTitle,
+  .typePreviewInk {
     color: var(--ce-document-text);
   }
 
@@ -994,7 +1001,8 @@ $text-color: var(--ce-border);
     background: var(--ce-selection-bg);
     color: var(--ce-selection-text);
 
-    .typeTitle {
+    .typeTitle,
+    .typePreviewInk {
       color: inherit;
     }
   }

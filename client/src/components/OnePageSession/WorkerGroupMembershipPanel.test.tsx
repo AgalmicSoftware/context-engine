@@ -231,8 +231,57 @@ describe('WorkerGroupMembershipPanel', () => {
         'href',
         '/groups?sessionSlug=alpha&worker=https%3A%2F%2Fsession-worker.example',
       );
+      // The session's name is a link to its page; an unlisted session keeps its Worker so the link opens.
+      const session = screen.getByTestId('ce-worker-group-session-link');
+      expect(session).toHaveTextContent(sessionName ? 'Alpha Session (alpha)' : 'alpha');
+      expect(session).toHaveAttribute('href', '/session/alpha?worker=https%3A%2F%2Fsession-worker.example');
     },
   );
+
+  it('links every group page to its session, also where the visibility line does not name it', async () => {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            groups: [
+              {
+                groupId: 'hosts',
+                sessionSlug: 'alpha',
+                label: 'Hosts',
+                joinMode: 'open',
+                memberVisibility: 'admin_only',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+    render(
+      <WorkerGroupMembershipPanel
+        allowAnonymousGroupDiscovery
+        canReadGroups
+        sessionId={SESSION_ID}
+        sessionSlug="alpha"
+        sessionName="Alpha Session"
+        workerUrl="https://session-worker.example"
+        selectedGroupId="hosts"
+        fetchImpl={fetchImpl as typeof fetch}
+      />,
+    );
+    expect(await screen.findByTestId('ce-worker-group-member-visibility')).toHaveTextContent(
+      'Member visibility:admin only',
+    );
+    expect(screen.getByTestId('ce-worker-group-session')).toHaveTextContent('Session:Alpha Session (alpha)');
+    // One link to the session, not two.
+    expect(screen.getAllByTestId('ce-worker-group-session-link')).toHaveLength(1);
+    expect(screen.getByTestId('ce-worker-group-session-link')).toHaveAttribute(
+      'href',
+      '/session/alpha?worker=https%3A%2F%2Fsession-worker.example',
+    );
+  });
 
   it('formats active, expired, and unlimited join windows without depending on wall-clock time', () => {
     expect(resolveWorkerGroupJoinWindowDisplay({ nowMs: Date.parse('2026-01-01T00:00:00.000Z') })).toEqual({

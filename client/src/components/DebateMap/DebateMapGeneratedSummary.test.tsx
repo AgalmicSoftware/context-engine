@@ -57,7 +57,7 @@ describe('shortenSummary', () => {
   });
 });
 
-it('leads with the short summary and lists the positions on request', () => {
+it('leads with the short summary and shows every position without asking', () => {
   render(
     <DebateMapGeneratedSummary
       entries={[
@@ -69,17 +69,11 @@ it('leads with the short summary and lists the positions on request', () => {
   );
   const section = screen.getByRole('region', { name: 'AI-generated summary' });
   expect(within(section).getByText(first)).toBeInTheDocument();
-  expect(within(section).queryByText('Check learning')).not.toBeInTheDocument();
 
-  const toggle = within(section).getByRole('button', { name: 'Show more' });
-  expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  expect(document.getElementById(String(toggle.getAttribute('aria-controls')))).toBeInTheDocument();
-  fireEvent.click(toggle);
-
-  expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  expect(toggle).toHaveTextContent('Show less');
-  expect(within(section).getByText(`${first} ${second}`)).toBeInTheDocument();
-  const [held, alone] = within(section).getAllByRole('listitem');
+  // The positions are there from the start, in their own section with their number.
+  const positions = screen.getByRole('region', { name: 'Positions' });
+  expect(positions).toHaveTextContent(/^Positions 2/);
+  const [held, alone] = within(positions).getAllByRole('listitem');
   expect(within(held).getByText('Check learning').tagName).toBe('STRONG');
   expect(held).toHaveTextContent('4 of 8 participants');
   expect(held).toHaveTextContent('Unsure about harms.');
@@ -88,9 +82,30 @@ it('leads with the short summary and lists the positions on request', () => {
   expect(alone).toHaveTextContent('Reject restrictions1 participant');
   expect(alone.querySelector('[aria-hidden="true"]')).toBeNull();
 
+  // The toggle opens and closes the rest of the summary only.
+  const toggle = within(section).getByRole('button', { name: 'See more' });
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(document.getElementById(String(toggle.getAttribute('aria-controls')))).toBeInTheDocument();
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(toggle).toHaveTextContent('See less');
+  expect(within(section).getByText(`${first} ${second}`)).toBeInTheDocument();
   fireEvent.click(toggle);
   expect(within(section).getByText(first)).toBeInTheDocument();
-  expect(within(section).queryAllByRole('listitem')).toHaveLength(0);
+  expect(within(positions).getAllByRole('listitem')).toHaveLength(2);
+});
+
+it('offers no toggle for a short summary, and shows positions that come without one', () => {
+  render(
+    <DebateMapGeneratedSummary
+      entries={[
+        { id: 's', comment: first },
+        { id: 'p1', label: 'Check learning', comment: '', participantCount: 2, participantTotal: 4 },
+      ]}
+    />,
+  );
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Positions' })).toHaveTextContent('2 of 4 participants');
 });
 
 it('offers no toggle when the summary is short and there are no positions', () => {

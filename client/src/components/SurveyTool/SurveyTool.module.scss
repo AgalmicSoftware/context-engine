@@ -7856,9 +7856,9 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 
   // Choice options stack one per line and scroll up and down inside the answer area, never sideways, from the top
-  // (centring would push the first ones out of reach). When more are below, the area ends partway through an option
-  // (usePileHalfRowCut), and that edge fades a little; once scrolled, the top edge does too. The padding, and
-  // keyboard scrolling, keep the last option clear at the end.
+  // (centring would push the first ones out of reach). When more are below, the area fills its room and ends partway
+  // through an option (usePileHalfRowCut), and that edge fades a little; once scrolled, the top edge does too. The
+  // padding, and keyboard scrolling, keep the last option clear at the end.
   .pileCardInner .pileCardMainContent:has(.multichoiceQuestionContainer) {
     --pile-list-fade-top: black;
     --pile-list-fade-bottom: black;
@@ -7907,7 +7907,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     flex: 0 0 auto;
     flex-direction: column;
     flex-wrap: nowrap;
-    gap: 8px;
+    // usePileHalfRowCut spreads the options to fill the room, so the list still ends partway through one.
+    gap: calc(8px + var(--pile-list-row-spread, 0px));
     width: 100%;
     max-width: 100%;
     height: auto;

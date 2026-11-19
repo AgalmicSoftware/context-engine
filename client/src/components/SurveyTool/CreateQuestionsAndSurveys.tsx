@@ -22,6 +22,7 @@ import {
   faEraser,
   faQuestionCircle,
 } from '@fortawesome/free-solid-svg-icons';
+import QuadraticTypePreview from './QuadraticTypePreview';
 import styles from './CreateQuestionsAndSurveys.module.scss';
 import InterviewSuggestedQuestionPrompt from './InterviewSuggestedQuestionPrompt';
 import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient';
@@ -3321,21 +3322,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             aria-label="Add Quadratic allocation question"
           >
             <div className={styles.typeTitle}>Quadratic allocation</div>
-            <div className={styles.quadraticPreview} aria-hidden="true">
-              <span className={styles.quadraticPreviewStep} data-step="down">
-                −
-              </span>
-              <span className={styles.quadraticPreviewVote}>2</span>
-              <span className={styles.quadraticPreviewStep} data-step="up" data-active="true">
-                +
-              </span>
-              <span className={styles.quadraticPreviewSquares}>
-                <i />
-                <i />
-                <i />
-                <i />
-              </span>
-            </div>
+            <QuadraticTypePreview />
           </button>
 
           <button

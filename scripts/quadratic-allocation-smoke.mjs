@@ -157,9 +157,10 @@ export async function probeQuadraticAllocation(page) {
   for (let i = 0; i < 9; i++) await parks.press('ArrowLeft');
   for (let i = 0; i < 12; i++) await transit.press('ArrowRight');
   await page.getByRole('button', { name: 'Submit locally', exact: true }).click();
-  const rows = page.getByTestId('ce-quadratic-results').getByRole('row');
-  assert.match(await rows.nth(1).textContent(), /Parks7-25/);
-  assert.match(await rows.nth(2).textContent(), /Transit5-7-2/);
+  // Each option is a row of bars; its totals are also spoken as one sentence.
+  const rows = page.getByTestId('ce-quadratic-results').getByRole('listitem');
+  assert.match(await rows.nth(0).textContent(), /Parks: support 7, oppose 2, net \+5/);
+  assert.match(await rows.nth(1).textContent(), /Transit: support 5, oppose 7, net −2/);
   const geometry = await page.evaluate(() => {
     const container = document.querySelector('[data-testid="ce-quadratic-pile-card"]');
     const sliders = container.querySelectorAll('input[type="range"]');

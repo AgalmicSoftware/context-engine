@@ -278,6 +278,11 @@ jest.mock('../DemoViews/CorpusViewer', () => {
     default: MockCorpusViewer,
   };
 });
+// The build of the results as a whole feeds the Session Agent alone, so its button shows only with the agent on.
+const AI_VIEWS_AGENT_ON = {
+  audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' }],
+};
+
 describe('OnePageSession results routing', () => {
   afterEach(() => {
     mockRenderRealPolisReport = false;
@@ -337,6 +342,278 @@ describe('OnePageSession results routing', () => {
     });
     return subject;
   };
+
+  it('offers one Update Session Agent button where the agent is on, and no AI Views wording', () => {
+    const update = jest.fn();
+    const shellProps = {
+      account: '0xabc',
+      aggregatorData: {},
+      autoMintCountdown: null,
+      autoMintingMode: false,
+      autoMintStatuses: [],
+      autoMintTargets: [],
+      autoOpenResults: false,
+      blockLimits: {},
+      cacheHasLoaded: true,
+      contracts: {},
+      corpusViewerLoadRequestNonce: 0,
+      corpusViewerLoadState: DEFAULT_CORPUS_VIEWER_LOAD_STATE,
+      defaultFeaturedSBTs: [],
+      defaultFilterState: {},
+      defaultSbtTags: [],
+      defaultTags: [],
+      disclaimersActive: false,
+      displaySessionSlug: 'edge',
+      dismissedLoginBanner: false,
+      dismissedStatusItems: {},
+      effectiveSlug: 'edge',
+      embeddedAtlasNodeId: null,
+      embeddedAtlasReturnState: null,
+      embeddedGroupsSessionConfig: {},
+      embeddedGroupsSessionSlug: 'edge',
+      embeddedQuestionSessionSlug: 'edge',
+      expandedImages: {},
+      filterState: {},
+      generatedResultsAuthAvailable: true,
+      isDemoSlug: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+      litHooks: {},
+      loginComplete: true,
+      needsLoginForAutoMint: false,
+      network: {},
+      networkChainId: 11155420,
+      pileSubmitRailVisible: false,
+      provider: {},
+      questionPool: [],
+      questionResponsesNonce: 1,
+      questionScanProgress: null,
+      questionsSectionRef: React.createRef(),
+      refreshQuestionMetadata: jest.fn(),
+      refreshQuestionResponses: jest.fn(),
+      refreshSbtData: jest.fn(),
+      refreshSurveyResponsesByID: jest.fn(),
+      resolvedPolisDemoDataBySlug: {},
+      resolvedSessionConfig: { sessionAgent: AI_VIEWS_AGENT_ON },
+      resultsViewMode: 'polis',
+      riskMatrixRestoreState: null,
+      sbtCacheRevision: 1,
+      sbtImages: {},
+      sbtNames: {},
+      sbtRealtimeCoverageBySlug: {},
+      sbtScanProgressBySlug: {},
+      sessionHeader: '',
+      sessionInfo: '',
+      sessionName: 'Edge',
+      sharedQuestionPool: [],
+      showDocuments: false,
+      showEmbeddedCreateGroup: false,
+      showGroups: false,
+      showQuestions: false,
+      showResults: true,
+      slug: 'edge',
+      titleText: 'edge',
+      toggleLoginModal: jest.fn(),
+      onCancelAutoMintCountdown: jest.fn(),
+      onCorpusAtlasIssueOpen: jest.fn(),
+      onCorpusViewerLoadStateChange: jest.fn(),
+      onDismissLoginBanner: jest.fn(),
+      onDismissStatusItem: jest.fn(),
+      onEmbeddedAtlasModalClose: jest.fn(),
+      onFilterChange: jest.fn(),
+      onGroupsViewAll: jest.fn(),
+      onSessionAgentUpdate: update,
+      onKickoffAutoMintIfNeeded: jest.fn(),
+      onLoadFullCorpusClick: jest.fn(),
+      onOpenResults: jest.fn(),
+      onPileSubmitRailVisibilityChange: jest.fn(),
+      onResultsModalClose: jest.fn(),
+      onResultsModeChange: jest.fn(),
+      onRiskMatrixRestoreApplied: jest.fn(),
+      onToggleDocuments: jest.fn(),
+      onToggleEmbeddedCreateGroup: jest.fn(),
+      onToggleGroups: jest.fn(),
+      onToggleQuestions: jest.fn(),
+      onToggleResults: jest.fn(),
+      onToggleStatusImagePreview: jest.fn(),
+      onViewAllQuestionsClick: jest.fn(),
+    };
+
+    const ready = {
+      adminAuthorized: true,
+      viewerAuthorized: true,
+      artifact: null,
+      viewOptions: [{ key: 'circles', label: 'Circles' }],
+      status: 'ready',
+      canGenerate: true,
+      canCheckStatus: false,
+      generationMode: 'manual',
+      lastFailure: '',
+    };
+    const button = () => screen.queryByTestId('ce-session-agent-update');
+    const notice = () => screen.queryByTestId('ce-session-agent-update-failed');
+    const shell = (props) => <OnePageSessionStandardShell {...shellProps} {...props} />;
+
+    // An admin not yet proven: one press does the whole thing, through the host.
+    const { rerender } = render(shell({ generatedResultsAuthAvailable: true }));
+    expect(button()).toHaveTextContent('Update Session Agent');
+    fireEvent.click(button());
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/AI Views/)).not.toBeInTheDocument();
+
+    rerender(shell({ generatedResultsAnalysis: ready }));
+    expect(button()).toHaveTextContent('Update Session Agent');
+    expect(button()).toBeEnabled();
+    expect(notice()).not.toBeInTheDocument();
+
+    // A press that found no changed answers says so: nothing was built or charged.
+    const unchanged = () => screen.queryByTestId('ce-session-agent-update-unchanged');
+    expect(unchanged()).not.toBeInTheDocument();
+    rerender(shell({ generatedResultsAnalysis: ready, sessionAgentUpdateUnchanged: true }));
+    expect(unchanged()).toHaveTextContent('No answers have changed since the last update');
+    rerender(shell({ generatedResultsAnalysis: { ...ready, isRunning: true }, sessionAgentUpdateUnchanged: true }));
+    expect(unchanged()).not.toBeInTheDocument();
+    rerender(shell({ generatedResultsAnalysis: ready }));
+
+    rerender(shell({ generatedResultsAnalysis: { ...ready, isRunning: true, canGenerate: false } }));
+    expect(button()).toHaveTextContent('Updating Session Agent…');
+    expect(button()).toBeDisabled();
+
+    rerender(shell({ generatedResultsAnalysis: { ...ready, lastFailure: 'AI provider timeout' } }));
+    expect(button()).toHaveTextContent('Retry Session Agent update');
+    expect(notice()).toHaveTextContent('Session Agent update failed: AI provider timeout');
+
+    rerender(shell({ generatedResultsAnalysis: { ...ready, canCheckStatus: true, canGenerate: false } }));
+    expect(button()).toHaveTextContent('Check Session Agent update');
+    expect(button()).toBeEnabled();
+
+    // An admin who cannot start one (a session that only builds automatically) sees the button greyed, and why.
+    rerender(shell({ generatedResultsAnalysis: { ...ready, canGenerate: false, generationMode: 'automatic' } }));
+    expect(button()).toBeDisabled();
+    expect(screen.getByTestId('ce-session-agent-update-problem')).toHaveTextContent(
+      'updates its Session Agent automatically',
+    );
+
+    // A press that could not be proven or sent says so.
+    rerender(
+      shell({
+        generatedResultsAuthAvailable: true,
+        generatedResultsAnalysis: { ...ready, adminAuthorized: false, canGenerate: false, error: 'Sign-in declined.' },
+      }),
+    );
+    expect(button()).toBeEnabled();
+    expect(screen.getByTestId('ce-session-agent-update-problem')).toHaveTextContent(
+      'Session Agent update could not start: Sign-in declined.',
+    );
+
+    // Someone who is no admin sees nothing of it.
+    rerender(
+      shell({
+        generatedResultsAuthAvailable: false,
+        generatedResultsAnalysis: { ...ready, adminAuthorized: false, canGenerate: false, error: 'Not allowed.' },
+      }),
+    );
+    expect(button()).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-agent-update-problem')).not.toBeInTheDocument();
+
+    // Agent off: no button. A session still building automatically keeps the notice of a failed build.
+    const failedAutomatic = { ...ready, generationMode: 'automatic', lastFailure: 'Automatic retries have stopped.' };
+    rerender(shell({ generatedResultsAnalysis: failedAutomatic, resolvedSessionConfig: {} }));
+    expect(button()).not.toBeInTheDocument();
+    expect(notice()).toHaveTextContent('Automatic retries have stopped.');
+    rerender(shell({ generatedResultsAnalysis: { ...ready, lastFailure: 'x' }, resolvedSessionConfig: {} }));
+    expect(notice()).not.toBeInTheDocument();
+    expect(screen.queryByText(/AI Views/)).not.toBeInTheDocument();
+  });
+
+  it('updates the Session Agent in one press: checks a quiet build, else proves the admin and builds', async () => {
+    const subject = createSubject({ slug: 'edge' });
+    subject.loadGeneratedResultsArtifact = jest.fn();
+    subject.handleGeneratedResultsGenerate = jest.fn();
+    const authorizeTo = (next) =>
+      (subject.handleGeneratedResultsAuthorize = jest.fn(async () => {
+        subject.state = { ...subject.state, generatedResultsAnalysis: next };
+      }));
+
+    subject.state = { ...subject.state, generatedResultsAnalysis: { canCheckStatus: true, adminAuthorized: true } };
+    await subject.handleSessionAgentUpdate();
+    expect(subject.loadGeneratedResultsArtifact).toHaveBeenCalledTimes(1);
+    expect(subject.handleGeneratedResultsGenerate).not.toHaveBeenCalled();
+
+    subject.state = { ...subject.state, generatedResultsAnalysis: { adminAuthorized: false } };
+    authorizeTo({ adminAuthorized: false, canGenerate: false });
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsAuthorize).toHaveBeenCalledTimes(1);
+    expect(subject.handleGeneratedResultsGenerate).not.toHaveBeenCalled();
+
+    subject.state = { ...subject.state, generatedResultsAnalysis: { adminAuthorized: false } };
+    authorizeTo({ adminAuthorized: true, canGenerate: true });
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledWith(false);
+
+    // The same build read twice: the public read before the proof has no draft id, the status read after it has.
+    // That is not a new build, so the press builds.
+    subject.state = {
+      ...subject.state,
+      generatedResultsAnalysis: { adminAuthorized: false, lastGoodDraftId: '', lastGoodGeneratedAt: 't1' },
+    };
+    authorizeTo({ adminAuthorized: true, canGenerate: true, lastGoodDraftId: 'abc', lastGoodGeneratedAt: 't1' });
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(2);
+
+    // Proving the admin waited out a build already under way: the fresh one is not built again.
+    subject.state = {
+      ...subject.state,
+      generatedResultsAnalysis: { adminAuthorized: false, lastGoodDraftId: '', lastGoodGeneratedAt: 't1' },
+    };
+    authorizeTo({ adminAuthorized: true, canGenerate: true, lastGoodDraftId: 'b', lastGoodGeneratedAt: 't2' });
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(2);
+
+    // Already proven: no second signature.
+    authorizeTo({});
+    subject.state = { ...subject.state, generatedResultsAnalysis: { adminAuthorized: true, canGenerate: true } };
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsAuthorize).not.toHaveBeenCalled();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(3);
+    expect(subject.state.sessionAgentUpdateUnchanged).toBe(false);
+
+    // The Worker handed back the same build: the press says nothing changed.
+    subject.state = {
+      ...subject.state,
+      generatedResultsAnalysis: { adminAuthorized: true, canGenerate: true, lastGoodGeneratedAt: 't1' },
+    };
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenLastCalledWith(false);
+    expect(subject.state.sessionAgentUpdateUnchanged).toBe(true);
+
+    // A new build: no such note.
+    subject.handleGeneratedResultsGenerate = jest.fn(async () => {
+      subject.state = {
+        ...subject.state,
+        generatedResultsAnalysis: { ...subject.state.generatedResultsAnalysis, lastGoodGeneratedAt: 't2' },
+      };
+    });
+    await subject.handleSessionAgentUpdate();
+    expect(subject.state.sessionAgentUpdateUnchanged).toBe(false);
+
+    // Retry after a failed build forces one, and never says nothing changed.
+    subject.handleGeneratedResultsGenerate = jest.fn();
+    subject.state = {
+      ...subject.state,
+      generatedResultsAnalysis: {
+        adminAuthorized: true,
+        canGenerate: true,
+        lastFailure: 'provider timed out',
+        lastGoodGeneratedAt: 't2',
+      },
+    };
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledWith(true);
+    expect(subject.state.sessionAgentUpdateUnchanged).toBe(false);
+  });
 
   it('rebuilds a reopened report when the session hidden list changed', () => {
     const storeSession = (hidden) =>
@@ -969,8 +1246,7 @@ describe('OnePageSession results routing', () => {
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
-    expect(screen.queryByTestId('ce-session-generated-results-check')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-agent-update')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Report$/i })).toBeInTheDocument();
   });
 
@@ -1058,119 +1334,6 @@ describe('OnePageSession results routing', () => {
     );
     expect(screen.queryByRole('button', { name: /^(Circles|Breakdown|Risk Matrix|Atlas)$/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
-  });
-
-  it('lets an admin check AI views when the public report route finds no report', async () => {
-    const originalFetch = global.fetch;
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: false,
-      status: 404,
-      json: async () => ({
-        ok: false,
-        jobState: 'idle',
-        error: 'No generated results analysis artifact is available yet.',
-      }),
-    });
-    global.fetch = fetchMock;
-    try {
-      render(
-        <OnePageSession
-          {...buildProps()}
-          account="0xabc"
-          loginComplete={true}
-          sessionConfig={{
-            ...buildProps().sessionConfig,
-            adminAddress: '0xAbC',
-            corsWorkerUrl: 'https://worker.example',
-            resultsAnalysis: {
-              version: 1,
-              generationMode: 'manual',
-              views: { circles: true, breakdown: true, riskMatrix: true },
-              autoAfter: { threshold: 10, unit: 'distinctParticipants' },
-              inputScope: 'submitted',
-              publication: 'latest_success_visible',
-            },
-          }}
-        />,
-      );
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-      await waitFor(() =>
-        expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/results-analysis/artifact'))).toBe(true),
-      );
-      // Let the 404 land: the button is enabled before it does.
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      });
-      expect(screen.getByTestId('ce-session-generated-results-check')).toBeEnabled();
-      expect(screen.getByTestId('ce-session-generated-results-check')).toHaveTextContent('Check AI Views');
-    } finally {
-      global.fetch = originalFetch;
-    }
-  });
-
-  it('offers only the explicit generated AI status check for a plausible admin hint', async () => {
-    render(
-      <OnePageSession
-        {...buildProps()}
-        account="0xabc"
-        loginComplete={true}
-        sessionConfig={{
-          ...buildProps().sessionConfig,
-          adminAddress: '0xAbC',
-          corsWorkerUrl: 'https://worker.example',
-          resultsAnalysis: {
-            version: 1,
-            generationMode: 'manual',
-            views: { circles: true, breakdown: true, riskMatrix: true },
-            autoAfter: { threshold: 10, unit: 'distinctParticipants' },
-            inputScope: 'submitted',
-            publication: 'latest_success_visible',
-          },
-        }}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-
-    expect(screen.getByTestId('ce-session-generated-results-check')).toHaveTextContent('Check AI Views');
-    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Circles$/i })).not.toBeInTheDocument();
-  });
-
-  it('invokes anonymous generated-results recheck with the rendered session host bound', async () => {
-    let callbackThis = null;
-    const loadSpy = jest
-      .spyOn(OnePageSession.prototype, 'loadGeneratedResultsArtifact')
-      .mockImplementation(function mockLoadGeneratedResultsArtifact() {
-        callbackThis = this;
-        return Promise.resolve();
-      });
-    const sessionRef = React.createRef();
-    render(<OnePageSession {...buildProps()} ref={sessionRef} />);
-
-    act(() => {
-      sessionRef.current.setState({
-        showResults: true,
-        generatedResultsAnalysis: {
-          adminAuthorized: false,
-          viewerAuthorized: true,
-          artifact: null,
-          canCheckStatus: true,
-          canGenerate: false,
-          isRunning: false,
-          status: 'ready',
-          statusLabel: 'Generated AI views are still being prepared. Check again for the latest status.',
-          viewOptions: [],
-        },
-      });
-    });
-    loadSpy.mockClear();
-    callbackThis = null;
-
-    fireEvent.click(screen.getByTestId('ce-session-generated-results-check'));
-
-    expect(loadSpy).toHaveBeenCalledTimes(1);
-    expect(callbackThis).toBe(sessionRef.current);
   });
 
   it('renders structured session context as escaped text and official links', async () => {
@@ -1939,194 +2102,6 @@ describe('OnePageSession results routing', () => {
     expect(screen.queryByTestId('ce-session-context')).not.toBeInTheDocument();
   });
 
-  it('shows a Retry action for automatic-only generated analysis failures and a Recheck action after polling expires', async () => {
-    const baseGeneratedState = {
-      adminAuthorized: true,
-      viewerAuthorized: true,
-      artifact: null,
-      viewOptions: [{ key: 'circles', label: 'Circles' }],
-      status: 'ready',
-      statusLabel: 'No generated view yet.',
-    };
-    const authorize = jest.fn();
-    const check = jest.fn();
-    const generate = jest.fn();
-    const shellProps = {
-      account: '0xabc',
-      aggregatorData: {},
-      autoMintCountdown: null,
-      autoMintingMode: false,
-      autoMintStatuses: [],
-      autoMintTargets: [],
-      autoOpenResults: false,
-      blockLimits: {},
-      cacheHasLoaded: true,
-      contracts: {},
-      corpusViewerLoadRequestNonce: 0,
-      corpusViewerLoadState: DEFAULT_CORPUS_VIEWER_LOAD_STATE,
-      defaultFeaturedSBTs: [],
-      defaultFilterState: {},
-      defaultSbtTags: [],
-      defaultTags: [],
-      disclaimersActive: false,
-      displaySessionSlug: 'edge',
-      dismissedLoginBanner: false,
-      dismissedStatusItems: {},
-      effectiveSlug: 'edge',
-      embeddedAtlasNodeId: null,
-      embeddedAtlasReturnState: null,
-      embeddedGroupsSessionConfig: {},
-      embeddedGroupsSessionSlug: 'edge',
-      embeddedQuestionSessionSlug: 'edge',
-      expandedImages: {},
-      filterState: {},
-      generatedResultsAnalysis: {
-        ...baseGeneratedState,
-        canGenerate: true,
-        generationMode: 'automatic',
-        lastFailure: 'Provider failed.',
-      },
-      generatedResultsAuthAvailable: true,
-      isDemoSlug: false,
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      isSBTCacheReady: true,
-      isSurveyCacheReady: true,
-      litHooks: {},
-      loginComplete: true,
-      needsLoginForAutoMint: false,
-      network: {},
-      networkChainId: 11155420,
-      pileSubmitRailVisible: false,
-      provider: {},
-      questionPool: [],
-      questionResponsesNonce: 1,
-      questionScanProgress: null,
-      questionsSectionRef: React.createRef(),
-      refreshQuestionMetadata: jest.fn(),
-      refreshQuestionResponses: jest.fn(),
-      refreshSbtData: jest.fn(),
-      refreshSurveyResponsesByID: jest.fn(),
-      resolvedPolisDemoDataBySlug: {},
-      resolvedSessionConfig: {},
-      resultsViewMode: 'polis',
-      riskMatrixRestoreState: null,
-      sbtCacheRevision: 1,
-      sbtImages: {},
-      sbtNames: {},
-      sbtRealtimeCoverageBySlug: {},
-      sbtScanProgressBySlug: {},
-      sessionHeader: '',
-      sessionInfo: '',
-      sessionName: 'Edge',
-      sharedQuestionPool: [],
-      showDocuments: false,
-      showEmbeddedCreateGroup: false,
-      showGroups: false,
-      showQuestions: false,
-      showResults: true,
-      slug: 'edge',
-      titleText: 'edge',
-      toggleLoginModal: jest.fn(),
-      onCancelAutoMintCountdown: jest.fn(),
-      onCorpusAtlasIssueOpen: jest.fn(),
-      onCorpusViewerLoadStateChange: jest.fn(),
-      onDismissLoginBanner: jest.fn(),
-      onDismissStatusItem: jest.fn(),
-      onEmbeddedAtlasModalClose: jest.fn(),
-      onFilterChange: jest.fn(),
-      onGroupsViewAll: jest.fn(),
-      onGeneratedResultsAuthorize: authorize,
-      onGeneratedResultsCheck: check,
-      onGeneratedResultsGenerate: generate,
-      onKickoffAutoMintIfNeeded: jest.fn(),
-      onLoadFullCorpusClick: jest.fn(),
-      onOpenResults: jest.fn(),
-      onPileSubmitRailVisibilityChange: jest.fn(),
-      onResultsModalClose: jest.fn(),
-      onResultsModeChange: jest.fn(),
-      onRiskMatrixRestoreApplied: jest.fn(),
-      onToggleDocuments: jest.fn(),
-      onToggleEmbeddedCreateGroup: jest.fn(),
-      onToggleGroups: jest.fn(),
-      onToggleQuestions: jest.fn(),
-      onToggleResults: jest.fn(),
-      onToggleStatusImagePreview: jest.fn(),
-      onViewAllQuestionsClick: jest.fn(),
-    };
-
-    const view = render(<OnePageSessionStandardShell {...shellProps} />);
-    fireEvent.click(screen.getByTestId('ce-session-generated-results-generate'));
-    expect(screen.getByTestId('ce-session-generated-results-generate')).toHaveTextContent('Retry AI Views');
-    expect(generate).toHaveBeenCalledWith(true);
-
-    view.rerender(
-      <OnePageSessionStandardShell
-        {...shellProps}
-        resultsViewMode="circles"
-        generatedResultsAnalysis={resolveGeneratedResultsControllerState({
-          statusBody: {
-            ok: true,
-            adminAuthorized: true,
-            settings: { generationMode: 'automatic', views: { circles: true } },
-            capability: { manual: { supported: true } },
-            state: { jobState: 'failed', lastFailure: { error: 'Provider failed.', retriesExhausted: true } },
-          },
-        })}
-      />,
-    );
-    expect(screen.getByText('Automatic retries have stopped. Provider failed.')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-session-generated-results-generate')).toHaveTextContent('Retry AI Views');
-
-    view.rerender(
-      <OnePageSessionStandardShell
-        {...shellProps}
-        generatedResultsAnalysis={{
-          ...baseGeneratedState,
-          canCheckStatus: true,
-          canGenerate: false,
-          lastFailure: '',
-          statusLabel: 'Generated AI views are still being prepared. Check again for the latest status.',
-        }}
-      />,
-    );
-
-    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
-    expect(screen.getByTestId('ce-session-generated-results-check')).toHaveTextContent('Recheck AI Views');
-    fireEvent.click(screen.getByTestId('ce-session-generated-results-check'));
-    expect(check).toHaveBeenCalledTimes(1);
-    expect(authorize).not.toHaveBeenCalled();
-
-    view.rerender(
-      <OnePageSessionStandardShell
-        {...shellProps}
-        generatedResultsAuthAvailable={false}
-        generatedResultsAnalysis={{
-          ...baseGeneratedState,
-          adminAuthorized: false,
-          viewerAuthorized: true,
-          canCheckStatus: true,
-          canGenerate: false,
-          lastFailure: '',
-          statusLabel: 'Generated AI views are still being prepared. Check again for the latest status.',
-        }}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId('ce-session-generated-results-check'));
-    expect(check).toHaveBeenCalledTimes(2);
-    expect(authorize).not.toHaveBeenCalled();
-
-    view.rerender(
-      <OnePageSessionStandardShell
-        {...shellProps}
-        generatedResultsAuthAvailable={false}
-        generatedResultsAnalysis={{ ...baseGeneratedState, viewOptions: [], canGenerate: false }}
-      />,
-    );
-    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ce-session-generated-results-check')).not.toBeInTheDocument();
-  });
   it('renders the Raw Results action only while results are expanded and styles it like the other demo mode buttons', async () => {
     render(<OnePageSession {...buildProps()} />);
 

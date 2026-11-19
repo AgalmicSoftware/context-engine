@@ -1,10 +1,17 @@
+// The look the owner picked from the mock-ups: a pale page, and each answer, option and position on its own
+// white card with a thin border.
 .sections {
+  --answer-card-bg: var(--ce-document-canvas);
+  --answer-card-border: 1px solid var(--ce-document-border);
   color: var(--ce-document-text);
-  background: var(--ce-document-canvas);
+  background: color-mix(in srgb, var(--ce-status-info-soft) 30%, var(--ce-document-canvas));
+  border-radius: 12px;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 14px;
+  // Larger text and numbers throughout (owner: "numbers and text should be larger"); 17px still fits a phone.
+  font-size: 17px;
   line-height: 1.5;
-  padding: 4px 0;
+  padding: 4px 14px;
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
 
@@ -23,7 +30,7 @@
   }
   h4 {
     font:
-      600 16px/1.4 Arial,
+      600 20px/1.35 Arial,
       Helvetica,
       sans-serif;
     color: var(--ce-document-text);
@@ -47,6 +54,24 @@
     min-height: 40px;
     font: inherit;
     font-weight: 600;
+    cursor: pointer;
+    opacity: 1;
+    transform: none;
+  }
+  .writtenAnswer button.seeMore {
+    appearance: none;
+    min-height: 44px;
+    margin: 0 0 -8px;
+    padding: 0 2px;
+    background: transparent;
+    background-image: none;
+    border: 0;
+    box-shadow: none;
+    text-shadow: none;
+    color: var(--ce-document-text);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
     cursor: pointer;
     opacity: 1;
     transform: none;
@@ -104,14 +129,48 @@
   gap: 12px;
   margin-bottom: 16px;
 }
-.questionHeading > span {
-  color: var(--ce-document-text-muted);
+// "Pick one" or "Pick any", as on the question's card in the pile.
+.kindPill {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 1px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  vertical-align: 0.15em;
   white-space: nowrap;
-  font-size: 13px;
 }
-.written p {
+// How many answered, as a pill beside the question.
+.questionHeading > span {
+  flex-shrink: 0;
+  padding: 3px 12px;
+  border: 1px solid var(--ce-status-info);
+  border-radius: 999px;
+  background: var(--answer-card-bg);
+  color: var(--ce-document-text);
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+}
+// Each written answer in its own block, so it is clear where one ends and the next begins.
+.written {
+  display: grid;
+  gap: 8px;
   margin: 10px 0;
+}
+.writtenAnswer {
+  padding: 10px 12px;
+  border: 1px solid var(--ce-document-border);
+  border-left: 3px solid var(--ce-status-info);
+  border-radius: 8px;
+  background: var(--answer-card-bg);
+}
+.writtenAnswer p {
+  margin: 0;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   color: var(--ce-document-text);
 }
 .rating {
@@ -125,11 +184,11 @@
   flex-direction: column;
 }
 .average strong {
-  font-size: 26px;
+  font-size: 32px;
   color: var(--ce-document-text);
 }
 .average span {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--ce-document-text-muted);
 }
 .histogram {
@@ -140,7 +199,7 @@
 .histogram text {
   fill: var(--ce-document-text);
   font:
-    12px Arial,
+    14px Arial,
     Helvetica,
     sans-serif;
 }
@@ -151,12 +210,30 @@
 .choiceTrackBg {
   fill: var(--ce-document-border);
 }
+// A card per option: its name, then its bar with the count under it.
 .choices li {
   display: grid;
-  grid-template-columns: minmax(100px, 1fr) 2fr 90px;
-  gap: 12px;
+  grid-template-columns: minmax(100px, 1fr) 2fr;
+  gap: 14px;
   align-items: center;
-  margin: 12px 0;
+  margin: 8px 0;
+  padding: 10px 14px;
+  border: var(--answer-card-border);
+  border-radius: 8px;
+  background: var(--answer-card-bg);
+}
+.choiceLabel {
+  font-weight: 600;
+}
+.choiceShare {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.choiceShare .numeric {
+  text-align: left;
+  font-size: 15px;
+  color: var(--ce-document-text-muted);
 }
 .choiceTrack {
   // Explicit SVG geometry survives html2canvas's desktop capture clone.
@@ -164,6 +241,7 @@
   width: 100%;
   min-width: 0;
   height: 16px;
+  border-radius: 999px;
 }
 .numeric {
   text-align: right;
@@ -178,10 +256,13 @@
 }
 .legend {
   display: grid;
-  grid-template-columns: 1fr 1fr 56px;
+  grid-template-columns: 1fr 1fr 64px;
   gap: 10px;
   margin-left: 30%;
-  font-size: 13px;
+  // Lined up with the bars inside the cards below.
+  padding: 0 15px;
+  font-size: 15px;
+  font-weight: 600;
   text-align: center;
 }
 .legend > :last-child {
@@ -189,10 +270,25 @@
 }
 .quadratic li {
   display: grid;
-  grid-template-columns: minmax(100px, 30%) 1fr 56px;
+  grid-template-columns: minmax(100px, 30%) 1fr 64px;
   gap: 10px;
   align-items: center;
-  margin: 12px 0;
+  margin: 8px 0;
+  padding: 10px 14px;
+  border: var(--answer-card-border);
+  border-radius: 8px;
+  background: var(--answer-card-bg);
+}
+.optionLabel {
+  font-weight: 600;
+}
+// The net in its own box at the end of the row.
+.net {
+  padding: 4px 6px;
+  border: var(--answer-card-border);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 18px;
 }
 .diverging {
   display: flex;
@@ -204,17 +300,17 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  min-height: 24px;
+  min-height: 26px;
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: 15px;
 }
 .leftHalf {
   justify-content: flex-end;
   border-right: 1px solid var(--ce-data-viz-axis);
-  padding-left: 32px;
+  padding-left: 40px;
 }
 .rightHalf {
-  padding-right: 32px;
+  padding-right: 40px;
 }
 .leftHalf i,
 .rightHalf i {
@@ -241,11 +337,10 @@
     grid-template-columns: 1fr;
     gap: 6px;
   }
+  // A choice's name takes its own line above its bar and numbers, so larger text has room.
   .choices li {
-    grid-template-columns: 1fr 90px;
-  }
-  .choices li > span:first-child {
-    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
   .quadratic li {
     grid-template-columns: 1fr 48px;

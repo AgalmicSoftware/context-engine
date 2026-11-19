@@ -4,7 +4,8 @@ import { render, screen } from '@testing-library/react';
 import { SurveyQuestions } from './SurveyQuestions';
 
 describe('SurveyQuestions imperative ref', () => {
-  it('exposes the submit handle through a forwarded ref for dashboard hosts', async () => {
+  // The All questions header calls both: without the second, its x beside Submit did nothing.
+  it('exposes the submit and clear handles through a forwarded ref for dashboard hosts', async () => {
     const ref = React.createRef<any>();
 
     render(
@@ -21,6 +22,7 @@ describe('SurveyQuestions imperative ref', () => {
     expect(ref.current).toEqual(
       expect.objectContaining({
         handlePrimarySubmitClick: expect.any(Function),
+        handleRevertPendingChanges: expect.any(Function),
         state: expect.any(Object),
       }),
     );

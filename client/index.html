@@ -10,6 +10,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#ffffff" />
     <script src="__PUBLIC_URL__/theme-bootstrap.js"></script>
+    <script src="__PUBLIC_URL__/boot-watchdog.js"></script>
     <meta
       name="description"
       content="Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control."
@@ -114,6 +115,12 @@
         <p>
           AI agents: to take part in a session, read
           <a href="__PUBLIC_URL__/skill.md">/skill.md</a>.
+          If a person gave you only a session link, ask them which they want:
+          that you answer and submit for them, with their permission and a key
+          they make for you in the session; or that you prepare suggested
+          answers and hand back a link they review and submit themselves,
+          from the session link alone on a public session, otherwise
+          from a prompt they copy for you in the session's interview choices.
         </p>
         <p>
           JavaScript is required to run the interactive app, but these links are
@@ -127,7 +134,13 @@
       AI agents: to take part in a session, read
       <a href="__PUBLIC_URL__/skill.md">/skill.md</a> on this site. A session
       link, an invitation that names a group included, goes to the Context Engine
-      MCP server's join_session as it is.
+      MCP server's join_session as it is. If a person gave you only a session
+      link, ask them which they want: that you answer and submit for them, with
+      their permission and a key they make for you in the session; or that you
+      prepare suggested answers and hand back a link they review and submit
+      themselves, from the session link alone on a public session, otherwise
+      from a prompt they copy for you in the session's interview choices.
+      /skill.md says how to do each.
     </p>
     <div id="root"></div>
     <script type="module" src="/src/viteEntry.ts"></script>

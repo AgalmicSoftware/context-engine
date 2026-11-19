@@ -34,6 +34,11 @@ const hasNoNameStore = (sessionConfig: unknown): boolean => {
   return projection.source === 'legacy_registry' || (projection.profileValid && !projection.isWorkerCanonical);
 };
 
+// A Worker that couldn't say whether it keeps names (its capabilities timed out or failed) leaves them unknown, and
+// nothing else asks again until the reader or the session changes. Asked once more a little later, one slow answer
+// doesn't hide an older Worker's answer names, or a newer one's names, for the whole visit.
+export const NAMES_RETRY_MS = 5000;
+
 const sameNames = (a: SessionNames, b: SessionNames): boolean => {
   const keys = Object.keys(a);
   return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
@@ -58,16 +63,24 @@ export const useSessionNames = (options: SessionNamesOptions): SessionNamesState
   const noStore = !workerUrl && hasNoNameStore(options.sessionConfig);
   useEffect(() => {
     let current = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    // One retry for each run of failures, counted when it runs: a read that works earns the next failure its own,
+    // and a sign-in or a save that reads early and fails too doesn't use it up.
+    let retried = false;
     setState(noStore ? NO_STORE : UNKNOWN);
     const load = async () => {
       if (!workerUrl) return;
       const seq = ++loadSeq.current;
+      // A newer read stands in for a retry still waiting.
+      clearTimeout(retry);
       let next: SessionNamesState;
+      let failed = false;
       try {
         const source = await resolveSessionNamesSource(latest.current);
         next = { source, names: source ? await source.readAll() : {}, answerNamesShown: !source };
       } catch {
         next = UNKNOWN;
+        failed = true;
       }
       // Keep the same state when nothing changed, so the views using it don't render again.
       if (current && seq === loadSeq.current) {
@@ -78,6 +91,13 @@ export const useSessionNames = (options: SessionNamesOptions): SessionNamesState
             ? was
             : next,
         );
+        if (!failed) retried = false;
+        else if (!retried) {
+          retry = setTimeout(() => {
+            retried = true;
+            void load();
+          }, NAMES_RETRY_MS);
+        }
       }
     };
     void load();
@@ -85,6 +105,7 @@ export const useSessionNames = (options: SessionNamesOptions): SessionNamesState
     const stopToken = subscribeWorkerSessionToken(() => void load());
     return () => {
       current = false;
+      clearTimeout(retry);
       stopNames();
       stopToken();
     };

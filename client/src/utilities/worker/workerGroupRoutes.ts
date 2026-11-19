@@ -39,6 +39,30 @@ export const buildWorkerGroupsPath = ({
   return `${path}?${params.toString()}${hash}`;
 };
 
+/**
+ * The session's own page, from one of its group pages. The link always carries the session's Worker: an unlisted
+ * session needs it to open at all, and a listed session's plain link can mean something else (an event's own
+ * entry link joins a group). Nothing else from the group's link (an invite, a group id) goes along.
+ */
+export const buildWorkerSessionPath = ({
+  sessionSlug,
+  workerUrl,
+}: {
+  sessionSlug: unknown;
+  workerUrl?: string;
+}): string => {
+  const slug = canonicalizeSessionSlug(sessionSlug);
+  if (!slug) return '';
+  const path = buildPublicRoute(`/session/${encodeURIComponent(slug)}`);
+  let worker = '';
+  try {
+    worker = workerUrl ? parseSessionWorkerDiscoveryOrigin(workerUrl) : '';
+  } catch {
+    worker = '';
+  }
+  return worker ? `${path}?${new URLSearchParams({ worker }).toString()}` : path;
+};
+
 // Older shared links called the slug "sessionName". An explicit slug wins
 // when both are present, so stale display names cannot change a group's owner.
 export const readWorkerGroupSessionSlugFromSearch = (search: unknown): string => {

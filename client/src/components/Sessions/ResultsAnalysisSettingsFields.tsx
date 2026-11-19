@@ -1,16 +1,16 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { FormText, Input, Label } from 'reactstrap';
 import {
   RESULTS_ANALYSIS_THRESHOLD_MAX,
   RESULTS_ANALYSIS_THRESHOLD_MIN,
   normalizeResultsAnalysisSettings,
-  validResultsAnalysisSettings,
 } from '../../../../shared/resultsAnalysisSettings.mjs';
 import { SetupHelp, setupHelpId } from './setup/SetupPrimitives';
 
 type Props = {
   value: unknown;
   onChange: (value: Record<string, unknown>) => void;
+  // No longer used here; kept so the set-up and Settings pages pass what they always have.
   backgroundAutoSupported?: boolean;
   unsupportedReason?: string;
   disabled?: boolean;
@@ -19,31 +19,28 @@ type Props = {
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
-const VIEW_LABELS = {
-  circles: 'Circles',
-  breakdown: 'Breakdown',
-  riskMatrix: 'Risk Matrix',
-} as const;
-
 const MODE_HELP =
-  'When the AI makes the views below. Manual: an admin presses Generate in Results. Automatic: after the number of new participants set below, on Centralized sessions. Manual and automatic: both.';
-const VIEWS_HELP =
-  'Which views the AI makes from the answers. Circles: a map of the arguments, with its atlas. Breakdown: how groups of participants answered, showing only groups of at least the smallest size. Risk Matrix: the answers on a grid whose two axes come from the session’s subject.';
+  'When what the Session Agent knows about the results as a whole is refreshed. Each update is a paid AI call on the session’s AI key.';
 const THRESHOLD_HELP =
-  'An automatic run starts after this many new participants since the last run, automatic or manual. Someone answering again doesn’t count.';
+  'An automatic update starts after this many new participants since the last update. Someone answering again doesn’t count.';
 const ROW = { display: 'flex', alignItems: 'center', gap: 8 } as const;
 
-export default function ResultsAnalysisSettingsFields({
-  value,
-  onChange,
-  backgroundAutoSupported = false,
-  unsupportedReason = '',
-  disabled = false,
-}: Props) {
+/**
+ * The Session Agent answers about the results as a whole from a build an admin starts with Update Session Agent
+ * in Results. That is the whole feature, so a session on manual updates, which is every new one, sees nothing
+ * here. A session already set to update automatically goes on doing so in its Worker, each one a paid AI call;
+ * it sees when and how often, and can turn it back to manual. What else is stored for the build stays as it is.
+ */
+export default function ResultsAnalysisSettingsFields({ value, onChange, disabled = false }: Props) {
   const id = useId();
-  const raw = asRecord(value);
   const settings = normalizeResultsAnalysisSettings(value);
-  const rawAutoAfter = asRecord(raw.autoAfter);
+  const automatic = settings.generationMode === 'automatic' || settings.generationMode === 'both';
+  // Once shown the fields stay, so an admin who picks manual can still change their mind before saving.
+  const [shown, setShown] = useState(automatic);
+  if (automatic && !shown) setShown(true);
+  if (!shown) return null;
+
+  const rawAutoAfter = asRecord(asRecord(value).autoAfter);
   const thresholdValue = Object.prototype.hasOwnProperty.call(rawAutoAfter, 'threshold')
     ? String(rawAutoAfter.threshold ?? '')
     : String(settings.autoAfter.threshold);
@@ -53,77 +50,40 @@ export default function ResultsAnalysisSettingsFields({
     !Number.isSafeInteger(thresholdNumber) ||
     thresholdNumber < RESULTS_ANALYSIS_THRESHOLD_MIN ||
     thresholdNumber > RESULTS_ANALYSIS_THRESHOLD_MAX;
-  const settingsInvalid = raw && Object.keys(raw).length ? !validResultsAnalysisSettings(raw) : false;
-  const autoDisabled = disabled || !backgroundAutoSupported;
-  const change = (patch: Record<string, unknown>) =>
-    onChange({
-      ...raw,
-      ...settings,
-      ...patch,
-    });
-  const changeView = (key: keyof typeof VIEW_LABELS, checked: boolean) =>
-    change({
-      views: {
-        ...settings.views,
-        [key]: checked,
-      },
-    });
+  // Only the settings the session's validation knows, so a stray stored key cannot block the save.
+  const change = (patch: Record<string, unknown>) => onChange({ ...settings, ...patch });
 
   return (
-    <fieldset disabled={disabled} style={{ minWidth: 0 }}>
-      <legend>Results analysis</legend>
-      <div>
-        <div style={{ ...ROW, marginBottom: '0.5rem' }}>
-          <Label for={`${id}-mode`} style={{ marginBottom: 0 }}>
-            Generation mode
-          </Label>
-          <SetupHelp id={`${id}-mode`} label="Generation mode" help={MODE_HELP} />
-        </div>
-        <Input
-          id={`${id}-mode`}
-          type="select"
-          value={settings.generationMode}
-          aria-describedby={setupHelpId(`${id}-mode`)}
-          onChange={(event) => change({ generationMode: event.target.value })}
-        >
-          <option value="manual">Manual</option>
-          <option value="automatic" disabled={autoDisabled}>
-            Automatic after threshold
-          </option>
-          <option value="both" disabled={autoDisabled}>
-            Manual and automatic
-          </option>
-        </Input>
+    <fieldset disabled={disabled} style={{ minWidth: 0 }} data-testid="ce-session-agent-updates">
+      <legend>Session Agent updates</legend>
+      <div style={{ ...ROW, marginBottom: '0.5rem' }}>
+        <Label for={`${id}-mode`} style={{ marginBottom: 0 }}>
+          Update the Session Agent
+        </Label>
+        <SetupHelp id={`${id}-mode`} label="Update the Session Agent" help={MODE_HELP} />
       </div>
-      {unsupportedReason ? <FormText>{unsupportedReason}</FormText> : null}
-      {settingsInvalid ? (
-        <FormText color="danger">Results analysis settings need a valid threshold and known options.</FormText>
-      ) : null}
-
-      <div role="group" aria-labelledby={`${id}-views`} aria-describedby={setupHelpId(`${id}-views`)}>
-        <div style={{ ...ROW, marginTop: 12 }}>
-          <span id={`${id}-views`}>AI Views</span>
-          <SetupHelp id={`${id}-views`} label="AI Views" help={VIEWS_HELP} />
-        </div>
-        {(['circles', 'breakdown', 'riskMatrix'] as const).map((key) => (
-          <Label key={key} style={{ display: 'block', marginBottom: 0 }}>
-            <input
-              type="checkbox"
-              checked={settings.views[key]}
-              onChange={(event) => changeView(key, event.target.checked)}
-            />{' '}
-            {VIEW_LABELS[key]}
-          </Label>
-        ))}
-      </div>
-
-      {(settings.generationMode === 'automatic' || settings.generationMode === 'both') && (
+      <Input
+        id={`${id}-mode`}
+        type="select"
+        value={settings.generationMode}
+        aria-describedby={setupHelpId(`${id}-mode`)}
+        onChange={(event) => change({ generationMode: event.target.value })}
+      >
+        <option value="manual">When an admin presses Update Session Agent</option>
+        <option value="automatic">Automatically, after new participants</option>
+        <option value="both">Both</option>
+      </Input>
+      {automatic ? (
         <div>
           <div style={{ ...ROW, margin: '12px 0 0.5rem' }}>
             <Label for={`${id}-threshold`} style={{ marginBottom: 0 }}>
-              Distinct participant threshold
+              New participants before an automatic update
             </Label>
-            <SetupHelp id={`${id}-threshold`} label="Distinct participant threshold" help={THRESHOLD_HELP} />
+            <SetupHelp
+              id={`${id}-threshold`}
+              label="New participants before an automatic update"
+              help={THRESHOLD_HELP}
+            />
           </div>
           <Input
             id={`${id}-threshold`}
@@ -142,7 +102,10 @@ export default function ResultsAnalysisSettingsFields({
               })
             }
           />
+          {thresholdInvalid ? <FormText color="danger">Enter a whole number of participants.</FormText> : null}
         </div>
+      ) : (
+        <FormText>Automatic updates stop when you save.</FormText>
       )}
     </fieldset>
   );

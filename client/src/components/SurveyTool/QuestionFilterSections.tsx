@@ -36,6 +36,7 @@ import {
   resolveQuestionFilterSectionHeaderStyle,
 } from './questionFilterDisplayHelpers';
 
+import QuadraticTypePreview from './QuadraticTypePreview';
 import styles from './QuestionFilter.module.scss';
 
 // Only on-chain SBT sessions render this (shouldEnableQuestionFilterSbt), so Hosted pages skip its SBT code.
@@ -334,7 +335,9 @@ export function QuestionFilterQuestionTypesSection({
             aria-pressed={pendingSelectedTypes.includes('quadratic')}
           >
             <div className={styles.typeTitle}>Quadratic allocation</div>
-            <div className={styles.typePreviewRow}>99 voice credits · ± votes</div>
+            <div className={`${styles.typePreviewRow} ${styles.typePreviewInk}`}>
+              <QuadraticTypePreview plain />
+            </div>
           </button>
           <button
             type="button"

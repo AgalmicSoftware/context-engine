@@ -3,7 +3,6 @@ import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy';
 import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import { buildSignedAdminActionAuth, fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 import { readWorkerCapabilities } from '../../utilities/worker/workerCapabilities';
-import { readWorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
 import { defaultStrictAllowDemoFallback } from '../../utilities/worker/workerSessionResolution.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
@@ -80,61 +79,6 @@ export const feedbackOffered = async (options: FeedbackOptions): Promise<boolean
   } catch {
     return false;
   }
-};
-
-/** True once the session's end time has passed, when the Worker stops writing speech down. */
-export const sessionEnded = (sessionConfig: unknown): boolean => {
-  const endsAt = Date.parse(toStr(asRecord(sessionConfig).sessionEndsAt));
-  return Number.isFinite(endsAt) && endsAt <= Date.now();
-};
-
-// The Worker's rule for writing down speech in a session it runs: transcription among the scopes it gives a
-// signed-in participant, or a signed-out visitor where no sign-in condition stands in the way. A signed-in
-// person's sign-in condition is the Worker's to check.
-const transcriptionOpen = (config: Record<string, unknown>, signedIn: boolean): boolean => {
-  const policy = asRecord(config.workerAuthority);
-  const conditions = asRecord(policy.loginGate).conditions;
-  const gated =
-    Array.isArray(conditions) &&
-    conditions.some((condition) => !!condition && typeof condition === 'object' && !Array.isArray(condition));
-  const list = signedIn ? policy.participantScopes : policy.anonymousScopes;
-  return (
-    Number(policy.version) === 1 &&
-    (signedIn || !gated) &&
-    (Array.isArray(list) ? list : []).some((scope) => toStr(scope).trim().toLowerCase() === 'transcribe') &&
-    asRecord(config.scopes).transcribe !== false
-  );
-};
-
-/**
- * Whether speech can be written down here as for an answer: the session pays for AI, hasn't ended, and gives
- * this person, signed in or not, transcription. Asked when the form opens, and only a real answer counts:
- * `null` when the Worker couldn't be read, so the next open asks again.
- */
-export const dictationOffered = async (options: FeedbackOptions): Promise<boolean | null> => {
-  const { sessionSlug, sessionConfig, account } = options;
-  const config = asRecord(sessionConfig);
-  if (sessionEnded(config) || !transcriptionOpen(config, !!account)) return false;
-  const presence = await readWorkerResourcePresence({ sessionSlug, sessionConfig, context: { account } }).catch(
-    () => null,
-  );
-  return presence ? presence.ai : null;
-};
-
-/**
- * True for a visitor the session writes no speech down for, though it would once they sign in: it pays for AI,
- * hasn't ended, and gives signed-in participants transcription. False when the Worker couldn't be read, so
- * nothing is promised.
- */
-export const dictationNeedsSignIn = async (options: FeedbackOptions): Promise<boolean> => {
-  const { sessionSlug, sessionConfig, account } = options;
-  const config = asRecord(sessionConfig);
-  if (account || sessionEnded(config) || transcriptionOpen(config, false) || !transcriptionOpen(config, true))
-    return false;
-  const presence = await readWorkerResourcePresence({ sessionSlug, sessionConfig, context: { account } }).catch(
-    () => null,
-  );
-  return presence?.ai === true;
 };
 
 // The feedback route's own refusals are plain sentences for the sender; any other error's text may hold anything.

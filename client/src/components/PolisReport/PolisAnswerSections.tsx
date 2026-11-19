@@ -5,15 +5,64 @@ import styles from './PolisAnswerSections.module.scss';
 const signed = (value: number) => (value > 0 ? `+${value}` : value < 0 ? `−${Math.abs(value)}` : '0');
 const tone = (value: number) => (value > 0 ? styles.positive : value < 0 ? styles.negative : '');
 
-function AnswerChart({ question, showAll }: { question: ReportAnswerQuestion; showAll: boolean }) {
+// A long written answer shows about this much until its reader asks for the rest, so one long answer does not
+// bury the short ones beside it.
+const WRITTEN_PREVIEW_CHARS = 300;
+// An answer only a little over the limit is shown whole: a See more that reveals a word or two is no help.
+const WRITTEN_PREVIEW_SLACK = 40;
+
+/** The start of a long answer, ended at a word; null when the answer is short enough to show whole. */
+export const writtenAnswerPreview = (text: string): string | null => {
+  if (text.length <= WRITTEN_PREVIEW_CHARS) return null;
+  const head = text.slice(0, WRITTEN_PREVIEW_CHARS + 1);
+  const lastSpace = head.search(/\s\S*$/);
+  // A single run without spaces (a link, say) is cut at the limit.
+  let cut = lastSpace > WRITTEN_PREVIEW_CHARS / 2 ? lastSpace : WRITTEN_PREVIEW_CHARS;
+  // Never between the two halves of one character (an emoji, say).
+  const before = text.charCodeAt(cut - 1);
+  if (before >= 0xd800 && before <= 0xdbff) cut -= 1;
+  if (text.length - cut <= WRITTEN_PREVIEW_SLACK) return null;
+  return `${text.slice(0, cut).trimEnd()}…`;
+};
+
+function WrittenAnswer({ text, whole }: { text: string; whole: boolean }) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const preview = whole ? null : writtenAnswerPreview(text);
+  return (
+    <div className={styles.writtenAnswer} data-pdf-keep-together>
+      <p id={id}>{preview !== null && !open ? preview : text}</p>
+      {preview !== null && (
+        <button
+          type="button"
+          className={styles.seeMore}
+          aria-expanded={open}
+          aria-controls={id}
+          onClick={() => setOpen((shown) => !shown)}
+        >
+          {open ? 'See less' : 'See more'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AnswerChart({
+  question,
+  showAll,
+  pdfMode,
+}: {
+  question: ReportAnswerQuestion;
+  showAll: boolean;
+  pdfMode: boolean;
+}) {
   if (question.type === 'freeform') {
     const texts = showAll ? question.texts : question.texts.slice(0, 3);
     return (
       <div className={styles.written}>
         {texts.map((text, index) => (
-          <p data-pdf-keep-together key={index}>
-            {text}
-          </p>
+          // The export and print show every answer whole.
+          <WrittenAnswer key={`${index}:${text.length}`} text={text} whole={pdfMode} />
         ))}
       </div>
     );
@@ -64,22 +113,28 @@ function AnswerChart({ question, showAll }: { question: ReportAnswerQuestion; sh
   }
   if (question.type === 'multichoice')
     return (
+      // One form for "Pick one" and "Pick any": each option has its own bar, the share of those who answered
+      // that chose it, with the count under it. Picks of several options may add up to more than everyone.
       <ul className={styles.choices} aria-label="Multiple choice results">
         {question.options.map((option, index) => (
           <li key={index}>
-            <span>{option.label}</span>
-            <svg className={styles.choiceTrack} viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true">
-              <rect width="100" height="16" className={styles.choiceTrackBg} />
-              <rect width={(option.count / question.count) * 100} height="16" className={styles.choiceBar} />
-            </svg>
-            <span className={styles.numeric}>
-              {Math.round((option.count / question.count) * 100)}% ({option.count})
+            <span className={styles.choiceLabel}>{option.label}</span>
+            <span className={styles.choiceShare}>
+              <svg className={styles.choiceTrack} viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true">
+                <rect width="100" height="16" className={styles.choiceTrackBg} />
+                <rect width={(option.count / question.count) * 100} height="16" className={styles.choiceBar} />
+              </svg>
+              <span className={styles.numeric} role="img" aria-label={`${option.count} of ${question.count}`}>
+                {option.count}/{question.count}
+              </span>
             </span>
           </li>
         ))}
       </ul>
     );
   const max = Math.max(1, ...question.options.flatMap((option) => [option.positive, -option.negative]));
+  // Most supported first; options with the same net keep the question's own order.
+  const ranked = [...question.options].sort((a, b) => b.net - a.net);
   return (
     <div className={styles.quadratic}>
       <div className={styles.legend}>
@@ -88,7 +143,7 @@ function AnswerChart({ question, showAll }: { question: ReportAnswerQuestion; sh
         <span>Net</span>
       </div>
       <ul aria-label="Quadratic allocation results">
-        {question.options.map((option, index) => (
+        {ranked.map((option, index) => (
           <li key={index}>
             <span className={styles.optionLabel}>{option.label}</span>
             <div className={styles.diverging}>
@@ -101,7 +156,7 @@ function AnswerChart({ question, showAll }: { question: ReportAnswerQuestion; sh
                 <span className={styles.positive}>{signed(option.positive)}</span>
               </div>
             </div>
-            <strong className={`${styles.numeric} ${tone(option.net)}`}>{signed(option.net)}</strong>
+            <strong className={`${styles.numeric} ${styles.net} ${tone(option.net)}`}>{signed(option.net)}</strong>
           </li>
         ))}
       </ul>
@@ -174,12 +229,15 @@ export default function PolisAnswerSections({
                       <article key={question.id} data-pdf-keep-together className={styles.question}>
                         {pdfMode && index === 0 && <h3>{sectionTitles[type]}</h3>}
                         <div className={styles.questionHeading} data-pdf-keep-together>
-                          <h4>{question.prompt}</h4>
+                          <h4>
+                            {question.prompt}
+                            {question.choiceKind && <span className={styles.kindPill}>{question.choiceKind}</span>}
+                          </h4>
                           <span>
                             {question.count} {question.count === 1 ? 'response' : 'responses'}
                           </span>
                         </div>
-                        <AnswerChart question={question} showAll={showAll} />
+                        <AnswerChart question={question} showAll={showAll} pdfMode={pdfMode} />
                       </article>
                     ))}
                 {!pdfMode && remaining > 0 && (

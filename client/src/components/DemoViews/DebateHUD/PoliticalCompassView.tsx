@@ -273,11 +273,14 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
     );
   };
 
+  // The four quadrants in the arrangement people know from the familiar four-colour compass picture: red and
+  // blue above, green and purple below, each strong enough to be told apart at a glance. The hues are each
+  // theme's own chart colours.
   const quadColors = {
-    topLeft: 'color-mix(in srgb, var(--ce-data-series-7) 35%, transparent)',
-    topRight: 'color-mix(in srgb, var(--ce-data-series-1) 35%, transparent)',
-    bottomLeft: 'color-mix(in srgb, var(--ce-data-series-4) 30%, transparent)',
-    bottomRight: 'color-mix(in srgb, var(--ce-data-series-5) 35%, transparent)',
+    topLeft: 'color-mix(in srgb, var(--ce-data-series-4) 55%, var(--ce-document-canvas))',
+    topRight: 'color-mix(in srgb, var(--ce-data-series-1) 55%, var(--ce-document-canvas))',
+    bottomLeft: 'color-mix(in srgb, var(--ce-data-series-6) 55%, var(--ce-document-canvas))',
+    bottomRight: 'color-mix(in srgb, var(--ce-data-series-2) 55%, var(--ce-document-canvas))',
   };
   const getAvatarBaseRadius = (point: CompassPoint) => {
     if (point?.type === 'historical') return 16;

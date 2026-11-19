@@ -3,8 +3,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import SessionFeedback from './SessionFeedback';
 import { FOOTER_SESSION_ACTIONS_IDS } from '../Footer/Footer';
+import { dictationOffered } from '../../domains/worker/sessionDictationPorts';
 import {
-  dictationOffered,
   feedbackOffered,
   feedbackView,
   feedbackWorkerRun,
@@ -13,7 +13,6 @@ import {
 
 jest.mock('../../domains/worker/sessionFeedbackPorts', () => ({
   FEEDBACK_TEXT_MAX: 2000,
-  dictationOffered: jest.fn(),
   feedbackOffered: jest.fn(),
   sendFeedback: jest.fn(),
   feedbackView: jest.requireActual<typeof import('../../domains/worker/sessionFeedbackPorts')>(
@@ -22,8 +21,11 @@ jest.mock('../../domains/worker/sessionFeedbackPorts', () => ({
   feedbackWorkerRun: jest.requireActual<typeof import('../../domains/worker/sessionFeedbackPorts')>(
     '../../domains/worker/sessionFeedbackPorts',
   ).feedbackWorkerRun,
-  sessionEnded: jest.requireActual<typeof import('../../domains/worker/sessionFeedbackPorts')>(
-    '../../domains/worker/sessionFeedbackPorts',
+}));
+jest.mock('../../domains/worker/sessionDictationPorts', () => ({
+  dictationOffered: jest.fn(),
+  sessionEnded: jest.requireActual<typeof import('../../domains/worker/sessionDictationPorts')>(
+    '../../domains/worker/sessionDictationPorts',
   ).sessionEnded,
 }));
 

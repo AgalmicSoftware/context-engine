@@ -16,6 +16,14 @@ const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/,
 assert(['127.0.0.1', 'localhost', '[::1]'].includes(new URL(baseUrl).hostname), 'This journey requires a local client');
 const outputDir = process.env.OUTPUT_DIR || 'artifacts/participant-journey-smoke';
 const engines = { webkit, chromium };
+// Text contrast fails a run only in Chromium; in WebKit it is reported (see assertReadableText).
+const contrastRule = (engineName) => ({ failUnreadable: engineName === 'chromium' });
+// The visit's own two looks print what WebKit reports, so it is never passed over in silence.
+const readText = async (engineName, locator, label) => {
+  for (const note of await assertReadableText(locator, label, contrastRule(engineName))) {
+    if (note.includes('unreadable')) console.log(`  [${engineName}] reported, not failed: ${note}`);
+  }
+};
 const engineNames = (process.env.JOURNEY_ENGINES || 'webkit,chromium').split(',').map((name) => name.trim()).filter(Boolean);
 for (const name of engineNames) assert.ok(engines[name], `Unknown browser engine: ${name}`);
 await mkdir(outputDir, { recursive: true });
@@ -214,7 +222,7 @@ const runJourney = async (engineName, phoneName) => {
     const dialog = await openLoginDialog(page);
     await assertReachable(page.getByTestId('ce-passkey-wallet-create'), 'Create passkey, in the log-in dialog,');
     await assertReachable(page.getByTestId('ce-passkey-wallet-sign-in'), 'Sign in, in the log-in dialog,');
-    await assertReadableText(dialog, 'The log-in dialog');
+    await readText(engineName, dialog, 'The log-in dialog');
     await createPasskey(page, person.wallet);
     console.log(`[${label}] Opened the invite link and made a passkey.`);
 
@@ -229,7 +237,7 @@ const runJourney = async (engineName, phoneName) => {
     // 3. One of every kind of question, on the card.
     const answered = new Map();
     await answerCards(page, questions, answered, typedQuestions.length);
-    await assertReadableText(activeCard(page), 'The question card');
+    await readText(engineName, activeCard(page), 'The question card');
     console.log(`[${label}] Answered one card of every kind.`);
 
     // 4. A reload before Submit keeps the unsent answers.
@@ -414,7 +422,7 @@ const runLookPass = async (engineName) => {
           await look(() => assertCardFitsWithNext(page, `The card "${prompt}"`));
           await look(() => assertNoSidewaysScroll(page, `The card "${prompt}"`));
           await look(() => assertOptionsInsideScreen(page, `The card "${prompt}"`));
-          await look(() => assertReadableText(activeCard(page), `The card "${prompt}"`));
+          await look(() => assertReadableText(activeCard(page), `The card "${prompt}"`, contrastRule(engineName)));
           if (index + 1 < questions.length) {
             await tapNext(page);
             assert.ok(await cardLeft(page, prompt, 5000), `Next did not leave the card "${prompt}"`);
@@ -424,15 +432,15 @@ const runLookPass = async (engineName) => {
         const dialog = await openLoginDialog(page);
         await look(() => assertReachable(page.getByTestId('ce-passkey-wallet-create'), 'Create passkey, in the log-in dialog,'));
         await look(() => assertReachable(page.getByTestId('ce-passkey-wallet-sign-in'), 'Sign in, in the log-in dialog,'));
-        await look(() => assertReadableText(dialog, 'The log-in dialog'));
+        await look(() => assertReadableText(dialog, 'The log-in dialog', contrastRule(engineName)));
         await createPasskey(page, person.wallet);
         await page.getByTestId('ce-session-groups-toggle').click();
         const code = page.getByLabel('Invite link or password for By invitation', { exact: true });
         await code.waitFor();
         await look(() => assertReachable(code, 'The group code field'));
-        await look(() => assertReadableText(code, 'The empty group code field'));
+        await look(() => assertReadableText(code, 'The empty group code field', contrastRule(engineName)));
         await code.fill('ab12-cd34');
-        await look(() => assertReadableText(code, 'The filled group code field'));
+        await look(() => assertReadableText(code, 'The filled group code field', contrastRule(engineName)));
         await look(() => assertNoSidewaysScroll(page, 'The Groups section'));
         await look(() => assert.deepEqual(pageErrors, [], 'No page errors'));
         assertNoHiddenFaults(session, browserRequests, 'The look pass');

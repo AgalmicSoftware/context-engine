@@ -118,6 +118,12 @@ const sessionConfig = {
   sessionId,
   sessionName: 'Synthetic Generated Results Smoke',
   sessionInfo: 'Synthetic fixture used only for browser smoke coverage.',
+  // Update Session Agent shows while the Session Agent, the build's one reader, is on.
+  sessionAgent: {
+    audiences: [
+      { who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' },
+    ],
+  },
   defaultTags: [],
   defaultSbtTags: [],
   defaultFeaturedSBTs: [],

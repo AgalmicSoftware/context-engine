@@ -898,6 +898,36 @@ describe('DebateMap', () => {
     expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'parent-node' }));
   });
 
+  it('opens a session subtopic in one click, over its question circles, and only zooms into what is above it', () => {
+    const onNodeClick = jest.fn();
+    const question = (id: string) => ({ id, name: `Question ${id}`, isQuestion: true, questions: [{ id }] });
+    render(
+      <AtlasViewComponent
+        data={[
+          {
+            id: 'branch',
+            name: 'Branch',
+            children: [
+              { id: 'subtopic', name: 'Subtopic', children: [question('q1'), question('q2')] },
+              { id: 'other', name: 'Other subtopic' },
+            ],
+          },
+        ]}
+        atlasLayoutMode="packed"
+        readOnly
+        onNodeClick={onNodeClick}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Branch' }), { key: 'Enter' });
+    expect(onNodeClick).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Subtopic' }), { key: 'Enter' });
+    expect(onNodeClick).toHaveBeenCalledTimes(1);
+    expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'subtopic' }));
+    // Its question circles are now the ones in reach, each opening to itself.
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Question q1' }), { key: 'Enter' });
+    expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'q1' }));
+  });
+
   it('lets keyboard users drill into packed groups and open leaf circles', () => {
     const onNodeClick = jest.fn();
     render(

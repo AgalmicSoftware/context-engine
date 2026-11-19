@@ -2,6 +2,7 @@ import { validateQuadraticAllocation } from '../../../../shared/questions/quadra
 import { normalizeRatingAnswer } from '../../../../shared/questions/ratingScale.mjs';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue';
+import { takesOnePick } from '../SurveyTool/surveyToolResponseState';
 
 export type ReportRecord = Record<string, unknown>;
 export type AnswerType = 'freeform' | 'rating' | 'multichoice' | 'quadratic';
@@ -16,7 +17,10 @@ export type ReportAnswerQuestion = {
   max: number;
   bins: { score: number; count: number }[];
   options: { label: string; count: number; positive: number; negative: number; net: number }[];
+  // "Pick one" or "Pick any" for a multiple choice question, in the pile's own words; '' otherwise.
+  choiceKind: string;
 };
+
 export const answerTypeTitles: Record<AnswerType, string> = {
   freeform: 'Freeform',
   rating: 'Ratings',
@@ -193,6 +197,7 @@ export function buildReportAnswerQuestions(
       max,
       bins: [],
       options: [],
+      choiceKind: type === 'multichoice' ? (takesOnePick(meta) ? 'Pick one' : 'Pick any') : '',
     };
     if (type === 'freeform') question.texts = [...values.values()] as string[];
     if (type === 'rating') {

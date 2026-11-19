@@ -691,7 +691,7 @@ Admin test panel:
   Any other failure, or a temporary one after those retries
   (`retriesExhausted`), pauses automatic generation and keeps the last good
   artifact. The admin Results view states “Automatic retries have stopped”
-  with the failure reason beside the **Retry AI Views** action. `automatic`-only sessions allow an explicit admin manual retry as
+  with the failure reason beside the **Retry Session Agent update** action. `automatic`-only sessions allow an explicit admin manual retry as
   recovery; otherwise repeated submissions do not thrash provider calls. Storage
   capacity and read failures before provider admission also persist
   `lastFailure` under the same rules. An ineligible-input `422` does not persist
@@ -836,7 +836,7 @@ BASE_URL=http://127.0.0.1:3100 node scripts/session-generated-results-real-ui-sm
 
 The fixture uses synthetic submitted questions/responses and synthetic
 generated artifacts. Results shows no AI Views tab; the build feeds the Session
-Agent. The smoke checks that no such tab appears, and exercises real
+Agent, and an admin starts it with **Update Session Agent**. The smoke checks that no such tab appears, and exercises real
 OnePageSession refresh success, provider timeout, admin-auth `403` offering the
 check again, and an anonymous viewer without admin controls.
 

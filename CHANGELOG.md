@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.19] - 2026-11-19
+
+A website release: no Session Worker or MCP change, and nothing needs redeploying for it. Its merge also publishes what 0.9.18 could not: the Session Worker bundle with 0.9.18's Worker code (a Worker made from it reports release 0.9.19), under this release's commit, and MCP 0.7.0.
+
+### Client — available when the site deploys
+
+- Results: admins and results admins get one **Update Session Agent** button where the Session Agent is on. It refreshes what the Session Agent knows about the results as a whole and says so when an update fails. A press is a paid AI call only when answers have changed since the last update; when none have, it says so and nothing is built or charged (a change to the session's context alone does not count). **Retry** after a failed update always builds. It replaces the Check, Generate and Refresh "AI Views" buttons; the "AI Views" name is gone from the site.
+- Settings and `/new`: the results analysis settings are gone for sessions that update the Session Agent by hand, which is every new session. A session already set to update automatically still sees when and how often, and can switch back.
+- Agents: an AI agent given only a public session's link can now prepare suggested answers and hand back a link the person reviews and submits; `/skill.md` says how. Private sessions still start from the prompt the person copies in the session. The page's note for agents, `/skill.md` and `llms.txt` say an agent given a link should ask the person whether to answer and submit for them with a key they make, or to prepare suggested answers for them to review.
+- The atlas: a subtopic shows its questions as circles; closing a question leaves you among them, and **Up Level** goes back. A node shows where participants stand at once, in larger text, and "Where people split" uses the chart's own end labels. The List view can sort by atlas order, most split or most answered.
+- The compass's quadrants take red, blue, green and purple from each theme's chart colours (muted in Civic, where the fourth is teal).
+- Raw Results and the report draw quadratic questions as bars ranked by net, with the net in a box, and multiple choice as share bars with a pill saying whether one or several could be picked; multiple choice counts read "2/4", with no percentage. The report's answer sections are larger, on white cards; written answers each sit in their own block, and long ones fold after about 300 characters with **See more**.
+- The Question Types tile shows the quadratic preview in the tile's own colour.
+- On phones, a long choice list fills its question card and still ends part-way through an option, so the blank band under it is gone and it is clear there is more to scroll to.
+- Classic 95: a tap just under the topic window's title bar no longer closes the window.
+- The x beside Submit in the All questions view clears unsent answers again.
+- The suggested name for your agent ends "Agent", and fits the session's name rule.
+- Results show answers' own names on an older Session Worker even when its first reply was slow.
+- Signing in while a public session's Results are loading no longer reads every answer twice.
+- A page that cannot load (a blocked or missing script, a stalled connection) now says so and offers Reload, instead of staying blank.
+- A group's page links to its session.
+
+### Tests
+
+- The browser journeys judge text contrast once the text is drawn: they wait for fonts, finished fades and a painted frame, and look again for up to 5 seconds at text below 3:1. A cold Linux WebKit had twice misread a fade as unreadable text and failed `main` after 0.9.18. Unreadable text now fails a run only in Chromium and is reported in WebKit; WebKit still fails on sign-in, answering, submitting, reloading and results.
+
 ## [0.9.18] - 2026-11-19
 
 Session Workers need redeploying for the Worker changes below. A redeploy changes no stored record and signs no one out, and turns nothing on: on a session from before this release Context cards and the analysis card are both off until an admin turns them on. A session made on `/new` starts with the analysis card on and Context cards off; both can be set there.

@@ -628,8 +628,41 @@ describe('SingleQuestionResponse aggregator memoization', () => {
     });
     const markup = renderToStaticMarkup(subject.renderAggregatorByType());
     expect(markup).toContain('2 encrypted or invalid responses excluded.');
-    expect(markup).toMatch(/Parks<\/th><td[^>]*>3<\/td><td[^>]*>-2<\/td><td[^>]*>1<\/td>/);
-    expect(markup).toMatch(/Transit<\/th><td[^>]*>4<\/td><td[^>]*>-4<\/td><td[^>]*>0<\/td>/);
+    expect(markup).toContain('>Parks: support 3, oppose 2, net +1<');
+    expect(markup).toContain('>Transit: support 4, oppose 4, net 0<');
+  });
+
+  it('draws each multiple choice option as its own bar with the count under it, and says pick one or pick any', () => {
+    const record = (responder: string, value: unknown) => ({
+      responder,
+      timestamp: 1,
+      response: { answer: { value } },
+    });
+    const allResponses = [
+      record('a', ['Parks']),
+      record('b', ['Parks', 'Transit']),
+      record('c', ['Transit']),
+      record('d', ['Parks']),
+    ];
+    const any = renderToStaticMarkup(
+      createSubject({
+        question: { id: 'q-any', type: 'multichoice', options: ['Parks', 'Transit', 'Housing'] },
+        allResponses,
+      }).renderAggregatorByType(),
+    );
+    expect(any).toContain('>Pick any<');
+    // The share of the four responders who chose each: picks of several options may pass 100% together.
+    expect(any).toMatch(/Parks<\/span><span[^>]*><i style="width:75%"><\/i><\/span><span[^>]*>3\/4</);
+    expect(any).toMatch(/Transit<\/span><span[^>]*><i style="width:50%"><\/i><\/span><span[^>]*>2\/4</);
+    expect(any).toMatch(/Housing<\/span><span[^>]*><i style="width:0%"><\/i><\/span><span[^>]*>0\/4</);
+    expect(any).not.toContain('%)');
+    const one = renderToStaticMarkup(
+      createSubject({
+        question: { id: 'q-one', type: 'multichoice', options: ['Parks', 'Transit'], singleSelect: true },
+        allResponses: [record('a', ['Parks'])],
+      }).renderAggregatorByType(),
+    );
+    expect(one).toContain('>Pick one<');
   });
 
   it('applies custom SurveyResults aggregator card classes without affecting the default component styles', () => {

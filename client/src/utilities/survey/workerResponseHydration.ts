@@ -345,8 +345,10 @@ export const loadWorkerResponses = async (
         workerUrl: target.workerUrl,
         resource: 'responses',
         ...(ownResponses
-          ? { ownResponses: { account: readString(account).toLowerCase(), sessionId: target.sessionId }, signal }
+          ? { ownResponses: { account: readString(account).toLowerCase(), sessionId: target.sessionId } }
           : signedOutLoad),
+        // A load told to stop drops the page it is waiting for, too.
+        ...(signal ? { signal } : {}),
         cursor,
         limit: 100,
       });

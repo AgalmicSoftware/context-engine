@@ -65,12 +65,11 @@ describe('every option on /new has its own "?"', () => {
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.SETUP_ENCRYPTION), { target: { value: 'worker_envelope' } });
     fireEvent.click(screen.getByLabelText('Default access rules'));
     fireEvent.click(screen.getByRole('button', { name: 'Add SBT holders' }));
-    fireEvent.change(screen.getByLabelText('Generation mode'), { target: { value: 'automatic' } });
     fireEvent.change(screen.getByLabelText('Opening question'), { target: { value: 'owner' } });
     fireEvent.click(screen.getByLabelText('Check for new session questions during interviews'));
     fireEvent.click(screen.getByLabelText('Suggest groups to join'));
     fireEvent.click(screen.getByLabelText('Show “How well AIs predicted people” in Results'));
-    for (const label of ['Owner opening question', 'Question growth threshold (%)', 'Distinct participant threshold']) {
+    for (const label of ['Owner opening question', 'Question growth threshold (%)']) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
     expect(screen.getByLabelText('SBT contract address')).toBeInTheDocument();

@@ -314,33 +314,60 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   await step('open topic', () => page.locator('[data-testid^="ce-political-compass-point-"]').first().waitFor({ timeout: 15000 }));
   const panel = page.locator('[class*="modalContent"]').last();
   await step('topic panel', () => assertReadable(panel));
-  // Its close button reaches 44px across and down, for a thumb, in every theme.
+  // Its close button reaches 44px across and down, for a thumb. In a title bar (Classic 95) it reaches the bar's
+  // whole height instead, and never below it, where a tap belongs to the window's first line.
   await step('topic close reach', async () => {
     const reach = await panel.getByTitle('Close').evaluate((button) => {
       const box = button.getBoundingClientRect();
       const [x, y] = [box.left + box.width / 2, box.top + box.height / 2];
-      const hits = (points) => points.filter(([px, py]) => button.contains(document.elementFromPoint(px, py))).length;
+      const hit = ([px, py]) => button.contains(document.elementFromPoint(px, py));
       const offsets = Array.from({ length: 121 }, (_, index) => index - 60);
-      return [hits(offsets.map((d) => [x + d, y])), hits(offsets.map((d) => [x, y + d]))];
+      const header = button.closest('[class*="modalHeader"]');
+      const bar = getComputedStyle(header).position === 'sticky' ? header.getBoundingClientRect() : null;
+      return {
+        across: offsets.filter((d) => hit([x + d, y])).length,
+        down: offsets.filter((d) => hit([x, y + d])).length,
+        barHeight: bar ? Math.floor(bar.height) : 0,
+        // Every pixel from the bar's foot to 60px under the button's middle.
+        underBar: bar ? offsets.filter((d) => y + d >= bar.bottom && hit([x, y + d])).length : 0,
+      };
     });
-    assert(Math.min(...reach) >= 44, `The topic window's close button reaches only ${reach.join(' by ')}px`);
+    const tall = reach.barHeight ? Math.min(44, reach.barHeight - 1) : 44;
+    assert(
+      reach.across >= 44 && reach.down >= tall,
+      `The topic window's close button reaches only ${reach.across} by ${reach.down}px`,
+    );
+    assert.equal(reach.underBar, 0, `The close button takes taps ${reach.underBar}px below its title bar`);
   });
 
-  // The summary leads short; its positions open on request.
-  const more = panel.getByRole('button', { name: 'Show more' });
-  await more.hover();
-  await step('summary toggle hovered', () => assertReadable(panel));
-  await more.focus();
-  await step('summary toggle focused', () => assertReadable(panel));
-  await more.click();
+  // The positions show at once, each on its own card. A long summary leads short and opens on request.
   await step('summary positions', async () => {
-    await panel.getByRole('listitem').filter({ hasText: 'Pilot it locally first' }).waitFor();
+    await panel.getByRole('listitem').filter({ hasText: 'Pilot it locally first' }).first().waitFor();
     await assertReadable(panel);
     const overflowing = await panel
       .getByRole('listitem')
       .evaluateAll((items) => items.filter((item) => item.scrollWidth > item.clientWidth + 1).map((item) => item.textContent));
     assert.deepEqual(overflowing, [], 'A position overflows its card');
   });
+  // Where its positions sit at both ends of the first axis, they are set side by side under the axis's own words.
+  await step('where people split', async () => {
+    const split = panel.getByRole('region', { name: 'Where people split' });
+    await split.waitFor();
+    const ends = await split.getByRole('heading', { level: 4 }).allTextContents();
+    assert.deepEqual(ends, ['Slow and careful', 'Fast and bold']);
+    assert.equal(await split.getByRole('listitem').count(), 3);
+    await assertReadable(split);
+  });
+  if (screenshotDir) await panel.screenshot({ path: `${screenshotDir}/debate-atlas-node-top-${tag}.png` });
+  const more = panel.getByRole('button', { name: 'See more' });
+  if (await more.count()) {
+    await more.hover();
+    await step('summary toggle hovered', () => assertReadable(panel));
+    await more.focus();
+    await step('summary toggle focused', () => assertReadable(panel));
+    await more.click();
+    await step('whole summary', () => assertReadable(panel));
+  }
 
   // Hovering a participant names them, in the tooltip's own colours.
   await page.locator('[data-testid$="-avatar"]').first().waitFor();
@@ -376,8 +403,29 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   }
   if (screenshotDir) await cards.last().screenshot({ path: `${screenshotDir}/debate-atlas-question-${tag}.png` });
 
-  // The category behind it has a compass of its own, with the same legend.
+  // Behind its window the subtopic's questions are circles of their own; one opens to that question, ready to
+  // read, and Up Level goes back to the subtopic's siblings.
   await panel.getByTitle('Close').click();
+  const questionCircles = page.getByTestId('ce-atlas-node');
+  await step('question circles', async () => {
+    await questionCircles.first().waitFor({ timeout: 15000 });
+    assert.equal(await questionCircles.count(), 2, 'A subtopic with two questions shows two question circles');
+    // The circles' own text; the level's title above them is not judged here.
+    for (const circle of await questionCircles.all()) await assertReadable(circle);
+  });
+  if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-questions-${tag}.png` });
+  await questionCircles.first().click();
+  const questionPanel = page.locator('[class*="modalContent"]').last();
+  await step('question window', async () => {
+    await questionPanel.getByRole('link', { name: /^Answer: / }).waitFor({ timeout: 15000 });
+    assert.equal(await questionPanel.getByRole('link', { name: /^Answer: / }).count(), 1);
+    await assertReadable(questionPanel);
+  });
+  if (screenshotDir) await questionPanel.screenshot({ path: `${screenshotDir}/debate-atlas-question-window-${tag}.png` });
+  await questionPanel.getByTitle('Close').click();
+  await page.getByRole('button', { name: /up level/i }).click();
+
+  // The category behind it has a compass of its own, with the same legend.
   await page.getByLabel('Open Transport').click();
   const categoryPanel = page.locator('[class*="modalContent"]').last();
   await step('open category', () => categoryPanel.getByText('Topic', { exact: true }).waitFor({ timeout: 15000 }));
@@ -411,6 +459,30 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
     assert(![category, topicChip].includes(plain), `A List level has no colour of its own: ${category}, ${topicChip}`);
   });
   if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-list-${tag}.png` });
+  // The list can be ranked by how people split or by how many answered; each row then says what it was ranked by.
+  const sort = atlas.getByTestId('ce-atlas-list-sort');
+  await step('list sort', async () => {
+    const rowNames = () =>
+      atlas.locator('[class*="flatNodeContainer"]').evaluateAll((rows) =>
+        rows.map((row) => row.querySelector('[class*="pathContainer"] button:last-of-type')?.textContent?.trim()),
+      );
+    const atlasOrder = await rowNames();
+    assert.equal(await atlas.locator('[class*="rankNote"]').count(), 0, 'Atlas order shows no rank note');
+    await sort.selectOption('split');
+    await atlas.locator('[class*="rankNote"]').first().waitFor();
+    const notes = await atlas.locator('[class*="rankNote"]').allTextContents();
+    assert(notes.every((note) => /^\d+ of \d+ in the largest position$/.test(note)), `Rank notes read oddly: ${notes}`);
+    assert.deepEqual([...(await rowNames())].sort(), [...atlasOrder].sort(), 'Sorting keeps every row');
+    await assertReadable(atlas);
+    const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
+    assert(overflow <= 1, `The sorted list scrolls sideways by ${overflow}px`);
+    if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-list-split-${tag}.png` });
+    await sort.selectOption('answered');
+    await atlas.locator('[class*="rankNote"]').first().waitFor();
+    assert((await atlas.locator('[class*="rankNote"]').allTextContents()).every((note) => /^\d+ answered$/.test(note)));
+    await sort.selectOption('atlas');
+    assert.deepEqual(await rowNames(), atlasOrder, 'Atlas order comes back as it was');
+  });
   await atlas.locator('[data-testid="ce-debate-view-mode"][data-ce-view-mode="tree"]').click();
   await step('tree categories', () => assertReadable(atlas));
   await atlas.getByRole('button', { name: 'Transport', exact: true }).first().click();

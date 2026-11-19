@@ -7,7 +7,7 @@ const toRecord = (value: unknown): UnknownRecord =>
 const lower = (value: unknown): string => (typeof value === 'string' ? value.trim().toLowerCase() : '');
 
 /**
- * Whether to offer this account the Results builds (AI Views, atlas, risk
+ * Whether to offer this account the Results builds (Session Agent update, atlas, risk
  * matrix): admins, co-admins and results admins. On a hat session any signed-in
  * account is offered them and the Worker decides.
  */

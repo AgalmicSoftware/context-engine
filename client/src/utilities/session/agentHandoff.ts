@@ -25,16 +25,25 @@ export class AgentDelegateKeyError extends Error {
   }
 }
 
-// The name goes inside a double-quoted shell argument, so it keeps none of the
-// characters a shell reads there, nor `!`, which history-expands.
+// The agent saves this as its name in the session, so it must pass the session's name rule: at most 32
+// characters, of letters, numbers, spaces and . _ ' - only. A name the Worker would refuse is shortened or
+// cleaned here, where the person can see it, not left for the agent to find out. That set also holds none of
+// the characters a shell reads inside the double-quoted argument the name is pasted in.
+const AGENT_NAME_SUFFIX = "'s Agent";
+const SESSION_NAME_CHARS = 32;
+
 export const agentDisplayName = (ownerName: unknown): string => {
-  const name = toStr(ownerName)
-    .replace(/[\p{Cc}"$`\\!]/gu, '')
+  const cleaned = toStr(ownerName)
+    .normalize('NFKC')
+    // Characters drawn as nothing (an emoji's variation selector, joiners, fillers) are refused by the rule too.
+    .replace(/[^\p{L}\p{M}\p{N} ._'-]|[\p{Default_Ignorable_Code_Point}\u{16FE4}]/gu, '')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 40)
     .trim();
-  return name ? `${name}'s Kami` : '';
+  const name = [...cleaned]
+    .slice(0, SESSION_NAME_CHARS - AGENT_NAME_SUFFIX.length)
+    .join('')
+    .trim();
+  return name ? `${name}${AGENT_NAME_SUFFIX}` : '';
 };
 
 export const buildMcpAddCommand = (displayName: string): string =>

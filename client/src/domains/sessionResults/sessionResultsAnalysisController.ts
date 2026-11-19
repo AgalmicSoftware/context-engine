@@ -42,6 +42,7 @@ export type GeneratedResultsControllerState = {
   generationMode: string;
   isRunning: boolean;
   lastGoodDraftId: string;
+  lastGoodGeneratedAt: string;
   lastFailure: string;
   questions: GeneratedResultsSnapshotQuestion[];
   responses: GeneratedResultsSnapshotResponse[];
@@ -140,6 +141,7 @@ export const buildInitialGeneratedResultsControllerState = (): GeneratedResultsC
   isRunning: false,
   lastFailure: '',
   lastGoodDraftId: '',
+  lastGoodGeneratedAt: '',
   questions: [],
   responses: [],
   selectedView: SESSION_GENERATED_RESULTS_VIEW_KEYS.CIRCLES,
@@ -258,6 +260,8 @@ export const resolveGeneratedResultsControllerState = ({
     isRunning,
     lastFailure,
     lastGoodDraftId: toText(lastGood.draftId),
+    // The public artifact read carries no draft id; both it and the admin status read carry the build's time.
+    lastGoodGeneratedAt: toText(lastGood.generatedAt || artifact?.generatedAt),
     questions: toArray(snapshot.questions).map(normalizeSnapshotQuestion),
     responses: toArray(snapshot.responses).map(normalizeSnapshotResponse),
     selectedView,

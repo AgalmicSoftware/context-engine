@@ -12,7 +12,7 @@ import { copyText } from '../../utilities/ui/copyText';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { withCurrentWorkerHint } from '../../utilities/ui/currentWorkerHint';
-import { buildWorkerGroupsPath } from '../../utilities/worker/workerGroupRoutes.js';
+import { buildWorkerGroupsPath, buildWorkerSessionPath } from '../../utilities/worker/workerGroupRoutes.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import {
   joinWorkerGroup,
@@ -354,12 +354,37 @@ const WorkerGroupDetailView = ({
                 <span className={sbtPageStyles.label}>Join policy:</span>
                 <span>{WORKER_GROUP_JOIN_LABELS[group.joinMode]}</span>
               </p>
+              {group.memberVisibility !== 'session' && (
+                // The visibility line below names the session only for session-wide groups; every group's page
+                // links to its session.
+                <p data-testid="ce-worker-group-session">
+                  <span className={sbtPageStyles.label}>Session:</span>
+                  <a
+                    className={styles.workerGroupSessionLink}
+                    href={buildWorkerSessionPath({ sessionSlug, workerUrl })}
+                    data-testid="ce-worker-group-session-link"
+                  >
+                    {sessionLabel}
+                  </a>
+                </p>
+              )}
               <p className={styles.workerGroupVisibility} data-testid="ce-worker-group-member-visibility">
                 <span className={sbtPageStyles.label}>Member visibility:</span>
                 <span>
-                  {group.memberVisibility === 'session'
-                    ? `Session: ${sessionLabel}`
-                    : group.memberVisibility.replace(/_/g, ' ')}
+                  {group.memberVisibility === 'session' ? (
+                    <>
+                      Session:{' '}
+                      <a
+                        className={styles.workerGroupSessionLink}
+                        href={buildWorkerSessionPath({ sessionSlug, workerUrl })}
+                        data-testid="ce-worker-group-session-link"
+                      >
+                        {sessionLabel}
+                      </a>
+                    </>
+                  ) : (
+                    group.memberVisibility.replace(/_/g, ' ')
+                  )}
                 </span>
               </p>
               <p data-testid="ce-worker-group-removal-auth">

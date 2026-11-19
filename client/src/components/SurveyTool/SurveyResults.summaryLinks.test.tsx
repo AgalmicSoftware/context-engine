@@ -431,11 +431,11 @@ describe('SurveyResults multichoice aggregator summary', () => {
 
     expect(screen.getByText('2 total responders to this multichoice question.')).toBeInTheDocument();
     expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('2 (100.00%)')).toBeInTheDocument();
+    expect(screen.getByText('2/2')).toBeInTheDocument();
     expect(screen.getByText('Beta')).toBeInTheDocument();
-    expect(screen.getByText('1 (50.00%)')).toBeInTheDocument();
+    expect(screen.getByText('1/2')).toBeInTheDocument();
     expect(screen.getByText('Gamma')).toBeInTheDocument();
-    expect(screen.getByText('0 (0.00%)')).toBeInTheDocument();
+    expect(screen.getByText('0/2')).toBeInTheDocument();
   });
 
   it('renders quadratic totals through the real results module using each respondent’s latest allocation', async () => {
@@ -467,25 +467,12 @@ describe('SurveyResults multichoice aggregator summary', () => {
     await expandQuestionCard('Allocate project support');
 
     const results = await screen.findByTestId('ce-quadratic-results');
-    const table = within(results).getByRole('table', { name: 'Quadratic allocation results' });
+    const list = within(results).getByRole('list', { name: 'Quadratic allocation results' });
     expect(
-      within(table)
-        .getAllByRole('columnheader')
-        .map((cell) => cell.textContent),
-    ).toEqual(['Option', 'Positive', 'Negative', 'Net']);
-    expect(
-      within(table)
-        .getAllByRole('row')
-        .slice(1)
-        .map((row) =>
-          within(row)
-            .getAllByRole('cell')
-            .map((cell) => cell.textContent),
-        ),
-    ).toEqual([
-      ['3', '-2', '1'],
-      ['5', '-4', '1'],
-    ]);
+      within(list)
+        .getAllByRole('listitem')
+        .map((row) => row.firstElementChild?.textContent?.replace(/^[^:]*: /, '')),
+    ).toEqual(['support 3, oppose 2, net +1', 'support 5, oppose 4, net +1']);
   });
 
   it('keeps the SurveyResults multichoice summary renderer when question metadata is still missing', async () => {

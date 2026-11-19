@@ -457,6 +457,14 @@ export const normalizeMultichoiceValue = (value: unknown): unknown[] => {
   return [value];
 };
 
+/**
+ * Whether a multiple choice question's answer may hold one pick only, as answers are checked when stored: a
+ * single-select flag, or a limit of one. Results use it to say "Pick one" or "Pick any" beside a question.
+ */
+export const takesOnePick = (question: UnknownRecord | null | undefined): boolean =>
+  !!(question?.singleSelect || question?.oneSelectionOnly || question?.singleChoice) ||
+  Number(question?.maxSelections) === 1;
+
 export const isSingleSelectMultichoice = (question: MultichoiceQuestion | null | undefined): boolean => {
   if (!question || question.type !== 'multichoice') return false;
   return !!(question.singleSelect || question.oneSelectionOnly || question.singleChoice);

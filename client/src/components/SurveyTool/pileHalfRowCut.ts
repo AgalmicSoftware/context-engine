@@ -25,6 +25,38 @@ export const resolvePileHalfRowCut = (available: number, rows: PileListRow[]): n
   return cut === undefined ? undefined : Math.floor(cut);
 };
 
+// The most a gap between rows may grow: a one-line option's height. That fills any room with one-line options
+// (the most they need is 70% of a row and a gap, 40px for a 46px row); taller ones would open a gap wider than an
+// option, so past this the list is shortened for the rest.
+const SPREAD_MAX = 44;
+
+export type PileListFit = {
+  /** Space to add to each gap between rows. */
+  spread: number;
+  /** The list's height where it must be shorter than its room; undefined where it keeps the room. */
+  height?: number;
+};
+
+/**
+ * How a scrolling list fills `available` and still ends inside a row. The cut alone can only shorten a list, so
+ * room that ended between one row's middle part and the next left a blank band under it: the rows above the cut
+ * one spread apart instead, by what brings that row's cut to the room's end. Where no row is above it, or the gaps
+ * would grow past SPREAD_MAX, the list is shortened as before.
+ */
+export const resolvePileListFit = (available: number, rows: PileListRow[]): PileListFit => {
+  const cut = resolvePileHalfRowCut(available, rows);
+  if (cut === undefined) return { spread: 0 };
+  const cutRow = rows.find((row) => cut > row.top && cut < row.top + row.height);
+  if (!cutRow) return { spread: 0, height: cut };
+  const gapsAbove = rows.filter((row) => row.top < cutRow.top).length;
+  const end = cutRow.top + cutRow.height * CUT_TO;
+  const slack = available - end;
+  if (gapsAbove === 0 || slack <= 0) return { spread: 0, height: cut };
+  const spread = slack / gapsAbove;
+  if (spread <= SPREAD_MAX) return { spread };
+  return { spread: SPREAD_MAX, height: Math.floor(end + gapsAbove * SPREAD_MAX) };
+};
+
 /**
  * Rows measured from the top of a scrolling list's content, whatever it has scrolled to, in layout pixels: a card
  * still scaling in as it arrives would otherwise shrink every measure.
@@ -40,10 +72,14 @@ export const measurePileListRows = (list: HTMLElement, rows: Element[]): PileLis
 
 export type PileListCue = 'none' | 'start' | 'middle' | 'end';
 
+// Read by the list's styles as extra space between its rows.
+const ROW_SPREAD = '--pile-list-row-spread';
+
 /**
  * Keeps a scrolling answer area ending inside a row, and marks which ends have more (`data-list-cue`), so a long list
- * never looks complete. Applies only while the area scrolls (phones); elsewhere it leaves it alone. Returns the cue,
- * or 'off' where the area cannot scroll.
+ * never looks complete. The rows spread apart to fill the room, and the area shortens where they cannot
+ * (resolvePileListFit). Applies only while the area scrolls (phones); elsewhere it leaves it alone. Returns the
+ * cue, or 'off' where the area cannot scroll.
  */
 export const usePileHalfRowCut = (
   ref: React.RefObject<HTMLElement | null>,
@@ -71,24 +107,32 @@ export const usePileHalfRowCut = (
       setListCue(scrollable ? cue : 'off');
     };
     const fit = () => {
+      // Measure the rows as they lie on their own, without the last fit. Undoing it can shorten the content, which
+      // would pull a scrolled list back; it keeps its place.
+      const scrolled = area.scrollTop;
       area.style.maxHeight = '';
+      area.style.removeProperty(ROW_SPREAD);
       const rows = Array.from(area.querySelectorAll(rowSelector));
       const overflowY = getComputedStyle(area).overflowY;
       if (rows.length && (overflowY === 'auto' || overflowY === 'scroll')) {
-        const cut = resolvePileHalfRowCut(area.clientHeight, measurePileListRows(area, rows));
-        if (cut !== undefined) area.style.maxHeight = `${cut}px`;
+        const { spread, height } = resolvePileListFit(area.clientHeight, measurePileListRows(area, rows));
+        if (spread > 0) area.style.setProperty(ROW_SPREAD, `${Math.round(spread * 100) / 100}px`);
+        if (height !== undefined) area.style.maxHeight = `${height}px`;
       }
+      if (area.scrollTop !== scrolled) area.scrollTop = scrolled;
       updateCue();
     };
-    // The frame keeps its size whatever the area's own height, so fitting it never feeds back. The prompt above
-    // can change size (it shrinks a long one to fit) and so change the room; rows that wrap differently (rotation,
-    // font size) resize the content; a new question replaces it.
+    // The frame keeps its size whatever the area's own height, and a row keeps its size however far apart the
+    // rows are spread, so fitting never feeds back: the rows are watched, not the list around them, which the
+    // spread resizes. The prompt above can change size (it shrinks a long one to fit) and so change the room; rows
+    // that wrap differently (rotation, font size, a tick beside a long label) resize; a new question replaces them.
     const observer = new ResizeObserver(fit);
     const observeContent = () => {
       observer.disconnect();
       observer.observe(frame);
       Array.from(frame.children).forEach((sibling) => sibling !== area && observer.observe(sibling));
-      Array.from(area.children).forEach((child) => observer.observe(child));
+      const rows = Array.from(area.querySelectorAll(rowSelector));
+      (rows.length ? rows : Array.from(area.children)).forEach((watched) => observer.observe(watched));
     };
     const contentWatcher = new MutationObserver(() => {
       observeContent();
@@ -103,6 +147,7 @@ export const usePileHalfRowCut = (
       contentWatcher.disconnect();
       area.removeEventListener('scroll', updateCue);
       area.style.maxHeight = '';
+      area.style.removeProperty(ROW_SPREAD);
       delete area.dataset.listCue;
       setListCue('off');
     };

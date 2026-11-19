@@ -86,6 +86,6 @@ describe('OnePageSessionAgentShell', () => {
       'AI-generated Circles, Breakdown, and Risk Matrix views are not available in the agent web shell yet.',
     );
     await screen.findByTestId('agent-question-pile');
-    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-agent-update')).not.toBeInTheDocument();
   });
 });

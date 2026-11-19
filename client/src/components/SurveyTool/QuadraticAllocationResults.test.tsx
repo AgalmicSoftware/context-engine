@@ -27,3 +27,32 @@ it('includes decrypted allocations that retain their encrypted flag', () => {
     excludedResponses: 0,
   });
 });
+
+it('draws each option as oppose and support bars around zero, with its net', () => {
+  const responses = [{ answer: { value: [2, -1] } }, { answer: { value: [-1, -2] } }, { answer: { value: [2, 0] } }];
+  render(<QuadraticAllocationResults question={question} responses={responses} />);
+  const rows = screen.getAllByRole('listitem');
+  expect(rows).toHaveLength(2);
+  // What a screen reader hears for a row, and what the eye reads at its end.
+  expect(rows[0]).toHaveTextContent('Option A: support 4, oppose 1, net +3');
+  expect(rows[1]).toHaveTextContent('Option B: support 0, oppose 3, net −3');
+  // The eye's copy of the name and numbers is hidden from screen readers, which get the sentence.
+  expect(rows[0].querySelectorAll('[aria-hidden="true"]')).toHaveLength(3);
+  // Bars share one scale: the largest side of any option is the full width.
+  const widths = rows.map((row) => [...row.querySelectorAll('i')].map((bar) => bar.style.width));
+  expect(widths).toEqual([
+    ['25%', '100%'],
+    ['75%', '0%'],
+  ]);
+  expect(screen.queryByRole('table')).not.toBeInTheDocument();
+});
+
+it('ranks the options by net, most supported first', () => {
+  const three = { options: ['Low', 'Mid', 'High'], voiceCredits: 99 };
+  render(<QuadraticAllocationResults question={three} responses={[{ answer: { value: [-2, 1, 3] } }]} />);
+  expect(screen.getAllByRole('listitem').map((row) => row.firstElementChild?.textContent)).toEqual([
+    'High: support 3, oppose 0, net +3',
+    'Mid: support 1, oppose 0, net +1',
+    'Low: support 0, oppose 2, net −2',
+  ]);
+});

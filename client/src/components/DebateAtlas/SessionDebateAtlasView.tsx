@@ -23,8 +23,8 @@ type Props = {
   onRequestedNodeClose?: (() => void) | null;
 };
 
-// A built atlas has topics and, under each, subtopics.
-const LEVEL_LABELS = ['Topic', 'Subtopic'];
+// A built atlas has topics, under each its subtopics, and under each of those its questions.
+const LEVEL_LABELS = ['Topic', 'Subtopic', 'Question'];
 
 // A built atlas replaces the demo atlas and the RxC topic circles: read-only
 // circles whose topics and subtopics each open a compass of positions and participants.

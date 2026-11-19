@@ -73,9 +73,9 @@ const formatCount = (value: number) => value.toLocaleString('en-US');
 // An AI build reads every counted version at once, so it stops past the limit; warn from 80%.
 const storedVersionsNote = ({ count, limit, overLimit }: StoredVersionsDiagnostics) =>
   overLimit
-    ? `Over the limit: AI Views, the atlas and the risk matrix can't be built, and the Session Agent's Detailed answers leave out members' answers. Each person's latest answer to each question counts; for answers saved before 0.9.10, every saved change counts.`
+    ? `Over the limit: the atlas, the risk matrix and the Session Agent's update can't be built, and the Session Agent's Detailed answers leave out members' answers. Each person's latest answer to each question counts; for answers saved before 0.9.10, every saved change counts.`
     : count >= limit * 0.8
-      ? `Close to the limit: past ${formatCount(limit)}, AI Views, the atlas and the risk matrix can't be built, and the Session Agent's Detailed answers leave out members' answers. Each person's latest answer to each question counts; for answers saved before 0.9.10, every saved change counts.`
+      ? `Close to the limit: past ${formatCount(limit)}, the atlas, the risk matrix and the Session Agent's update can't be built, and the Session Agent's Detailed answers leave out members' answers. Each person's latest answer to each question counts; for answers saved before 0.9.10, every saved change counts.`
       : '';
 
 const AdminSessionDiagnostics = ({

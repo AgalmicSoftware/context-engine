@@ -1,7 +1,8 @@
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import PolisAnswerSections from './PolisAnswerSections';
+import PolisAnswerSections, { writtenAnswerPreview } from './PolisAnswerSections';
 import { buildReportAnswerQuestions } from './polisReportAnswers';
+import { choiceKindLabel } from '../SurveyTool/MultichoiceQuestionInput';
 
 const questions = buildReportAnswerQuestions({
   q1: [{ responder: 'a', response: { type: 'rating', prompt: 'Less answered', answer: { value: 0 } } }],
@@ -103,7 +104,7 @@ it('renders proportional multiple-choice bars with explicit geometry for PDF cap
   });
   render(<PolisAnswerSections questions={multipleChoice} pdfMode />);
   const rows = within(screen.getByRole('list', { name: 'Multiple choice results' })).getAllByRole('listitem');
-  expect(rows.map((row) => row.textContent)).toEqual(['Garden67% (2)', 'Bus33% (1)', 'Paths0% (0)']);
+  expect(rows.map((row) => row.textContent)).toEqual(['Garden2/3', 'Bus1/3', 'Paths0/3']);
   const widths = rows.map((row) => Number(row.querySelector('svg rect:last-child')?.getAttribute('width')));
   expect(widths[0]).toBeCloseTo(200 / 3);
   expect(widths[1]).toBeCloseTo(100 / 3);
@@ -156,4 +157,80 @@ it('limits the binary preview to five and includes every binary question in PDF'
   expect(screen.queryByText('Binary 5')).not.toBeInTheDocument();
   rerender(<PolisAnswerSections {...props} binaryQuestionCount={5} />);
   expect(screen.queryByRole('button', { name: /View more/ })).not.toBeInTheDocument();
+});
+
+const longAnswer = `${'A sentence of ordinary length about the street outside. '.repeat(12)}The end.`;
+const longWritten = buildReportAnswerQuestions({
+  text1: [longAnswer, 'A short answer'].map((value, index) => ({
+    responder: `person-${index}`,
+    response: { type: 'freeform', prompt: 'One long answer beside a short one', answer: { value } },
+  })),
+});
+
+it('shows the start of a long written answer, cut at a word, with a See more that opens and closes it', () => {
+  render(<PolisAnswerSections questions={longWritten} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Freeform' }));
+  const preview = writtenAnswerPreview(longAnswer) as string;
+  expect(preview.length).toBeLessThanOrEqual(301);
+  expect(preview.endsWith('…')).toBe(true);
+  // Cut at a word: what is shown is whole words of the answer.
+  expect(longAnswer.startsWith(preview.slice(0, -1))).toBe(true);
+  expect(/\s/.test(longAnswer[preview.length - 1])).toBe(true);
+  expect(screen.getByText(preview)).toBeInTheDocument();
+  expect(screen.queryByText(longAnswer)).not.toBeInTheDocument();
+  // The short answer has no control, and each answer sits in its own block.
+  const more = screen.getByRole('button', { name: 'See more' });
+  expect(screen.getAllByRole('button', { name: /See (more|less)/ })).toHaveLength(1);
+  expect(screen.getByText('A short answer').parentElement).not.toBe(screen.getByText(preview).parentElement);
+  expect(more).toHaveAttribute('aria-expanded', 'false');
+  expect(document.getElementById(more.getAttribute('aria-controls') as string)).toHaveTextContent(preview);
+  fireEvent.click(more);
+  expect(screen.getByText(longAnswer.trim(), { normalizer: (text) => text.trim() })).toBeInTheDocument();
+  const less = screen.getByRole('button', { name: 'See less' });
+  expect(less).toHaveAttribute('aria-expanded', 'true');
+  fireEvent.click(less);
+  expect(screen.getByText(preview)).toBeInTheDocument();
+});
+
+it('shows every written answer whole in the export', () => {
+  render(<PolisAnswerSections questions={longWritten} pdfMode />);
+  expect(screen.getByText(longAnswer.trim(), { normalizer: (text) => text.trim() })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /See (more|less)/ })).not.toBeInTheDocument();
+});
+
+it('leaves an answer of 300 characters whole and cuts a long run without spaces at the limit', () => {
+  expect(writtenAnswerPreview('x'.repeat(300))).toBeNull();
+  expect(writtenAnswerPreview('x'.repeat(400))).toBe(`${'x'.repeat(300)}…`);
+  // A little over the limit is shown whole; an emoji at the cut is not split in two.
+  expect(writtenAnswerPreview(`${'word '.repeat(60)}and a few more words.`)).toBeNull();
+  expect(writtenAnswerPreview(`${'x'.repeat(299)}😀${'x'.repeat(200)}`)).toBe(`${'x'.repeat(299)}…`);
+});
+
+it('marks a multiple choice question Pick one or Pick any, in the pile\u2019s words, and ranks quadratic options by net', () => {
+  const kinds = buildReportAnswerQuestions(
+    {
+      one: [{ responder: 'a', response: { type: 'multichoice', prompt: 'One only', answer: { value: 'Garden' } } }],
+      any: [{ responder: 'a', response: { type: 'multichoice', prompt: 'Several', answer: { value: ['Bus'] } } }],
+      capped: [{ responder: 'a', response: { type: 'multichoice', prompt: 'Capped', answer: { value: 'Bus' } } }],
+      votes: [{ responder: 'a', response: { type: 'quadratic', prompt: 'Votes', answer: { value: [-2, 1, 3] } } }],
+    },
+    {
+      one: { type: 'multichoice', options: ['Garden', 'Bus'], singleSelect: true },
+      any: { type: 'multichoice', options: ['Garden', 'Bus'] },
+      // A limit of one is one pick too, flag or no flag, and whether stored as a number or as text.
+      capped: { type: 'multichoice', options: ['Garden', 'Bus'], maxSelections: '1' },
+      votes: { type: 'quadratic', options: ['Low', 'Mid', 'High'], voiceCredits: 99 },
+    },
+  );
+  expect(Object.fromEntries(kinds.map((question) => [question.prompt, question.choiceKind]))).toEqual({
+    'One only': choiceKindLabel(true),
+    Several: choiceKindLabel(false),
+    Capped: choiceKindLabel(true),
+    Votes: '',
+  });
+  render(<PolisAnswerSections questions={kinds} pdfMode />);
+  expect(screen.getByRole('heading', { name: 'One only Pick one' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Several Pick any' })).toBeInTheDocument();
+  const rows = within(screen.getByRole('list', { name: 'Quadratic allocation results' })).getAllByRole('listitem');
+  expect(rows.map((row) => row.textContent)).toEqual(['High0+3+3', 'Mid0+1+1', 'Low−20−2']);
 });
