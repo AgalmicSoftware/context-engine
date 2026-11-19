@@ -1,3 +1,5 @@
+import InterviewResponderNameOption from './InterviewResponderNameOption';
+import { useSessionNames } from '../../utilities/session/useSessionNames';
 import { summarizeInterviewConsent, type InterviewConsentOverrides } from './sessionInterviewConsent';
 import { useInterviewSavedAnswers } from './useInterviewSavedAnswers';
 import { getSessionAiSettings } from '../../utilities/ai/aiSettings';
@@ -231,6 +233,10 @@ export default function SessionInterviewPanel({
     contextToken: string;
     included: boolean;
   } | null>(kept.researchSharingChoice);
+  // A session that keeps names shows them only to the people it admits. A name written into an answer would
+  // reach everyone who can read answers, so there the choice isn't offered and no name is sent, as with the MCP.
+  // Unknown counts as kept.
+  const namesKept = !useSessionNames({ sessionSlug, sessionConfig, account: String(account || '') }).answerNamesShown;
   const [includeResponderName, setIncludeResponderName] = useState(kept.includeResponderName);
   // Like research sharing, kept across signing in to submit, which resets consentOverrides.
   const [draftTextKept, setDraftTextKept] = useState(kept.draftText);
@@ -1009,12 +1015,13 @@ export default function SessionInterviewPanel({
       hasAiPrefill,
       includePredictionComparison,
       includeProvenance,
-      includeResponderName,
+      includeResponderName: namesKept ? false : includeResponderName,
       // Forward the shown detail only when it is narrower than the session's current one.
       consentOverrides: {
         ...consentOverrides,
         ...(draftTextForwarded === undefined ? {} : { includeDraftText: draftTextForwarded }),
         ...(shownResearchDetail === sessionResearchDetail ? {} : { researchDetail: shownResearchDetail }),
+        ...(namesKept ? { includeResponderName: false } : {}),
       },
       isInterviewBusy,
       researchAvailable,
@@ -1065,6 +1072,7 @@ export default function SessionInterviewPanel({
     includePredictionComparison,
     includeProvenance,
     includeResponderName,
+    namesKept,
     consentOverrides,
     shownResearchDetail,
     sessionResearchDetail,
@@ -1127,26 +1135,16 @@ export default function SessionInterviewPanel({
       : [importedResponderName];
   // The responder-name choice sits with the other sharing choices.
   const nameOption =
-    importedResponderName || hasSavedName ? (
-      <Label check className={styles.sessionInterviewProvenance}>
-        <Input
-          type="checkbox"
-          checked={nameChoice.mixed ? false : nameChoice.checked}
-          aria-checked={nameChoice.mixed ? 'mixed' : nameChoice.checked}
-          innerRef={(element: HTMLInputElement | null) => {
-            if (element) element.indeterminate = nameChoice.mixed;
-          }}
-          disabled={applying}
-          onChange={(event) => {
-            const included = event.target.checked;
-            setIncludeResponderName(included);
-            setConsentOverrides((prev) => ({ ...prev, includeResponderName: included }));
-          }}
-          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME}
-        />{' '}
-        {`Include ${displayedResponderNames.map((name) => `“${name}”`).join(', ')} as the responder ${displayedResponderNames.length > 1 ? 'names' : 'name'} with submitted responses`}
-        {nameChoice.mixed ? ' (mixed saved choices)' : ''}
-      </Label>
+    !namesKept && (importedResponderName || hasSavedName) ? (
+      <InterviewResponderNameOption
+        names={displayedResponderNames as string[]}
+        choice={nameChoice}
+        disabled={applying}
+        onChange={(included) => {
+          setIncludeResponderName(included);
+          setConsentOverrides((prev) => ({ ...prev, includeResponderName: included }));
+        }}
+      />
     ) : null;
   const researchCoverage = prefillPacket?.source?.researchCoverage;
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
