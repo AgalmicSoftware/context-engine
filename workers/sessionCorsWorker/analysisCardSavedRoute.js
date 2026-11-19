@@ -1,5 +1,6 @@
-import { analysisCardOn, normalizeSavedAnalysisCard } from '../../shared/analysisCardSaved.mjs';
+import { analysisCardAnswersArePrivate, analysisCardOn, normalizeSavedAnalysisCard } from '../../shared/analysisCardSaved.mjs';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
+import { createRequesterAccessChecks } from './storageRouteExecution.js';
 
 // One personal analysis card per person, saved on their page so every visitor sees the same card without pressing
 // Analyze.
@@ -11,6 +12,9 @@ import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 //   (withdrawn) or { published: null } (nothing saved).
 // Both need what the card's picture needs: a sign-in with the `ai` scope, rechecked against the session's current
 // rules, in a session that has not ended and has not turned the card off. Neither calls a model or counts an AI call.
+// A card is made from its owner's answers and quotes up to three of them, so it goes only where those answers go:
+// none is saved where the session keeps answers to their author and its admins, and a saved one is given only to
+// someone who may read that person's answers (a card saved before the session's rules were tightened included).
 export const ANALYSIS_CARD_PUBLISH_PATH = '/analysis-card/publish';
 export const ANALYSIS_CARD_PUBLISHED_PATH = '/analysis-card/published';
 export const ANALYSIS_CARD_SAVED_PATHS = [ANALYSIS_CARD_PUBLISH_PATH, ANALYSIS_CARD_PUBLISHED_PATH];
@@ -93,6 +97,15 @@ export const dispatchAnalysisCardSavedRoute = async ({
     const card = stored?.published === true ? normalizeSavedAnalysisCard(stored.card) : null;
     const savedAt = Number(stored?.savedAt);
     if (!card || !Number.isFinite(savedAt)) return send({ published: null }, 200);
+    // To anyone but its owner the card reads as not saved unless they may read the owner's answers, as a read of
+    // one of those answers would decide. A check that cannot be made counts as no.
+    if (account !== accountOf(address)) {
+      const checks = (deps?.createRequesterAccessChecks || createRequesterAccessChecks)({
+        env, config, slug, requesterAddress: address, authScopes: scopes, deps,
+      });
+      const mayRead = await checks.canRead({ resource: 'responses', responder: account }).catch(() => false);
+      if (!mayRead) return send({ published: null }, 200);
+    }
     return send({ published: true, card, savedAt }, 200);
   }
 
@@ -102,6 +115,8 @@ export const dispatchAnalysisCardSavedRoute = async ({
   if (typeof body?.published !== 'boolean') return send({ error: 'invalid_request' }, 400);
   const card = body.published ? normalizeSavedAnalysisCard(body.card) : null;
   if (body.published && !card) return send({ error: 'invalid_card' }, 400);
+  // Withdrawing stays open, so a card saved under looser rules can still be taken down.
+  if (card && analysisCardAnswersArePrivate(config)) return send({ error: 'analysis_card_answers_private' }, 403);
   if (card) {
     const refused = await preflight.count?.();
     if (refused) return refused;

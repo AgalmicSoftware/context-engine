@@ -3266,12 +3266,20 @@ Signed login/bootstrap requests:
   without pressing Analyze. Both take the picture route's rule (the `ai` scope,
   rechecked against the session's current rules, in a session that has not
   ended: 403 or 410 otherwise), call no model and count no AI call.
+  A card is made from its owner's answers and quotes up to three of them, so
+  it goes only where those answers go. Where the session keeps each answer to
+  its author and the admins (results shown as totals only, or to admins only),
+  `publish` refuses a card with 403 `analysis_card_answers_private`, and the
+  page neither saves one nor offers to. `published` gives a saved card only to
+  its owner and to a reader who may read that person's answers, as a read of
+  one would decide; to anyone else it answers `{ published: null }`, a card
+  saved before the session's rules were tightened included.
   - `publish` takes `{ "published": true, "card": {...} }` to save the
     caller's card, or `{ "published": false }` to withdraw it. The card is
     always filed under the signed-in address, whatever the body names, so
     nobody can save a card onto someone else's page. It holds the card's words
     only (`shared/analysisCardSaved.mjs`: title, match note, figure, guessed
-    works and up to three of the person's public answers, capped, at most
+    works and up to three of the person's answers that are not locked, capped, at most
     8,000 bytes); anything else is dropped, and a card without a title or a
     figure in "Name (years)" form is 400 `invalid_card`. A person may save 20
     times a day (429 past that).

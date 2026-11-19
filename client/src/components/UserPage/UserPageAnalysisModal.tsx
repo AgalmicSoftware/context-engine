@@ -181,8 +181,8 @@ const UserPageAnalysisModal = ({
                         <FontAwesomeIcon icon={faQuestionCircle} />
                       </button>
                       <UncontrolledTooltip target="analysisCardPublishHelp" trigger="hover focus" autohide={false}>
-                        Anyone signed in to this session who may use its AI sees this card on your page, with up to
-                        three of your public answers. Untick to remove it.
+                        Anyone signed in to this session who may use its AI and read your answers sees this card on your
+                        page, with up to three of those answers. Untick to remove it.
                       </UncontrolledTooltip>
                       {analysisCardPublish.note ? (
                         <p className={styles.placeholderNote} role="status">

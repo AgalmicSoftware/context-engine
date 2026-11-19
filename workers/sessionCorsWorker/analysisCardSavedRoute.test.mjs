@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   ANALYSIS_CARD_PUBLISH_PATH,
@@ -13,10 +14,12 @@ import { json } from './responseKvHelpers.js';
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import { FEATURES } from './workerCapabilities.js';
 import { projectPublicWorkerSessionConfig, selectDeployWorkerSessionConfigFields } from '../shared/workerSessionConfig.mjs';
+import { analysisCardAnswersArePrivate } from '../../shared/analysisCardSaved.mjs';
 import { classifySessionConfigEdits } from '../../shared/sessionConfigEdits.mjs';
 
 const OWNER = `0x${'a1'.repeat(20)}`;
 const VISITOR = `0x${'b2'.repeat(20)}`;
+const ADMIN = `0x${'c3'.repeat(20)}`;
 const NOW = Date.parse('2026-11-18T12:00:00Z');
 const CARD = {
   title: 'A patient builder of shared rules',
@@ -30,8 +33,17 @@ const CARD = {
   },
 };
 
-// A session that never saved the switch has the card on, as every session from before the switch does.
-const ON = {};
+// A session that never saved the switch has the card on, as every session from before the switch does. Its
+// answers are public, as a new session's are, so every signed-in visitor may read a saved card.
+const PUBLIC_SESSION = JSON.parse(
+  readFileSync(new URL('../../tests/fixtures/worker-compat/previous-minor.json', import.meta.url), 'utf8'),
+).config;
+const ON = { ...PUBLIC_SESSION, adminAddress: ADMIN };
+// The same session with its results shown another way.
+const showing = (visibility) => ({
+  ...ON,
+  sessionModeProfile: { ...ON.sessionModeProfile, results: { ...ON.sessionModeProfile.results, visibility } },
+});
 
 const createKv = () => {
   const rows = new Map();
@@ -62,6 +74,7 @@ const run = async ({
   scopes = { ai: true },
   currentScopes = { ai: true },
   refuse = [],
+  createRequesterAccessChecks,
 } = {}) => {
   const counted = [];
   const response = await dispatchAnalysisCardSavedRoute({
@@ -82,6 +95,7 @@ const run = async ({
         counted.push({ route, address: who, limit });
         return !refuse.includes(route);
       },
+      ...(createRequesterAccessChecks ? { createRequesterAccessChecks } : {}),
     },
   });
   return { response, body: await response.json(), counted, kv };
@@ -252,9 +266,50 @@ test('the signed-in dispatcher answers both paths itself, whatever action the bo
   }
 });
 
+test('a card goes only where its owner\'s answers go: not saved where answers are private, read only by who may read them', async () => {
+  const asMember = { ai: true, storage: true };
+  const readAs = (kv, address, config, scopes = asMember) =>
+    run({ path: ANALYSIS_CARD_PUBLISHED_PATH, body: { account: OWNER }, address, kv, config, scopes });
+  for (const visibility of ['participant_aggregate', 'private_admin']) {
+    const config = showing(visibility);
+    assert.equal(analysisCardAnswersArePrivate(config), true, visibility);
+    // No card is saved: the Worker gives each answer there only to its author and the admins.
+    const kv = createKv();
+    const refused = await run({ kv, config, scopes: asMember });
+    assert.deepEqual([refused.response.status, refused.body], [403, { error: 'analysis_card_answers_private' }], visibility);
+    assert.deepEqual([kv.puts.length, refused.counted.length], [0, 0], visibility);
+    // A card saved while answers were public is no longer given to other participants, with or without the
+    // storage scope; its owner and the admins, who may read the answers, still get it, and it can be taken down.
+    await run({ kv });
+    assert.deepEqual((await readAs(kv, VISITOR, config)).body, { published: null }, visibility);
+    assert.deepEqual((await readAs(kv, VISITOR, config, { ai: true })).body, { published: null }, visibility);
+    assert.equal((await readAs(kv, OWNER, config)).body.published, true, visibility);
+    assert.equal((await readAs(kv, ADMIN, config)).body.published, true, visibility);
+    const withdrawn = await run({ kv, config, body: { published: false }, scopes: asMember });
+    assert.deepEqual([withdrawn.response.status, withdrawn.body], [200, { published: false }], visibility);
+  }
+  // Where members see every answer, a member reads the card; a sign-in that could not read the answers does not.
+  const members = showing('session_member_full');
+  assert.equal(analysisCardAnswersArePrivate(members), false);
+  const kv = createKv();
+  assert.equal((await run({ kv, config: members, scopes: asMember })).response.status, 200);
+  assert.equal((await readAs(kv, VISITOR, members)).body.published, true);
+  assert.deepEqual((await readAs(kv, VISITOR, members, { ai: true })).body, { published: null });
+  // Public answers: every signed-in visitor reads the card. A session from before mode profiles keeps none private.
+  assert.equal(analysisCardAnswersArePrivate(ON), false);
+  assert.equal(analysisCardAnswersArePrivate({}), false);
+  assert.equal((await readAs(kv, VISITOR, ON, { ai: true })).body.published, true);
+  // A check that cannot be made counts as no.
+  const broken = await run({
+    path: ANALYSIS_CARD_PUBLISHED_PATH, body: { account: OWNER }, address: VISITOR, kv,
+    createRequesterAccessChecks: () => ({ canRead: async () => { throw new Error('gate unavailable'); } }),
+  });
+  assert.deepEqual(broken.body, { published: null });
+});
+
 test('the card is on unless an admin turns it off: off, nothing is counted, read or stored', async () => {
   const kv = createKv();
-  await run({ kv, config: { analysisCardEnabled: true } });
+  await run({ kv, config: { ...ON, analysisCardEnabled: true } });
   const before = [...kv.rows.entries()];
   assert.equal(before.length, 1);
   kv.gets.length = 0;

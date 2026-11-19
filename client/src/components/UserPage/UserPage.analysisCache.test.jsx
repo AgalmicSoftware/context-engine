@@ -688,6 +688,33 @@ describe('UserPage analysis cache and routing', () => {
     await expect(instance.resolveSavedAnalysisCardOptions()).resolves.toBeNull();
   });
 
+  it.each(['participant_aggregate', 'private_admin'])(
+    'on my own page shows my card but saves none, and offers no box, where answers are kept private (%s)',
+    async (visibility) => {
+      const own = '0x00000000000000000000000000000000000000d4';
+      const { instance, slug } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+      const config = instance._getSessionConfigForSlugExact(slug);
+      jest
+        .spyOn(instance, '_getSessionConfigForSlugExact')
+        .mockImplementation((candidate) =>
+          candidate === slug
+            ? { ...config, sessionModeProfile: { authority: { mode: 'worker_canonical' }, results: { visibility } } }
+            : null,
+        );
+      matchedAnalysis();
+      analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+
+      await instance.analyzeUser();
+      await waitFor(() => expect(instance.state.analysisCard).toMatchObject({ own: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // The card quotes answers only I and the admins may read: it never leaves this window.
+      expect(readSavedAnalysisCard).not.toHaveBeenCalled();
+      expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
+      expect(instance.state.analysisCardPublish).toBeNull();
+    },
+  );
+
   it("makes no card where the page's own session turned it off, though the AI answers from another", async () => {
     const own = '0x00000000000000000000000000000000000000c3';
     const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: 'active-slug' });

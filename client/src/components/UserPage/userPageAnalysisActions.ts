@@ -1,4 +1,4 @@
-import { analysisCardOn } from '@ce-shared/analysisCardSaved.mjs';
+import { analysisCardAnswersArePrivate, analysisCardOn } from '@ce-shared/analysisCardSaved.mjs';
 
 import type UserPage from './UserPage';
 import { analyzeUserCard, analyzeUserOpinions, fetchAnalysisCardPicture } from 'utilities/ai/aiClient.js';
@@ -352,7 +352,11 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
         return null;
       }
     };
-    const savedRead = isPageSession(this, aiOptions) ? readSavedAnalysisCard(addressLower, aiOptions) : null;
+    // Where the session keeps each person's answers to them and its admins, my card is made for me alone: it
+    // quotes those answers, so it is not saved on my page and no box offers to (the Worker refuses it too).
+    const keptToMe = ownProfile && analysisCardAnswersArePrivate(this._getSessionConfigForSlugExact(pageSlug));
+    const savedRead =
+      isPageSession(this, aiOptions) && !keptToMe ? readSavedAnalysisCard(addressLower, aiOptions) : null;
     void Promise.resolve(savedRead).then(async (saved) => {
       if (!isCurrent()) return;
       if (!ownProfile && saved?.status === 'ready') {

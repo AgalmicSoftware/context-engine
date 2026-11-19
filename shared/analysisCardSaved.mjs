@@ -99,3 +99,19 @@ export const ANALYSIS_CARD_FEATURE = 'analysis_card_v1';
  * counting, reading or storing anything, and the page neither makes nor shows a card.
  */
 export const analysisCardOn = (config) => config?.analysisCardEnabled !== false;
+
+/**
+ * Whether the session keeps each person's answers to that person and its admins (results shown as totals only,
+ * or to admins only). A card is made from a person's answers and quotes them, so none is saved on a page there:
+ * the Worker refuses the save and the page does not offer it.
+ */
+export const analysisCardAnswersArePrivate = (config) => {
+  const profile = config?.sessionModeProfile;
+  const visibility = profile?.results?.visibility;
+  return (
+    profile?.authority?.mode === 'worker_canonical' &&
+    !!visibility &&
+    visibility !== 'public_full_if_storage_public' &&
+    visibility !== 'session_member_full'
+  );
+};

@@ -135,7 +135,9 @@ describe('UserPageAnalysisModal', () => {
     );
     const box = screen.getByRole('checkbox', { name: 'Show this card on my page' }) as HTMLInputElement;
     expect(box.checked).toBe(true);
-    expect(screen.getByRole('tooltip').textContent).toMatch(/three of your public answers/);
+    expect(screen.getByRole('tooltip').textContent).toMatch(
+      /read your answers sees this card on your page, with up to three of those answers/,
+    );
     fireEvent.click(box);
     expect(onAnalysisCardShownChange).toHaveBeenCalledWith(false);
 
