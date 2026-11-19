@@ -14,7 +14,7 @@ import { validAgentHttpConfig } from '../../shared/agentHttpConfig.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
 import { normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { stableCanonicalSerialize } from '../shared/deployHelperCore.mjs';
-import { isRealtimeInterviewModel, normalizeRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
+import { isRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
 import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
@@ -308,9 +308,11 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   const migrateStoredModel = typeof storedModel === 'string' &&
     /^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(storedModel) && !isRealtimeInterviewModel(storedModel);
   if (migrateStoredModel) {
-    // Old writes allowed these aliases; their runtime already uses the current
-    // fallback. Migrate that stored value without accepting new invalid models.
-    existing = { ...existing, interviewMode: { ...existing.interviewMode, realtimeModel: normalizeRealtimeInterviewModel(storedModel) } };
+    // Old writes allowed these aliases; their runtime already uses the Worker's
+    // default. Drop the stored value, never write the default: older Workers
+    // refuse every save while a model they don't take (gpt-live-1.1) is stored.
+    const { realtimeModel: _legacyModel, ...interviewMode } = existing.interviewMode;
+    existing = { ...existing, interviewMode };
   }
   const kind = toTrimmedString(mutation?.kind);
   let incomingConfig;
@@ -327,7 +329,8 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       return { ok: false, status: 400, error: 'Invalid session identity.' };
     }
     if (migrateStoredModel && incomingConfig?.interviewMode?.realtimeModel === storedModel) {
-      incomingConfig = { ...incomingConfig, interviewMode: { ...incomingConfig.interviewMode, realtimeModel: existing.interviewMode.realtimeModel } };
+      const { realtimeModel: _legacyModel, ...interviewMode } = incomingConfig.interviewMode;
+      incomingConfig = { ...incomingConfig, interviewMode };
     }
     if (hasOwn(incomingConfig, AUTHORIZATION_EPOCH_KEY)) {
       return { ok: false, status: 400, error: 'Authorization epoch is server-managed.' };

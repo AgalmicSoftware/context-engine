@@ -903,7 +903,7 @@ test('accepts gpt-live-1, gpt-live-1.1 and documented legacy models while reject
   }
 });
 
-test('unrelated mutations migrate only previously accepted stored realtime models', () => {
+test('unrelated mutations drop only previously accepted stored realtime aliases', () => {
   for (const legacyModel of ['gpt-realtime', 'gpt-realtime-preview', 'GPT-REALTIME']) {
     const existingConfig = { ...cloneJson(baseConfig), interviewMode: { enabled: true, realtimeModel: legacyModel } };
     for (const mutation of [
@@ -916,9 +916,8 @@ test('unrelated mutations migrate only previously accepted stored realtime model
       const result = applySessionConfigMutation({ existingConfig, mutation, slug: 'session-a' });
       assert.equal(result.ok, true, JSON.stringify({ legacyModel, mutation, result }));
       assert.equal(resolveRealtimeInterviewModel(result.config), 'gpt-live-1.1');
-      if (mutation.incomingConfig?.interviewMode?.enabled !== false) {
-        assert.equal(result.config.interviewMode.realtimeModel, 'gpt-live-1.1');
-      }
+      // Dropped, never written as the default: older Workers refuse gpt-live-1.1.
+      assert.equal(Object.hasOwn(result.config.interviewMode || {}, 'realtimeModel'), false);
       assert.equal(existingConfig.interviewMode.realtimeModel, legacyModel);
     }
     const replacement = applySessionConfigMutation({ existingConfig, slug: 'session-a',
