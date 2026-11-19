@@ -1,5 +1,6 @@
 import { Input } from 'reactstrap';
 
+import { CONTEXT_CARDS_HELP } from '../setup/ContextSourcesPanel';
 import { SetupCheck, SetupField, setupHelpId } from '../setup/SetupPrimitives';
 import { asRecord, text, type SetupDraft } from '../setup/setupSectionTypes';
 import styles from '../setup/SessionSetup.module.scss';
@@ -164,7 +165,7 @@ export const SettingsContextCardsField = ({ draft, onChange }: FieldsProps) => (
   <SetupCheck
     id="ce-settings-context-cards"
     label="Context cards"
-    help="The session’s AI writes a short card for each file or link added: a summary, topic tags and key names. Cards show as tags in the list, and tell the AI and agents what a source covers when there is no room to read it. Images can be added too, and whoever adds a PDF or image can have the AI read it once. Each card and each reading uses the session’s AI key."
+    help={CONTEXT_CARDS_HELP}
     checked={draft.contextCardsEnabled === true}
     testId="ce-settings-context-cards"
     onChange={(checked) => onChange(['contextCardsEnabled'], checked)}

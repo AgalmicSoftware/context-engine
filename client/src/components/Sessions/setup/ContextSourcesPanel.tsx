@@ -37,6 +37,9 @@ export const CONTEXT_PRIVACY_HELP =
   'Only session admins can open it, and the session’s AI uses it only when it works for an admin. Everyone else never receives it.';
 export const FILE_ACCESS_HELP =
   'A file locked to groups is for their members and the session’s admins; an admins-only file is for admins. The session’s AI uses a file only when it works for someone who may read it.';
+/** What the Context cards setting does and costs, on the setup page and in Settings. */
+export const CONTEXT_CARDS_HELP =
+  'The session’s AI writes a short card for each file or link added: a summary, topic tags and key names. Cards show as tags in the list, and tell the AI and agents what a source covers when there is no room to read it. Images can be added too, and whoever adds a PDF or image can have the AI read it once. Each card and each reading uses the session’s AI key.';
 export const CONTEXT_ANALYZE_HELP =
   'Sends the PDF or image to the session’s own AI provider with the session’s key. The text it returns is saved with the file. Unticked, the file is kept but gives the AI no text.';
 const LINK_HELP =

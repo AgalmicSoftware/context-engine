@@ -88,7 +88,8 @@ describe('setup context files', () => {
       target: { files: [new File(['x'], 'clip.mp4', { type: 'video/mp4' })] },
     });
     expect(screen.getByText('Add a PDF, or a Markdown, plain text, CSV or JSON file.')).toBeInTheDocument();
-    // A new session starts with cards off, so setup takes no image.
+    // A new session has cards off unless they are turned on here, so setup takes no image yet.
+    expect(screen.getByTestId('ce-setup-context-cards')).not.toBeChecked();
     expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).not.toMatch(/image|\.png/);
     fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), {
       target: { files: [new File(['png'], 'chart.png', { type: 'image/png' })] },
@@ -102,6 +103,22 @@ describe('setup context files', () => {
     ]);
     fireEvent.click(screen.getByRole('button', { name: 'Remove brief.pdf' }));
     expect(latest.contextFiles).toEqual([{ name: 'deck.pdf', adminsOnly: true }]);
+  });
+
+  it('takes images once Context cards are turned on for the new session', () => {
+    render(<Harness initial={{}} />);
+    fireEvent.click(screen.getByTestId('ce-setup-context-cards'));
+    expect(latest.contextCardsEnabled).toBe(true);
+    expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).toMatch(/image\/png/);
+    fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), {
+      target: { files: [new File(['png'], 'chart.png', { type: 'image/png' })] },
+    });
+    expect(latest.contextFiles).toEqual([{ name: 'chart.png', adminsOnly: false }]);
+    // An image is read by the session's AI, as a PDF is.
+    expect(screen.getByLabelText('Analyze with the session’s AI')).toBeChecked();
+    fireEvent.click(screen.getByTestId('ce-setup-context-cards'));
+    expect(latest.contextCardsEnabled).toBe(false);
+    expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).not.toMatch(/image/);
   });
 
   it('after Create, adds the files, reads the PDFs asked for and the links, once', async () => {

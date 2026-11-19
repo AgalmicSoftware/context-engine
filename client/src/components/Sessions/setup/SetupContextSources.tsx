@@ -15,7 +15,7 @@ import {
   type ContextFileAccess,
 } from '../../../utilities/docLibrary/contextSources';
 import ContextAccessPicker from './ContextAccessPicker';
-import { CONTEXT_ANALYZE_HELP, FILE_ACCESS_HELP } from './ContextSourcesPanel';
+import { CONTEXT_ANALYZE_HELP, CONTEXT_CARDS_HELP, FILE_ACCESS_HELP } from './ContextSourcesPanel';
 import { SetupCheck, SetupField, setupHelpId } from './SetupPrimitives';
 import { asList, asRecord, text, type SetupDraft } from './setupSectionTypes';
 import styles from './SessionSetup.module.scss';
@@ -65,9 +65,9 @@ export type SetupGroupOption = { groupId: string; label: string };
 const FILE_VISIBILITY_HELP = `${FILE_ACCESS_HELP} Groups set up under Access and identity are made at Create, before these files are added.`;
 
 const MB = 1024 * 1024;
-const ADD_FILE_HELP = `A PDF up to ${CONTEXT_SOURCE_LIMITS.pdfBytes / MB} MB, or Markdown, text, CSV or JSON up to ${CONTEXT_SOURCE_LIMITS.textFileBytes / MB} MB. It is added to the session after Create, for the people you choose in its Visible to. Images can be added once Context cards are on in the session’s settings.`;
-// A new session starts with Context cards off, so it takes no images yet.
-const NO_IMAGES = { images: false };
+// Images are taken where the session will have Context cards on.
+const addFileHelp = (cards: boolean) =>
+  `A PDF up to ${CONTEXT_SOURCE_LIMITS.pdfBytes / MB} MB, ${cards ? `a PNG, JPEG or WebP image up to ${CONTEXT_SOURCE_LIMITS.imageBytes / MB} MB, ` : ''}or Markdown, text, CSV or JSON up to ${CONTEXT_SOURCE_LIMITS.textFileBytes / MB} MB. It is added to the session after Create, for the people you choose in its Visible to.${cards ? '' : ' Images can be added with Context cards on.'}`;
 const ATTACH_AGAIN_HELP =
   'The page holds chosen files only until it reloads. Choose this file again so Create can add it.';
 
@@ -103,12 +103,14 @@ type FilesProps = {
 // or a reload) asks for the file again.
 export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: FilesProps) => {
   const entries = readContextFiles(draft);
+  // As the session will: images only with Context cards on.
+  const cards = draft.contextCardsEnabled === true;
   const named = groups.flatMap(({ groupId, label }) => (label.trim() ? [{ groupId, label: label.trim() }] : []));
   const [problem, setProblem] = useState('');
   const save = (next: ContextFileEntry[]) => onChange(['contextFiles'], next);
   const attach = (file: File | undefined, replacing = '') => {
     if (!file) return;
-    const reason = checkContextFile(file, NO_IMAGES);
+    const reason = checkContextFile(file, { images: cards });
     setProblem(reason);
     if (reason) return;
     if (replacing && replacing !== file.name) pending.set(replacing, null);
@@ -119,6 +121,14 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
   };
   return (
     <div className={styles.listRowBody} data-testid="ce-setup-context-files">
+      <SetupCheck
+        id="ce-setup-context-cards"
+        label="Context cards"
+        help={CONTEXT_CARDS_HELP}
+        checked={cards}
+        testId="ce-setup-context-cards"
+        onChange={(checked) => onChange(['contextCardsEnabled'], checked)}
+      />
       {entries.map((entry, index) => {
         const chosen = pending.files[entry.name];
         return (
@@ -173,12 +183,12 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
           </div>
         );
       })}
-      <SetupField id="ce-setup-context-file" label="Add a file" help={ADD_FILE_HELP}>
+      <SetupField id="ce-setup-context-file" label="Add a file" help={addFileHelp(cards)}>
         <Input
           id="ce-setup-context-file"
           type="file"
           aria-describedby={setupHelpId('ce-setup-context-file')}
-          accept={contextFileAccept(NO_IMAGES)}
+          accept={contextFileAccept({ images: cards })}
           data-testid="ce-setup-context-file-input"
           onChange={(event) => {
             attach((event.target as HTMLInputElement).files?.[0]);

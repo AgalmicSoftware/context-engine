@@ -75,8 +75,9 @@ spend the session's AI key on an item already there; the Worker refuses anyone
 else. Where the session has [cards](#cards) on, whoever added a PDF or image
 may have the AI read it once (see [PDFs and images](#pdfs-and-images)).
 
-- **Setup (`/new`):** the Context section takes paragraphs, links and files
-  other than images, since a new session starts with cards off.
+- **Setup (`/new`):** the Context section takes paragraphs, links and files.
+  Its **Context cards** tick box, off to start, makes the session with
+  [cards](#cards) on; ticked, the file picker there takes images too.
   Files stay in the browser until **Create**; then **Add context to
   the session** uploads them, has the session's AI read the PDFs marked
   **Analyze with the session's AI**, and, unless unticked, reads each link's
@@ -206,7 +207,9 @@ advertise `context_cards_v1`.
 **Cards are off unless an admin turns them on**: **Context cards** in a
 session's Settings, under Context (`contextCardsEnabled`, off when unset; the
 setting is offered only where the Worker keeps cards, and changing it signs no
-one out). While off, no card is made, written, listed or given to an AI, so
+one out). A session can also be made with cards on: the same tick box is in
+the Context section of `/new`, and a session template may carry
+`"contextCardsEnabled": true`. While off, no card is made, written, listed or given to an AI, so
 the session's prompts are exactly those of a session without cards, only
 admins can have a PDF or image read, and the session takes no new images. Cards written while it was on stay stored
 and show again when it is turned back on. A card a person wrote is still
