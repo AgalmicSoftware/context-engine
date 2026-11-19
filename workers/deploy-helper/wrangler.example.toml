@@ -27,8 +27,8 @@ ALLOWED_ORIGINS = "http://localhost:3000"
 
 # Optional default session worker bundle URL when callers omit bundleUrl.
 # Keep both assets on the release selected by client/src/variables/workerReleasePin.json.
-WORKER_BUNDLE_URL = "https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-0744dc384f5195baae787632952d41653887c31d/sessionCorsWorker.bundle.js"
-WORKER_BUNDLE_MANIFEST_URL = "https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-0744dc384f5195baae787632952d41653887c31d/worker-release-manifest.json"
+WORKER_BUNDLE_URL = "https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-eb8bb385712e0a1fc763345629501cc5db78c3d7/sessionCorsWorker.bundle.js"
+WORKER_BUNDLE_MANIFEST_URL = "https://github.com/AgalmicSoftware/context-engine/releases/download/worker-bundles-eb8bb385712e0a1fc763345629501cc5db78c3d7/worker-release-manifest.json"
 
 # Optional compatibility date for session workers deployed by this helper.
 WORKER_COMPATIBILITY_DATE = "2024-09-02"
