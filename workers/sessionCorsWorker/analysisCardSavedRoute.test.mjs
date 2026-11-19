@@ -273,7 +273,7 @@ test('a card goes only where its owner\'s answers go: not saved where answers ar
   const asMember = { ai: true, storage: true };
   const readAs = (kv, address, config, scopes = asMember) =>
     run({ path: ANALYSIS_CARD_PUBLISHED_PATH, body: { account: OWNER }, address, kv, config, scopes });
-  for (const visibility of ['participant_aggregate', 'private_admin']) {
+  for (const visibility of ['participant_aggregate', 'session_member_aggregate', 'private_admin', 'public_redacted_snapshot']) {
     const config = showing(visibility);
     assert.equal(analysisCardAnswersArePrivate(config), true, visibility);
     // No card is saved: the Worker gives each answer there only to its author and the admins.

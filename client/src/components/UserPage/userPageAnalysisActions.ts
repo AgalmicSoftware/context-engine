@@ -167,6 +167,13 @@ const publishCard = async (
       ? 'The card could not be saved to your page. Try again.'
       : 'The card could not be taken off your page. Try again.';
     if (message === 'invalid_card') note = 'This card cannot be saved to your page.';
+    // The session now keeps answers to their author and its admins, which this page had not heard: no card is
+    // saved there, so there is nothing to tick or to try again.
+    if (message === 'analysis_card_answers_private') {
+      publishContexts.delete(page);
+      page.setState(() => (context.isCurrent() ? { analysisCardPublish: null } : null));
+      return;
+    }
     update({ shown: context.stored === 'ready', saving: false, note });
   }
 };
@@ -367,9 +374,10 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
     const keptToMe = ownProfile && analysisCardAnswersArePrivate(this._getSessionConfigForSlugExact(pageSlug));
     // The Worker is asked before anything is paid for. This page's copy of the session may be from before an
     // admin turned the card off, and the card's words are an ordinary AI call the Worker cannot tell from any
-    // other: so when it answers that the card is off, the card is left out, words and picture unasked. The same
-    // request reads the saved card, which counts only in the page's own session.
-    void readSavedAnalysisCard(addressLower, aiOptions).then(async (answer) => {
+    // other: so when it answers that the card is off, the card is left out, words and picture unasked. It is
+    // asked afresh, as what this visit remembers of the saved card may be just as old. The same request reads
+    // the saved card, which counts only in the page's own session.
+    void readSavedAnalysisCard(addressLower, aiOptions, { fresh: true }).then(async (answer) => {
       if (!isCurrent()) return;
       if (answer?.status === 'off') return leaveCardOut();
       const saved = isPageSession(this, aiOptions) ? answer : null;

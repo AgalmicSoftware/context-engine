@@ -537,7 +537,9 @@ describe('UserPage analysis cache and routing', () => {
     await instance.analyzeUser();
     await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
 
-    expect(readSavedAnalysisCard).toHaveBeenCalledWith(addressLower, expect.objectContaining({ sessionSlug: slug }));
+    expect(readSavedAnalysisCard).toHaveBeenCalledWith(addressLower, expect.objectContaining({ sessionSlug: slug }), {
+      fresh: true,
+    });
     expect(instance.state.analysisCard).toMatchObject({
       own: false,
       title: 'Keeps the commons in common hands',
@@ -721,7 +723,7 @@ describe('UserPage analysis cache and routing', () => {
 
   it.each([
     ['its own session', { activeSessionSlug: undefined }],
-    ['another session the AI answers from', { activeSessionSlug: '' }],
+    ['a page with no session of its own', { activeSessionSlug: '' }],
   ])('a page loaded before the card was turned off pays for no card, in %s', async (_where, props) => {
     const own = '0x00000000000000000000000000000000000000e5';
     const { instance } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
@@ -734,7 +736,9 @@ describe('UserPage analysis cache and routing', () => {
     await waitFor(() => expect(instance.state.aiAnalysis).toBe('summary'));
     await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
 
+    // Asked afresh: what the page read when it opened is from before the card was turned off.
     expect(readSavedAnalysisCard).toHaveBeenCalledTimes(1);
+    expect(readSavedAnalysisCard.mock.calls[0][2]).toEqual({ fresh: true });
     // Neither the card's words (an AI call on the session's key) nor its picture is asked for.
     expect(analyzeUserCard).not.toHaveBeenCalled();
     expect(fetchAnalysisCardPicture).not.toHaveBeenCalled();
@@ -920,6 +924,25 @@ describe('UserPage analysis cache and routing', () => {
     expect(unreadable.instance.state.analysisCardPublish).toBeNull();
     unreadable.instance.setAnalysisCardShown(true);
     expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
+  });
+
+  it('on my own page takes the box away when the session now keeps answers private', async () => {
+    // This page's copy of the session is from before its results were made private: the Worker refuses the save.
+    const own = '0x00000000000000000000000000000000000000a7';
+    const { instance } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+    matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'none' });
+    publishSavedAnalysisCard.mockReset().mockRejectedValue(new Error('analysis_card_answers_private'));
+    analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(publishSavedAnalysisCard).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(instance.state.analysisCardPublish).toBeNull());
+
+    // The card stays for me to see; there is nothing left to tick.
+    expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans');
+    instance.setAnalysisCardShown(true);
+    expect(publishSavedAnalysisCard).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the analysis when the card cannot be written, and tries the card again next time', async () => {

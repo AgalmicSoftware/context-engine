@@ -101,11 +101,17 @@ const askWorker = async (
  * Worker, a network failure, no answer in time). A read that fails is asked again the next time. `off` is the
  * Worker saying an admin turned the card off: the page's own copy of the session may be older than that, so the
  * page asks here before it pays for a card. It is asked again the next time too, as the card may be back on.
+ * `fresh` asks the Worker whatever this visit remembers: the remembered answer may itself be from before the
+ * card was turned off. What comes back replaces it, for the page's section too.
  */
-export const readSavedAnalysisCard = (account: string, opts: unknown): Promise<SavedAnalysisCardRead | null> => {
+export const readSavedAnalysisCard = (
+  account: string,
+  opts: unknown,
+  { fresh = false }: { fresh?: boolean } = {},
+): Promise<SavedAnalysisCardRead | null> => {
   const key = keyOf(opts, account);
   const kept = known.get(key);
-  if (kept) return kept;
+  if (kept && !fresh) return kept;
   const read = bounded(
     (signal) => askWorker('/analysis-card/published', { account }, opts, { signal }),
     SAVED_CARD_READ_TIMEOUT_MS,

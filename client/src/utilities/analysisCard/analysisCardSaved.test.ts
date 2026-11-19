@@ -88,6 +88,28 @@ it('says when the session has turned the card off, and asks again next time', as
   await expect(readSavedAnalysisCard(PERSON, opts)).resolves.toEqual({ status: 'none' });
 });
 
+it("asks the Worker again, not the visit's memory, when the page needs a fresh answer", async () => {
+  const opts = options();
+  mockedFetch.mockResolvedValue(reply({ published: null }));
+  // As the page's own section reads the card when the page opens.
+  await expect(readSavedAnalysisCard(PERSON, opts)).resolves.toEqual({ status: 'none' });
+  // An admin turns the card off. The remembered answer does not know.
+  mockedFetch.mockResolvedValue({
+    ok: false,
+    status: 403,
+    json: async () => ({ error: 'analysis_card_off' }),
+  } as unknown as Response);
+  await expect(readSavedAnalysisCard(PERSON, opts)).resolves.toEqual({ status: 'none' });
+  expect(mockedFetch).toHaveBeenCalledTimes(1);
+  // Analyze asks afresh before it pays for a card, and what it learns replaces what was remembered.
+  await expect(readSavedAnalysisCard(PERSON, opts, { fresh: true })).resolves.toEqual({ status: 'off' });
+  expect(mockedFetch).toHaveBeenCalledTimes(2);
+  mockedFetch.mockResolvedValue(reply({ published: false }));
+  await expect(readSavedAnalysisCard(PERSON, opts, { fresh: true })).resolves.toEqual({ status: 'withdrawn' });
+  await expect(readSavedAnalysisCard(PERSON, opts)).resolves.toEqual({ status: 'withdrawn' });
+  expect(mockedFetch).toHaveBeenCalledTimes(3);
+});
+
 it("saves only the card's words, and tells the page at once", async () => {
   const opts = options();
   const shown = normalizeAnalysisCard({ ...CARD, own: true, link: 'contextengine.sh/session/x', account: PERSON });
