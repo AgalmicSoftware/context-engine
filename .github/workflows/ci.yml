@@ -454,7 +454,7 @@ jobs:
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
     # Playwright 1.58.2 supports Ubuntu 24.04; ubuntu-latest can select 26.04.
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -491,15 +491,38 @@ jobs:
           node -e "require('playwright').chromium.launch().then((browser) => browser.close())" \
             || npx playwright install-deps chromium
 
-      # None of WebKit's system libraries are on the runner image, so they are fetched every run.
+      # None of WebKit's system libraries are on the runner image, so apt fetches them every run, and the
+      # package mirror is sometimes very slow. Each part is time-boxed and the install tried twice; if WebKit
+      # still cannot be installed, the leg warns and skips its journeys rather than failing for the mirror.
+      # apt runs as root, so its time box runs as root too: a box run as the runner user cannot stop it.
+      # The binary is called directly so npm writes nothing as root in the runner user's home.
       - name: Install Playwright WebKit
+        id: webkit
         if: ${{ matrix.engine == 'webkit' }}
-        run: npx playwright install --with-deps webkit
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nDPkg::Lock::Timeout "60";\n' \
+            | sudo tee /etc/apt/apt.conf.d/80-ci-webkit >/dev/null || true
+          for try in 1 2; do
+            if sudo env "PATH=$PATH" timeout -k 30s 3m ./node_modules/.bin/playwright install-deps webkit \
+              && timeout -k 10s 2m npx playwright install webkit \
+              && timeout -k 10s 1m node -e "require('playwright').webkit.launch().then((browser) => browser.close())"; then
+              echo "installed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "WebKit install try $try did not finish."
+            sudo timeout -k 10s 1m dpkg --configure -a || true
+          done
+
+      - name: Report WebKit not installed
+        if: ${{ matrix.engine == 'webkit' && steps.webkit.outputs.installed != 'true' }}
+        run: echo "::warning title=WebKit journeys did not run::WebKit could not be installed on this runner; the WebKit journeys did not run."
 
       - name: Build client
+        if: ${{ matrix.engine != 'webkit' || steps.webkit.outputs.installed == 'true' }}
         run: npm --prefix client run build
 
       - name: Run browser journeys
+        if: ${{ matrix.engine != 'webkit' || steps.webkit.outputs.installed == 'true' }}
         env:
           BASE_URL: http://127.0.0.1:4173
           OUTPUT_DIR: /tmp/context-engine-journey-smoke

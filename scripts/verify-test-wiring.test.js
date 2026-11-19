@@ -120,12 +120,49 @@ test('the browser journeys run as their own hosted job, one leg per engine, and 
   // WebKit is the engine of every iPhone browser; each engine is its own leg, so one cannot hide the other.
   assert.match(journeyJob, /fail-fast: false\s+matrix:\s+engine: \[chromium, webkit\]/);
   assert.match(journeyJob, /JOURNEY_ENGINES: \$\{\{ matrix\.engine \}\}/);
-  assert.match(journeyJob, /npx playwright install --with-deps webkit/);
   assert.match(journeyJob, /npm --prefix workers\/sessionCorsWorker ci/);
-  assert.match(journeyJob, /timeout-minutes: 20/);
   assert.match(journeyJob, /curl -fsS "\$BASE_URL" >\/dev\/null\s+npm run ci:gate -- e2e-journey/);
   assert.match(aggregateJob, /needs:[\s\S]*?- e2e-journey\n/);
   assert.match(aggregateJob, /"e2e-journey":"\$\{\{ needs\.e2e-journey\.result \}\}"/);
+
+  // A slow package mirror must not redden the run: each WebKit install try is time-boxed, a try counts only
+  // once WebKit launches, and if both fail the leg warns and skips its journeys. Once WebKit is installed,
+  // the journeys run and fail the run as before.
+  const step = (name) => {
+    const start = journeyJob.indexOf(`- name: ${name}\n`);
+    assert.notEqual(start, -1, `${name} step`);
+    const end = journeyJob.indexOf('- name:', start + 1);
+    return journeyJob.slice(start, end === -1 ? undefined : end);
+  };
+  const install = step('Install Playwright WebKit');
+  assert.match(install, /id: webkit\n/);
+  assert.match(
+    install,
+    /for try in 1 2; do\n\s+if sudo env "PATH=\$PATH" timeout -k \d+s \d+m \.\/node_modules\/\.bin\/playwright install-deps webkit \\\n\s+&& timeout -k \d+s \d+m npx playwright install webkit \\\n\s+&& timeout -k \d+s \d+m node -e "require\('playwright'\)\.webkit\.launch\(\)\.then\(\(browser\) => browser\.close\(\)\)"; then\n\s+echo "installed=true" >> "\$GITHUB_OUTPUT"\n\s+exit 0\n/,
+  );
+  // apt runs as root, so its boxes must run as root: a box run as the runner user cannot stop it. Nothing
+  // after the loop, and nothing in it outside a condition, may fail the step.
+  assert.match(install, /\n\s+sudo timeout -k \d+s \d+m dpkg --configure -a \|\| true\n\s+done\n\s*$/);
+  assert.doesNotMatch(install, /continue-on-error|timeout-minutes|\bexit [1-9]|timeout[^\n]*sudo/);
+  // Both tries at their limits, with kill grace and cleanup, end at least 5 minutes before the job limit:
+  // about 1 minute of setup comes first, and the build and the journeys take about 3.
+  const boxed = [...install.matchAll(/timeout -k (\d+)s (\d+)m /g)];
+  assert.equal(boxed.length, 4);
+  const worstMinutes = 2 * boxed.reduce((sum, [, grace, limit]) => sum + Number(limit) + Number(grace) / 60, 0);
+  const jobMinutes = Number(journeyJob.match(/\n    timeout-minutes: (\d+)\n/)[1]);
+  assert.ok(jobMinutes <= 25, `the journey job may take ${jobMinutes} minutes`);
+  assert.ok(worstMinutes + 5 <= jobMinutes, `two WebKit install tries can take ${worstMinutes} of ${jobMinutes} minutes`);
+  assert.match(
+    step('Report WebKit not installed'),
+    /if: \$\{\{ matrix\.engine == 'webkit' && steps\.webkit\.outputs\.installed != 'true' \}\}\n\s+run: echo "::warning title=WebKit journeys did not run::WebKit could not be installed on this runner; the WebKit journeys did not run\."\n/,
+  );
+  const ranWhenInstalled = "if: ${{ matrix.engine != 'webkit' || steps.webkit.outputs.installed == 'true' }}\n";
+  assert.ok(step('Build client').includes(ranWhenInstalled), 'the build waits for WebKit');
+  const journeys = step('Run browser journeys');
+  assert.ok(journeys.includes(ranWhenInstalled), 'the journeys run once WebKit is installed');
+  assert.doesNotMatch(journeys, /continue-on-error/);
+  assert.match(journeys, /\n\s+npm run ci:gate -- e2e-journey\n/, 'a journey failure fails the leg');
+  assert.match(step('Upload journey diagnostics'), /if: failure\(\)\n/);
 });
 
 test('E2E gate runs publication with isolated Worker dependencies and diagnostics', () => {
