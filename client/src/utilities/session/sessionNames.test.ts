@@ -32,11 +32,11 @@ beforeEach(() => {
   global.fetch = fetchMock as unknown as typeof fetch;
 });
 
-it('keeps the short address beside a name two people share', () => {
+it('shows the short address in brackets after every name', () => {
   expect(sessionNameLabels({ [A]: 'Sam', [B]: 'sam', [C]: 'Ada' })).toEqual({
-    [A]: 'Sam · 0x000…00aa',
-    [B]: 'sam · 0x000…00bb',
-    [C]: 'Ada',
+    [A]: 'Sam (0x000…00aa)',
+    [B]: 'sam (0x000…00bb)',
+    [C]: 'Ada (0x000…00cc)',
   });
 });
 

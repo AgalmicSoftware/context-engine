@@ -149,22 +149,16 @@ export const resolveSessionNamesSource = async (options: SessionNamesOptions): P
   return kept;
 };
 
+/** An address as the site shortens it, with a real ellipsis. */
+export const shortSessionAddress = (address: string): string =>
+  String(getShortenedAddress(address, false)).replace('...', '…');
+
 /**
- * What to show for each named address. Names aren't unique, so a name two people share keeps each one's short
- * address beside it.
+ * What to show for each named address: the name, then the short address in brackets. Names aren't unique and
+ * anyone can pick any name, so the address always stays in sight.
  */
 export const sessionNameLabels = (names: SessionNames): Record<string, string> => {
-  const counts = new Map<string, number>();
-  for (const name of Object.values(names)) {
-    const key = name.toLocaleLowerCase();
-    counts.set(key, (counts.get(key) || 0) + 1);
-  }
   const labels: Record<string, string> = {};
-  for (const [address, name] of Object.entries(names)) {
-    labels[address] =
-      (counts.get(name.toLocaleLowerCase()) || 0) > 1
-        ? `${name} · ${String(getShortenedAddress(address, false)).replace('...', '…')}`
-        : name;
-  }
+  for (const [address, name] of Object.entries(names)) labels[address] = `${name} (${shortSessionAddress(address)})`;
   return labels;
 };
