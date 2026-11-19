@@ -93,6 +93,7 @@ const FIELD_LABELS: Record<string, string> = {
   sessionInfo: 'Session Description',
   sessionModeProfile: 'Session Mode',
   interviewModeEnabled: 'Voice interview modes',
+  contextCardsEnabled: 'Context cards',
   interviewMode: 'Interview settings',
   resultsAnalysis: 'Results analysis',
   'interviewMode.realtimeModel': 'Interview voice model',

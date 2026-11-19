@@ -252,6 +252,7 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   // drafts should start with session-group auto-feature enabled.
   delete draft.autoFeatureSBTsWithFeaturedSbtTags;
   draft.autoFeatureSBTsBySessionSlug = true;
+  draft.contextCardsEnabled = false;
   draft.interviewModeEnabled = true;
   draft.interviewMode = {
     ...normalizeInterviewSettings(draft.interviewMode),

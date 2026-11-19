@@ -55,6 +55,7 @@ export const buildSessionSetupKickoff = ({ setupUrl }: { setupUrl: string }): st
     '"questionsGenPrompt": "the audience, goal and tone, for the AI that drafts more questions later",',
     '"questions": [up to 200 questions, described below],',
     '"groupCreationPolicy": "participants" or "admin_only" (who may create groups),',
+    '"contextCardsEnabled": true (the session\'s AI writes a short card for each file or link added as context, and images can be added; each card uses the session\'s AI key) or false (the default),',
     '"interviewModeEnabled": true (people answer on the web page, in a voice interview, through their own AI, or by recording a group discussion) or false (the web page only),',
     `"interviewMode": {"openingMode": "auto" or "owner", "openingPrompt": "the interviewer's first words, up to 1,200 characters; required when openingMode is owner", "steeringPrompt": "how the voice interviewer should behave, up to 3,000 characters"}`,
     '}',

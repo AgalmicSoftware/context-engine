@@ -30,6 +30,7 @@ const PROMPT_FIELDS = new Set([
   'questionsGenPrompt',
   'questions',
   'groupCreationPolicy',
+  'contextCardsEnabled',
   'interviewModeEnabled',
   'interviewMode',
   'openingMode',

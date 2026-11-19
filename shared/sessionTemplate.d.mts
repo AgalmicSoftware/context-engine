@@ -35,6 +35,8 @@ export type SessionTemplate = {
   sessionContext: { title: string; paragraphs: string[]; links: Array<{ label: string; url: string }> };
   /** Files are listed by name and privacy only, to attach again. */
   contextFiles: Array<{ name: string; adminsOnly?: boolean }>;
+  /** Whether the new session starts with Context cards on; off by default. */
+  contextCardsEnabled: boolean;
   questionsGenPrompt: string;
   /** Added to the session after it is created; at most 200. */
   questions: SessionTemplateQuestion[];

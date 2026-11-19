@@ -93,6 +93,8 @@ const DEFAULTS = Object.freeze({
   appearance: { colorSchemeId: 'context-engine' },
   sessionContext: { title: '', paragraphs: [], links: [], html: '' },
   contextFiles: [],
+  // Off unless a template turns context cards on for the session it sets up.
+  contextCardsEnabled: false,
   questionsGenPrompt: '',
   questions: [],
   defaultTags: '',

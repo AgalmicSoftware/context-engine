@@ -106,6 +106,16 @@ describe('session templates and the setup draft', () => {
     expect(exportDraft(imported)).toEqual(shared);
   });
 
+  it('a template turns Context cards on for the session it sets up, through a reload and an export', () => {
+    const shared = template({ format: SESSION_TEMPLATE_FORMAT, sessionName: 'Salon', contextCardsEnabled: true });
+    const imported = applySessionTemplateToDraft(shared);
+    expect(imported.contextCardsEnabled).toBe(true);
+    expect(exportDraft(reload(imported)).contextCardsEnabled).toBe(true);
+    // A template that doesn't say leaves a draft's cards off, an earlier choice included.
+    const plain = template({ format: SESSION_TEMPLATE_FORMAT, sessionName: 'Plain' });
+    expect(applySessionTemplateToDraft(plain, imported).contextCardsEnabled).toBe(false);
+  });
+
   it('keeps the base profile when the template has none and resets every other portable field', () => {
     const local = realLengthSessionWizardDraft(sessionWizardTemplateProfiles().publicWithAgents);
     const imported = applySessionTemplateToDraft(
