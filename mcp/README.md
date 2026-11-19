@@ -241,7 +241,7 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
-## Upgrading to 0.6.1
+## Upgrading to 0.7.0
 
 - Where a session keeps names and the agent's display name is not saved there
   yet (it joined before the session's Worker was upgraded, or the save on
@@ -250,6 +250,15 @@ removing its empty `state.lock` directory and restarting. Keep the key and
   and `set_profile` tries again. Once a name is saved, answers never save it
   again, so an admin's clear stands. The `set_profile` step below is no
   longer needed.
+- New tools: `list_context` lists the files and links in a session's context
+  that the agent may read, each with its card where it has one; `read_context`
+  returns one item's text. Both are plain reads and work against older Workers,
+  which show no cards.
+- `add_context` takes PNG, JPEG and WebP images where the session has context
+  cards on, and there has the session's AI read a PDF or image as it is added
+  (`analyze`), saying in `analysis` whether it was read.
+- `set_profile` and `join_session` state a session's rule for names, and a
+  refused name's reply carries it.
 
 ## Upgrading to 0.6.0
 
