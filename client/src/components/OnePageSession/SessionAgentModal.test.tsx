@@ -88,7 +88,14 @@ describe('SessionAgentModal', () => {
     speechNeedsSignIn.mockResolvedValue(false);
     mockWhisper.state = {};
   });
-  afterEach(() => {
+  afterEach(async () => {
+    // Unmount, then let what the modal already asked finish, and only then reset the mocks. On a loaded machine
+    // a status read lands after a test's last line: a modal still on the page would then ask a mock that
+    // answers nothing once reset, and a check already under way would make its second call in the next test.
+    cleanup();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     jest.resetAllMocks();
   });
 
