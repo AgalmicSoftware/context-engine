@@ -256,7 +256,7 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
             normalized(entry.payload.questionID || entry.payload.questionId) === entry.questionId) held.set(key, entry);
       }
       return { entries: [...held.values()].sort((a, b) => compareChainOrder(b, a)).slice(0, maxRecords),
-        complete: false, chainOrders, unreadAnswers: state.result?.unreadAnswers || 0 };
+        complete: false, chainOrders, unreadAnswers: state.result?.unreadAnswers || 0, capped: false, overMax: false, scanned: false };
     }
     if (!state || state.scope !== scope || head < state.head || replaced) {
       state = { scope, head: startBlock - 1, mark: null, ranges: [], latest: new Map(), capped: false };
@@ -362,7 +362,10 @@ export const createRegistrySession = async ({ info, config, wallet, fetchImpl = 
       }
     }));
     unreadAnswers += selected.length - next;
-    state.result = { entries, complete, chainOrders, unreadAnswers };
+    // Why a result is incomplete: more answers than maxRecords, more than the
+    // scan's own 10,000 (overMax), or a scan that hasn't reached the start yet.
+    state.result = { entries, complete, chainOrders, unreadAnswers,
+      capped: candidates.length > maxRecords || state.capped, overMax: state.capped, scanned: verified && !state.ranges.length };
     return state.result;
   };
 

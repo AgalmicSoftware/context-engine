@@ -5,6 +5,7 @@ import {
   SESSION_AGENT_LIMITS,
   SESSION_AGENT_RULES,
   buildSessionAgentMessages,
+  sessionAgentContextLimits,
   sessionAgentInstructions,
   sessionAgentMinAnswers,
   sessionAgentOpenToAnyone,
@@ -416,4 +417,88 @@ test('each part is cut to its limit, and no material is said plainly', () => {
   const empty = buildSessionAgentMessages({ style: 'general', question: 'Hi' });
   assert.match(empty.messages[1].content, /^This session has no material you may read/);
   assert.deepEqual(empty.read, { context: 0, results: false, answers: 0 });
+});
+
+test('the questions an answer read are named closest first, at most five, and their ids never reach the prompt', () => {
+  const answers = ['bus', 'bus lanes', 'bus fares and lanes', 'bus stops', 'bus drivers', 'bus depots', 'parks'].map((topic, index) => ({
+    id: `0xid${index}`, question: `What about ${topic}?`, answers: [{ text: 'An answer.' }],
+  }));
+  const detailed = buildSessionAgentMessages({ style: 'detailed', question: 'Fares and lanes for the bus?', material: { answers } });
+  assert.equal(detailed.related.length, SESSION_AGENT_LIMITS.relatedQuestions);
+  assert.deepEqual(detailed.related[0], { id: '0xid2', question: 'What about bus fares and lanes?' });
+  assert.equal(detailed.relatedFrom, 'answers');
+  assert.ok(!detailed.related.some((item) => item.id === '0xid6'), 'a question sharing no topic word is not linked');
+  assert.doesNotMatch(detailed.messages.map((message) => message.content).join('\n'), /0xid/);
+  // An answer group with no id is read and counted as before, and links nothing.
+  const unnamed = buildSessionAgentMessages({ style: 'detailed', question: 'The bus?', material: { answers: answers.map(({ id, ...rest }) => rest) } });
+  assert.deepEqual(unnamed.related, []);
+  assert.equal(unnamed.read.answers, 7);
+  // General answers read no member's answer: the questions the results cite are linked, and only with results read.
+  const resultsQuestions = [{ id: '0xr1', question: 'Should bus lanes stay?' }, { id: '0xr2', question: 'More parks?' }];
+  const general = buildSessionAgentMessages({ style: 'general', question: 'The bus?', material: { answers, results: 'Results text.', resultsQuestions } });
+  assert.deepEqual(general.related, [{ id: '0xr1', question: 'Should bus lanes stay?' }]);
+  assert.equal(general.relatedFrom, 'results');
+  assert.deepEqual(buildSessionAgentMessages({ style: 'general', question: 'The bus?', material: { resultsQuestions } }).related, []);
+});
+
+test('a question reads context whole to its limits, and less on Cloudflare’s model', () => {
+  assert.deepEqual(sessionAgentContextLimits('openai'), { totalChars: 320000, itemChars: 12000, items: 48 });
+  assert.deepEqual(sessionAgentContextLimits(), sessionAgentContextLimits('anthropic'));
+  assert.deepEqual(sessionAgentContextLimits('workers-ai'), { totalChars: 160000, itemChars: 6000, items: 48 });
+  assert.deepEqual(
+    [SESSION_AGENT_LIMITS.contextChars, SESSION_AGENT_LIMITS.contextItemChars, SESSION_AGENT_LIMITS.contextItems],
+    [320000, 12000, 48],
+  );
+  const sources = Array.from({ length: 30 }, (_, index) => ({ title: `page ${index}`, kind: 'file', text: `${index}:`.padEnd(13000, 'w') }));
+  const held = (context) => {
+    const { messages, read } = buildSessionAgentMessages({ style: 'general', question: 'Hi', material: { sources }, ...(context ? { context } : {}) });
+    const block = messages[1].content;
+    return { items: read.context, chars: block.slice(0, block.indexOf('</session_context>')).length, item: block.match(/"0:w+/)[0].length };
+  };
+  // Each page to 12,000 characters, and as many as fit in 320,000.
+  const own = held();
+  assert.ok(own.items >= 26 && own.items < 30 && own.chars <= 320000, JSON.stringify(own));
+  assert.ok(own.item > 11990 && own.item <= 12001, String(own.item));
+  // Text outside Latin scripts takes more tokens a character, so fewer characters of it are read:
+  // a quarter as many of Chinese, half as many of Cyrillic, and a mix in between.
+  const blockOf = (letter) => {
+    const pages = Array.from({ length: 40 }, (_, index) => ({ title: `p${index}`, kind: 'file', text: letter.repeat(12000) }));
+    const { messages } = buildSessionAgentMessages({ style: 'general', question: 'Hi', material: { sources: pages } });
+    return messages[1].content.slice(0, messages[1].content.indexOf('</session_context>')).length;
+  };
+  const [latin, cyrillic, chinese] = ['w', 'ж', '議'].map(blockOf);
+  assert.ok(latin > 300000 && latin <= 320000, String(latin));
+  assert.ok(cyrillic > 145000 && cyrillic <= 160000, String(cyrillic));
+  assert.ok(chinese > 68000 && chinese <= 80000, String(chinese));
+  // Cloudflare's model: each to 6,000, up to 160,000.
+  const cloudflare = held(sessionAgentContextLimits('workers-ai'));
+  assert.ok(cloudflare.items >= 26 && cloudflare.items < 30 && cloudflare.chars <= 160000, JSON.stringify(cloudflare));
+  assert.ok(cloudflare.item > 5990 && cloudflare.item <= 6001, String(cloudflare.item));
+});
+
+test('without members’ answers the agent is told the counts are on the Results page, not that there are none', () => {
+  const material = { results: 'Two themes.', answers: [{ question: 'Shorter meetings?', answers: [{ choices: ['Agree'] }, { choices: ['Agree'] }] }] };
+  const NOT_GIVEN = /It is a summary in words\. How many members gave each answer is on the session’s Results page; you are not given those counts here, beyond any figure the summary itself states\. Asked for other numbers, say that you are not given them and that the Results page shows them, never that there are none\./;
+  const promptOf = (style, given = material) => buildSessionAgentMessages({ style, question: 'How many agreed?', material: given }).messages[1].content;
+  // General answers read no member's answer, so they hold no counts.
+  assert.match(promptOf('general'), NOT_GIVEN);
+  // Detailed answers are given the counts, and are told nothing of the kind.
+  assert.doesNotMatch(promptOf('detailed'), NOT_GIVEN);
+  assert.match(promptOf('detailed'), /"counts":\{"Agree":2\}/);
+  // Detailed with no answers to read is as General is; and with no results to read, nothing is said about them.
+  assert.match(promptOf('detailed', { results: 'Two themes.', answers: [] }), NOT_GIVEN);
+  assert.doesNotMatch(promptOf('general', { answers: material.answers }), /Results page/);
+  // The sentence stays outside the tags: the results themselves are unchanged.
+  assert.match(promptOf('general'), /<session_results>\n"Two themes\."\n<\/session_results>/);
+});
+
+test('the agent is told whether the session records its chats, so it can say when asked', () => {
+  const systemOf = (setting) => buildSessionAgentMessages({ setting, style: 'general', question: 'Is this recorded?' }).messages[0].content;
+  const off = systemOf({ audiences: [audience(everyone)] });
+  assert.match(off, /About this chat: this session does not record chats with you, so this question and your answer are not stored in its records\. Say so if asked\.$/);
+  const on = systemOf({ audiences: [audience(everyone)], history: true });
+  assert.match(on, /About this chat: this session stores a chat with you in its records, for its organisers, unless the asker turns that off for a chat\. Whether this one is stored is shown to the asker beside your answer; say so if asked\.$/);
+  // It comes after the rules, which no setting moves or removes.
+  for (const system of [off, on]) assert.ok(system.indexOf('These rules always apply') < system.indexOf('About this chat:'));
+  assert.match(systemOf(undefined), /does not record chats/);
 });

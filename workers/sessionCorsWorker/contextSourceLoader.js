@@ -11,7 +11,7 @@ import {
 import { buildSessionContextPrompt, SESSION_CONTEXT_TEXT_LIMITS } from '../../shared/sessionContextText.mjs';
 import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
-import { buildIndexPrefix, readContextSourceBytes, readContextSourceRow } from './storageRouteExecution.js';
+import { buildIndexPrefix, prefetchKvPayloads, readContextSourceBytes, readContextSourceRow } from './storageRouteExecution.js';
 import { StorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 
 // How much one AI prompt's reading list may cost: rows looked at (chosen from
@@ -21,6 +21,11 @@ import { StorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 // source can be a 1 MB read and a decryption, and the block holds far less.
 export const CONTEXT_READ_LIMITS = Object.freeze({ rows: 300, listPages: 40, metadataBytes: 1024 * 1024, sources: 16 });
 const MAX_READ_BYTES = 1024 * 1024;
+// The next sources' stored bytes are read ahead in one KV bulk get: this many
+// at most, so little is read in vain when the block fills early, and of this
+// many stored bytes together, which keeps the reply well under KV's 25 MB.
+const PREFETCH_SOURCES = 16;
+const PREFETCH_BYTES = 8 * 1024 * 1024;
 const LIST_PAGE = 1000;
 const BULK_GET = 100;
 const decoder = new TextDecoder();
@@ -126,7 +131,8 @@ export const contextReadingOrder = (rows) => {
  * The context sources every participant may read, as texts for the shared
  * prompt block: link snapshots, text files, and the AI's reading of each PDF
  * (an unread PDF gives no text), in contextReadingOrder, until they fill
- * `totalChars`. The Worker's own AI features act for participants, so
+ * `totalChars`, each counted to `itemChars`, the most of it the caller's
+ * block takes. The Worker's own AI features act for participants, so
  * admins-only items never reach them. `readable(row)` narrows or widens that
  * to one person's access; `principal` names who the read is for in the
  * envelope audit; files added by `leaveOutUploaders` (lower-case addresses)
@@ -142,7 +148,7 @@ export const contextReadingOrder = (rows) => {
  */
 export const loadParticipantContextSources = async ({
   env, slug, config, deps, readable, principal, leaveOutUploaders, totalChars = SESSION_CONTEXT_TEXT_LIMITS.totalChars,
-  maxSources = CONTEXT_READ_LIMITS.sources,
+  maxSources = CONTEXT_READ_LIMITS.sources, itemChars = SESSION_CONTEXT_TEXT_LIMITS.itemChars,
 } = {}) => {
   const warn = typeof deps?.log?.warn === 'function' ? deps.log.warn : console.warn;
   let listed = { rows: [], leftOut: 0, stopped: [] };
@@ -178,6 +184,41 @@ export const loadParticipantContextSources = async ({
   let leftOut = listed.leftOut;
   let unreadable = 0;
   let failed = 0;
+  // Reads the next few sources' bytes in one storage round trip in place of
+  // one each. Only rows this reader may read reach here, and each read below
+  // still checks its own size and takes its bytes from the Map. A row too
+  // large to read is left to its own read, which refuses it. So is a PDF
+  // whose reading isn't listed beside it (found through the PDF's row, one
+  // read more), and every row when the bulk get is refused.
+  let prefetched = new Map();
+  let prefetchedTo = 0;
+  const prefetchFrom = async (start) => {
+    const ids = [];
+    let bytes = 0;
+    let next = start;
+    // Each row that will be a source takes a place, read ahead or not, and
+    // the window ends where the block would be full: a row's stored size is
+    // at least its text's length, so no more is read ahead than may be used.
+    let places = Math.min(PREFETCH_SOURCES, maxSources - sources.length);
+    let room = totalChars - chars;
+    for (; next < ordered.length && places > 0 && room > 0; next += 1) {
+      const isPdf = ordered[next].contentType === CONTEXT_FILE_TYPES.pdf;
+      const textRow = isPdf ? readings.get(ordered[next].id) : ordered[next];
+      const size = Number(textRow?.size);
+      if (!textRow?.id || !(size <= MAX_READ_BYTES)) {
+        // A PDF that names its reading is read on its own and still becomes a source.
+        if (isPdf && ordered[next].contextReadingId) places -= 1;
+        continue;
+      }
+      if (bytes + size > PREFETCH_BYTES) break;
+      ids.push(textRow.id);
+      bytes += size;
+      places -= 1;
+      room -= Math.min(size, itemChars);
+    }
+    prefetchedTo = Math.max(next, start + 1);
+    prefetched = (ids.length > 1 && await prefetchKvPayloads({ env, slug, ids })) || new Map();
+  };
   for (const [position, row] of ordered.entries()) {
     if (sources.length >= maxSources || chars >= totalChars) {
       // A PDF the AI never read has no text to leave out.
@@ -192,7 +233,10 @@ export const loadParticipantContextSources = async ({
     try {
       const textRow = isPdf ? await readingOf(row) : row;
       if (!textRow) continue;
-      bytes = await readContextSourceBytes({ env, config, slug, metadata: textRow, maxBytes: MAX_READ_BYTES, principal, strict: true, deps });
+      if (position >= prefetchedTo) await prefetchFrom(position);
+      bytes = await readContextSourceBytes({
+        env, config, slug, metadata: textRow, maxBytes: MAX_READ_BYTES, principal, strict: true, deps, prefetched,
+      });
     } catch (error) {
       if (error instanceof StorageReadLimitError) unreadable += 1;
       else failed += 1;
@@ -215,11 +259,14 @@ export const loadParticipantContextSources = async ({
         continue;
       }
     }
+    // No caller's block takes more of a text than `itemChars`, so no more is kept: one character
+    // over says it was longer. A session's largest files are then never all held at once.
+    text = text.trim().slice(0, itemChars + 1);
     sources.push({
       title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isPdf,
       everyone: forEveryone(row, config), groupIds: groupLockedIds(row.accessConditions) || [], uploader: lower(row.uploader),
     });
-    chars += Math.min(text.trim().length, SESSION_CONTEXT_TEXT_LIMITS.itemChars);
+    chars += Math.min(text.length, itemChars);
   }
   return {
     sources, leftOut, withheld: mine.length - ordered.length, unreadable, failed,

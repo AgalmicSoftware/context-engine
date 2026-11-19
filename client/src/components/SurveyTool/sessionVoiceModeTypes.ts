@@ -61,6 +61,8 @@ export type SessionVoiceModeModalProps = SessionInterviewPanelBaseProps & {
   isOpen: boolean;
   onInterviewProgressChange?: (inProgress: boolean) => void;
   mode: SessionVoiceMode | null;
+  /** Counts the page's fresh opens, so one that lands straight on the interview starts a new one, as choosing it does. */
+  openCount?: number;
   /** null goes back to the two choices. */
   onSelectMode: (mode: SessionVoiceMode | null) => void;
   questionPool?: unknown[];

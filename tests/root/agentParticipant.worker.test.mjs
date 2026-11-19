@@ -1622,12 +1622,20 @@ test('a chat is stored through the real Worker only when its asker says so, with
   const stored = async () => (await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/all' })).body.entries;
   const first = await alice.participant.askSessionAgent({ question: '  Asked through the MCP?  ' });
   assert.deepEqual([first.answer, first.answers, first.recording, first.stored], ['Most agree.', 'general', true, true]);
+  // And in a sentence, for an agent that passes the answer on to a person.
+  assert.equal(first.chat, 'This question and its answer were stored for the session’s organisers, who may export them, without your address.');
   assert.deepEqual((({ question, by, name }) => ({ question, by, name }))((await stored()).at(-1)), { question: 'Asked through the MCP?', by: undefined, name: undefined });
-  await alice.participant.askSessionAgent({ question: 'With my address?', attribution: 'address', name: ' Alice’s agent ' });
+  const named = await alice.participant.askSessionAgent({ question: 'With my address?', attribution: 'address', name: ' Alice’s agent ' });
+  assert.equal(named.chat, 'This question and its answer were stored for the session’s organisers, who may export them, with your address.');
   assert.deepEqual((({ by, name }) => ({ by, name }))((await stored()).at(-1)), { by: alice.wallet.address.toLowerCase(), name: 'Alice’s agent' });
   const kept = (await stored()).length;
   const unkept = await alice.participant.askSessionAgent({ question: 'Kept out?', store: false });
   assert.deepEqual([unkept.recording, unkept.stored, (await stored()).length], [true, false, kept]);
+  assert.equal(unkept.chat, 'This question and its answer were not stored, as you asked.');
+  // A question the Worker won't keep is answered, and the sentence points at the reason.
+  const refusedToKeep = await alice.participant.askSessionAgent({ question: `What about 0x${'9'.repeat(40)}?` });
+  assert.deepEqual([refusedToKeep.stored, refusedToKeep.chat], [false, 'This question and its answer were not stored; note says why.']);
+  assert.match(refusedToKeep.note, /wasn’t stored/);
   for (const [bad, error] of [
     [{ question: ' ' }, /Ask a question/], [{ question: 'x'.repeat(501) }, /at most 500 characters/], [{ question: 'Q?', store: 'yes' }, /store must be true or false/],
     [{ question: 'Q?', attribution: 'name' }, /attribution must be address or anonymous/], [{ question: 'Q?', name: 'x'.repeat(61) }, /at most 60 characters/],
@@ -1653,7 +1661,28 @@ test('the MCP says a session’s agent stores nothing where recording is off, an
   // Even asked to store, nothing is: the session keeps no chats.
   const reply = await alice.participant.askSessionAgent({ question: 'Kept?', store: true, attribution: 'address', name: 'Alice' });
   assert.deepEqual([reply.answer, reply.recording, reply.stored], ['Most agree.', false, false]);
+  assert.equal(reply.chat, 'This question and its answer were not stored: this session records no chats.');
   assert.deepEqual((await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/all' })).body.entries, []);
+
+  // The session begins recording before the MCP reads its settings again: the MCP sends nothing about storing,
+  // and the Worker, which now records, keeps nothing and gives no reason. The sentence then points at no note,
+  // and the caller's own word is kept.
+  const sent = [];
+  const sinceTurnedOn = workerFetch(env);
+  const carol = await createAgent(env, 'carol.delve.town', [], async (url, init = {}) => {
+    if (!String(url).endsWith('/session-agent/ask')) return sinceTurnedOn(url, init);
+    sent.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ answer: 'Most agree.', answers: 'general', stored: false }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+  assert.equal((await carol.participant.joinSession({ link: LINK })).sessionAgent.recording, false);
+  const unasked = await carol.participant.askSessionAgent({ question: 'Kept now?' });
+  assert.deepEqual([unasked.recording, unasked.stored, 'note' in unasked], [true, false, false]);
+  assert.equal(unasked.chat, 'This question and its answer were not stored.');
+  const keptOut = await carol.participant.askSessionAgent({ question: 'Kept out?', store: false });
+  assert.equal(keptOut.chat, 'This question and its answer were not stored, as you asked.');
+  assert.deepEqual(sent, [{ question: 'Kept now?' }, { question: 'Kept out?' }]);
 
   // A session with no Session Agent says so, and the tool refuses before any call.
   const plain = createEnv([sessionConfig()]);

@@ -174,7 +174,7 @@ what it left out.
 | Interview opening (Worker) | what every participant may read | 4,000 |
 | Results analysis (Worker) | what every participant may read | 12,000 |
 | Debate atlas and risk matrix builds (Worker) | what every participant may read | 6,000 |
-| Session Agent (Worker) | what its answer style lets the asker read | 8,000 |
+| Session Agent (Worker) | what its answer style lets the asker read | 320,000, each item to 12,000, from up to 48 added items; 160,000 and 6,000 on Cloudflare's model |
 
 The Worker's features act for all participants, so they never use admins-only
 items, items with a narrower access than the session's, or items it cannot

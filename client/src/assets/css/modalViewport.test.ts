@@ -68,7 +68,8 @@ it('centres a modal by its visible-height overlay, not a spacer that counts the 
 
 it("keeps the atlas panel's phone close at the top of the visible screen, clear of the browser's bottom bar", () => {
   const fixedClose = atlasRules.filter(
-    ({ selectors, body }) => /\.modalHeader \.closeIcon$/.test(selectors) && /position:\s*fixed/.test(body),
+    ({ selectors, body }) =>
+      /\.modalHeader \.modalControls \.closeIcon$/.test(selectors) && /position:\s*fixed/.test(body),
   );
   expect(fixedClose.length).toBeGreaterThan(0);
   fixedClose.forEach(({ body }) => {

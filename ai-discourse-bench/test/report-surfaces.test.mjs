@@ -1993,7 +1993,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.debateMap \.primaryControls, \.debateMap \.secondaryControls \{[^}]*min-width: 0/);
   assert.match(html, /class="viewModeSwitch"/);
   assert.doesNotMatch(html, /\.ce-results-mode-pane \.debateMap \.viewModeSwitch \{ border: 1px solid #ddd; border-radius: var\(--ce-radius-4\); background: #fff; \}/);
-  assert.match(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="circles" class="active"/);
+  assert.match(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="circles" class="active">[^<]*<[^]*?<\/svg> Atlas<\/button>/);
   assert.doesNotMatch(html, /data-testid="ce-debate-view-mode"[^>]*aria-pressed=/);
   assert.doesNotMatch(html, /data-testid="ce-debate-view-mode"[^>]*title="Static benchmark report includes/);
   assert.doesNotMatch(html, /data-testid="ce-debate-view-mode" data-ce-view-mode="atlas">/);
@@ -2384,8 +2384,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /function openRiskMatrixModal\(point\)/);
   assert.match(html, /renderRiskCommentGroup\('Opportunities', opportunities, 'opportunity'/);
   assert.match(html, /document\.querySelectorAll\('\[data-ce-risk-matrix-cell\]'\)\.forEach/);
-  assert.match(html, /class="riskMatrixCell cell riskMatrixHeaderCell headerCell activeHeaderCell"/);
-  assert.match(html, /riskMatrixHeaderCell headerCell riskMatrixRowHeader activeHeaderCell/);
+  assert.match(html, /class="riskMatrixCell cell riskMatrixHeaderCell headerCell axisTop activeHeaderCell"/);
+  assert.match(html, /riskMatrixHeaderCell headerCell riskMatrixRowHeader axisLeft activeHeaderCell/);
   assert.match(html, /class="riskMatrixCell cell riskMatrixGridCell gridCell/);
   assert.doesNotMatch(html, /opportunity balance \+/);
   assert.doesNotMatch(html, /risk balance -/);
@@ -2395,7 +2395,20 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /data-testid="ce-risk-matrix-subgrid"/);
   assert.match(html, /class="subgridContainer detailGrid"/);
   assert.match(html, /data-testid="ce-risk-matrix-subcell-/);
-  assert.match(html, /Open a square to read its analysis\./);
+  // The grid's help sits beside its title, with no line of its own.
+  assert.doesNotMatch(html, /Open a square to read/);
+  assert.match(html, /<\/h3>\s*<details class="detailHelp"><summary aria-label="How to read this grid">/);
+  // On a phone the labels stay in view while the grid scrolls.
+  assert.match(html, /class="riskMatrixCell cell riskMatrixCornerCell cornerCell axisTop axisLeft"/);
+  assert.match(html, /class="riskMatrixCell cell riskMatrixHeaderCell headerCell axisTop/);
+  assert.match(html, /riskMatrixRowHeader axisLeft/);
+  assert.match(html, /detailHeading axisTop"/);
+  assert.match(html, /detailHeading axisLeft"/);
+  assert.match(html, /@media \(max-width: 768px\) \{\s*\.riskMatrixEmbedded\.embedded \{ padding-left: 0; padding-right: 0; \}\s*\.riskMatrixEmbedded \.riskMatrixSectionCard\.sectionCard \{ padding-left: 8px; padding-right: 8px; \}\s*\.riskMatrixGridScroll\.gridScroll \{ max-height: 70svh; overflow: auto; scroll-padding: 84px 0 0 130px; \}/);
+  assert.match(html, /\.riskMatrixSectionCard \.axisLeft \{ position: sticky; z-index: 1;/);
+  assert.match(html, /\.axisLeft:focus-visible \{ background: linear-gradient\(rgba\(77, 255, 164, 0\.14\)/);
+  assert.match(html, /\.axisLeft:focus-visible \{ outline: 3px solid #4dffa4; outline-offset: -3px; \}/);
+  assert.match(html, /\.riskMatrixSectionCard \.detailAxis\.axisLeft \{[^}]*align-self: stretch; \}/);
   // The detail grid names its axes, has a key, and says when a square is empty.
   assert.match(html, />Columns: [^<]+<\/div>/);
   assert.match(html, />Rows: [^<]+<\/div>/);

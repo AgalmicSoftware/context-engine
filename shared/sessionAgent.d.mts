@@ -38,8 +38,10 @@ export type SessionAgentMaterial = {
   sessionContext?: unknown;
   sources?: SessionContextPromptSource[];
   results?: string;
-  /** `scale` says what a rating question's numbers mean. */
-  answers?: Array<{ question: string; scale?: string; answers: SessionAgentMemberAnswer[] }>;
+  /** `scale` says what a rating question's numbers mean; `id` links an answer to its question and is never sent. */
+  answers?: Array<{ id?: string; question: string; scale?: string; answers: SessionAgentMemberAnswer[] }>;
+  /** The questions the published results cite, for linking an answer that read them. */
+  resultsQuestions?: Array<{ id: string; question: string }>;
 };
 
 export const SESSION_AGENT_STYLES: readonly SessionAgentStyle[];
@@ -54,9 +56,12 @@ export const SESSION_AGENT_LIMITS: Readonly<{
   answerWords: number;
   answerChars: number;
   contextChars: number;
+  contextItemChars: number;
+  contextItems: number;
   resultsChars: number;
   answersChars: number;
   answerItemChars: number;
+  relatedQuestions: number;
   countedChoices: number;
   choiceChars: number;
   scaleChars: number;
@@ -85,6 +90,12 @@ export function sessionAgentStoresChats(setting: SessionAgentSetting | null | un
 /** The instructions a style is sent: the admin's, or the default. */
 export function sessionAgentInstructions(setting: SessionAgentSetting | null | undefined, style: SessionAgentStyle): string;
 
+/** How much context one question reads: characters in all, per item, and added files and links. */
+export type SessionAgentContextLimits = Readonly<{ totalChars: number; itemChars: number; items: number }>;
+
+/** The limits for the provider that answers; a session on Cloudflare's model reads less. */
+export function sessionAgentContextLimits(provider?: string): SessionAgentContextLimits;
+
 /** The system and user messages for one question, and how much material they carry. */
 export function buildSessionAgentMessages(input: {
   setting?: SessionAgentSetting | null;
@@ -93,9 +104,17 @@ export function buildSessionAgentMessages(input: {
   material?: SessionAgentMaterial;
   /** Orders what members wrote; Math.random unless given. */
   random?: () => number;
+  /** sessionAgentContextLimits for the provider that will answer; the default provider's unless given. */
+  context?: SessionAgentContextLimits;
 }): {
   messages: Array<{ role: 'system' | 'user'; content: string }>;
   read: { context: number; results: boolean; answers: number };
   /** Context items that didn't fit the block. */
   contextOmitted: number;
+  /** Each context item the prompt holds: which link, note or source, by its place in its own list. */
+  contextItems: Array<{ part: 'links' | 'notes' | 'sources'; index: number }>;
+  /** The questions closest to the one asked, closest first. */
+  related: Array<{ id: string; question: string }>;
+  /** Whether `related` are questions whose answers the prompt holds, or ones the published results cite. */
+  relatedFrom: 'answers' | 'results';
 };

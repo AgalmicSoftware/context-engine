@@ -752,7 +752,11 @@ Admin test panel:
   an artifact with no valid requested section fails generation.
 - Worker-canonical analysis scans share a synchronous safety budget: 800 storage
   operations, 10,000 metadata/hidden-marker/committed-response rows, 8 MiB of
-  metadata, and 8 MiB of readable payload data. KV metadata and payloads are
+  metadata, 32 MiB of stored payload bytes (8 MiB when an upload checks its
+  answers), and 8 MiB of the answers a build keeps. A build keeps each answer
+  without its research material (`interviewProvenance`), which no build uses,
+  and reads answers in slices of at most 500 or about 4 MiB, so it never holds
+  all their stored bytes at once (questions are read in one batch). The error names whichever limit was reached. KV metadata and payloads are
   read in bulk gets of up to 100 keys, each one operation, so about 80 people
   answering 30 questions, with some answers changed, read whole in under 100
   operations. R2 has no bulk read, so with R2 bound each payload is one
@@ -767,7 +771,7 @@ Admin test panel:
   processing; they are not a claim about a universal platform request ceiling.
   Past the row limit the error says so in plain words ("AI builds read at most
   10,000 stored question and answer versions at once…"), and the Session Agent's
-  Detailed answers note the same limit; `GET /admin/diagnostics` returns the
+  Detailed answers say which limit left members' answers out; `GET /admin/diagnostics` returns the
   count as `storedVersions`.
   An answer stored with one question and this session's id (not a survey
   bundle, and readable by the Worker) lists that question, the session id and
@@ -882,7 +886,11 @@ Authenticated clients can use the worker as the session storage boundary:
     readable value its question doesn't accept (an option it lacks, a rating
     off its scale or step) is `422` `response_answer_invalid`. Encrypted
     values, blank answers (a comment alone) and locked or encrypted questions
-    aren't checked.
+    aren't checked. A Worker isolate keeps the session's questions it read
+    for 5 seconds, so a Submit's answers share one read. An answer naming a
+    question it lacks reads them again before it's refused, and a question
+    written through that isolate is seen at once. A question edited through
+    another may be checked as it was for up to 5 seconds.
   - In those sessions, each signed-in person may store at most 20 versions of
     one question's answer, the latest included (`422`
     `response_limit_versions`), and at most five times as many answers as the
@@ -1042,10 +1050,13 @@ Authenticated clients can use the worker as the session storage boundary:
   check, so a batch never shows more than single reads would. The reply is
   `{ items }`, one per id in order, each `{ id, status, contentType, text }`
   or `{ id, status, error, reason? }`. Only text and JSON items come back
-  (`415` otherwise). Items are read five at a time; once the batch holds 8 MiB
-  of text the rest answer `413`, to be read one by one. The reply is
+  (`415` otherwise). Where payloads live in KV (no R2 bound), the whole batch
+  is fetched in one KV bulk get; if KV refuses it (over 25 MB), each item is
+  fetched alone. Items are then checked five at a time; once the batch holds
+  8 MiB of text the rest answer `413`, to be read one by one. The session's
+  gate is asked once per request, not per item. The reply is
   `private, no-store` when any item is private.
-- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in bulk KV gets of up to 100 keys, one per page of rows. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Question and survey rows include `metadata.uploader` and `metadata.resourceId` when they were recorded, and `metadata.uploadAuthority` for new uploads. `metadata.uploaderIsAdmin` is derived strictly from `uploadAuthority === "admin"`. Clients use the explicit upload authority stamp for precedence and ignore legacy flags and current public admin configuration. A version of an id that an admin hid is listed only as a marker, `{ "hidden": true, "metadata": { "resource", "resourceId", "hidden": true } }`, with no storage reference, so clients can drop a copy they cached earlier. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
+- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default `100`; at most `500` for `responses` and `100` otherwise, a larger value clamped rather than refused) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Index rows are read in bulk KV gets of up to 100 keys, five at once. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Question and survey rows include `metadata.uploader` and `metadata.resourceId` when they were recorded, and `metadata.uploadAuthority` for new uploads. `metadata.uploaderIsAdmin` is derived strictly from `uploadAuthority === "admin"`. Clients use the explicit upload authority stamp for precedence and ignore legacy flags and current public admin configuration. A version of an id that an admin hid is listed only as a marker, `{ "hidden": true, "metadata": { "resource", "resourceId", "hidden": true } }`, with no storage reference, so clients can drop a copy they cached earlier. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
   - Worker-canonical question and survey authoring writes payloads to this
     session's Cloudflare storage and does not register them in the Surveys
     contract. Fresh clients paginate the `questions` and `surveys` indexes,
@@ -1323,7 +1334,13 @@ hidden rows, plaintext rows, payloads, owner records and hidden markers. Empty
 documents are preserved in both KV and R2, including envelope-encrypted documents. Payload
 headers carry size, SHA-256 and chunk count; 256 KiB chunks span bounded 4 MiB
 pages. Export and import use an 800-operation budget, leaving headroom below
-the 1,000 KV operations per request limit. Wrapped DEKs and stored metadata remain unchanged. Auth nonces, rate
+the 1,000 KV operations per request limit. Export reads each listed page of KV
+values in bulk gets of up to 100 keys. A payload's size is read from its record
+first, so payloads are read in groups no larger than the page has room for; a
+payload whose record is missing or gives no size is read on its own. Without
+R2, a payload is read once. With bulk reads, a 4,000-item session took about
+1,100 KV operations in tests, against about 12,500 before, with the same
+archive. Wrapped DEKs and stored metadata remain unchanged. Auth nonces, rate
 counters, upload retry receipts and transient analysis jobs are not recovery
 data and are excluded. Legacy plaintext session secrets must first be saved
 through the encrypted secret workflow.
@@ -2746,6 +2763,7 @@ token. The body carries `address`, `signature`, `action`, `slug`, `bodyHash`,
 - `POST /admin/lit-chipotle-status`
 - `POST /admin/storage/set-hidden`
 - `POST /admin/feedback/delete` (see [Session feedback](#session-feedback))
+- `POST /admin/names/clear` (see [Names](#names))
 
 `/admin/storage/set-hidden` notes:
 
@@ -2807,7 +2825,7 @@ Never return secrets in responses.
   `appearance`, `sessionHeaderImg`, `contextAdditionPolicy`,
   `resultsAdminAddresses`, every interview setting (`interviewModeEnabled` and
   all of `interviewMode`, which each interview request reads afresh),
-  `sessionAgent`, `groupMemberCeiling` and `feedbackEnabled` (each read afresh
+  `sessionAgent`, `groupMemberCeiling`, `feedbackEnabled` and `namesEnabled` (each read afresh
   where it applies), and the curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
@@ -3489,6 +3507,54 @@ one out.
   that reads answers, files or results lists it, so it never reaches AI Views,
   the atlas, the risk matrix, the Session Agent, the fidelity report, exports
   or backups.
+
+### Names
+
+A person can give themselves a name in a session, shown to its members in
+place of their address (Workers advertising `session_names_v1`). Names are per
+session and per address, kept in the session's coordinator; only sessions a
+Worker runs have them, and `namesEnabled: false` turns them off (on unless
+set; the flag stays advertised, and changing the setting signs no one out).
+
+- `POST /names/set` with the session token takes `{ name }` and sets the
+  token's own address's name; an address in the body is ignored. `""` removes
+  it. It returns `{ name, setAt }` with the name as stored (NFKC, trimmed,
+  inner spaces collapsed), or `{ name: null, setAt: null }` after a removal.
+  - A name is 1 to 32 characters of letters, marks and digits in any script,
+    spaces and `. - _ '`, with nothing drawn as blank (joiners, variation
+    selectors, fillers). A word with Latin letters has no letters of another
+    alphabet, and a word never mixes two of those drawn like Latin (Greek,
+    Cyrillic, Armenian, Cherokee, Lisu, Coptic, Canadian syllabics,
+    Tifinagh). The address, ENS, web-address and role checks drop accents and
+    read such letters, and Latin small capitals, IPA letters and letters
+    with a stroke or hook, each case by
+    its shape, as the Latin ones they resemble. This covers the common
+    look-alikes, not every confusable Unicode lists.
+    Refusals are `400` `{ error, reason }`: `empty`,
+    `too_long`, `agent_mark` (a typed "(agent)": the site marks agents),
+    `characters`, `mixed_scripts` (one word in two alphabets, as above),
+    `address` (`0x` and hex, or 16 hex digits in a row), `ens`
+    (`.eth`), `url_or_email`, `secret`, `role` (admin, administrator,
+    moderator, host, organiser, organizer, official, staff, system, results
+    admin, session agent, group agent, context engine, RadicalxChange, RxC, as
+    whole words). Names are not unique.
+  - A person changes their name at most 10 times in 24 hours (`429`
+    `rate_limited`). Signed out is `401`; names off, or an on-chain session,
+    is `403` `names_off`.
+- `GET /names?slug=<slug>` returns `{ names: { <lowercased address>: name } }`
+  for the whole session in one read, to a reader signed in whom the session's
+  own rule admits, as a read of its questions would. Anyone else, signed out
+  included, gets `200` `{ names: {} }` and sees addresses as before. It is sent
+  `Cache-Control: private, max-age=30` and `Vary: Authorization`.
+- `GET /names/me?slug=<slug>` with the session token returns
+  `{ name, setAt }` (each `null` when unset); signed out is `401`.
+- `POST /admin/names/clear` is a signed admin action whose body adds
+  `member` (the address whose name goes; `address` stays the signing admin's)
+  and returns `{ cleared: true }`. No one can set another person's name.
+- Only the names routes and session backups read the store, so a name never
+  reaches AI prompts, AI Views, the atlas, the risk matrix, the Session Agent,
+  exports or agent results. Backups carry every name; a restore adds them
+  and keeps any name the person has set on the target since.
 
 ## Self-deploy
 

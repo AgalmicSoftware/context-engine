@@ -13,6 +13,7 @@ export const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'interviewModeEnabled',
   'pileAutoAdvanceEnabled',
   'feedbackEnabled',
+  'namesEnabled',
   'interviewMode',
   'defaultTags',
   'defaultGroupTags',

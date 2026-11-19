@@ -5,6 +5,10 @@ import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 
 jest.mock('../../utilities/worker/workerAuth', () => ({ getWorkerSessionToken: jest.fn() }));
+// Session names are read through their own module and tested there; this test counts only the groups' requests.
+jest.mock('../../utilities/session/useSessionNames', () => ({
+  useSessionNames: () => ({ source: null, names: {}, answerNamesShown: true }),
+}));
 const account = '0x00000000000000000000000000000000000000aa';
 const sessionId = '0x11111111111111111111111111111111';
 const sessionConfig = {

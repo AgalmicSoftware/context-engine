@@ -1404,20 +1404,24 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
         align-items: center;
         gap: 12px;
         flex-shrink: 0;
+        // An opaque disc in the window's own colours, ringed in its text colour, so it shows on the window and on
+        // the dimmed page around it, and at least 44px, so a thumb finds it.
         .closeIcon {
-          background: transparent;
-          border: none;
-          font-size: 1.5rem;
-          cursor: pointer;
-          color: $text-muted;
-          transition:
-            transform 0.2s,
-            color 0.2s;
           display: flex;
+          flex: none;
           align-items: center;
+          justify-content: center;
+          width: 44px;
+          height: 44px;
           padding: 0;
+          border: 2px solid currentColor;
+          border-radius: var(--ce-radius-round);
+          background: var(--ce-document-text);
+          color: var(--ce-overlay-text);
+          font-size: 1.25rem;
+          cursor: pointer;
+          transition: transform 0.2s;
           &:hover {
-            color: var(--ce-color-white);
             transform: scale(1.1);
           }
         }
@@ -2909,13 +2913,10 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
           flex-basis: 100%;
         }
       }
-      .modalHeader .closeIcon {
+      .modalHeader .modalControls .closeIcon {
         position: fixed;
         top: calc(env(safe-area-inset-top, 0px) + 10px);
         right: 10px;
-        background: var(--ce-document-text);
-        border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-        color: var(--ce-color-white);
         width: 50px;
         height: 50px;
         border-radius: var(--ce-radius-round);
@@ -3088,10 +3089,14 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       color: var(--ce-document-text-muted);
     }
 
-    .modalHeader .titleSection .linkButton,
-    .modalHeader .modalControls .closeIcon {
+    .modalHeader .titleSection .linkButton {
       color: var(--ce-control-text);
       opacity: 1;
+    }
+
+    .modalHeader .modalControls .closeIcon {
+      background: var(--ce-overlay-surface);
+      color: var(--ce-overlay-text);
     }
 
     .headerVoteSection .netScoreContainer .voteBreakdown,
@@ -3714,6 +3719,27 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
             &:active {
               border-color: var(--ce-border-inset);
               box-shadow: var(--ce-shadow-pressed);
+            }
+          }
+
+          // Close stays as small as Windows 95's, with a thumb's 44px reach from its top right corner, inside the
+          // window. The bar keeps that reach clear of its other buttons, so it never takes their clicks.
+          .modalControls {
+            padding-left: 22px;
+          }
+
+          .closeIcon {
+            position: relative;
+            top: auto;
+            right: auto;
+
+            &::after {
+              content: '';
+              position: absolute;
+              top: -4px;
+              right: -4px;
+              width: 44px;
+              height: 44px;
             }
           }
 

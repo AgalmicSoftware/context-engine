@@ -41,6 +41,7 @@ import { dispatchResultsBuildStore } from './resultsBuildStore.js';
 import { nextResultsJobAt, readResultsJob, runResultsJobs, startResultsJob } from './resultsJobs.js';
 import { RESULTS_JOB_RUNNERS } from './resultsJobRunners.js';
 import { dispatchSessionAgentOptOutStore } from './sessionAgentOptOuts.js';
+import { dispatchSessionNamesStore } from './sessionNames.js';
 import { dispatchSessionAgentHistoryStore } from './sessionAgentHistory.js';
 import { dispatchSessionFeedbackStore } from './sessionFeedback.js';
 import {
@@ -3591,6 +3592,9 @@ export class SessionWriteCoordinator {
     if (resultsJob) return this.executeResultsJob(resultsJob[1], payload || {});
     if (url.pathname.startsWith('/session-config/session-agent/')) {
       return dispatchSessionAgentOptOutStore(this, url.pathname.split('/').pop(), payload || {});
+    }
+    if (url.pathname.startsWith('/session-config/session-names/')) {
+      return dispatchSessionNamesStore(this, url.pathname.split('/').pop(), payload || {});
     }
     if (url.pathname.startsWith('/session-config/session-agent-history/')) {
       return dispatchSessionAgentHistoryStore(this, url.pathname.split('/').pop(), payload || {});

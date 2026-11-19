@@ -507,7 +507,12 @@ describe('RiskMatrix', () => {
     fireEvent.click(screen.getByLabelText('Close'));
     fireEvent.click(screen.getByTestId('ce-risk-matrix-subcell-safety-alignment-vs-capabilities-scaling'));
     expect(screen.getByText('AI note')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-risk-matrix-subgrid')).toHaveTextContent('Open a square to read its notes.');
+    // The grid's help sits beside its title, with no line of its own above the key.
+    const subgrid = screen.getByTestId('ce-risk-matrix-subgrid');
+    expect(subgrid).not.toHaveTextContent('Open a square');
+    const help = within(subgrid).getByRole('button', { name: 'How to read this grid' });
+    expect(help.previousElementSibling).toHaveTextContent(/x/);
+    expect(help.previousElementSibling?.tagName).toBe('H3');
   });
 
   it('labels the detail grid’s axes, key, empty squares and highlights', () => {

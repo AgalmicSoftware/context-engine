@@ -68,7 +68,13 @@ export default function RiskMatrixDetail(props: Props) {
       <button
         key={`${axis}-${sub}`}
         type="button"
-        className={clsx(styles.cell, styles.headerCell, styles.detailHeading, on && styles.activeHeaderCell)}
+        className={clsx(
+          styles.cell,
+          styles.headerCell,
+          styles.detailHeading,
+          axis === 'column' ? styles.axisTop : styles.axisLeft,
+          on && styles.activeHeaderCell,
+        )}
         data-testid={`ce-risk-matrix-subheader-${axis === 'column' ? 'x' : 'y'}-${testIdFragment(sub)}`}
         data-ce-control-appearance="frameless"
         aria-pressed={on}
@@ -91,18 +97,15 @@ export default function RiskMatrixDetail(props: Props) {
         <h3 className={styles.sectionTitle}>
           {rows.name} x {columns.name}
         </h3>
-        <p className={styles.subgridSummary}>
-          {demo ? 'Open a square for its notes and linked atlas scenarios.' : 'Open a square to read its notes.'}{' '}
-          <button
-            type="button"
-            id={helpId}
-            className={styles.detailHelp}
-            aria-label="How to read this grid"
-            onClick={(event) => event.currentTarget.focus()}
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} />
-          </button>
-        </p>
+        <button
+          type="button"
+          id={helpId}
+          className={styles.detailHelp}
+          aria-label="How to read this grid"
+          onClick={(event) => event.currentTarget.focus()}
+        >
+          <FontAwesomeIcon icon={faQuestionCircle} />
+        </button>
         <CETooltip target={helpId} placement="bottom" trigger="hover focus" autohide={false}>
           Each column is a sub-section of {columns.name}; each row, a sub-section of {rows.name}. A square holds the
           notes on where the two meet. Each note is an opportunity or a risk at an intensity from 1 to 10; the number
@@ -146,12 +149,14 @@ export default function RiskMatrixDetail(props: Props) {
         ) : null}
       </div>
 
-      <div className={styles.gridScroll}>
+      <div className={`${styles.gridScroll} ${styles.pinnedScroll}`}>
         <div
           ref={gridRef}
           className={clsx(styles.subgridContainer, styles.detailGrid)}
           style={{
             gridTemplateColumns: `minmax(112px, 0.9fr) repeat(${columns.subcategories.length}, minmax(96px, 1fr))`,
+            // At least its columns' least widths, so a label pinned on a phone travels the whole scroll.
+            minWidth: `max(100%, ${112 + columns.subcategories.length * (96 + 8) + 10}px)`,
           }}
         >
           <div aria-hidden="true" style={{ gridColumn: 1, gridRow: 1 }} />
@@ -161,7 +166,10 @@ export default function RiskMatrixDetail(props: Props) {
           >
             Columns: {columns.name}
           </div>
-          <div className={clsx(styles.detailAxis, styles.detailAxisRows)} style={{ gridColumn: 1, gridRow: 2 }}>
+          <div
+            className={clsx(styles.detailAxis, styles.detailAxisRows, styles.axisTop, styles.axisLeft)}
+            style={{ gridColumn: 1, gridRow: 2 }}
+          >
             Rows: {rows.name}
           </div>
           {columns.subcategories.map((subX) => heading(subX, 'column'))}

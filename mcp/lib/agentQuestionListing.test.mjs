@@ -40,7 +40,10 @@ const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplet
     }
     if (path === '/groups/my-memberships') return Response.json({ memberships: [] });
     if (path === '/groups/join' && onJoin) return onJoin(JSON.parse(init.body));
-    if (path === '/storage/read') return Response.json(payloads.get(url.searchParams.get('id')));
+    if (path === '/storage/read') {
+      const payload = payloads.get(url.searchParams.get('id'));
+      return payload === undefined ? Response.json({ error: 'Not found.' }, { status: 404 }) : Response.json(payload);
+    }
     if (path === '/storage/list' && url.searchParams.get('resource') === 'questions') {
       return Response.json({ items: [...payloads.keys()].map((id, index) => ({
         metadata: { id, resource: 'questions', resourceId: questionId(index), createdAt: new Date(Date.UTC(2026, 0, 1, 0, index)).toISOString() },
@@ -177,7 +180,7 @@ test('the answer value has a JSON-schema type covering every answer type', () =>
   assert.deepEqual(value.anyOf[2].items.anyOf.map((option) => option.type), ['string', 'number']);
 });
 
-test('get_results stops listing answers after 20 seconds and reading them at 40, and says it is partial', async (t) => {
+test('get_results stops listing answers after 20 seconds and says it is partial', async (t) => {
   // Each page of everyone's answers takes 3 seconds, as on a busy Worker.
   let clock = Date.parse('2026-11-13T00:00:00.000Z');
   let pages = 0;
@@ -194,7 +197,89 @@ test('get_results stops listing answers after 20 seconds and reading them at 40,
   const results = await participant.getResults({});
   assert.equal(pages, 7);
   assert.equal(results.partial, true);
+  assert.match(results.next, /^These counts are partial: .*Listing the session’s answers stopped at its 20-second limit after 0 records, so older answers were not counted\. Call get_results again in a minute\.$/);
   assert.equal(results.questions.length, 28);
+});
+
+const PUBLIC_RESULTS_CONFIG = { ...fixture.config, sessionModeProfile: { ...fixture.config.sessionModeProfile, results: { visibility: 'public_full_if_storage_public' } } };
+// Six people agree with the first statement; `missing` of them can't be read.
+const sixAnswers = async (t, { missing = 0 } = {}) => {
+  const limits = [];
+  const answers = Array.from({ length: 6 }, (_, index) => ({ id: `a${index}`, responder: `0x${String(index + 1).repeat(40)}` }));
+  const { participant, payloads } = await setup(t, {
+    config: PUBLIC_RESULTS_CONFIG,
+    everyone: (url) => {
+      limits.push(url.searchParams.get('limit'));
+      return { items: answers.map(({ id, responder }, index) => ({
+        metadata: { id, resource: 'responses', responder, createdAt: new Date(Date.UTC(2026, 1, 1, 0, index)).toISOString() },
+        storageRef: { backend: 'cloudflare', resource: 'responses', id },
+      })), cursor: null, listComplete: true };
+    },
+  });
+  answers.slice(missing).forEach(({ id }) => payloads.set(id, {
+    questionID: questionId(0), type: 'binary', answer: { value: 'Agree' }, sessionSlug: slug, sessionId,
+  }));
+  return { participant, limits };
+};
+
+test('get_results lists 500 answers a page and, when complete, has no next', async (t) => {
+  const { participant, limits } = await sixAnswers(t);
+  const results = await participant.getResults({});
+  assert.deepEqual(limits, ['500']);
+  assert.equal(results.partial, false);
+  assert.equal(results.next, undefined);
+  assert.equal(results.participants, 6);
+  assert.equal(results.questions[0].counts.Agree, 6);
+});
+
+test('a result capped by maxRecords says its counts are not the session’s and how to get them', async (t) => {
+  const { participant } = await sixAnswers(t);
+  const results = await participant.getResults({ maxRecords: 2 });
+  assert.equal(results.partial, true);
+  assert.equal(results.participants, 2);
+  assert.equal(results.next, 'These counts are partial: participants and every count cover only the answers read, so do not report them as the session’s results. Only the newest 2 answer records were counted, because you passed maxRecords 2. Call get_results again without maxRecords for the whole session.');
+});
+
+test('a result past 10,000 answer records says one call reads no more', async (t) => {
+  const items = Array.from({ length: 10_001 }, (_, index) => ({
+    metadata: { id: `r${index}`, resource: 'responses', responder: '0x' + '1'.repeat(40), createdAt: new Date(Date.UTC(2026, 1, 1, 0, 0, index)).toISOString() },
+    storageRef: { backend: 'cloudflare', resource: 'responses', id: `r${index}` },
+  }));
+  // The fixture lists every stored payload as a question, so these answers stay unstored (unread).
+  const { participant } = await setup(t, { config: PUBLIC_RESULTS_CONFIG, everyone: () => ({ items, cursor: null, listComplete: true }) });
+  const results = await participant.getResults({});
+  assert.equal(results.partial, true);
+  assert.match(results.next, /do not report them as the session’s results\. This session has more than 10000 answer records, the most one call reads, so only the newest 10000 were counted\. 10000 answer records could not be read/);
+  const fewer = await participant.getResults({ maxRecords: 500 });
+  assert.match(fewer.next, /because you passed maxRecords 500\. Call get_results again without maxRecords to count the newest 10000, the most one call reads; this session has more\. 500 answer records/);
+});
+
+test('a capped result whose listing also ran out of time says both', async (t) => {
+  let clock = Date.parse('2026-11-13T00:00:00.000Z');
+  let pages = 0;
+  const { participant } = await setup(t, {
+    now: () => clock,
+    config: PUBLIC_RESULTS_CONFIG,
+    everyone: () => {
+      pages += 1;
+      clock += 30_000;
+      return { items: [1, 2, 3].map((n) => ({
+        metadata: { id: `p${pages}-${n}`, resource: 'responses', responder: '0x' + String(n).repeat(40), createdAt: new Date(Date.UTC(2026, 1, 1, 0, pages, n)).toISOString() },
+        storageRef: { backend: 'cloudflare', resource: 'responses', id: `p${pages}-${n}` },
+      })), cursor: `p${pages}`, listComplete: false };
+    },
+  });
+  const results = await participant.getResults({ maxRecords: 2 });
+  assert.equal(pages, 1);
+  assert.match(results.next, /because you passed maxRecords 2\. Call get_results again without maxRecords for the whole session\. Listing the session’s answers stopped at its 20-second limit after 3 records/);
+});
+
+test('a result missing unread answers says how many and to call again', async (t) => {
+  const { participant } = await sixAnswers(t, { missing: 2 });
+  const results = await participant.getResults({});
+  assert.equal(results.partial, true);
+  assert.equal(results.unreadAnswers, 2);
+  assert.match(results.next, /do not report them as the session’s results\. 2 answer records could not be read and were left out\. Call get_results again in a minute to read them\.$/);
 });
 
 test('with the default filter, the paging hint says to answer and call again, not to skip ahead', async (t) => {

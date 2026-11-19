@@ -43,7 +43,11 @@ const memoryKv = () => {
       operation();
       // Cloudflare's bulk get: up to 100 keys as one operation, answered as a Map.
       const one = (name) => { gets.set(name, (gets.get(name) || 0) + 1); return values.get(name) ?? null; };
-      return Array.isArray(key) ? new Map(key.map((name) => [name, one(name)])) : one(key);
+      if (!Array.isArray(key)) return one(key);
+      // As Cloudflare: 1 to 100 keys, at most 25 MB of values in all.
+      if (key.length < 1 || key.length > 100) throw new Error(`KV GET_BULK failed: ${key.length} keys`);
+      if (key.reduce((sum, name) => sum + (values.get(name)?.length || 0), 0) > 25 * 1000 * 1000) throw new Error('KV GET_BULK failed: 413');
+      return new Map(key.map((name) => [name, one(name)]));
     },
     put: async (key, value, options) => {
       operation();
@@ -1316,7 +1320,7 @@ test('cached group snapshots detect mutations during an export page and reclaim 
   let snapshotKey;
   let changed = false;
   source.kv.get = async (key) => {
-    if (!changed && key.startsWith('ce-storage-payload:')) {
+    if (!changed && [key].flat().some((name) => name.startsWith('ce-storage-payload:'))) {
       snapshotStore = [...source.env.__coordinatorInstances.values()].find(({ store }) => [...store.keys()].some((name) => name.startsWith('worker-group-backup-meta:'))).store;
       snapshotKey = [...snapshotStore.keys()].find((name) => name.startsWith('worker-group-backup-meta:'));
       snapshotStore.set('storage-backup-revision', 1);
@@ -1836,14 +1840,14 @@ test('backup and restore retain the authoritative secrets despite stale source a
     incomingSecrets: { openaiKey: 'synthetic-current-key', customRpcKey: '' } });
   assert.equal(edit.ok, true);
   const sourceGet = source.kv.get;
-  source.kv.get = (key) => key.endsWith(':secrets') ? stale : sourceGet(key);
+  source.kv.get = (key) => typeof key === 'string' && key.endsWith(':secrets') ? stale : sourceGet(key);
   const pages = await allPages(source.env);
   assert.deepEqual(await decryptSessionSecretsEnvelope(pages[0].coordinator.secrets, { env: source.env, slug }), { openaiKey: 'synthetic-current-key' });
   const target = fixture();
   target.kv.values.delete(`session:${slug}:config`);
   for (const page of pages) assert.equal((await importPage(target.env, page)).ok, true);
   const targetGet = target.kv.get;
-  target.kv.get = (key) => key.endsWith(':secrets') ? stale : targetGet(key);
+  target.kv.get = (key) => typeof key === 'string' && key.endsWith(':secrets') ? stale : targetGet(key);
   assert.equal((await updateSessionSecretsAfterLitRepair({ env: target.env, slug, expectedAuthority,
     incomingSecrets: { anthropicKey: 'synthetic-other-key' } })).ok, true);
   target.kv.get = targetGet;
@@ -1982,4 +1986,107 @@ for (const recovery of ['status', 'retry']) test(`signed restore ${recovery} rec
   const authority = store.get('session-config-authority');
   store.set('session-config-authority', { ...authority, revision: authority.revision + 1 });
   assert.equal((await call(importer, action, body)).status, 403);
+});
+
+// A backup reads stored values in bulk gets. A payload's size comes from its
+// record, so payloads are read in groups no larger than the page has room for.
+const storeItem = (kv, resource, id, bytes, extra = {}) => {
+  const metadata = { id, resource, responder: admin, storageLayer: 'kv', size: bytes.length, ...extra };
+  kv.values.set(`ce-storage:${slug}:${resource}:${id}`, JSON.stringify(metadata));
+  kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from(bytes).toString('base64url') }));
+};
+const recordGets = (kv) => {
+  const calls = [];
+  const get = kv.get;
+  kv.get = async (key) => { calls.push({ bulk: Array.isArray(key), keys: [key].flat() }); return get(key); };
+  return calls;
+};
+
+test('a backup reads each stored value once, in bulk gets that fit a page, and restores', async () => {
+  const source = fixture();
+  for (let i = 0; i < 250; i += 1) storeItem(source.kv, 'responses', `cf_bulk_${String(i).padStart(3, '0')}`, Buffer.alloc(3_000, 97 + (i % 26)));
+  for (let d = 0; d < 2; d += 1) storeItem(source.kv, 'docsContext', `cf_bulk_doc_${d}`, Buffer.alloc(3 * 1024 * 1024, 120 + d));
+  source.kv.values.set(`ce-storage-owner:${slug}:questions:0xabc`, '{"uploader":"synthetic"}');
+  source.kv.values.set(`ce-storage-hidden:${slug}:questions:0xabc`, '{"hidden":true}');
+  const calls = recordGets(source.kv);
+  const pages = await allPages(source.env);
+  assert.equal(pages.at(-1).manifest.complete, true);
+  const stored = [...source.kv.values.keys()].filter((key) => /^ce-storage(-payload|-owner|-hidden)?:/.test(key));
+  // A record is read twice: for its payload's size, then as itself. A file
+  // larger than a page is read again on each page it continues on, as before.
+  for (const key of stored.filter((name) => !name.includes('cf_bulk_doc_'))) {
+    assert.equal(source.kv.gets.get(key), /^ce-storage:/.test(key) ? 2 : 1, key);
+  }
+  assert.ok(calls.every(({ bulk, keys }) => bulk || !/^ce-storage(-payload|-owner|-hidden)?:/.test(keys[0])), 'no stored value is read on its own');
+  // Never both large files in one read: a group holds what one page can.
+  const docs = (keys) => keys.filter((key) => key.includes('payload') && key.includes('cf_bulk_doc_')).length;
+  assert.ok(calls.every(({ keys }) => docs(keys) <= 1));
+  assert.ok(Math.max(...source.kv.requests) <= 40, `KV operations per page: ${Math.max(...source.kv.requests)}`);
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  let result;
+  for (const page of pages) assert.equal((result = await importPage(target.env, page)).ok, true);
+  assert.equal(result.body.complete, true);
+  for (const key of stored) {
+    const want = source.kv.values.get(key);
+    const got = target.kv.values.get(key);
+    if (key.includes('payload')) assert.equal(JSON.parse(got).payloadBase64url, JSON.parse(want).payloadBase64url, key);
+    else assert.equal(got, want, key);
+  }
+});
+
+test('a payload with no record, a misfiled record, or an understated size is still backed up whole', async () => {
+  const source = fixture();
+  storeItem(source.kv, 'responses', 'cf_understated', Buffer.alloc(200_000, 98), { size: 10 });
+  storeItem(source.kv, 'responses', 'cf_misfiled', Buffer.from('misfiled'));
+  source.kv.values.set(`ce-storage:${slug}:responses:cf_misfiled`, JSON.stringify({ id: 'cf_other', resource: 'responses', size: 1 }));
+  source.kv.values.set(`ce-storage-payload:${slug}:cf_orphan`, JSON.stringify({ metadata: { id: 'cf_orphan' }, payloadBase64url: Buffer.from('orphan').toString('base64url') }));
+  const pages = await allPages(source.env);
+  assert.equal(pages.at(-1).manifest.complete, true);
+  const entries = pages.flatMap((page) => page.entries);
+  const bytesOf = (id) => Buffer.concat(entries.filter((entry) => entry.kind === 'chunk' && entry.id === id && !entry.target)
+    .map((entry) => Buffer.from(entry.base64url, 'base64url')));
+  assert.deepEqual(bytesOf('cf_understated'), Buffer.alloc(200_000, 98));
+  assert.equal(bytesOf('cf_misfiled').toString(), 'misfiled');
+  assert.equal(bytesOf('cf_orphan').toString(), 'orphan');
+});
+
+test('a stored payload without an id or with bytes that do not decode stops the backup, as before', async () => {
+  for (const envelope of [{ metadata: {}, payloadBase64url: 'AAAA' }, { metadata: { id: 'cf_bad' }, payloadBase64url: 7 }]) {
+    const source = fixture();
+    source.kv.values.set(`ce-storage-payload:${slug}:cf_bad`, JSON.stringify(envelope));
+    await assert.rejects(allPages(source.env), /A backup payload is missing or unreadable/);
+  }
+});
+
+test('a bulk get Cloudflare refuses, where records understate their sizes, is read key by key instead', async () => {
+  const source = fixture();
+  for (let n = 0; n < 9; n += 1) storeItem(source.kv, 'responses', `cf_small_hint_${n}`, Buffer.alloc(3 * 1000 * 1000, 100 + n), { size: 10 });
+  const pages = await allPages(source.env);
+  assert.equal(pages.at(-1).manifest.complete, true);
+  const entries = pages.flatMap((page) => page.entries);
+  for (let n = 0; n < 9; n += 1) {
+    const bytes = Buffer.concat(entries.filter((entry) => entry.kind === 'chunk' && entry.id === `cf_small_hint_${n}`)
+      .map((entry) => Buffer.from(entry.base64url, 'base64url')));
+    assert.deepEqual(bytes, Buffer.alloc(3 * 1000 * 1000, 100 + n));
+  }
+});
+
+test('a payload whose metadata names another id is read by that id, as before', async () => {
+  const source = fixture();
+  storeItem(source.kv, 'responses', 'cf_named', Buffer.from('named'));
+  const metadata = { id: 'cf_named', resource: 'responses', size: 5 };
+  source.kv.values.set(`ce-storage-payload:${slug}:cf_alias`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('alias').toString('base64url') }));
+  const entries = (await allPages(source.env)).flatMap((page) => page.entries);
+  const bytesOf = (id) => entries.filter((entry) => entry.kind === 'chunk' && entry.id === id).map((entry) => Buffer.from(entry.base64url, 'base64url').toString()).join('');
+  assert.equal(bytesOf('cf_alias'), 'named');
+});
+
+test('a session with no stored payloads exports without an empty bulk get', async () => {
+  const source = fixture();
+  source.kv.values.set(`ce-storage-owner:${slug}:questions:0xabc`, '{"uploader":"synthetic"}');
+  const calls = recordGets(source.kv);
+  const pages = await allPages(source.env);
+  assert.equal(pages.at(-1).manifest.complete, true);
+  assert.ok(calls.every(({ bulk, keys }) => !bulk || keys.length > 0));
 });

@@ -43,11 +43,40 @@ const OWN_ANSWER_WAIT_MS = 2_000;
 // second limit, so it returns within a host's usual 60 seconds.
 const RESULTS_LIST_DEADLINE_MS = 20_000;
 const RESULTS_READ_DEADLINE_MS = 40_000;
+// Agents have reported a partial result's counts as the session's, so a
+// partial one says why it is partial and what reads the rest. `capped` is
+// true when the session has more answer records than were read, `overMax`
+// when it has more than one call reads; `listStop` says why listing them
+// stopped early ('scan' on chain).
+const partialResultsNext = ({ cap, read, capped, overMax, listStop, unread, questionsComplete }) => {
+  const plural = (count, one) => `${count} ${one}${count === 1 ? '' : 's'}`;
+  const reasons = [];
+  if (capped) {
+    reasons.push(cap < MAX_RESULT_RECORDS
+      ? `Only the newest ${cap} answer records were counted, because you passed maxRecords ${cap}. Call get_results again without maxRecords ${overMax
+        ? `to count the newest ${MAX_RESULT_RECORDS}, the most one call reads; this session has more.` : 'for the whole session.'}`
+      : `This session has more than ${MAX_RESULT_RECORDS} answer records, the most one call reads, so only the newest ${MAX_RESULT_RECORDS} were counted.`);
+  }
+  if (listStop === 'scan') {
+    reasons.push('Reading the session’s answers from the chain did not finish in this call, so some answers were not counted. Call get_results again: each call continues where the last stopped.');
+  } else if (listStop) {
+    const limit = listStop === 'deadline' ? ` at its ${RESULTS_LIST_DEADLINE_MS / 1000}-second limit` : '';
+    reasons.push(`Listing the session’s answers stopped${limit} after ${plural(read, 'record')}, so older answers were not counted. Call get_results again in a minute.`);
+  }
+  if (unread) reasons.push(`${plural(unread, 'answer record')} could not be read and ${unread === 1 ? 'was' : 'were'} left out. Call get_results again in a minute to read ${unread === 1 ? 'it' : 'them'}.`);
+  if (!questionsComplete) reasons.push('Some questions could not be read, so they are missing here. Call get_results again shortly.');
+  return ['These counts are partial: participants and every count cover only the answers read, so do not report them as the session’s results.',
+    ...(reasons.length ? reasons : ['Call get_results again in a minute.'])].join(' ');
+};
+
 // list_questions returns up to this many questions a call.
 const MAX_LISTED_QUESTIONS = 100;
 // A Worker lists answers without their question, so results read every listed
 // one: a 30-question salon of 80 people, some changing answers, lists ~2,900.
 const MAX_RESULT_RECORDS = 10000;
+// Asked of a Worker's answer list; each Worker sends at most its own page
+// size, which newer ones raise from 100 to 500.
+const RESULTS_LIST_PAGE_SIZE = 500;
 const READ_CONCURRENCY = 16;
 // A batch read takes 100 ids; an agent sends two at a time, each of which the
 // Worker reads five records at a time.
@@ -603,6 +632,26 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     return isRecord(entry) ? entry : {};
   };
 
+  // A Worker that keeps names holds the agent's own, set with set_profile or
+  // on joining, and shows it in place of the address; answers there carry no
+  // name of their own.
+  const keepsNames = async (ctx) => !ctx.registry && !!(await ctx.client.readFeatures())?.includes('session_names_v1');
+  const saveName = async (ctx) => {
+    if (!(await keepsNames(ctx))) return null;
+    // A name saved before the admin turned names off is still readable, so ask the setting.
+    if (ctx.client.config?.namesEnabled === false) return { saved: false, error: 'Names are off in this session.' };
+    const wanted = profile().displayName;
+    try {
+      // Each change counts against a daily limit, so a name already saved is left as it is.
+      const current = await ctx.client.request(`/names/me?slug=${encodeURIComponent(ctx.info.slug)}`, { auth: true }).catch(() => null);
+      if (current && (current.name || '') === wanted.normalize('NFKC').trim().replace(/\s+/gu, ' ')) return { saved: true, name: current.name };
+      const saved = await ctx.client.request('/names/set', { method: 'POST', auth: true, body: { name: wanted } });
+      return { saved: true, name: saved?.name ?? null };
+    } catch (error) {
+      return { saved: false, error: text(error?.message) || 'The session didn’t save your name.' };
+    }
+  };
+
   // The agent keeps its own record of what it answered, so a very large
   // session whose answer listing is cut short still shows its answers.
   const rememberAnswers = (ctx, answered) =>
@@ -978,8 +1027,18 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       await saveState((fresh) => {
         fresh.profile = { ...fresh.profile, ...next };
       });
+      const names = 'displayName' in next
+        ? (await mapLimit(Object.values(state.sessions).filter((entry) => isRecord(entry) && entry.kind !== 'registry'), READ_CONCURRENCY,
+          async (entry) => {
+            const saved = await openEntry(entry).then(async (ctx) => { await ensureReady(ctx); return saveName(ctx); })
+              .catch((error) => ({ saved: false, error: text(error?.message) || 'The session couldn’t be reached.' }));
+            return saved && { session: entry.slug, ...saved };
+          })).filter(Boolean)
+        : [];
       return {
         profile: profile(),
+        // Sessions whose Worker keeps names: whether each saved the new one.
+        ...(names.length ? { names } : {}),
         note: kept.length
           ? `Your host set ${kept.join(' and ')}, which stay${kept.length > 1 ? '' : 's'} as it set ${kept.length > 1 ? 'them' : 'it'}. The rest applies to answers and statements submitted from now on.`
           : 'Applies to answers and statements submitted from now on.',
@@ -1136,6 +1195,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         named: !!profile().displayName, groups: outcome.groups, addingContext: outcome.addingContext, instructions,
       });
       if (youMay.length) outcome.youMay = youMay;
+      if (profile().displayName) {
+        const saved = await saveName(ctx);
+        if (saved) outcome.name = saved;
+      }
       return outcome;
     },
 
@@ -1206,6 +1269,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const loaded = await loadQuestions(ctx);
       const questions = new Map(loaded.map((question) => [question.id, question]));
       const recruitmentSource = text(sessionState(ctx).recruitmentSource);
+      const answerProfile = (await keepsNames(ctx)) ? { ...profile(), displayName: '' } : profile();
       const results = [];
       const answered = [];
       const pendingAnswers = [];
@@ -1243,7 +1307,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
             conviction: item.conviction,
             responder: wallet.address,
             session: { sessionSlug: ctx.info.slug, sessionId: ctx.client.sessionId },
-            profile: profile(),
+            profile: answerProfile,
             recruitmentSource,
           });
         } catch {
@@ -1407,13 +1471,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           note: 'This session does not publish results to participants. Only your own answers are visible (see list_questions with filter "answered").',
         };
       }
-      const cap = Math.min(Math.max(Number(maxRecords) || MAX_RESULT_RECORDS, 1), MAX_RESULT_RECORDS);
+      const cap = Math.min(Math.max(Math.trunc(Number(maxRecords) || MAX_RESULT_RECORDS), 1), MAX_RESULT_RECORDS);
       const questions = await loadQuestions(ctx);
       const wanted = questionIds?.length ? idList(questionIds) : null;
       let entries;
       let complete;
       let listedCount;
       let unreadAnswers;
+      let capped;
+      let overMax;
+      let listStop;
       const knownIds = new Set(questions.map((question) => question.id));
       if (ctx.registry) {
         const result = await ctx.registry.readAnswers({ questionIds: knownIds, maxRecords: cap, signal });
@@ -1421,9 +1488,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         complete = result.complete;
         listedCount = entries.length;
         unreadAnswers = result.unreadAnswers;
+        capped = result.capped;
+        overMax = result.overMax;
+        listStop = result.scanned === false ? 'scan' : null;
       } else {
         const started = now();
-        const result = await ctx.client.listAll('responses', { maxItems: MAX_RESULT_RECORDS, deadlineMs: RESULTS_LIST_DEADLINE_MS, signal });
+        const result = await ctx.client.listAll('responses', { maxItems: MAX_RESULT_RECORDS, pageSize: RESULTS_LIST_PAGE_SIZE, deadlineMs: RESULTS_LIST_DEADLINE_MS, signal });
         const listed = result.items
           .filter((item) => text(item.storageRef?.id))
           .sort((left, right) => (text(left.metadata?.createdAt) < text(right.metadata?.createdAt) ? 1 : -1));
@@ -1431,6 +1501,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         complete = result.complete;
         listedCount = listed.length;
         unreadAnswers = entries.unread;
+        overMax = result.stopped === 'max';
+        capped = listedCount > cap || overMax;
+        listStop = complete || result.stopped === 'max' ? null : result.stopped || 'deadline';
       }
       const latest = latestAnswersByQuestion(entries, {
         sessionSlug: ctx.info.slug,
@@ -1439,6 +1512,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       });
       // Like the web report: participants who gave at least one valid answer to a visible question.
       const participants = new Set(questions.flatMap((question) => respondersWithAnswers(question, latest.get(question.id))));
+      const partial = !complete || listedCount > cap || questions.complete === false || entries.complete === false;
       return {
         session: ctx.info.slug,
         resultsPublic: visibility === PUBLIC_RESULTS,
@@ -1446,7 +1520,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         webUrl: buildSessionWebUrl(ctx.info),
         participants: participants.size,
         unreadAnswers,
-        partial: !complete || listedCount > cap || questions.complete === false || entries.complete === false,
+        partial,
+        ...(partial ? { next: partialResultsNext({ cap, read: listedCount, capped, overMax, listStop,
+          unread: unreadAnswers || 0, questionsComplete: questions.complete !== false }) } : {}),
         questions: questions
           .filter((question) => !wanted || wanted.has(question.id))
           .map((question) => summarizeQuestion(question, latest.get(question.id))),
@@ -1601,7 +1677,22 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const reply = await ctx.client.request('/session-agent/ask', {
         method: 'POST', auth: true, signal, body: { question: asked, ...keep },
       });
-      const stored = typeof reply?.stored === 'boolean';
+      const recording = typeof reply?.stored === 'boolean';
+      const stored = reply?.stored === true;
+      // In words as well: an agent passing the answer on to a person passes on sentences, not fields.
+      let chat = 'This question and its answer were not stored: this session records no chats.';
+      if (stored) {
+        chat = `This question and its answer were stored for the session’s organisers, who may export them, ${
+          keep.attribution === 'address' ? 'with' : 'without'} your address.`;
+      } else if (recording) {
+        // The caller's own word, whatever was sent: a session that began recording since it was last
+        // read is sent nothing about storing, and the Worker then keeps nothing and gives no reason.
+        chat = 'This question and its answer were not stored.';
+        if (store === false) chat = 'This question and its answer were not stored, as you asked.';
+        else if (/chat (wasn’t|couldn’t be) stored/.test(text(reply?.note))) {
+          chat = 'This question and its answer were not stored; note says why.';
+        }
+      }
       return {
         session: ctx.info.slug,
         answer: text(reply?.answer),
@@ -1609,8 +1700,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         ...(isRecord(reply?.read) ? { read: reply.read } : {}),
         ...(text(reply?.note) ? { note: text(reply.note) } : {}),
         // The Worker's own word on both: its setting may have changed since this session was read.
-        recording: stored,
-        stored: reply?.stored === true,
+        recording,
+        stored,
+        chat,
       };
     },
 

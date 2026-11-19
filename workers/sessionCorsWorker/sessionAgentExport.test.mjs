@@ -523,14 +523,16 @@ test('a context item whose stored bytes are gone is counted, and the rest is exp
   assert.equal(manifest.leftOut.unreadableContext, 1);
 });
 
-test('a session with more stored versions than the agent reads says so, and exports no answers', async () => {
-  const { content, file } = await exported({
-    deps: { loadWorkerCanonicalResultsAnalysisSource: async () => ({ ok: false, status: 503, reason: 'results_analysis_snapshot_limit' }) },
+for (const limit of ['rows', 'answerBytes', 'operations']) {
+  test(`a session past the agent's ${limit} limit says so, and exports no answers`, async () => {
+    const { content, file } = await exported({
+      deps: { loadWorkerCanonicalResultsAnalysisSource: async () => ({ ok: false, status: 503, reason: 'results_analysis_snapshot_limit', limit }) },
+    });
+    assert.equal(file.manifest.leftOut.answersNotRead, 1);
+    assert.deepEqual([texts(file, 'counts'), texts(file, 'written'), texts(file, 'question')], [[], [], []]);
+    assert.match(content, /OPEN agenda/);
   });
-  assert.equal(file.manifest.leftOut.answersNotRead, 1);
-  assert.deepEqual([texts(file, 'counts'), texts(file, 'written'), texts(file, 'question')], [[], [], []]);
-  assert.match(content, /OPEN agenda/);
-});
+}
 
 test('a stored chat is exported only as widely as its answer was fit for: never an admin’s, a group’s for that group', async () => {
   const chat = (id, extra) => ({ id, day: '2026-11-24', answers: 'detailed', question: 'What is planned?', answer: 'An answer.', ...extra });

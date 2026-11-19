@@ -572,7 +572,8 @@ describe('DebateMap', () => {
     expect(topNodes.map((node: any) => node.id)).toEqual(['comment-heavy', 'nested-high', 'early-tie']);
   });
 
-  it('switches between circles and atlas from the main mode controls', () => {
+  // The node atlas is hidden for now: the switch reads Atlas (the circles), Tree, List.
+  it('calls the circles view Atlas and offers no node atlas', () => {
     render(
       <MemoryRouter>
         <DebateMapComponent
@@ -585,27 +586,17 @@ describe('DebateMap', () => {
       </MemoryRouter>,
     );
 
-    expect(
-      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed'),
-    ).toBeTruthy();
-
-    fireEvent.click(getDebateViewModeButton('atlas'));
-
-    expect(
-      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'orbital'),
-    ).toBeTruthy();
-    expect(
-      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed'),
-    ).toBeFalsy();
-
+    const buttons = screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE);
+    expect(buttons.map((button) => button.textContent?.trim())).toEqual(['Atlas', 'Tree', 'List']);
+    expect(getDebateViewModeButton('circles')).toHaveTextContent('Atlas');
+    fireEvent.click(getDebateViewModeButton('list'));
     fireEvent.click(getDebateViewModeButton('circles'));
-
     expect(
       getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed'),
     ).toBeTruthy();
   });
 
-  it('starts in atlas mode when explicitly configured', () => {
+  it('opens on the circles even when set to open on the node atlas', () => {
     render(
       <MemoryRouter>
         <DebateMapComponent
@@ -620,8 +611,11 @@ describe('DebateMap', () => {
     );
 
     expect(
-      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'orbital'),
+      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed'),
     ).toBeTruthy();
+    expect(
+      getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'orbital'),
+    ).toBeFalsy();
   });
 
   it('builds historical compass points using the current vote for x and other votes for y', () => {

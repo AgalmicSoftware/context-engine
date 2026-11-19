@@ -40,7 +40,6 @@ export const analysisProfileKey = (props: ProfileRecord): string => {
 };
 export const analysisInputSignature = (state: ProfileRecord): string =>
   JSON.stringify([
-    state.username,
     state.sbtList,
     state.questionResponseInfo,
     state.detailedQuestionResponses,
@@ -142,8 +141,8 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
   };
 
   const userData = {
+    // The name a person chose is not sent to the AI: it says nothing about their views, and is free text they control.
     address: this.props.viewAddress,
-    username: this.state.username || null,
     sbts,
     questions,
     surveys,

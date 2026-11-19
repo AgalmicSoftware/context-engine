@@ -241,6 +241,23 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.6.0
+
+- Where a session keeps names (a Worker advertising `session_names_v1`, Context
+  Engine 0.9.17 or later), the display name is saved in the session on
+  `join_session` and with `set_profile`, and both report the saved name.
+  Answers there no longer carry the name. On an older Worker the name still
+  travels in each answer.
+- An agent that joined a session before that session's Worker was upgraded,
+  or whose name did not save on joining, runs `set_profile` with its display
+  name once after the upgrade. Until then Results shows its address with
+  "(agent)".
+- `get_results`: a partial result's `next` says its counts are not the
+  session's totals, why, and how to read the rest. Answers list up to 500 a
+  page where the Worker allows it.
+- `ask_session_agent`'s reply gains `chat`, one sentence to pass on with the
+  answer, saying whether the question and answer were stored.
+
 ## Upgrading to 0.5.1
 
 - `answer` tells a mistyped question id from a locked one. An id that matches
@@ -402,7 +419,7 @@ directory when upgrading; identities and saved session access do not change.
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. When some are refused the rest are still stored: `next` says which went through, and a question id that matches nothing gets the nearest listed id when it looks mistyped. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
 | `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set, or `groups` names some of the session's groups: then the members of any one of them see it, and the admins. |
-| `ask_session_agent` | Asks the session's own Session Agent one question, when it has one and its admins let the agent ask. Chats with it can be recorded when the session's recording setting is on (`get_session` shows `sessionAgent.recording`): the question and answer are then stored for the session's organisers unless `store` is false, with the agent's address only if `attribution` is `address`. |
+| `ask_session_agent` | Asks the session's own Session Agent one question, when it has one and its admins let the agent ask. Chats with it can be recorded when the session's recording setting is on (`get_session` shows `sessionAgent.recording`): the question and answer are then stored for the session's organisers unless `store` is false, with the agent's address only if `attribution` is `address`. The reply's `chat` says in a sentence whether this one was stored, to pass on with the answer. |
 | `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
 | `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`: a code, a password or the group's whole invite link; or the one its link carried, held until the MCP restarts; after that, join with the link again). |
 | `leave_group` | Leaves a group the agent is in, when the group lets members leave. |
@@ -505,9 +522,13 @@ unknown `CE_MCP_*` name.
   records, newest first (`maxRecords` reads fewer): 100 to a request, two
   requests at a time, from a Worker that offers batch reads, and otherwise
   one to a request, 16 at a time. Questions are read the same way. It lists
-  answers for at most 20 seconds and reads them until 40, then answers with
-  `partial: true`, so it returns within a host's usual 60-second limit. It
-  caches what it has read and counts answers the way the session report does.
+  answers up to 500 a page where the Worker sends that many, for at most 20
+  seconds, and reads them until 40, then answers with `partial: true`, so it
+  returns within a host's usual 60-second limit. A partial result's `next`
+  says the counts are not the session's totals, why (the `maxRecords` cap,
+  the 10,000-record cap, the time limit or unread records) and how to read
+  the rest. It caches what it has read and counts answers the way the
+  session report does.
 - **Large sessions.** The server also remembers what the agent answered. A
   tool call waits at most 2 seconds for the agent's earlier answers from the
   Session Worker; past that, the questions come back with a note, and the

@@ -240,12 +240,31 @@ describe('UserPageHeader', () => {
   });
 
   it("marks a label on someone else's account as yours, not their name", () => {
-    const { rerender } = render(<UserPageHeader {...createProps({ addressIsPrivateLabel: true })} />);
-    const tag = screen.getByText('your label');
-    expect(tag).toHaveAttribute('title', expect.stringMatching(/Only you see it, on this device; it isn't their name/));
+    const { rerender } = render(<UserPageHeader {...createProps({ privateLabelTag: 'your label' })} />);
+    expect(screen.getByText('your label')).toHaveAttribute(
+      'title',
+      expect.stringMatching(/Only you see it, on this device; it isn't their name/),
+    );
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Profile Label, your label');
 
-    rerender(<UserPageHeader {...createProps({ addressIsPrivateLabel: false })} />);
-    expect(screen.queryByText('your label')).toBeNull();
+    rerender(<UserPageHeader {...createProps({ privateLabelTag: 'your label: Ada' })} />);
+    expect(screen.getByText('your label: Ada')).toBeInTheDocument();
+
+    rerender(<UserPageHeader {...createProps({ privateLabelTag: '' })} />);
+    expect(screen.queryByText(/your label/)).toBeNull();
+  });
+
+  it('says where your own username is saved', () => {
+    const props = { isOwner: true, isEditingUsername: true, showUsernamePen: false, username: 'Sam' };
+    const { rerender } = render(<UserPageHeader {...createProps(props)} />);
+    expect(screen.getByRole('textbox', { name: 'Set username' })).toHaveAccessibleDescription(
+      'Saved on this device only',
+    );
+
+    rerender(<UserPageHeader {...createProps({ ...props, usernameSavedTo: 'session' })} />);
+    expect(screen.getByRole('textbox', { name: 'Set username' })).toHaveAccessibleDescription(
+      'Shown to people in this session',
+    );
   });
 
   it('keeps minimized header actions limited to the username error display', () => {

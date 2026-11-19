@@ -71,10 +71,13 @@ const createR2 = () => {
 
 export const pageResponse = (body, type = 'text/html; charset=utf-8') => new Response(body, { headers: { 'content-type': type } });
 
-export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthropic', model: 'claude-sonnet-5-5' }, provider } = {}) => {
+// `r2: false` binds no R2, as deployed Workers do: every item's bytes are then a KV key.
+export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthropic', model: 'claude-sonnet-5-5' }, provider, r2: withR2 = true } = {}) => {
   const kv = createKv();
-  const r2 = createR2();
-  const env = installSessionCoordinatorBinding({ CE_STORAGE_INDEX_KV: kv, CE_STORAGE_R2: r2, CE_STORAGE_ENVELOPE_KEK: 'synthetic-context-test-kek' });
+  const r2 = withR2 ? createR2() : null;
+  const env = installSessionCoordinatorBinding({
+    CE_STORAGE_INDEX_KV: kv, ...(r2 ? { CE_STORAGE_R2: r2 } : {}), CE_STORAGE_ENVELOPE_KEK: 'synthetic-context-test-kek',
+  });
   const state = {
     config: {
       slug: 'salon',

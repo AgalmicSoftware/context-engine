@@ -35,7 +35,7 @@ test('a results admin reads AI Views status as the admin does; others may not, n
   assert.equal(diagnostics.body.error, AUTH_FAILED);
 });
 
-test('a results admin starts AI Views as the admin does, and gets nothing else an admin has', async () => {
+test('a results admin starts AI Views as the admin does, and a stranger cannot', async () => {
   const { admin, env, resultsAdmin, stranger } = setup();
   const generate = (wallet) => signedAdminRequest({ env, wallet, action: 'results-analysis/generate', body: {} });
   const asAdmin = await generate(admin);
@@ -45,18 +45,50 @@ test('a results admin starts AI Views as the admin does, and gets nothing else a
   assert.equal(asResultsAdmin.body.error, asAdmin.body.error);
   assert.equal((await generate(stranger)).status, 403);
 
-  for (const [action, body] of [
-    ['set-config', { config: { ...setup().config, sessionName: 'Taken over' } }],
-    ['set-secrets', { secrets: {} }],
-    ['secret-presence', {}],
-    ['export-storage-envelopes', {}],
-    ['export-session-backup', {}],
-    ['export-recovery-key', {}],
-  ]) {
+});
+
+// The other actions the Worker takes from an admin today, kept by hand: add a new action here. A results
+// admin builds results and nothing more.
+const ADMIN_ONLY_ACTIONS = [
+  ['set-config', { config: { ...setup().config, sessionName: 'Taken over' } }],
+  ['set-secrets', { secrets: {} }],
+  ['set-limits', { limits: {} }],
+  ['secret-presence', {}],
+  ['storage/set-hidden', { resource: 'questions', id: `0x${'7'.repeat(64)}`, hidden: true }],
+  ['groups/create', { group: { groupId: 'taken', label: 'Taken' } }],
+  ['groups/update', { group: { groupId: 'taken', label: 'Taken' } }],
+  ['groups/delete', { groupId: 'taken' }],
+  ['groups/list', {}],
+  ['groups/list-members', { groupId: 'taken' }],
+  ['groups/add-member', { groupId: 'taken', member: '0x00000000000000000000000000000000000000ee' }],
+  ['groups/remove-member', { groupId: 'taken', member: '0x00000000000000000000000000000000000000ee' }],
+  ['groups/reconcile-empty', {}],
+  ['groups/invites/add', { groupId: 'taken', hashes: ['a'.repeat(64)] }],
+  ['groups/invites/list', { groupId: 'taken' }],
+  ['groups/invites/revoke', { groupId: 'taken', hashes: ['a'.repeat(64)] }],
+  ['groups/password/set', { groupId: 'taken' }],
+  ['feedback/delete', {}],
+  ['session-agent/export', {}],
+  ['session-agent/chats/delete', {}],
+  ['refresh-interview-opening', {}],
+  ['issue-sponsored-grants', {}],
+  ['export-storage-envelopes', {}],
+  ['export-session-backup', {}],
+  ['import-session-backup', {}],
+  ['session-backup-status', {}],
+  ['export-recovery-key', {}],
+  ['lit-chipotle-status', {}],
+  ['lit-chipotle-provision', {}],
+  ['lit-chipotle-bootstrap-session', {}],
+];
+
+test('a results admin is refused every admin action but the three that build results', async () => {
+  for (const [action, body] of ADMIN_ONLY_ACTIONS) {
     // A fresh session each time: sign-in nonces are limited per address.
-    const fresh = setup();
-    const refused = await signedAdminRequest({ env: fresh.env, wallet: fresh.resultsAdmin, action, body });
+    const { env, resultsAdmin } = setup();
+    const refused = await signedAdminRequest({ env, wallet: resultsAdmin, action, body });
     assert.equal(refused.status, 403, `${action}: ${JSON.stringify(refused.body)}`);
+    assert.equal(refused.body.error, AUTH_FAILED, action);
   }
 });
 

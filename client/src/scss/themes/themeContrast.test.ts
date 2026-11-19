@@ -84,18 +84,24 @@ describe('bundled app-theme contrast', () => {
     style: 'expanded',
   }).css;
 
-  // The "Pick one" / "Pick any" pill on a question card names its own colour, held to text contrast on the card.
-  // Inheriting, it took a muted slate in the dark theme (about 2:1).
-  test.each(registry.themes.map(({ id }) => id))('%s keeps the choice pill readable on the card', (themeId) => {
-    const surveyCss = sass.compile(path.resolve(scssDir, 'components/SurveyTool/SurveyTool.module.scss'), {
-      loadPaths: [scssDir],
-      style: 'expanded',
-      logger: sass.Logger.silent,
-    }).css;
-    const token = surveyCss.match(/\.choiceKindPill\s*\{[^}]*?\bcolor:\s*var\(--ce-([a-z0-9-]+)\)/)?.[1];
-    expect(token).toBeDefined();
-    assertContrast(themeValues(css, themeId), token as string, 'card-bg', 4.5);
-  });
+  // Text on a question card names its own colour, held to text contrast on the card. The "Pick one" / "Pick any"
+  // pill inherited a muted slate in the dark theme (about 2:1); the rating readout was white on Classic 95's grey (1.8:1).
+  const cardTextClasses = ['choiceKindPill', 'ratingValueDisplay'];
+  const surveyCss = sass.compile(path.resolve(scssDir, 'components/SurveyTool/SurveyTool.module.scss'), {
+    loadPaths: [scssDir],
+    style: 'expanded',
+    logger: sass.Logger.silent,
+  }).css;
+  test.each(registry.themes.flatMap(({ id }) => cardTextClasses.map((className) => [id, className])))(
+    '%s keeps .%s readable on the card',
+    (themeId, className) => {
+      const token = surveyCss.match(
+        new RegExp(`\\.${className}\\s*\\{[^}]*?\\bcolor:\\s*var\\(--ce-([a-z0-9-]+)\\)`),
+      )?.[1];
+      expect(token).toBeDefined();
+      assertContrast(themeValues(css, themeId), token as string, 'card-bg', 4.5);
+    },
+  );
 
   test.each(registry.themes.map(({ id }) => id))('%s meets documented text and focus contrast', (themeId) => {
     const values = themeValues(css, themeId);
@@ -380,6 +386,46 @@ describe('bundled app-theme contrast', () => {
     ] as const;
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
+
+  // The debate map's topic window closes from an X that sat bare on the window, and half over the dimmed page on a
+  // phone. It is now an opaque disc ringed in its own X colour; Classic 95 keeps its raised title-bar button.
+  const debateMapCss = compileModule('components/DebateMap/DebateMap.module.scss');
+  test.each(registry.themes.map(({ id, layoutProfile }) => [id, layoutProfile]))(
+    '%s shows the topic window close button clearly',
+    (themeId, layoutProfile) => {
+      const values = themeValues(css, themeId);
+      const paint = painter(values);
+      const close = '.debateMap .modalContent .modalHeader .modalControls .closeIcon';
+      const firstContainer = debateMapCss.indexOf('@container');
+      const rule =
+        layoutProfile === 'desktop-window'
+          ? moduleRule(debateMapCss, '.debateMapWrapper.embeddedAtlas .debateMap .modalContent .modalHeader .closeIcon')
+          : moduleRule(layoutProfile === 'minimal-app' ? debateMapCss : debateMapCss.slice(0, firstContainer), close);
+      const window = paint(
+        layoutProfile === 'desktop-window'
+          ? 'var(--ce-titlebar-bg)'
+          : layoutProfile === 'minimal-app'
+            ? 'var(--ce-overlay-surface)'
+            : 'var(--ce-document-text)',
+      );
+      const fill = composite(paint(rule.background), window);
+      const x = composite(paint(rule.color), fill);
+      const ratio = (a: Rgba, b: Rgba) => Number(contrastRatio(a, b).toFixed(2));
+      expect(ratio(x, fill)).toBeGreaterThanOrEqual(4.5);
+      if (layoutProfile === 'desktop-window') {
+        expect(ratio(fill, window)).toBeGreaterThanOrEqual(3);
+        return;
+      }
+      // Its ring takes the X's colour, so the edge shows on the window, and the ring or the fill on the dimmed page.
+      expect(rule.border).toBe('2px solid currentColor');
+      expect(ratio(x, window)).toBeGreaterThanOrEqual(3);
+      const dimmed = composite(
+        paint('color-mix(in srgb, var(--ce-compat-dark) 85%, transparent)'),
+        paint('var(--ce-canvas)'),
+      );
+      expect(Math.max(ratio(x, dimmed), ratio(fill, dimmed))).toBeGreaterThanOrEqual(3);
+    },
+  );
 
   // The Session Doc Library's fields sit in an upload box on a panel, both translucent layers on the page canvas.
   // Its link fields took the document text the recipe gives every field (1.93:1 in Context Engine), and Classic 95's

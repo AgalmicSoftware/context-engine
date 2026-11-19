@@ -28,11 +28,26 @@ export type SessionAgentStatus = {
 /** What to keep of one chat: with the asker's address or without, and a name if they gave one; null keeps nothing. */
 export type SessionAgentKeep = { attribution: 'address' | 'anonymous'; name: string } | null;
 
+/** One context item an answer drew on: a link or note from the session's settings, or an added link or file. */
+export type SessionAgentSource = {
+  kind: 'session-link' | 'session-note' | 'link' | 'file';
+  title: string;
+  /** A web address, or '' when the item has none. */
+  url: string;
+  /** A PDF, as the session's AI read it. */
+  readByAi: boolean;
+};
+
 export type SessionAgentReply = {
   answer: string;
   answers: SessionAgentStyle;
   /** How much the answer drew on: items of context, the results, members' answers. */
   read: { context: number; results: boolean; answers: number };
+  /** The context items counted in `read`, or null when the Worker lists none for this asker. */
+  sources: SessionAgentSource[] | null;
+  /** The questions closest to the one asked: ones whose answers it read, or ones the results cite. */
+  questions: Array<{ id: string; question: string }>;
+  questionsFrom: 'answers' | 'results';
   note: string;
   /** Whether this chat was stored; null when the session stores none. */
   stored: boolean | null;
@@ -44,6 +59,26 @@ const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 const styleOf = (value: unknown): SessionAgentStyle | null =>
   value === 'general' || value === 'detailed' ? value : null;
+
+const SOURCE_KINDS = ['session-link', 'session-note', 'link', 'file'] as const;
+// Only a web address becomes a link: the Worker's word is not enough to follow any other scheme.
+const webAddress = (value: unknown) => (/^https?:\/\//i.test(toStr(value).trim()) ? toStr(value).trim() : '');
+const sourcesOf = (value: unknown): SessionAgentSource[] | null =>
+  Array.isArray(value)
+    ? value.map(asRecord).flatMap((item) => {
+        const kind = SOURCE_KINDS.find((known) => known === item.kind);
+        const title = toStr(item.title).trim();
+        return kind && title ? [{ kind, title, url: webAddress(item.url), readByAi: item.readByAi === true }] : [];
+      })
+    : null;
+// An id goes into a link's path, so only one made of an id's own characters is kept.
+const QUESTION_ID = /^[A-Za-z0-9_.:-]{1,100}$/;
+const questionsOf = (value: unknown) =>
+  (Array.isArray(value) ? value : []).map(asRecord).flatMap((item) => {
+    const id = toStr(item.id).trim();
+    const question = toStr(item.question).trim();
+    return QUESTION_ID.test(id) && question ? [{ id, question }] : [];
+  });
 
 /** The Worker asks for a sign-in: thrown for someone not signed in whom it won't answer as they are. */
 export class SignInToAsk extends Error {}
@@ -130,6 +165,9 @@ export const askSessionAgent = async (
     answer: toStr(result.answer),
     answers: styleOf(result.answers) || 'general',
     read: { context: Number(read.context) || 0, results: read.results === true, answers: Number(read.answers) || 0 },
+    sources: sourcesOf(result.sources),
+    questions: questionsOf(result.questions),
+    questionsFrom: result.questionsFrom === 'results' ? 'results' : 'answers',
     note: toStr(result.note),
     stored: typeof result.stored === 'boolean' ? result.stored : null,
   };

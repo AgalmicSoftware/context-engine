@@ -24,7 +24,7 @@ const HELP =
 const LEFT_OUT: Array<[string, (count: number) => string]> = [
   [
     'answersNotRead',
-    () => 'every question and answer: this session stores more versions than the Session Agent can read at once',
+    () => 'every question and answer: this session stores more than the Session Agent can read at once',
   ],
   ['optedOut', (count) => `${count} from people who opted out`],
   ['patternMatches', (count) => `${count} written ${count === 1 ? 'answer' : 'answers'} that may name someone`],

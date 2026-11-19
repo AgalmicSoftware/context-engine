@@ -158,6 +158,8 @@ export interface RatingMatrixBuildResult {
   questions: string[];
   promptsMap: StringMap;
   displayNamesMap?: StringMap;
+  /** Responders whose answers say they are AI agents. */
+  agents?: string[];
 }
 
 export interface PolisReportProps {
@@ -911,6 +913,18 @@ function isPolisRealRowAllowedForSession(
   );
 }
 
+/**
+ * An AI agent's answers say so themselves, unverified. The participant list and the map show it beside the
+ * name, as the context list does.
+ */
+export const markPolisAgents = (names: StringMap, agents: Iterable<string>): StringMap => {
+  const marked: StringMap = { ...names };
+  for (const responder of agents) {
+    marked[responder] = `${names[responder] || getShortenedAddress(responder, false)} (agent)`;
+  }
+  return marked;
+};
+
 export function buildRatingMatrixFromRealData(
   realQR: PolisQuestionResponses | UnknownRecord,
   options: { sessionSlug?: unknown; allowDemo?: boolean; metadata?: Record<string, unknown> } = {},
@@ -972,11 +986,7 @@ export function buildRatingMatrixFromRealData(
       if (asRecord(parsed.participant).kind === 'agent') agents.add(responder);
     }
   });
-  // An AI agent's answers say so themselves, unverified. The participant list and the map show it beside the
-  // name, as the context list does.
-  agents.forEach((responder) => {
-    displayNamesMap[responder] = `${displayNamesMap[responder] || getShortenedAddress(responder, false)} (agent)`;
-  });
+  Object.assign(displayNamesMap, markPolisAgents(displayNamesMap, agents));
 
   // No usable questions or participants => bail out
   if (binaryQuestions.length === 0 || participantsSet.size === 0) {
@@ -1018,6 +1028,7 @@ export function buildRatingMatrixFromRealData(
     questions: questionsSorted,
     promptsMap,
     displayNamesMap,
+    agents: [...agents],
   };
 }
 

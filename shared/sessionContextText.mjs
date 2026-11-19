@@ -61,11 +61,15 @@ export const buildSessionContextPrompt = ({
   const data = title ? { title } : {};
   let included = 0;
   let { omitted } = context;
+  // Which link, note or source each included item is, by its place in its own list.
+  const items = [];
+  let adding = null;
   const tryAdd = (key, entry) => {
     const next = { ...data, [key]: [...(data[key] || []), entry] };
     if (blockLength(next) > totalChars) return false;
     data[key] = next[key];
     included += 1;
+    items.push(adding);
     return true;
   };
   // A long text is cut to what room is left, when that is still useful.
@@ -84,13 +88,18 @@ export const buildSessionContextPrompt = ({
     }
     omitted += 1;
   };
-  links.forEach((link) => {
+  links.forEach((link, index) => {
+    adding = { part: 'links', index };
     if (!tryAdd('links', link)) omitted += 1;
   });
-  notes.forEach((note) => addText('notes', clip(note, itemChars), (fitted) => fitted));
-  (Array.isArray(sources) ? sources : []).forEach((source) => {
+  notes.forEach((note, index) => {
+    adding = { part: 'notes', index };
+    addText('notes', clip(note, itemChars), (fitted) => fitted);
+  });
+  (Array.isArray(sources) ? sources : []).forEach((source, index) => {
     const body = clip(text(source?.text), itemChars);
     if (!body) return;
+    adding = { part: 'sources', index };
     const about = {
       title: clip(text(source.title), 200) || 'Untitled',
       kind: source.kind === 'link' ? 'link' : 'file',
@@ -104,5 +113,6 @@ export const buildSessionContextPrompt = ({
     text: empty ? '' : `${PREAMBLE}\n${OPEN}\n${encode(data)}\n${CLOSE}`,
     included,
     omitted,
+    items,
   };
 };

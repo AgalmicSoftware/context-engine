@@ -10,6 +10,7 @@ import { isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvel
 import { coordinateWorkerGroupBackup } from './workerGroups.js';
 import { canOptOut, sessionAgentOptOutKey, sessionAgentUnattributedKey } from './sessionAgentOptOuts.js';
 import { isSessionAgentHistoryBackup, restoreSessionAgentHistory } from './sessionAgentHistory.js';
+import { isSessionNamesBackup, restoreSessionNames } from './sessionNames.js';
 import { base64urlToBytes, bytesToBase64url } from './storageEnvelopeEncryption.js';
 import { isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
 import { isStorageResourceId } from './storageUploadValidation.js';
@@ -23,7 +24,8 @@ const stable = (value) => JSON.stringify(value, (_, item) => object(item) ? Obje
 const same = (a, b) => stable(a) === stable(b);
 const digest = async (bytes) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((v) => v.toString(16).padStart(2, '0')).join('');
 const hashPattern = /^[a-f0-9]{64}$/;
-const resources = new Set(['docsContext', 'questions', 'surveys', 'responses', 'generatedArtifacts', 'media', 'images']);
+// The storage resources a backup carries.
+export const BACKUP_RESOURCES = new Set(['docsContext', 'questions', 'surveys', 'responses', 'generatedArtifacts', 'media', 'images']);
 const temporary = { expirationTtl: 7 * 86400 };
 const workerUrlFields = ['corsWorkerUrl', 'corsWorkerURL', 'CorsWorkerURL', 'workerUrl',
   'sessionCorsWorkerUrl', 'sessionWorkerUrl', 'sessionWorkerURL', 'workerURL'];
@@ -87,6 +89,7 @@ const validateSnapshot = ({ snapshot, manifest, normalizeConfig, normalizeSessio
   if (snapshot.sessionAgentHistory !== undefined && !isSessionAgentHistoryBackup(snapshot.sessionAgentHistory)) {
     fail('Invalid backup Session Agent chats.');
   }
+  if (snapshot.sessionNames !== undefined && !isSessionNamesBackup(snapshot.sessionNames)) fail('Invalid backup names.');
 };
 
 const validatePage = (page, slug) => {
@@ -103,7 +106,7 @@ const validatePage = (page, slug) => {
   for (const entry of page.entries) {
     if (!object(entry)) fail('Invalid backup entry.');
     if (entry.kind === 'record') {
-      if (!resources.has(entry.resource) || !isSafeCloudflareStorageRefId(entry.id) || !object(entry.metadata) ||
+      if (!BACKUP_RESOURCES.has(entry.resource) || !isSafeCloudflareStorageRefId(entry.id) || !object(entry.metadata) ||
           entry.metadata.id !== entry.id || entry.metadata.resource !== entry.resource ||
           entry.key !== buildIndexKey({ slug, resource: entry.resource, id: entry.id })) fail('Invalid backup metadata key.');
     } else if (entry.kind === 'owner' || entry.kind === 'hidden') {
@@ -451,6 +454,10 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       progress.counts.written += chats.written;
       progress.counts.skipped += chats.skipped;
       chats.conflicts.forEach(conflict);
+      const names = await restoreSessionNames(storage, snapshot.sessionNames || [],
+        (key) => journalBackupImportWrite(storage, page.archiveId, 'durable', key));
+      progress.counts.written += names.written;
+      progress.counts.skipped += names.skipped;
       if (!progress.counts.conflicts) {
         // Commit the verified authority before reclaiming its staged snapshot.
         // The importing actor remains authorized until cleanup and handoff end.

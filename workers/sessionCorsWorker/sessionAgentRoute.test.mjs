@@ -7,7 +7,9 @@ import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretAct
 import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, harness, idOf, json } from './contextSourceTestFixture.mjs';
 import { dispatchSessionAgentHistoryStore, listSessionAgentHistory } from './sessionAgentHistory.js';
-import { SESSION_AGENT_SIGNED_OUT, dispatchSessionAgentRoute } from './sessionAgentRoute.js';
+import { SESSION_AGENT_SIGNED_OUT, dispatchSessionAgentRoute, resultsQuestions } from './sessionAgentRoute.js';
+import { getStorageIndexBinding } from './storageKvBindings.js';
+import { hiddenStorageResourcePrefix } from './storageResourceOwnership.js';
 import { createDurableStorage } from './workerGroupTestFixture.mjs';
 
 const MEMBER = `0x${'3'.repeat(40)}`;
@@ -172,34 +174,79 @@ test('General answers read the context, open files and visible results, never an
   for (const piece of ['GROUP notes', 'ANSWER']) assert.doesNotMatch(member.prompt, new RegExp(piece));
 });
 
+const NOT_ALL_READ = 'Some of the session’s context wasn’t read: the Session Agent reads at most 320,000 characters or 48 items of it, and 12,000 characters of any one.';
+
+test('an answer past a build limit and the context limit says both, answers first', async () => {
+  const h = await seeded();
+  for (let index = 0; index < 28; index += 1) {
+    const name = `LONG${String(index).padStart(2, '0')}`;
+    await idOf(await h.uploadFile({ name: `${name}.md`, type: 'text/markdown', bytes: encode(`${name} `.repeat(1800)) }));
+  }
+  const both = await ask(h, { address: MEMBER, deps: { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+    ok: false, status: 503, reason: 'results_analysis_snapshot_limit', limit: 'answerBytes' }) } });
+  assert.equal(both.body.note, `Members’ answers weren’t read: together they hold more text than the Session Agent can read at once. ${NOT_ALL_READ}`);
+});
+
 test('an answer says when some of the session’s context wasn’t read', async () => {
   const h = await seeded();
   const fitted = await ask(h);
   assert.equal(fitted.body.note, undefined, 'all of it fitted');
-  // Three long notes: the Session Agent reads at most 8,000 characters of context.
-  for (const name of ['one', 'two', 'three']) {
-    await idOf(await h.uploadFile({ name: `${name}.md`, type: 'text/markdown', bytes: encode(`${name.toUpperCase()} `.repeat(1500)) }));
+  // Long notes: the Session Agent reads each to 12,000 characters, and 320,000 in all.
+  const names = Array.from({ length: 28 }, (_, index) => `LONG${String(index).padStart(2, '0')}`);
+  for (const name of names) {
+    await idOf(await h.uploadFile({ name: `${name}.md`, type: 'text/markdown', bytes: encode(`${name} `.repeat(1800)) }));
   }
-  // What isn't needed isn't read: the third note's bytes are never fetched.
+  // What isn't needed isn't read: the last note's bytes are never fetched.
   const read = [];
   const get = h.r2.get;
   h.r2.get = async (key) => {
     const object = await get(key);
-    if (object) read.push(new TextDecoder().decode(await object.arrayBuffer()).slice(0, 5));
+    if (object) read.push(new TextDecoder().decode(await object.arrayBuffer()).slice(0, 6));
     return object;
   };
   const crowded = await ask(h);
   h.r2.get = get;
   assert.equal(crowded.status, 200);
-  assert.equal(crowded.body.note, 'Some of the session’s context wasn’t read: the Session Agent reads at most 8,000 characters or 16 items of it.');
-  assert.doesNotMatch(crowded.prompt, /THREE/);
-  assert.ok(read.includes('ONE O') && !read.includes('THREE'), JSON.stringify(read));
-  // Everything read, but the session's own notes leave no room for a source.
-  const notes = await seeded();
-  notes.state.config.sessionContext.paragraphs = Array.from({ length: 4 }, (_, i) => `NOTE ${i} `.repeat(300).slice(0, 1990));
-  const full = await ask(notes);
-  assert.equal(full.body.note, 'Some of the session’s context wasn’t read: the Session Agent reads at most 8,000 characters or 16 items of it.');
-  assert.doesNotMatch(full.prompt, /OPEN agenda/);
+  assert.equal(crowded.body.note, NOT_ALL_READ);
+  assert.match(crowded.prompt, /LONG00/);
+  assert.doesNotMatch(crowded.prompt, /LONG27/);
+  assert.ok(read.includes('LONG00') && !read.includes('LONG27'), JSON.stringify(read));
+  // A long item is read to 12,000 characters, not all 12,600 of it: that many of its words, and its name.
+  assert.equal(crowded.prompt.match(/LONG00/g).length, Math.floor(12000 / 'LONG00 '.length) + 1);
+
+  // More items than it reads at once: the first 48, and the note says so.
+  const many = await seeded();
+  for (let index = 0; index < 50; index += 1) {
+    await idOf(await many.uploadFile({ name: `note-${index}.md`, type: 'text/markdown', bytes: encode(`SHORT${String(index).padStart(2, '0')}`) }));
+  }
+  const capped = await ask(many, { address: ADMIN });
+  assert.equal(capped.body.note, NOT_ALL_READ);
+  assert.equal(capped.body.sources.filter((source) => source.kind === 'file').length, 48);
+  assert.doesNotMatch(capped.prompt, /SHORT49/);
+});
+
+test('a session answering on Cloudflare’s model reads less context: the most that model was tried at', async () => {
+  const h = await seeded();
+  await idOf(await h.uploadFile({ name: 'long.md', type: 'text/markdown', bytes: encode('Z'.repeat(10000)) }));
+  const own = await ask(h);
+  assert.equal(own.prompt.match(/Z/g).length, 10000);
+  // The same file, cut at 6,000 characters for Cloudflare's model.
+  const ownAi = h.state.config.ai;
+  h.state.config.ai = { ...ownAi, models: { ...ownAi.models, 'session-agent': { provider: 'workers-ai', model: '@cf/zai-org/glm-5.3' } } };
+  const calls = [];
+  const cloudflare = await ask(h, { deps: { proxyWorkersAi: async ({ payload }) => { calls.push(payload); return json({ completion: 'An answer.' }); } } });
+  assert.equal(cloudflare.status, 200, JSON.stringify(cloudflare.body));
+  assert.equal(calls.length, 1);
+  const prompt = calls[0].messages.map((message) => message.content).join('\n');
+  assert.equal(prompt.match(/Z/g).length, 5999);
+  // 27 such files pass 160,000 characters, which the note then names.
+  for (let index = 0; index < 27; index += 1) {
+    await idOf(await h.uploadFile({ name: `fill-${index}.md`, type: 'text/markdown', bytes: encode('Y'.repeat(7000)) }));
+  }
+  const filled = await ask(h, { deps: { proxyWorkersAi: async () => json({ completion: 'An answer.' }) } });
+  assert.equal(filled.body.note, 'Some of the session’s context wasn’t read: the Session Agent reads at most 160,000 characters or 48 items of it, and 6,000 characters of any one.');
+  h.state.config.ai = ownAi;
+  assert.equal((await ask(h)).body.note, undefined, 'on the session’s own model all of it fits');
 });
 
 test('the session’s own gate comes first: someone it keeps out may not ask, whatever the audiences say', async () => {
@@ -267,9 +314,143 @@ test('Detailed answers add what the asker may read and members’ answers, and n
   assert.match(unread.body.note, /couldn’t be read/);
   // Past the build limit the note says which limit, in plain words.
   const tooMany = await ask(h, { address: MEMBER, deps: { loadWorkerCanonicalResultsAnalysisSource: async () => ({
-    ok: false, status: 503, reason: 'results_analysis_snapshot_limit' }) } });
+    ok: false, status: 503, reason: 'results_analysis_snapshot_limit', limit: 'rows' }) } });
   assert.doesNotMatch(tooMany.prompt, /ANSWER/);
   assert.match(tooMany.body.note, /weren’t read: this session stores more than 10,000 question and answer versions/);
+  for (const [limit, note] of [
+    ['listed', /there are more than the Session Agent can read at once/],
+    ['answerBytes', /together they hold more text than the Session Agent can read at once/],
+    ['payloadBytes', /together they hold more text than the Session Agent can read at once/],
+    ['operations', /there are more than the Session Agent can read at once/],
+    ['metadataBytes', /there are more than the Session Agent can read at once/],
+  ]) {
+    const past = await ask(h, { address: MEMBER, deps: { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+      ok: false, status: 503, reason: 'results_analysis_snapshot_limit', limit }) } });
+    assert.doesNotMatch(past.prompt, /ANSWER/);
+    assert.match(past.body.note, new RegExp(`weren’t read: ${note.source}`));
+  }
+});
+
+test('a signed-in asker is told which context items the answer read, each one theirs to read; a visitor gets the count alone', async () => {
+  const h = await seeded();
+  h.state.config.sessionContext = {
+    title: 'Context', paragraphs: ['CONTEXT for everyone.'], links: [{ label: 'The charter', url: 'https://example.org/charter' }],
+  };
+  const titles = (reply) => reply.body.sources.map((source) => `${source.kind}: ${source.title}`);
+  // General: the session's own link and note, then the one file open to everyone.
+  const general = await ask(h);
+  assert.deepEqual(titles(general), ['session-link: The charter', 'session-note: CONTEXT for everyone.', 'file: agenda.md']);
+  assert.equal(general.body.read.context, general.body.sources.length);
+  assert.equal(general.body.sources[0].url, 'https://example.org/charter');
+  // A file's name and kind: nothing about who added it or what it says.
+  assert.deepEqual(general.body.sources[2], { kind: 'file', title: 'agenda.md' });
+  // A group's file is listed only for someone the group's rule lets read it, and an admins' file only for an admin.
+  const member = await ask(h, { address: MEMBER });
+  assert.deepEqual(titles(member).slice(2), ['file: agenda.md', 'file: group.txt']);
+  const admin = await ask(h, { address: ADMIN });
+  assert.deepEqual(titles(admin).slice(2).sort(), ['file: agenda.md', 'file: board.txt', 'file: group.txt']);
+  for (const reply of [general, member]) assert.doesNotMatch(JSON.stringify(reply.body), /board\.txt/);
+  assert.doesNotMatch(JSON.stringify(general.body), /group\.txt/);
+  // An item that didn't fit the prompt was not read, so it is not listed.
+  for (let index = 0; index < 27; index += 1) {
+    await idOf(await h.uploadFile({ name: `long-${index}.md`, type: 'text/markdown', bytes: encode('L'.repeat(12500)) }));
+  }
+  await idOf(await h.uploadFile({ name: 'late.md', type: 'text/markdown', bytes: encode('LATE file') }));
+  const full = await ask(h);
+  assert.equal(full.body.read.context, full.body.sources.length);
+  assert.ok(titles(full).includes('file: long-0.md') && !titles(full).includes('file: late.md'));
+  assert.match(full.body.note, /wasn’t read/);
+
+  // Each listed item is the one read, whatever was passed over ahead of it: a file with no words, and a
+  // file whose adder keeps theirs out of the agent.
+  const mixed = await seeded();
+  mixed.state.config.sessionContext = { title: 'Context', paragraphs: [], links: [] };
+  await idOf(await mixed.uploadFile({ name: 'blank.md', type: 'text/markdown', bytes: encode('   ') }));
+  await idOf(await mixed.uploadFile({ name: 'theirs.md', type: 'text/markdown', bytes: encode('THEIRS'), address: PARTICIPANT }));
+  await idOf(await mixed.uploadFile({ name: 'last.md', type: 'text/markdown', bytes: encode('LAST words') }));
+  const optedOut = { callSessionAgentOptOutStore: async (env, slug, operation) => (
+    { ok: true, body: operation === 'list' ? { addresses: [PARTICIPANT] } : {} }) };
+  const passedOver = await ask(mixed, { address: ADMIN, deps: optedOut });
+  assert.match(passedOver.prompt, /LAST words/);
+  assert.doesNotMatch(passedOver.prompt, /THEIRS/);
+  assert.deepEqual(titles(passedOver).sort(), ['file: agenda.md', 'file: board.txt', 'file: group.txt', 'file: last.md']);
+
+  // Not signed in, the answer reads what a first sign-in could, which the page may not list to a visitor.
+  const visitor = await askSignedOut(await seeded());
+  assert.equal(visitor.body.read.context, 2);
+  assert.equal('sources' in visitor.body, false);
+  assert.doesNotMatch(JSON.stringify(visitor.body), /agenda\.md/);
+});
+
+test('an answer links the questions it read that are closest to the one asked, never by what a member wrote', async () => {
+  const address = (digit) => `0x${String(digit).repeat(40)}`;
+  const people = [MEMBER, address(7), address(8)];
+  const answered = (questionId, words) => people.map((_, index) => (
+    { questionId, answer: `${words} ${index}`, participantId: `participant_00${index + 1}` }));
+  const source = { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+    ok: true,
+    snapshot: {
+      questions: [
+        { id: '0xAA', prompt: 'Should meetings be shorter?', type: 'text' },
+        { id: '0xBB', prompt: 'Who should chair the budget committee?', type: 'text' },
+        { id: '0xCC', prompt: 'Is parking a problem?', type: 'text' },
+      ],
+      responses: [
+        ...answered('0xAA', 'Dana of Oakland says parking'),
+        ...answered('0xBB', 'someone local'),
+        // Too few answered this one for anyone but an admin to hear from it.
+        { questionId: '0xCC', answer: 'yes', participantId: 'participant_001' },
+      ],
+    },
+    participantAddresses: new Map(people.map((person, index) => [`participant_00${index + 1}`, person])),
+  }) };
+  const h = await seeded();
+  const detailed = await ask(h, { address: MEMBER, deps: source, body: { question: 'How long should meetings be, and who sets the budget?' } });
+  assert.deepEqual(detailed.body.questions, [
+    { id: '0xaa', question: 'Should meetings be shorter?' },
+    { id: '0xbb', question: 'Who should chair the budget committee?' },
+  ]);
+  assert.equal(detailed.body.questionsFrom, 'answers');
+  // The ids are for the page: the model is never given them.
+  assert.doesNotMatch(detailed.prompt, /0xaa|0xbb/i);
+  // A question's own words decide, not its answers: a name or place only an answer holds links nothing.
+  const byAnswer = await ask(h, { address: MEMBER, deps: source, body: { question: 'What did Dana of Oakland say?' } });
+  assert.equal('questions' in byAnswer.body, false);
+  // A thinly answered question is neither read nor linked for a member; an admin reads it.
+  const parking = { question: 'Is parking a problem?' };
+  assert.equal('questions' in (await ask(h, { address: MEMBER, deps: source, body: parking })).body, false);
+  assert.deepEqual((await ask(h, { address: ADMIN, deps: source, body: parking })).body.questions, [{ id: '0xcc', question: 'Is parking a problem?' }]);
+
+  // General answers read no member's answer: they link the questions the published results cite.
+  const published = { readPublishedResultsAnalysisArtifact: async ({ includeSnapshot }) => ({
+    ok: true,
+    artifact: { sections: {
+      overview: { available: true, overview: 'RESULTS: shorter meetings.' },
+      breakdown: { available: true, groups: [{ label: 'Meetings', questionIds: ['0xAA', '0xDD'] }] },
+      atlas: { available: false, nodes: [{ label: 'Hidden', questionIds: ['0xBB'] }] },
+    } },
+    ...(includeSnapshot ? { snapshot: { questions: [
+      { id: '0xAA', prompt: 'Should meetings be shorter?' },
+      { id: '0xBB', prompt: 'Who should chair the budget meetings?' },
+      { id: '0xDD', prompt: 'Should meetings move online?' },
+    ] } } : {}),
+  }) };
+  const question = { question: 'What about meetings?' };
+  const general = await ask(h, { deps: published, body: question });
+  assert.deepEqual(general.body.questions.map((item) => item.id).sort(), ['0xaa', '0xdd']);
+  assert.equal(general.body.questionsFrom, 'results');
+  // Someone not signed in gets the same links: the results are theirs to see.
+  assert.deepEqual((await askSignedOut(h, { deps: published, body: question })).body.questions.map((item) => item.id).sort(), ['0xaa', '0xdd']);
+  // A question an admin has since removed is left out, and so is every link where the asker may not see results.
+  h.state.config.BLOCKED_QUESTION_IDS = ['0xDD'];
+  assert.deepEqual((await ask(h, { deps: published, body: question })).body.questions, [{ id: '0xaa', question: 'Should meetings be shorter?' }]);
+  // So is one hidden from the Storage panel, which the settings don't list.
+  await getStorageIndexBinding(h.env).put(`${hiddenStorageResourcePrefix({ slug: 'salon', resource: 'questions' })}0xaa`, '1');
+  assert.equal('questions' in (await ask(h, { deps: published, body: question })).body, false);
+  assert.match((await ask(h, { deps: published, body: question })).prompt, /RESULTS/);
+  const hidden = { ...published, evaluateResultsAnalysisViewerEligibility: () => ({ ok: false }) };
+  assert.equal('questions' in (await ask(h, { deps: hidden, body: question })).body, false);
+  assert.deepEqual(resultsQuestions({ artifact: null, snapshot: null, config: {} }), []);
 });
 
 test('results reach an answer only where the page shows the asker results', async () => {
@@ -429,6 +610,44 @@ const chatStore = () => {
     deps: { callSessionAgentHistoryStore, now: () => Date.parse('2026-11-24T23:30:00.000Z') }, kept: () => listSessionAgentHistory(storage), setting,
   };
 };
+
+test('each question tells the agent whether this session records chats', async () => {
+  assert.match((await ask(await seeded())).prompt, /About this chat: this session does not record chats with you/);
+  const kept = await ask(await seeded(recording), { deps: chatStore().deps });
+  const STORES = /About this chat: this session stores a chat with you in its records, for its organisers, unless the asker turns that off for a chat/;
+  assert.match(kept.prompt, STORES);
+  assert.match((await askSignedOut(await seeded())).prompt, /About this chat: this session does not record chats with you/);
+  // Someone not signed in is told the same of a session that records, and their chat is stored when they ask for it.
+  const store = chatStore();
+  const visitor = await askSignedOut(await seeded(recording), { body: { question: 'What do people want?', store: true }, deps: store.deps });
+  assert.match(visitor.prompt, STORES);
+  assert.equal(visitor.body.stored, true);
+  assert.deepEqual((await store.kept()).map(({ question, by, signedOut }) => ({ question, by, signedOut })), [
+    { question: 'What do people want?', by: undefined, signedOut: true },
+  ]);
+});
+
+test('a General answer is told the counts are on the Results page, and a Detailed one is given them', async () => {
+  const NOT_GIVEN = /you are not given those counts here, beyond any figure the summary itself states\. Asked for other numbers, say that you are not given them and that the Results page shows them, never that there are none\./;
+  const general = await ask(await seeded());
+  assert.equal(general.body.answers, 'general');
+  assert.match(general.prompt, NOT_GIVEN);
+  assert.match((await askSignedOut(await seeded())).prompt, NOT_GIVEN);
+  // Three members answered, so a Detailed answer has their answers and their counts to read.
+  const three = { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+    ok: true,
+    snapshot: {
+      questions: [{ id: 'q1', prompt: 'What should change?', type: 'text' }],
+      responses: ['meet less', 'meet later', 'meet outside'].map((answer, index) => (
+        { questionId: 'q1', answer: `ANSWER ${answer}`, participantId: `participant_00${index + 1}` })),
+    },
+    participantAddresses: new Map([MEMBER, `0x${'7'.repeat(40)}`, `0x${'8'.repeat(40)}`].map((address, index) => [`participant_00${index + 1}`, address])),
+  }) };
+  const detailed = await ask(await seeded(), { address: MEMBER, deps: three });
+  assert.equal(detailed.body.answers, 'detailed');
+  assert.match(detailed.prompt, /ANSWER meet less/);
+  assert.doesNotMatch(detailed.prompt, NOT_GIVEN);
+});
 
 test('nothing asked is kept unless the session stores chats and the asker asked for it', async () => {
   const off = chatStore();

@@ -210,6 +210,14 @@ import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildExplorerAddressUrl } from '../../variables/chains.js';
 import { ethers } from 'ethers';
+import {
+  normalizeSessionName,
+  resolveSessionNamesSource,
+  subscribeSessionNames,
+  type SessionNamesSource,
+} from '../../utilities/session/sessionNames';
+import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
+import { subscribeWorkerSessionToken } from '../../domains/worker/workerGroupPorts';
 
 const accountLog = createLogger('account');
 const CompareAddressSection = React.lazy(() => import('./CompareAddresses'));
@@ -1272,6 +1280,11 @@ class UserPage extends Component<any, any> {
 
   componentDidMount() {
     this._isMounted = true;
+    this._stopSessionNames = [
+      subscribeSessionNames(() => void this.loadSessionNames()),
+      subscribeWorkerSessionToken(() => void this.loadSessionNames()),
+    ];
+    void this.loadSessionNames();
     try {
       if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
         window.addEventListener(PROFILE_SCAN_REPORT_EVENT, this.handleBackgroundProfileScanReport);
@@ -1318,6 +1331,8 @@ class UserPage extends Component<any, any> {
 
   componentWillUnmount() {
     this._isMounted = false;
+    this._stopSessionNames.forEach((stop) => stop());
+    this._stopSessionNames = [];
     this._profileScanRequestSeq += 1;
     try {
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
@@ -1344,6 +1359,7 @@ class UserPage extends Component<any, any> {
   }
 
   componentDidUpdate(prevProps: UserPagePreviousProps, prevState: UnknownRecord) {
+    if (this.sessionNamesKey() !== this._sessionNamesKey) void this.loadSessionNames();
     const analysisProfileChanged = analysisProfileKey(prevProps) !== analysisProfileKey(this.props);
     if (analysisProfileChanged || analysisInputSignature(prevState) !== analysisInputSignature(this.state)) {
       invalidateUserAnalysis(this, analysisProfileChanged);
@@ -1548,9 +1564,61 @@ class UserPage extends Component<any, any> {
     }
   };
 
+  // --- Names people set in the session (its Session Worker keeps them); without one, a username stays here ---
+  _stopSessionNames: Array<() => void> = [];
+  _sessionNamesKey = '';
+  // The key whose names have arrived; until then a Worker session's own name isn't read from this device.
+  _sessionNamesLoadedKey: string | null = null;
+  _pendingSessionName: string | null = null;
+  // Reads can finish out of order (one started before a sign-in came back): only the latest one counts.
+  _sessionNamesLoadSeq = 0;
+
+  sessionNamesOptions = () => ({
+    sessionSlug: normalizeSessionSlug(this.props.sessionSlug ?? this.props.activeSessionSlug ?? ''),
+    sessionConfig: this.props.sessionConfig,
+    account: String(this.props.account || ''),
+  });
+
+  sessionNamesKey = (): string => {
+    const options = this.sessionNamesOptions();
+    const workerUrl = options.sessionSlug
+      ? getUsableSessionWorkerUrl({
+          slug: options.sessionSlug,
+          sessionConfig: options.sessionConfig,
+          requireExactWorkerSession: true,
+        })
+      : '';
+    const namesOff = (options.sessionConfig as { namesEnabled?: unknown } | null)?.namesEnabled === false;
+    return workerUrl ? `${workerUrl}|${options.sessionSlug}|${options.account.toLowerCase()}|${namesOff}` : '';
+  };
+
+  loadSessionNames = async (): Promise<void> => {
+    const key = this.sessionNamesKey();
+    const seq = ++this._sessionNamesLoadSeq;
+    this._sessionNamesKey = key;
+    // Unreachable names are shown as none, and your own name stays on this device until the Worker answers.
+    const source = key ? await resolveSessionNamesSource(this.sessionNamesOptions()).catch(() => null) : null;
+    const names = source ? await source.readAll() : {};
+    if (!this._isMounted || this._sessionNamesKey !== key || seq !== this._sessionNamesLoadSeq) return;
+    this._sessionNamesLoadedKey = key;
+    this.setState({ sessionNamesSource: source, sessionNames: names }, () => {
+      // A name being typed is never overwritten by a reload.
+      if (!this.state.isEditingUsername) this.loadPersistedUsername();
+    });
+  };
+
   loadPersistedUsername = (): void => {
     const { viewAddress, account, network } = this.props;
     if (account && viewAddress && account.toLowerCase() === viewAddress.toLowerCase()) {
+      // A Worker session's names are still on their way: wait, rather than flash this device's name first.
+      if (this.sessionNamesKey() && this._sessionNamesLoadedKey !== this.sessionNamesKey()) return;
+      if (this.state.sessionNamesSource?.enabled) {
+        if (this._isMounted) {
+          const stored = this.state.sessionNames?.[viewAddress.toLowerCase()] || '';
+          this.setState(buildUserPageUsernameLoadedStatePatch({ username: stored }));
+        }
+        return;
+      }
       try {
         const storedUsername = localStorage.getItem(usernameStorageKey(viewAddress, network?.id));
         // With nothing saved this clears the field, so cancelling a first edit drops the typed text.
@@ -2863,6 +2931,11 @@ class UserPage extends Component<any, any> {
 
     if (account && viewAddress && account.toLowerCase() === viewAddress.toLowerCase()) {
       if (!this._isMounted) return;
+      const source = this.state.sessionNamesSource;
+      if (source?.enabled) {
+        this.saveSessionName(source, normalizeSessionName(newUsernameToSet));
+        return;
+      }
       try {
         localStorage.setItem(usernameStorageKey(viewAddress, network?.id), newUsernameToSet);
       } catch (error) {
@@ -2885,6 +2958,36 @@ class UserPage extends Component<any, any> {
         );
       }
     }
+  };
+
+  // The Worker counts each save against a daily limit, so an unchanged name, or one already on its way, isn't sent.
+  saveSessionName = (source: SessionNamesSource, name: string): void => {
+    const viewAddress = String(this.props.viewAddress || '').toLowerCase();
+    const stored = normalizeSessionName(this.state.sessionNames?.[viewAddress]);
+    this.setState(buildUserPageUsernameSaveStatePatch({ username: name }));
+    if (name === stored || name === this._pendingSessionName) return;
+    this._pendingSessionName = name;
+    source
+      .setOwn(name)
+      .then((saved) => {
+        if (!this._isMounted) return;
+        this.setState({
+          sessionNames: { ...this.state.sessionNames, [viewAddress]: saved || '' },
+          ...buildUserPageUsernameLoadedStatePatch({ username: saved || '' }),
+        });
+      })
+      .catch((error: unknown) => {
+        if (!this._isMounted) return;
+        this.setState({
+          ...buildUserPageUsernameErrorStatePatch({
+            usernameError: error instanceof Error && error.message ? error.message : "The name couldn't be saved.",
+          }),
+          isEditingUsername: true,
+        });
+      })
+      .finally(() => {
+        if (this._pendingSessionName === name) this._pendingSessionName = null;
+      });
   };
 
   toggleBookmark = (optionalMeta: BookmarkToggleMeta | React.MouseEvent<HTMLElement> = {}): void => {
@@ -3342,6 +3445,12 @@ class UserPage extends Component<any, any> {
     }
 
     const explorerUrl = this.getExplorerUrl();
+    // Someone else's name from the session; your own shows through the username field.
+    const viewsOwnAccount =
+      !!this.props.account && String(this.props.account).toLowerCase() === String(propViewAddress || '').toLowerCase();
+    const theirSessionName = viewsOwnAccount
+      ? ''
+      : this.state.sessionNames?.[String(propViewAddress || '').toLowerCase()] || '';
     const {
       addressHref,
       addressLabel,
@@ -3358,6 +3467,7 @@ class UserPage extends Component<any, any> {
       minimized,
       nicknameInput: this.state.nicknameInput,
       propViewAddress,
+      sessionName: theirSessionName,
       stateViewAddress: this.state.viewAddress,
       username,
       sessionSlug: this.getProfileSessionSlug(),
@@ -3561,7 +3671,10 @@ class UserPage extends Component<any, any> {
       <div className={rootClassName}>
         <UserPageHeader
           addressDisplay={addressDisplay}
-          addressIsPrivateLabel={!isOwner && !!nicknameToUse}
+          privateLabelTag={
+            !isOwner && nicknameToUse ? (theirSessionName ? `your label: ${nicknameToUse}` : 'your label') : ''
+          }
+          usernameSavedTo={this.state.sessionNamesSource?.enabled ? 'session' : 'device'}
           analyzeButtonDisplayState={analyzeButtonDisplayState}
           avatarDisplayState={avatarDisplayState}
           bookmarkButtonDisplayState={bookmarkButtonDisplayState}

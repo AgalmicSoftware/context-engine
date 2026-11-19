@@ -968,13 +968,25 @@ describe('UserPage analysis cache and routing', () => {
     expect(instance.state).toMatchObject({ analysisDetails: 'new result', analysisServedFromCache: true });
   });
 
+  it("sends no username to the AI, and a name change doesn't count as new input", async () => {
+    const { instance } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({ details: 'result' });
+    await instance.analyzeUser();
+    expect(analyzeUserOpinions.mock.calls[0][0]).not.toHaveProperty('username');
+    expect(JSON.stringify(analyzeUserOpinions.mock.calls[0][0])).not.toContain('Cache Test User');
+    const previous = instance.state;
+    instance.state = { ...previous, username: 'Renamed' };
+    instance.componentDidUpdate(instance.props, previous);
+    expect(instance.state).toMatchObject({ analysisDetails: 'result' });
+  });
+
   it('keeps a closed analysis dialog closed when the same profile refreshes', async () => {
     const { instance } = makeAnalysisCacheInstance();
     analyzeUserOpinions.mockResolvedValueOnce({ details: 'old input result' });
     await instance.analyzeUser();
     instance.setState({ showAnalysisModal: false });
     const previous = instance.state;
-    instance.state = { ...previous, username: 'Updated profile data' };
+    instance.state = { ...previous, sbtList: [] };
     instance.componentDidUpdate(instance.props, previous);
     expect(instance.state).toMatchObject({ analysisDetails: '', showAnalysisModal: false });
     expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
@@ -986,7 +998,7 @@ describe('UserPage analysis cache and routing', () => {
     await instance.analyzeUser();
     expect(instance.state.showAnalysisModal).toBe(true);
     const previous = instance.state;
-    instance.state = { ...previous, username: 'Updated profile data' };
+    instance.state = { ...previous, sbtList: [] };
     instance.componentDidUpdate(instance.props, previous);
     expect(instance.state).toMatchObject({ analysisDetails: '', showAnalysisModal: true });
     switchAnalysisProfile(instance, { viewAddress: '0x00000000000000000000000000000000000000ee' });
@@ -1000,7 +1012,7 @@ describe('UserPage analysis cache and routing', () => {
     const run = instance.analyzeUser();
     await waitFor(() => expect(analyzeUserOpinions).toHaveBeenCalledTimes(1));
     const previous = instance.state;
-    instance.state = { ...previous, username: 'Changed input' };
+    instance.state = { ...previous, sbtList: [] };
     instance.componentDidUpdate(instance.props, previous);
     pending.resolve({ details: 'obsolete input' });
     await run;

@@ -448,6 +448,110 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  # The whole visit and salon-size Results, in the engine of Android browsers and the engine of every
+  # iPhone browser. Beside the smoke job, so WebKit's system packages are off that job's clock.
+  e2e-journey:
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
+    # Playwright 1.58.2 supports Ubuntu 24.04; ubuntu-latest can select 26.04.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, webkit]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+            workers/sessionCorsWorker/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install client dependencies
+        run: npm --prefix client ci
+
+      - name: Install Session Worker dependencies
+        run: npm --prefix workers/sessionCorsWorker ci
+
+      # As in the smoke job: the runner image has Chromium's system libraries.
+      - name: Install Playwright Chromium
+        if: ${{ matrix.engine == 'chromium' }}
+        run: |
+          npx playwright install --only-shell chromium
+          node -e "require('playwright').chromium.launch().then((browser) => browser.close())" \
+            || npx playwright install-deps chromium
+
+      # None of WebKit's system libraries are on the runner image, so apt fetches them every run, and the
+      # package mirror is sometimes very slow. Each part is time-boxed and the install tried twice; if WebKit
+      # still cannot be installed, the leg warns and skips its journeys rather than failing for the mirror.
+      # apt runs as root, so its time box runs as root too: a box run as the runner user cannot stop it.
+      # The binary is called directly so npm writes nothing as root in the runner user's home.
+      - name: Install Playwright WebKit
+        id: webkit
+        if: ${{ matrix.engine == 'webkit' }}
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nDPkg::Lock::Timeout "60";\n' \
+            | sudo tee /etc/apt/apt.conf.d/80-ci-webkit >/dev/null || true
+          for try in 1 2; do
+            if sudo env "PATH=$PATH" timeout -k 30s 3m ./node_modules/.bin/playwright install-deps webkit \
+              && timeout -k 10s 2m npx playwright install webkit \
+              && timeout -k 10s 1m node -e "require('playwright').webkit.launch().then((browser) => browser.close())"; then
+              echo "installed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "WebKit install try $try did not finish."
+            sudo timeout -k 10s 1m dpkg --configure -a || true
+          done
+
+      - name: Report WebKit not installed
+        if: ${{ matrix.engine == 'webkit' && steps.webkit.outputs.installed != 'true' }}
+        run: echo "::warning title=WebKit journeys did not run::WebKit could not be installed on this runner; the WebKit journeys did not run."
+
+      - name: Build client
+        if: ${{ matrix.engine != 'webkit' || steps.webkit.outputs.installed == 'true' }}
+        run: npm --prefix client run build
+
+      - name: Run browser journeys
+        if: ${{ matrix.engine != 'webkit' || steps.webkit.outputs.installed == 'true' }}
+        env:
+          BASE_URL: http://127.0.0.1:4173
+          OUTPUT_DIR: /tmp/context-engine-journey-smoke
+          JOURNEY_ENGINES: ${{ matrix.engine }}
+        run: |
+          set -euo pipefail
+          npm --prefix client run preview -- --host 127.0.0.1 --port 4173 > /tmp/context-engine-vite-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 60); do
+            if curl -fs "$BASE_URL" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS "$BASE_URL" >/dev/null
+          npm run ci:gate -- e2e-journey
+
+      - name: Upload journey diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-journey-${{ matrix.engine }}-diagnostics
+          path: |
+            /tmp/context-engine-vite-preview.log
+            /tmp/context-engine-journey-smoke/
+          if-no-files-found: warn
+          retention-days: 7
+
   test:
     name: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'release-staging') && 'release-staging-pr-deduplicated' || 'test' }}
     runs-on: ubuntu-latest
@@ -460,6 +564,7 @@ jobs:
       - root-jest
       - workers
       - e2e-smoke
+      - e2e-journey
       - cecc-and-node
     if: ${{ always() }}
 
@@ -484,7 +589,7 @@ jobs:
         if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || !startsWith(github.head_ref, 'release-staging') }}
         env:
           CI_GATE_RESULTS_JSON: >-
-            {"wiring-and-release":"${{ needs.wiring-and-release.result }}","public-text":"${{ needs.wiring-and-release.result }}","contracts":"${{ needs.contracts.result }}","client-tests":"${{ needs.client-tests.result }}","client":"${{ needs.client.result }}","root-jest":"${{ needs.root-jest.result }}","workers":"${{ needs.workers.result }}","e2e-smoke":"${{ needs.e2e-smoke.result }}","cecc-and-node":"${{ needs.cecc-and-node.result }}"}
+            {"wiring-and-release":"${{ needs.wiring-and-release.result }}","public-text":"${{ needs.wiring-and-release.result }}","contracts":"${{ needs.contracts.result }}","client-tests":"${{ needs.client-tests.result }}","client":"${{ needs.client.result }}","root-jest":"${{ needs.root-jest.result }}","workers":"${{ needs.workers.result }}","e2e-smoke":"${{ needs.e2e-smoke.result }}","e2e-journey":"${{ needs.e2e-journey.result }}","cecc-and-node":"${{ needs.cecc-and-node.result }}"}
         run: npm run ci:gates:check-hosted
 
       - name: Download tested Worker bundle candidate

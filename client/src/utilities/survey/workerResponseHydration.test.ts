@@ -951,6 +951,87 @@ describe('reading a large listing', () => {
     expect(Math.max(...progress)).toBe(PAGES * 100);
   });
 
+  // A members-only session refuses a signed-out batch; it is read again signed in, and the tab then sends that
+  // route signed in. Six batches sent at once before that would all be read twice.
+  it('holds a signed-in reader to one batch until a signed-out one comes back', async () => {
+    const pending: Array<{ ids: string[]; resolve: (value: unknown[]) => void }> = [];
+    const readBatch = jest.fn(
+      ({ ids }: any) =>
+        new Promise<unknown[]>((resolve) => {
+          pending.push({ ids, resolve });
+        }),
+    );
+    const loading = loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: workerConfig, account: '0xreader' },
+      batchDeps(readBatch),
+    );
+    const settle = async () => {
+      for (let i = 0; i < 200; i += 1) await Promise.resolve();
+    };
+    await settle();
+    expect(pending).toHaveLength(1);
+    const first = pending.shift()!;
+    first.resolve(first.ids.map(payload));
+    await settle();
+    expect(pending).toHaveLength(RESPONSE_BATCH_CONCURRENCY);
+    while (pending.length) {
+      const batch = pending.shift()!;
+      batch.resolve(batch.ids.map(payload));
+      await settle();
+    }
+    expect(await loading).toHaveLength(PAGES * 100);
+    expect(readBatch).toHaveBeenCalledTimes(PAGES);
+  });
+
+  // A members-only session refuses a signed-out load's first page. If the person's sign-in landed while that page
+  // was in the air, the page was sent again signed in and the load read every answer as a reader who had gone,
+  // beside the load the sign-in starts: every answer read twice.
+  it('keeps a load that starts signed out signed out, whoever signs in meanwhile', async () => {
+    const listing = jest.fn(listPage);
+    const readBatch = jest.fn(async ({ ids }: any) => ids.map(payload));
+    for (const account of [undefined, '']) {
+      listing.mockClear();
+      readBatch.mockClear();
+      await loadWorkerResponses(
+        { sessionSlug: 'demo-sh', sessionConfig: workerConfig, account },
+        batchDeps(readBatch, listing),
+      );
+      expect(listing).toHaveBeenCalledTimes(PAGES);
+      expect(readBatch).toHaveBeenCalledTimes(PAGES);
+      expect(listing.mock.calls.map(([options]: any[]) => options.anonymousOnly)).toEqual(Array(PAGES).fill(true));
+      expect(readBatch.mock.calls.map(([options]: any[]) => options.anonymousOnly)).toEqual(Array(PAGES).fill(true));
+    }
+    // One answer at a time, on a Worker without batches, as well.
+    const readBlob = jest.fn(async () => new Response(JSON.stringify(payload('one'))));
+    await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: workerConfig },
+      {
+        listSessionStorageRefsPage: listing,
+        readSessionStorageBlob: readBlob,
+        readWorkerCapabilities: async () => ({ features: [] }) as any,
+      },
+    );
+    expect(readBlob).toHaveBeenCalledTimes(PAGES * 100);
+    expect(readBlob.mock.calls.every(([options]: any[]) => options.anonymousOnly === true)).toBe(true);
+  });
+
+  it('leaves a signed-in reader free to sign its reads, and their own answers signed in', async () => {
+    const listing = jest.fn(listPage);
+    const readBatch = jest.fn(async ({ ids }: any) => ids.map(payload));
+    await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: workerConfig, account: '0xreader' },
+      batchDeps(readBatch, listing),
+    );
+    expect(listing.mock.calls.some(([options]: any[]) => 'anonymousOnly' in options)).toBe(false);
+    expect(readBatch.mock.calls.some(([options]: any[]) => 'anonymousOnly' in options)).toBe(false);
+    const own = jest.fn(async () => ({ items: [], cursor: null, listComplete: true }));
+    await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: workerConfig, account: '0xreader', ownResponses: true },
+      batchDeps(readBatch, own),
+    );
+    expect(own.mock.calls.some(([options]: any[]) => 'anonymousOnly' in options)).toBe(false);
+  });
+
   it('counts each listed page while a reload reuses its cached answers', async () => {
     const readBatch = jest.fn(async ({ ids }: any) => ids.map(payload));
     const progress: Array<[number, number, boolean]> = [];

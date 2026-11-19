@@ -45,7 +45,7 @@ const describeBuild = (build: ResultsBuildSummary): string => {
 };
 
 // A built Results view under one small header: the version picked, with its
-// model and counts beneath, and what the view is behind a "?". The tab names the view.
+// model and counts beside it, and what the view is behind a "?". The tab names the view.
 export default function ResultsBuildPanel({
   build,
   builds,

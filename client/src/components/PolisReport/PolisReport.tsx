@@ -112,7 +112,9 @@ import {
 } from './polisReportRuntime';
 import PolisAnswerSections, { type AnswerSectionsOpen } from './PolisAnswerSections';
 import { buildReportResponseStats, buildReportAnswerQuestions } from './polisReportAnswers';
-import { readPolisReportCacheContext } from './polisReportRuntime';
+import { markPolisAgents, readPolisReportCacheContext } from './polisReportRuntime';
+import { useSessionNames } from '../../utilities/session/useSessionNames';
+import { sessionNameLabels } from '../../utilities/session/sessionNames';
 import {
   buildPolisDemoSurveyResultsNetworkData,
   buildPolisDemoSurveyResultsAggregatorData,
@@ -210,6 +212,7 @@ export default function PolisReport({
   const [allQuestions, setAllQuestions] = useState<string[]>([]);
   const [stats, setStats] = useState<PolisStats | null>(null);
   const [demoDisplayNames, setDemoDisplayNames] = useState<StringMap>({});
+  const [agentResponders, setAgentResponders] = useState<string[]>([]);
 
   // Single SVD-based approach (statements + participants):
   const [participantCoords, setParticipantCoords] = useState<PolisPoint[]>([]);
@@ -292,6 +295,20 @@ export default function PolisReport({
   // Toggling between demo data or real data
   const [useDemoData, setUseDemoData] = useState<boolean>(() => autoUseDemoData);
   const effectiveUseDemoData = useDemoData;
+  // Where the session keeps names, they replace any name an answer carried; answers' own names show only where
+  // the session has no place for names, never while that's still unknown.
+  const sessionNames = useSessionNames({
+    sessionSlug: activeReportSlug,
+    sessionConfig,
+    account: String(account || ''),
+  });
+  const participantNames = useMemo(
+    () =>
+      effectiveUseDemoData || sessionNames.answerNamesShown
+        ? demoDisplayNames
+        : markPolisAgents(sessionNameLabels(sessionNames.names), agentResponders),
+    [sessionNames, effectiveUseDemoData, agentResponders, demoDisplayNames],
+  );
   const usesSimulatedProfiles = effectiveUseDemoData && isBuiltInPolisDemoDataset(activeDemoData);
   const scopedQuestionScanProgress = useMemo(() => {
     if (!questionScanProgress) return null;
@@ -937,6 +954,7 @@ export default function PolisReport({
       setAllQuestions(buildResult.questions);
       setQuestionPrompts(buildResult.promptsMap);
       setDemoDisplayNames(buildResult.displayNamesMap || {});
+      setAgentResponders(buildResult.agents || []);
 
       const labels = buildResult.questions.map((_q, idx) => `#${idx + 1}`);
       setQuestionLabels(labels);
@@ -1371,7 +1389,7 @@ export default function PolisReport({
       return <p style={{ fontStyle: 'italic', marginLeft: '10px' }}>(No participants found.)</p>;
     }
 
-    const unique = getRenderableParticipantList(allResponders, demoDisplayNames);
+    const unique = getRenderableParticipantList(allResponders, participantNames);
 
     if (unique.length === 0) {
       return <p style={{ fontStyle: 'italic', marginLeft: '10px' }}>(No valid participant addresses.)</p>;
@@ -1380,7 +1398,7 @@ export default function PolisReport({
     return (
       <div className={styles.participantsList}>
         {unique.map((addr, idx) => {
-          const displayName = demoDisplayNames[addr];
+          const displayName = participantNames[addr];
           const simulatedName = usesSimulatedProfiles ? displayName : '';
           const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
           const imgSrc = simulatedName ? getPolisHistoricalParticipantAvatar(simulatedName, addr) : getBlockieFor(addr);
@@ -2044,7 +2062,7 @@ export default function PolisReport({
                   const px = xScale(d.x);
                   const py = yScale(d.y);
                   const addr = allResponders?.[d.index];
-                  const displayName = demoDisplayNames?.[addr];
+                  const displayName = participantNames[addr];
                   const linkHref = buildPolisParticipantProfileHref({
                     address: addr,
                     displayName,

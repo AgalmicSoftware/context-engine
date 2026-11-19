@@ -1,5 +1,6 @@
 import {
   deleteFeedback,
+  dictationNeedsSignIn,
   dictationOffered,
   feedbackCsv,
   feedbackOffered,
@@ -117,6 +118,38 @@ describe('sessionFeedbackPorts', () => {
     await expect(dictationOffered({ ...SIGNED_IN, sessionConfig: SPEAKING })).resolves.toBeNull();
     presence.mockRejectedValue(new Error('no Worker'));
     await expect(dictationOffered({ ...SIGNED_IN, sessionConfig: SPEAKING })).resolves.toBeNull();
+  });
+
+  it('tells a visitor signing in would allow speech only where it would: the session pays for AI and gives members transcription', async () => {
+    const membersOnly = { ...WORKER_RUN, workerAuthority: { ...AUTHORITY, anonymousScopes: ['ai'] } };
+    presence.mockResolvedValue({ ai: true, arweave: false, rpc: false, txGas: false });
+    await expect(dictationNeedsSignIn({ ...VISITOR, sessionConfig: membersOnly })).resolves.toBe(true);
+    // A sign-in condition alone stops a visitor too, though visitors are listed for transcription.
+    const gated = {
+      ...WORKER_RUN,
+      workerAuthority: { ...AUTHORITY, loginGate: { conditions: [{ kind: 'worker_group', groupIds: ['salon'] }] } },
+    };
+    await expect(dictationNeedsSignIn({ ...VISITOR, sessionConfig: gated })).resolves.toBe(true);
+    // Not where a visitor may already speak, a member couldn't either, the person is signed in, or it has ended.
+    presence.mockClear();
+    const ended = { ...membersOnly, sessionEndsAt: new Date(Date.now() - 60_000).toISOString() };
+    for (const [who, sessionConfig] of [
+      [VISITOR, SPEAKING],
+      [
+        VISITOR,
+        { ...WORKER_RUN, workerAuthority: { ...AUTHORITY, anonymousScopes: ['ai'], participantScopes: ['ai'] } },
+      ],
+      [SIGNED_IN, membersOnly],
+      [VISITOR, ended],
+    ] as const) {
+      await expect(dictationNeedsSignIn({ ...who, sessionConfig })).resolves.toBe(false);
+    }
+    expect(presence).not.toHaveBeenCalled();
+    // Nor where the session pays for no AI, or its Worker can't be read: nothing is promised.
+    presence.mockResolvedValue({ ai: false, arweave: true, rpc: true, txGas: true });
+    await expect(dictationNeedsSignIn({ ...VISITOR, sessionConfig: membersOnly })).resolves.toBe(false);
+    presence.mockRejectedValue(new Error('no Worker'));
+    await expect(dictationNeedsSignIn({ ...VISITOR, sessionConfig: membersOnly })).resolves.toBe(false);
   });
 
   it('offers no speech once the session has ended, without asking the Worker', async () => {

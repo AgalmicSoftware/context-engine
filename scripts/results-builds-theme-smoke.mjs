@@ -69,7 +69,9 @@ const note = (cell, valence, intensity, comment, participantCount) => ({
   participantCount,
   questionIds: ['q-b1t1'],
 });
-// A strong and a faint cell of each kind, one with both kinds of note, and pairs with none.
+// A strong and a faint cell of each kind, one with both kinds of note, and pairs with none. Eight areas, one with
+// three parts, so on a phone the grid scrolls down as well as sideways, wider than its least width, and the detail
+// grid scrolls too.
 const riskMatrix = {
   id: 'risk_mh1_0a1b2c3d',
   builtAt: '2026-11-08T14:20:00.000Z',
@@ -80,7 +82,12 @@ const riskMatrix = {
   areas: [
     { name: 'Transport', subareas: ['Bus lanes', 'Bike parking'] },
     { name: 'Housing', subareas: ['Rents', 'Repairs'] },
-    { name: 'Safety', subareas: ['Street lighting'] },
+    { name: 'Safety', subareas: ['Street lighting', 'Crossings', 'Night patrols'] },
+    { name: 'Parks', subareas: ['Playgrounds'] },
+    { name: 'Schools', subareas: ['Routes to school'] },
+    { name: 'Water', subareas: ['Mains'] },
+    { name: 'Waste', subareas: ['Collection'] },
+    { name: 'Energy', subareas: ['Heating'] },
   ],
   notes: [
     note('Transport.Bus lanes.Housing.Rents', 'opportunity', 8, 'Faster buses open cheaper neighbourhoods to commuters.', 6),
@@ -307,6 +314,17 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   await step('open topic', () => page.locator('[data-testid^="ce-political-compass-point-"]').first().waitFor({ timeout: 15000 }));
   const panel = page.locator('[class*="modalContent"]').last();
   await step('topic panel', () => assertReadable(panel));
+  // Its close button reaches 44px across and down, for a thumb, in every theme.
+  await step('topic close reach', async () => {
+    const reach = await panel.getByTitle('Close').evaluate((button) => {
+      const box = button.getBoundingClientRect();
+      const [x, y] = [box.left + box.width / 2, box.top + box.height / 2];
+      const hits = (points) => points.filter(([px, py]) => button.contains(document.elementFromPoint(px, py))).length;
+      const offsets = Array.from({ length: 121 }, (_, index) => index - 60);
+      return [hits(offsets.map((d) => [x + d, y])), hits(offsets.map((d) => [x, y + d]))];
+    });
+    assert(Math.min(...reach) >= 44, `The topic window's close button reaches only ${reach.join(' by ')}px`);
+  });
 
   // The summary leads short; its positions open on request.
   const more = panel.getByRole('button', { name: 'Show more' });
@@ -416,6 +434,92 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-tree-${tag}.png` });
 }
 
+// The picker and its model and counts share a row, going under only where both can't fit.
+async function assertHeaderRow(view) {
+  const result = await view.evaluate((root) => {
+    const header = root.querySelector('header');
+    const [picker, meta] = header.children;
+    const width = (el) => el.getBoundingClientRect().width;
+    const sameRow = Math.abs(picker.getBoundingClientRect().top - meta.getBoundingClientRect().top) < 12;
+    const gap = parseFloat(getComputedStyle(header).columnGap) || 0;
+    return { sameRow, fits: width(picker) + gap + width(meta) <= width(header) + 0.5 };
+  });
+  assert.equal(result.sameRow, result.fits, `The version header ${result.sameRow ? 'shares' : 'splits'} its row (fits: ${result.fits})`);
+}
+
+// On a phone a grid scrolls inside its card and keeps its labels in view: scrolled to its far corner, the row
+// labels still sit at its left and the column labels at its top, opaque and on top. On a desktop none stick.
+async function assertPinnedAxes(grid, name, phone, { mustScroll = true } = {}) {
+  // Focus as the keyboard does, so the labels' focus ring is the one a keyboard user sees.
+  await grid.page().keyboard.press('Shift');
+  const result = await grid.evaluate((root, phone) => {
+    const rows = root.querySelectorAll('[data-testid*="header-y-"]');
+    const columns = root.querySelectorAll('[data-testid*="header-x-"]');
+    const rowHead = rows[rows.length - 1];
+    const columnHead = columns[columns.length - 1];
+    if (!phone) return { sticky: [rowHead, columnHead].some((el) => getComputedStyle(el).position === 'sticky') };
+    let box = rowHead.parentElement;
+    while (box && !/auto|scroll/.test(getComputedStyle(box).overflowX)) box = box.parentElement;
+    if (box.scrollWidth <= box.clientWidth + 1) return { fits: true };
+    box.scrollIntoView({ block: 'start' });
+    box.scrollTo(box.scrollWidth, box.scrollHeight);
+    const edge = box.getBoundingClientRect();
+    // Each is read where nothing pinned covers it: a row label at its left, a column label at its right.
+    const onTop = (el, x) => {
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(x(r), r.top + r.height / 2);
+      return el.contains(hit);
+    };
+    const opaque = (el) => !/\/\s*0?\.\d+\s*\)|rgba\([^)]*,\s*0?\.\d+\)|transparent/.test(getComputedStyle(el).backgroundColor);
+    const out = {
+      scrolledX: box.scrollLeft,
+      scrollsY: box.scrollHeight > box.clientHeight + 1,
+      rowLeft: Math.round(rowHead.getBoundingClientRect().left - edge.left),
+      columnTop: Math.round(columnHead.getBoundingClientRect().top - edge.top),
+      onTop: onTop(rowHead, (r) => r.left + 6) && onTop(columnHead, (r) => r.right - 6),
+      opaque: opaque(rowHead) && opaque(columnHead),
+      // The corner covers its whole cell: just inside its top, beside the row labels, no heading or square shows.
+      cornerCovers: !document
+        .elementFromPoint(rowHead.getBoundingClientRect().left + 4, columnHead.getBoundingClientRect().top + 3)
+        ?.closest('[data-testid*="header-x-"], [data-testid*="cell-"]'),
+      // The rim over the gaps between labels draws (a theme's button shadow must not win over it).
+      rim: [rowHead, columnHead].every((el) => /0px 0px 0px 6px/.test(getComputedStyle(el).boxShadow)),
+      backgrounds: [rowHead, columnHead].map((el) => getComputedStyle(el).backgroundColor).join(' | '),
+      // A focused label draws its ring inside itself: outside, a neighbour's rim or the scroll edge covers it.
+      ring: [rowHead, columnHead].map((el) => {
+        el.focus({ preventScroll: true });
+        const style = getComputedStyle(el);
+        const inside =
+          el.matches(':focus-visible') &&
+          style.outlineStyle !== 'none' &&
+          parseFloat(style.outlineWidth) >= 2 &&
+          parseFloat(style.outlineOffset) <= -parseFloat(style.outlineWidth);
+        const seen = `${el.matches(':focus-visible')} ${style.outlineStyle} ${style.outlineWidth} ${style.outlineOffset}`;
+        el.blur();
+        return inside || seen;
+      }),
+    };
+    box.scrollTo(0, 0);
+    return out;
+  }, phone);
+  if (!phone) {
+    assert(!result.sticky, `${name}: labels stick on a desktop`);
+    return;
+  }
+  if (result.fits) {
+    assert(!mustScroll, `${name}: the grid doesn't scroll sideways`);
+    return;
+  }
+  console.log(`${name}: labels held while it scrolled ${result.scrollsY ? 'both ways' : 'sideways'}`);
+  assert(Math.abs(result.rowLeft) <= 1, `${name}: the row labels moved ${result.rowLeft}px from the left`);
+  if (result.scrollsY) assert(Math.abs(result.columnTop) <= 1, `${name}: the column labels moved ${result.columnTop}px from the top`);
+  assert(result.onTop, `${name}: a square shows over the labels`);
+  assert(result.opaque, `${name}: the labels are see-through (${result.backgrounds})`);
+  assert(result.cornerCovers, `${name}: a heading or square shows in the corner`);
+  assert(result.rim, `${name}: the rim between the labels doesn't draw`);
+  assert(result.ring.every((ring) => ring === true), `${name}: a focused label's ring isn't drawn inside it (${result.ring})`);
+}
+
 // A built risk matrix: its stamp, picker and "?", its cells in each state, a
 // cell's notes, and the detail grid of the two areas it joins.
 export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } = {}) {
@@ -444,6 +548,20 @@ export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } =
   await help.blur();
   const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
   assert(overflow <= 1, `The page scrolls sideways by ${overflow}px`);
+  await step('risk matrix header row', () => assertHeaderRow(view));
+  const phone = page.viewportSize().width <= 768;
+  const matrix = view.locator('section').filter({ has: page.locator('[data-testid^="ce-risk-matrix-header-y-"]') }).last();
+  await step('risk matrix pinned labels', () => assertPinnedAxes(matrix, 'risk matrix', phone));
+  // On a phone the grid takes the Results panel's width: only the card's border and thin side remain (16px on a desktop).
+  await step('risk matrix side room', async () => {
+    const inset = await view.evaluate((root) => {
+      const row = [...root.querySelectorAll('[data-testid^="ce-risk-matrix-header-y-"]')].pop();
+      let box = row.parentElement;
+      while (box && !/auto|scroll/.test(getComputedStyle(box).overflowX)) box = box.parentElement;
+      return Math.round(box.getBoundingClientRect().left - root.querySelector('[data-testid="ce-risk-matrix"]').getBoundingClientRect().left);
+    });
+    assert(phone ? inset <= 9 : inset === 17, `The grid starts ${inset}px inside the matrix`);
+  });
 
   // The strongest opportunity and risk, and a faint cell holding both kinds.
   for (const pair of ['transport-vs-housing', 'housing-vs-safety', 'safety-vs-transport']) {
@@ -492,6 +610,8 @@ export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } =
     await assertReadable(modal);
   });
   await modal.getByRole('button', { name: 'Close', exact: true }).last().click();
+  await modal.waitFor({ state: 'hidden' });
+  await step('detail grid pinned labels', () => assertPinnedAxes(subgrid, 'detail grid', phone, { mustScroll: false }));
   const detailOverflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
   assert(detailOverflow <= 1, `The page scrolls sideways by ${detailOverflow}px with the detail grid open`);
   if (screenshotDir) await subgrid.screenshot({ path: `${screenshotDir}/risk-matrix-detail-${tag}.png` });
@@ -538,7 +658,9 @@ export async function runResultsBuildsThemeSmoke() {
     for (const theme of themes) {
       for (const width of widths) {
         const tag = `${theme}-${width}`;
-        const context = await browser.newContext({ viewport: { width, height: 900 } });
+        // Phones at their own heights, so a grid that scrolls inside its card does here too.
+        const height = { 360: 640, 375: 667, 390: 844 }[width] || 900;
+        const context = await browser.newContext({ viewport: { width, height } });
         await installBuildFixtures(context, base);
         await context.addInitScript((value) => {
           localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');

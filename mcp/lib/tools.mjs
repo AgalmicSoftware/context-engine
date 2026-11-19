@@ -48,11 +48,11 @@ export const buildTools = (participant) => [
     name: 'set_profile',
     title: 'Set display profile',
     description:
-      'Set the display name shown beside your answers in session reports (for example your handle), and the self-reported model and platform recorded with them. A model or platform your host already set stays as it set it. Leave modelId and platform out unless you know them exactly; never guess one.',
+      'Set the display name shown beside your answers in session reports (for example your handle), and the self-reported model and platform recorded with them. A session whose Worker keeps names saves it as your name there, shown to its members in place of your address; the result says whether each joined session took it. A model or platform your host already set stays as it set it. Leave modelId and platform out unless you know them exactly; never guess one.',
     inputSchema: {
       type: 'object',
       properties: {
-        displayName: text('Name shown in reports; up to 80 characters. Empty string clears it.'),
+        displayName: text('Name shown in reports; up to 80 characters, and up to 32 where a session keeps names. Empty string clears it.'),
         modelId: text('The exact id of the model you run on. Leave it out if you are not sure; never guess.'),
         platform: text('Agent platform or harness, if you know it exactly. Leave it out otherwise.'),
       },
@@ -214,13 +214,13 @@ export const buildTools = (participant) => [
     name: 'get_results',
     title: 'Get results',
     description:
-      'Summarize everyone’s latest answers per question when the session shows results to everyone or to its signed-in members: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished (it stops after about 40 seconds so the call returns in time), capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
+      'Summarize everyone’s latest answers per question when the session shows results to everyone or to its signed-in members: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished (it stops after about 40 seconds so the call returns in time), capped, or any listed question or answer payload could not be read; then the counts are not the session’s totals, and next says why and how to read the rest. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
     inputSchema: {
       type: 'object',
       properties: {
         session: sessionParam,
         questionIds: { type: 'array', items: { type: 'string' }, description: 'Limit to these questions.' },
-        maxRecords: { type: 'integer', minimum: 1, maximum: 10000, description: 'Most answer records to read (default and most 10000).' },
+        maxRecords: { type: 'integer', minimum: 1, maximum: 10000, description: 'Most answer records to read, newest first (default and most 10000). Fewer than the session holds gives partial counts.' },
       },
       additionalProperties: false,
     },
@@ -231,7 +231,7 @@ export const buildTools = (participant) => [
     name: 'ask_session_agent',
     title: 'Ask the session’s agent',
     description:
-      'Ask the session’s own Session Agent one question about the session, when it has one and its admins let you ask. It answers from the session’s context, results and, for some askers, members’ answers, naming no one, in at most 150 words. Chats with a session’s agent can be recorded when the session’s recording setting is on: get_session shows this session’s setting as sessionAgent.recording. While it is on, this call stores your question and the answer for the session’s organisers, who may export them, unless you pass store false; your address is stored only if you pass attribution "address". While it is off, nothing is kept. Returns the answer, how much it drew on, and whether the chat was stored.',
+      'Ask the session’s own Session Agent one question about the session, when it has one and its admins let you ask. It answers from the session’s context, results and, for some askers, members’ answers, naming no one, in at most 150 words. Chats with a session’s agent can be recorded when the session’s recording setting is on: get_session shows this session’s setting as sessionAgent.recording. While it is on, this call stores your question and the answer for the session’s organisers, who may export them, unless you pass store false; your address is stored only if you pass attribution "address". While it is off, nothing is kept. Returns the answer, how much it drew on, and whether the chat was stored: stored says so, and chat says it in a sentence to pass on with the answer.',
     inputSchema: {
       type: 'object',
       properties: {

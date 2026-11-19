@@ -135,6 +135,19 @@
   .hint {
     flex: 1 1 200px;
   }
+
+  // A microphone error takes its own line under the row, so Ask keeps its place.
+  [role='alert'] {
+    order: 1;
+  }
+}
+
+// On a phone the three don't fit one line: the hint takes the line above, so the microphone and Ask stay
+// together on the right.
+@media (max-width: 420px) {
+  .withMic .hint {
+    flex-basis: 100%;
+  }
 }
 
 // The accent pair, which every theme keeps readable, in each state.
@@ -173,6 +186,44 @@
 .answerText {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+// What the answer read. Its links keep the dialog's own text colour, underlined: the page's link colour is
+// for another surface.
+.sources {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+
+  summary {
+    cursor: pointer;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 1.2rem;
+  }
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover,
+  &:focus,
+  &:active {
+    background: transparent;
+    color: inherit;
+  }
 }
 
 .switches {

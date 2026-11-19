@@ -176,7 +176,7 @@ function verifyRootScripts(rootDir, failures) {
     ['contracts', 'client-tests', 'client', 'root-jest', 'workers', 'cecc-and-node'].forEach((gateName) => {
       expectProfileGate('ci', ciProfile, gateName);
     });
-    ['contracts', 'client-tests', 'client', 'root-jest', 'workers', 'e2e-smoke', 'cecc-and-node'].forEach((gateName) => {
+    ['contracts', 'client-tests', 'client', 'root-jest', 'workers', 'e2e-smoke', 'e2e-journey', 'cecc-and-node'].forEach((gateName) => {
       expectProfileGate('hosted', hostedProfile, gateName);
     });
     [
@@ -189,6 +189,8 @@ function verifyRootScripts(rootDir, failures) {
       ['root-jest', 'npm run test:root:jest'],
       ['workers', 'npm run test:worker:session-cors'],
       ['e2e-smoke', 'npm run test:e2e:smoke'],
+      ['e2e-journey', 'npm run test:e2e:journey'],
+      ['e2e-journey', 'npm run test:e2e:results-salon'],
       ['cecc-and-node', 'npm run test:node:tracked'],
       ['cecc-and-node', 'npm run test:cache-guard'],
       ['release', 'npm run typecheck:client-tests'],
@@ -217,6 +219,7 @@ function verifyRootScripts(rootDir, failures) {
       ['root-jest', 'run: npm run ci:gate -- root-jest'],
       ['workers', 'run: npm run ci:gate -- workers'],
       ['e2e-smoke', 'npm run ci:gate -- e2e-smoke'],
+      ['e2e-journey', 'npm run ci:gate -- e2e-journey'],
       ['cecc-and-node', 'run: npm run ci:gate -- cecc-and-node'],
     ].forEach(([label, expected]) => {
       if (!workflow.includes(expected)) {

@@ -97,6 +97,12 @@ session's own, built from everyone's answers, so they are read as the Results
 page shows them. If members' answers can't be read
 for a question, the answer goes ahead without them and says so.
 
+The published results are a summary in words, without counts. An answer that
+reads no member's answers, as every General answer does, is told so: that how
+many members gave each answer is on the Results page and is not given to it,
+beyond any figure the summary itself states. Asked for other numbers it then
+says it is not given them, not that there are none.
+
 Someone who is not an admin gets nothing from a question that fewer than three
 members answered, counting only members who have not kept their answers out:
 a count of one, or the one answer left when the asker keeps their own out,
@@ -106,8 +112,17 @@ admin can lower the three with the setting's `minAnswers` (a whole number from
 sets to 1 when turned off. At 1 the rule is off: a question only one member
 answered is used, so that person's answer can come back as the members' view.
 
-One question reads at most 8,000 characters of context, 2,000 of results and
-24,000 of answers. For each question members answered, a Detailed answer is
+One question reads at most 320,000 characters of context, 2,000 of results and
+24,000 of answers. The context is read whole where it fits: each added file or
+link to 12,000 characters, from up to 48 of them, the admins' first and then
+each adder's in turn. A session whose Session Agent answers on Cloudflare's
+model reads less, 160,000 characters and 6,000 of each item, the most that
+model was tried at. These are characters of English-like text: text in other
+scripts takes more tokens a character, so fewer characters of it are read,
+about half as many in most scripts and a quarter as many in Chinese, Japanese
+and Korean. A full question is then about 60,000 tokens of input whatever the
+language, the largest size tried, so the AI provider's rate limit, not this
+number, decides how many people can ask at once. For each question members answered, a Detailed answer is
 given how many answered and, where the question has set options (agree or
 disagree, a rating, a choice), how many chose each, with what a rating's
 numbers mean. These counts cover every member's answer, however large the
@@ -123,6 +138,49 @@ wrote, the close questions before the rest. If some questions' answers still do
 not fit, the agent is told how many were left out. In a session of 50 people
 and about 50 questions that is every count, the written answers to the closest
 questions, and a few from each of the others.
+
+## Who the dialog says gets Detailed answers
+
+Above the question box the dialog says which answers the person gets. For
+General answers its "?" also says who the session gives Detailed ones, read
+from the session's own audiences as the Worker judges them: members of some of
+its groups, people holding certain digital credentials, people who sign in,
+or, when no audience gives Detailed answers, only its admins. An audience that
+an earlier one already answers is passed over, as the first audience to admit
+a person sets their answers.
+
+## What an answer says it read
+
+Under each answer the dialog says how much it drew on: items of context,
+the results, members' answers.
+
+- **The context items.** Someone signed in can open that line to see which
+  items the answer read: the session's own notes and links, then each added
+  file or link by its name, with a link's address. Every item listed is one
+  that person may read, group locks included, because the answer was only ever
+  given what they may read. Someone not signed in gets the count alone: they are
+  answered from what a first sign-in could read, which the page may not list
+  to a visitor.
+- **Questions.** Up to five questions are linked, each to its own page: those
+  whose answers the agent read (Detailed), or else those the published results
+  cite (General), that share a topic word with the question asked. The dialog
+  says which of the two they are. Only a question's own words are compared,
+  never what members wrote, so a name or detail from an answer links nothing.
+  A question an admin has removed, in the session's settings or from the
+  Storage panel, is not linked.
+- **Results.** An answer that read the results offers **Open Results**.
+
+The list is of what the prompt held, not of what the model used: it does not
+say which item a sentence came from.
+
+## Asking by voice
+
+The question box has a microphone wherever an answer box would: the session
+pays for AI, has not ended, and gives this person transcription, signed in or
+not. Speech is written down by the session's Worker on the same route and
+limits as a spoken answer, and joins the end of what is typed, up to the 500
+characters a question may have. A visitor the session writes no speech down
+for is told signing in would allow it.
 
 ## Instructions and rules
 
@@ -155,9 +213,12 @@ them:
 
 The rules are instructions to an AI model, not a filter: nothing removes what
 a member wrote about themselves before the model reads it, and nothing checks
-the reply. In trials with made-up data the agent never named a participant,
-but asked what a participant described by their role had said, it still passed
-on that person's view, unnamed, in most replies. A session that needs stronger
+the reply. In trials with made-up data the agent never named a participant on
+an OpenAI model, with up to 320,000 characters of context. On Cloudflare's
+model it did once in 24 questions about that participant, quoting what they
+wrote about themselves, with 160,000 characters of context; and asked what a
+participant described by their role had said, it still passed on that
+person's view, unnamed, in most replies. A session that needs stronger
 protection should give every audience General answers: that style reads no
 member's written answers, only the shared context, files and published
 results. Admins always get Detailed answers.
@@ -240,7 +301,7 @@ diff, and a changed one shows what changed.
   "agent": {
     "instructions": { "general": "…", "detailed": "…" },
     "rules": ["…"],
-    "limits": { "questionChars": 500, "answerWords": 150, "contextChars": 8000, "resultsChars": 2000, "answersChars": 24000, "answerItemChars": 300 },
+    "limits": { "questionChars": 500, "answerWords": 150, "contextChars": 320000, "resultsChars": 2000, "answersChars": 24000, "answerItemChars": 300 },
     "audiences": [{ "who": { "match": "any", "conditions": [{ "kind": "worker_group", "groupIds": ["salon"] }] }, "answers": "detailed" }],
     "minAnswers": 3
   },
@@ -335,7 +396,7 @@ by elimination: leaving an address off is not anonymity within a small group.
 | `unreadableContext` | Context items that will never be read: stored text that is missing, larger than 1 MiB, or empty, such as a link whose page gave no text |
 | `resultsNotForEveryone` | 1 when the published results stayed out because not everyone the session admits may see them |
 | `membersWithoutAddress` | Group members with no address |
-| `answersNotRead` | 1 when every question and answer stayed out because the session stores more question and answer versions than the agent can read at once (10,000) |
+| `answersNotRead` | 1 when every question and answer stayed out because the session's stored questions and answers pass a limit on what the agent reads at once, such as 10,000 versions or 8 MiB of answers |
 
 Withheld and locked answers, hidden questions, secrets, keys and Worker
 addresses are never in the file. The `results` items are the text of the
@@ -416,6 +477,14 @@ Nothing asked or answered is kept unless an admin turns on **Record chats** in
 the Session Agent's settings (`history: true`). It is off by default, and
 turning it on or off signs no one out.
 
+The agent itself is told which it is on every question, after its rules:
+that the session does not record chats, or that it stores one unless the asker
+turns that off for a chat, and that the asker is shown whether this one was. Asked whether the
+chat is recorded, it then answers from the session's setting. The answer's
+own text never carries a line about recording: the dialog and the reply's
+`stored` field say that, and a stored chat keeps the answer as the agent
+wrote it.
+
 While it is on, the dialog shows **Store this chat**, ticked to start, with a
 "?" saying what that means. A chat is stored only when its asker leaves the
 box ticked. Signed in with an address, they choose **No address**, which is
@@ -489,16 +558,21 @@ other signed-in routes.
   person can still set their switches; `ask` then refuses with `410` or with
   `403` (`ai_disabled`).
 - `POST /session-agent/ask` with `{ question }` (at most 500 characters) returns
-  `{ answer, answers, audience, read, note?, stored? }`. While the session
+  `{ answer, answers, audience, read, sources?, questions?, note?, stored? }`. While the session
   records chats it also takes `store` (true to keep this chat), `attribution`
   (`address` or `anonymous`, the default) and `name` (60 characters at most),
   and `stored` says whether the chat was kept; nothing is kept without
   `store: true`. `read` says how much the answer
   drew on: `{ context, results, answers }`, as a count of context items, whether
-  it read the results, and a count of members' answers. The answer is at most
-  1,500 characters. `note` says what wasn't read: members' answers past the
-  stored-versions limit, or context past the 8,000 characters or 16 items
-  ("Some of the session's context wasn't read: …").
+  it read the results, and a count of members' answers. `sources` lists the
+  context items counted, each `{ kind, title, url?, readByAi? }` with `kind`
+  one of `session-link`, `session-note`, `link` or `file`, and is sent only to
+  someone signed in. `questions` lists up to five `{ id, question }` closest to
+  the one asked, and `questionsFrom` says whether they are questions whose
+  `answers` the prompt held or ones the published `results` cite. The answer is at most
+  1,500 characters. `note` says what wasn't read: members' answers past a
+  read limit (10,000 versions, 8 MiB of answers or 32 MiB stored), or context past the 320,000 characters or 48 items
+  (160,000 on Cloudflare's model; "Some of the session's context wasn't read: …").
 - `POST /session-agent/opt-out` with `{ optedOut: true | false }` returns
   `{ optedOut }`.
 - `POST /session-agent/attribution` with `{ unattributed: true | false }`

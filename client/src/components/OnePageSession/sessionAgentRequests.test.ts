@@ -33,6 +33,9 @@ describe('sessionAgentRequests', () => {
       answer: 'An answer.',
       answers: 'detailed',
       read: { context: 3, results: true, answers: 4 },
+      sources: null,
+      questions: [],
+      questionsFrom: 'answers',
       note: '',
       stored: null,
     });
@@ -59,6 +62,47 @@ describe('sessionAgentRequests', () => {
     expect(fetchWorker.mock.calls[2][1]?.body).toBe(JSON.stringify({ unattributed: true }));
     reply(200, { unattributed: false });
     await expect(setSessionAgentUnattributed(false, OPTIONS)).resolves.toBe(false);
+  });
+
+  it('reads what an answer drew on, keeping only what it can show and only web addresses as links', async () => {
+    reply(200, {
+      answer: 'An answer.',
+      answers: 'general',
+      read: { context: 4, results: true, answers: 0 },
+      sources: [
+        { kind: 'session-link', title: 'Charter', url: 'https://example.org/charter' },
+        { kind: 'session-note', title: 'A note.' },
+        { kind: 'link', title: 'Sneaky', url: 'javascript:alert(1)' },
+        { kind: 'file', title: 'report.pdf', readByAi: true, uploader: '0xabc' },
+        { kind: 'file', title: '  ' },
+        { kind: 'something-new', title: 'Unknown kind' },
+        'not an item',
+      ],
+      questions: [
+        { id: '0xq1', question: 'Shorter meetings?' },
+        { id: '', question: 'No id' },
+        { id: '0xq2' },
+        // An id goes into a link's path: one that could change the link is dropped.
+        { id: '0xq3?session=other', question: 'Sneaky id' },
+        { id: '../admin', question: 'Another' },
+        null,
+      ],
+      questionsFrom: 'results',
+    });
+    const answer = await askSessionAgent('Why?', OPTIONS);
+    expect(answer.sources).toEqual([
+      { kind: 'session-link', title: 'Charter', url: 'https://example.org/charter', readByAi: false },
+      { kind: 'session-note', title: 'A note.', url: '', readByAi: false },
+      { kind: 'link', title: 'Sneaky', url: '', readByAi: false },
+      { kind: 'file', title: 'report.pdf', url: '', readByAi: true },
+    ]);
+    expect(answer.questions).toEqual([{ id: '0xq1', question: 'Shorter meetings?' }]);
+    expect(answer.questionsFrom).toBe('results');
+    // A Worker that lists nothing for this asker gives no list at all, which is not an empty one.
+    reply(200, { answer: 'An answer.', answers: 'general', read: { context: 2 }, sources: [] });
+    expect((await askSessionAgent('Why?', OPTIONS)).sources).toEqual([]);
+    reply(200, { answer: 'An answer.', answers: 'general', read: { context: 2 } });
+    expect((await askSessionAgent('Why?', OPTIONS)).sources).toBeNull();
   });
 
   it('reads how the Worker would answer, and nothing it doesn’t know', async () => {

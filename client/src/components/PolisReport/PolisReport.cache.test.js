@@ -25,6 +25,7 @@ import PolisReport, {
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
 import { buildReportResponseStats } from './polisReportAnswers';
+import { useSessionNames } from '../../utilities/session/useSessionNames';
 import { buildUmapParticipantData, clusterExploratoryPoints, rememberClusterAnalysis } from './polisReportRuntime';
 import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
 import { clusterUMAPPointsKmeans, doUMAP } from '../../utilities/survey/consensusMath';
@@ -49,6 +50,9 @@ jest.mock('html2canvas', () => ({
   default: jest.fn(async () => ({ width: 100, height: 100 })),
 }));
 jest.mock('jspdf', () => ({ __esModule: true, jsPDF: function JsPdfStub() {} }));
+jest.mock('../../utilities/session/useSessionNames', () => ({
+  useSessionNames: jest.fn(() => ({ source: null, names: {}, answerNamesShown: true })),
+}));
 jest.mock('../../utilities/ui/browserPdfExport', () => ({
   ...jest.requireActual('../../utilities/ui/browserPdfExport'),
   saveCanvasAsPagedPdf: jest.fn(),
@@ -273,6 +277,68 @@ describe('PolisReport participant profile links', () => {
     expect(link).toHaveAttribute('href', `/u/${addresses[0]}?session=rxc-ra-test`);
     expect(link.parentElement.querySelector('img')).toHaveAttribute('src', 'data:image/png;base64,mock-blockie');
     expect(screen.queryByTestId('ce-polis-participant-avatar-Franklin')).not.toBeInTheDocument();
+  });
+
+  it("shows the session's names in place of names answers carried, still marking agents", async () => {
+    const addresses = ['1', '2', '3'].map((digit) => `0x${digit.repeat(40)}`);
+    const responses = {
+      q1: addresses.map((responder, index) => ({
+        responder,
+        questionId: 'q1',
+        response: JSON.stringify({
+          type: 'binary',
+          prompt: 'Agree?',
+          responderName: index === 0 ? 'Franklin' : '',
+          ...(index === 2 ? { participant: { kind: 'agent', verification: 'self_reported' } } : {}),
+          answer: { value: index ? 'Disagree' : 'Agree' },
+        }),
+      })),
+    };
+    jest.mocked(useSessionNames).mockReturnValue({
+      source: { enabled: true, readAll: jest.fn(), setOwn: jest.fn() },
+      names: { [addresses[1]]: 'Sam', [addresses[2]]: 'Sam' },
+      answerNamesShown: false,
+    });
+
+    try {
+      render(<PolisReport {...baseReportProps} slug="rxc-ra-test" questionResponses={responses} />);
+
+      // The list shows each label twice: in full, and short for narrow screens.
+      expect(await screen.findByRole('link', { name: new RegExp(`^Sam · ${addresses[1]}`) })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: new RegExp(`^Sam · ${addresses[2]} \\(agent\\)`) })).toBeInTheDocument();
+      expect(screen.queryByText(/Franklin/)).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: new RegExp(`^${addresses[0]}`) })).toBeInTheDocument();
+    } finally {
+      jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: true });
+    }
+  });
+
+  it("shows no name an answer carried while a Worker session's names are unknown", async () => {
+    const responder = `0x${'4'.repeat(40)}`;
+    const responses = {
+      q1: [
+        {
+          responder,
+          questionId: 'q1',
+          response: JSON.stringify({
+            type: 'binary',
+            prompt: 'Agree?',
+            responderName: 'Franklin',
+            answer: { value: 'Agree' },
+          }),
+        },
+      ],
+    };
+    jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: false });
+
+    try {
+      render(<PolisReport {...baseReportProps} slug="rxc-ra-test" questionResponses={responses} />);
+
+      expect(await screen.findByRole('link', { name: new RegExp(`^${responder}`) })).toBeInTheDocument();
+      expect(screen.queryByText(/Franklin/)).not.toBeInTheDocument();
+    } finally {
+      jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: true });
+    }
   });
 
   it('keeps simulated-user links and portraits for the built-in demo participants', async () => {

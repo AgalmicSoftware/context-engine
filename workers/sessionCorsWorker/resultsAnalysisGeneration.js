@@ -41,7 +41,7 @@ import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 import { buildParticipantContextPrompt } from './contextSourceLoader.js';
 import { formatValidAnalysisAnswer, readStoredRating } from './resultsAnalysisAnswerValidation.js';
 import { DEFAULT_RATING_SCALE, normalizeRatingScale, ratingStepFor } from '../../shared/questions/ratingScale.mjs';
-import { RESULTS_ANALYSIS_SCAN_LIMITS, createResultsAnalysisScanBudget, isStorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
+import { RESULTS_ANALYSIS_SCAN_LIMITS, RESULTS_BUILD_PAYLOAD_BYTES, createResultsAnalysisScanBudget, isStorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 
 
 const readCoordinatedResultsAnalysisStatusDefault = async (args = {}) => (
@@ -522,6 +522,35 @@ const toResponseRow = (metadata, payload, config) => ({
   encrypted: metadata.encrypted === true || metadata.payloadEncrypted === true || payload.encrypted === true || payload.payloadEncrypted === true,
 });
 
+// An answer as a build keeps it, counted against the build's answer budget:
+// research material is stored with some answers but no build reads it.
+const ANSWER_READ_SLICE = 500;
+const ANSWER_READ_SLICE_BYTES = 4 * 1024 * 1024;
+// Rows in slices of at most 500, or of about 4 MiB as their metadata gives
+// their stored sizes, so a slice's stored bytes are dropped before the next.
+export const answerSlices = (rows) => {
+  const slices = [];
+  let slice = [];
+  let bytes = 0;
+  for (const row of rows) {
+    const size = Number(row?.metadata?.size) || 0;
+    if (slice.length && (slice.length === ANSWER_READ_SLICE || bytes + size > ANSWER_READ_SLICE_BYTES)) {
+      slices.push(slice);
+      slice = [];
+      bytes = 0;
+    }
+    slice.push(row);
+    bytes += size;
+  }
+  if (slice.length) slices.push(slice);
+  return slices;
+};
+const keptAnswer = (payload, budget) => {
+  const { interviewProvenance: _research, ...kept } = payload;
+  budget.answer(kept);
+  return kept;
+};
+
 const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, committedResponses = [], budget, latestOnly = true }) => {
   const index = getStorageIndexBinding(env);
   if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
@@ -583,38 +612,41 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
   const rows = latestOnly
     ? await listLatestResponseRows({ index, slug, sessionId: buildSessionIdOf(config), budget })
     : await listCloudflareMetadataRows({ index, slug, resource: 'responses', budget, strict: true });
-  const readResponsePayload = await readPayloads(rows.map((row) => row?.metadata)
-    .filter((metadata) => isObj(metadata) && trim(metadata.responder) && !isEncrypted(metadata)));
   const responseRows = [];
   let excludedCount = 0;
   let lockedCount = 0;
-  for (const row of rows) {
-    if (row?.listed) {
-      const { questionId, responder, id, createdAt } = row.listed;
-      const version = { questionId, __trustedParticipantId: responder, __storageRefId: id, responder,
-        createdAt, submittedAt: createdAt, timestamp: createdAt };
-      listedVersions.add(version);
-      responseRows.push(version);
-      continue;
+  // A slice's stored bytes are dropped once its answers are kept.
+  for (const slice of answerSlices(rows)) {
+    const readResponsePayload = await readPayloads(slice.map((row) => row?.metadata)
+      .filter((metadata) => isObj(metadata) && trim(metadata.responder) && !isEncrypted(metadata)));
+    for (const row of slice) {
+      if (row?.listed) {
+        const { questionId, responder, id, createdAt } = row.listed;
+        const version = { questionId, __trustedParticipantId: responder, __storageRefId: id, responder,
+          createdAt, submittedAt: createdAt, timestamp: createdAt };
+        listedVersions.add(version);
+        responseRows.push(version);
+        continue;
+      }
+      const metadata = row?.metadata;
+      if (!isObj(metadata) || !trim(metadata.responder)) {
+        excludedCount += 1;
+        continue;
+      }
+      // Encrypted bytes do not say which question they answer, so these rows
+      // cannot be matched to an older answer.
+      if (isEncrypted(metadata)) {
+        excludedCount += 1;
+        if (metadataAccessMatchesPublishedAudience(metadata, config)) lockedCount += 1;
+        continue;
+      }
+      const payload = parseJsonBytes(await readResponsePayload(metadata));
+      if (!isObj(payload)) {
+        excludedCount += 1;
+        continue;
+      }
+      responseRows.push(toResponseRow(metadata, keptAnswer(payload, budget), config));
     }
-    const metadata = row?.metadata;
-    if (!isObj(metadata) || !trim(metadata.responder)) {
-      excludedCount += 1;
-      continue;
-    }
-    // Encrypted bytes do not say which question they answer, so these rows
-    // cannot be matched to an older answer.
-    if (isEncrypted(metadata)) {
-      excludedCount += 1;
-      if (metadataAccessMatchesPublishedAudience(metadata, config)) lockedCount += 1;
-      continue;
-    }
-    const payload = parseJsonBytes(await readResponsePayload(metadata));
-    if (!isObj(payload)) {
-      excludedCount += 1;
-      continue;
-    }
-    responseRows.push(toResponseRow(metadata, payload, config));
   }
   // After the stored rows: the queue holds a shortened copy, and on an exact tie
   // the first row stays. A queued row matters only until the listing shows it.
@@ -627,7 +659,7 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
       excludedCount += 1;
       continue;
     }
-    responseRows.push(toResponseRow(metadata, payload, config));
+    responseRows.push(toResponseRow(metadata, keptAnswer(payload, budget), config));
   }
   const normalized = await normalizeSanitizedRows({ rows: responseRows, questions, slug, config, strictLocked: false, requireKnownQuestion: true, listedVersions });
   if (!normalized.ok) return normalized;
@@ -643,9 +675,19 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
 
 // Each person's latest answer to a question counts, with every version of
 // answers stored before answers named their question.
-const snapshotLimitText = (kind) => (kind === 'rows' || kind === 'listed'
-  ? `AI builds read at most ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} stored question and answer versions at once, and this session stores more.`
-  : 'This session’s stored questions and answers are too large for an AI build to read at once.');
+const MIB = 1024 * 1024;
+const snapshotLimitText = (kind) => {
+  if (kind === 'rows' || kind === 'listed') {
+    return `AI builds read at most ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} stored question and answer versions at once, and this session stores more.`;
+  }
+  if (kind === 'answerBytes') {
+    return `The answers an AI build reads for this session hold more than ${RESULTS_ANALYSIS_SCAN_LIMITS.answerBytes / MIB} MiB of text, the most it reads at once.`;
+  }
+  if (kind === 'payloadBytes') {
+    return `This session’s stored questions and answers, research material included, are larger than the ${RESULTS_BUILD_PAYLOAD_BYTES / MIB} MiB an AI build reads at once.`;
+  }
+  return 'This session’s stored questions and answers are too large for an AI build to read at once.';
+};
 
 const SNAPSHOT_CHANGED = {
   ok: false, status: 503, reason: 'results_analysis_snapshot_unavailable',
@@ -654,7 +696,7 @@ const SNAPSHOT_CHANGED = {
 
 export const loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
   try {
-    const first = createResultsAnalysisScanBudget();
+    const first = createResultsAnalysisScanBudget({ payloadBytes: RESULTS_BUILD_PAYLOAD_BYTES });
     const source = await readWorkerCanonicalResultsAnalysisSource({ ...args, budget: first });
     if (!source.listedVersionWon) return source;
     // A newer answer read as listed was gone or changed (withdrawn mid-build,
@@ -663,7 +705,7 @@ export const loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
     // for both fails this build only, and the next build starts afresh.
     try {
       return await readWorkerCanonicalResultsAnalysisSource({ ...args,
-        budget: createResultsAnalysisScanBudget({ operationsUsed: first.operationsUsed }), latestOnly: false });
+        budget: createResultsAnalysisScanBudget({ operationsUsed: first.operationsUsed, payloadBytes: RESULTS_BUILD_PAYLOAD_BYTES }), latestOnly: false });
     } catch (error) {
       if (isStorageReadLimitError(error) && error.kind === 'operations') return SNAPSHOT_CHANGED;
       throw error;
@@ -675,7 +717,7 @@ export const loadWorkerCanonicalResultsAnalysisSource = async (args = {}) => {
     };
     // Retrying cannot shrink the session, so automatic runs pause instead.
     return {
-      ok: false, status: 503, reason: 'results_analysis_snapshot_limit', retryable: false,
+      ok: false, status: 503, reason: 'results_analysis_snapshot_limit', retryable: false, limit: error.kind,
       error: `${snapshotLimitText(error.kind)} No report was made; the last one is unchanged.`,
     };
   }

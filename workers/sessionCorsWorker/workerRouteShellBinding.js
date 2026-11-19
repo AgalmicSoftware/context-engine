@@ -8,7 +8,8 @@ import { dispatchInterviewStarterRequest } from './interviewStarter.js';
 import { dispatchAnonymousFeedbackRequest } from './sessionFeedbackRoute.js';
 import { dispatchSignedOutSessionAgentRequest } from './sessionAgentSignedOut.js';
 import { evaluatePrivateSessionAccess, privateSessionRefusal, readGroupReadInviteHeader } from './privateSessionAccess.js';
-import { STORAGE_GROUP_READ_INVITE } from './storageRouteExecution.js';
+import { STORAGE_GROUP_READ_INVITE, createRequesterAccessChecks } from './storageRouteExecution.js';
+import { readSessionNames } from './sessionNames.js';
 import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import {
@@ -628,8 +629,8 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       }
 
 
-      // Atlases and risk matrices share this route's slug, CORS and optional sign-in handling.
-      if (['results-analysis-artifact', 'debate-atlas', 'risk-matrix'].includes(routeSelection.kind)) {
+      // Atlases, risk matrices and names share this route's slug, CORS and optional sign-in handling.
+      if (['results-analysis-artifact', 'debate-atlas', 'risk-matrix', 'names'].includes(routeSelection.kind)) {
         const withQuerySlugHeader = (() => {
           try {
             const params = new URL(request.url).searchParams;
@@ -684,6 +685,25 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           config = context.config;
           address = context.address;
           scopes = context.scopes;
+        }
+        if (routeSelection.kind === 'names') {
+          const result = await readSessionNames({
+            env, slug: targetSlug, config, path: routeSelection.path, address,
+            // The gate's chain and secret lookups, as the reads below get them.
+            sessionGate: () => createRequesterAccessChecks({
+              env, config, slug: targetSlug, requesterAddress: address, authScopes: scopes,
+              deps: {
+                checkSbtGate: deps?.checkSbtGate, resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+                readResourceGateOnChain: deps?.readResourceGateOnChain, resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+                toRegistrySessionSlug: deps?.toRegistrySessionSlug, getSessionSecrets: deps?.getSessionSecrets,
+              },
+            }).sessionGate(),
+          });
+          // Each reader's own map: kept briefly by their browser, never shared.
+          const namesHeaders = new Headers(corsContext?.headers || routeBaseHeaders || {});
+          namesHeaders.set('Cache-Control', routeSelection.path === '/names' && result.status === 200 ? 'private, max-age=30' : 'private, no-store');
+          namesHeaders.append('Vary', 'Authorization');
+          return deps?.json?.(result.body, result.status, namesHeaders);
         }
         // A private session's results follow its rule; the reads below see the
         // invite too, so someone signed out reads what members are shown.

@@ -120,6 +120,22 @@ test('on a members-only session a batch refuses visitors with the reason, and se
   assert.deepEqual(member.body.items.map((item) => item.status), [200, 200, 200, 200]);
 });
 
+test('a batch of members-only answers tells every cache not to keep it, as each single read does', async () => {
+  const { env, participants } = await seed({
+    people: 2,
+    questions: 2,
+    configOverrides: { sessionModeProfile: { ...createSessionEnv().config.sessionModeProfile, results: { visibility: 'session_member_full' } } },
+  });
+  const [{ token }] = participants;
+  const ids = (await listAll(signedOut(env).call, token)).flat();
+  const single = await fetchWorker(makeRequest(`/storage/read?id=${ids[0]}`, { token }), env);
+  assert.equal(single.status, 200);
+  assert.equal(single.headers.get('Cache-Control'), 'private, no-store');
+  const batch = await fetchWorker(makeRequest('/storage/read-batch', { method: 'POST', token, body: { ids } }), env);
+  assert.deepEqual((await batch.json()).items.map((item) => item.status), [200, 200, 200, 200]);
+  assert.equal(batch.headers.get('Cache-Control'), 'private, no-store');
+});
+
 test('a batch stops reading once it holds 8 MiB and leaves the rest to single reads', async () => {
   const { admin, env } = createSessionEnv();
   const adminToken = await login({ env, wallet: admin });
@@ -175,4 +191,36 @@ test('a batch takes 1 to 100 distinct valid ids, and reports a missing one on it
   assert.deepEqual(mixed.body.items.map((item) => item.status), [200, 404]);
   const capabilities = await call('/capabilities');
   assert.ok(capabilities.body.features.includes('storage_read_batch_v1'));
+});
+
+test('answers list up to 500 a page, in bulk gets sent together; other lists stay at 100', async () => {
+  const { env } = await seed({ people: 5, questions: 120 });
+  const { call } = signedOut(env);
+  const kv = env.CE_STORAGE_INDEX_KV;
+  const get = kv.get.bind(kv);
+  let open = 0;
+  let mostOpen = 0;
+  kv.get = async (key, type) => {
+    if (!Array.isArray(key)) return get(key, type);
+    open += 1;
+    mostOpen = Math.max(mostOpen, open);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return await get(key, type);
+    } finally {
+      open -= 1;
+    }
+  };
+  const first = await call('/storage/list?resource=responses&limit=500');
+  assert.equal(first.body.items.length, 500);
+  assert.equal(mostOpen, 5, 'the page’s five bulk gets go out together');
+  const second = await call(`/storage/list?resource=responses&limit=500&cursor=${encodeURIComponent(first.body.cursor)}`);
+  assert.deepEqual([second.body.items.length, second.body.listComplete], [100, true]);
+  const ids = new Set([...first.body.items, ...second.body.items].map((item) => item.storageRef.id));
+  assert.equal(ids.size, 600);
+  // A larger limit is clamped, never refused: older sites ask for 100, and other resources keep pages of 100.
+  assert.equal((await call('/storage/list?resource=responses&limit=1000')).body.items.length, 500);
+  assert.equal((await call('/storage/list?resource=responses&limit=100')).body.items.length, 100);
+  const questions = await call('/storage/list?resource=questions&limit=500');
+  assert.deepEqual([questions.body.items.length, questions.body.listComplete], [100, false]);
 });

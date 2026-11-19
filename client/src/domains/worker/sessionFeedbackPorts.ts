@@ -121,6 +121,22 @@ export const dictationOffered = async (options: FeedbackOptions): Promise<boolea
   return presence ? presence.ai : null;
 };
 
+/**
+ * True for a visitor the session writes no speech down for, though it would once they sign in: it pays for AI,
+ * hasn't ended, and gives signed-in participants transcription. False when the Worker couldn't be read, so
+ * nothing is promised.
+ */
+export const dictationNeedsSignIn = async (options: FeedbackOptions): Promise<boolean> => {
+  const { sessionSlug, sessionConfig, account } = options;
+  const config = asRecord(sessionConfig);
+  if (account || sessionEnded(config) || transcriptionOpen(config, false) || !transcriptionOpen(config, true))
+    return false;
+  const presence = await readWorkerResourcePresence({ sessionSlug, sessionConfig, context: { account } }).catch(
+    () => null,
+  );
+  return presence?.ai === true;
+};
+
 // The feedback route's own refusals are plain sentences for the sender; any other error's text may hold anything.
 const refusal = async (response: Response): Promise<string> => {
   const { error, reason } = asRecord(await response.json().catch(() => ({})));

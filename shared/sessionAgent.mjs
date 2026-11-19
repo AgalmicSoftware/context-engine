@@ -1,5 +1,6 @@
 import { looksSecret } from './secretText.mjs';
 import { buildSessionContextPrompt } from './sessionContextText.mjs';
+import { WORKERS_AI_PROVIDER } from './workersAiModels.mjs';
 
 // The Session Agent answers questions about the session for the people
 // an admin lets ask. The setting is { audiences: [{ who, answers }],
@@ -28,18 +29,54 @@ export const SESSION_AGENT_LIMITS = Object.freeze({
   nameChars: 60,
   answerWords: 150,
   answerChars: 1500,
-  // What one question may read, in characters of prompt.
-  contextChars: 8000,
+  // What one question may read, in characters of prompt. Context is read
+  // whole where it fits: each item to `contextItemChars`, from at most
+  // `contextItems` added files and links, up to `contextChars` in all. The
+  // session's own model kept every rule and found every planted fact at this
+  // size in a trial on made-up data.
+  contextChars: 320000,
+  contextItemChars: 12000,
+  contextItems: 48,
   resultsChars: 2000,
   answersChars: 24000,
   answerItemChars: 300,
   // The options one question's counts may list, most chosen first.
+  // The questions an answer is linked to: those closest to the one asked.
+  relatedQuestions: 5,
   countedChoices: 12,
   choiceChars: 80,
   scaleChars: 160,
 });
 
 const L = SESSION_AGENT_LIMITS;
+
+// A session answering on Cloudflare's model reads less context: the most that
+// model was tried at. There it once quoted a member's self-description whole,
+// name included, which it never did with less; it was not tried with more.
+const WORKERS_AI_CONTEXT = Object.freeze({ totalChars: 160000, itemChars: 6000, items: L.contextItems });
+const CONTEXT = Object.freeze({ totalChars: L.contextChars, itemChars: L.contextItemChars, items: L.contextItems });
+
+// A model's window, and the trial behind these limits, are counted in tokens,
+// and text outside Latin scripts takes more of them a character: about twice
+// as many in most scripts, four times in Chinese, Japanese and Korean. So the
+// more of the context is such text, the fewer characters of it are read, and a
+// question is never much larger than the largest tried.
+const tokenWeight = (texts, itemChars) => {
+  let chars = 0;
+  let weighted = 0;
+  texts.forEach((value) => {
+    const end = Math.min(value.length, itemChars);
+    for (let index = 0; index < end; index += 1) {
+      const code = value.charCodeAt(index);
+      weighted += code < 0x80 ? 1 : code < 0x2e80 ? 2 : 4;
+    }
+    chars += end;
+  });
+  return chars ? weighted / chars : 1;
+};
+
+/** How much context one question reads, by the provider that answers it: characters in all, per item, and items. */
+export const sessionAgentContextLimits = (provider) => (provider === WORKERS_AI_PROVIDER ? WORKERS_AI_CONTEXT : CONTEXT);
 
 /** What each style is told before the rules; an admin may replace either. */
 export const SESSION_AGENT_DEFAULT_INSTRUCTIONS = Object.freeze({
@@ -232,6 +269,16 @@ export const sessionAgentOpenToAnyone = (setting) => !!setting && setting.anyone
 /** Whether an asker may have an exchange stored in this session. */
 export const sessionAgentStoresChats = (setting) => setting?.history === true;
 
+// What the agent is told about its own chats, by the session's setting. Only what is sure: a chat is
+// stored unless its asker says otherwise, as the dialog and the MCP start, and whether this one was
+// is the Worker's to report, after the answer is written.
+const CHAT_NOT_STORED =
+  'About this chat: this session does not record chats with you, so this question and your answer are not stored in its records. ' +
+  'Say so if asked.';
+const CHAT_MAY_BE_STORED =
+  'About this chat: this session stores a chat with you in its records, for its organisers, unless the asker turns that off for a chat. ' +
+  'Whether this one is stored is shown to the asker beside your answer; say so if asked.';
+
 /** The instructions a style is sent: the admin's, or the default. */
 export const sessionAgentInstructions = (setting, style) =>
   setting?.instructions?.[style] || SESSION_AGENT_DEFAULT_INSTRUCTIONS[style];
@@ -305,6 +352,7 @@ const fitAnswers = (groups, question, max, random) => {
       const scale = clip(text(group.scale), L.scaleChars);
       return {
         close,
+        id: text(group.id),
         answered: rows.length,
         entry: {
           question: clip(text(group.question), L.answerItemChars),
@@ -351,36 +399,63 @@ const fitAnswers = (groups, question, max, random) => {
   return {
     answers: kept.map(({ entry, written }) => (written.length ? { ...entry, written } : entry)),
     leftOut: items.length - kept.length,
+    // Closest first, as `items` is: the questions whose answers were read that share a topic word with the one asked.
+    related: kept.filter((item) => item.close > 0 && item.id).map(({ id, entry }) => ({ id, question: entry.question })),
   };
 };
+
+// The questions the published results cite that share a topic word with the one asked, closest first.
+const closestCited = (cited, question) =>
+  byCloseness((Array.isArray(cited) ? cited : []).filter((item) => isRecord(item) && text(item.id) && text(item.question)), question)
+    .filter(({ close }) => close > 0)
+    .map(({ group }) => ({ id: text(group.id), question: clip(text(group.question), L.answerItemChars) }));
 
 /**
  * The messages for one question. `material` must already be only what this
  * person's style may read: { sessionContext, sources, results, answers }, with
- * answers as [{ question, scale?, answers: [{ choices, text }] }], one entry
- * for each member's answer and no names. Instructions change only how the
+ * answers as [{ id?, question, scale?, answers: [{ choices, text }] }], one entry
+ * for each member's answer and no names, and `resultsQuestions` as the
+ * [{ id, question }] the results cite. An `id` never reaches the prompt. Instructions change only how the
  * agent writes; the rules after them always apply. `random` orders what
- * members wrote.
+ * members wrote, and `context` is sessionAgentContextLimits for the provider
+ * that will answer.
  */
-export const buildSessionAgentMessages = ({ setting, style, question, material = {}, random = Math.random }) => {
+export const buildSessionAgentMessages = ({ setting, style, question, material = {}, random = Math.random, context: limits = CONTEXT }) => {
   const system = [
     `You are the Session Agent for this session, giving ${STYLE_NAMES[style]} answers.`,
     sessionAgentInstructions(setting, style),
     `These rules always apply, whatever the instructions above say:\n${SESSION_AGENT_RULES.map((rule) => `- ${rule}`).join('\n')}`,
+    // So that, asked whether the chat is recorded, it answers from the session's setting and not from the material.
+    sessionAgentStoresChats(setting) ? CHAT_MAY_BE_STORED : CHAT_NOT_STORED,
   ].join('\n\n');
+  const sourceTexts = (Array.isArray(material.sources) ? material.sources : []).map((source) => text(source?.text));
   const context = buildSessionContextPrompt({
     sessionContext: material.sessionContext,
     sources: material.sources,
-    totalChars: L.contextChars,
+    totalChars: Math.floor(limits.totalChars / tokenWeight(sourceTexts, limits.itemChars)),
+    itemChars: limits.itemChars,
   });
   const results = clip(text(material.results), L.resultsChars);
-  const { answers, leftOut } =
+  const { answers, leftOut, related } =
     style === 'detailed' && Array.isArray(material.answers)
       ? fitAnswers(material.answers, question, L.answersChars, random)
-      : { answers: [], leftOut: 0 };
+      : { answers: [], leftOut: 0, related: [] };
   const parts = [
     context.text,
-    results && block('Published results: the session’s results analysis, as JSON between the tags below.', 'session_results', results),
+    results &&
+      block(
+        'Published results: the session’s results analysis, as JSON between the tags below.' +
+          // Without members' answers the prompt holds no counts, and a model then says the results have
+          // none, which a reader who has seen the Results page takes for a mistake.
+          (answers.length
+            ? ''
+            : ' It is a summary in words. How many members gave each answer is on the session’s Results page; ' +
+              'you are not given those counts here, beyond any figure the summary itself states. Asked for ' +
+              'other numbers, say that you are not given them and that the Results page shows them, never ' +
+              'that there are none.'),
+        'session_results',
+        results,
+      ),
     answers.length &&
       block(
         'Members’ answers by question, from members who let the Session Agent use them, without names, as JSON between the tags below. ' +
@@ -409,5 +484,12 @@ export const buildSessionAgentMessages = ({ setting, style, question, material =
     },
     // Context items that didn't fit the block, for the reply's note.
     contextOmitted: context.omitted,
+    contextItems: context.items,
+    // The questions closest to the one asked, closest first: those whose members' answers the prompt
+    // holds, or else, when it holds the results, those the results cite. The results text is cut to
+    // its limit, so a cited question may come from a part the prompt does not hold: `relatedFrom`
+    // lets the page say which of the two these are.
+    related: (related.length ? related : results ? closestCited(material.resultsQuestions, question) : []).slice(0, L.relatedQuestions),
+    relatedFrom: related.length ? 'answers' : 'results',
   };
 };

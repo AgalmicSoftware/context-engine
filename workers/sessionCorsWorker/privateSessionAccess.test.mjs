@@ -512,6 +512,7 @@ const ROUTE_KINDS = {
   'results-analysis-artifact': RULE,
   'debate-atlas': RULE,
   'risk-matrix': RULE,
+  names: RULE, // names show only to people signed in whom the rule admits; one's own name to oneself
   anonymous: RULE, // AI and the group list here; storage checks each read itself
   authenticated: RULE, // at the entry, but for storage, joining a group by its id, and one's own switches and drafts
   'interview-catalog-ticket': 'held to the rule where the ticket is used, the catalog',

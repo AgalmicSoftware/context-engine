@@ -16,4 +16,10 @@ export function buildSessionContextPrompt(input?: {
   sources?: SessionContextPromptSource[];
   itemChars?: number;
   totalChars?: number;
-}): { text: string; included: number; omitted: number };
+}): {
+  text: string;
+  included: number;
+  omitted: number;
+  /** Each included item: which of the session's links or notes, or of `sources`, by its place in that list. */
+  items: Array<{ part: 'links' | 'notes' | 'sources'; index: number }>;
+};

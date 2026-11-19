@@ -96,7 +96,7 @@ function writeInventoryFixture(rootDir, overrides = {}) {
     schemaVersion: 1,
     profiles: {
       ci: ['wiring-and-release', 'contracts', 'client-tests', 'client', 'root-jest', 'workers', 'cecc-and-node'],
-      hosted: ['wiring-and-release', 'contracts', 'client-tests', 'client', 'root-jest', 'workers', 'e2e-smoke', 'cecc-and-node'],
+      hosted: ['wiring-and-release', 'contracts', 'client-tests', 'client', 'root-jest', 'workers', 'e2e-smoke', 'e2e-journey', 'cecc-and-node'],
     },
     gates: {
       contracts: {
@@ -128,6 +128,12 @@ function writeInventoryFixture(rootDir, overrides = {}) {
       'e2e-smoke': {
         commands: [{ label: 'e2e', command: 'npm', args: ['run', 'test:e2e:smoke'] }],
       },
+      'e2e-journey': {
+        commands: [
+          { label: 'visit', command: 'npm', args: ['run', 'test:e2e:journey'] },
+          { label: 'results', command: 'npm', args: ['run', 'test:e2e:results-salon'] },
+        ],
+      },
       'cecc-and-node': {
         commands: [
           { label: 'node', command: 'npm', args: ['run', 'test:node:tracked'] },
@@ -150,6 +156,7 @@ function writeInventoryFixture(rootDir, overrides = {}) {
     'run: npm run ci:gate -- root-jest',
     'run: npm run ci:gate -- workers',
     'npm run ci:gate -- e2e-smoke',
+    'npm run ci:gate -- e2e-journey',
     'run: npm run ci:gate -- cecc-and-node',
     '  test:',
     'needs:',

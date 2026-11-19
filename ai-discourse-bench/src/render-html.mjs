@@ -2660,7 +2660,7 @@ const renderRiskMatrix = (report) => {
     const isActive = activeCategoryX === category.name;
     return `<button
       type="button"
-      class="riskMatrixCell cell riskMatrixHeaderCell headerCell${isActive ? ' activeHeaderCell' : ''}"
+      class="riskMatrixCell cell riskMatrixHeaderCell headerCell axisTop${isActive ? ' activeHeaderCell' : ''}"
       style="grid-column:${index + 2};grid-row:1;"
       data-testid="ce-risk-matrix-header-x-${escapeHtml(toTestIdFragment(category.name))}"
       aria-pressed="${isActive ? 'true' : 'false'}"
@@ -2708,7 +2708,7 @@ const renderRiskMatrix = (report) => {
     const isActive = activeCategoryY === rowCategory.name;
     return `<button
       type="button"
-      class="riskMatrixCell cell riskMatrixHeaderCell headerCell riskMatrixRowHeader${isActive ? ' activeHeaderCell' : ''}"
+      class="riskMatrixCell cell riskMatrixHeaderCell headerCell riskMatrixRowHeader axisLeft${isActive ? ' activeHeaderCell' : ''}"
       style="grid-column:1;grid-row:${rowIndex + 2};"
       data-testid="ce-risk-matrix-header-y-${escapeHtml(toTestIdFragment(rowCategory.name))}"
       aria-pressed="${isActive ? 'true' : 'false'}"
@@ -2720,11 +2720,9 @@ const renderRiskMatrix = (report) => {
   const subgridSection = (activeCategoryXEntry && activeCategoryYEntry) ? `<section class="riskMatrixSectionCard sectionCard" data-testid="ce-risk-matrix-subgrid">
     <div class="subgridHeader">
       <h3 class="riskMatrixSectionTitle sectionTitle">${escapeHtml(activeCategoryYEntry.name)} x ${escapeHtml(activeCategoryXEntry.name)}</h3>
-      <div class="subgridSummary">Open a square to read its analysis.
-        <details class="detailHelp"><summary aria-label="How to read this grid">?</summary>
-          <p>Each column is a sub-section of ${escapeHtml(activeCategoryXEntry.name)}; each row, a sub-section of ${escapeHtml(activeCategoryYEntry.name)}. A square holds the analysis of where the two meet. The number adds the opportunities and subtracts the risks.</p>
-        </details>
-      </div>
+      <details class="detailHelp"><summary aria-label="How to read this grid">?</summary>
+        <p>Each column is a sub-section of ${escapeHtml(activeCategoryXEntry.name)}; each row, a sub-section of ${escapeHtml(activeCategoryYEntry.name)}. A square holds the analysis of where the two meet. The number adds the opportunities and subtracts the risks.</p>
+      </details>
     </div>
     <ul class="detailLegend" aria-label="Key">
       <li><span class="detailSwatch detailSwatchOpportunity" aria-hidden="true"></span><strong>▲ +</strong> More opportunity</li>
@@ -2732,17 +2730,17 @@ const renderRiskMatrix = (report) => {
       <li><span class="detailSwatch detailSwatchEmpty" aria-hidden="true"></span>No notes</li>
     </ul>
     <div class="riskMatrixGridScroll gridScroll">
-      <div class="subgridContainer detailGrid" style="grid-template-columns: minmax(112px, 0.9fr) repeat(${activeCategoryXEntry.subcategories.length}, minmax(96px, 1fr));">
+      <div class="subgridContainer detailGrid" style="grid-template-columns: minmax(112px, 0.9fr) repeat(${activeCategoryXEntry.subcategories.length}, minmax(96px, 1fr)); min-width: max(100%, ${112 + activeCategoryXEntry.subcategories.length * (96 + 8) + 10}px);">
         <div class="detailAxis" style="grid-column:2 / span ${activeCategoryXEntry.subcategories.length};grid-row:1;">Columns: ${escapeHtml(activeCategoryXEntry.name)}</div>
-        <div class="detailAxis detailAxisRows" style="grid-column:1;grid-row:2;">Rows: ${escapeHtml(activeCategoryYEntry.name)}</div>
+        <div class="detailAxis detailAxisRows axisTop axisLeft" style="grid-column:1;grid-row:2;">Rows: ${escapeHtml(activeCategoryYEntry.name)}</div>
         ${activeCategoryXEntry.subcategories.map((subX, index) => `<div
-          class="riskMatrixCell cell riskMatrixHeaderCell headerCell detailHeading"
+          class="riskMatrixCell cell riskMatrixHeaderCell headerCell detailHeading axisTop"
           style="grid-column:${index + 2};grid-row:2;"
           data-testid="ce-risk-matrix-subheader-x-${escapeHtml(toTestIdFragment(subX))}"
         >${escapeHtml(subX)}</div>`).join('')}
         ${activeCategoryYEntry.subcategories.map((subY, rowIndex) => {
           const rowHeader = `<div
-            class="riskMatrixCell cell riskMatrixHeaderCell headerCell detailHeading"
+            class="riskMatrixCell cell riskMatrixHeaderCell headerCell detailHeading axisLeft"
             style="grid-column:1;grid-row:${rowIndex + 3};"
             data-testid="ce-risk-matrix-subheader-y-${escapeHtml(toTestIdFragment(subY))}"
           >${escapeHtml(subY)}</div>`;
@@ -2793,8 +2791,8 @@ const renderRiskMatrix = (report) => {
           ${Object.keys(overlayCells).length === 0 ? '<div class="aidb-analysis-required" role="status"><strong>Analysis not generated.</strong> The measured benchmark does not infer risk or opportunity interactions. Supply a validated second-pass analysis overlay to populate this matrix.</div>' : ''}
           <section class="riskMatrixSectionCard sectionCard">
             <div class="riskMatrixGridScroll gridScroll">
-              <div class="riskMatrixGridContainer gridContainer" style="grid-template-columns: 122px repeat(${RISK_MATRIX_CATEGORIES.length}, minmax(104px, 1fr)); grid-template-rows: auto repeat(${RISK_MATRIX_CATEGORIES.length}, minmax(78px, auto));">
-                <div class="riskMatrixCell cell riskMatrixCornerCell cornerCell" style="grid-column:1;grid-row:1;"><span>Y / X</span></div>
+              <div class="riskMatrixGridContainer gridContainer" style="grid-template-columns: 122px repeat(${RISK_MATRIX_CATEGORIES.length}, minmax(104px, 1fr)); grid-template-rows: auto repeat(${RISK_MATRIX_CATEGORIES.length}, minmax(78px, auto)); min-width: max(980px, ${122 + RISK_MATRIX_CATEGORIES.length * (104 + 8)}px);">
+                <div class="riskMatrixCell cell riskMatrixCornerCell cornerCell axisTop axisLeft" style="grid-column:1;grid-row:1;"><span>Y / X</span></div>
                 ${headerCells}
                 ${gridRows}
               </div>
@@ -3197,7 +3195,7 @@ const renderDebateAtlas = (report) => {
           <div class="controls">
             <div class="primaryControls">
               <div class="viewModeSwitch" aria-label="Debate atlas view mode">
-                <button type="button" data-testid="ce-debate-view-mode" data-ce-view-mode="circles" class="active">${renderFontAwesomeIcon('circle', 'debateViewModeIcon')} Circles</button>
+                <button type="button" data-testid="ce-debate-view-mode" data-ce-view-mode="circles" class="active">${renderFontAwesomeIcon('circle', 'debateViewModeIcon')} Atlas</button>
                 <button type="button" data-testid="ce-debate-view-mode" data-ce-view-mode="list">${renderFontAwesomeIcon('list', 'debateViewModeIcon')} List</button>
                 <span class="viewModeSeparator" aria-hidden="true"></span>
                 <span class="inlineLegendItem"><span class="legendDot category"></span><span>Category</span></span>
@@ -4522,10 +4520,11 @@ export const renderHtmlReport = (inputReport) => {
     .popOutEffect { transform: translateY(-2px) scale(1.02); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28); }
     .riskMatrixCellValue { padding: 2px 8px; border-radius: var(--ce-radius-pill); background: #1f234f; color: rgba(244, 247, 255, 0.96); font-size: 1.2rem; font-weight: 700; letter-spacing: 0.02em; }
     .riskMatrixCellMeta { color: rgba(190, 199, 230, 0.72); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
-    .subgridHeader { margin-bottom: 14px; }
+    .subgridHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
     .subgridSummary { margin: 8px 0 0; color: rgba(190, 199, 230, 0.82); font-size: 0.88rem; line-height: 1.5; }
     .subgridContainer { display: grid; gap: 8px; min-width: 100%; width: 100%; }
-    .detailHelp { display: inline-block; margin-left: 4px; }
+    .detailHelp { display: inline-block; }
+    .detailHelp[open] { flex-basis: 100%; }
     .detailHelp summary { display: inline-flex; align-items: center; justify-content: center; width: 1.4em; height: 1.4em; border: 1px solid rgba(190, 199, 230, 0.82); border-radius: 50%; color: rgba(244, 247, 255, 0.96); font-weight: 700; cursor: pointer; list-style: none; }
     .detailHelp summary::-webkit-details-marker { display: none; }
     .detailHelp summary:focus-visible { outline: 3px solid rgba(77, 255, 164, 0.7); outline-offset: 2px; }
@@ -4541,6 +4540,29 @@ export const renderHtmlReport = (inputReport) => {
     .riskMatrixHeaderCell.headerCell.detailHeading:hover { border-color: rgba(190, 199, 230, 0.82); background: rgba(255, 255, 255, 0.08); box-shadow: none; }
     .riskMatrixCell.cell.detailHeading { min-height: 56px; border-color: rgba(190, 199, 230, 0.82); font-size: 0.82rem; hyphens: auto; }
     .subgridContainer.detailGrid { padding: 5px; }
+    /* Phones scroll a grid both ways inside its card, so its labels stay in view: row labels at the left, column labels
+       at the top, the corner over both. Each keeps its tint, laid over the card and the page, with a rim of the same over
+       the gaps, so squares passing beneath never show through. */
+    @media (max-width: 768px) {
+      .riskMatrixEmbedded.embedded { padding-left: 0; padding-right: 0; }
+      .riskMatrixEmbedded .riskMatrixSectionCard.sectionCard { padding-left: 8px; padding-right: 8px; }
+      .riskMatrixGridScroll.gridScroll { max-height: 70svh; overflow: auto; scroll-padding: 84px 0 0 130px; }
+      .riskMatrixSectionCard .axisTop,
+      .riskMatrixSectionCard .axisLeft { position: sticky; z-index: 1; background: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); box-shadow: 0 0 0 6px var(--ce-card-bg), 0 0 0 6px var(--ce-color-bg); }
+      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisTop:hover,
+      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisLeft:hover,
+      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisTop:focus-visible,
+      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisLeft:focus-visible { background: linear-gradient(rgba(77, 255, 164, 0.14), rgba(77, 255, 164, 0.14)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); box-shadow: 0 0 0 6px var(--ce-card-bg), 0 0 0 6px var(--ce-color-bg); }
+      /* The ring is drawn inside the label: outside, a neighbour's rim or the scroll edge would cover it. */
+      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisTop:focus-visible,
+      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisLeft:focus-visible { outline: 3px solid #4dffa4; outline-offset: -3px; }
+      .riskMatrixSectionCard .axisTop { top: 0; }
+      .riskMatrixSectionCard .axisLeft { left: 0; }
+      .riskMatrixSectionCard .axisTop.axisLeft { z-index: 2; }
+      .riskMatrixSectionCard .riskMatrixCornerCell.cornerCell.axisTop { background: linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); }
+      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.activeHeaderCell { background: linear-gradient(rgba(77, 255, 164, 0.18), rgba(77, 255, 164, 0.18)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); }
+      .riskMatrixSectionCard .detailAxis.axisLeft { background: linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); display: flex; align-items: center; align-self: stretch; }
+    }
     .riskMatrixCell.cell.detailCell { flex-direction: column; gap: 4px; min-height: 72px; border-color: rgba(190, 199, 230, 0.82); }
     .riskMatrixCell.cell.detailCellEmpty { background: transparent; border-style: dashed; }
     .detailNoteCount { padding: 1px 8px; border-radius: var(--ce-radius-pill); background: #1f234f; color: rgba(244, 247, 255, 0.96); font-size: 0.75rem; }

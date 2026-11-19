@@ -118,6 +118,10 @@ export const loadWorkerResponses = async (
   const listPage = deps.listSessionStorageRefsPage || listSessionStorageRefsPage;
   const readBlob = deps.readSessionStorageBlob || readSessionStorageBlob;
   const context = { account, providerLike };
+  // A load keeps the reader it started as. One started signed out reads signed out to its end: a members-only
+  // session's refusal ends it. Were its refused page sent again under a sign-in that landed meanwhile, it would
+  // read every answer for a reader who is gone, beside the load that sign-in starts.
+  const signedOutLoad = !readString(account) && !ownResponses ? { anonymousOnly: true as const } : {};
   const items: UnknownRecord[] = [];
   const seenCursors = new Set<string>();
   let cursor: string | null = (!ownResponses && readString(startCursor)) || null;
@@ -169,6 +173,7 @@ export const loadWorkerResponses = async (
     context,
     workerUrl: target.workerUrl,
     ...(signal ? { signal } : {}),
+    ...signedOutLoad,
   };
   // The Worker sends an answer's research material only to its author and the session's admins, so those reads
   // go signed in: a signed-out copy would drop it from Results, the export, and a resubmitted answer. Everyone
@@ -217,6 +222,10 @@ export const loadWorkerResponses = async (
     }
   };
   let batched: boolean | null = null;
+  // A signed-out batch a members-only session refuses is read again signed in, and only then does this tab know
+  // the route needs a sign-in (workerSignInRoutes). Until one has come back, a signed-in reader's batches go one
+  // at a time, so the first is the only one sent twice; a signed-out reader has no sign-in to learn.
+  let signedOutRouteKnown = !reader || readsAllWhole;
   const readBatch = deps.readSessionStorageBatch || readSessionStorageBatch;
   const readPayloads = async (chunk: WantedRead[]): Promise<unknown[]> => {
     const payloads: unknown[] = [];
@@ -229,6 +238,7 @@ export const loadWorkerResponses = async (
         const read = whole
           ? await readWhole((auth) => readBatch({ ...readTarget, ...auth, ids }))
           : await readBatch({ ...readTarget, ids });
+        if (!whole) signedOutRouteKnown = true;
         part.forEach(({ index }, at) => {
           payloads[index] = read[at];
         });
@@ -283,7 +293,7 @@ export const loadWorkerResponses = async (
     reportProgress(rows);
   };
   const pump = () => {
-    const limit = batched ? RESPONSE_BATCH_CONCURRENCY : 1;
+    const limit = batched && signedOutRouteKnown ? RESPONSE_BATCH_CONCURRENCY : 1;
     while (!failure && active < limit && next < chunks.length) {
       const at = next++;
       active += 1;
@@ -336,7 +346,7 @@ export const loadWorkerResponses = async (
         resource: 'responses',
         ...(ownResponses
           ? { ownResponses: { account: readString(account).toLowerCase(), sessionId: target.sessionId }, signal }
-          : {}),
+          : signedOutLoad),
         cursor,
         limit: 100,
       });

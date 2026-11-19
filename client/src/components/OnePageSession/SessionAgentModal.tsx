@@ -1,13 +1,17 @@
 /** @file SessionAgentModal.tsx: asks the Session Agent, and sets how it and its export may use what you gave. */
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
+import { dictationNeedsSignIn, dictationOffered, sessionEnded } from '../../domains/worker/sessionFeedbackPorts';
 import CETooltip from '../Shared/CETooltip';
 import SessionAgentNotice from './SessionAgentNotice';
-import { sessionAgentAddressNotice } from './sessionAgentWording';
+import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import SessionDictation from './SessionDictation';
+import { sessionAgentAddressNotice, sessionAgentFullerAnswersNote } from './sessionAgentWording';
 import {
   askSessionAgent,
   readSessionAgentStatus,
@@ -15,11 +19,16 @@ import {
   setSessionAgentUnattributed,
   type SessionAgentReply,
   type SessionAgentRequestOptions,
+  type SessionAgentSource,
   type SessionAgentStatus,
 } from './sessionAgentRequests';
 import styles from './SessionAgentModal.module.scss';
 
-type Props = SessionAgentRequestOptions & { onClose: () => void };
+type Props = SessionAgentRequestOptions & {
+  onClose: () => void;
+  /** Opens the page's Results; left out where the page has none to open. */
+  onOpenResults?: () => void;
+};
 
 const STYLE_HELP = {
   general:
@@ -60,6 +69,29 @@ const drewOn = ({ context, results, answers }: SessionAgentReply['read']) => {
   return `Drew on ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]}.`;
 };
 
+const SOURCE_KIND = {
+  'session-link': 'link in the session’s context',
+  'session-note': 'the session’s context',
+  link: 'link',
+  file: 'file',
+};
+
+// One item the answer read: a link when it has a web address, and what kind of item it is.
+const Source = ({ source }: { source: SessionAgentSource }) => (
+  <li>
+    {source.url ? (
+      <a href={source.url} target="_blank" rel="noopener noreferrer" className={styles.link}>
+        {source.title}
+      </a>
+    ) : (
+      source.title
+    )}{' '}
+    <span className={styles.hint}>
+      ({source.readByAi ? 'PDF, as the session’s AI read it' : SOURCE_KIND[source.kind]})
+    </span>
+  </li>
+);
+
 type HelpProps = { id: string; label: string; text: string };
 
 // A "?" whose text a screen reader hears as its description and everyone else sees on hover or focus.
@@ -87,7 +119,7 @@ const Help = ({ id, label, text }: HelpProps) => (
 
 // The dialog shows only the latest answer. A chat is kept only where the
 // session stores chats and the asker leaves "Store this chat" ticked.
-export default function SessionAgentModal({ sessionSlug, sessionConfig, account, onClose }: Props) {
+export default function SessionAgentModal({ sessionSlug, sessionConfig, account, onClose, onOpenResults }: Props) {
   const baseId = `ce-session-agent-${useId().replace(/:/g, '')}`;
   const options = { sessionSlug, sessionConfig, account };
   const [attempt, setAttempt] = useState(0);
@@ -100,6 +132,16 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   const [store, setStore] = useState(STORE_TO_START);
   const [withAddress, setWithAddress] = useState(ADDRESS_TO_START);
   const [name, setName] = useState('');
+  // Whether the session writes this person's speech down, as for an answer: asked once they may ask.
+  const [speech, setSpeech] = useState<boolean | null>(null);
+  // A visitor the session writes no speech down for, though it would once they sign in.
+  const [speechAfterSignIn, setSpeechAfterSignIn] = useState(false);
+  const [listening, setListening] = useState(false);
+  // Spoken words that didn't fit under the question's limit.
+  const [cut, setCut] = useState(false);
+  // What is in the box now: words are written down after a wait, during which more may be typed.
+  const typed = useRef(question);
+  typed.current = question;
   const [savingSwitch, setSavingSwitch] = useState(false);
   const [switchError, setSwitchError] = useState('');
   const switchSaves = useRef(0);
@@ -119,6 +161,9 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
       setReply(null);
       // What the person before typed and chose is theirs: the next starts as anyone does.
       setQuestion('');
+      setSpeech(null);
+      setSpeechAfterSignIn(false);
+      setCut(false);
       setStore(STORE_TO_START);
       setWithAddress(ADDRESS_TO_START);
       setName('');
@@ -140,10 +185,41 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     };
   }, [sessionSlug, sessionConfig, account, attempt, person]);
 
+  const mayAsk = !!status?.on && !status.closed && !!status.answers;
+  useEffect(() => {
+    if (!mayAsk || speech !== null) return undefined;
+    let active = true;
+    const asker = { sessionSlug, sessionConfig, account };
+    void dictationOffered(asker).then(async (offered) => {
+      // A Worker that couldn't be read gives null, so the next check asks again.
+      if (offered === null) return;
+      // Both answers before either is set: setting the first ends this check.
+      const afterSignIn = !offered && (await dictationNeedsSignIn(asker));
+      if (!active || shownFor.current !== person) return;
+      setSpeech(offered);
+      setSpeechAfterSignIn(afterSignIn);
+    });
+    return () => {
+      active = false;
+    };
+  }, [mayAsk, speech, sessionSlug, sessionConfig, account, person]);
+
+  // Spoken words join the end of what is there, as in an answer, up to the question's limit.
+  const addWords = useCallback((words: string) => {
+    const spoken = words.trim();
+    if (!spoken) return;
+    const base = typed.current.trimEnd();
+    const joined = `${base}${base ? ' ' : ''}${spoken}`;
+    setQuestion(joined.slice(0, SESSION_AGENT_LIMITS.questionChars));
+    setCut(joined.length > SESSION_AGENT_LIMITS.questionChars);
+  }, []);
+
+  // Asked when the dialog opened; a session that has ended since writes no more speech down.
+  const microphone = speech === true && !sessionEnded(sessionConfig);
   const hasAddress = status?.unattributed != null;
   const ask = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!question.trim() || asking) return;
+    if (!question.trim() || asking || listening) return;
     setAsking(true);
     setAskError('');
     try {
@@ -282,19 +358,14 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             : status.signedOut
               ? 'Not signed in, you get General answers.'
               : `You get ${style === 'detailed' ? 'Detailed' : 'General'} answers.`}
-          <button
-            type="button"
+          <Help
             id={`${baseId}-style`}
-            className={styles.helpLink}
-            data-ce-control-appearance="frameless"
-            aria-label={`What ${style === 'detailed' ? 'Detailed' : 'General'} answers draw on`}
-            onClick={(event) => event.currentTarget.focus()}
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
-          </button>
-          <CETooltip target={`${baseId}-style`} placement="bottom" trigger="hover focus" autohide={false}>
-            {STYLE_HELP[style]}
-          </CETooltip>
+            label={`What ${style === 'detailed' ? 'Detailed' : 'General'} answers draw on`}
+            text={
+              STYLE_HELP[style] +
+              (style === 'general' ? ` ${sessionAgentFullerAnswersNote(sessionConfig, status.signedOut)}` : '')
+            }
+          />
         </p>
         <form className={styles.form} onSubmit={ask}>
           <label htmlFor={`${baseId}-question`} className={styles.label}>
@@ -308,8 +379,16 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             rows={3}
             aria-describedby={`${baseId}-limits`}
             data-testid="ce-session-agent-question"
-            onChange={(event) => setQuestion(event.target.value)}
+            onChange={(event) => {
+              setQuestion(event.target.value);
+              setCut(false);
+            }}
           />
+          {cut ? (
+            <p className={styles.hint} role="status">
+              The end of what you said didn’t fit in {SESSION_AGENT_LIMITS.questionChars} characters.
+            </p>
+          ) : null}
           {status.recording ? (
             <div className={styles.keep} data-testid="ce-session-agent-keep">
               <div className={styles.switchRow}>
@@ -368,15 +447,24 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
               ) : null}
             </div>
           ) : null}
-          <div className={styles.row}>
+          <div className={`${styles.row} ${microphone ? styles.withMic : ''}`}>
             <p id={`${baseId}-limits`} className={styles.hint}>
               Answers are at most {SESSION_AGENT_LIMITS.answerWords} words.{' '}
               {!status.recording ? 'Questions and answers aren’t kept.' : store ? '' : 'This chat won’t be kept.'}
+              {speech === false && speechAfterSignIn ? ' Sign in to ask by voice.' : ''}
             </p>
+            {microphone ? (
+              <SessionDictation
+                options={{ sessionSlug, sessionConfig, account }}
+                onWords={addWords}
+                onBusy={setListening}
+                testId="ce-session-agent-mic"
+              />
+            ) : null}
             <button
               type="submit"
               className={styles.ask}
-              disabled={asking || !question.trim()}
+              disabled={asking || listening || !question.trim()}
               data-testid="ce-session-agent-ask"
             >
               {asking ? 'Asking…' : 'Ask'}
@@ -392,7 +480,60 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
           {reply ? (
             <div className={styles.answer} data-testid="ce-session-agent-answer">
               <p className={styles.answerText}>{reply.answer}</p>
-              <p className={styles.hint}>{drewOn(reply.read)}</p>
+              {reply.sources?.length ? (
+                <details className={styles.sources} data-testid="ce-session-agent-sources">
+                  <summary className={styles.hint}>{drewOn(reply.read)}</summary>
+                  <p className={styles.hint}>The context it read, which you may read too:</p>
+                  <ul>
+                    {reply.sources.map((source, index) => (
+                      // The same item can be added twice, so its place is its key.
+                      <Source key={index} source={source} />
+                    ))}
+                  </ul>
+                </details>
+              ) : (
+                <p className={styles.hint}>{drewOn(reply.read)}</p>
+              )}
+              {reply.questions.length ? (
+                <div className={styles.sources} data-testid="ce-session-agent-questions">
+                  <p className={styles.hint}>
+                    {reply.questionsFrom === 'results'
+                      ? 'Questions the session’s results cite that are closest to yours:'
+                      : 'Questions whose answers it read that are closest to yours:'}
+                  </p>
+                  <ul>
+                    {reply.questions.map(({ id, question: prompt }) => (
+                      <li key={id}>
+                        <a
+                          // The route helper names the session, and its Worker where a fresh browser needs it.
+                          href={buildPublicRoute(buildQuestionRoutePath(id, { sessionSlug }))}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.link}
+                        >
+                          {prompt}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {reply.read.results && onOpenResults ? (
+                <p>
+                  <button
+                    type="button"
+                    className={styles.link}
+                    data-ce-control-appearance="frameless"
+                    data-testid="ce-session-agent-open-results"
+                    onClick={() => {
+                      onClose();
+                      onOpenResults();
+                    }}
+                  >
+                    Open Results
+                  </button>
+                </p>
+              ) : null}
               {reply.stored ? <p className={styles.hint}>This chat was stored.</p> : null}
               {reply.note ? <p className={styles.hint}>{reply.note}</p> : null}
             </div>

@@ -1774,16 +1774,35 @@ export const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
     engine.closeSessionVoiceModeModal();
     return;
   }
+  openSessionVoiceModeModal(engine, null);
+};
+
+// Opens the dialog afresh, at a mode or at the chooser; an interview already under way is resumed.
+const openSessionVoiceModeModal = (engine: PileViewModeEngine, mode: SessionVoiceMode | null) => {
   const resumeInterview =
     engine.state.interviewProgressContext === engine.buildSessionInterviewSubmitContextToken(engine.props);
   if (!resumeInterview) releaseHeldClaim();
   engine.setState({
     showVoiceModeModal: true,
-    sessionVoiceMode: resumeInterview ? 'interview' : null,
+    sessionVoiceMode: resumeInterview ? 'interview' : mode,
     ...(resumeInterview
       ? {}
-      : { interviewPrefillPacket: null, interviewPrefillError: '', interviewPrefillNotice: '', interviewClaim: null }),
+      : {
+          interviewPrefillPacket: null,
+          interviewPrefillError: '',
+          interviewPrefillNotice: '',
+          interviewClaim: null,
+          voiceModeOpenCount: Number(engine.state.voiceModeOpenCount || 0) + 1,
+        }),
   });
+};
+
+/** The end-of-set card's "Talk it through": the one-person interview itself, not the chooser beside the group's. */
+export const openSessionInterview = (engine: PileViewModeEngine) => {
+  if (!isInterviewFeatureEnabled(engine.props?.sessionConfig)) return;
+  if (engine.state.showListeningPanel) engine.closeListeningPanel();
+  openSessionVoiceModeModal(engine, 'interview');
+  engine.syncSessionVoiceModeQuery('interview');
 };
 
 const selectSessionVoiceMode = (engine: PileViewModeEngine, mode: SessionVoiceMode | null) => {
@@ -3630,7 +3649,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
       }
       onSeeResults={() => openSessionResults(engine)}
       onTalkItThrough={
-        isInterviewFeatureEnabled(engine.props?.sessionConfig) ? () => engine.toggleSessionVoiceModeModal() : null
+        isInterviewFeatureEnabled(engine.props?.sessionConfig) ? () => openSessionInterview(engine) : null
       }
       onJoinGroup={typeof engine.props.onViewSessionGroups === 'function' ? engine.props.onViewSessionGroups : null}
       answersHref={pileSubmitResponderHref}
@@ -3805,6 +3824,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 submitContextToken={submitContextToken}
                 isOpen={!!showVoiceModeModal}
                 mode={(sessionVoiceMode as SessionVoiceMode | null) || null}
+                openCount={Number(engine.state.voiceModeOpenCount || 0)}
                 onSelectMode={engine.selectSessionVoiceMode}
                 onClose={engine.closeSessionVoiceModeModal}
                 questionPool={interviewQuestions}

@@ -148,10 +148,13 @@ try {
           for (const control of topRow) {
             assert(Math.abs(control.cy - layout.actions.cy) <= 1, `Menu, microphone, Submit and Clear share the top row: ${detail}`);
           }
-          // One row at every phone width; the counter floats above the arrows.
+          // One row at every phone width; the counter sits between the arrows on that row (the phone row smoke checks
+          // when it stacks or steps out).
           assert(Math.abs(layout.nav.cy - layout.actions.cy) <= 1, `Controls stay on one row: ${detail}`);
-          assert.equal(layout.lineTops.length, 1, `Counter is horizontal: ${detail}`);
-          assert(layout.counter.bottom <= layout.nav.top + 1, `Counter floats above the arrows: ${detail}`);
+          if (layout.counter.width > 0) {
+            assert(layout.counter.left >= layout.prev.right - 0.5 && layout.counter.right <= layout.next.left + 0.5, `Counter sits between the arrows: ${detail}`);
+            assert(Math.abs(layout.counter.cy - layout.nav.cy) <= 4, `Counter shares the arrows' line: ${detail}`);
+          }
           assert(layout.submitLabelFits, `Submit label fits its button: ${detail}`);
           assert(layout.submitFontSizes.every(size => size >= 16), `Submit and its count remain readable at phone widths: ${detail}`);
         }
