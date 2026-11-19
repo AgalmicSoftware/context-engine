@@ -278,6 +278,11 @@ jest.mock('../DemoViews/CorpusViewer', () => {
     default: MockCorpusViewer,
   };
 });
+// AI Views feeds the Session Agent alone, so its buttons show only while the agent is on.
+const AI_VIEWS_AGENT_ON = {
+  audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' }],
+};
+
 describe('OnePageSession results routing', () => {
   afterEach(() => {
     mockRenderRealPolisReport = false;
@@ -1080,6 +1085,7 @@ describe('OnePageSession results routing', () => {
           loginComplete={true}
           sessionConfig={{
             ...buildProps().sessionConfig,
+            sessionAgent: AI_VIEWS_AGENT_ON,
             adminAddress: '0xAbC',
             corsWorkerUrl: 'https://worker.example',
             resultsAnalysis: {
@@ -1116,6 +1122,7 @@ describe('OnePageSession results routing', () => {
         loginComplete={true}
         sessionConfig={{
           ...buildProps().sessionConfig,
+          sessionAgent: AI_VIEWS_AGENT_ON,
           adminAddress: '0xAbC',
           corsWorkerUrl: 'https://worker.example',
           resultsAnalysis: {
@@ -1146,7 +1153,13 @@ describe('OnePageSession results routing', () => {
         return Promise.resolve();
       });
     const sessionRef = React.createRef();
-    render(<OnePageSession {...buildProps()} ref={sessionRef} />);
+    render(
+      <OnePageSession
+        {...buildProps()}
+        sessionConfig={{ ...buildProps().sessionConfig, sessionAgent: AI_VIEWS_AGENT_ON }}
+        ref={sessionRef}
+      />,
+    );
 
     act(() => {
       sessionRef.current.setState({
@@ -2008,7 +2021,7 @@ describe('OnePageSession results routing', () => {
       refreshSbtData: jest.fn(),
       refreshSurveyResponsesByID: jest.fn(),
       resolvedPolisDemoDataBySlug: {},
-      resolvedSessionConfig: {},
+      resolvedSessionConfig: { sessionAgent: AI_VIEWS_AGENT_ON },
       resultsViewMode: 'polis',
       riskMatrixRestoreState: null,
       sbtCacheRevision: 1,
@@ -2126,7 +2139,38 @@ describe('OnePageSession results routing', () => {
     );
     expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-session-generated-results-check')).not.toBeInTheDocument();
+
+    // With the Session Agent off nothing reads AI Views: no buttons, and no failure notice pointing at them.
+    const failed = { ...baseGeneratedState, canGenerate: true, lastFailure: 'Automatic retries have stopped.' };
+    view.rerender(
+      <OnePageSessionStandardShell {...shellProps} resolvedSessionConfig={{}} generatedResultsAnalysis={failed} />,
+    );
+    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-generated-results-check')).not.toBeInTheDocument();
+    expect(screen.queryByText('Automatic retries have stopped.')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-generated-results-check')).not.toBeInTheDocument();
+    // A session that builds automatically keeps them with the agent off: its Worker builds either way.
+    view.rerender(
+      <OnePageSessionStandardShell
+        {...shellProps}
+        resolvedSessionConfig={{}}
+        generatedResultsAnalysis={{ ...failed, generationMode: 'automatic' }}
+      />,
+    );
+    expect(screen.getByTestId('ce-session-generated-results-generate')).toHaveTextContent('Retry AI Views');
+    expect(screen.getByText('Automatic retries have stopped.')).toBeInTheDocument();
+    // On again: the notice and its Retry come back together, and the button carries its "?" explanation.
+    view.rerender(<OnePageSessionStandardShell {...shellProps} generatedResultsAnalysis={failed} />);
+    const retry = screen.getByTestId('ce-session-generated-results-generate');
+    expect(retry).toHaveTextContent('Retry AI Views');
+    expect(retry.querySelector('svg')).not.toBeNull();
+    expect(screen.getByText('Automatic retries have stopped.')).toBeInTheDocument();
+    fireEvent.focus(retry);
+    expect(
+      await screen.findByText(/summary of the responses that this session's Session Agent reads.*paid AI call/),
+    ).toBeInTheDocument();
   });
+
   it('renders the Raw Results action only while results are expanded and styles it like the other demo mode buttons', async () => {
     render(<OnePageSession {...buildProps()} />);
 

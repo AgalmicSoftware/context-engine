@@ -118,6 +118,12 @@ const sessionConfig = {
   sessionId,
   sessionName: 'Synthetic Generated Results Smoke',
   sessionInfo: 'Synthetic fixture used only for browser smoke coverage.',
+  // The AI Views buttons show while the Session Agent, their one reader, is on.
+  sessionAgent: {
+    audiences: [
+      { who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' },
+    ],
+  },
   defaultTags: [],
   defaultSbtTags: [],
   defaultFeaturedSBTs: [],
