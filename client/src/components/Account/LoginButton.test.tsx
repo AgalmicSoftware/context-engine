@@ -51,18 +51,15 @@ describe('LoginButton', () => {
     );
   });
 
-  it('gives the Settings dropdown a full row on narrow screens while preserving the desktop grid', () => {
+  it('keeps the Settings strip on one row on desktop and stacks the session first on phones', () => {
     expect(compiledAccountStylesheet).toMatch(
-      /\.settingsQuickControlsGrid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/,
+      /\.settingsStrip\s*\{[^}]*grid-template-areas:\s*"config session explainers appearance";/,
     );
-    const mobileGrid = compiledAccountStylesheet.match(
-      /@media \(max-width: 480px\)\s*\{[\s\S]*?\.settingsQuickControlsGrid\s*\{([^}]+)\}/,
+    const phoneStrip = compiledAccountStylesheet.match(
+      /@media \(max-width: 640px\)\s*\{[\s\S]*?\.settingsStrip\s*\{([^}]+)\}/,
     )?.[1];
-    expect(mobileGrid).toContain('grid-template-columns: 1fr;');
-    // Three controls: the lone third one takes its whole row, not half of it.
-    expect(compiledAccountStylesheet).toMatch(
-      /\.settingsQuickControlCell:last-child:nth-child\(odd\)\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/,
-    );
+    expect(phoneStrip).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
+    expect(phoneStrip).toMatch(/"session session"\s*"config explainers"\s*"appearance appearance"/);
   });
 
   it('opens the account modal when idle', () => {

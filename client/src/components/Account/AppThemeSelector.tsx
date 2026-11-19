@@ -9,14 +9,26 @@ import {
 } from '../../utilities/ui/themeRuntime';
 import styles from './AppThemeSelector.module.scss';
 
-const AppThemeSelector = (): React.ReactElement => {
-  const [preference, setPreference] = React.useState(() => readStoredThemePreference() || '');
-  const deploymentTheme = normalizeThemeId(
-    typeof document === 'undefined' ? null : document.documentElement.dataset.ceDeploymentTheme,
-  );
-  const defaultOptionLabel = deploymentTheme ? `${getThemeMetadata(deploymentTheme).label} (default)` : 'Default';
+const readDeploymentTheme = () =>
+  normalizeThemeId(typeof document === 'undefined' ? null : document.documentElement.dataset.ceDeploymentTheme);
 
+const useThemePreference = () => {
+  const [preference, setPreference] = React.useState(() => readStoredThemePreference() || '');
   React.useEffect(() => subscribeThemeChanges(() => setPreference(readStoredThemePreference() || '')), []);
+  return [preference, setPreference] as const;
+};
+
+/** Short name of the theme in use, for buttons that summarise the choice. */
+export const useThemeChoiceLabel = (): string => {
+  const [preference] = useThemePreference();
+  const theme = preference || readDeploymentTheme();
+  return theme ? getThemeMetadata(theme).label : 'Default';
+};
+
+const AppThemeSelector = (): React.ReactElement => {
+  const [preference, setPreference] = useThemePreference();
+  const deploymentTheme = readDeploymentTheme();
+  const defaultOptionLabel = deploymentTheme ? `${getThemeMetadata(deploymentTheme).label} (default)` : 'Default';
 
   return (
     <div className={styles.field}>

@@ -162,7 +162,8 @@ const treeHasPropValue = (node: any, propName: string, expected: any): boolean =
   if (Array.isArray(node)) return node.some((child) => treeHasPropValue(child, propName, expected));
   if (typeof node !== 'object') return false;
   if (node?.props?.[propName] === expected) return true;
-  return treeHasPropValue(node?.props?.children, propName, expected);
+  // Walk every element-valued prop, not only children (e.g. a strip's sessionControl).
+  return Object.values(node?.props || {}).some((value) => treeHasPropValue(value, propName, expected));
 };
 
 const PASSKEY_ADDRESS = '0x1111111111111111111111111111111111111111';

@@ -148,6 +148,8 @@
   "SETTINGS_QUICK_CONTROLS": "ce-settings-quick-controls",
   "SETTINGS_THEME": "ce-settings-theme",
   "SETTINGS_COLOR_BLIND": "ce-settings-color-blind",
+  "SETTINGS_APPEARANCE_TOGGLE": "ce-settings-appearance-toggle",
+  "SETTINGS_APPEARANCE_PANEL": "ce-settings-appearance-panel",
   "WIZARD_SESSION_HEADER_INLINE_BAR": "ce-wizard-session-header-inline-bar",
   "WIZARD_SESSION_HEADER_URL_TOGGLE": "ce-wizard-session-header-url-toggle",
   "WIZARD_SESSION_HEADER_PASTE": "ce-wizard-session-header-paste",

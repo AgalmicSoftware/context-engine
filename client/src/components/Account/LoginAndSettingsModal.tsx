@@ -45,7 +45,6 @@ import LoginModalDisplayBody from './LoginModalDisplayBody';
 import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
 import LoginPreLoginConfigPanel from './LoginPreLoginConfigPanel';
 import LoginPreLoginSettingsDisplay from './LoginPreLoginSettingsDisplay';
-import LoginThemeQuickControl from './LoginThemeQuickControl';
 import { DEFAULT_AUTO_REQUEST_TESTNET_FUNDS, DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import contractScripts, {
   getAllSessionSlugs,
@@ -1705,7 +1704,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     rowClassName = '',
     showSession = true,
     layout = 'row',
-    themeControl = null,
+    showAppearance = false,
   }: any = {}) =>
     LoginSettingsControlRow({
       configOpen,
@@ -1725,7 +1724,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       rowClassName,
       showSession,
       sessionControl: this.renderGlobalSessionSelector(),
-      themeControl,
+      showAppearance,
     });
 
   renderGlobalSessionSelector = ({ testId = 'ce-web3modal-session-select' }: { testId?: string } = {}) => {
@@ -2323,7 +2322,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         {this.renderSettingsControlRow({
           activeSession,
           configOpen: this.state.aiSettingsOpen,
-          layout: 'quick-grid',
+          layout: 'strip',
           onToggleConfig: this.toggleAiSettingsPanel,
           betweenSessionAndTooltips:
             cryptoTerminology && overview.capabilities.showNetworkControls
@@ -2342,7 +2341,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             ) : null,
           tooltipsInfoId: 'postLoginTooltipsToggleTooltip',
           tooltipPlacement: 'right',
-          themeControl: <LoginThemeQuickControl />,
+          showAppearance: true,
         })}
 
         {this.state.aiSettingsOpen &&

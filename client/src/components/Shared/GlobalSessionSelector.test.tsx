@@ -322,4 +322,79 @@ describe('GlobalSessionSelector', () => {
     expect(screen.getAllByRole('option', { name: 'Discovered Worker (worker-discovered)' })).toHaveLength(2);
     view.unmount();
   });
+
+  describe('as the Settings session picker', () => {
+    const worker = (slug: string, sessionName: string) => [
+      slug,
+      {
+        slug,
+        sessionName,
+        corsWorkerUrl: 'https://worker.example',
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      },
+    ];
+    const names = () => screen.getAllByRole('option').map((option) => option.textContent);
+    const renderPicker = (primarySessionSlug = '') =>
+      render(
+        <GlobalSessionSelector
+          selection={{ primarySessionSlug, selectedSessionScope: primarySessionSlug ? 'active' : 'general' }}
+          onChange={jest.fn()}
+          testId="settings-selector"
+        />,
+      );
+
+    beforeEach(() => {
+      jest.mocked(getAllSessionSlugs).mockReturnValue([]);
+      jest.mocked(getSessionConfigBySlug).mockReturnValue(null);
+    });
+
+    it('offers only ALL and General when no session is known', () => {
+      renderPicker();
+      expect(names()).toEqual(['ALL', 'General']);
+      expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('');
+    });
+
+    it('offers the one known session and switches to it', () => {
+      jest.mocked(getAllSessionSlugs).mockReturnValue(['lantern']);
+      jest.mocked(getSessionConfigBySlug).mockReturnValue({ slug: 'lantern', sessionName: 'Lantern Forum' });
+      const onChange = jest.fn();
+      render(
+        <GlobalSessionSelector
+          selection={{ primarySessionSlug: '', selectedSessionScope: 'general' }}
+          onChange={onChange}
+          testId="settings-selector"
+        />,
+      );
+      expect(names()).toEqual(['ALL', 'General', 'Lantern Forum (lantern)']);
+      fireEvent.change(screen.getByRole('combobox', { name: 'Session' }), { target: { value: 'lantern' } });
+      expect(onChange).toHaveBeenCalledWith({ primarySessionSlug: 'lantern', selectedSessionScope: 'active' });
+    });
+
+    it('lists several sessions in name order with the chosen one selected', () => {
+      jest.mocked(getAllSessionSlugs).mockReturnValue(['quarry', 'lantern', 'meadow']);
+      jest.mocked(getSessionConfigBySlug).mockImplementation((slug: unknown) => ({
+        slug,
+        sessionName: { quarry: 'Quarry Talks', lantern: 'Lantern Forum', meadow: 'Meadow Circle' }[slug as string],
+      }));
+      renderPicker('meadow');
+      expect(names()).toEqual([
+        'ALL',
+        'General',
+        'Lantern Forum (lantern)',
+        'Meadow Circle (meadow)',
+        'Quarry Talks (quarry)',
+      ]);
+      expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('meadow');
+    });
+
+    it('keeps an unlisted Worker session reachable through its ?worker= link', () => {
+      jest.mocked(getAllDemoSessionConfigs).mockReturnValue([worker('hidden-grove', 'Hidden Grove')] as never);
+      renderPicker('hidden-grove');
+      expect(names()).toContain('Hidden Grove (hidden-grove)');
+      expect(screen.getByRole('link', { name: 'Open session Hidden Grove' })).toHaveAttribute(
+        'href',
+        '/session/hidden-grove?worker=https%3A%2F%2Fworker.example',
+      );
+    });
+  });
 });
