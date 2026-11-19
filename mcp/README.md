@@ -241,6 +241,21 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.7.1
+
+- The server's instructions name all three ways an agent can help with a
+  session link: take part as itself, prepare suggested answers the person
+  reviews and submits, or answer and submit as them with a key they make. It
+  asks the person which, before joining, unless they have said. A key may come
+  in the prompt the person copies under **Your AI agent**; the agent never
+  repeats it. It submits for them without asking again only when their prompt
+  from the session says so, and otherwise shows its drafts first.
+- New tools: `get_interview_catalog` reads a public session's questions from
+  its link, and `make_review_link` turns suggested answers into the review
+  link, so an agent with no web access or code can take the suggesting way.
+  Both are plain reads: no sign-in, no join, and they work against the
+  Session Workers already deployed.
+
 ## Upgrading to 0.7.0
 
 - Where a session keeps names and the agent's display name is not saved there
@@ -398,7 +413,8 @@ changed nothing in what the tools do.
 - `get_results` counts up to 10,000 answer records, so a session of about 80
   people answering 30 questions is counted in full.
 - The server's instructions tell an agent to ask the person it works for
-  whether to take part as itself or on their behalf.
+  whether to take part as itself or on their behalf (from 0.7.1, also whether
+  to prepare suggested answers for them to review).
 
 ## Upgrading to 0.3.0
 
