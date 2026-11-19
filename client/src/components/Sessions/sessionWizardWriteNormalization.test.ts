@@ -788,6 +788,24 @@ describe('sessionWizardWriteNormalization', () => {
     expect(() => build('2.5')).toThrow('Most members in a group: a whole number from 1 to 10,000.');
   });
 
+  test('buildSessionWizardWorkerConfigPayload sends Context cards only when the draft turns them on', () => {
+    const build = (contextCardsEnabled: unknown) =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'context-cards',
+        draft: {
+          contextCardsEnabled,
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+        workerUrl: 'https://worker.example',
+      });
+
+    expect(build(true)).toHaveProperty('contextCardsEnabled', true);
+    // Off is left out, as older Workers refuse the field; the config writers clear a stored one.
+    expect(build(false)).not.toHaveProperty('contextCardsEnabled');
+    expect(build(undefined)).not.toHaveProperty('contextCardsEnabled');
+    expect(build('true')).not.toHaveProperty('contextCardsEnabled');
+  });
+
   test('buildSessionWizardWorkerConfigPayload sends the Session Agent as the Worker stores it, and leaves it out when off', () => {
     const build = (
       sessionAgent: unknown,

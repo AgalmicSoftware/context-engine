@@ -568,6 +568,9 @@ test('contextCardsEnabled is true or false, signs no one out, the site can read 
     applySessionConfigMutation({ existingConfig: base, slug: 's', mutation: { kind: 'set-config', incomingConfig: { ...base, contextCardsEnabled } } });
   assert.deepEqual([save('yes').ok, save('yes').status, save('yes').error], [false, 400, 'contextCardsEnabled must be true or false.']);
   assert.deepEqual([save(true).ok, save(false).ok], [true, true]);
+  // A session may be made with cards on: its first save, with nothing stored, takes the setting too.
+  const made = applySessionConfigMutation({ existingConfig: null, slug: 's', mutation: { kind: 'set-config', incomingConfig: { ...base, contextCardsEnabled: true } } });
+  assert.deepEqual([made.ok, made.config.contextCardsEnabled], [true, true]);
   assert.deepEqual(classifySessionConfigEdits(base, { ...base, contextCardsEnabled: true }), { content: ['contextCardsEnabled'], authority: [], signsParticipantsOut: false });
   assert.equal(projectPublicWorkerSessionConfig({ ...base, contextCardsEnabled: true }).contextCardsEnabled, true);
   assert.equal(selectDeployWorkerSessionConfigFields({ ...base, contextCardsEnabled: true }).contextCardsEnabled, true);

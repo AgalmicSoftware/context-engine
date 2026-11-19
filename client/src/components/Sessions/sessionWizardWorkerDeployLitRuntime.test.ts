@@ -123,6 +123,75 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
     expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)).config.agentInstructions).toBe(expected);
   });
 
+  it.each([
+    ['turns off Context cards a Worker config has on', { contextCardsEnabled: true }, false],
+    ['leaves Context cards out for a Worker config without them', {}, undefined],
+  ])('%s when the config leaves them out', async (_label, stored, expected) => {
+    const fetchImpl = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({
+      ok: true,
+      json: async () => (init?.method === 'POST' ? { ok: true } : { config: { slug: 'lit-session', ...stored } }),
+    }));
+    const ensureSessionConfig = createSessionWizardEnsureWorkerSessionConfig({
+      getWorkerConfig: () => ({
+        slug: 'lit-session',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }),
+      getAdminAddress: () => '0xadmin',
+      signTypedAdminAction: async () => ({ address: '0xadmin', signature: '0xsig' }),
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await ensureSessionConfig({ workerUrl: 'https://worker.example.test', slug: 'lit-session' });
+
+    expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)).config.contextCardsEnabled).toBe(expected);
+  });
+
+  it('sends Context cards on only to a Worker that says it keeps them', async () => {
+    const save = async (capabilities: () => unknown) => {
+      const fetchImpl = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+        if (String(url).includes('/capabilities')) return capabilities();
+        return { ok: true, status: 200, json: async () => (init?.method === 'POST' ? { ok: true } : { config: {} }) };
+      });
+      const ensureSessionConfig = createSessionWizardEnsureWorkerSessionConfig({
+        getWorkerConfig: () => ({
+          slug: 'lit-session',
+          contextCardsEnabled: true,
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        }),
+        getAdminAddress: () => '0xadmin',
+        signTypedAdminAction: async () => ({ address: '0xadmin', signature: '0xsig' }),
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      });
+      const outcome = await ensureSessionConfig({ workerUrl: 'https://worker.example.test', slug: 'lit-session' }).then(
+        () => 'saved',
+        (error: Error) => error.message,
+      );
+      const posts = fetchImpl.mock.calls.filter(([, init]) => init?.method === 'POST');
+      return { outcome, sent: posts.map(([, init]) => JSON.parse(String(init?.body)).config.contextCardsEnabled) };
+    };
+    const answers = (features: string[]) => () => ({ ok: true, status: 200, json: async () => ({ features }) });
+
+    expect(await save(answers(['worker_groups', 'context_cards_v1']))).toEqual({ outcome: 'saved', sent: [true] });
+    // An older Worker, and one from before capabilities, are never sent the setting.
+    const tooOld = expect.stringContaining('too old to keep Context cards');
+    expect(await save(answers(['worker_groups']))).toEqual({ outcome: tooOld, sent: [] });
+    expect(await save(() => ({ ok: false, status: 404, json: async () => ({}) }))).toEqual({
+      outcome: tooOld,
+      sent: [],
+    });
+    // Nor is a Worker that could not be asked.
+    const unchecked = expect.stringContaining('be checked for Context cards');
+    expect(await save(() => ({ ok: false, status: 503, json: async () => ({}) }))).toEqual({
+      outcome: unchecked,
+      sent: [],
+    });
+    expect(
+      await save(() => {
+        throw new Error('offline');
+      }),
+    ).toEqual({ outcome: unchecked, sent: [] });
+  });
+
   it('keeps the AI daily limit the Worker stores, which /new has no field for', async () => {
     const fetchImpl = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({
       ok: true,

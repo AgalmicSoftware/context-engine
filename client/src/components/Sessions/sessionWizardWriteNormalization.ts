@@ -505,6 +505,9 @@ export const buildSessionWizardWorkerConfigPayload = ({
     const sessionAgent = validateSessionAgent(resolvedDraft.sessionAgent ?? null);
     if (!sessionAgent.ok) throw new Error(`Fix the Session Agent: ${sessionAgent.errors[0].message}`);
     if (sessionAgent.value) next.sessionAgent = sessionAgent.value;
+    // Context cards. Off is left out, as older Workers refuse the field; the
+    // config writers send false when the Worker's config already has it.
+    if (resolvedDraft.contextCardsEnabled === true) next.contextCardsEnabled = true;
     // The default is left out, so a Worker without the setting takes the session.
     const ceiling = trimString(resolvedDraft.groupMemberCeiling);
     if (ceiling && Number(ceiling) !== WORKER_GROUP_MEMBER_CEILING_DEFAULT) {

@@ -321,14 +321,46 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
 };
 
 // set-config merges fields, so a config that leaves out its instructions for AI
-// agents or its Session Agent must clear stored ones, with '' and null. Older
-// Workers refuse either field, so each clear is sent only when the Worker's
-// config already has the field. A Worker with no config answers 404. Any other
-// failed read stops before signing: leaving a field out could keep what is
-// stored, and would change the revision a retry signs.
+// agents, its Session Agent or Context cards must clear stored ones, with '',
+// null and false. Older Workers refuse these fields, so each clear is sent only
+// when the Worker's config already has the field. A Worker with no config
+// answers 404. Any other failed read stops before signing: leaving a field out
+// could keep what is stored, and would change the revision a retry signs.
 // set-config replaces limits whole and /new has no AI daily limit, so the one
 // stored (set in Settings) is kept the same way.
-const CLEARED_WHEN_LEFT_OUT = { agentInstructions: '', sessionAgent: null } as const;
+const CLEARED_WHEN_LEFT_OUT = { agentInstructions: '', sessionAgent: null, contextCardsEnabled: false } as const;
+
+// A session made with Context cards on is sent only to a Worker that says it
+// keeps them: an older one would refuse the whole save, naming only the field.
+const assertWorkerKeepsContextCards = async (
+  workerOrigin: string,
+  slug: string,
+  fetchImpl: SessionWizardWorkerConfigFetchPort,
+): Promise<void> => {
+  let features: unknown;
+  try {
+    const response = await fetchImpl(`${workerOrigin}/capabilities?slug=${encodeURIComponent(slug)}`, {
+      method: 'GET',
+      credentials: 'omit',
+      redirect: 'error',
+      headers: { Accept: 'application/json' },
+    });
+    // A Worker from before capabilities answers 404: it keeps no cards.
+    features = response.ok ? (await readResponseJson(response)).features : response.status === 404 ? [] : undefined;
+  } catch {
+    features = undefined;
+  }
+  if (!Array.isArray(features)) {
+    throw new Error(
+      "The Session Worker couldn't be checked for Context cards, so the settings weren't saved. Try again.",
+    );
+  }
+  if (!features.includes('context_cards_v1')) {
+    throw new Error(
+      'This Session Worker is too old to keep Context cards. Untick Context cards under Context, or update the Worker, then try again.',
+    );
+  }
+};
 export const withStoredConfigKept = async <T extends UnknownRecord>({
   config,
   workerOrigin,
@@ -341,6 +373,9 @@ export const withStoredConfigKept = async <T extends UnknownRecord>({
   fetchImpl: SessionWizardWorkerConfigFetchPort;
 }): Promise<T> => {
   const profile = config.sessionModeProfile as { authority?: { mode?: unknown } } | undefined;
+  if (config.contextCardsEnabled === true && profile?.authority?.mode === 'worker_canonical') {
+    await assertWorkerKeepsContextCards(workerOrigin, slug, fetchImpl);
+  }
   const leftOut = Object.keys(CLEARED_WHEN_LEFT_OUT).filter(
     (field) => !Object.prototype.hasOwnProperty.call(config, field),
   ) as Array<keyof typeof CLEARED_WHEN_LEFT_OUT>;

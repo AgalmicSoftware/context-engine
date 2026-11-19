@@ -25,9 +25,10 @@ const baseConfig = () => ({
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
   storageProfile: { backend: 'cloudflare' },
   ai: { models: { fast: { provider: 'openai', model: 'gpt-test' } } },
-  // A config with instructions for AI agents and a Session Agent is written without first reading the stored one.
+  // A config that states its instructions for AI agents, Session Agent and Context cards is written without first reading the stored one.
   agentInstructions: 'Join the open group.',
   sessionAgent: { audiences: [] },
+  contextCardsEnabled: false,
 });
 
 const withoutInstructions = (config: Record<string, unknown>) => {
