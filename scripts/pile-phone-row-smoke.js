@@ -177,7 +177,7 @@ const SWEEP = { from: 320, to: 440 };
 const NO_STYLE_QUERY_CSS = (() => {
   const scss = fs.readFileSync(path.join(__dirname, '../client/src/components/SurveyTool/SurveyTool.module.scss'), 'utf8');
   const first = (name) => scss.match(new RegExp(`${name}: ([^;]+);`))[1];
-  return `[class*="_pileControls_"] { --pile-submit-digits: ${first('--pile-submit-digits')} !important; --pile-submit-chars: ${first('--pile-submit-chars')} !important; --pile-row-arrows: ${first('--pile-row-arrows')} !important; }`;
+  return `[class*="_pileControls_"] { --pile-submit-digits: ${first('--pile-submit-digits')} !important; --pile-submit-chars: ${first('--pile-submit-chars')} !important; --pile-row-arrows: ${first('--pile-row-arrows')} !important; --pile-submit-floor: ${first('--pile-submit-floor')} !important; }`;
 })();
 
 // The faces the row is drawn in on this machine, and how wide they come out.

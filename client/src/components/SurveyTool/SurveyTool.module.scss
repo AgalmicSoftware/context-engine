@@ -7338,9 +7338,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     --pile-submit-digits: 9;
     --pile-submit-chars: 6.8;
     --pile-row-arrows: 8px;
-    // The least the word is given. A theme's numbers fit its own font; while that font loads, or if it never
-    // does, a fallback with narrower digits would count the word short and cut it.
-    --pile-submit-floor: 62px;
+    // The least the word is given, whatever the digits come to. A fallback font (while the theme's loads, or if it
+    // never does) may have narrower digits, and a renderer that draws every letter a whole number of pixels wide
+    // (Linux) makes Classic 95's word 69px against digits of 7px, where the numbers above count it as 63px.
+    --pile-submit-floor: 72px;
   }
 
   // Each theme's own fonts: Poppins' word is narrow against its digits, Open Sans has narrow digits, and Classic
@@ -7350,6 +7351,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
       --pile-submit-digits: 7;
       --pile-submit-chars: 5.95;
       --pile-row-arrows: 0px;
+      --pile-submit-floor: 62px;
     }
   }
 
@@ -7358,6 +7360,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
       --pile-submit-digits: 8;
       --pile-submit-chars: 6.8;
       --pile-row-arrows: 0px;
+      --pile-submit-floor: 62px;
     }
   }
 
@@ -7366,6 +7369,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
       --pile-submit-digits: 9;
       --pile-submit-chars: 6.5;
       --pile-row-arrows: 8px;
+      --pile-submit-floor: 72px;
     }
   }
 

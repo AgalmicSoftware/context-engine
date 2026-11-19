@@ -102,7 +102,14 @@ it('sizes the phone counter by the room the row has in the font in use', () => {
   expect(counter).toMatch(
     /--pile-row-rest: calc\(\s*var\(--pile-row-fixed\) \+ var\(--pile-row-arrows\) \+ max\(var\(--pile-submit-digits\) \* 1ch, var\(--pile-submit-floor\)\) \+\s*8px\s*\);/,
   );
-  expect(css).toMatch(/--pile-submit-floor: 62px;/);
+  // Classic 95's word is wider than its digits say where letters are drawn whole pixels wide, so it and the
+  // values a browser without style queries gets keep 72px; the other two themes' own fonts need 62px.
+  expect([...css.matchAll(/--pile-submit-floor: (\d+)px;/g)].map((match) => match[1])).toEqual([
+    '72',
+    '62',
+    '62',
+    '72',
+  ]);
   // Each form's switch compares the row's own width (cqw) with that need and the form's width.
   expect(counter).toMatch(
     /--pile-room-line: calc\(\(100cqw - var\(--pile-row-rest\) - var\(--pile-counter-line\)\) \* 999\);/,
