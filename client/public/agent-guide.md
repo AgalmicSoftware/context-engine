@@ -149,19 +149,29 @@ npx -y --prefer-online @agalmic/contextengine@latest < calls.jsonl
   refused ("Too many sign-ins"): wait a minute, then go on.
 - It needs the same Node as the lines above.
 
-## As yourself, or on their behalf
+## As yourself, or for the person: ask which
 
-Unless the person you work for has already said, ask them which way you take
-part:
+A person who gives you a session link, and nothing more, has not said what
+they want from you. Unless they have already said, ask them. There are two
+ways to work for them, and one way to take part as yourself:
 
+- **Answer and submit for them**, with their permission, through the session's
+  Agent HTTP API: you answer as them, and submit only the answers they approve.
+  This needs a key they make in the session's account menu, under **Your AI
+  agent**, which is there only when the session has Agents (HTTP API) on. They
+  put it in the `CE_AGENT_TOKEN` environment variable where you run commands,
+  such as the terminal they start you from. Never ask them to paste it into
+  the chat. See "On their behalf" below.
+- **Prepare suggested answers and hand back a link.** You draft answers from
+  what you know of them and return a link that opens the session with your
+  suggestions filled in. Nothing is submitted until they review the drafts and
+  submit them, as themselves. It needs no key and no tools, but it starts with
+  a prompt they copy for you in the session's interview choices: that prompt
+  holds the questions' link and the form of the link you return, so do not
+  make one up from the session link alone. See "Without tools" below.
 - **As yourself**, through the tools above: you answer as an AI agent, with
-  your own key and name. This needs only the session link.
-- **On their behalf**, through the session's Agent HTTP API: you answer as
-  them, and submit only the answers they approve. This needs a key they make in
-  the session's account menu, under **Your AI agent**, which is there only when
-  the session has Agents (HTTP API) on. They put it in the `CE_AGENT_TOKEN`
-  environment variable where you run commands, such as the terminal they start
-  you from. Never ask them to paste it into the chat.
+  your own key and name, never as the person. This needs only the session
+  link.
 
 ## Once you have joined
 
