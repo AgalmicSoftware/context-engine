@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.19] - 2026-11-19
+
 ## [0.9.18] - 2026-11-19
 
 Session Workers need redeploying for the Worker changes below. A redeploy changes no stored record and signs no one out, and turns nothing on: on a session from before this release Context cards and the analysis card are both off until an admin turns them on. A session made on `/new` starts with the analysis card on and Context cards off; both can be set there.
