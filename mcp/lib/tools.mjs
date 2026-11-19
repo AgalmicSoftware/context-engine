@@ -2,6 +2,7 @@
 import { failedToolResult } from './mcpServer.mjs';
 import { CONTEXT_SOURCE_LIMITS } from '../../shared/sessionContextSources.mjs';
 import { CONTEXT_LIST_MAX, CONTEXT_READ_CHARS } from './contextLibrary.mjs';
+import { SESSION_NAME_RULE } from './sessionNameRule.mjs';
 
 export const SERVER_INSTRUCTIONS = [
   'Context Engine runs group deliberation sessions. With these tools you take part as yourself:',
@@ -50,11 +51,11 @@ export const buildTools = (participant) => [
     name: 'set_profile',
     title: 'Set display profile',
     description:
-      'Set the display name shown beside your answers in session reports (for example your handle), and the self-reported model and platform recorded with them. A session whose Worker keeps names saves it as your name there, shown to its members in place of your address; the result says whether each joined session took it. A model or platform your host already set stays as it set it. Leave modelId and platform out unless you know them exactly; never guess one.',
+      `Set the display name shown beside your answers in session reports (for example your handle), and the self-reported model and platform recorded with them. A session whose Worker keeps names saves it as your name there, shown to its members in place of your address; the result says whether each joined session took it, and a refusal gives the rule. ${SESSION_NAME_RULE} A model or platform your host already set stays as it set it. Leave modelId and platform out unless you know them exactly; never guess one.`,
     inputSchema: {
       type: 'object',
       properties: {
-        displayName: text('Name shown in reports; up to 80 characters, and up to 32 where a session keeps names. Empty string clears it.'),
+        displayName: text('Name shown in reports: up to 80 characters of any kind, and the names rule in this tool’s description where a session keeps names. Empty string clears it.'),
         modelId: text('The exact id of the model you run on. Leave it out if you are not sure; never guess.'),
         platform: text('Agent platform or harness, if you know it exactly. Leave it out otherwise.'),
       },
@@ -67,7 +68,7 @@ export const buildTools = (participant) => [
     name: 'join_session',
     title: 'Join a session',
     description:
-      'Join a Context Engine session from its link. A link without worker= reaches the Session Worker its site lists in /known-sessions.json, or else the OP Sepolia registry. Signs in with your own key; registry reads remain available if the gate refuses sign-in. Claims SBTs explicitly marked for auto-claim in the link, and names any group in the link without joining it, except in a private session, which it joins through the link’s group first since nothing in one can be read before. Returns the context and the session’s instructions for agents (agentInstructions) to read before answering, its groups, its invitation to add context when it has one, and what you may do next if you want to (youMay): set a display name, join an open group, add context.',
+      `Join a Context Engine session from its link. A link without worker= reaches the Session Worker its site lists in /known-sessions.json, or else the OP Sepolia registry. Signs in with your own key; registry reads remain available if the gate refuses sign-in. Claims SBTs explicitly marked for auto-claim in the link, and names any group in the link without joining it, except in a private session, which it joins through the link’s group first since nothing in one can be read before. Returns the context and the session’s instructions for agents (agentInstructions) to read before answering, its groups, its invitation to add context when it has one, and what you may do next if you want to (youMay): set a display name, join an open group, add context. Where the session keeps names, a display name you have set is saved there on joining, and the result’s name says whether it was. ${SESSION_NAME_RULE}`,
     inputSchema: {
       type: 'object',
       properties: {

@@ -21,6 +21,7 @@ import { createKnownSessions } from './knownSessions.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
+import { SESSION_NAME_RULE } from './sessionNameRule.mjs';
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import { createWorkerGroupPasswordKeys, formatWorkerGroupReadInvite, parseGroupInviteToken } from '../../shared/workerGroupJoin.mjs';
@@ -709,7 +710,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       await markNameSaved(ctx, wanted);
       return { saved: true, name: saved?.name ?? null };
     } catch (error) {
-      return { saved: false, error: text(error?.message) || 'The session didn’t save your name.' };
+      // A name the session refused comes back with its rule, so the next try can fit it.
+      return { saved: false, error: text(error?.message) || 'The session didn’t save your name.',
+        ...(error?.status === 400 ? { rule: SESSION_NAME_RULE } : {}) };
     }
   };
 
