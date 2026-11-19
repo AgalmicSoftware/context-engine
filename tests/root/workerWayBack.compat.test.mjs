@@ -282,7 +282,10 @@ describe('putting a session back on a released Worker bundle', () => {
   const keepPicture = session => session.kv.put(`session:${slug}:analysis-card-picture:v1:figure:${analysisCardFigureKey(card.figure)}`,
     JSON.stringify({ figure: card.figure, name: 'Elinor Ostrom', portrait: 'A woman at a desk.', look: { era: '1990s', ground: 'paper', accentHex: '#aa3311' },
       image: { mime: 'image/jpeg', base64: 'aW1hZ2U=' } }));
-  describe.each(sides)('context cards and the saved analysis card on %s', (_name, ref) => {
+  // Only bundles from before 0.9.18 lack both features; the pinned bundle has
+  // them since 0.9.19's pin, so the drill runs on the live (0.9.17) bundle.
+  const beforeCards = [['the live bundle', live]];
+  describe.each(beforeCards)('context cards and the saved analysis card on %s', (_name, ref) => {
     (ref ? it.each(switchSets) : it.skip.each(switchSets))('with %o saved: read, restored, saved and back again', async (switches) => {
       const released = bundles[ref];
       const session = await drill({ provider });
