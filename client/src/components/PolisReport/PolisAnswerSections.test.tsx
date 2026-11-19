@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import PolisAnswerSections from './PolisAnswerSections';
+import PolisAnswerSections, { writtenAnswerPreview } from './PolisAnswerSections';
 import { buildReportAnswerQuestions } from './polisReportAnswers';
 
 const questions = buildReportAnswerQuestions({
@@ -156,4 +156,51 @@ it('limits the binary preview to five and includes every binary question in PDF'
   expect(screen.queryByText('Binary 5')).not.toBeInTheDocument();
   rerender(<PolisAnswerSections {...props} binaryQuestionCount={5} />);
   expect(screen.queryByRole('button', { name: /View more/ })).not.toBeInTheDocument();
+});
+
+const longAnswer = `${'A sentence of ordinary length about the street outside. '.repeat(12)}The end.`;
+const longWritten = buildReportAnswerQuestions({
+  text1: [longAnswer, 'A short answer'].map((value, index) => ({
+    responder: `person-${index}`,
+    response: { type: 'freeform', prompt: 'One long answer beside a short one', answer: { value } },
+  })),
+});
+
+it('shows the start of a long written answer, cut at a word, with a See more that opens and closes it', () => {
+  render(<PolisAnswerSections questions={longWritten} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Freeform' }));
+  const preview = writtenAnswerPreview(longAnswer) as string;
+  expect(preview.length).toBeLessThanOrEqual(301);
+  expect(preview.endsWith('…')).toBe(true);
+  // Cut at a word: what is shown is whole words of the answer.
+  expect(longAnswer.startsWith(preview.slice(0, -1))).toBe(true);
+  expect(/\s/.test(longAnswer[preview.length - 1])).toBe(true);
+  expect(screen.getByText(preview)).toBeInTheDocument();
+  expect(screen.queryByText(longAnswer)).not.toBeInTheDocument();
+  // The short answer has no control, and each answer sits in its own block.
+  const more = screen.getByRole('button', { name: 'See more' });
+  expect(screen.getAllByRole('button', { name: /See (more|less)/ })).toHaveLength(1);
+  expect(screen.getByText('A short answer').parentElement).not.toBe(screen.getByText(preview).parentElement);
+  expect(more).toHaveAttribute('aria-expanded', 'false');
+  expect(document.getElementById(more.getAttribute('aria-controls') as string)).toHaveTextContent(preview);
+  fireEvent.click(more);
+  expect(screen.getByText(longAnswer.trim(), { normalizer: (text) => text.trim() })).toBeInTheDocument();
+  const less = screen.getByRole('button', { name: 'See less' });
+  expect(less).toHaveAttribute('aria-expanded', 'true');
+  fireEvent.click(less);
+  expect(screen.getByText(preview)).toBeInTheDocument();
+});
+
+it('shows every written answer whole in the export', () => {
+  render(<PolisAnswerSections questions={longWritten} pdfMode />);
+  expect(screen.getByText(longAnswer.trim(), { normalizer: (text) => text.trim() })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /See (more|less)/ })).not.toBeInTheDocument();
+});
+
+it('leaves an answer of 300 characters whole and cuts a long run without spaces at the limit', () => {
+  expect(writtenAnswerPreview('x'.repeat(300))).toBeNull();
+  expect(writtenAnswerPreview('x'.repeat(400))).toBe(`${'x'.repeat(300)}…`);
+  // A little over the limit is shown whole; an emoji at the cut is not split in two.
+  expect(writtenAnswerPreview(`${'word '.repeat(60)}and a few more words.`)).toBeNull();
+  expect(writtenAnswerPreview(`${'x'.repeat(299)}😀${'x'.repeat(200)}`)).toBe(`${'x'.repeat(299)}…`);
 });

@@ -51,6 +51,24 @@
     opacity: 1;
     transform: none;
   }
+  .writtenAnswer button.seeMore {
+    appearance: none;
+    min-height: 44px;
+    margin: 0 0 -8px;
+    padding: 0 2px;
+    background: transparent;
+    background-image: none;
+    border: 0;
+    box-shadow: none;
+    text-shadow: none;
+    color: var(--ce-document-text);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+    opacity: 1;
+    transform: none;
+  }
   .sectionContent button.more:hover {
     background: color-mix(in srgb, var(--ce-status-info-soft) 82%, var(--ce-status-info));
     border-color: var(--ce-status-info);
@@ -109,9 +127,23 @@
   white-space: nowrap;
   font-size: 13px;
 }
-.written p {
+// Each written answer in its own block, so it is clear where one ends and the next begins.
+.written {
+  display: grid;
+  gap: 8px;
   margin: 10px 0;
+}
+.writtenAnswer {
+  padding: 10px 12px;
+  border: 1px solid var(--ce-document-border);
+  border-left: 3px solid var(--ce-status-info);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ce-status-info-soft) 45%, var(--ce-document-canvas));
+}
+.writtenAnswer p {
+  margin: 0;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   color: var(--ce-document-text);
 }
 .rating {

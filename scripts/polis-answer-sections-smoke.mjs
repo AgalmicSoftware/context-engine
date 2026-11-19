@@ -76,7 +76,28 @@ export async function probePolisAnswerSections(page) {
   assert.equal(await written.getByRole('button', { name: /Show all/ }).count(), 0);
   await written.getByRole('button', { name: 'View more (2)', exact: true }).click();
   assert.equal(await written.locator('p').count(), 5, 'Single control expands hidden answers and questions');
-  assert.equal(await written.getByRole('button').count(), 2, 'Only the section header and one expansion control');
+  assert.equal(await written.getByRole('button').count(), 3, 'The section header, one expansion control and one See more');
+  // Each written answer is its own block; a long one shows its start until asked for the rest.
+  const blocks = written.locator('[data-pdf-keep-together] > p');
+  const shut = await blocks.nth(1).innerText();
+  assert.ok(shut.length <= 301 && shut.endsWith('…'), `A long answer shows about 300 characters first (${shut.length})`);
+  const seeMore = written.getByRole('button', { name: 'See more', exact: true });
+  assert.equal(await seeMore.getAttribute('aria-expanded'), 'false');
+  await seeMore.focus();
+  await page.keyboard.press('Enter');
+  assert.ok((await blocks.nth(1).innerText()).length > 600, 'See more opens the whole answer in place, from the keyboard');
+  const seeLess = written.getByRole('button', { name: 'See less', exact: true });
+  assert.equal(await seeLess.getAttribute('aria-expanded'), 'true');
+  const boxes = await written.locator('p').evaluateAll((nodes) => nodes.map((node) => {
+    const block = node.parentElement;
+    const css = getComputedStyle(block);
+    const rect = block.getBoundingClientRect();
+    return { background: css.backgroundColor, top: rect.top, bottom: rect.bottom };
+  }));
+  assert.ok(boxes.every((box) => box.background !== 'rgba(0, 0, 0, 0)'), 'Each written answer has a background');
+  assert.ok(boxes.slice(1).every((box, index) => box.top >= boxes[index].bottom), 'Written answers do not run together');
+  await seeLess.click();
+  assert.equal(await blocks.nth(1).innerText(), shut);
   await written.getByRole('button', { name: 'View less', exact: true }).click();
   for (const theme of ['context-engine', 'classic-95']) {
     await page.getByTestId('ce-settings-theme').selectOption(theme);
