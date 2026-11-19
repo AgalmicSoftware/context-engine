@@ -1,4 +1,5 @@
 import QuadraticAllocationResults from './QuadraticAllocationResults';
+import { choiceKindLabel } from './MultichoiceQuestionInput';
 import { getVoiceCredits } from '../../../../shared/questions/quadraticAllocation.mjs';
 import QuadraticAllocationResponse from './QuadraticAllocationResponse';
 /** @file SingleQuestionResponse.tsx */
@@ -580,26 +581,29 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
         </div>
       );
     }
-    const percent = (num: number) => ((num / multichoiceSummary.totalResponders) * 100).toFixed(2);
+    const total = multichoiceSummary.totalResponders;
+    // One pick only, read as the report reads it for the same question.
+    const question = aggregatorQuestion as Record<string, unknown> | null;
+    const onePick =
+      !!(question?.singleSelect || question?.oneSelectionOnly || question?.singleChoice) ||
+      question?.maxSelections === 1;
 
     return (
       <div className={aggregatorContainerClassName}>
         <p className={aggregatorParagraphClassName}>
-          {multichoiceSummary.totalResponders} total responders to this multichoice question.
+          <span className={styles.choiceKindPill}>{choiceKindLabel(onePick)}</span> {total} total responders to this
+          multichoice question.
         </p>
+        {/* One form for both kinds: each option's own bar, the share of responders who chose it, and the count
+            under it. */}
         {multichoiceSummary.options.map((label: string) => (
           <div key={label} className={styles.multiChoiceOption}>
             <span className={styles.optionLabel}>{label}</span>
-            <span className={styles.optionStats}>
-              {multichoiceSummary.counts[label]} ({percent(multichoiceSummary.counts[label])}%)
-            </span>
-            {/* How many of the responders chose it, as a bar; the numbers beside it say the same. */}
             <span className={styles.optionBar} aria-hidden="true">
-              <i
-                style={{
-                  width: `${Math.min(100, (multichoiceSummary.counts[label] / multichoiceSummary.totalResponders) * 100)}%`,
-                }}
-              />
+              <i style={{ width: `${Math.min(100, (multichoiceSummary.counts[label] / total) * 100)}%` }} />
+            </span>
+            <span className={styles.optionStats} aria-label={`${multichoiceSummary.counts[label]} of ${total}`}>
+              {multichoiceSummary.counts[label]}/{total}
             </span>
           </div>
         ))}

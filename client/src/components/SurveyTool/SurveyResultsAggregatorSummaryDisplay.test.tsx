@@ -57,13 +57,13 @@ describe('SurveyResultsAggregatorSummaryDisplay', () => {
 
     expect(screen.getByText('4 total responders to this multichoice question.')).toBeInTheDocument();
     expect(screen.getByText('Yes')).toBeInTheDocument();
-    expect(screen.getByText('3 (75.00%)')).toBeInTheDocument();
+    expect(screen.getByText('3/4')).toBeInTheDocument();
     expect(screen.getByText('No')).toBeInTheDocument();
-    expect(screen.getByText('1 (25.00%)')).toBeInTheDocument();
+    expect(screen.getByText('1/4')).toBeInTheDocument();
     // Each option also shows its share of the responders as a bar.
-    const bar = (text) => screen.getByText(text).parentElement.querySelector('i').style.width;
-    expect(bar('3 (75.00%)')).toBe('75%');
-    expect(bar('1 (25.00%)')).toBe('25%');
+    const bar = (text: string) => screen.getByText(text).parentElement?.querySelector('i')?.style.width;
+    expect(bar('3/4')).toBe('75%');
+    expect(bar('1/4')).toBe('25%');
   });
 
   it('renders summary empty-state copy as passive display', () => {

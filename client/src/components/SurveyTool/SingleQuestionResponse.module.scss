@@ -534,11 +534,24 @@
 }
 
 .optionStats {
+  flex: 1 1 100%;
   font-weight: 700;
   color: var(--ce-color-white);
 }
 
-// Chosen by this share of the responders: a bar on its own line under the option's name and numbers.
+// "Pick one" or "Pick any", as on the question's card in the pile.
+.choiceKindPill {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.85em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+// Chosen by this share of the responders: a bar on its own line under the option's name, the count under it.
 .optionBar {
   flex: 1 1 100%;
   height: 10px;

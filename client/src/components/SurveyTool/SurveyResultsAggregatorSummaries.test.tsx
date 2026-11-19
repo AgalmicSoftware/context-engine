@@ -47,8 +47,8 @@ describe('SurveyResultsAggregatorSummaries', () => {
 
     expect(screen.getByText('4 total responders to this multichoice question.')).toBeInTheDocument();
     expect(screen.getByText('Yes')).toBeInTheDocument();
-    expect(screen.getByText('3 (75.00%)')).toBeInTheDocument();
+    expect(screen.getByText('3/4')).toBeInTheDocument();
     expect(screen.getByText('No')).toBeInTheDocument();
-    expect(screen.getByText('1 (25.00%)')).toBeInTheDocument();
+    expect(screen.getByText('1/4')).toBeInTheDocument();
   });
 });

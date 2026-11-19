@@ -78,18 +78,20 @@ export const SurveyResultsMultichoiceDistributionDisplay = ({
         {totalResponders} total responders to this multichoice question.
       </p>
       {options.map((option) => {
-        const percent = ((option.count / totalResponders) * 100).toFixed(2);
         return (
           <div key={option.key} className={multichoiceOptionClassName}>
             <span className={styles.surveyResultsMultichoiceOptionLabel}>{option.label}</span>
-            <span className={styles.surveyResultsMultichoiceOptionStats}>
-              {option.count} ({percent}%)
-            </span>
-            {/* How many of the responders chose it, as a bar; the numbers beside it say the same. */}
+            {/* Each option's own bar: the share of responders who chose it, with the count under it. */}
             <span className={styles.surveyResultsMultichoiceOptionBar} aria-hidden="true">
               <i
                 style={{ width: `${totalResponders > 0 ? Math.min(100, (option.count / totalResponders) * 100) : 0}%` }}
               />
+            </span>
+            <span
+              className={styles.surveyResultsMultichoiceOptionStats}
+              aria-label={`${option.count} of ${totalResponders}`}
+            >
+              {option.count}/{totalResponders}
             </span>
           </div>
         );

@@ -431,11 +431,11 @@ describe('SurveyResults multichoice aggregator summary', () => {
 
     expect(screen.getByText('2 total responders to this multichoice question.')).toBeInTheDocument();
     expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('2 (100.00%)')).toBeInTheDocument();
+    expect(screen.getByText('2/2')).toBeInTheDocument();
     expect(screen.getByText('Beta')).toBeInTheDocument();
-    expect(screen.getByText('1 (50.00%)')).toBeInTheDocument();
+    expect(screen.getByText('1/2')).toBeInTheDocument();
     expect(screen.getByText('Gamma')).toBeInTheDocument();
-    expect(screen.getByText('0 (0.00%)')).toBeInTheDocument();
+    expect(screen.getByText('0/2')).toBeInTheDocument();
   });
 
   it('renders quadratic totals through the real results module using each respondent’s latest allocation', async () => {
