@@ -3270,10 +3270,13 @@ Signed login/bootstrap requests:
   it goes only where those answers go. Where the session keeps each answer to
   its author and the admins (results shown as totals only, or to admins only),
   `publish` refuses a card with 403 `analysis_card_answers_private`, and the
-  page neither saves one nor offers to. `published` gives a saved card only to
-  its owner and to a reader who may read that person's answers, as a read of
-  one would decide; to anyone else it answers `{ published: null }`, a card
-  saved before the session's rules were tightened included.
+  page neither saves one nor offers to. A card saved before the session's
+  rules were tightened is deleted by the first `publish` or `published`
+  request that meets it, so it cannot come back if they are loosened again;
+  a withdrawal's marker holds none of the card's words and stays. Elsewhere
+  `published` gives a saved card only to its owner and to a reader who may
+  read that person's answers, as a read of one would decide; to anyone else
+  it answers `{ published: null }`.
   - `publish` takes `{ "published": true, "card": {...} }` to save the
     caller's card, or `{ "published": false }` to withdraw it. The card is
     always filed under the signed-in address, whatever the body names, so

@@ -12,9 +12,10 @@ import { createRequesterAccessChecks } from './storageRouteExecution.js';
 //   (withdrawn) or { published: null } (nothing saved).
 // Both need what the card's picture needs: a sign-in with the `ai` scope, rechecked against the session's current
 // rules, in a session that has not ended and has not turned the card off. Neither calls a model or counts an AI call.
-// A card is made from its owner's answers and quotes up to three of them, so it goes only where those answers go:
-// none is saved where the session keeps answers to their author and its admins, and a saved one is given only to
-// someone who may read that person's answers (a card saved before the session's rules were tightened included).
+// A card is made from its owner's answers and quotes up to three of them, so it goes only where those answers go.
+// Where the session keeps answers to their author and its admins, none is saved, and one saved before the rules
+// were tightened is deleted by the first request that meets it, so it cannot come back if they are loosened
+// again. Elsewhere a saved card is given only to its owner and to someone who may read that person's answers.
 export const ANALYSIS_CARD_PUBLISH_PATH = '/analysis-card/publish';
 export const ANALYSIS_CARD_PUBLISHED_PATH = '/analysis-card/published';
 export const ANALYSIS_CARD_SAVED_PATHS = [ANALYSIS_CARD_PUBLISH_PATH, ANALYSIS_CARD_PUBLISHED_PATH];
@@ -83,6 +84,16 @@ export const dispatchAnalysisCardSavedRoute = async ({
     return send({ error: 'card_store_unavailable' }, 503);
   }
   const keyOf = (account) => `session:${slug}:${KEY_PREFIX}${account}`;
+  const answersPrivate = analysisCardAnswersArePrivate(config);
+  // Deletes a stored card's words. A withdrawal's marker holds none and keeps the person's "no", so it stays.
+  const forget = async (account, stored) => {
+    if (stored?.published !== true) return;
+    try {
+      await kv.delete?.(keyOf(account));
+    } catch {
+      // The card is still not given to anyone: every answer below is made without it.
+    }
+  };
 
   if (path === ANALYSIS_CARD_PUBLISHED_PATH) {
     const account = accountOf(body?.account);
@@ -96,6 +107,10 @@ export const dispatchAnalysisCardSavedRoute = async ({
     if (stored?.published === false) return send({ published: false }, 200);
     const card = stored?.published === true ? normalizeSavedAnalysisCard(stored.card) : null;
     const savedAt = Number(stored?.savedAt);
+    if (answersPrivate) {
+      await forget(account, stored);
+      return send({ published: null }, 200);
+    }
     if (!card || !Number.isFinite(savedAt)) return send({ published: null }, 200);
     // To anyone but its owner the card reads as not saved unless they may read the owner's answers, as a read of
     // one of those answers would decide. A check that cannot be made counts as no.
@@ -115,8 +130,15 @@ export const dispatchAnalysisCardSavedRoute = async ({
   if (typeof body?.published !== 'boolean') return send({ error: 'invalid_request' }, 400);
   const card = body.published ? normalizeSavedAnalysisCard(body.card) : null;
   if (body.published && !card) return send({ error: 'invalid_card' }, 400);
-  // Withdrawing stays open, so a card saved under looser rules can still be taken down.
-  if (card && analysisCardAnswersArePrivate(config)) return send({ error: 'analysis_card_answers_private' }, 403);
+  // Withdrawing stays open. A card stored under looser rules goes with the refusal.
+  if (card && answersPrivate) {
+    try {
+      await forget(owner, parseJson(await kv.get(keyOf(owner))));
+    } catch {
+      // Unreadable now: the next request that meets the card deletes it.
+    }
+    return send({ error: 'analysis_card_answers_private' }, 403);
+  }
   if (card) {
     const refused = await preflight.count?.();
     if (refused) return refused;

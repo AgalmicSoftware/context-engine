@@ -61,6 +61,9 @@ const createKv = () => {
       puts.push({ key, value, options });
       rows.set(key, value);
     },
+    delete: async (key) => {
+      rows.delete(key);
+    },
   };
 };
 
@@ -278,15 +281,28 @@ test('a card goes only where its owner\'s answers go: not saved where answers ar
     const refused = await run({ kv, config, scopes: asMember });
     assert.deepEqual([refused.response.status, refused.body], [403, { error: 'analysis_card_answers_private' }], visibility);
     assert.deepEqual([kv.puts.length, refused.counted.length], [0, 0], visibility);
-    // A card saved while answers were public is no longer given to other participants, with or without the
-    // storage scope; its owner and the admins, who may read the answers, still get it, and it can be taken down.
+    // A card saved while answers were public is given to nobody once they are private, and is deleted by the
+    // first request that meets it, whoever asks: were the rules loosened again, it would otherwise come back
+    // quoting answers given under the stricter ones.
+    const key = `session:salon:analysis-card-saved:v1:${OWNER}`;
+    for (const [reader, scopes] of [[VISITOR, { ai: true }], [VISITOR, asMember], [ADMIN, asMember], [OWNER, asMember]]) {
+      await run({ kv });
+      assert.equal(kv.rows.has(key), true, visibility);
+      assert.deepEqual((await readAs(kv, reader, config, scopes)).body, { published: null }, visibility);
+      assert.equal(kv.rows.has(key), false, visibility);
+      assert.deepEqual((await readAs(kv, VISITOR, ON)).body, { published: null }, `${visibility}: gone when public again`);
+    }
+    // So is one that a refused save finds stored.
     await run({ kv });
-    assert.deepEqual((await readAs(kv, VISITOR, config)).body, { published: null }, visibility);
-    assert.deepEqual((await readAs(kv, VISITOR, config, { ai: true })).body, { published: null }, visibility);
-    assert.equal((await readAs(kv, OWNER, config)).body.published, true, visibility);
-    assert.equal((await readAs(kv, ADMIN, config)).body.published, true, visibility);
+    assert.equal((await run({ kv, config, scopes: asMember })).response.status, 403, visibility);
+    assert.equal(kv.rows.has(key), false, visibility);
+    // A "no" holds none of the card's words and is kept, and withdrawing still works there.
+    await run({ kv });
     const withdrawn = await run({ kv, config, body: { published: false }, scopes: asMember });
     assert.deepEqual([withdrawn.response.status, withdrawn.body], [200, { published: false }], visibility);
+    assert.deepEqual((await readAs(kv, VISITOR, config)).body, { published: false }, visibility);
+    assert.equal((await run({ kv, config, scopes: asMember })).response.status, 403, visibility);
+    assert.deepEqual((await readAs(kv, OWNER, ON)).body, { published: false }, `${visibility}: the "no" stays`);
   }
   // Where members see every answer, a member reads the card; a sign-in that could not read the answers does not.
   const members = showing('session_member_full');
