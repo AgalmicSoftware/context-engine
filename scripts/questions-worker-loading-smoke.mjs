@@ -40,7 +40,7 @@ try {
       console.log((await page.locator('body').innerText()).match(/Questions\s*\(\d+\)/)?.[0]);
       // Revisiting a verified session must hydrate that session, not keep the previous count.
       const selector = page.getByTestId('ce-tool-explorer-active-session');
-      await selector.selectOption('demo-sh');
+      await selector.selectOption('rxc-ra-agent-test-1');
       await page.waitForFunction(() => /Questions\s*\([1-9]\d*\)/.test(document.body.innerText));
       await selector.selectOption('eddy26');
       await page.waitForFunction(() => /Questions\s*\([1-9]\d*\)/.test(document.body.innerText));

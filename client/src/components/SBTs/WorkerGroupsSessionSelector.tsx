@@ -51,6 +51,7 @@ const WorkerGroupsSessionSelector = ({
   const sessionHref =
     (exactEntry?.href.includes('?worker=') ? exactEntry.href : knownEntry?.href || exactEntry?.href) ||
     buildPublicRoute(`/session/${encodeURIComponent(sessionSlug)}`);
+  const shownName = sessionListName(sessionSlug, sessionName);
   // The current session always shows; others only when the site's lists show them.
   const options = [
     { slug: sessionSlug, name: sessionName, href: sessionHref },
@@ -73,7 +74,7 @@ const WorkerGroupsSessionSelector = ({
           data-testid={E2E_TESTIDS.WORKER_GROUPS_SESSION_SELECT}
           className={styles.workerRouteSessionSelect}
           value={sessionSlug}
-          title={`${sessionName} (${sessionSlug})`}
+          title={`${shownName} (${sessionSlug})`}
           onFocus={refresh}
           onChange={(event) => {
             const next = options.find((entry) => entry.slug === event.target.value);
@@ -91,7 +92,7 @@ const WorkerGroupsSessionSelector = ({
             </option>
           ))}
         </select>
-        <a href={sessionHref} aria-label={`Open session ${sessionName}`} title={`Open session ${sessionName}`}>
+        <a href={sessionHref} aria-label={`Open session ${shownName}`} title={`Open session ${shownName}`}>
           <FontAwesomeIcon
             aria-hidden="true"
             className={styles.workerRouteSessionExternalIcon}

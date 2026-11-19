@@ -193,7 +193,7 @@ export async function runSmoke() {
           await inspectSessionSelectorLayout(selector, 'right');
           await selector.selectOption({ label: 'General' });
           await inspectSessionSelectorLayout(selector, 'right');
-          await selector.selectOption({ label: 'Demo Session (demo-sh)' });
+          await selector.selectOption({ label: 'RA agent test (rxc-ra-agent-test-1)' });
           await inspectSessionSelectorLayout(selector, 'right');
           await page.getByRole('button', { name: '← Back', exact: true }).click();
         }

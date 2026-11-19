@@ -46,7 +46,7 @@ try {
       assert(panelBounds.y >= selectorBounds.y + selectorBounds.height, 'Expanded options sit below the toolbar');
       await inspect();
       await filter.click();
-      for (const value of ['__ce_all_sessions__', '', 'eddy26']) {
+      for (const value of ['__ce_all_sessions__', 'rxc-ra-agent-test-1', 'eddy26']) {
         await select.selectOption(value);
         await filter.waitFor({ timeout: 60000 });
         await inspect();
