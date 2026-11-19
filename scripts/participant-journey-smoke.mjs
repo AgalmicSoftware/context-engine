@@ -36,6 +36,22 @@ const freeText = 'A crossing by the school, and a bench.';
 
 const activeCard = (page) => page.getByTestId('ce-pile-active-question');
 const nextButton = (page) => page.getByRole('button', { name: 'Next Question', exact: true });
+// Next, tapped as a finger taps it: where it is on the screen, without waiting for it to hold still. A
+// Playwright click waits, and that was the fault: in the first theme Next grows for 0.2 s once a pointer rests
+// on it, a click inside that time is retried, and the third try scrolls Next to the middle of the screen. The
+// look pass then read the page as scrolled. A tap on a covered or off-screen Next still fails, at the check
+// that the card was left. `scrollTo` is for a walk that has scrolled to an option: a person scrolls back to Next.
+const tapNext = async (page, { scrollTo = false } = {}) => {
+  const next = nextButton(page);
+  await next.waitFor();
+  if (scrollTo) await next.scrollIntoViewIfNeeded();
+  const box = await next.boundingBox();
+  assert.ok(box, 'Next has a place on the screen');
+  const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+  const screen = page.viewportSize();
+  assert.ok(x >= 0 && x <= screen.width && y >= 0 && y <= screen.height, `Next is off the screen, at ${Math.round(x)},${Math.round(y)} of ${screen.width}x${screen.height}`);
+  await page.touchscreen.tap(x, y);
+};
 const cardPrompt = async (page, prompts) => {
   const text = await activeCard(page).innerText();
   return prompts.find((prompt) => text.includes(prompt)) || '';
@@ -113,7 +129,7 @@ const answerCards = async (page, questions, answered, count) => {
     }
     const movesOnByItself = fresh && question.record.type === 'binary';
     if (movesOnByItself && await cardLeft(page, prompt, 5000)) continue;
-    await nextButton(page).click();
+    await tapNext(page, { scrollTo: true });
     assert.ok(await cardLeft(page, prompt, 5000), `Next did not leave the card "${prompt}"`);
   }
   assert.equal(answered.size, count, `Answered ${answered.size} of ${count} cards`);
@@ -127,9 +143,19 @@ const showQuestion = async (page, prompt, count) => {
   for (let index = 0; index <= count && await previous.isEnabled(); index += 1) await previous.click();
   for (let index = 0; index <= count; index += 1) {
     if ((await card.innerText()).includes(prompt)) return card;
+    // A click here: its wait for Next to hold still is what paces this walk.
     await nextButton(page).click();
   }
   return assert.fail(`Question was not shown: ${prompt}`);
+};
+
+// JOURNEY_CPU=4 slows Chromium's processor four times, as a loaded runner does: the timing faults this journey
+// has met (a click landing while a control still moves) show there and not on a quiet machine.
+const slowCpu = async (context, page, engineName) => {
+  const rate = Number(process.env.JOURNEY_CPU || 0);
+  if (rate > 1 && engineName === 'chromium') {
+    await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate });
+  }
 };
 
 const submitButton = (page) => page.locator('[data-testid="ce-survey-submit"]:visible').first();
@@ -169,6 +195,7 @@ const runJourney = async (engineName, phoneName) => {
       },
     });
     page = await context.newPage();
+    await slowCpu(context, page, engineName);
     // A reload cuts off requests in flight, which WebKit reports as page errors; those are not faults.
     const pageErrors = [];
     let leaving = false;
@@ -370,6 +397,7 @@ const runLookPass = async (engineName) => {
           fixture: person, viewport, contextOptions: { hasTouch: true, ...(engineName === 'chromium' ? { isMobile: true } : {}) },
         });
         page = await context.newPage();
+        await slowCpu(context, page, engineName);
         await page.goto(session.sessionUrl, { waitUntil: 'domcontentloaded' });
         await activeCard(page).waitFor();
         await chooseTheme(page, theme);
@@ -388,7 +416,7 @@ const runLookPass = async (engineName) => {
           await look(() => assertOptionsInsideScreen(page, `The card "${prompt}"`));
           await look(() => assertReadableText(activeCard(page), `The card "${prompt}"`));
           if (index + 1 < questions.length) {
-            await nextButton(page).click();
+            await tapNext(page);
             assert.ok(await cardLeft(page, prompt, 5000), `Next did not leave the card "${prompt}"`);
           }
         }
@@ -413,7 +441,8 @@ const runLookPass = async (engineName) => {
     }
   } catch (error) {
     if (page) await page.screenshot({ path: `${outputDir}/look-${where.replace(/ /g, '-')}-failure.png` }).catch(() => {});
-    error.message = `[look: ${where}] ${error.message}`;
+    // What the pass had already found often explains the step that stopped it.
+    error.message = `[look: ${where}] ${error.message}${problems.length ? ` (found before it: ${problems.join('; ')})` : ''}`;
     throw error;
   } finally {
     await browser.close();
