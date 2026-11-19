@@ -4,8 +4,8 @@
 // The way back: a session whose Worker is put back on a released bundle after
 // running this one. Data, a backup and settings made here must still read,
 // restore and save under the released bundle, and come back intact when this
-// Worker returns. Two released bundles: the one live sessions run, and the
-// release this one is pinned to.
+// Worker returns. Released bundles: the one live sessions run, the release
+// this one is pinned to, and one from before names.
 import { execFileSync } from 'node:child_process';
 import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
@@ -30,9 +30,11 @@ const bundleRef = (ref, what) => {
   console.warn(`Skipping locally: ${message}`);
   return '';
 };
-// The bundle live sessions run (0.9.12; 0.9.13 to 0.9.16 changed no Worker
-// code). Move this pin deliberately, to the bundle live sessions run; never to a moving tag.
-const live = bundleRef('refs/tags/worker-bundles-8d41d69ffc6db0fa31d990d306ed2979d9fe02fa', 'the live bundle');
+// The bundle live sessions run (0.9.17). Move this pin deliberately, to the
+// bundle live sessions run; never to a moving tag.
+const live = bundleRef('refs/tags/worker-bundles-0744dc384f5195baae787632952d41653887c31d', 'the live bundle');
+// A bundle from before names (0.9.12), for the names drill.
+const beforeNames = bundleRef('refs/tags/worker-bundles-8d41d69ffc6db0fa31d990d306ed2979d9fe02fa', 'a bundle from before names');
 // The release this one is pinned to: pin-worker-release names its bundles in the
 // deploy helper's example config. WAY_BACK_PINNED_REF stands in for it before
 // that release is published (a local run only; CI always takes the pin).
@@ -187,7 +189,7 @@ describe('putting a session back on a released Worker bundle', () => {
     // replaces with a partial stand-in; Node's own fetch still makes it.
     globalThis.Response = (await fetch('data:,')).constructor;
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-way-back-worker-'));
-    for (const ref of new Set([live, pinned].filter(Boolean))) bundles[ref] = await loadBundle(ref, tempDir);
+    for (const ref of new Set([beforeNames, live, pinned].filter(Boolean))) bundles[ref] = await loadBundle(ref, tempDir);
   }, 120000);
 
   afterAll(async () => {
@@ -195,8 +197,8 @@ describe('putting a session back on a released Worker bundle', () => {
     if (tempDir) await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  (live ? it : it.skip)('reads, restores and saves settings on the live bundle, and keeps names for the return', async () => {
-    const released = bundles[live];
+  (beforeNames ? it : it.skip)('reads, restores and saves settings on a bundle from before names, and keeps names for the return', async () => {
+    const released = bundles[beforeNames];
     const session = await drill();
     try {
       const { config } = session;
@@ -405,9 +407,10 @@ describe('putting a session back on a released Worker bundle', () => {
       }
     }, 120000);
 
-    // A session made before 0.9.18 has neither switch. Turning the analysis card
-    // off there saves only that one, so the context cards switch stays absent.
-    (ref ? it : it.skip)('with only analysisCardEnabled: false saved: read, restored, saved and back again', async () => {
+    // A session from before 0.9.18 never saved either switch, so the card and
+    // Context cards are both off. This Worker stores nothing new for it, and the
+    // released bundle meets no setting it does not know.
+    (ref ? it : it.skip)('with neither switch saved: both off, nothing new stored, and the way back meets no new setting', async () => {
       const released = bundles[ref];
       const session = await drill({ provider });
       try {
@@ -416,17 +419,19 @@ describe('putting a session back on a released Worker bundle', () => {
         expect(config).not.toHaveProperty('contextCardsEnabled');
         await session.kv.put(`session:${slug}:config`, JSON.stringify(config));
         const [admin, person] = [session.client(owner), session.client(member)];
-        const savedCard = client => client.request('/analysis-card/published', { method: 'POST', auth: true, body: { account: member.address } });
+        const ownCard = client => client.request('/analysis-card/published', { method: 'POST', auth: true, body: { account: member.address } });
+        const publish = client => client.request('/analysis-card/publish', { method: 'POST', auth: true, body: { published: true, card } });
         const picture = client => client.request('/analysis-card/picture', { method: 'POST', auth: true, body: { figure: card.figure } });
         const refusal = request => request.then(() => null, error => [error.status, error.code]);
         const storedConfig = store => JSON.parse(store.values.get(`session:${slug}:config`));
-        const cardRows = () => [...session.kv.values].filter(([key]) => key.includes(':analysis-card-'));
-        const off = { analysisCardEnabled: false };
+        const cardRows = store => [...store.values.keys()].filter(key => key.includes('analysis-card'));
 
-        // On this Worker, neither switch saved: the card is on, so a member saves
-        // one and has a picture. A context file gets no card, as cards are off.
+        // On this Worker: a member's own card, its picture and a context file's
+        // card are all refused, and the session's config is left as it was.
         const current = session.current();
         expect(await session.signed(current, 'set-secrets', { secrets: { anthropicKey: 'synthetic-anthropic-key' } })).toMatchObject({ status: 200 });
+        const configBefore = storedConfig(session.kv);
+        expect(configBefore).toEqual(config);
         const form = new FormData();
         form.append('file', new Blob([new TextEncoder().encode('# Minutes\nWe agreed.')], { type: 'text/markdown' }), 'notes.md');
         form.append('resource', 'docsContext');
@@ -436,72 +441,63 @@ describe('putting a session back on a released Worker bundle', () => {
         const notes = (await admin.request('/storage/upload', { method: 'POST', auth: true, form })).id;
         const context = async (client = admin) => (await client.request('/storage/list?resource=docsContext&role=context', { auth: true }))
           .items.map(item => [item.storageRef.id, item.metadata.card ?? null]);
-        expect(await context()).toEqual([[notes, null]]);
-        const reads = async client => client.request(`/storage/read?id=${encodeURIComponent(notes)}`, { auth: true, raw: true });
-        expect(await person.request('/analysis-card/publish', { method: 'POST', auth: true, body: { published: true, card } })).toMatchObject({ published: true, card });
-        await keepPicture(session);
-        expect(await picture(person)).toMatchObject({ cached: true, image: { mime: 'image/jpeg', base64: 'aW1hZ2U=' } });
-        const cardRowsBefore = cardRows();
-        expect(cardRowsBefore).toHaveLength(2);
-        // The admin page turns the card off: only that field, as the page sends it.
-        expect(await session.signed(current, 'set-config', { config: off })).toMatchObject({ status: 200 });
-        expect(storedConfig(session.kv)).toMatchObject(off);
-        expect(storedConfig(session.kv)).not.toHaveProperty('contextCardsEnabled');
-        expect(await refusal(savedCard(admin))).toEqual([403, 'analysis_card_off']);
-        expect(await refusal(picture(person))).toEqual([403, 'analysis_card_off']);
+        const makeCard = () => refusal(admin.request('/storage/context', { method: 'POST', auth: true, body: { action: 'make-card', id: notes } }));
+        const cardsOff = [409, 'context_cards_off'];
+        const reads = client => client.request(`/storage/read?id=${encodeURIComponent(notes)}`, { auth: true, raw: true });
+        const bothOff = async () => {
+          expect(await refusal(publish(person))).toEqual([403, 'analysis_card_off']);
+          expect(await refusal(ownCard(person))).toEqual([403, 'analysis_card_off']);
+          expect(await refusal(picture(person))).toEqual([403, 'analysis_card_off']);
+          expect(await makeCard()).toEqual(cardsOff);
+          expect(await context()).toEqual([[notes, null]]);
+        };
+        await bothOff();
+        expect(storedConfig(session.kv)).toEqual(configBefore);
+        expect(cardRows(session.kv)).toEqual([]);
         const pages = await session.backup();
-        expect(JSON.stringify(pages)).toContain('analysisCardEnabled');
+        expect(JSON.stringify(pages)).not.toContain('analysisCardEnabled');
         expect(JSON.stringify(pages)).not.toContain('contextCardsEnabled');
-        expect(JSON.stringify(pages)).not.toContain(card.title);
 
-        // (a) The released bundle reads the file, serves no switch, and has no
-        // card routes; the saved card and the off switch stay stored.
+        // (a) The released bundle reads the file and has no card routes.
         const signedInBefore = session.signIns;
         const previous = session.released(released);
-        expect(await session.readConfig()).not.toHaveProperty('analysisCardEnabled');
         expect(await reads(person)).toBe('# Minutes\nWe agreed.');
-        for (const ask of [savedCard, picture]) expect(await refusal(ask(person))).toEqual([404, expect.anything()]);
-        expect(storedConfig(session.kv)).toMatchObject(off);
+        for (const ask of [ownCard, picture, publish]) expect(await refusal(ask(person))).toEqual([404, expect.anything()]);
         expect(session.signIns).toBe(signedInBefore);
-        // (b) A backup restores there, keeping the off switch unseen: this Worker
-        // on the restored session finds the card off, and no saved card.
+        // (b) The backup restores there whole, and this Worker on the restored
+        // session finds both still off.
+        expect(pages.at(-1).manifest.complete).toBe(true);
         const { fresh, results } = await session.restore(pages, released.createWorkerRuntime, released.SessionWriteCoordinator);
         results.forEach((result, index) => expect(result).toMatchObject({ status: 200, body: { complete: pages[index].manifest.complete, counts: { conflicts: 0 } } }));
         const restorer = fresh.client(owner);
         expect(await reads(restorer)).toBe('# Minutes\nWe agreed.');
-        expect(await fresh.readConfig()).not.toHaveProperty('analysisCardEnabled');
-        expect([...fresh.store.values.keys()].filter(key => key.includes('analysis-card'))).toEqual([]);
         fresh.deploy(createWorkerRuntime, SessionWriteCoordinator, provider);
-        expect(await fresh.readConfig()).toMatchObject(off);
+        expect(await fresh.readConfig()).not.toHaveProperty('analysisCardEnabled');
         expect(await fresh.readConfig()).not.toHaveProperty('contextCardsEnabled');
-        expect(await refusal(savedCard(restorer))).toEqual([403, 'analysis_card_off']);
-        // (c) A settings page reloaded on the released bundle saves a rename; a
-        // page loaded before, still carrying the off switch, is refused whole.
+        expect(await refusal(ownCard(fresh.client(member)))).toEqual([403, 'analysis_card_off']);
+        // (c) A settings save there, from a page loaded before or after the way
+        // back, carries no switch, as none was changed: it saves.
         expect(await session.signed(previous, 'set-config', { config: { sessionName: 'Renamed on the way back' } }))
           .toEqual({ status: 200, body: { ok: true } });
-        expect(await session.signed(previous, 'set-config', { config: { ...off, sessionName: 'Refused' } })).toEqual({
-          status: 400, body: { error: 'Unsupported worker-canonical session config field: analysisCardEnabled.' },
-        });
-        expect(storedConfig(session.kv)).toMatchObject({ ...off, sessionName: 'Renamed on the way back', ai: { models: config.ai.models } });
-        expect(storedConfig(session.kv)).not.toHaveProperty('contextCardsEnabled');
-        expect(cardRows()).toEqual(cardRowsBefore);
+        const renamed = storedConfig(session.kv);
+        expect(renamed.sessionName).toBe('Renamed on the way back');
+        expect(renamed).not.toHaveProperty('analysisCardEnabled');
+        expect(renamed).not.toHaveProperty('contextCardsEnabled');
 
-        // (d) This Worker again: the card is still off and context cards still
-        // unsaved; turning the card on brings back the saved card and its picture.
+        // (d) This Worker again: both still off, until an admin turns the card
+        // on; then a member saves and reads their own card.
         const signedInBack = session.signIns;
         session.current();
-        expect(await session.readConfig()).toMatchObject({ ...off, sessionName: 'Renamed on the way back' });
-        expect(await session.readConfig()).not.toHaveProperty('contextCardsEnabled');
-        expect(await reads(admin)).toBe('# Minutes\nWe agreed.');
-        expect(await context()).toEqual([[notes, null]]);
-        const makeCard = () => refusal(admin.request('/storage/context', { method: 'POST', auth: true, body: { action: 'make-card', id: notes } }));
-        expect(await makeCard()).toEqual([409, expect.anything()]);
-        expect(await refusal(savedCard(admin))).toEqual([403, 'analysis_card_off']);
+        const returned = await session.readConfig();
+        expect(returned).toMatchObject({ sessionName: 'Renamed on the way back' });
+        expect(returned).not.toHaveProperty('analysisCardEnabled');
+        expect(returned).not.toHaveProperty('contextCardsEnabled');
+        await bothOff();
         expect(await session.signed(session.deployed, 'set-config', { config: { analysisCardEnabled: true } })).toMatchObject({ status: 200 });
+        expect(await publish(person)).toMatchObject({ published: true, card });
+        expect(await ownCard(person)).toMatchObject({ published: true, card });
         expect(await session.readConfig()).not.toHaveProperty('contextCardsEnabled');
-        expect(await makeCard()).toEqual([409, expect.anything()]);
-        expect(await savedCard(admin)).toMatchObject({ published: true, card });
-        expect(await picture(person)).toMatchObject({ cached: true, image: { mime: 'image/jpeg', base64: 'aW1hZ2U=' } });
+        expect(await makeCard()).toEqual(cardsOff);
         expect(session.signIns).toBe(signedInBack);
       } finally {
         session.end();
