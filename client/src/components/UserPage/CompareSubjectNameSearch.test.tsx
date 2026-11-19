@@ -84,7 +84,7 @@ describe('CompareSubjectNameSearch', () => {
 describe('Compare by name', () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    jest.mocked(useSessionNames).mockReturnValue({ source: null, names, answerNamesShown: false });
+    jest.mocked(useSessionNames).mockReturnValue({ source: null, names, answerNamesShown: false, signIn: null });
   });
   afterEach(() => {
     jest.useRealTimers();

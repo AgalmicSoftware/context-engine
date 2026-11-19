@@ -1,7 +1,7 @@
 /** @file sessionNames.ts: the names people give themselves in a session, read from where the session keeps them. */
 import { getShortenedAddress } from '../ui/displayHelpers';
 import { readWorkerCapabilities } from '../worker/workerCapabilities';
-import { fetchWorkerWithAuth, getCachedWorkerSessionToken } from '../worker/workerAuth';
+import { fetchWorkerWithAuth, getCachedWorkerSessionToken, getWorkerSessionToken } from '../worker/workerAuth';
 import { groupReadHeaders } from '../worker/workerGroupReadProof';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { getUsableSessionWorkerUrl } from './sessionWorkerAvailability';
@@ -17,6 +17,13 @@ export type SessionNamesSource = {
   enabled: boolean;
   /** Every name this reader may see; empty, not an error, for someone the session doesn't let read them. */
   readAll: () => Promise<SessionNames>;
+  /**
+   * Whether this tab holds the session sign-in names are read with. A person whose wallet is connected can lack
+   * it (a new tab starts without one), and is then shown addresses until they sign in.
+   */
+  hasSignIn: () => Promise<boolean>;
+  /** Signs the person in to the session because they asked to see names; this may open their wallet or passkey. */
+  signIn: () => Promise<void>;
   /** Sets the signed-in person's own name; '' removes it. Resolves to the name as stored, or null. */
   setOwn: (name: string) => Promise<string | null>;
 };
@@ -45,6 +52,10 @@ const readNames = (body: unknown): SessionNames => {
 const READ_TTL_MS = 30_000;
 const reads = new Map<string, { at: number; names: Promise<SessionNames> }>();
 
+// A sign-in the page tried by itself and couldn't make isn't tried again on every reload of the names.
+const QUIET_SIGN_IN_RETRY_MS = 60_000;
+const quietSignInFailedAt = new Map<string, number>();
+
 const changeListeners = new Set<() => void>();
 /** Hears every name saved from this page, so each view showing names can reload them. */
 export const subscribeSessionNames = (listener: () => void): (() => void) => {
@@ -55,6 +66,8 @@ export const subscribeSessionNames = (listener: () => void): (() => void) => {
 const NAMES_OFF: SessionNamesSource = {
   enabled: false,
   readAll: async () => ({}),
+  hasSignIn: async () => true,
+  signIn: async () => {},
   setOwn: async () => {
     throw new Error('Names are off in this session.');
   },
@@ -69,12 +82,29 @@ const workerSource = (base: string, options: SessionNamesOptions): SessionNamesS
     allowDemoFallback: defaultStrictAllowDemoFallback(),
   };
   const slugQuery = `slug=${encodeURIComponent(options.sessionSlug)}`;
+  const signInKey = `${base}|${options.sessionSlug}|${options.account.toLowerCase()}`;
   return {
     enabled: true,
+    hasSignIn: async () => !options.account || !!(await getCachedWorkerSessionToken(session)),
+    signIn: async () => {
+      await getWorkerSessionToken(session);
+    },
     // Reading never asks for a sign-in: a held token widens what the Worker shows, and without one it answers
     // as it would anyone signed out.
     readAll: async () => {
-      const token = options.account ? await getCachedWorkerSessionToken(session) : '';
+      let token = options.account ? await getCachedWorkerSessionToken(session) : '';
+      // A new tab holds no session sign-in. A wallet that can sign without asking (an unlocked passkey) signs in
+      // here, at the cost of two requests once per tab; any other wallet is left alone and reads as signed out.
+      if (
+        !token &&
+        options.account &&
+        Date.now() - (quietSignInFailedAt.get(signInKey) || 0) > QUIET_SIGN_IN_RETRY_MS
+      ) {
+        token = await getWorkerSessionToken({ ...session, prompt: false }).catch(() => {
+          quietSignInFailedAt.set(signInKey, Date.now());
+          return '';
+        });
+      }
       const key = `${base}|${options.sessionSlug}|${token}`;
       const kept = reads.get(key);
       if (kept && Date.now() - kept.at < READ_TTL_MS) return kept.names;

@@ -288,6 +288,35 @@ describe('UserPage username editing', () => {
     expect(localStorage.getItem(`userPageUsername_${viewAddress}`)).toBeNull();
   });
 
+  it('signs in before opening the name field in a tab with no session sign-in, and shows the stored name', async () => {
+    const viewAddress = '0x00000000000000000000000000000000000000e1';
+    const source = {
+      enabled: true,
+      setOwn: jest.fn(),
+      hasSignIn: jest.fn(async () => false),
+      signIn: jest.fn(async () => undefined),
+      readAll: jest.fn(async () => ({ [viewAddress]: 'Sam' })),
+    };
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    instance.state = { ...instance.state, sessionNamesSource: source, sessionNames: {}, username: '' };
+
+    await instance.onUsernamePenClick();
+    expect(source.signIn).toHaveBeenCalledTimes(1);
+    expect(instance.state).toMatchObject({ isEditingUsername: true, username: 'Sam' });
+    expect(instance.state.sessionNames[viewAddress]).toBe('Sam');
+
+    // A sign-in the person closes still opens the field; one already held asks for nothing.
+    source.signIn.mockRejectedValueOnce(new Error('closed'));
+    instance.state = { ...instance.state, isEditingUsername: false, username: '' };
+    await instance.onUsernamePenClick();
+    expect(instance.state).toMatchObject({ isEditingUsername: true, username: '' });
+
+    source.hasSignIn.mockResolvedValue(true);
+    instance.state = { ...instance.state, isEditingUsername: false };
+    await instance.onUsernamePenClick();
+    expect(source.signIn).toHaveBeenCalledTimes(2);
+  });
+
   it("reopens the field with the Worker's reason when it refuses a name", async () => {
     const viewAddress = '0x00000000000000000000000000000000000000ef';
     const setOwn = jest.fn(async () => {

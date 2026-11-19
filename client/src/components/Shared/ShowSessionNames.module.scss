@@ -1,0 +1,30 @@
+// Sits above a list of addresses, in that list's own text colour.
+.showNames {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  color: inherit;
+  font-size: 0.95rem;
+
+  :global(:root) & button {
+    appearance: none;
+    min-height: 44px;
+    padding: 0 2px;
+    background: transparent;
+    background-image: none;
+    border: 0;
+    box-shadow: none;
+    text-shadow: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+    &:disabled {
+      cursor: progress;
+      text-decoration: none;
+    }
+  }
+}

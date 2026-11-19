@@ -53,6 +53,7 @@ import { useCompareSessionData } from './useCompareSessionData';
 import CompareSubjectInputList from './CompareSubjectInputList';
 import CompareSubjectNameSearch, { resolveTypedCompareNames } from './CompareSubjectNameSearch';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
+import ShowSessionNames from '../Shared/ShowSessionNames';
 import CompareSubjectParticipants from './CompareSubjectParticipants';
 import {
   buildCompareSubjectsRoutePath,
@@ -272,7 +273,7 @@ const CompareAddress = ({
   );
 
   // Only the names the session's Worker shows this viewer; none where the session keeps no names.
-  const { names: sessionNames } = useSessionNames({
+  const { names: sessionNames, signIn: signInForNames } = useSessionNames({
     sessionSlug: activeSessionSlug,
     sessionConfig,
     account: account || '',
@@ -846,6 +847,7 @@ const CompareAddress = ({
           </div>
         )}
 
+        <ShowSessionNames signIn={signInForNames} />
         <CompareSubjectInputList
           onAddSubject={addCompareAddress}
           renderSubjectInput={renderInputOrYouPill}

@@ -2896,9 +2896,27 @@ class UserPage extends Component<any, any> {
     }
   };
 
-  onUsernamePenClick = (): void => {
+  onUsernamePenClick = async (): Promise<void> => {
+    // In a tab with no session sign-in the name read came back empty. The person has asked to set their name, which
+    // needs that sign-in anyway, so it is made first and the field opens on the name they already have.
+    const source = this.state.sessionNamesSource;
+    let signedInNames: Record<string, string> | null = null;
+    if (source?.enabled && !(await source.hasSignIn().catch(() => true))) {
+      signedInNames = await source
+        .signIn()
+        .then(() => source.readAll())
+        .catch(() => null);
+    }
     if (!this._isMounted) return;
-    this.setState(buildUserPageUsernameEditOpenStatePatch(), () => {
+    // The name is put in the field here: a reload never overwrites a field that is open, so it can't be left to one.
+    const own = String(this.props.viewAddress || '').toLowerCase();
+    const loaded = signedInNames
+      ? {
+          sessionNames: signedInNames,
+          ...buildUserPageUsernameLoadedStatePatch({ username: signedInNames[own] || '' }),
+        }
+      : {};
+    this.setState({ ...loaded, ...buildUserPageUsernameEditOpenStatePatch() }, () => {
       // focus the input when it shows (best-effort via microtask)
       setTimeout(() => {
         try {

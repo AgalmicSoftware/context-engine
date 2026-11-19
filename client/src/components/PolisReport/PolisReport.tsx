@@ -114,6 +114,7 @@ import PolisAnswerSections, { type AnswerSectionsOpen } from './PolisAnswerSecti
 import { buildReportResponseStats, buildReportAnswerQuestions } from './polisReportAnswers';
 import { markPolisAgents, readPolisReportCacheContext } from './polisReportRuntime';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
+import ShowSessionNames from '../Shared/ShowSessionNames';
 import { sessionNameLabels } from '../../utilities/session/sessionNames';
 import {
   buildPolisDemoSurveyResultsNetworkData,
@@ -1397,6 +1398,7 @@ export default function PolisReport({
 
     return (
       <div className={styles.participantsList}>
+        {!effectiveUseDemoData && <ShowSessionNames signIn={sessionNames.signIn} />}
         {unique.map((addr, idx) => {
           const displayName = participantNames[addr];
           const simulatedName = usesSimulatedProfiles ? displayName : '';
