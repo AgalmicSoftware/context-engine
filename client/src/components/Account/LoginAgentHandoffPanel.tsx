@@ -43,8 +43,14 @@ const keyErrorMessage = (error: unknown): string => {
 const suggestReturnUrl = (sessionSlug: string, sessionUrl: string): string | undefined => {
   if (typeof window === 'undefined') return sessionUrl;
   const parts = window.location.pathname.split('/').filter(Boolean);
-  const onSessionPage = parts.at(-2) === 'session' && decodeURIComponent(parts.at(-1) || '') === sessionSlug;
-  return onSessionPage ? undefined : sessionUrl;
+  let pageSlug = '';
+  try {
+    pageSlug = parts.at(-2) === 'session' ? decodeURIComponent(parts.at(-1) || '') : '';
+  } catch {
+    // A malformed path is not the session's page.
+  }
+  // The Worker matches the slug without case, as the dialog's slug is lowercased.
+  return pageSlug && pageSlug.toLowerCase() === sessionSlug.toLowerCase() ? undefined : sessionUrl;
 };
 
 // A short label's "?": its words show on hover and focus, and describe the button. Below, where above would

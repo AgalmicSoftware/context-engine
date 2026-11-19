@@ -257,3 +257,27 @@ it('says when a key cannot be made, and a new choice clears the message', async 
   fireEvent.click(screen.getByRole('radio', { name: 'Suggest answers for me to review' }));
   expect(screen.getByRole('alert')).toBeEmptyDOMElement();
 });
+
+it("on the session's own page, sends drafts back to that page with its join link, whatever the slug's case", async () => {
+  window.history.pushState({}, '', '/session/Salon?joinGroup=g1');
+  try {
+    renderPanel();
+    const prompt = await copySuggestPrompt();
+    expect(prompt).toContain(
+      `sessionUrl=${encodeURIComponent(`${window.location.origin}/session/Salon?joinGroup=g1`)}`,
+    );
+  } finally {
+    window.history.pushState({}, '', '/');
+  }
+});
+
+it('treats a malformed page path as off the session page, without failing', async () => {
+  window.history.pushState({}, '', '/session/%E0');
+  try {
+    renderPanel();
+    const prompt = await copySuggestPrompt();
+    expect(prompt).toContain(`sessionUrl=${encodeURIComponent(sessionUrl)}`);
+  } finally {
+    window.history.pushState({}, '', '/');
+  }
+});
