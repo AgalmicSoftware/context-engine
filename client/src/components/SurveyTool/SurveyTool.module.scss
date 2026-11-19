@@ -7338,6 +7338,9 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     --pile-submit-digits: 9;
     --pile-submit-chars: 6.8;
     --pile-row-arrows: 8px;
+    // The least the word is given. A theme's numbers fit its own font; while that font loads, or if it never
+    // does, a fallback with narrower digits would count the word short and cut it.
+    --pile-submit-floor: 62px;
   }
 
   // Each theme's own fonts: Poppins' word is narrow against its digits, Open Sans has narrow digits, and Classic
@@ -7366,8 +7369,9 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     }
   }
 
-  // Phones up to the common 390 to 400px need the gaps for the counter and Submit's word.
-  @media (max-width: 409px) {
+  // Phones need the gaps for the counter and Submit's word: up to the largest (430px), so the counter does not
+  // go back to stacked on a 412px phone after a line at 400px.
+  @media (max-width: 430px) {
     .pileInteractionUnit .pileControls {
       --pile-row-fixed: 220px;
     }
@@ -7388,7 +7392,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .pileInteractionUnit .pileNav .pileNavCounterText {
     --pile-counter-line: calc(var(--pile-counter-digits, 2) * 2ch + 2ch);
     --pile-counter-stack: calc(var(--pile-counter-digits, 2) * 1ch + 4px);
-    --pile-row-rest: calc(var(--pile-row-fixed) + var(--pile-row-arrows) + var(--pile-submit-digits) * 1ch + 8px);
+    --pile-row-rest: calc(
+      var(--pile-row-fixed) + var(--pile-row-arrows) + max(var(--pile-submit-digits) * 1ch, var(--pile-submit-floor)) +
+        8px
+    );
     // Switches: far above zero while the row has room for that form, far below once it has not.
     --pile-room-line: calc((100cqw - var(--pile-row-rest) - var(--pile-counter-line)) * 999);
     --pile-room-stack: calc((100cqw - var(--pile-row-rest) - var(--pile-counter-stack)) * 999);
@@ -7429,7 +7436,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .pileInteractionUnit .pileFooter .pileSubmitButtonLabel {
     font-size: clamp(
       0.8em,
-      1em + (100cqw - var(--pile-row-fixed) - var(--pile-row-arrows) + 10px - var(--pile-submit-chars) * 1ch - 8px) *
+      1em +
+        (
+          100cqw - var(--pile-row-fixed) - var(--pile-row-arrows) +
+            10px - max(var(--pile-submit-chars) * 1ch, var(--pile-submit-floor)) - 8px
+        ) *
         0.3,
       1em
     );

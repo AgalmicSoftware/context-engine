@@ -32,6 +32,28 @@ const THEME_DEFAULT_VERSION = fs
 const ROUTE = '/session/demo';
 const ACTIVE_CARD = '[data-testid="ce-pile-active-question"]';
 
+// What the stylesheet works from, read back in the font this machine draws: how much room the row has left for
+// the counter on one line and for its numbers stacked (px; below zero where that form does not fit), and the
+// width of a digit. Installed in the page so every measurement shares it.
+const installRoomProbe = (context) =>
+  context.addInitScript(() => {
+    window.__pileRowRoom = (row) => {
+      const counterBox = row.querySelector('[class*="_pileNavCounterText_"]');
+      const rowStyle = getComputedStyle(row);
+      const number = (name) => parseFloat(rowStyle.getPropertyValue(name));
+      const probe = Object.assign(document.createElement('span'), { ariaHidden: 'true' });
+      probe.style.cssText = 'position:absolute;visibility:hidden;width:1ch;height:1px;padding:0;border:0';
+      counterBox.append(probe);
+      const ch = probe.getBoundingClientRect().width;
+      probe.remove();
+      const digits = parseFloat(getComputedStyle(counterBox).getPropertyValue('--pile-counter-digits')) || 2;
+      const width = row.clientWidth - parseFloat(rowStyle.paddingLeft) - parseFloat(rowStyle.paddingRight);
+      const word = Math.max(number('--pile-submit-digits') * ch, number('--pile-submit-floor'));
+      const rest = number('--pile-row-fixed') + number('--pile-row-arrows') + word + 8;
+      return { line: width - rest - (digits * 2 * ch + 2 * ch), stack: width - rest - (digits * ch + 4), ch };
+    };
+  });
+
 const measureRow = (page) =>
   page.evaluate(() => {
     const row = document.querySelector('[class*="_pileControls_"]');
@@ -105,10 +127,9 @@ const measureRow = (page) =>
     const numbers = [counterBox.firstElementChild, counterBox.lastElementChild].map(box);
     const text = document.createRange();
     text.selectNodeContents(counterBox);
-    const rowStyle = getComputedStyle(row);
     const counter = {
       shown: shown(counterBox),
-      room: row.clientWidth - parseFloat(rowStyle.paddingLeft) - parseFloat(rowStyle.paddingRight),
+      room: window.__pileRowRoom(row),
       left: box(counterBox).left,
       right: box(counterBox).right,
       middle: (box(counterBox).top + box(counterBox).bottom) / 2,
@@ -149,7 +170,8 @@ const measureRow = (page) =>
 // drew the same font a little wider than the machine it was tuned on, with 1.4px to spare. The tightest row
 // measures 6.7px on that machine, so another platform may draw the word up to 3.7px wider before this fails.
 const MIN_SPARE = 3;
-const SWEEP = { from: 320, to: 430 };
+// To 440px: the row's gaps widen past 430px, and the rows just after a change are the tightest.
+const SWEEP = { from: 320, to: 440 };
 // What a browser without style() container queries (Safari before 18, Firefox) gets: the stylesheet's first,
 // unconditional values, in every theme.
 const NO_STYLE_QUERY_CSS = (() => {
@@ -157,6 +179,23 @@ const NO_STYLE_QUERY_CSS = (() => {
   const first = (name) => scss.match(new RegExp(`${name}: ([^;]+);`))[1];
   return `[class*="_pileControls_"] { --pile-submit-digits: ${first('--pile-submit-digits')} !important; --pile-submit-chars: ${first('--pile-submit-chars')} !important; --pile-row-arrows: ${first('--pile-row-arrows')} !important; }`;
 })();
+
+// The faces the row is drawn in on this machine, and how wide they come out.
+const describeFonts = (page) =>
+  page.evaluate(() => {
+    const row = document.querySelector('[class*="_pileControls_"]');
+    const counterBox = row.querySelector('[class*="_pileNavCounterText_"]');
+    const label = row.querySelector('[class*="_pileSubmitButtonLabel_"]');
+    const word = document.createRange();
+    word.selectNodeContents(label.firstChild);
+    const face = (el) => {
+      const style = getComputedStyle(el);
+      const first = style.fontFamily.split(',')[0].trim();
+      const loaded = document.fonts.check(`${style.fontWeight} ${style.fontSize} ${first}`);
+      return `${first} ${style.fontWeight} ${style.fontSize}${loaded ? '' : ' (not loaded; a fallback draws it)'}`;
+    };
+    return `counter ${face(counterBox)}, a digit ${window.__pileRowRoom(row).ch.toFixed(2)}px; Submit ${face(label)}, its word ${word.getBoundingClientRect().width.toFixed(1)}px at ${window.innerWidth}px`;
+  });
 
 const measureSpare = (page, digits) =>
   page.evaluate((digitCount) => {
@@ -174,13 +213,26 @@ const measureSpare = (page, digits) =>
     word.selectNodeContents(label.firstChild);
     const spare = button.clientWidth - word.getBoundingClientRect().width;
     const lines = counterBox.getBoundingClientRect().width < 1 ? 0 : Math.abs(first.getBoundingClientRect().top - last.getBoundingClientRect().top) < 2 ? 1 : 2;
+    const room = window.__pileRowRoom(row);
     first.textContent = was[0];
     last.textContent = was[1];
     counterBox.style.setProperty('--pile-counter-digits', was[2]);
-    return { spare, lines };
+    return { spare, lines, room };
   }, digits);
 
-const assertRow = (state, where, { width, wideFont }) => {
+// The form the row's room calls for, or null within EDGE px of a change, where either may show.
+const EDGE = 4;
+const FORMS = ['gone', 'on one line', 'stacked'];
+const formByRoom = ({ line, stack, ch }) => {
+  // A reading that is not a number would skip every form check unseen.
+  assert(Number.isFinite(line) && Number.isFinite(stack) && ch > 0, `the row's room could not be read (${line}, ${stack}, ${ch})`);
+  if (line >= EDGE) return 1;
+  if (stack <= -EDGE) return 0;
+  if (line <= -EDGE && stack >= EDGE) return 2;
+  return null;
+};
+
+const assertRow = (state, where) => {
   const label = `${where}:`;
   const names = state.controls.map((control) => control.name);
   for (const required of ['Question actions', 'Previous Question', 'Next Question']) {
@@ -199,12 +251,16 @@ const assertRow = (state, where, { width, wideFont }) => {
   }
   const { counter } = state;
   // The counter gives way to Submit's word by the room the row has in the font in use: one line, then its numbers
-  // stacked, then gone. In the site's own fonts that leaves it off the narrowest phones, on from 375px, and on one
-  // line on a large phone; in a wide font it may give way sooner, and Submit's word (checked above) still shows whole.
-  if (!wideFont) {
-    if (width <= 320) assert.equal(counter.shown, false, `${label} the counter should leave the row to Submit`);
-    if (width >= 375) assert.equal(counter.shown, true, `${label} the counter should show`);
-    if (width >= 430) assert.equal(counter.lines, 1, `${label} the counter should take one line`);
+  // stacked, then gone. Which widths that falls on is the font's to decide, and a runner draws fonts its own way,
+  // so the form is checked against the room measured here, and only where that room is clear either way.
+  const form = counter.shown ? counter.lines : 0;
+  const wanted = formByRoom(counter.room);
+  if (wanted !== null) {
+    assert.equal(
+      form,
+      wanted,
+      `${label} the counter should be ${FORMS[wanted]} with ${counter.room.line.toFixed(1)}px for one line and ${counter.room.stack.toFixed(1)}px for a stack; it is ${FORMS[form]}`,
+    );
   }
   if (counter.shown) {
     assert(
@@ -231,12 +287,31 @@ const assertRow = (state, where, { width, wideFont }) => {
   assert(state.overflowX <= 0, `${label} the page should not be wider than the screen (${state.overflowX}px over)`);
 };
 
-// A second pass in a font wider than the site's own: a runner's fallback font, a person's larger text setting or a
-// longer word all take more of the row, and Submit's word must still show whole. Verdana where it is installed,
-// DejaVu Sans on a Linux runner; both are among the widest common faces.
-const WIDE_FONT_CSS = `* { font-family: Verdana, 'DejaVu Sans', sans-serif !important; }`;
+// Further passes, each a way a machine may differ from the one the row was tuned on. Submit's word must show
+// whole in all of them, and the counter's form must follow the room measured in that pass.
+// - A font wider than the site's own (a fallback font, larger text, a longer word): Verdana where it is installed,
+//   DejaVu Sans on a Linux runner, both among the widest common faces.
+// - No style() container queries (Safari before 18, Firefox): the stylesheet's first, unconditional values.
+// - Another machine's drawing: the site's fonts missing, so the system's stand in, with every letter set a little
+//   wider than its font says. A hosted runner drew Submit's word 0.5px wider than the machine this was tuned on;
+//   this adds 0.25px a letter, three times that.
+const PASSES = Object.freeze([
+  { name: '', minSpare: MIN_SPARE },
+  { name: ' (wide font)', minSpare: 0, css: `* { font-family: Verdana, 'DejaVu Sans', sans-serif !important; }` },
+  { name: ' (no style queries)', minSpare: MIN_SPARE, css: NO_STYLE_QUERY_CSS },
+  { name: ' (system fonts, wider letters)', minSpare: 0, css: `* { letter-spacing: 0.25px !important; }`, noWebFonts: true },
+]);
 
-async function runTheme(browser, baseUrl, browserName, theme, wideFont = false, noStyleQueries = false) {
+async function runTheme(browser, baseUrl, browserName, theme, pass, failures) {
+  const named = `${browserName} ${theme}${pass.name}`;
+  // Every failing cell is kept and reported at the end, so one run shows all there is to fix.
+  const check = (run) => {
+    try {
+      run();
+    } catch (error) {
+      failures.push(error.message);
+    }
+  };
   const context = await browser.newContext({
     viewport: SIZES[0],
     hasTouch: true,
@@ -252,12 +327,13 @@ async function runTheme(browser, baseUrl, browserName, theme, wideFont = false, 
     },
     { themeId: theme, version: THEME_DEFAULT_VERSION },
   );
-  if (wideFont || noStyleQueries) {
+  await installRoomProbe(context);
+  if (pass.css) {
     await context.addInitScript((css) => {
       const add = () => document.head.append(Object.assign(document.createElement('style'), { textContent: css }));
       if (document.head) add();
       else document.addEventListener('DOMContentLoaded', add, { once: true });
-    }, `${wideFont ? WIDE_FONT_CSS : ''} ${noStyleQueries ? NO_STYLE_QUERY_CSS : ''}`);
+    }, pass.css);
   }
   const page = await context.newPage();
   const pageErrors = [];
@@ -265,10 +341,13 @@ async function runTheme(browser, baseUrl, browserName, theme, wideFont = false, 
   // The navigation smoke's fixtures answer the chain and Worker reads; every other host is refused.
   await installLocalSmokeFixtureRoutes(page, baseUrl, ROUTE);
   await installDemoWorkerFixtureRoutes(page, baseUrl, ROUTE);
+  // The newest route answers first, so this one comes after the fixtures'.
+  if (pass.noWebFonts) await page.route(/\.(woff2?|ttf|otf)(\?.*)?$/, (route) => route.abort());
   try {
     await page.goto(`${baseUrl}${ROUTE}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector(ACTIVE_CARD, { timeout: 60000 });
     assert.equal(await page.evaluate(() => document.documentElement.dataset.ceTheme), theme, `${theme} should apply`);
+    await page.evaluate(() => document.fonts.ready);
     // The session title fades out a few seconds after load, and the card grows into its room; measure after that.
     await page.waitForFunction(
       () =>
@@ -335,23 +414,56 @@ async function runTheme(browser, baseUrl, browserName, theme, wideFont = false, 
     await measureEverySize('answered');
     // Every width a phone has, for a two-digit and a three-digit count.
     const tightest = {};
+    const forms = {};
     for (const digits of [2, 3]) {
+      forms[digits] = [];
       for (let width = SWEEP.from; width <= SWEEP.to; width += 1) {
         await page.setViewportSize({ width, height: 700 });
         await page.waitForTimeout(40);
-        const { spare, lines } = await measureSpare(page, digits);
+        const { spare, lines, room } = await measureSpare(page, digits);
         if (!tightest[digits] || spare < tightest[digits].spare) tightest[digits] = { spare, width, lines };
+        forms[digits].push({ width, lines, room });
+        check(() => {
+          const wanted = formByRoom(room);
+          assert(
+            wanted === null || wanted === lines,
+            `${named} ${width}px, ${digits} digits: the counter should be ${FORMS[wanted]} with ${room.line.toFixed(1)}px for one line and ${room.stack.toFixed(1)}px for a stack; it is ${FORMS[lines]}`,
+          );
+        });
       }
     }
     const spareNote = [2, 3]
-      .map((digits) => `${digits} digits ${tightest[digits].spare.toFixed(1)}px at ${tightest[digits].width}px (count ${['gone', 'on one line', 'stacked'][tightest[digits].lines]})`)
+      .map((digits) => `${digits} digits ${tightest[digits].spare.toFixed(1)}px at ${tightest[digits].width}px (count ${FORMS[tightest[digits].lines]})`)
       .join('; ');
-    console.log(`  ${theme}${wideFont ? ' (wide font)' : ''}${noStyleQueries ? ' (no style queries)' : ''}: Submit's least spare room, ${SWEEP.from} to ${SWEEP.to}px: ${spareNote}`);
+    console.log(`  ${theme}${pass.name}: Submit's least spare room, ${SWEEP.from} to ${SWEEP.to}px: ${spareNote}`);
+    try {
+      // Where each form starts and ends on this machine, and what it measured them in: the first thing to read
+      // when a run differs from another machine's.
+      for (const digits of [2, 3]) {
+        const runs = [];
+        for (const at of forms[digits]) {
+          const last = runs[runs.length - 1];
+          if (last && last.lines === at.lines) last.to = at.width;
+          else runs.push({ lines: at.lines, from: at.width, to: at.width });
+        }
+        const lineRoom = [412, 430]
+          .map((width) => `${forms[digits].find((at) => at.width === width).room.line.toFixed(1)}px at ${width}px`)
+          .join(', ');
+        console.log(
+          `    ${digits} digits: ${runs.map((run) => `${FORMS[run.lines]} ${run.from} to ${run.to}px`).join(', ')}; one line's room ${lineRoom}`,
+        );
+      }
+      console.log(`    drawn in: ${await describeFonts(page)}`);
+    } catch (error) {
+      console.log(`    (this machine's forms and fonts could not be printed: ${error.message})`);
+    }
     for (const digits of [2, 3]) {
-      // In a wide font the word may sit closer to its edges, but it is never cut.
-      assert(
-        tightest[digits].spare >= (wideFont ? 0 : MIN_SPARE),
-        `${browserName} ${theme}${wideFont ? ' (wide font)' : ''}: Submit's word should keep ${wideFont ? 0 : MIN_SPARE}px to spare at every width (${spareNote})`,
+      // In another font the word may sit closer to its edges, but it is never cut.
+      check(() =>
+        assert(
+          tightest[digits].spare >= pass.minSpare,
+          `${named}, ${digits} digits: Submit's word should keep ${pass.minSpare}px to spare at every width (${spareNote})`,
+        ),
       );
     }
     await page.waitForFunction(
@@ -368,36 +480,47 @@ async function runTheme(browser, baseUrl, browserName, theme, wideFont = false, 
     await measureEverySize('end of set');
 
     for (const size of SIZES) {
-      const where = (stateName) =>
-        `${browserName} ${theme}${wideFont ? ' (wide font)' : ''}${noStyleQueries ? ' (no style queries)' : ''} ${size.name} ${size.width}x${size.height} ${stateName}`;
+      const where = (stateName) => `${named} ${size.name} ${size.width}x${size.height} ${stateName}`;
       const byState = ['unanswered', 'answered', 'end of set'].map((stateName) => [
         stateName,
         states[`${stateName} ${size.name}`],
       ]);
-      byState.forEach(([stateName, state]) =>
-        // Without style queries the counter may give way sooner than each theme's own numbers would have it.
-        assertRow(state, where(stateName), { width: size.width, wideFont: wideFont || noStyleQueries }),
-      );
+      byState.forEach(([stateName, state]) => check(() => assertRow(state, where(stateName))));
       const menu = states[`menu ${size.name}`];
-      assert(
-        menu.height > 0 && menu.top >= 0 && menu.bottom <= menu.viewportHeight,
-        `${where('menu')}: the actions menu should open on screen (${Math.round(menu.top)} to ${Math.round(menu.bottom)})`,
+      check(() =>
+        assert(
+          menu.height > 0 && menu.top >= 0 && menu.bottom <= menu.viewportHeight,
+          `${where('menu')}: the actions menu should open on screen (${Math.round(menu.top)} to ${Math.round(menu.bottom)})`,
+        ),
       );
       const answered = states[`answered ${size.name}`];
-      assert(
-        answered.controls.some((control) => /^Submit/.test(control.name)),
-        `${where('answered')}: Submit should show in the row`,
+      check(() =>
+        assert(
+          answered.controls.some((control) => /^Submit/.test(control.name)),
+          `${where('answered')}: Submit should show in the row`,
+        ),
       );
-      assert(
-        !states[`end of set ${size.name}`].controls.some((control) => /^Submit/.test(control.name)),
-        `${where('end of set')}: the end-of-set card's Submit should be the only one`,
+      check(() =>
+        assert(
+          !states[`end of set ${size.name}`].controls.some((control) => /^Submit/.test(control.name)),
+          `${where('end of set')}: the end-of-set card's Submit should be the only one`,
+        ),
       );
       for (const [stateName, state] of byState.slice(1)) {
-        assert.equal(state.arrows, byState[0][1].arrows, `${where(stateName)}: the arrows should not move`);
-        assert.equal(state.cardHeight, byState[0][1].cardHeight, `${where(stateName)}: the card should keep its height (top ${state.cardTop} vs ${byState[0][1].cardTop})`);
+        check(() => assert.equal(state.arrows, byState[0][1].arrows, `${where(stateName)}: the arrows should not move`));
+        check(() =>
+          assert.equal(
+            state.cardHeight,
+            byState[0][1].cardHeight,
+            `${where(stateName)}: the card should keep its height (top ${state.cardTop} vs ${byState[0][1].cardTop})`,
+          ),
+        );
       }
     }
-    assert.deepEqual(pageErrors, [], `${browserName} ${theme}: the page should raise no errors`);
+    check(() => assert.deepEqual(pageErrors, [], `${named}: the page should raise no errors`));
+  } catch (error) {
+    // A step that could not run at all (a card that never came, a menu that never opened) is one more failure.
+    failures.push(`${named}: ${error.message.split('\n')[0]}${pageErrors.length ? ` (page errors: ${pageErrors.join('; ')})` : ''}`);
   } finally {
     await context.close();
   }
@@ -411,19 +534,19 @@ async function runSmoke() {
   const { [browserName]: browserType } = require('playwright');
   if (!browserType) throw new Error(`Unsupported PLAYWRIGHT_BROWSER "${browserName}"`);
   const browser = await browserType.launch({ headless: true });
+  const failures = [];
   try {
-    for (const [wideFont, noStyleQueries] of [
-      [false, false],
-      [true, false],
-      [false, true],
-    ]) {
-      for (const theme of THEMES) await runTheme(browser, baseUrl, browserName, theme, wideFont, noStyleQueries);
+    for (const pass of PASSES) {
+      for (const theme of THEMES) await runTheme(browser, baseUrl, browserName, theme, pass, failures);
     }
   } finally {
     await browser.close();
   }
+  if (failures.length) {
+    throw new Error(`The phone question row failed ${failures.length} check(s) in ${browserName}:\n- ${failures.join('\n- ')}`);
+  }
   console.log(
-    `Phone question row held in ${browserName}: ${THEMES.length} themes x ${SIZES.length} sizes x 3 states, in the site's fonts, a wide one, and without style queries; every width from ${SWEEP.from} to ${SWEEP.to}px.`,
+    `Phone question row held in ${browserName}: ${THEMES.length} themes x ${SIZES.length} sizes x 3 states, in the site's fonts, a wide one, without style queries, and in system fonts with wider letters; every width from ${SWEEP.from} to ${SWEEP.to}px.`,
   );
 }
 

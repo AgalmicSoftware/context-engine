@@ -79,7 +79,7 @@ it('keeps the phone controls in one row, with the arrows fixed at its end', () =
 // Where a phone row is short of room, Submit keeps its word and its spinner rather than showing either cut.
 it('keeps Submit readable on the narrowest phone rows', () => {
   expect(css).toMatch(
-    /@media [^{]*max-width: 409px\)\s*\{[^@]*\.pileInteractionUnit \.pileControls > \.pileNav\s*\{\s*gap: 1px;/,
+    /@media [^{]*max-width: 430px\)\s*\{[^@]*\.pileInteractionUnit \.pileControls > \.pileNav\s*\{\s*gap: 1px;/,
   );
   expect(css).toMatch(
     /\.pileInteractionUnit \.pileFooter \.pileSubmitProgress\s*\{\s*flex-wrap: wrap;[^}]*max-height: 1\.25em;\s*overflow: hidden;/,
@@ -97,10 +97,12 @@ it('keeps Submit readable on the narrowest phone rows', () => {
 // now comes from the row's width against what the row needs in the font in use, never from a width in pixels.
 it('sizes the phone counter by the room the row has in the font in use', () => {
   const counter = css.match(/\.pileInteractionUnit \.pileNav \.pileNavCounterText\s*\{([^{}]*)\}/)?.[1] || '';
-  // What the rest of an answered row needs: its fixed parts and Submit's word, counted in this font's digits.
+  // What the rest of an answered row needs: its fixed parts and Submit's word, counted in this font's digits and
+  // never under a floor, so a fallback font with narrow digits cannot count the word short.
   expect(counter).toMatch(
-    /--pile-row-rest: calc\(var\(--pile-row-fixed\) \+ var\(--pile-row-arrows\) \+ var\(--pile-submit-digits\) \* 1ch \+ 8px\);/,
+    /--pile-row-rest: calc\(\s*var\(--pile-row-fixed\) \+ var\(--pile-row-arrows\) \+ max\(var\(--pile-submit-digits\) \* 1ch, var\(--pile-submit-floor\)\) \+\s*8px\s*\);/,
   );
+  expect(css).toMatch(/--pile-submit-floor: 62px;/);
   // Each form's switch compares the row's own width (cqw) with that need and the form's width.
   expect(counter).toMatch(
     /--pile-room-line: calc\(\(100cqw - var\(--pile-row-rest\) - var\(--pile-counter-line\)\) \* 999\);/,
@@ -143,7 +145,7 @@ it('sizes the phone counter by the room the row has in the font in use', () => {
   themed.slice(1).forEach((own) => own.forEach((value, at) => expect(value).toBeLessThanOrEqual(themed[0][at])));
   // Where the row is short even with the counter gone, the word shrinks by as much as it is short, not cut.
   expect(css).toMatch(
-    /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonLabel\s*\{\s*font-size: clamp\(0\.8em, 1em \+ \(100cqw - var\(--pile-row-fixed\) - var\(--pile-row-arrows\) \+ 10px - var\(--pile-submit-chars\) \* 1ch - 8px\) \* 0\.3, 1em\);/,
+    /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonLabel\s*\{\s*font-size: clamp\(0\.8em, 1em \+ \(100cqw - var\(--pile-row-fixed\) - var\(--pile-row-arrows\) \+ 10px - max\(var\(--pile-submit-chars\) \* 1ch, var\(--pile-submit-floor\)\) - 8px\) \* 0\.3, 1em\);/,
   );
 });
 
