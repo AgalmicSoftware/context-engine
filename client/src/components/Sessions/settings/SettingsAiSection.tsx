@@ -66,6 +66,8 @@ type Props = Omit<SetupSectionProps, 'mode' | 'conflicts'> & {
   keys?: React.ReactNode;
   /** Who may ask the Session Agent, for a session on a Session Worker. */
   sessionAgent?: React.ReactNode;
+  /** The personal analysis card's switch, where the Session Worker has the card. */
+  analysisCard?: React.ReactNode;
   /** True for a session on a Session Worker, which bounds each person's AI requests a day. */
   dailyLimit?: boolean;
   /** True when the Session Worker can answer the Session Agent on Cloudflare's models. */
@@ -83,6 +85,7 @@ export const SettingsAiSection = ({
   lockedReason,
   keys = null,
   sessionAgent = null,
+  analysisCard = null,
   dailyLimit = false,
   workersAi = false,
 }: Props) => {
@@ -304,6 +307,7 @@ export const SettingsAiSection = ({
           onChange={(event) => onChange(['defaultTags'], event.target.value)}
         />
       </SetupField>
+      {analysisCard}
       {sessionAgent}
       {/* It changes the AI models, so it shows only where AI can be edited. A
           session already on Cloudflare keeps it on a Worker without the binding,

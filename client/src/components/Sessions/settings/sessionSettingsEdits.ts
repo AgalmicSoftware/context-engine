@@ -131,6 +131,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     groupCreationPolicy: source.groupCreationPolicy,
     contextAdditionPolicy: source.contextAdditionPolicy,
     interviewModeEnabled: source.interviewModeEnabled !== false,
+    analysisCardEnabled: source.analysisCardEnabled !== false,
     // Every setting, as an edit writes them, so a setting left alone takes a fresh copy's value.
     interviewMode: { ...normalizeInterviewSettings(source.interviewMode), ...clone(asRecord(source.interviewMode)) },
     resultsAnalysis: normalizeResultsAnalysisSettings(source.resultsAnalysis),
@@ -307,6 +308,11 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
     const limit = Number(aiDaily) || null;
     if (limit !== (Number(formatAiDailyLimit(before.limits)) || null)) values.limits = { aiPerWalletPerDay: limit };
   }
+  // The analysis card is on unless turned off. Only a changed choice is stored, so a Worker too old to know the
+  // setting, whose page never shows it, is sent nothing.
+  if (!onChain && (draft.analysisCardEnabled !== false) !== (before.analysisCardEnabled !== false)) {
+    values.analysisCardEnabled = draft.analysisCardEnabled !== false;
+  }
   // Pile navigation has a deployment default; only a changed choice is stored.
   if (draft.pileAutoAdvanceEnabled !== resolvePileAutoAdvanceEnabled(before)) {
     values.pileAutoAdvanceEnabled = draft.pileAutoAdvanceEnabled === true;
@@ -364,6 +370,7 @@ const unchanged = (key: string, before: unknown, after: unknown) => {
   if (key === 'resultsAdminAddresses') return same(storedResultsAdmins(before), after);
   // Voice interviews are on unless turned off.
   if (key === 'interviewModeEnabled') return (before !== false) === after;
+  if (key === 'analysisCardEnabled') return (before !== false) === after;
   if (key === 'feedbackEnabled') return (before !== false) === after;
   if (key === 'contextCardsEnabled') return (before === true) === after;
   return same(before, after) || (isBlank(before) && isBlank(after));
@@ -496,6 +503,7 @@ const LABELS: Record<string, string> = {
   resultsAnalysis: 'Results analysis',
   resultsAdminAddresses: 'Results admins',
   sessionAgent: 'Session Agent',
+  analysisCardEnabled: 'Analysis card',
   ai: 'AI models and effort',
   sessionModeProfile: 'Access, results and hosting',
   storageProfile: 'Storage access',

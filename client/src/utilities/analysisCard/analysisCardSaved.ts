@@ -2,12 +2,18 @@
 // that person's own Analyze and shown to every signed-in visitor without pressing anything. Each person's card is
 // asked for once per visit and sign-in, and shared by the page's section and its Analyze window; a save or
 // withdrawal updates both at once.
-import { normalizeSavedAnalysisCard, type SavedAnalysisCard } from '@ce-shared/analysisCardSaved.mjs';
+import {
+  ANALYSIS_CARD_FEATURE,
+  analysisCardOn,
+  normalizeSavedAnalysisCard,
+  type SavedAnalysisCard,
+} from '@ce-shared/analysisCardSaved.mjs';
 
 import { resolveAiSessionOptions } from '../ai/aiClientRequestOptions';
 import { resolveAiWorkerEndpoint } from '../ai/aiClientWorkerTransport';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { readWorkerCapabilities } from '../worker/workerCapabilities';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 
 export type SavedAnalysisCardState =
@@ -128,6 +134,24 @@ export const publishSavedAnalysisCard = async (
   known.set(keyOf(opts, account), Promise.resolve(state));
   listeners.forEach((listener) => listener());
   return state;
+};
+
+/**
+ * Whether the page may make and show the card in the session the options name: the session has not turned it off,
+ * and its Session Worker has it. A Worker from before the card has neither its picture nor its saved card, so there
+ * the page shows nothing of it, setting or not. False too when the Worker can't be found or asked.
+ */
+export const analysisCardAvailableFor = async (opts: unknown): Promise<boolean> => {
+  const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
+  if (!analysisCardOn(sessionConfig)) return false;
+  try {
+    const allowDemoFallback = defaultStrictAllowDemoFallback();
+    const corsWorkerUrl = await getCorsProxyUrlOrThrow({ sessionSlug, sessionConfig, context, allowDemoFallback });
+    const { features } = await readWorkerCapabilities(resolveAiWorkerEndpoint(corsWorkerUrl).baseUrl, sessionSlug);
+    return features.includes(ANALYSIS_CARD_FEATURE);
+  } catch {
+    return false;
+  }
 };
 
 export const subscribeSavedAnalysisCards = (listener: () => void): (() => void) => {

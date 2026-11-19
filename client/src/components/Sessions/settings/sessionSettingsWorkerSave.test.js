@@ -729,6 +729,34 @@ describe('saving the edit page through the Session Worker', () => {
     );
   });
 
+  it('saves the Analysis card choice only when it changes, and signs no one out', () => {
+    const stored = publishedSession();
+    expect(stored).not.toHaveProperty('analysisCardEnabled');
+    // On unless turned off: a session that never set it shows the box ticked.
+    const off = editAndSave(stored, (draft) => {
+      expect(draft.analysisCardEnabled).toBe(true);
+      draft.analysisCardEnabled = false;
+    });
+    expect(off.save.patch).toEqual({ analysisCardEnabled: false });
+    expect(off.save.classification).toMatchObject({ content: ['analysisCardEnabled'], signsParticipantsOut: false });
+    expect(describeSessionSettingsPath('analysisCardEnabled')).toBe('Analysis card');
+    expect(off.result).toMatchObject({ ok: true });
+    expect(projectPublicWorkerSessionConfig(off.result.config).analysisCardEnabled).toBe(false);
+
+    const on = editAndSave(off.result.config, (draft) => {
+      expect(draft.analysisCardEnabled).toBe(false);
+      draft.analysisCardEnabled = true;
+    });
+    expect(on.save.patch).toEqual({ analysisCardEnabled: true });
+    expect(on.result).toMatchObject({ ok: true });
+
+    // Left alone, it is never sent, so a Worker too old to know it refuses nothing.
+    const untouched = editAndSave(stored, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
+  });
+
   it('saves nothing when nothing changed', () => {
     const stored = publishedSession();
     const { save } = editAndSave(stored, () => {});

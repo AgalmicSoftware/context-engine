@@ -1,3 +1,5 @@
+import { ANALYSIS_CARD_FEATURE } from '@ce-shared/analysisCardSaved.mjs';
+
 import { readWorkerCapabilities } from '../../utilities/worker/workerCapabilities';
 
 // Workers report their release from 0.9.3 on; an earlier one answers without it.
@@ -70,6 +72,17 @@ export const readWorkerSessionAgentOptions = async (
     recordChats: features.includes('session_agent_chats'),
     anyoneCanAsk: features.includes('session_agent_signed_out'),
   };
+};
+
+/** Whether the Session Worker has the analysis card's picture and saved card; false when it can't be read. */
+export const readWorkerHasAnalysisCard = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> => {
+  if (!workerOrigin) return false;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.features.includes(ANALYSIS_CARD_FEATURE);
 };
 
 export const WORKERS_AI_FEATURE = 'workers_ai_v1';

@@ -33,7 +33,15 @@ jest.mock('utilities/ai/aiClient.js', () => ({
   fetchAnalysisCardPicture: jest.fn(),
 }));
 
+// Whether the session's Worker has the card; the session's own switch still decides.
+let mockWorkerHasCard = true;
 jest.mock('utilities/analysisCard/analysisCardSaved', () => ({
+  analysisCardAvailableFor: jest.fn(
+    async (opts) =>
+      mockWorkerHasCard &&
+      jest.requireActual('utilities/ai/aiClientRequestOptions').resolveAiSessionOptions(opts).sessionConfig
+        ?.analysisCardEnabled !== false,
+  ),
   readSavedAnalysisCard: jest.fn(),
   publishSavedAnalysisCard: jest.fn(),
   subscribeSavedAnalysisCards: jest.fn(() => () => {}),
@@ -124,6 +132,7 @@ const makeAnalysisCacheInstance = (props = {}) => {
     candidate === slug
       ? {
           slug,
+          analysisCardEnabled: true,
           ai: {
             mode: 'openai',
             models: { thinking: 'gpt-5' },
@@ -655,7 +664,9 @@ describe('UserPage analysis cache and routing', () => {
     matchedAnalysis();
     analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['active-slug', 'open-slug']);
-    jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((slug) => ({ slug }));
+    jest
+      .spyOn(instance, '_getSessionConfigForSlugExact')
+      .mockImplementation((slug) => ({ slug, analysisCardEnabled: true }));
     checkSponsoredAccess.mockImplementation(async ({ sessionSlug }) =>
       sessionSlug === 'open-slug'
         ? { status: 'no-gate', gate: null, resourceKey: 'ai' }
@@ -672,6 +683,31 @@ describe('UserPage analysis cache and routing', () => {
     await expect(instance.resolveSavedAnalysisCardOptions()).resolves.toBeNull();
   });
 
+  it("makes no card where the page's own session turned it off, though the AI answers from another", async () => {
+    const own = '0x00000000000000000000000000000000000000c3';
+    const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: 'active-slug' });
+    matchedAnalysis();
+    jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['active-slug', 'open-slug']);
+    jest
+      .spyOn(instance, '_getSessionConfigForSlugExact')
+      .mockImplementation((slug) => ({ slug, analysisCardEnabled: slug !== 'active-slug' }));
+    checkSponsoredAccess.mockImplementation(async ({ sessionSlug }) =>
+      sessionSlug === 'open-slug'
+        ? { status: 'no-gate', gate: null, resourceKey: 'ai' }
+        : { status: 'denied', gate: { type: 'sbt' }, resourceKey: 'ai' },
+    );
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.aiAnalysis).toBe('summary'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(analyzeUserOpinions.mock.calls.at(-1)[1].sessionSlug).toBe('open-slug');
+    for (const mock of [analyzeUserCard, fetchAnalysisCardPicture, readSavedAnalysisCard, publishSavedAnalysisCard]) {
+      expect(mock).not.toHaveBeenCalled();
+    }
+    expect(instance.state.analysisCard).toBeNull();
+  });
+
   it('reads and saves no card on a page with no session of its own', async () => {
     // Not the account above, whose analysis in this session is cached by now.
     const own = '0x00000000000000000000000000000000000000dd';
@@ -679,7 +715,9 @@ describe('UserPage analysis cache and routing', () => {
     matchedAnalysis();
     analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['open-slug']);
-    jest.spyOn(instance, '_getSessionConfigForSlugExact').mockImplementation((slug) => ({ slug }));
+    jest
+      .spyOn(instance, '_getSessionConfigForSlugExact')
+      .mockImplementation((slug) => ({ slug, analysisCardEnabled: true }));
     checkSponsoredAccess.mockResolvedValue({ status: 'no-gate', gate: null, resourceKey: 'ai' });
 
     await instance.analyzeUser();
@@ -689,6 +727,75 @@ describe('UserPage analysis cache and routing', () => {
     expect(readSavedAnalysisCard).not.toHaveBeenCalled();
     expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
     await expect(instance.resolveSavedAnalysisCardOptions()).resolves.toBeNull();
+  });
+
+  it('makes, draws, reads, saves and shows no card where it is off or the Worker is too old, a kept card included', async () => {
+    const own = '0x00000000000000000000000000000000000000f1';
+    const { instance, slug } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
+    const on = instance._getSessionConfigForSlugExact(slug);
+    expect(on.analysisCardEnabled).toBe(true);
+    const { analysisCardEnabled: _unused, ...absent } = on;
+    let config = absent;
+    jest
+      .spyOn(instance, '_getSessionConfigForSlugExact')
+      .mockImplementation((candidate) => (candidate === slug ? config : null));
+    // A session that never saved the switch, as every session from before it, has the card on: a card is made,
+    // saved and kept with the analysis.
+    matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'none' });
+    analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
+    await instance.analyzeUser();
+    await waitFor(() => expect(publishSavedAnalysisCard).toHaveBeenCalledTimes(1));
+    expect(instance.state.analysisCard?.title).toBe('Trusts plain tools over grand plans');
+
+    // Turned off by an admin, or a Worker from before the card (setting or not): the kept analysis shows without
+    // its card.
+    const cardCalls = [
+      analyzeUserOpinions,
+      analyzeUserCard,
+      fetchAnalysisCardPicture,
+      readSavedAnalysisCard,
+      publishSavedAnalysisCard,
+    ];
+    for (const [off, workerHasCard] of [
+      [{ ...on, analysisCardEnabled: false }, true],
+      [absent, false],
+    ]) {
+      config = off;
+      mockWorkerHasCard = workerHasCard;
+      cardCalls.forEach((mock) => mock.mockClear());
+      await instance.analyzeUser();
+      expect(instance.state.aiAnalysis).toBe('summary');
+      await waitFor(() =>
+        expect(instance.state).toMatchObject({
+          analysisCard: null,
+          analysisCardPending: false,
+          analysisCardPicture: null,
+          analysisCardPublish: null,
+          analysisCardSavedAt: null,
+        }),
+      );
+      await expect(instance.resolveSavedAnalysisCardOptions()).resolves.toBeNull();
+      instance.setAnalysisCardShown(false);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      cardCalls.forEach((mock) => expect(mock).not.toHaveBeenCalled());
+    }
+    mockWorkerHasCard = true;
+
+    // A new analysis in a session with the card off asks for no card either.
+    const other = makeAnalysisCacheInstance({ viewAddress: '0x00000000000000000000000000000000000000f2' });
+    const offConfig = { ...on, analysisCardEnabled: false, slug: other.slug };
+    jest
+      .spyOn(other.instance, '_getSessionConfigForSlugExact')
+      .mockImplementation((candidate) => (candidate === other.slug ? offConfig : null));
+    matchedAnalysis();
+    cardCalls.forEach((mock) => mock.mockClear());
+    await other.instance.analyzeUser();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+    expect(other.instance.state.analysisHistoricalFigure).toBe('Grace Hopper (1906–1992)');
+    expect(other.instance.state.analysisCard).toBeNull();
+    cardCalls.slice(1).forEach((mock) => expect(mock).not.toHaveBeenCalled());
   });
 
   it('on my own page never saves over a "no", nor when the saved card cannot be read', async () => {

@@ -1,3 +1,5 @@
+import { analysisCardOn } from '@ce-shared/analysisCardSaved.mjs';
+
 import type UserPage from './UserPage';
 import { analyzeUserCard, analyzeUserOpinions, fetchAnalysisCardPicture } from 'utilities/ai/aiClient.js';
 import {
@@ -7,6 +9,7 @@ import {
   type AnalysisCardPlace,
 } from 'utilities/analysisCard/analysisCardModel';
 import {
+  analysisCardAvailableFor,
   publishSavedAnalysisCard,
   readSavedAnalysisCard,
   type SavedAnalysisCardState,
@@ -118,7 +121,7 @@ export async function resolveSavedAnalysisCardOptions(this: UserPage): Promise<P
   const session = await this.resolveAnalysisSessionContext();
   if (!session?.sessionConfig) return null;
   const options = buildUserPageAnalysisAiOptions({ analysisSession: session, context: analysisAiContextOf(this) });
-  return isPageSession(this, options) ? options : null;
+  return isPageSession(this, options) && (await analysisCardAvailableFor(options)) ? options : null;
 }
 
 // What the "Show this card on my page" box needs to save or withdraw my card, set when the card is shown. `stored`
@@ -278,7 +281,32 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
   // neither failing is an error of the analysis: the card is then left out, or shown without its picture.
   // First the person's saved card is looked up: on someone else's page it is shown in place of a new one, and a
   // card they withdrew is not replaced by another; on my own page it decides the "Show this card on my page" box.
+  // No card is written, drawn, read, saved or shown, not even one kept with an earlier analysis.
+  const leaveCardOut = (): void => {
+    publishContexts.delete(this);
+    this.setState(() =>
+      isCurrent()
+        ? {
+            analysisCard: null,
+            analysisCardPending: false,
+            analysisCardPicture: null,
+            analysisCardPublish: null,
+            analysisCardSavedAt: null,
+          }
+        : null,
+    );
+  };
+  // The card is left out where an admin turned it off, in the session the AI answers from or the page's own, and
+  // where that session's Worker is from before the card.
   const showAnalysisCard = (result: ProfileRecord, aiOptions: ProfileRecord, cardCache: CacheContext): void => {
+    if (!analysisCardOn(this._getSessionConfigForSlugExact(pageSlug))) return leaveCardOut();
+    void analysisCardAvailableFor(aiOptions).then((available) => {
+      if (!isCurrent()) return;
+      if (available) makeAnalysisCard(result, aiOptions, cardCache);
+      else leaveCardOut();
+    });
+  };
+  const makeAnalysisCard = (result: ProfileRecord, aiOptions: ProfileRecord, cardCache: CacheContext): void => {
     const alignment = (result.historicalAlignment || {}) as ProfileRecord;
     const figure = String(alignment.figure || '').trim();
     if (!figure || !isCurrent()) return;

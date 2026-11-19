@@ -44,6 +44,7 @@ import { describeWorkerModeError, listSessionModeConflicts } from '../../../util
 import {
   readWorkerCountsAiLimit,
   readWorkerRunsWorkersAi,
+  readWorkerHasAnalysisCard,
   readWorkerSessionAgentOptions,
   readWorkerKeepsDraftText,
   readWorkerTakesDataNote,
@@ -79,6 +80,7 @@ import { SettingsAiSection } from './SettingsAiSection';
 import { SettingsChainFacts, SettingsChainFields } from './SettingsChainFields';
 import SettingsFeedbackPanel from './SettingsFeedbackPanel';
 import {
+  SettingsAnalysisCardField,
   SettingsContextCardsField,
   SettingsFeedbackField,
   SettingsQuestionListFields,
@@ -240,6 +242,8 @@ const SessionSettingsPage = ({
   // Whether it counts a separate AI daily limit; an older one would store the field and ignore it.
   const [workerCountsAiLimit, setWorkerCountsAiLimit] = useState(false);
   const [workerRunsWorkersAi, setWorkerRunsWorkersAi] = useState(false);
+  // Whether it has the analysis card; an older one would refuse the setting, so it isn't offered there.
+  const [workerHasAnalysisCard, setWorkerHasAnalysisCard] = useState(false);
   // Whether it accepts the note on where research data goes; an older one would refuse the whole save.
   // On-chain sessions save to the registry, which takes it.
   const [workerTakesDataNote, setWorkerTakesDataNote] = useState(false);
@@ -253,6 +257,7 @@ const SessionSettingsPage = ({
     setWorkerKeepsCards(false);
     setWorkerCountsAiLimit(false);
     setWorkerRunsWorkersAi(false);
+    setWorkerHasAnalysisCard(false);
     setWorkerTakesDataNote(false);
     setWorkerAgentOptions({ recordChats: false, anyoneCanAsk: false });
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
@@ -272,6 +277,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerRunsWorkersAi(workerOrigin, sessionSlug, fetchImpl).then((runs) => {
       if (!stale) setWorkerRunsWorkersAi(runs);
+    });
+    void readWorkerHasAnalysisCard(workerOrigin, sessionSlug, fetchImpl).then((has) => {
+      if (!stale) setWorkerHasAnalysisCard(has);
     });
     void readWorkerTakesDataNote(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesDataNote(takes);
@@ -690,6 +698,11 @@ const SessionSettingsPage = ({
           lockedReason={onChain || workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
           dailyLimit={!onChain && workerCountsAiLimit}
           workersAi={!onChain && workerRunsWorkersAi}
+          analysisCard={
+            !onChain && workerHasAnalysisCard ? (
+              <SettingsAnalysisCardField draft={draft} onChange={updateDraft} />
+            ) : null
+          }
           sessionAgent={
             onChain ? null : workerAnswersSessionAgent(saved) ? (
               <SetupSessionAgent

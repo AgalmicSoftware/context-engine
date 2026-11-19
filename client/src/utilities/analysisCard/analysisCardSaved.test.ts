@@ -2,9 +2,11 @@ import { normalizeSavedAnalysisCard } from '@ce-shared/analysisCardSaved.mjs';
 
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { readWorkerCapabilities } from '../worker/workerCapabilities';
 import { buildAnalysisCard, normalizeAnalysisCard } from './analysisCardModel';
 import {
   SAVED_CARD_READ_TIMEOUT_MS,
+  analysisCardAvailableFor,
   SAVED_CARD_SAVE_TIMEOUT_MS,
   publishSavedAnalysisCard,
   readSavedAnalysisCard,
@@ -13,9 +15,11 @@ import {
 
 jest.mock('../worker/corsProxy.js', () => ({ getCorsProxyUrlOrThrow: jest.fn() }));
 jest.mock('../worker/workerAuth.js', () => ({ fetchWorkerWithAuth: jest.fn() }));
+jest.mock('../worker/workerCapabilities', () => ({ readWorkerCapabilities: jest.fn() }));
 
 const mockedProxy = jest.mocked(getCorsProxyUrlOrThrow);
 const mockedFetch = jest.mocked(fetchWorkerWithAuth);
+const mockedCapabilities = jest.mocked(readWorkerCapabilities);
 const PERSON = '0x00000000000000000000000000000000000000AA';
 const CARD = normalizeSavedAnalysisCard({
   title: 'Keeps the commons in common hands',
@@ -184,4 +188,27 @@ it('a card the page builds is a card the Worker keeps, and reads back the same',
   const saved = normalizeSavedAnalysisCard(built);
   expect(saved).not.toBeNull();
   expect(normalizeAnalysisCard({ ...saved, ...place })).toEqual(built);
+});
+
+it('is on unless the session turned it off, and only where its Worker has the card', async () => {
+  const available = (sessionConfig: unknown) => analysisCardAvailableFor({ sessionSlug: 's', sessionConfig });
+  const has = (features: string[]) => mockedCapabilities.mockResolvedValue({ legacy: false, features });
+  has(['analysis_card_v1']);
+  // A session that never saved the setting, as every session from before it, has the card on.
+  for (const sessionConfig of [{}, { analysisCardEnabled: true }, null, undefined]) {
+    await expect(available(sessionConfig)).resolves.toBe(true);
+  }
+  expect(mockedCapabilities).toHaveBeenLastCalledWith('https://worker.example', 's');
+  // Turned off, the Worker is not even asked.
+  mockedCapabilities.mockClear();
+  await expect(available({ analysisCardEnabled: false })).resolves.toBe(false);
+  expect(mockedCapabilities).not.toHaveBeenCalled();
+  // A Worker from before the card, one that can't be asked, or none found: nothing of the card shows.
+  has(['worker_groups']);
+  await expect(available({})).resolves.toBe(false);
+  mockedCapabilities.mockResolvedValue({ legacy: false, features: [], unavailable: true });
+  await expect(available({})).resolves.toBe(false);
+  has(['analysis_card_v1']);
+  mockedProxy.mockRejectedValueOnce(new Error('no worker'));
+  await expect(available({})).resolves.toBe(false);
 });

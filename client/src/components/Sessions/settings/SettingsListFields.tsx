@@ -183,3 +183,15 @@ export const SettingsFeedbackField = ({ draft, onChange }: FieldsProps) => (
     onChange={(checked) => onChange(['feedbackEnabled'], checked)}
   />
 );
+
+// Whether each person's AI analysis comes with the two-page picture card, which they may show on their page.
+export const SettingsAnalysisCardField = ({ draft, onChange }: FieldsProps) => (
+  <SetupCheck
+    id="ce-settings-analysis-card"
+    label="Analysis card"
+    help="Adds a two-page picture card to each person’s AI analysis: a title, the historical figure they are matched with and a portrait of that figure, and three of their answers, to download as a picture, GIF or video. People can show their own card on their page to everyone signed in, and take it off. Each card is one more AI request for that person, and each new portrait is drawn with the session’s OpenAI key, at most 60 a day. Turned off, no card is made or shown, and saved cards are hidden until it is turned back on."
+    checked={draft.analysisCardEnabled !== false}
+    testId="ce-settings-analysis-card"
+    onChange={(checked) => onChange(['analysisCardEnabled'], checked)}
+  />
+);
