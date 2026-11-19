@@ -1,18 +1,21 @@
 import {
-  CONTEXT_FILE_TYPES,
   CONTEXT_ROLE,
   CONTEXT_TAGS as TAGS,
   CONTEXT_TEXT_ROLE,
+  contextCardsOn,
+  contextFileIsReadByAi,
   contextRoleOf,
   contextTagValue,
   groupLockedIds,
   isAdminsOnlyAccess,
+  isContextImage,
 } from '../../shared/sessionContextSources.mjs';
 import { buildSessionContextPrompt, SESSION_CONTEXT_TEXT_LIMITS } from '../../shared/sessionContextText.mjs';
 import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
 import { buildIndexPrefix, prefetchKvPayloads, readContextSourceBytes, readContextSourceRow } from './storageRouteExecution.js';
 import { StorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
+import { contextCardOf } from './contextSourcePolicy.js';
 
 // How much one AI prompt's reading list may cost: rows looked at (chosen from
 // the key list before any is read), list pages (40,000 keys, after which the
@@ -139,6 +142,8 @@ export const contextReadingOrder = (rows) => {
  * are left out, with the AI's readings of them, and counted in `withheld`.
  * `leftOut` counts the sources with text not read for lack of room, and the
  * rows not looked at, which may include some this reader could not have read.
+ * `notRead` names the first of those: this reader's own sources with text and
+ * a card, as { title, kind, card }, for the prompt block to list.
  * Each source also says who may read it (`everyone` the session admits, or
  * only the `groupIds` it is locked to) and who added it (`uploader`).
  * `unavailable` says the list couldn't be read, in whole or in part, and
@@ -157,7 +162,7 @@ export const loadParticipantContextSources = async ({
   } catch {
     // The AI call goes ahead without context, but the operator should know why.
     warn('[context] sources left out of an AI prompt', { slug, reason: 'storage unavailable' });
-    return { sources: [], leftOut: 0, withheld: 0, unreadable: 0, failed: 0, unavailable: true };
+    return { sources: [], notRead: [], leftOut: 0, withheld: 0, unreadable: 0, failed: 0, unavailable: true };
   }
   if (listed.leftOut > 0) {
     warn('[context] sources left out of an AI prompt', { slug, reason: [...new Set(listed.stopped)].join(', '), leftOut: listed.leftOut });
@@ -178,6 +183,10 @@ export const loadParticipantContextSources = async ({
       contextTagValue(reading.tags, TAGS.derivedFrom) === pdf.id && await canRead(reading) ? reading : null;
   };
   const sources = [];
+  const notRead = [];
+  // With cards off, no AI is told of one: its prompt is as it was before cards.
+  const cardOf = contextCardsOn(config) ? contextCardOf : () => null;
+  const kindOf = (row) => (contextTagValue(row.tags, TAGS.kind) === 'link' ? 'link' : 'file');
   const mine = contextReadingOrder(visible.filter((row) => contextRoleOf(row.tags) === CONTEXT_ROLE));
   const ordered = mine.filter((row) => !leaveOutUploaders?.has(lower(row.uploader)));
   let chars = 0;
@@ -202,7 +211,7 @@ export const loadParticipantContextSources = async ({
     let places = Math.min(PREFETCH_SOURCES, maxSources - sources.length);
     let room = totalChars - chars;
     for (; next < ordered.length && places > 0 && room > 0; next += 1) {
-      const isPdf = ordered[next].contentType === CONTEXT_FILE_TYPES.pdf;
+      const isPdf = contextFileIsReadByAi(ordered[next].contentType);
       const textRow = isPdf ? readings.get(ordered[next].id) : ordered[next];
       const size = Number(textRow?.size);
       if (!textRow?.id || !(size <= MAX_READ_BYTES)) {
@@ -222,11 +231,23 @@ export const loadParticipantContextSources = async ({
   for (const [position, row] of ordered.entries()) {
     if (sources.length >= maxSources || chars >= totalChars) {
       // A PDF the AI never read has no text to leave out.
-      leftOut += ordered.slice(position)
-        .filter((rest) => rest.contentType !== CONTEXT_FILE_TYPES.pdf || readings.has(rest.id) || rest.contextReadingId).length;
+      const rest = ordered.slice(position)
+        .filter((later) => !contextFileIsReadByAi(later.contentType) || readings.has(later.id) || later.contextReadingId);
+      leftOut += rest.length;
+      // Each passed this reader's own check above, so its card may go where its text would have.
+      rest.forEach((later) => {
+        const card = cardOf(later);
+        if (!card) return;
+        // Who may read it, as a source says: a card tells its reader something of a locked file too.
+        notRead.push({
+          title: contextTagValue(later.tags, TAGS.name), kind: kindOf(later), card,
+          everyone: forEveryone(later, config), groupIds: groupLockedIds(later.accessConditions) || [],
+        });
+      });
       break;
     }
-    const isPdf = row.contentType === CONTEXT_FILE_TYPES.pdf;
+    // A PDF or an image: its text is the AI's reading of it.
+    const isPdf = contextFileIsReadByAi(row.contentType);
     // A storage error is a read that failed just now; bytes that are gone, or
     // too large to read here, will never be read.
     let bytes = null;
@@ -246,7 +267,7 @@ export const loadParticipantContextSources = async ({
       unreadable += 1;
       continue;
     }
-    const kind = contextTagValue(row.tags, TAGS.kind) === 'link' ? 'link' : 'file';
+    const kind = kindOf(row);
     let text = decoder.decode(bytes);
     let url = '';
     if (kind === 'link') {
@@ -263,19 +284,20 @@ export const loadParticipantContextSources = async ({
     // over says it was longer. A session's largest files are then never all held at once.
     text = text.trim().slice(0, itemChars + 1);
     sources.push({
-      title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isPdf,
+      card: cardOf(row),
+      title: contextTagValue(row.tags, TAGS.name), kind, url, text, readByAi: isContextImage(row.contentType) ? 'image' : isPdf,
       everyone: forEveryone(row, config), groupIds: groupLockedIds(row.accessConditions) || [], uploader: lower(row.uploader),
     });
     chars += Math.min(text.length, itemChars);
   }
   return {
-    sources, leftOut, withheld: mine.length - ordered.length, unreadable, failed,
+    sources, notRead, leftOut, withheld: mine.length - ordered.length, unreadable, failed,
     unavailable: listed.stopped.includes('storage unavailable'),
   };
 };
 
 /** The session's context block for an AI acting for any participant; '' when none. */
 export const buildParticipantContextPrompt = async ({ env, slug, config, deps, totalChars } = {}) => {
-  const { sources } = await loadParticipantContextSources({ env, slug, config, deps, totalChars });
-  return buildSessionContextPrompt({ sessionContext: config?.sessionContext, sources, totalChars }).text;
+  const { sources, notRead } = await loadParticipantContextSources({ env, slug, config, deps, totalChars });
+  return buildSessionContextPrompt({ sessionContext: config?.sessionContext, sources, notRead, totalChars }).text;
 };

@@ -3,6 +3,8 @@ import {
   analysisProfileKey,
   analysisInputSignature,
   invalidateUserAnalysis,
+  resolveSavedAnalysisCardOptions,
+  setAnalysisCardShown,
 } from './userPageAnalysisActions';
 /** @file UserPage.tsx */
 import React, { Component } from 'react';
@@ -158,6 +160,7 @@ import {
 } from './userPageHelpers';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import UserPageAnalysisModal from './UserPageAnalysisModal';
+import UserPageSavedAnalysisCard from './UserPageSavedAnalysisCard';
 import UserPageComparePanel from './UserPageComparePanel';
 import { resolveCompareCachesReady } from './compareSessionRuntime';
 import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
@@ -3268,6 +3271,8 @@ class UserPage extends Component<any, any> {
   };
 
   analyzeUser = analyzeUser.bind(this);
+  resolveSavedAnalysisCardOptions = resolveSavedAnalysisCardOptions.bind(this);
+  setAnalysisCardShown = setAnalysisCardShown.bind(this);
 
   openAiSettings = (): void => {
     if (this._isMounted) {
@@ -3736,6 +3741,16 @@ class UserPage extends Component<any, any> {
         </UserPageComparePanel>
 
         {!minimized && (
+          <UserPageSavedAnalysisCard
+            viewAddress={propViewAddress}
+            account={account}
+            pageSlug={String(this.props.activeSessionSlug || this.props.sessionSlug || '')}
+            profileKey={analysisProfileKey(this.props)}
+            loadOptions={this.resolveSavedAnalysisCardOptions}
+          />
+        )}
+
+        {!minimized && (
           <div className={styles.content}>
             {selectedTab === 'surveys' && (
               <UserPageSurveySection
@@ -3850,6 +3865,11 @@ class UserPage extends Component<any, any> {
         <UserPageAnalysisModal
           aiAnalysis={aiAnalysis}
           analysisCacheStatusState={analysisCacheStatusState}
+          analysisCard={this.state.analysisCard}
+          analysisCardPending={this.state.analysisCardPending}
+          analysisCardPicture={this.state.analysisCardPicture}
+          analysisCardPublish={this.state.analysisCardPublish}
+          analysisCardSavedAt={this.state.analysisCardSavedAt}
           analysisDetails={analysisDetails}
           analysisElapsedMs={analysisElapsedMs}
           analysisError={analysisError}
@@ -3861,6 +3881,7 @@ class UserPage extends Component<any, any> {
           analysisName={analysisName}
           analyzing={analyzing}
           isOpen={showAnalysisModal}
+          onAnalysisCardShownChange={this.setAnalysisCardShown}
           onOpenAiSettings={() => this.openAiSettings()}
           onRefreshAnalysis={() => this.analyzeUser(true)}
           onToggle={() => {

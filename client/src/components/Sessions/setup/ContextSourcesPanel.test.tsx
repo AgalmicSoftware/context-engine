@@ -69,6 +69,7 @@ const list = (overrides: Partial<SessionContextSourcesState> = {}): SessionConte
   signInToAdd: false,
   participantsCanAddLinks: false,
   groupFilesHidden: false,
+  cardsSupported: false,
   reload: jest.fn(),
   ...overrides,
 });
@@ -171,7 +172,7 @@ describe('context sources panel', () => {
   });
 
   it('uploads a file and has the session’s AI read a PDF only when Analyze is ticked', async () => {
-    renderPanel(list({ sources: [] }));
+    renderPanel(list({ sources: [], cardsSupported: true }));
     const input = await screen.findByTestId('ce-context-file');
     const pdf = new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' });
     fireEvent.change(input, { target: { files: [pdf] } });
@@ -191,8 +192,29 @@ describe('context sources panel', () => {
     fireEvent.change(screen.getByTestId('ce-context-file'), {
       target: { files: [new File(['x'], 'slides.pptx', { type: 'application/vnd.ms-powerpoint' })] },
     });
-    expect(screen.getByText(/Add a PDF, Markdown, plain text, CSV or JSON file/)).toBeInTheDocument();
+    expect(screen.getByText(/Add a PDF, a PNG, JPEG or WebP image, or a Markdown/)).toBeInTheDocument();
     expect(screen.getByTestId('ce-context-add-file')).toBeDisabled();
+
+    // With cards on, an image is read as a PDF is: Analyze is offered (unticked above), and the reading follows the upload.
+    const chart = new File(['png'], 'chart.png', { type: 'image/png' });
+    fireEvent.change(screen.getByTestId('ce-context-file'), { target: { files: [chart] } });
+    fireEvent.click(screen.getByTestId('ce-context-file-analyze'));
+    expect(screen.getByTestId('ce-context-file-analyze')).toBeChecked();
+    await act(async () => fireEvent.click(screen.getByTestId('ce-context-add-file')));
+    expect(uploadContextFile).toHaveBeenLastCalledWith({ file: chart }, options);
+    expect(readContextPdf).toHaveBeenCalledTimes(2);
+  });
+
+  it('takes no image where the session has cards off', async () => {
+    renderPanel(list({ sources: [] }));
+    const input = await screen.findByTestId('ce-context-file');
+    expect(input.getAttribute('accept')).not.toMatch(/image|\.png/);
+    fireEvent.change(input, { target: { files: [new File(['png'], 'chart.png', { type: 'image/png' })] } });
+    expect(
+      screen.getByText('A session takes images only once Context cards are on in its settings.'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('ce-context-add-file')).toBeDisabled();
+    expect(uploadContextFile).not.toHaveBeenCalled();
   });
 
   it('reads the session’s unread page links, and explains when sources cannot be added', async () => {

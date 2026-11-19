@@ -135,7 +135,11 @@ describe('session template tools', () => {
     expect(document.querySelector('script')).toBeNull();
     expect(onImport).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId('ce-template-import-apply'));
-    expect(onImport).toHaveBeenCalledWith(expect.objectContaining({ sessionName: '<script>alert(1)</script>' }));
+    // With the fields the pasted JSON itself named: every other field of the template is a default.
+    expect(onImport).toHaveBeenCalledWith(expect.objectContaining({ sessionName: '<script>alert(1)</script>' }), [
+      'format',
+      'sessionName',
+    ]);
   });
 
   it('imports the JSON an AI returns for a salon-sized session', () => {
@@ -147,7 +151,10 @@ describe('session template tools', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check' }));
     expect(screen.getByTestId('ce-template-changes')).toHaveTextContent('questions: 0 items → 28 items');
     fireEvent.click(screen.getByTestId('ce-template-import-apply'));
-    expect(onImport).toHaveBeenCalledWith(expect.objectContaining({ questions: expect.any(Array) }));
+    expect(onImport).toHaveBeenCalledWith(
+      expect.objectContaining({ questions: expect.any(Array) }),
+      expect.arrayContaining(['questions']),
+    );
     expect((onImport.mock.calls[0][0] as SessionTemplate).questions).toHaveLength(28);
   });
 
@@ -160,7 +167,7 @@ describe('session template tools', () => {
     fireEvent.change(screen.getByTestId('ce-template-file'), { target: { files: [file] } });
     expect(await screen.findByTestId('ce-template-changes')).toHaveTextContent('defaultTags: (empty) → parks');
     fireEvent.click(screen.getByTestId('ce-template-import-apply'));
-    expect(onImport).toHaveBeenCalledWith(expect.objectContaining({ defaultTags: 'parks' }));
+    expect(onImport).toHaveBeenCalledWith(expect.objectContaining({ defaultTags: 'parks' }), ['format', 'defaultTags']);
   });
 
   it('refuses a template file over 256 KB without reading it', () => {

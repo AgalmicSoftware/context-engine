@@ -1,11 +1,16 @@
+import { normalizeContextCard } from '../../shared/contextCards.mjs';
 import {
+  CONTEXT_ROLE,
   CONTEXT_TAGS,
   CONTEXT_TEXT_ROLE,
   contextAdderProblem,
+  contextCardsOn,
   contextFileByteLimit,
+  contextFileNoun,
   contextRoleOf,
   contextTagValue,
   isAdminsOnlyAccess,
+  isContextImage,
   lockedGroupsOf,
   participantsMayAddContext,
   resolveContextFileType,
@@ -45,22 +50,42 @@ export const checkContextSourceUpload = ({ payload = {}, config, uploader = '', 
   }
   if (kind !== 'file') return fail(400, 'A context source is a file or a link.', 'context_kind_invalid');
   const type = resolveContextFileType({ type: payload.contentType });
-  if (!type) return fail(415, 'Context files are PDF, Markdown, plain text, CSV or JSON.', 'context_type_unsupported');
+  if (!type) return fail(415, 'Context files are PDF, PNG, JPEG or WebP images, Markdown, plain text, CSV or JSON.', 'context_type_unsupported');
+  // An image is context only where the session has cards on. A session that never turned
+  // them on then holds nothing a Worker from before images would take for a text file.
+  if (isContextImage(type) && !contextCardsOn(config)) {
+    return fail(415, 'This session takes images as context only with Context cards turned on in its settings.', 'context_images_off');
+  }
   const limit = contextFileByteLimit(type);
   if ((payload.bytes?.length || 0) > limit) {
-    return fail(413, `This file is larger than ${limit / MIB} MB, the most a context ${type === 'application/pdf' ? 'PDF' : 'text file'} may be.`, 'context_too_large');
+    return fail(413, `This file is larger than ${limit / MIB} MB, the most a context ${contextFileNoun(type)} may be.`, 'context_too_large');
   }
   return { ok: true, role };
 };
 
-// What a list shows of a context source beyond its tags: the privacy level and who added it.
-export const contextSourceListFields = (metadata = {}) => (
-  metadata?.contextSource === true
+const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+
+// A card is plain text on its source's row. Only a file or link someone added
+// carries one, and never an item stored encrypted, whose row would then say
+// in the clear what its bytes do not.
+export const mayHaveContextCard = (row) =>
+  row?.contextSource === true && contextRoleOf(row.tags) === CONTEXT_ROLE &&
+  row.payloadEncrypted !== true && row.encrypted !== true && !isObj(row.envelope);
+
+/** A source's card within its limits, or null: read from its row alone, so it goes only where the row does. */
+export const contextCardOf = (row) => (mayHaveContextCard(row) ? normalizeContextCard(row.card) : null);
+
+// What a list shows of a context source beyond its tags: the privacy level, who added it and,
+// where the session has cards on, its card.
+export const contextSourceListFields = (metadata = {}, { cards = false } = {}) => {
+  const card = cards ? contextCardOf(metadata) : null;
+  return metadata?.contextSource === true
     ? {
       contextSource: true,
       adminsOnly: isAdminsOnlyAccess(metadata.accessConditions),
       lockedGroupIds: lockedGroupsOf(metadata.accessConditions),
       addedBy: metadata.uploader || '',
+      ...(card ? { card } : {}),
     }
-    : {}
-);
+    : {};
+};

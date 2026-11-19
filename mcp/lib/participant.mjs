@@ -10,12 +10,18 @@ import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorage
 import { htmlToPlainText, normalizeSessionContext } from '../../shared/sessionContext.mjs';
 import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
 import { MAX_AGENT_INSTRUCTIONS_CHARS } from '../../shared/sessionConfigEdits.mjs';
-import { CONTEXT_AGENT_ADDER, CONTEXT_SOURCE_LIMITS, agentAdderName, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import {
+  CONTEXT_AGENT_ADDER, CONTEXT_FILE_TYPES, CONTEXT_SOURCE_LIMITS, agentAdderName, contextCardsOn, contextFileIsReadByAi, participantsMayAddContext,
+} from '../../shared/sessionContextSources.mjs';
 import { buildNote, checkContextLink, contextInvitation, contextUploadForm, readContextFile, workerReadsContext } from './contextAdditions.mjs';
+import {
+  CONTEXT_DATA_NOTE, CONTEXT_LIST_MAX, contextEntries, contextEntryMatches, contextTextOf, contextTextPart, publicContextEntry,
+} from './contextLibrary.mjs';
 import { createKnownSessions } from './knownSessions.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
+import { SESSION_NAME_RULE } from './sessionNameRule.mjs';
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import { createWorkerGroupPasswordKeys, formatWorkerGroupReadInvite, parseGroupInviteToken } from '../../shared/workerGroupJoin.mjs';
@@ -94,6 +100,14 @@ const MAX_GROUP_TAGS = 20;
 const MAX_TAG_LENGTH = 80;
 const CONTEXT_ADMINS_ONLY = 'This session limits context to its admins, so nothing was added.';
 const CONTEXT_ENDED = 'This session has ended, so it takes no more context.';
+// A session's loader reads at most a few hundred context rows; a list past this is said to be partial.
+const MAX_CONTEXT_ROWS = 1000;
+// The Worker gives its AI three minutes to read a file; the tool call waits a part of that
+// and says the reading goes on, so a host that gives a call a minute still gets its answer.
+const CONTEXT_READ_TIMEOUT_MS = 200_000;
+const CONTEXT_READ_WAIT_MS = 40_000;
+const CONTEXT_NOT_READ = 'Not read by the session’s AI, so it gives the AI no text yet. A session admin can have it read.';
+const NO_CONTEXT_SOURCES = 'This session keeps no context files or links where an agent can list them.';
 const CONTEXT_NO_LINKS = 'This session’s Worker doesn’t take links from participants yet. You can add a file or text.';
 const CONTEXT_NO_FETCH = 'This session doesn’t let you have its Worker fetch pages, so it takes no links from you. You can add a file or text.';
 const CONTEXT_RATE_LIMITED = 'The session’s Worker is rate limiting you, so nothing was added. Retry in a few minutes; if it still refuses, you may have reached the session’s daily limit for your address, which clears within a day.';
@@ -427,7 +441,7 @@ const progressNotes = (questions, mine) => ({
 });
 
 export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), sbt = null, createProvider, sleep, registry = {},
-  ownAnswerWaitMs = OWN_ANSWER_WAIT_MS }) => {
+  ownAnswerWaitMs = OWN_ANSWER_WAIT_MS, contextReadWaitMs = CONTEXT_READ_WAIT_MS }) => {
   const requestTestEth = createTestEthRequester({ config, wallet, createProvider, now, sleep });
   const sessions = new Map(); // key -> { info, client, records: Map(storageId -> payload), missing: Map(storageId -> time) }
   let state = null;
@@ -541,6 +555,39 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   // The Worker fetches a participant's link only with their fetch scope.
   const mayAddLinks = (ctx, sessionConfig) => isSessionAdmin(ctx, sessionConfig) || ctx.client.tokenClaims?.scopes?.fetch === true;
 
+  // A PDF or image gives the session's AI no text until it is read. Where the session has cards
+  // on, whoever added one may ask for that, and the agent does, once, unless told not to. With
+  // cards off only an admin's agent asks, and only when told to. The reading goes on at the
+  // Worker if this call stops waiting, so it is never given the call's own signal.
+  const analyzeAdded = async (ctx, sessionConfig, id, wanted) => {
+    const cardsOn = contextCardsOn(sessionConfig);
+    if (!id || !(wanted ?? cardsOn) || (!cardsOn && !isSessionAdmin(ctx, sessionConfig))) return CONTEXT_NOT_READ;
+    const reading = ctx.client.contextAction({ action: 'read-pdf', id }, { timeoutMs: CONTEXT_READ_TIMEOUT_MS })
+      .then((result) => ({ result }), (error) => ({ error }));
+    let timer = null;
+    const waited = await Promise.race([
+      reading,
+      new Promise((resolve) => { timer = setTimeout(() => resolve(null), contextReadWaitMs); }),
+    ]);
+    clearTimeout(timer);
+    if (!waited) return 'The session’s AI is still reading it, which can take a few minutes. Where you can see the file, list_context shows readByAi once it has.';
+    // A daily limit, not a busy minute: the file is in, and adding it again would only add it twice.
+    if (waited.error instanceof WorkerRequestError && waited.error.status === 429) {
+      return 'Added, but the session’s AI did not read it: you have reached a daily limit of this session, likely your AI uses for today. Don’t add it again. A session admin can have it read.';
+    }
+    if (waited.error) return `Added, but the session’s AI did not read it: ${describeError(waited.error)} A session admin can have it read.`;
+    const chars = Number(waited.result?.text?.chars) || 0;
+    // An admin's reading isn't counted against a daily limit; an adder's is.
+    const counted = isSessionAdmin(ctx, sessionConfig) ? '' : ', and it counted as one of your AI uses today';
+    return `Read by the session’s AI${chars ? ` (${chars.toLocaleString('en-US')} characters)` : ''}. Its text is now context for whoever can see the file${counted}.`;
+  };
+
+  // The session's context sources as the Worker lists them for this agent.
+  const listContextEntries = async (ctx) => {
+    const { items, complete } = await ctx.client.listAll('docsContext', { role: 'context', maxItems: MAX_CONTEXT_ROWS, signal });
+    return { entries: contextEntries(items, { self: wallet.address.toLowerCase() }), complete };
+  };
+
   // The groups this agent may see, and whether it's in each. The MCP gives
   // groups and their tags no meaning; the session's instructions do.
   const describeGroups = async (ctx) => {
@@ -598,7 +645,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     if (ctx.registry || !participantsMayAddContext(sessionConfig) || hasEnded(sessionConfig) || !workerReadsContext(sessionConfig)) return {};
     const features = await ctx.client.readFeatures();
     if (!features?.includes('participant_context_v1')) return {};
-    return { addingContext: contextInvitation({ links: features.includes('participant_context_links_v1') && mayAddLinks(ctx, sessionConfig) }) };
+    return {
+      addingContext: contextInvitation({
+        links: features.includes('participant_context_links_v1') && mayAddLinks(ctx, sessionConfig),
+        images: contextCardsOn(sessionConfig),
+      }),
+    };
   };
 
   const remember = (ctx, title, recruitmentSource) =>
@@ -636,19 +688,31 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   // on joining, and shows it in place of the address; answers there carry no
   // name of their own.
   const keepsNames = async (ctx) => !ctx.registry && !!(await ctx.client.readFeatures())?.includes('session_names_v1');
-  const saveName = async (ctx) => {
+  // A saved name is remembered per session, so answers don't save it again after an admin cleared it.
+  const markNameSaved = (ctx, name) =>
+    saveState((fresh) => {
+      const entry = fresh.sessions[sessionKey(ctx.info)];
+      if (isRecord(entry) && entry.sessionId === ctx.client.sessionId) entry.nameSaved = name;
+    }).catch(() => {});
+  const saveName = async (ctx, { signal } = {}) => {
     if (!(await keepsNames(ctx))) return null;
     // A name saved before the admin turned names off is still readable, so ask the setting.
     if (ctx.client.config?.namesEnabled === false) return { saved: false, error: 'Names are off in this session.' };
     const wanted = profile().displayName;
     try {
       // Each change counts against a daily limit, so a name already saved is left as it is.
-      const current = await ctx.client.request(`/names/me?slug=${encodeURIComponent(ctx.info.slug)}`, { auth: true }).catch(() => null);
-      if (current && (current.name || '') === wanted.normalize('NFKC').trim().replace(/\s+/gu, ' ')) return { saved: true, name: current.name };
-      const saved = await ctx.client.request('/names/set', { method: 'POST', auth: true, body: { name: wanted } });
+      const current = await ctx.client.request(`/names/me?slug=${encodeURIComponent(ctx.info.slug)}`, { auth: true, signal }).catch(() => null);
+      if (current && (current.name || '') === wanted.normalize('NFKC').trim().replace(/\s+/gu, ' ')) {
+        await markNameSaved(ctx, wanted);
+        return { saved: true, name: current.name };
+      }
+      const saved = await ctx.client.request('/names/set', { method: 'POST', auth: true, body: { name: wanted }, signal });
+      await markNameSaved(ctx, wanted);
       return { saved: true, name: saved?.name ?? null };
     } catch (error) {
-      return { saved: false, error: text(error?.message) || 'The session didn’t save your name.' };
+      // A name the session refused comes back with its rule, so the next try can fit it.
+      return { saved: false, error: text(error?.message) || 'The session didn’t save your name.',
+        ...(error?.status === 400 ? { rule: SESSION_NAME_RULE } : {}) };
     }
   };
 
@@ -1269,7 +1333,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const loaded = await loadQuestions(ctx);
       const questions = new Map(loaded.map((question) => [question.id, question]));
       const recruitmentSource = text(sessionState(ctx).recruitmentSource);
-      const answerProfile = (await keepsNames(ctx)) ? { ...profile(), displayName: '' } : profile();
+      const namesKept = await keepsNames(ctx);
+      const answerProfile = namesKept ? { ...profile(), displayName: '' } : profile();
       const results = [];
       const answered = [];
       const pendingAnswers = [];
@@ -1380,12 +1445,30 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           warning = 'Answers were submitted, but the local answer history could not be saved. Do not resubmit them to fix this warning.';
         }
       }
+      // These answers carry no name, so a name never saved in the session (the
+      // agent joined before its Worker kept names, or the save on joining failed)
+      // is saved now. After the answers, so a slow or refused save neither holds
+      // nor loses them; tried once per session and name in this process, since
+      // each attempt can count against the daily limit. Once saved it is not
+      // saved again from here, so an admin's clear stands.
+      let name;
+      const wanted = profile().displayName;
+      if (namesKept && answered.length && wanted && ctx.nameChecked !== wanted && sessionState(ctx).nameSaved !== wanted &&
+        ctx.client.config?.namesEnabled !== false && !signal?.aborted) {
+        const saved = await saveName(ctx, { signal });
+        // A Worker whose features could not be read, or a call stopped mid-save, is tried again next time.
+        if (saved && !signal?.aborted) ctx.nameChecked = wanted;
+        if (saved && !saved.saved) {
+          name = { ...saved, next: 'Your answers were stored and show your address for now. To try again, call set_profile with your displayName.' };
+        }
+      }
       const failed = results.filter((result) => !result.ok);
       return {
         session: ctx.info.slug,
         ...(txHash ? { txHash } : {}),
         ...(reconciliationRequired ? { reconciliationRequired: true } : {}),
         ...(warning ? { warning } : {}),
+        ...(name ? { name } : {}),
         submitted: results.length - failed.length,
         failed: failed.length,
         // A model that reads one refusal can take the whole call for lost, or the refused answer for sent.
@@ -1574,13 +1657,14 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       return { session: ctx.info.slug, leftGroup: id };
     },
 
-    async addContext({ session, file, url, text: note, title, adminsOnly = false, groups } = {}) {
+    async addContext({ session, file, url, text: note, title, adminsOnly = false, groups, analyze } = {}) {
       const given = { file, url, text: note };
       const chosen = Object.keys(given).filter((key) => given[key] !== undefined && given[key] !== '');
       if (chosen.length !== 1) throw new Error('Pass exactly one of file, url or text.');
       const [kind] = chosen;
       if (kind === 'file' && title !== undefined) throw new Error('A file keeps its own name; pass title only with url or text.');
       if (adminsOnly !== undefined && typeof adminsOnly !== 'boolean') throw new Error('adminsOnly must be true or false.');
+      if (analyze !== undefined && typeof analyze !== 'boolean') throw new Error('analyze must be true or false.');
       // The website's "Visible to": the members of any of these groups, and the admins.
       if (groups !== undefined && (!Array.isArray(groups) || groups.some((id) => typeof id !== 'string'))) {
         throw new Error('groups must be a list of group IDs.');
@@ -1641,13 +1725,69 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           const source = isRecord(result?.source) ? result.source : {};
           return { session: ctx.info.slug, added: 'link', id: text(source.id), url: link.url, title: text(source.title) || link.title, visibleTo };
         }
-        const upload = kind === 'file' ? await readContextFile(file, { stateDir: config.stateDir }) : buildNote({ text: note, title });
+        const upload = kind === 'file'
+          ? await readContextFile(file, { stateDir: config.stateDir, images: contextCardsOn(sessionConfig) })
+          : buildNote({ text: note, title });
         checkpoint();
         const storageRef = await ctx.client.uploadForm(contextUploadForm(upload, { adminsOnly, groupIds, adderName }), { signal });
-        return { session: ctx.info.slug, added: kind, id: text(storageRef?.id), name: upload.name, visibleTo };
+        const id = text(storageRef?.id);
+        // The file is added whatever becomes of its reading.
+        const analysis = contextFileIsReadByAi(upload.contentType) ? await analyzeAdded(ctx, sessionConfig, id, analyze) : '';
+        return { session: ctx.info.slug, added: kind, id, name: upload.name, visibleTo, ...(analysis ? { analysis } : {}) };
       } catch (error) {
         throw contextRefusal(error, { olderLink: kind === 'url' && featuresUnread });
       }
+    },
+
+    // The files and links people added to the session, each with its card. The Worker lists
+    // only what this agent may read, so a card arrives exactly where its source does.
+    async listContext({ session, query } = {}) {
+      if (query !== undefined && typeof query !== 'string') throw new Error('query must be text.');
+      const ctx = await resolveSession(session);
+      if (ctx.registry) return { session: ctx.info.slug, sources: [], count: 0, note: NO_CONTEXT_SOURCES };
+      const sessionConfig = await ensureReady(ctx);
+      if (!workerReadsContext(sessionConfig)) return { session: ctx.info.slug, sources: [], count: 0, note: NO_CONTEXT_SOURCES };
+      checkpoint();
+      const { entries, complete } = await listContextEntries(ctx);
+      const asked = trim(query);
+      const matched = entries.filter((entry) => contextEntryMatches(entry, asked));
+      const shown = matched.slice(0, CONTEXT_LIST_MAX);
+      return {
+        session: ctx.info.slug,
+        sources: shown.map(publicContextEntry),
+        count: entries.length,
+        ...(asked ? { query: asked, matched: matched.length } : {}),
+        ...(matched.length > shown.length ? { more: matched.length - shown.length } : {}),
+        ...(complete ? {} : { partial: true }),
+        note: contextCardsOn(sessionConfig)
+          ? CONTEXT_DATA_NOTE
+          : `${CONTEXT_DATA_NOTE} This session has context cards off, so its sources carry no summaries or tags and a query matches titles and links only.`,
+      };
+    },
+
+    // One source's text, a part at a time: a link's page as the Worker read it, a text file,
+    // or the session's AI's reading of a PDF or image.
+    async readContext({ session, id, offset } = {}) {
+      const wanted = trim(id);
+      if (!wanted) throw new Error('Pass the id of a source from list_context.');
+      if (offset !== undefined && (!Number.isSafeInteger(offset) || offset < 0)) throw new Error('offset must be a whole number, 0 or more.');
+      const ctx = await resolveSession(session);
+      if (ctx.registry) throw new Error(NO_CONTEXT_SOURCES);
+      if (!workerReadsContext(await ensureReady(ctx))) throw new Error(NO_CONTEXT_SOURCES);
+      checkpoint();
+      const { entries } = await listContextEntries(ctx);
+      const entry = entries.find((candidate) => candidate.id === wanted);
+      if (!entry) throw new Error('This session lists no context source with that id that you can read. list_context lists them.');
+      const source = publicContextEntry(entry);
+      if (!entry.textId) {
+        return {
+          session: ctx.info.slug, source, text: '', chars: 0,
+          note: `The session’s AI has not read this ${entry.type === CONTEXT_FILE_TYPES.pdf ? 'PDF' : 'image'}, so it has no text yet.`,
+        };
+      }
+      checkpoint();
+      const raw = await ctx.client.readContextText(entry.textId, { signal });
+      return { session: ctx.info.slug, source, ...contextTextPart(contextTextOf(entry, raw), offset), note: CONTEXT_DATA_NOTE };
     },
 
     async askSessionAgent({ session, question, store, attribution, name } = {}) {

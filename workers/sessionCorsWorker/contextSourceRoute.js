@@ -1,11 +1,14 @@
 import {
   ADMINS_ONLY_ACCESS,
-  CONTEXT_FILE_TYPES,
   CONTEXT_ROLE,
   CONTEXT_SOURCE_LIMITS as LIMITS,
   CONTEXT_TAGS as TAGS,
   CONTEXT_TEXT_ROLE,
   contextAdderProblem,
+  contextCardsOn,
+  contextFileByteLimit,
+  contextFileIsReadByAi,
+  contextFileNoun,
   contextRoleOf,
   contextTagValue,
   groupLockedAccess,
@@ -13,9 +16,12 @@ import {
   lockedGroupsOf,
   participantsMayAddContext,
 } from '../../shared/sessionContextSources.mjs';
+import { contextCardContent } from '../../shared/contextCards.mjs';
 import { looksSecret } from '../../shared/secretText.mjs';
 import { resolveSessionLifecycle } from '../shared/sessionLifecycle.mjs';
-import { readPdfWithSessionAi } from './contextDocumentRead.js';
+import { cardAfterContextAdd, makeContextCard, readContextCardText, setContextCard } from './contextCard.js';
+import { prepareFileRead, readFileWithSessionAi } from './contextDocumentRead.js';
+import { contextCardOf, mayHaveContextCard } from './contextSourcePolicy.js';
 import { fetchContextSnapshotText } from './fetchExecution.js';
 import {
   buildIndexKey,
@@ -42,9 +48,9 @@ const commonTags = (kind) => [
 const isReadingOf = (row, id) =>
   !!row && contextRoleOf(row.tags) === CONTEXT_TEXT_ROLE && contextTagValue(row.tags, TAGS.derivedFrom) === id;
 
-// A source's AI readings. A KV list can lag a recent write, so the readings a
-// PDF row points to and those the admin's page shows are read directly too;
-// each must be a reading of this PDF.
+// A source's AI readings (a PDF's or an image's). A KV list can lag a recent write, so the readings a
+// file's row points to and those the admin's page shows are read directly too;
+// each must be a reading of this file.
 const readingsOf = async ({ env, slug, row, shownIds = [] }) => {
   const found = new Map((await listContextSourceRows({ env, slug }))
     .filter((entry) => isReadingOf(entry, row.id))
@@ -98,7 +104,7 @@ const linkAccessOf = (body, replaces) => {
 // its text with the link. With `replaces`, a refresh of that link: the same
 // page read again, whose snapshot keeps the link's title, privacy and adder,
 // then the old record goes.
-const addLink = async ({ body, env, slug, deps, store, json, now }) => {
+const addLink = async ({ body, env, config, slug, deps, store, json, now }) => {
   const url = trim(body.url);
   let parsed = null;
   try { parsed = url.length <= LIMITS.urlChars ? new URL(url) : null; } catch { parsed = null; }
@@ -163,7 +169,18 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
     ],
   });
   if (stored.response) return stored.response;
-  if (replaces) await removeCloudflareStorageRecords({ env, slug, rows: [replaces] });
+  // The old record goes as any removal does, in the session coordinator, which hands back
+  // the card it held at that moment: a card someone wrote while the page was being read
+  // again is carried over, and none is written onto a record already gone.
+  const old = replaces ? await coordinate(deps, { env, slug, operation: 'remove', id: replaces.id }) : null;
+  if (old && !old.ok && old.status !== 404) {
+    // The old record stays, so the one just stored goes: a refresh that fails
+    // leaves the link as it was, not there twice.
+    await removeCloudflareStorageRecords({ env, slug, rows: [{ id: stored.id, resource: 'docsContext' }] }).catch(() => {});
+    return json(old.body, old.status);
+  }
+  // A refreshed link keeps a card a person wrote; otherwise the page just read gets a new one.
+  await cardAfterContextAdd({ env, config, slug, id: stored.id, text, carried: old?.body?.card || null, deps });
   return json({
     ok: true,
     source: {
@@ -174,26 +191,26 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
   });
 };
 
-// Context changes to a PDF's readings run in the session coordinator.
+// Context changes to a file's readings run in the session coordinator.
 const coordinate = (deps, args) => (deps?.executeCoordinatedContextSourceOperation || executeCoordinatedContextSourceOperation)(args);
 const readAtOf = (row) => contextTagValue(row.tags, TAGS.readAt);
 
-// Run by the session coordinator once a reading is stored. A PDF removed while
-// its AI read it takes the text too, and a reading newer than this one stays.
+// Run by the session coordinator once a reading is stored. A file removed while
+// the AI read it takes the text too, and a reading newer than this one stays.
 export const finishContextPdfReading = async ({ env, slug, pdfId, readingId, readAt, markWrite }) => {
   const reading = { id: readingId, resource: 'docsContext' };
   const current = await readContextSourceRow({ env, slug, id: pdfId });
   if (!current) {
     await removeCloudflareStorageRecords({ env, slug, rows: [reading], markWrite });
-    return { status: 404, body: { error: 'That PDF was removed while the session’s AI read it.' } };
+    return { status: 404, body: { error: 'That file was removed while the session’s AI read it.' } };
   }
   const earlier = (await readingsOf({ env, slug, row: current })).filter((row) => row.id !== readingId);
   if (earlier.some((row) => readAtOf(row) > readAt || (readAtOf(row) === readAt && row.id > readingId))) {
     await removeCloudflareStorageRecords({ env, slug, rows: [reading], markWrite });
-    return { status: 409, body: { error: 'A newer reading of this PDF finished first.', reason: 'context_pdf_reading_superseded' } };
+    return { status: 409, body: { error: 'A newer reading of this file finished first.', reason: 'context_pdf_reading_superseded' } };
   }
   if (earlier.length) await removeCloudflareStorageRecords({ env, slug, rows: earlier, markWrite });
-  // The PDF row names its reading, so removing the PDF finds it without a list.
+  // The file's row names its reading, so removing the file finds it without a list.
   const row = { ...current, contextReadingId: readingId };
   await getStorageIndexBinding(env).put(
     buildIndexKey({ slug, resource: 'docsContext', id: pdfId }),
@@ -203,14 +220,16 @@ export const finishContextPdfReading = async ({ env, slug, pdfId, readingId, rea
   return { status: 200, body: { ok: true } };
 };
 
-// The session's AI reads the PDF; its text is stored beside it with the same privacy.
-const readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, json, now }) => {
-  const bytes = await readContextSourceBytes({ env, config, slug, metadata: pdf, maxBytes: LIMITS.pdfBytes, principal: admin, deps });
-  if (!bytes) return { response: json({ error: 'That PDF is no longer in the session.' }, 404) };
-  const name = contextTagValue(pdf.tags, TAGS.name) || 'document.pdf';
-  const secrets = (await deps?.getSessionSecrets?.(env, slug)) || {};
-  const read = await readPdfWithSessionAi({
-    config, secrets, bytes, filename: name, deps: { fetch: deps?.fetch, readTimeoutMs: deps?.readTimeoutMs },
+// The session's AI reads the PDF or image; its text is stored beside it with the same privacy.
+const readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, json, now, secrets }) => {
+  const noun = contextFileNoun(pdf.contentType);
+  const bytes = await readContextSourceBytes({
+    env, config, slug, metadata: pdf, maxBytes: contextFileByteLimit(pdf.contentType), principal: admin, deps,
+  });
+  if (!bytes) return { response: json({ error: `That ${noun} is no longer in the session.` }, 404) };
+  const name = contextTagValue(pdf.tags, TAGS.name) || (noun === 'PDF' ? 'document.pdf' : 'image');
+  const read = await readFileWithSessionAi({
+    config, secrets, bytes, filename: name, contentType: pdf.contentType, deps: { fetch: deps?.fetch, readTimeoutMs: deps?.readTimeoutMs },
   });
   if (!read.ok) return { response: json({ error: read.error, reason: read.reason }, read.status) };
   const readAt = now();
@@ -218,7 +237,7 @@ const readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, jso
   const stored = await storeRecord(store, {
     bytes: encoder.encode(text),
     contentType: 'text/plain',
-    // The PDF's own stored rule, so its text is never easier to read than it.
+    // The file's own stored rule, so its text is never easier to read than it.
     accessConditions: pdf.accessConditions || null,
     tags: [
       ...commonTags('file'),
@@ -232,25 +251,34 @@ const readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, jso
     ],
   });
   if (stored.response) return stored;
-  return { id: stored.id, model: read.model, readAt, chars: text.length, truncated: read.truncated || read.text.length > text.length };
+  return { id: stored.id, model: read.model, readAt, text, chars: text.length, truncated: read.truncated || read.text.length > text.length };
 };
 
-// A PDF: one reading at a time, replacing any earlier reading. A second read
-// while one runs is refused rather than paying for the same read twice.
-const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now }) => {
+// A PDF or an image: one reading at a time, replacing any earlier reading. A second read
+// while one runs is refused rather than paying for the same read twice. An adder's reading
+// (not an admin's) is their one, granted by the session coordinator, and `countAi` counts it.
+const readPdf = async ({ body, env, config, slug, admin, isAdmin, deps, store, json, now, countAi }) => {
   const pdf = await readContextSourceRow({ env, slug, id: body.id });
-  if (!pdf || contextRoleOf(pdf.tags) !== CONTEXT_ROLE || pdf.contentType !== CONTEXT_FILE_TYPES.pdf) {
-    return json({ error: 'That PDF is no longer in the session.' }, 404);
+  if (!pdf || contextRoleOf(pdf.tags) !== CONTEXT_ROLE || !contextFileIsReadByAi(pdf.contentType)) {
+    return json({ error: 'That PDF or image is no longer in the session.' }, 404);
   }
-  if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
-  if (Number(pdf.size) > LIMITS.pdfBytes) return json({ error: 'This PDF is too large for the session’s AI to read.' }, 413);
-  const begun = await coordinate(deps, { env, slug, operation: 'begin-read', id: pdf.id });
+  // Refusals that call no provider come before the reading is begun or counted.
+  const secrets = (await deps?.getSessionSecrets?.(env, slug)) || {};
+  const ready = prepareFileRead({ config, secrets, contentType: pdf.contentType });
+  if (!ready.ok) return json({ error: ready.error, reason: ready.reason }, ready.status);
+  if (Number(pdf.size) > contextFileByteLimit(pdf.contentType)) {
+    return json({ error: `This ${contextFileNoun(pdf.contentType)} is too large for the session’s AI to read.` }, 413);
+  }
+  // The coordinator knows of every reading stored, even one the file's row doesn't show yet.
+  const begun = await coordinate(deps, { env, slug, operation: 'begin-read', id: pdf.id, ...(isAdmin ? {} : { once: true }) });
   if (!begun.ok) return json(begun.body, begun.status);
   const end = (reading = {}) => coordinate(deps, { env, slug, operation: 'end-read', id: pdf.id, token: begun.body.token,
     ...(reading.id ? { readingId: reading.id, readAt: reading.readAt } : {}) });
   let reading;
   try {
-    reading = await readAndStorePdf({ pdf, env, config, slug, admin, deps, store, json, now });
+    // An adder's reading is counted only once it has begun; a refused count frees the file.
+    const refused = isAdmin ? null : await countAi();
+    reading = refused ? { response: refused } : await readAndStorePdf({ pdf, env, config, slug, admin, deps, store, json, now, secrets });
   } catch (error) {
     await end();
     throw error;
@@ -259,6 +287,8 @@ const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now 
   if (reading.response) return reading.response;
   if (!ended.ok) return json(ended.body, ended.status);
   const { id, model, readAt, chars, truncated } = reading;
+  // The file's card is made from the text just read, and sits on the file's row.
+  await cardAfterContextAdd({ env, config, slug, id: pdf.id, text: reading.text, deps });
   return json({ ok: true, text: { id, derivedFrom: pdf.id, model, readAt, chars, truncated } });
 };
 
@@ -266,28 +296,69 @@ const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now 
 // AI read from it, readings first so a failure part way never leaves a reading
 // without its PDF.
 export const removeContextSource = async ({ env, slug, id, readingIds, markWrite }) => {
-  const row = await readContextSourceRow({ env, slug, id });
+  // A row that can't be read just now is an error, never "already gone".
+  const row = await readContextSourceRow({ env, slug, id, strict: true });
   if (!row) return { status: 404, body: { error: 'That item is no longer in the session.' } };
   const rows = [...await readingsOf({ env, slug, row, shownIds: readingIds }), row];
   await removeCloudflareStorageRecords({ env, slug, rows, markWrite });
-  return { status: 200, body: { ok: true, removed: rows.map((entry) => entry.id) } };
+  const card = contextCardOf(row);
+  // The card goes with the source; a link's refresh takes it for the new record.
+  return { status: 200, body: { ok: true, removed: rows.map((entry) => entry.id), ...(card ? { card } : {}) } };
 };
 
 const remove = async ({ body, env, slug, deps, json }) => {
   const removed = await coordinate(deps, { env, slug, operation: 'remove', id: trim(body.id), readingIds: body.readingIds });
-  return json(removed.body, removed.status);
+  const { card: _card, ...reply } = removed.body || {};
+  return json(reply, removed.status);
 };
 
-const ACTIONS = Object.freeze({ 'add-link': addLink, 'read-pdf': readPdf, remove });
+// A person writes a source's card, or with `card: null` takes it off.
+const setCard = async ({ body, env, slug, admin, isAdmin, deps, json, now }) => {
+  const content = body.card === null ? null : contextCardContent(body.card);
+  if (body.card !== null && !content) {
+    return json({ error: 'A card needs a summary, tags or names.', reason: 'context_card_invalid' }, 400);
+  }
+  if (content && looksSecret([content.summary, ...content.tags, ...content.names].join(' '))) {
+    return json({ error: 'This card looks like it holds a key, token or password. Remove it: secrets never go in context.' }, 400);
+  }
+  const set = await setContextCard({
+    env, slug, id: trim(body.id), deps, card: content && { ...content, by: isAdmin ? 'admin' : 'adder', at: now() },
+  });
+  return json(set.body, set.status);
+};
+
+// The session's AI writes the card of a source that has none, or only one it wrote before.
+const makeCard = async ({ body, env, config, slug, admin, deps, json }) => {
+  const row = await readContextSourceRow({ env, slug, id: body.id });
+  if (!row || contextRoleOf(row.tags) !== CONTEXT_ROLE) return json({ error: 'That item is no longer in the session.' }, 404);
+  if (!mayHaveContextCard(row)) return json({ error: 'An item stored encrypted has no card.', reason: 'context_card_unsupported' }, 409);
+  const current = contextCardOf(row);
+  if (current && current.by !== 'ai') return json({ ok: true, card: current, kept: true });
+  if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
+  const text = await readContextCardText({ env, config, slug, row, principal: admin, deps });
+  if (!text.trim()) {
+    return json({ error: 'This item has no text to describe. Have the session’s AI read a PDF or image first.', reason: 'context_card_no_text' }, 409);
+  }
+  const made = await makeContextCard({
+    env, config, secrets: (await deps?.getSessionSecrets?.(env, slug)) || {}, deps, text,
+    title: contextTagValue(row.tags, TAGS.name), kind: contextTagValue(row.tags, TAGS.kind),
+  });
+  if (!made.ok) return json({ error: 'The session’s AI could not write this card.', reason: made.reason }, made.reason === 'ai_disabled' ? 403 : 502);
+  const set = await setContextCard({ env, slug, id: row.id, card: made.card, deps });
+  return json(set.body, set.status);
+};
+
+const ACTIONS = Object.freeze({ 'add-link': addLink, 'read-pdf': readPdf, remove, 'set-card': setCard, 'make-card': makeCard });
 
 // POST /storage/context { action, ... }: admins change context sources. Anyone
-// else may remove what they added, and add a link while the session takes
-// additions and hasn't ended, when they may have the Worker fetch pages;
-// refreshing a link and having a PDF read stay with admins, as each makes the
-// Worker work again for an item already there. Files are added through
-// /storage/upload with a context role.
+// else may remove what they added and write its card, and add a link while the session takes
+// additions and hasn't ended, when they may have the Worker fetch pages. Where cards are on,
+// they may also have the session's AI read a PDF or image they added, once, as one of their
+// AI calls for the day. Refreshing a link, reading a file again and having the AI write a
+// card stay with admins, as each makes the Worker work again for an item already there.
+// Files are added through /storage/upload with a context role.
 export const contextSourceRoute = async ({
-  request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, store, authorizeAdd, checkFetchAccess,
+  request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, store, authorizeAdd, checkFetchAccess, checkAiAccess,
 } = {}) => {
   const json = (body, status = 200) => (deps?.json
     ? deps.json(body, status, baseHeaders)
@@ -299,10 +370,22 @@ export const contextSourceRoute = async ({
   let body = null;
   try { body = await request.json(); } catch { body = null; }
   const name = isObj(body) ? trim(body.action) : '';
-  const participantMay = name === 'remove' || (name === 'add-link' && !trim(body.replaces));
+  const participantMay = ['remove', 'set-card'].includes(name) || (name === 'read-pdf' && contextCardsOn(config)) ||
+    (name === 'add-link' && !trim(body.replaces));
   if (!isAdmin && !participantMay) return refused();
   if (!isObj(body)) return json({ error: 'Invalid JSON.' }, 400);
   if (!Object.hasOwn(ACTIONS, name)) return json({ error: 'Unknown context action.' }, 400);
+  if (['set-card', 'make-card'].includes(name) && !contextCardsOn(config)) {
+    return json({ error: 'Context cards are off for this session.', reason: 'context_cards_off' }, 409);
+  }
+  // A card is words the AI may be shown, and so is a reading, so writing one is adding:
+  // not where the session limits context to admins, and not once it has ended.
+  if (!isAdmin && ['set-card', 'read-pdf'].includes(name)) {
+    if (!participantsMayAddContext(config)) return refused();
+    if (resolveSessionLifecycle(config, { now: deps?.now }).ended) {
+      return json({ error: 'This session has ended.', code: 'session_ended' }, 410);
+    }
+  }
   // Checked before the Worker fetches anything; the upload path checks again as it stores.
   if (name === 'add-link') {
     if (!isAdmin && !participantsMayAddContext(config)) {
@@ -327,13 +410,32 @@ export const contextSourceRoute = async ({
       if (!fetchAccess?.ok) return fetchAccess?.response || json({ error: 'Fetch access could not be checked.' }, 403);
     }
   }
-  if (!isAdmin && name === 'remove') {
-    // A row that can't be read proves nothing, so it removes nothing.
+  let countAi = null;
+  if (!isAdmin && participantMay && name !== 'add-link') {
+    // A row that can't be read proves nothing, so it removes nothing, and its card stays as it is.
     const row = await readContextSourceRow({ env, slug, id: body.id });
     if (!row) return json({ error: 'That item is no longer in the session.' }, 404);
     if (trim(row.uploader).toLowerCase() !== admin) return refused();
+    if (name === 'read-pdf') {
+      if (!contextFileIsReadByAi(row.contentType)) return json({ error: 'That PDF or image is no longer in the session.' }, 404);
+      // One reading for its adder. Another would spend the session's AI again on a file it has read.
+      // The coordinator refuses it too, where this row doesn't show its reading yet.
+      if (row.contextReadingId) {
+        return json({ error: 'The session’s AI has read this file. Only session admins can have it read again.', reason: 'context_admin_required' }, 403);
+      }
+      // It spends the session's AI for them, so it takes the AI scope of their sign-in and
+      // counts against their daily limit, as /ai does: counted once the reading has begun.
+      if (authScopes?.ai !== true) {
+        return json({ error: 'This session doesn’t let you use its AI, so only an admin can have this file read.', reason: 'context_read_ai_denied' }, 403);
+      }
+      const aiAccess = await checkAiAccess?.();
+      if (!aiAccess?.ok || typeof aiAccess.count !== 'function') {
+        return aiAccess?.response || json({ error: 'AI access could not be checked.' }, 403);
+      }
+      countAi = aiAccess.count;
+    }
   }
   const action = ACTIONS[name];
   const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
-  return action({ body, env, config, slug, admin, deps, store, json, now });
+  return action({ body, env, config, slug, admin, isAdmin, deps, store, json, now, countAi });
 };

@@ -36,6 +36,7 @@ import {
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
 import { runQueuedAutomaticResultsAnalysisJob, valueLooksEncrypted } from './resultsAnalysisGeneration.js';
 import { publishCloudflareOwnedStorageMetadata, scanLegacyStorageOwnerIds, setCloudflareStorageResourceHidden } from './storageRouteExecution.js';
+import { storeContextCard } from './contextCard.js';
 import { finishContextPdfReading, removeContextSource } from './contextSourceRoute.js';
 import { dispatchResultsBuildStore } from './resultsBuildStore.js';
 import { nextResultsJobAt, readResultsJob, runResultsJobs, startResultsJob } from './resultsJobs.js';
@@ -113,6 +114,9 @@ const FAUCET_WALLET_POLL_MS = 100;
 const CONTEXT_PDF_READING_PREFIX = 'context-pdf-reading:';
 // Longer than a PDF reading's AI deadline, so an abandoned reading frees its PDF.
 const CONTEXT_PDF_READING_LEASE_MS = 5 * 60 * 1000;
+// Kept once a reading of a file is stored, until the file is removed: its adder's one
+// reading is refused here even while the file's KV row doesn't show that reading yet.
+const CONTEXT_PDF_HAS_READING_PREFIX = 'context-pdf-has-reading:';
 const WORKER_GROUP_CAPACITY_META_KEY = 'worker-group-capacity-meta-v3';
 const WORKER_GROUP_CAPACITY_GROUP_PREFIX = 'worker-group-capacity-group-v3:';
 const WORKER_GROUP_CAPACITY_MEMBER_PREFIX = 'worker-group-capacity-member-v3:';
@@ -2771,17 +2775,26 @@ export class SessionWriteCoordinator {
 
   // Context changes to a PDF's readings run one at a time per session, so a
   // reading, a removal and the PDF's pointer to its reading never interleave.
+  // A card is written to its source's row here too, and a refreshed link's old
+  // record is removed here, so a card write never undoes one of them.
   async executeContextSourceOperation(operation, payload) {
     const run = this.contextSourceTail.then(async () => {
       try {
         const slug = normalizeWorkerSessionSlug(payload?.slug);
         const id = toTrimmedString(payload?.id);
         const leaseKey = `${CONTEXT_PDF_READING_PREFIX}${id}`;
+        const readKey = `${CONTEXT_PDF_HAS_READING_PREFIX}${id}`;
         const markWrite = () => bumpStorageBackupRevision(this.state.storage);
         if (operation === 'begin-read') {
           const nowMs = Number(this.now()) || Date.now();
           if ((await this.state.storage.get(leaseKey))?.expiresAtMs > nowMs) {
-            return jsonResponse({ error: 'This PDF is already being read.', reason: 'context_pdf_reading' }, 409);
+            return jsonResponse({ error: 'This file is already being read.', reason: 'context_pdf_reading' }, 409);
+          }
+          // An adder's one reading (`once`) is refused once any reading of the file is stored.
+          if (payload.once === true && await this.state.storage.get(readKey)) {
+            return jsonResponse({
+              error: 'The session’s AI has read this file. Only session admins can have it read again.', reason: 'context_admin_required',
+            }, 403);
           }
           const token = createAttemptId(this.crypto);
           await this.state.storage.put(leaseKey, { token, expiresAtMs: nowMs + CONTEXT_PDF_READING_LEASE_MS });
@@ -2793,11 +2806,18 @@ export class SessionWriteCoordinator {
           await assertNoActiveBackupImport(this);
           const result = await finishContextPdfReading({ env: this.env, slug, pdfId: id, readingId: toTrimmedString(payload.readingId),
             readAt: toTrimmedString(payload.readAt), markWrite });
+          if (result.status === 200) await this.state.storage.put(readKey, true);
           return jsonResponse(result.body, result.status);
         }
         if (operation === 'remove') {
           await assertNoActiveBackupImport(this);
           const result = await removeContextSource({ env: this.env, slug, id, readingIds: payload.readingIds, markWrite });
+          if (result.status === 200) await this.state.storage.delete(readKey);
+          return jsonResponse(result.body, result.status);
+        }
+        if (operation === 'set-card') {
+          await assertNoActiveBackupImport(this);
+          const result = await storeContextCard({ env: this.env, slug, id, card: payload.card, markWrite });
           return jsonResponse(result.body, result.status);
         }
         return jsonResponse({ error: 'Not found.' }, 404);

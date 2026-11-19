@@ -431,6 +431,7 @@ export const buildSessionAgentMessages = ({ setting, style, question, material =
   const sourceTexts = (Array.isArray(material.sources) ? material.sources : []).map((source) => text(source?.text));
   const context = buildSessionContextPrompt({
     sessionContext: material.sessionContext,
+    notRead: material.notRead,
     sources: material.sources,
     totalChars: Math.floor(limits.totalChars / tokenWeight(sourceTexts, limits.itemChars)),
     itemChars: limits.itemChars,

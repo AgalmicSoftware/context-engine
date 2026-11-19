@@ -241,6 +241,25 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.7.0
+
+- Where a session keeps names and the agent's display name is not saved there
+  yet (it joined before the session's Worker was upgraded, or the save on
+  joining failed), its next `answer` saves it, once per session in each run.
+  A save that fails leaves the answers stored; the reply's `name` says why,
+  and `set_profile` tries again. Once a name is saved, answers never save it
+  again, so an admin's clear stands. The `set_profile` step below is no
+  longer needed.
+- New tools: `list_context` lists the files and links in a session's context
+  that the agent may read, each with its card where it has one; `read_context`
+  returns one item's text. Both are plain reads and work against older Workers,
+  which show no cards.
+- `add_context` takes PNG, JPEG and WebP images where the session has context
+  cards on, and there has the session's AI read a PDF or image as it is added
+  (`analyze`), saying in `analysis` whether it was read.
+- `set_profile` and `join_session` state a session's rule for names, and a
+  refused name's reply carries it.
+
 ## Upgrading to 0.6.0
 
 - Where a session keeps names (a Worker advertising `session_names_v1`, Context
@@ -412,13 +431,15 @@ directory when upgrading; identities and saved session access do not change.
 | Tool | What it does |
 | --- | --- |
 | `whoami` | Shows the agent's address, display profile and joined sessions. |
-| `set_profile` | Sets the display name shown in reports and the self-reported model and platform. A model or platform set by the host stays. |
-| `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it (a private session's is joined first), and returns the session context, its instructions for agents, its groups and any invitation to add context. It also returns `youMay`: what the agent may do next if it wants to (set a display name, join an open group, add context). |
+| `set_profile` | Sets the display name shown in reports and the self-reported model and platform. A model or platform set by the host stays. The MCP takes a display name of up to 80 characters of any kind. A session that keeps names takes at most 32: letters, numbers, spaces and `. - _ '` only (a straight `'`, not `’`), and no name that claims a role (such as admin or host) or looks like an address, web address, key or "(agent)". A refused name is not shortened or changed: the result gives the session's refusal and this rule, and the agent chooses another. |
+| `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it (a private session's is joined first), and returns the session context, its instructions for agents, its groups and any invitation to add context. It also returns `youMay`: what the agent may do next if it wants to (set a display name, join an open group, add context). Where the session keeps names, a display name already set is saved there, under the rule given for `set_profile`, and `name` says whether it was. |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, whether the session has a Session Agent and records chats with it, end time and the agent's progress. |
 | `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; only unanswered ones unless `filter` asks for `answered` or `all`. Up to 100 a call; `more` and `next` say how to get the rest. |
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. When some are refused the rest are still stored: `next` says which went through, and a question id that matches nothing gets the nearest listed id when it looks mistyped. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
-| `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set, or `groups` names some of the session's groups: then the members of any one of them see it, and the admins. |
+| `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set, or `groups` names some of the session's groups: then the members of any one of them see it, and the admins. A PDF or image has no text until the session's AI reads it: where the session has context cards on, the tool asks for that once (unless `analyze` is false); with cards off only an admin's agent can, with `analyze: true`. `analysis` says what came of it. |
+| `list_context` | Lists the files and links people added to the session's context that the agent may read, each with its card (a short summary, topic tags and key names) where the session keeps cards. `query` keeps the sources that hold every word given, in their title, link or card; no AI is asked. |
+| `read_context` | Returns one context source's text by its id: a link's page as the Session Worker read it, a text file, or the session's AI's reading of a PDF or image. Up to 20,000 characters a call; `next` is the `offset` for the following part. |
 | `ask_session_agent` | Asks the session's own Session Agent one question, when it has one and its admins let the agent ask. Chats with it can be recorded when the session's recording setting is on (`get_session` shows `sessionAgent.recording`): the question and answer are then stored for the session's organisers unless `store` is false, with the agent's address only if `attribution` is `address`. The reply's `chat` says in a sentence whether this one was stored, to pass on with the answer. |
 | `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
 | `join_group` | Joins a group by id in a hosted session: an open group, or one joined by a one-use code or group password (`invite`: a code, a password or the group's whole invite link; or the one its link carried, held until the MCP restarts; after that, join with the link again). |
@@ -442,7 +463,7 @@ unknown `CE_MCP_*` name.
 | --- | --- | --- |
 | `CE_MCP_STATE_DIR` | `~/.context-engine-mcp` | Holds `agent-key.json` and `state.json`. Absolute path. |
 | `CE_MCP_PRIVATE_KEY` | none | The agent's key (`0x` and 64 hex digits), used instead of `agent-key.json`, for hosts that keep no files between runs. Never written to disk; must match any key file already there. Keep it in the host's secret store. |
-| `CE_MCP_DISPLAY_NAME` | none | Name shown beside answers in reports; `set_profile` overrides it. |
+| `CE_MCP_DISPLAY_NAME` | none | Name shown beside answers in reports, up to 80 characters; `set_profile` overrides it. A session that keeps names applies its own rule (see `set_profile`). |
 | `CE_MCP_MODEL_ID` | none | Model recorded with each answer, marked as set by the host (`modelIdSetBy: "host"`); `set_profile` cannot change it. Without it, a model the agent declares is marked `"agent"`. |
 | `CE_MCP_PLATFORM` | none | Agent platform recorded with each answer, marked the same way (`platformSetBy`); `set_profile` cannot change it. Without it and without one from `set_profile`, the name the MCP client gives when it connects (for example `claude-code`) is used, marked `"agent"`. |
 | `CE_MCP_APP_ORIGIN` | `https://contextengine.sh` | An extra Context Engine web origin the agent may sign in as (for a self-hosted app). |
@@ -509,8 +530,15 @@ unknown `CE_MCP_*` name.
   (`groups`, by the IDs `get_session` lists): belonging to any one of them is
   enough, and admins always see it. A link for groups needs a Worker that
   advertises `context_link_groups_v1`. Files are
-  a PDF up to 20 MB, or
-  Markdown, plain text, CSV or JSON up to 1 MB. Files in the state directory,
+  a PDF up to 20 MB, a PNG, JPEG or WebP image up to 5 MB (only where the
+  session has context cards on; the invitation lists images only then), or
+  Markdown, plain text, CSV or JSON up to 1 MB. A PDF or image gives the
+  session's AI no text until that AI has read it. Where a session has context
+  cards on, whoever adds one may have it read once, as one of their AI uses
+  for the day; `add_context` asks for that unless `analyze` is false, waits up
+  to 40 seconds, and reports in `analysis` whether it was read, is still being
+  read, or could not be. With cards off it asks only when an admin's agent
+  sets `analyze` to true. The reading is context for whoever can see the file. Files in the state directory,
   hidden files and files in hidden folders (such as `~/.config` or `~/.aws`)
   are never added. Text that looks like a key, token or password is refused,
   credentials in JSON included; a PDF's text isn't checked, so check a PDF

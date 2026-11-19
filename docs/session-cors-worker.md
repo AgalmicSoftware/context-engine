@@ -860,17 +860,31 @@ Authenticated clients can use the worker as the session storage boundary:
   groups as a file's lock does, not with `adminsOnly` (`400 context_policy_unsupported`, before any fetch);
   Workers that take it advertise `context_link_groups_v1`, and the reply's `source` carries `adminsOnly` and
   `lockedGroupIds`;
-  `{ action: "read-pdf", id }` sends a context PDF to the session's own Claude or OpenAI model and stores the
+  `{ action: "read-pdf", id }` sends a context PDF or image to the session's own Claude or OpenAI model and stores the
   returned text beside it with the same privacy; `{ action: "remove", id }` deletes a context source and that
-  text. A PDF has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the
-  session coordinator applies finished readings and removals one at a time, so a removed PDF stays removed and
+  text. Where `contextCardsEnabled` is `true`, whoever added a PDF or image may send `read-pdf` for it once, while it has
+  no reading, `contextAdditionPolicy` isn't `admin_only` and the session hasn't ended: it needs the token's `ai`
+  scope (`403 context_read_ai_denied`) and counts as one AI call against `limits.aiPerWalletPerDay`, counted only
+  once the session coordinator has begun the reading (`429` over the limit, which frees the file again); a refusal
+  before that (`ai_disabled`, `context_pdf_provider_unsupported`, `context_pdf_key_missing`, `413`, `409`) costs
+  nothing. A second reading, which the coordinator refuses once any reading of the file is stored, or anyone else's
+  file, is `403 context_admin_required`. A file has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the
+  session coordinator applies finished readings and removals one at a time, so a removed file stays removed and
   a reading never replaces a newer one. Uploads with a context role on `/storage/upload` must come from someone
-  signed in (an admin, or anyone while `contextAdditionPolicy` isn't `admin_only`), be a PDF (20 MB) or text file
-  (1 MB), carry no access rule other than admins-only or a lock to at most 20 of the session's groups, whose
+  signed in (an admin, or anyone while `contextAdditionPolicy` isn't `admin_only`), be a PDF (20 MB), a PNG, JPEG or
+  WebP image (5 MB, only where `contextCardsEnabled` is `true`; else `415 context_images_off`) or a text file (1 MB), carry no access rule other than admins-only or a lock to at most 20 of the session's groups, whose
   members may each read it, and be readable by the Worker. The session
   coordinator publishes each context item only while its uploader may still add it, so a link, PDF reading or upload
   that finishes after that admin was replaced, or after participants were limited, returns `409` and is not listed; a content-only settings edit
-  meanwhile does not stop it. See [Session context](session-context-sources.md).
+  meanwhile does not stop it. `{ action: "set-card", id, card: { summary, tags, names } | null }` writes or
+  removes a source's card (admins for any source; anyone else for one they added, while `contextAdditionPolicy`
+  isn't `admin_only` and the session hasn't ended; `400 context_card_invalid` for
+  an empty card, `409 context_card_unsupported` for an item stored encrypted), and `{ action: "make-card", id }`
+  has the session's AI write it (admins only; `409 context_card_no_text` for a PDF or image not yet read, `502` when the
+  AI gives no usable card). Both are `409 context_cards_off` unless the session's `contextCardsEnabled` is `true`;
+  while it is not, no card is made on an add, and `/storage/list` returns none. Workers that keep cards advertise
+  `context_cards_v1`. See
+  [Session context](session-context-sources.md).
 - `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` needs a session configured for Cloudflare storage: an unencrypted request for it on a session with no backend or plain `arweave` gets `400`, while a `lit-arweave` session or an encrypted payload uses Arweave instead. It writes blobs to R2 and authorization metadata/index rows to KV when R2 is available. An R2 deployment's index KV must have both `get` and `put`; otherwise upload returns `501` before any R2 write. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
   - Worker-canonical participant submissions preserve the verified session
     config through this call, so response uploads target the session's own
@@ -2478,6 +2492,11 @@ Runtime:
   - The Cloudflare API token is never a session secret. A direct `/new` token is
     consumed only by the deploy helper and is not written to either KV record.
 
+- `session:{slug}:analysis-card-picture:v1:figure:{figure}` JSON for one
+  drawn card picture (TTL 30 days) or a remembered refusal (one day),
+  `…:v1:looks` for the recent art directions and `…:v1:session-limit` while the
+  session's daily number is used up (one hour). All can be deleted; the next
+  request asks again.
 - `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
 - route and auth-nonce counters are authoritative only in `CE_SESSION_COORDINATOR`; no KV counter fallback is accepted
 
@@ -2823,9 +2842,9 @@ Never return secrets in responses.
 - Content-only edits keep web and agent sessions signed in: `sessionName`,
   `sessionInfo`, `sessionContext`, `questionsGenPrompt`, `agentInstructions`,
   `appearance`, `sessionHeaderImg`, `contextAdditionPolicy`,
-  `resultsAdminAddresses`, every interview setting (`interviewModeEnabled` and
+  `resultsAdminAddresses`, `analysisCardEnabled`, every interview setting (`interviewModeEnabled` and
   all of `interviewMode`, which each interview request reads afresh),
-  `sessionAgent`, `groupMemberCeiling`, `feedbackEnabled` and `namesEnabled` (each read afresh
+  `sessionAgent`, `groupMemberCeiling`, `feedbackEnabled`, `namesEnabled` and `contextCardsEnabled` (each read afresh
   where it applies), and the curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
@@ -3195,6 +3214,108 @@ Signed login/bootstrap requests:
   - Route scope disables fail before the request-`apiKey` bypass.
   - Provider inference:
     omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI. When both provider and model are omitted on a session-funded request, the Worker selects the saved fast model (or thinking model when `modelType: thinking`), including its provider.
+- The personal analysis card's routes below answer only in a session that has
+  the card on (`analysisCardEnabled: true`; absent or false means off). A
+  session made on `/new` starts with it on, because the box there starts
+  ticked; one that never saved the setting, as every session from before the
+  card, has it off until an admin turns it on in Settings. Workers that have
+  the routes advertise `analysis_card_v1`, and the site makes and shows no card
+  on a Worker that does not. Off, each answers 403 `analysis_card_off` before
+  it counts, reads or stores anything, and pictures and cards already stored
+  stay where they are, unread.
+- `POST /analysis-card/picture` returns the picture on a personal analysis
+  card: an illustration of the historical figure the analysis matched, in a
+  style of the figure's own time. It takes `{ "figure": "Name (years)" }` under
+  the `/ai` scope check and nothing else: no answer, name or address reaches
+  it. A name that is not at most six words of letters followed by years in
+  brackets is refused with 400 `invalid_figure`. Two requests go to OpenAI with
+  the session's own key. The first sees only the figure's name and returns an
+  art direction; it answers `died: 0` for anyone living, fictional or unknown,
+  and the route then returns 422 `figure_not_recognised` without drawing, as it
+  does when the name the model returns is not of the person asked for (the two
+  share no word of three letters or more, or, for a name of shorter words, are
+  not the same name). The second draws from
+  that art direction alone (`shared/analysisCardPicture.mjs` holds both
+  prompts) with the image model Session Wrapped uses, 1024 by 1536, and never
+  asks for words in the picture. If OpenAI's moderation refuses the portrait
+  the route tries once more with a still life of the figure's objects
+  (`portrait: false`), then returns 422 `picture_refused`. The reply is
+  `{ figure, name, portrait, look: { era, ground, accentHex }, image: { mime,
+  base64 }, cached }`.
+  - Each figure is drawn once per session and kept for 30 days in
+    `session:{slug}:analysis-card-picture:v1:figure:{figure}`, where `{figure}`
+    is the request's own text in lower case with plain hyphens; a kept picture
+    is returned without calling OpenAI or counting a use. The years are part
+    of the key, so two people who share a name are kept apart, and nothing is
+    folded away, so a string that only looks like a figure never shares its
+    record. The
+    last eight art directions are kept beside it so a new figure is told which
+    looks are taken. A backup does not carry these records.
+  - A new picture counts as one of the person's AI calls a day, and a session
+    draws at most 60 new pictures a day (429 `picture_session_limit`). The
+    first request is bounded per person by the same daily number, so
+    unrecognised names cannot spend the session's key without limit.
+  - A figure the model does not know, or whose picture was refused, is
+    remembered for a day, and a session that reached its daily number for an
+    hour: until then the same answer is returned without another request or
+    another of the viewer's AI calls. Kept pictures are still returned, a
+    refusal is never written over a picture, and an answer that named somebody
+    else is not remembered.
+  - A session without an OpenAI key answers 409 `picture_needs_openai_key`,
+    whatever provider its text model uses, and an ended session answers 410.
+    The page then shows the card without a picture.
+- `POST /analysis-card/publish` and `POST /analysis-card/published` keep one
+  personal analysis card per person, shown on their page to every visitor
+  without pressing Analyze. Both take the picture route's rule (the `ai` scope,
+  rechecked against the session's current rules, in a session that has not
+  ended: 403 or 410 otherwise), call no model and count no AI call.
+  A card is made only by its own person: the page makes one only for the
+  signed-in person's own address, and on anyone else's page shows the card
+  that person saved, or none. (The Worker cannot tell the card's words from
+  any other `/ai` call, and its picture names a historical figure, not a
+  person, so this part is the page's rule; saving is the Worker's.)
+  A card is made from its owner's answers and quotes up to three of them, so
+  it goes only where those answers go. Where the session keeps each answer to
+  its author and the admins (results shown as totals only, or to admins only),
+  `publish` refuses a card with 403 `analysis_card_answers_private`, and the
+  page neither saves one nor offers to. A card saved before the session's
+  rules were tightened is deleted by the first `publish` or `published`
+  request that meets it while the card is on and the session runs, so it
+  does not come back if they are loosened again; one that no request met in
+  that time is still stored. A withdrawal's marker holds none of the card's
+  words and stays. Elsewhere
+  `published` gives a saved card only to its owner and to a reader who may
+  read that person's answers, as a read of one would decide; to anyone else
+  it answers `{ published: null }`.
+  - `publish` takes `{ "published": true, "card": {...} }` to save the
+    caller's card, or `{ "published": false }` to withdraw it. The card is
+    always filed under the signed-in address, and a request that names
+    another `account` is refused with 403 `analysis_card_own_only`, so
+    nobody can save a card onto someone else's page or take one down. It holds the card's words
+    only (`shared/analysisCardSaved.mjs`: title, match note, figure, guessed
+    works and up to three of the person's answers that are not locked, capped, at most
+    8,000 bytes); anything else is dropped, and a card without a title or a
+    figure in "Name (years)" form is 400 `invalid_card`. A person may save 20
+    times a day (429 past that).
+  - Withdrawing replaces the card with `{ published: false, withdrawnAt }`, so
+    none of its words stay stored and the page knows not to save a new one on
+    its own. It is never counted, so the day's saves never keep anyone from
+    taking their card down, and it writes nothing when the card is already
+    down. Ticking the box again saves the card again.
+  - `published` takes `{ "account": "0x..." }` and answers `{ published: true,
+    card, savedAt }`, `{ published: false }` (withdrawn) or `{ published: null
+    }` (nothing saved). Reading is not counted: checking a count costs as much
+    as the read.
+  - Stored in `session:{slug}:analysis-card-saved:v1:{address}`, each record
+    kept a year from its last save. A backup does not carry these records, and
+    a restore does not bring them back. Signed-out visitors see no card. An
+    older bundle put back leaves the records unused until they expire; the
+    page then shows no saved card.
+  - Known limits. A saved card keeps the answers it quotes even after the
+    question is hidden, the answer is made private or the person leaves the
+    session; withdrawing removes them. A visitor's view draws the card's
+    portrait again once the stored one has expired (after 30 days), counted
+    to the visitor's AI calls and the session's daily pictures.
 - `POST /session-agent/ask` answers a question to the Session Agent
   through the session's own AI, under the `/ai` scope check and rate limit.
   `POST /session-agent/status` says how the signed-in person would be answered,

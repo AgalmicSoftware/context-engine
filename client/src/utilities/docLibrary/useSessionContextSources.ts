@@ -1,7 +1,7 @@
 /** @file useSessionContextSources.ts: the context sources a reader may see, and their text for the AI. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { participantsMayAddContext } from '@ce-shared/sessionContextSources.mjs';
+import { contextCardsOn, participantsMayAddContext } from '@ce-shared/sessionContextSources.mjs';
 import { buildSessionContextPrompt } from '@ce-shared/sessionContextText.mjs';
 import { getUsableSessionWorkerUrl } from '../session/sessionWorkerAvailability';
 import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
@@ -14,6 +14,7 @@ import {
   loadContextSourcesForAi,
   workerAcceptsParticipantContext,
   workerAcceptsParticipantLinks,
+  workerSupportsContextCards,
   type ContextSource,
 } from './contextSources';
 
@@ -132,6 +133,22 @@ export function useSessionContextSources({
   }, [active, isAdmin, account, sessionSlug, revision]);
   // Checked only where adding is on offer. Only someone signed in can add; anyone else is asked to log in.
   const [workerAccepts, setWorkerAccepts] = useState({ files: false, links: false });
+  // Cards are written only by someone signed in, on a Worker that keeps them,
+  // and only from a list that offers changes: the AI's context asks nothing.
+  const [workerKeepsCards, setWorkerKeepsCards] = useState(false);
+  useEffect(() => {
+    if (!active || !offersAdding || !account) {
+      setWorkerKeepsCards(false);
+      return undefined;
+    }
+    let current = true;
+    void workerSupportsContextCards({ sessionSlug, sessionConfig: configRef.current, context: { account } }).then(
+      (cards) => current && setWorkerKeepsCards(cards),
+    );
+    return () => {
+      current = false;
+    };
+  }, [active, offersAdding, sessionSlug, account]);
   const offered = active && offersAdding && participantsMayAddContext(sessionConfig) && !sessionHasEnded(sessionConfig);
   const mayAdd = offered && !!account;
   useEffect(() => {
@@ -162,6 +179,10 @@ export function useSessionContextSources({
     participantsCanAddLinks: mayAdd && workerAccepts.files && workerAccepts.links,
     // Not offered while the list, and any sign-in it asked for, is still under way.
     groupFilesHidden: groupFilesHidden && !loading,
+    // Whether this reader may write cards here: where the session has cards on, an admin any
+    // source's, anyone else their own sources', and only while they could still add context,
+    // as the Worker rules.
+    cardsSupported: workerKeepsCards && contextCardsOn(sessionConfig) && (isAdmin || mayAdd),
     reload,
   };
 }

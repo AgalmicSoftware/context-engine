@@ -252,6 +252,7 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   // drafts should start with session-group auto-feature enabled.
   delete draft.autoFeatureSBTsWithFeaturedSbtTags;
   draft.autoFeatureSBTsBySessionSlug = true;
+  draft.contextCardsEnabled = false;
   draft.interviewModeEnabled = true;
   draft.interviewMode = {
     ...normalizeInterviewSettings(draft.interviewMode),
@@ -260,6 +261,8 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
     realtimeModel: DEFAULT_REALTIME_INTERVIEW_MODEL,
   };
   draft.resultsAnalysis = normalizeResultsAnalysisSettings();
+  // The personal analysis card is on unless turned off.
+  draft.analysisCardEnabled = true;
   draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   draft.litCredentials = {};
   draft.perMemberSpendLimits = draft.perMemberSpendLimits || { ai: '', arweave: '', txGas: '' };

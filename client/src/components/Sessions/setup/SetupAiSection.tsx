@@ -31,6 +31,25 @@ export const SessionAgentModelChoice = ({ draft, onChange }: Pick<SetupSectionPr
   />
 );
 
+// Whether each person's AI analysis comes with the two-page picture card, in
+// setup and in settings. In setup the box starts ticked (a draft that says
+// nothing means on). In settings the draft always holds true or false, false
+// for a session that never saved the switch.
+export const AnalysisCardChoice = ({
+  id,
+  draft,
+  onChange,
+}: Pick<SetupSectionProps, 'draft' | 'onChange'> & { id: string }) => (
+  <SetupCheck
+    id={id}
+    label="Analysis card"
+    testId={id}
+    help="Adds a two-page picture card to each person’s AI analysis: a title, the historical figure they are matched with and a portrait of that figure, and three of their answers, to download as a picture, GIF or video. People can show their own card on their page to everyone signed in, and take it off. Each card is one more AI request for that person, and each new portrait is drawn with the session’s OpenAI key, at most 60 a day. Turned off, no card is made or shown, and saved cards are hidden until it is turned back on."
+    checked={draft.analysisCardEnabled !== false}
+    onChange={(on) => onChange(['analysisCardEnabled'], on)}
+  />
+);
+
 const providerLabel = (value: string) => AI_PROVIDER_OPTIONS.find((option) => option.value === value)?.label || value;
 
 const readModels = (draft: SetupSectionProps['draft']) => {
@@ -58,11 +77,21 @@ type AiProps = SetupSectionProps & {
   keys?: React.ReactNode;
   /** Who may ask the Session Agent, for a session on a Session Worker. */
   sessionAgent?: React.ReactNode;
+  /** A session on a Session Worker, which keeps the analysis card's setting. */
+  workerHosted?: boolean;
 };
 
 const REASONING_EFFORTS = ['low', 'medium', 'high'];
 
-export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null, sessionAgent = null }: AiProps) => {
+export const SetupAiSection = ({
+  draft,
+  onChange,
+  open,
+  onToggle,
+  keys = null,
+  sessionAgent = null,
+  workerHosted = false,
+}: AiProps) => {
   const { provider, fast, thinking } = readModels(draft);
   const ai = asRecord(draft.ai);
   const setProvider = (next: string) => {
@@ -100,7 +129,11 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null, s
     <SetupSection
       sectionKey="ai"
       title="AI"
-      summary={[summarizeAi(draft), sessionAgent && draft.sessionAgent ? 'Session Agent on' : '']
+      summary={[
+        summarizeAi(draft),
+        sessionAgent && draft.sessionAgent ? 'Session Agent on' : '',
+        workerHosted && draft.analysisCardEnabled === false ? 'Analysis card off' : '',
+      ]
         .filter(Boolean)
         .join(' · ')}
       open={open}
@@ -174,6 +207,7 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null, s
           onChange={(event) => onChange(['defaultTags'], event.target.value)}
         />
       </SetupField>
+      {workerHosted ? <AnalysisCardChoice id="ce-setup-analysis-card" draft={draft} onChange={onChange} /> : null}
       {sessionAgent}
       {/* A Worker deployed from this release has the AI binding the choice needs. */}
       {sessionAgent && draft.sessionAgent ? <SessionAgentModelChoice draft={draft} onChange={onChange} /> : null}

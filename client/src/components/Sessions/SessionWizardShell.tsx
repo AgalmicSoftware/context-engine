@@ -155,7 +155,7 @@ const SessionWizardShell = ({
           onRegistryChainChange={onRegistryChainIdChange}
           deployment={<WorkerPanel {...workerPanelProps} />}
         />
-        <SetupAiSection {...section('ai')} keys={aiKeys} sessionAgent={sessionAgent} />
+        <SetupAiSection {...section('ai')} keys={aiKeys} sessionAgent={sessionAgent} workerHosted={isWorkerCanonical} />
         <SetupCreatePanel {...createPanelProps} />
         <SessionWizardModals {...modalsProps} />
       </div>

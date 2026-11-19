@@ -8,11 +8,16 @@ import {
   CONTEXT_SOURCE_LIMITS,
   CONTEXT_TAGS,
   CONTEXT_TEXT_ROLE,
+  contextCardsOn,
   contextFileByteLimit,
+  contextFileIsReadByAi,
+  contextFileNoun,
   contextRoleOf,
   contextTagValue,
+  isContextImage,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
+import { normalizeContextCard, type ContextCard, type ContextCardContent } from '@ce-shared/contextCards.mjs';
 import type { SessionContextPromptSource } from '@ce-shared/sessionContextText.mjs';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy';
 import { fetchWorkerWithAuth, hasCachedWorkerSessionToken } from '../worker/workerAuth.js';
@@ -50,6 +55,10 @@ export type ContextSource = {
   fetchedAt: string;
   /** A PDF's text as the session's AI read it. */
   reading: { id: string; model: string; at: string } | null;
+  /** What it is about, as the session's AI or a person wrote it; absent when it has no card. */
+  card?: ContextCard;
+  /** True when the Worker stores it encrypted: such an item takes no card. */
+  encrypted?: boolean;
 };
 
 export type ContextSourceOptions = {
@@ -95,6 +104,10 @@ export const workerSupportsContextSources = (options: ContextSourceOptions): Pro
 export const workerAcceptsParticipantContext = (options: ContextSourceOptions): Promise<boolean> =>
   workerHasFeature(options, 'participant_context_v1');
 
+/** True when this session's Worker keeps a card for each context source. */
+export const workerSupportsContextCards = (options: ContextSourceOptions): Promise<boolean> =>
+  workerHasFeature(options, 'context_cards_v1');
+
 /** True when this session's Worker lets participants add links too (Session Workers from 0.9.2). */
 export const workerAcceptsParticipantLinks = (options: ContextSourceOptions): Promise<boolean> =>
   workerHasFeature(options, 'participant_context_links_v1');
@@ -109,6 +122,8 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
   const role = contextRoleOf(tags);
   if (!role) return null;
   const addedByAgent = contextTagValue(tags, CONTEXT_TAGS.adderKind) === CONTEXT_AGENT_ADDER;
+  // Cut to the card's limits again here: a list is only as careful as its Worker.
+  const card = role === CONTEXT_ROLE ? normalizeContextCard(metadata.card) : null;
   return {
     id,
     role,
@@ -133,6 +148,8 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
       role === CONTEXT_TEXT_ROLE
         ? { id, model: contextTagValue(tags, CONTEXT_TAGS.readModel), at: contextTagValue(tags, CONTEXT_TAGS.readAt) }
         : null,
+    ...(card ? { card } : {}),
+    ...(metadata.encrypted === true ? { encrypted: true } : {}),
   };
 };
 
@@ -198,9 +215,9 @@ export const readContextSourceBlob = async (
   return !source.mime || blob.type === source.mime ? blob : new Blob([blob], { type: source.mime });
 };
 
-/** A source's text for an AI: a link's page snapshot, a text file, or a PDF's AI reading ('' when unread). */
+/** A source's text for an AI: a link's page snapshot, a text file, or the AI's reading of a PDF or image ('' when unread). */
 export const readContextSourceText = async (source: ContextSource, options: ContextSourceOptions): Promise<string> => {
-  if (source.mime === CONTEXT_FILE_TYPES.pdf) return source.reading ? readText(source.reading.id, options) : '';
+  if (contextFileIsReadByAi(source.mime)) return source.reading ? readText(source.reading.id, options) : '';
   const text = await readText(source.id, options);
   if (source.kind !== 'link') return text;
   try {
@@ -226,7 +243,7 @@ export const loadContextSourcesForAi = async (
               kind: source.kind,
               url: source.url,
               text,
-              readByAi: source.mime === CONTEXT_FILE_TYPES.pdf,
+              readByAi: isContextImage(source.mime) ? ('image' as const) : source.mime === CONTEXT_FILE_TYPES.pdf,
             }
           : null;
       } catch {
@@ -301,6 +318,30 @@ export const addContextLink = async (
 export const readContextPdf = async (id: string, options: ContextSourceOptions): Promise<UnknownRecord> =>
   asRecord((await postContextAction({ action: 'read-pdf', id }, options)).text);
 
+/** Writes a source's card as a person, or with null takes it off. Admins write any; others their own source's. */
+export const setContextCard = async (
+  id: string,
+  card: ContextCardContent | null,
+  options: ContextSourceOptions,
+): Promise<void> => {
+  await postContextAction({ action: 'set-card', id, card }, options);
+};
+
+/** Asks the session's AI to write a source's card. Admins only: it is a call on the session's key. */
+export const makeContextCard = async (id: string, options: ContextSourceOptions): Promise<void> => {
+  await postContextAction({ action: 'make-card', id }, options);
+};
+
+/** True when a source may carry a card: not one the Worker stores encrypted. */
+export const contextSourceTakesCard = (source: Pick<ContextSource, 'encrypted'>): boolean => source.encrypted !== true;
+
+/** The sources the session's AI could write a card for: without one, able to carry one, and with text to describe. */
+export const contextSourcesWithoutCards = (sources: ContextSource[]): ContextSource[] =>
+  sources.filter(
+    (source) =>
+      !source.card && contextSourceTakesCard(source) && (!contextFileIsReadByAi(source.mime) || !!source.reading),
+  );
+
 /** Removes a source and the AI's reading of it (named too, as a list can lag a recent reading). */
 export const removeContextSource = async (
   source: Pick<ContextSource, 'id' | 'reading'>,
@@ -312,13 +353,24 @@ export const removeContextSource = async (
   );
 };
 
-/** A file the context accepts, or the reason it does not. */
-export const checkContextFile = (file: { name?: string; type?: string; size?: number }): string => {
+/**
+ * A file the context accepts, or the reason it does not. `images` says whether
+ * the session takes images: only with Context cards on, as its Worker checks too.
+ */
+export const checkContextFile = (
+  file: { name?: string; type?: string; size?: number },
+  { images }: { images: boolean },
+): string => {
   const type = resolveContextFileType({ name: file.name, type: file.type });
-  if (!type) return 'Add a PDF, Markdown, plain text, CSV or JSON file.';
+  if (!type) {
+    return images
+      ? 'Add a PDF, a PNG, JPEG or WebP image, or a Markdown, plain text, CSV or JSON file.'
+      : 'Add a PDF, or a Markdown, plain text, CSV or JSON file.';
+  }
+  if (isContextImage(type) && !images) return 'A session takes images only once Context cards are on in its settings.';
   const limit = contextFileByteLimit(type);
   return (file.size || 0) > limit
-    ? `${file.name || 'This file'} is larger than ${limit / (1024 * 1024)} MB, the most for a ${type === CONTEXT_FILE_TYPES.pdf ? 'PDF' : 'text file'}.`
+    ? `${file.name || 'This file'} is larger than ${limit / (1024 * 1024)} MB, the most for ${isContextImage(type) ? 'an' : 'a'} ${contextFileNoun(type)}.`
     : '';
 };
 
@@ -330,7 +382,7 @@ export const uploadContextFile = async (
   { file, adminsOnly = false, groupIds = [] }: { file: File } & ContextFileAccess,
   options: ContextSourceOptions,
 ): Promise<string> => {
-  const problem = checkContextFile(file);
+  const problem = checkContextFile(file, { images: contextCardsOn(options.sessionConfig) });
   if (problem) throw new Error(problem);
   const contentType = resolveContextFileType({ name: file.name, type: file.type });
   const result = await uploadDataToSessionStorage(new File([file], file.name, { type: contentType }), undefined, {
@@ -360,10 +412,19 @@ const KIND_LABELS: Record<string, string> = {
   [CONTEXT_FILE_TYPES.txt]: 'Text',
   [CONTEXT_FILE_TYPES.csv]: 'CSV',
   [CONTEXT_FILE_TYPES.json]: 'JSON',
+  [CONTEXT_FILE_TYPES.png]: 'Image',
+  [CONTEXT_FILE_TYPES.jpeg]: 'Image',
+  [CONTEXT_FILE_TYPES.webp]: 'Image',
 };
-const FILE_EXTENSION = /\.(?:pdf|md|markdown|txt|csv|json)$/i;
+const FILE_EXTENSION = /\.(?:pdf|md|markdown|txt|csv|json|png|jpe?g|webp)$/i;
 
-/** What kind of source it is, in a word: Link, PDF, Markdown, Text, CSV, JSON or File. */
+/** What a file picker for context offers: every accepted extension and type, images only where the session takes them. */
+export const contextFileAccept = ({ images }: { images: boolean }): string => {
+  const types = Object.entries(CONTEXT_FILE_TYPES).filter(([, type]) => images || !isContextImage(type));
+  return [...types.map(([extension]) => `.${extension}`), ...new Set(types.map(([, type]) => type))].join(',');
+};
+
+/** What kind of source it is, in a word: Link, PDF, Image, Markdown, Text, CSV, JSON or File. */
 export const contextSourceKindLabel = (source: Pick<ContextSource, 'kind' | 'mime' | 'title'>): string =>
   source.kind === 'link'
     ? 'Link'

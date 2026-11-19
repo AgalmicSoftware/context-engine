@@ -18,6 +18,7 @@ export const CONTEXT_TAGS: Readonly<{
 
 export const CONTEXT_SOURCE_LIMITS: Readonly<{
   pdfBytes: number;
+  imageBytes: number;
   textFileBytes: number;
   pageBytes: number;
   snapshotChars: number;
@@ -36,7 +37,17 @@ export const CONTEXT_FILE_TYPES: Readonly<{
   txt: 'text/plain';
   csv: 'text/csv';
   json: 'application/json';
+  png: 'image/png';
+  jpg: 'image/jpeg';
+  jpeg: 'image/jpeg';
+  webp: 'image/webp';
 }>;
+/** True for an image a context source may be. */
+export function isContextImage(contentType: unknown): boolean;
+/** True for a file whose text is the session's AI's reading of it: a PDF or an image. */
+export function contextFileIsReadByAi(contentType: unknown): boolean;
+/** What a file of this type is called in a message. */
+export function contextFileNoun(contentType: unknown): 'PDF' | 'image' | 'text file';
 
 /** The worker_role condition that makes an item admins only. */
 export const ADMINS_ONLY_ACCESS: Readonly<{
@@ -48,6 +59,7 @@ export function contextTagValue(tags: unknown, name: string): string;
 export function contextRoleOf(tags: unknown): '' | 'context' | 'context-text';
 export function isAdminsOnlyAccess(accessConditions: unknown): boolean;
 export function participantsMayAddContext(config: unknown): boolean;
+export function contextCardsOn(config: unknown): boolean;
 /** The one adder mark an item may carry: an agent's. */
 export const CONTEXT_AGENT_ADDER: 'agent';
 /** An agent's name as an item carries it: one line of plain text, cut to fit. */

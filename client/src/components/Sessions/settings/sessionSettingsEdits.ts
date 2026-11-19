@@ -131,6 +131,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     groupCreationPolicy: source.groupCreationPolicy,
     contextAdditionPolicy: source.contextAdditionPolicy,
     interviewModeEnabled: source.interviewModeEnabled !== false,
+    analysisCardEnabled: source.analysisCardEnabled === true,
     // Every setting, as an edit writes them, so a setting left alone takes a fresh copy's value.
     interviewMode: { ...normalizeInterviewSettings(source.interviewMode), ...clone(asRecord(source.interviewMode)) },
     resultsAnalysis: normalizeResultsAnalysisSettings(source.resultsAnalysis),
@@ -138,6 +139,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     sessionModeProfile: clone(source.sessionModeProfile ?? null),
     pileAutoAdvanceEnabled: resolvePileAutoAdvanceEnabled(source),
     feedbackEnabled: source.feedbackEnabled !== false,
+    contextCardsEnabled: source.contextCardsEnabled === true,
     defaultFilterState: formatFilterState(source.defaultFilterState),
     defaultSbtTags: text(source.defaultSbtTags),
     autoFeatureSBTsBySessionSlug: resolveSessionWizardAutoFeatureBySessionSlug(source) !== false,
@@ -306,6 +308,11 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
     const limit = Number(aiDaily) || null;
     if (limit !== (Number(formatAiDailyLimit(before.limits)) || null)) values.limits = { aiPerWalletPerDay: limit };
   }
+  // The analysis card is off unless turned on. Only a changed choice is stored, so a Worker too old to know the
+  // setting, whose page never shows it, is sent nothing.
+  if (!onChain && (draft.analysisCardEnabled === true) !== (before.analysisCardEnabled === true)) {
+    values.analysisCardEnabled = draft.analysisCardEnabled === true;
+  }
   // Pile navigation has a deployment default; only a changed choice is stored.
   if (draft.pileAutoAdvanceEnabled !== resolvePileAutoAdvanceEnabled(before)) {
     values.pileAutoAdvanceEnabled = draft.pileAutoAdvanceEnabled === true;
@@ -314,6 +321,10 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
   // know the setting, whose page never shows it, is sent nothing.
   if (!onChain && (draft.feedbackEnabled !== false) !== (before.feedbackEnabled !== false)) {
     values.feedbackEnabled = draft.feedbackEnabled !== false;
+  }
+  // Context cards are off unless turned on. Only a changed choice is stored, for the same reason.
+  if (!onChain && (draft.contextCardsEnabled === true) !== (before.contextCardsEnabled === true)) {
+    values.contextCardsEnabled = draft.contextCardsEnabled === true;
   }
   // A cleared end time is sent as '' so the stored one goes; an unchanged one is left alone.
   if (trimmed(draft.sessionEndsAt) !== trimmed(before.sessionEndsAt)) {
@@ -359,7 +370,9 @@ const unchanged = (key: string, before: unknown, after: unknown) => {
   if (key === 'resultsAdminAddresses') return same(storedResultsAdmins(before), after);
   // Voice interviews are on unless turned off.
   if (key === 'interviewModeEnabled') return (before !== false) === after;
+  if (key === 'analysisCardEnabled') return (before === true) === after;
   if (key === 'feedbackEnabled') return (before !== false) === after;
+  if (key === 'contextCardsEnabled') return (before === true) === after;
   return same(before, after) || (isBlank(before) && isBlank(after));
 };
 
@@ -490,11 +503,13 @@ const LABELS: Record<string, string> = {
   resultsAnalysis: 'Results analysis',
   resultsAdminAddresses: 'Results admins',
   sessionAgent: 'Session Agent',
+  analysisCardEnabled: 'Analysis card',
   ai: 'AI models and effort',
   sessionModeProfile: 'Access, results and hosting',
   storageProfile: 'Storage access',
   pileAutoAdvanceEnabled: 'Next question after an answer',
   feedbackEnabled: 'Feedback box',
+  contextCardsEnabled: 'Context cards',
   defaultFilterState: 'Default filters',
   defaultSbtTags: 'SBT tags',
   autoFeatureSBTsBySessionSlug: 'Feature this session’s SBTs',

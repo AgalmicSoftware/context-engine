@@ -69,7 +69,13 @@ export const TemplateChanges = ({ changes }: { changes: SessionTemplateChange[] 
 type SessionTemplateActionsProps = {
   /** The current draft as a template (validated). */
   buildTemplate: () => SessionTemplateResult;
-  onImport: (template: SessionTemplate) => void;
+  /** `named` lists the fields the imported JSON itself gave; every other field of `template` is a default. */
+  onImport: (template: SessionTemplate, named: string[]) => void;
+  /**
+   * Fields a template changes only when it names them. For a session that already exists, a template made before
+   * such a field existed says nothing about it, so the session's own setting stays and is not listed as a change.
+   */
+  keptUnlessNamed?: readonly string[];
   /** The draft came from a share link: sharing sends it back with these changes. */
   fromLink: boolean;
   fileName: string;
@@ -82,15 +88,18 @@ type SessionTemplateActionsProps = {
 export const SessionTemplateActions = ({
   buildTemplate,
   onImport,
+  keptUnlessNamed = [],
   fromLink,
   fileName,
   linkBase,
 }: SessionTemplateActionsProps) => {
   const [importOpen, setImportOpen] = useState(false);
   const [pasted, setPasted] = useState('');
-  const [candidate, setCandidate] = useState<{ template: SessionTemplate; changes: SessionTemplateChange[] } | null>(
-    null,
-  );
+  const [candidate, setCandidate] = useState<{
+    template: SessionTemplate;
+    changes: SessionTemplateChange[];
+    named: string[];
+  } | null>(null);
   const [errors, setErrors] = useState<SessionTemplateError[]>([]);
   const [status, setStatus] = useState('');
   const [tooLong, setTooLong] = useState(false);
@@ -149,9 +158,15 @@ export const SessionTemplateActions = ({
     }
     setErrors([]);
     const mine = buildTemplate();
+    // The JSON parsed above, so this cannot throw; its own top-level fields.
+    const named = Object.keys(JSON.parse(json) as Record<string, unknown>);
+    const kept = keptUnlessNamed.filter((field) => !named.includes(field));
     setCandidate({
       template: result.template,
-      changes: mine.ok ? diffSessionTemplates(mine.template, result.template) : [],
+      changes: mine.ok
+        ? diffSessionTemplates(mine.template, result.template).filter((change) => !kept.includes(change.path))
+        : [],
+      named,
     });
   };
   const readFile = (file: File | undefined) => {
@@ -243,7 +258,7 @@ export const SessionTemplateActions = ({
                   className={`${styles.button} ${styles.primaryButton}`}
                   data-testid={E2E_TESTIDS.SETUP_TEMPLATE_IMPORT_APPLY}
                   onClick={() => {
-                    onImport(candidate.template);
+                    onImport(candidate.template, candidate.named);
                     setCandidate(null);
                     setPasted('');
                     setImportOpen(false);

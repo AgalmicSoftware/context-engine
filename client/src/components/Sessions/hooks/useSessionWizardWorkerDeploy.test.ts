@@ -1821,6 +1821,10 @@ describe('useSessionWizardWorkerDeploy', () => {
         secrets: { openaiKey: 'sk-ai' },
       }),
     );
+    // The session the deploy makes starts as the page has it: the analysis card on, as its box starts ticked,
+    // and Context cards only when ticked.
+    expect(deployPayload.analysisCardEnabled).toBe(true);
+    expect(deployPayload).not.toHaveProperty('contextCardsEnabled');
     expect(deployPayload.registryAddress).toBeUndefined();
     expect(deployPayload.registryChainId).toBeUndefined();
     expect(deployPayload.rpcUrl).toBeUndefined();

@@ -1,16 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Input } from 'reactstrap';
 
+import { CONTEXT_CARD_COST_USD } from '@ce-shared/contextCards.mjs';
 import {
-  CONTEXT_FILE_TYPES,
   CONTEXT_SOURCE_LIMITS,
+  contextFileIsReadByAi,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
 import ContextAccessPicker, { contextGroupsLabel } from './ContextAccessPicker';
+import ContextCardChips from '../../OnePageSession/ContextCardChips';
+import ContextCardEditor, { CONTEXT_CARD_HELP } from '../../OnePageSession/ContextCardEditor';
 import {
   addContextLink,
   checkContextFile,
+  contextFileAccept,
   contextAdderLabel,
+  contextSourceTakesCard,
+  contextSourcesWithoutCards,
+  makeContextCard,
   readContextPdf,
   removeContextSource,
   uploadContextFile,
@@ -23,15 +30,18 @@ import {
   useSessionContextSources,
   type SessionContextSourcesState,
 } from '../../../utilities/docLibrary/useSessionContextSources';
-import { SetupCheck, SetupField, setupHelpId } from './SetupPrimitives';
+import { SetupCheck, SetupField, SetupHelp, setupHelpId } from './SetupPrimitives';
 import styles from './SessionSetup.module.scss';
 
 export const CONTEXT_PRIVACY_HELP =
   'Only session admins can open it, and the session’s AI uses it only when it works for an admin. Everyone else never receives it.';
 export const FILE_ACCESS_HELP =
   'A file locked to groups is for their members and the session’s admins; an admins-only file is for admins. The session’s AI uses a file only when it works for someone who may read it.';
+/** What the Context cards setting does and costs, on the setup page and in Settings. */
+export const CONTEXT_CARDS_HELP =
+  'The session’s AI writes a short card for each file or link added: a summary, topic tags and key names. Cards show as tags in the list, and tell the AI and agents what a source covers when there is no room to read it. Images can be added too, and whoever adds a PDF or image can have the AI read it once. Each card and each reading uses the session’s AI key.';
 export const CONTEXT_ANALYZE_HELP =
-  'Sends the PDF to the session’s own AI provider with the session’s key. The text it returns is saved with the PDF. Unticked, the PDF is kept but gives the AI no text.';
+  'Sends the PDF or image to the session’s own AI provider with the session’s key. The text it returns is saved with the file. Unticked, the file is kept but gives the AI no text.';
 const LINK_HELP =
   'The Session Worker reads the page now and keeps its text for the session’s AI. Refresh reads it again. Use https:// links to public pages.';
 
@@ -40,7 +50,18 @@ const formatDate = (value: string): string => {
   return Number.isFinite(time) ? new Date(time).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
 };
 
-export const isContextPdf = (source: Pick<ContextSource, 'mime'>) => source.mime === CONTEXT_FILE_TYPES.pdf;
+/** What making `count` cards costs, as the estimate an admin sees before any is made. */
+export const describeCardCost = (count: number): string => {
+  const total = count * CONTEXT_CARD_COST_USD;
+  const sum = total < 0.01 ? 'under $0.01' : `about $${total.toFixed(2)}`;
+  return (
+    `${count === 1 ? '1 item has' : `${count} items have`} no card. ` +
+    `Each card is one short call to the session’s AI on the session’s key, about $${CONTEXT_CARD_COST_USD} on the default model: ${sum} in all.`
+  );
+};
+
+/** True for a PDF or an image: a file whose text is the session’s AI’s reading of it. */
+export const isAiReadSource = (source: Pick<ContextSource, 'mime'>) => contextFileIsReadByAi(source.mime);
 
 /** One line about a source: who may read it, who added it, and what the AI has of it. */
 export const describeContextSource = (
@@ -58,7 +79,7 @@ export const describeContextSource = (
     ...(source.addedByAgent ? ['Agent'] : []),
     source.kind === 'link'
       ? `Read ${formatDate(source.fetchedAt)}`.trim()
-      : isContextPdf(source)
+      : isAiReadSource(source)
         ? source.reading
           ? `Read by AI (${source.reading.model}, ${formatDate(source.reading.at)})`
           : 'Not read by AI'
@@ -81,7 +102,7 @@ type Props = {
 // the session's AI and remove them. Changes apply at once, not on Save.
 const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = [], onSourcesChange, list }: Props) => {
   const own = useSessionContextSources({ sessionSlug, sessionConfig, account, enabled: !list });
-  const { sources, loading, error, supported, reload } = list || own;
+  const { sources, loading, error, supported, cardsSupported, reload } = list || own;
   const [workerReady, setWorkerReady] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -93,6 +114,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
   const groups = useContextGroups({ sessionSlug, sessionConfig, account });
   const [analyze, setAnalyze] = useState(true);
   const [fileKey, setFileKey] = useState(0);
+  const [editingCard, setEditingCard] = useState('');
   const options = { sessionSlug, sessionConfig, context: { account }, asAdmin: true };
 
   useEffect(() => {
@@ -138,8 +160,27 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
   const unreadLinks = pageLinks.filter(
     (link) => link.url && !sources.some((source) => source.kind === 'link' && source.url === link.url),
   );
-  const fileProblem = file ? checkContextFile(file) : '';
-  const fileIsPdf = !!file && resolveContextFileType(file) === CONTEXT_FILE_TYPES.pdf;
+  const withoutCards = cardsSupported ? contextSourcesWithoutCards(sources) : [];
+  // The count and the cost come first; nothing is spent without a yes.
+  const makeMissingCards = () => {
+    if (!window.confirm(`${describeCardCost(withoutCards.length)} Make them now?`)) return;
+    void run('The session’s AI is writing cards…', async () => {
+      let made = 0;
+      let problem = '';
+      for (const source of withoutCards) {
+        try {
+          await makeContextCard(source.id, options);
+          made += 1;
+        } catch (failure) {
+          problem ||= failure instanceof Error ? failure.message : 'the session’s AI did not answer.';
+        }
+      }
+      const wrote = made === 1 ? 'Wrote 1 card.' : `Wrote ${made} cards.`;
+      return problem ? `${wrote} ${withoutCards.length - made} could not be written: ${problem}` : wrote;
+    });
+  };
+  const fileProblem = file ? checkContextFile(file, { images: cardsSupported }) : '';
+  const fileIsAiRead = !!file && contextFileIsReadByAi(resolveContextFileType(file));
 
   return (
     <div className={styles.listRowBody} data-testid="ce-context-sources">
@@ -160,8 +201,29 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
                     adder: contextAdderLabel(source, sessionConfig, account),
                   })}
                 </span>
+                <ContextCardChips card={source.card} title={source.title || source.url || 'Untitled'} />
+                {editingCard === source.id ? (
+                  <ContextCardEditor
+                    source={source}
+                    options={options}
+                    onSaved={reload}
+                    onClose={() => setEditingCard('')}
+                  />
+                ) : null}
               </div>
               <div className={styles.buttonRow}>
+                {cardsSupported && contextSourceTakesCard(source) ? (
+                  <button
+                    type="button"
+                    className={styles.button}
+                    disabled={busy}
+                    aria-label={`Edit the card of ${source.title || source.url}`}
+                    aria-expanded={editingCard === source.id}
+                    onClick={() => setEditingCard((open) => (open === source.id ? '' : source.id))}
+                  >
+                    Edit card
+                  </button>
+                ) : null}
                 {source.kind === 'link' ? (
                   <button
                     type="button"
@@ -178,16 +240,16 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
                     Refresh
                   </button>
                 ) : null}
-                {isContextPdf(source) ? (
+                {isAiReadSource(source) ? (
                   <button
                     type="button"
                     className={styles.button}
                     disabled={busy}
                     aria-label={`${source.reading ? 'Read again with the session’s AI' : 'Read with the session’s AI'}: ${source.title}`}
                     onClick={() =>
-                      void run('The session’s AI is reading the PDF…', async () => {
+                      void run('The session’s AI is reading the file…', async () => {
                         await readContextPdf(source.id, options);
-                        return 'The session’s AI read the PDF.';
+                        return 'The session’s AI read the file.';
                       })
                     }
                   >
@@ -215,6 +277,21 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
         </ul>
       ) : !loading ? (
         <p className={styles.hint}>No files or links yet.</p>
+      ) : null}
+      {withoutCards.length ? (
+        <div className={styles.buttonRow}>
+          <button
+            type="button"
+            className={styles.button}
+            disabled={busy}
+            aria-describedby={setupHelpId('ce-context-make-cards')}
+            data-testid="ce-context-make-cards"
+            onClick={makeMissingCards}
+          >
+            Make missing cards ({withoutCards.length})
+          </button>
+          <SetupHelp id="ce-context-make-cards" label="cards" help={CONTEXT_CARD_HELP} />
+        </div>
       ) : null}
       {unreadLinks.length ? (
         <div className={styles.buttonRow}>
@@ -287,7 +364,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
           key={fileKey}
           id="ce-context-file"
           type="file"
-          accept=".pdf,.md,.markdown,.txt,.csv,.json,application/pdf,text/markdown,text/plain,text/csv,application/json"
+          accept={contextFileAccept({ images: cardsSupported })}
           data-testid="ce-context-file"
           onChange={(event) => setFile((event.target as HTMLInputElement).files?.[0] || null)}
         />
@@ -303,7 +380,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
           onChange={setFileAccess}
         />
       </SetupField>
-      {fileIsPdf ? (
+      {fileIsAiRead ? (
         <SetupCheck
           id="ce-context-file-analyze"
           label="Analyze with the session’s AI"
@@ -325,7 +402,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
               const id = await uploadContextFile({ file, ...fileAccess }, options);
               setFile(null);
               setFileKey((key) => key + 1);
-              if (!(analyze && fileIsPdf)) return 'File added.';
+              if (!(analyze && fileIsAiRead)) return 'File added.';
               setStatus('File added. The session’s AI is reading it…');
               try {
                 await readContextPdf(id, options);

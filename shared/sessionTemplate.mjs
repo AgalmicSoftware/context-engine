@@ -93,6 +93,8 @@ const DEFAULTS = Object.freeze({
   appearance: { colorSchemeId: 'context-engine' },
   sessionContext: { title: '', paragraphs: [], links: [], html: '' },
   contextFiles: [],
+  // Off unless a template turns context cards on for the session it sets up.
+  contextCardsEnabled: false,
   questionsGenPrompt: '',
   questions: [],
   defaultTags: '',
@@ -111,6 +113,8 @@ const DEFAULTS = Object.freeze({
   },
   // null keeps the page's default profile; a profile is never merged with it.
   sessionModeProfile: null,
+  // On unless a template turns the personal analysis card off for the session it sets up.
+  analysisCardEnabled: true,
 });
 const SHAPE = {
   ...shapeOf(DEFAULTS),

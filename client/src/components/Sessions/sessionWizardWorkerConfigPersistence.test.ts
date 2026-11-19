@@ -2,6 +2,7 @@ import {
   persistAndVerifySessionWizardWorkerConfig,
   type SessionWizardWorkerConfigFetchPort,
   type SessionWizardWorkerConfigSignInput,
+  withStoredConfigKept,
 } from './sessionWizardWorkerConfigPersistence';
 import { buildSessionWizardWorkerConfigPayload } from './sessionWizardWriteNormalization';
 import { buildSessionWizardDefaultTemplate } from './sessionWizardDraftState';
@@ -25,9 +26,12 @@ const baseConfig = () => ({
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
   storageProfile: { backend: 'cloudflare' },
   ai: { models: { fast: { provider: 'openai', model: 'gpt-test' } } },
-  // A config with instructions for AI agents and a Session Agent is written without first reading the stored one.
+  // A config that states its instructions for AI agents and its Session Agent, and states both card switches
+  // as off, is written without first reading the stored one.
   agentInstructions: 'Join the open group.',
   sessionAgent: { audiences: [] },
+  analysisCardEnabled: false,
+  contextCardsEnabled: false,
 });
 
 const withoutInstructions = (config: Record<string, unknown>) => {
@@ -263,10 +267,13 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       configRevision: revision,
     };
     const signAdminAction = jest.fn(async () => ({ signature: '0xsigned' }));
-    // The default draft has no instructions for AI agents, so the stored config is read first.
+    // The default draft has no instructions for AI agents, so the stored config is read first. Its analysis card
+    // box starts ticked, so the Worker is asked whether it has the card before the switch is sent.
+    expect(config.analysisCardEnabled).toBe(true);
     const fetchImpl = jest
       .fn()
       .mockResolvedValueOnce(jsonResponse(404, { error: 'Session not found.' }))
+      .mockResolvedValueOnce(jsonResponse(200, { features: ['analysis_card_v1'] }))
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
       .mockResolvedValueOnce(jsonResponse(200, { config: persistedConfig }));
 
@@ -300,7 +307,8 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       }),
     );
     expect(signAdminAction).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetchImpl.mock.calls[1][1].body).config).not.toHaveProperty('agentInstructions');
+    expect(JSON.parse(fetchImpl.mock.calls[2][1].body).config).not.toHaveProperty('agentInstructions');
+    expect(JSON.parse(fetchImpl.mock.calls[2][1].body).config).toHaveProperty('analysisCardEnabled', true);
   });
 
   // Serves reads from a stored config that each write replaces.
@@ -374,6 +382,156 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     await persist(lacks.fetchImpl);
     expect(lacks.written()).not.toHaveProperty('sessionAgent');
     expect(lacks.written()).toHaveProperty('agentInstructions', 'Join the open group.');
+  });
+
+  it('makes a session with Context cards on only after the Worker says it keeps them, and reads them back', async () => {
+    const persist = (features: string[]) => {
+      let stored: Record<string, unknown> | null = null;
+      const fetchImpl = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+        if (String(url).includes('/capabilities')) return jsonResponse(200, { features });
+        if (init?.method !== 'POST') return stored ? jsonResponse(200, { config: stored }) : jsonResponse(404, {});
+        stored = JSON.parse(String(init.body)).config;
+        return jsonResponse(200, { ok: true });
+      });
+      const saved = persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: { ...baseConfig(), contextCardsEnabled: true },
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        retryDelaysMs: [],
+      });
+      return { saved, fetchImpl, written: () => stored };
+    };
+    const keeps = persist(['context_cards_v1']);
+    await expect(keeps.saved).resolves.toMatchObject({ publicConfig: { contextCardsEnabled: true } });
+    // Asked before anything is written, and asked afresh.
+    const asked = keeps.fetchImpl.mock.calls.findIndex(([url]) => String(url).includes('/capabilities'));
+    const wrote = keeps.fetchImpl.mock.calls.findIndex(([, init]) => init?.method === 'POST');
+    expect(String(keeps.fetchImpl.mock.calls[asked][0])).toBe(`${WORKER_ORIGIN}/capabilities?slug=worker-session`);
+    expect(keeps.fetchImpl.mock.calls[asked][1]).toMatchObject({ method: 'GET', cache: 'no-store' });
+    expect(asked).toBeLessThan(wrote);
+    expect(keeps.written()).toHaveProperty('contextCardsEnabled', true);
+    const older = persist(['worker_groups']);
+    await expect(older.saved).rejects.toThrow('too old to keep Context cards');
+    expect(older.written()).toBeNull();
+  });
+
+  // What the wizard would write, given what the Worker holds and has.
+  const kept = (
+    page: Record<string, unknown>,
+    stored: Record<string, unknown> | null,
+    features: string[] | null = ['context_cards_v1', 'analysis_card_v1'],
+  ) =>
+    withStoredConfigKept({
+      config: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        ...page,
+      } as Record<string, unknown>,
+      workerOrigin: WORKER_ORIGIN,
+      slug: 'worker-session',
+      fetchImpl: async (url: RequestInfo | URL) => {
+        if (String(url).includes('/capabilities')) {
+          return features ? jsonResponse(200, { features }) : jsonResponse(503, {});
+        }
+        return stored ? jsonResponse(200, { config: stored }) : jsonResponse(404, { error: 'Session not found.' });
+      },
+    }).then(
+      (config: Record<string, unknown>) => ({
+        contextCardsEnabled: config.contextCardsEnabled,
+        analysisCardEnabled: config.analysisCardEnabled,
+      }),
+      (error: Error) => error.message,
+    );
+  // As /new sends them: the analysis card's box starts ticked, and off is left out.
+  const PAGE_DEFAULT = { analysisCardEnabled: true };
+  // A session that exists, as the Worker shows it; one from before the card never saved either switch.
+  const EXISTS = { sessionName: 'A session that exists', configRevision: 'config:earlier' };
+
+  it('a session with no config yet is made as the page says, with the analysis card on where the Worker has it', async () => {
+    expect(await kept(PAGE_DEFAULT, null)).toEqual({ analysisCardEnabled: true });
+    expect(await kept({ ...PAGE_DEFAULT, contextCardsEnabled: true }, null)).toEqual({
+      contextCardsEnabled: true,
+      analysisCardEnabled: true,
+    });
+    // Unticked: off is the resting state, so nothing is sent.
+    expect(await kept({}, null)).toEqual({});
+    // A Worker without the card: the session is made without it, not refused.
+    expect(await kept(PAGE_DEFAULT, null, ['worker_groups'])).toEqual({});
+    // Nor is one that cannot be asked: the box is only ticked by default, so the session is still made.
+    expect(await kept(PAGE_DEFAULT, null, null)).toEqual({});
+    // Context cards were a choice made on the page, so a Worker too old for them, or unasked, stops the save.
+    expect(await kept({ contextCardsEnabled: true }, null, ['analysis_card_v1'])).toMatch(
+      /too old to keep Context cards/,
+    );
+    expect(await kept({ contextCardsEnabled: true }, null, null)).toMatch(/couldn't be checked for Context cards/);
+  });
+
+  it('never gives the analysis card to a session that exists and never saved it, though the box on /new is ticked', async () => {
+    // The real case: every session from before the card. The box on /new always starts ticked.
+    expect(await kept(PAGE_DEFAULT, EXISTS)).toEqual({});
+    // Nor does a ticked box turn back on a card an admin turned off, or change one that is on.
+    expect(await kept(PAGE_DEFAULT, { ...EXISTS, analysisCardEnabled: false })).toEqual({ analysisCardEnabled: false });
+    expect(await kept(PAGE_DEFAULT, { ...EXISTS, analysisCardEnabled: true })).toEqual({ analysisCardEnabled: true });
+    // What the session holds it could already take, so no Worker is asked what it has.
+    expect(await kept(PAGE_DEFAULT, { ...EXISTS, analysisCardEnabled: true }, null)).toEqual({
+      analysisCardEnabled: true,
+    });
+    // Unticking is a choice: the card is turned off where the session holds the switch.
+    expect(await kept({}, { ...EXISTS, analysisCardEnabled: true })).toEqual({ analysisCardEnabled: false });
+    expect(await kept({}, { ...EXISTS, analysisCardEnabled: false })).toEqual({ analysisCardEnabled: false });
+    expect(await kept({}, EXISTS)).toEqual({});
+  });
+
+  it('keeps the Context cards a session has when the page leaves them unticked, and follows a tick', async () => {
+    // Unticked is where the box starts: it says nothing, so cards an admin turned on in Settings stay on.
+    expect(await kept({}, { ...EXISTS, contextCardsEnabled: true })).toEqual({ contextCardsEnabled: true });
+    expect(await kept({}, { ...EXISTS, contextCardsEnabled: false })).toEqual({ contextCardsEnabled: false });
+    // Ticking is a choice, sent where the Worker keeps cards.
+    expect(await kept({ contextCardsEnabled: true }, { ...EXISTS, contextCardsEnabled: false })).toEqual({
+      contextCardsEnabled: true,
+    });
+    expect(await kept({ contextCardsEnabled: true }, EXISTS, ['worker_groups'])).toMatch(
+      /too old to keep Context cards/,
+    );
+  });
+
+  it('reads back what it kept or turned off, with the same revision on a retry', async () => {
+    const withoutCards = ({
+      contextCardsEnabled: _cards,
+      analysisCardEnabled: _card,
+      ...rest
+    }: Record<string, unknown>) => rest;
+    const persist = (fetchImpl: SessionWizardWorkerConfigFetchPort) =>
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: withoutCards(baseConfig()),
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        retryDelaysMs: [],
+      });
+    // An earlier attempt stored both on; the page now has both boxes unticked.
+    const has = createWorkerFetch(async () =>
+      jsonResponse(200, {
+        config: verifiedConfig('earlier', { contextCardsEnabled: true, analysisCardEnabled: true }),
+      }),
+    );
+    const first = await persist(has.fetchImpl);
+    expect(has.written()).toMatchObject({ contextCardsEnabled: true, analysisCardEnabled: false });
+    expect(first.publicConfig).toMatchObject({ contextCardsEnabled: true, analysisCardEnabled: false });
+    // What was sent is what is stored now, so a retry signs the revision the first write claimed.
+    const second = await persist(has.fetchImpl);
+    expect(second.configRevision).toBe(first.configRevision);
+    // A Worker whose config never had either setting is not sent it.
+    const lacks = createWorkerFetch(async () => jsonResponse(200, { config: withoutCards(verifiedConfig('earlier')) }));
+    await persist(lacks.fetchImpl);
+    expect(lacks.written()).not.toHaveProperty('contextCardsEnabled');
+    expect(lacks.written()).not.toHaveProperty('analysisCardEnabled');
   });
 
   // Older Workers refuse the field, and none of them has stored it.
@@ -821,9 +979,12 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       persistedPublicConfig = publicConfig;
       return { signature: '0xsigned' };
     });
-    const fetchImpl = jest.fn(async (_url, init) =>
-      init?.method === 'POST' ? jsonResponse(200, { ok: true }) : jsonResponse(200, { config: persistedPublicConfig }),
-    );
+    const fetchImpl = jest.fn(async (url, init) => {
+      if (String(url).includes('/capabilities')) return jsonResponse(200, { features: ['analysis_card_v1'] });
+      return init?.method === 'POST'
+        ? jsonResponse(200, { ok: true })
+        : jsonResponse(200, { config: persistedPublicConfig });
+    });
 
     const result = await persistAndVerifySessionWizardWorkerConfig({
       workerUrl: WORKER_ORIGIN,

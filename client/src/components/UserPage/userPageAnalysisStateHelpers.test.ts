@@ -124,6 +124,7 @@ describe('userPageAnalysisStateHelpers', () => {
         figure: '',
         reasoning: '',
       },
+      card: null,
     });
     expect(
       buildUserPageAnalysisResultStatePatch({
@@ -154,6 +155,22 @@ describe('userPageAnalysisStateHelpers', () => {
       analyzing: false,
       analysisServedFromCache: true,
       analysisCachedAt: 1710000000000,
+    });
+    // A card stored with the result is left for the card step, which shows it only where the card is on.
+    const card = { title: 'Wants AI doing paperwork', figure: 'Elinor Ostrom (1933–2012)' };
+    expect(buildUserPageAnalysisResultStatePatch({ result: { card } })).toMatchObject({
+      analysisCard: null,
+      analysisCardPending: false,
+      analysisCardPicture: null,
+      analysisCardPublish: null,
+      analysisCardSavedAt: null,
+    });
+    expect(buildUserPageAnalysisResetStatePatch()).toMatchObject({
+      analysisCard: null,
+      analysisCardPending: false,
+      analysisCardPicture: null,
+      analysisCardPublish: null,
+      analysisCardSavedAt: null,
     });
     expect(buildUserPageAnalysisResetStatePatch({ analyzing: 'yes' }).analyzing).toBe(false);
     expect(buildUserPageAnalysisElapsedStatePatch({ nowMs: 1250, startedAt: 1000 })).toEqual({

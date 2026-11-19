@@ -2,19 +2,21 @@ import { useCallback, useState } from 'react';
 import { Input } from 'reactstrap';
 
 import {
-  CONTEXT_FILE_TYPES,
   CONTEXT_SOURCE_LIMITS,
+  contextCardsOn,
+  contextFileIsReadByAi,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
 import {
   addContextLink,
   checkContextFile,
+  contextFileAccept,
   readContextPdf,
   uploadContextFile,
   type ContextFileAccess,
 } from '../../../utilities/docLibrary/contextSources';
 import ContextAccessPicker from './ContextAccessPicker';
-import { CONTEXT_ANALYZE_HELP, FILE_ACCESS_HELP } from './ContextSourcesPanel';
+import { CONTEXT_ANALYZE_HELP, CONTEXT_CARDS_HELP, FILE_ACCESS_HELP } from './ContextSourcesPanel';
 import { SetupCheck, SetupField, setupHelpId } from './SetupPrimitives';
 import { asList, asRecord, text, type SetupDraft } from './setupSectionTypes';
 import styles from './SessionSetup.module.scss';
@@ -64,7 +66,9 @@ export type SetupGroupOption = { groupId: string; label: string };
 const FILE_VISIBILITY_HELP = `${FILE_ACCESS_HELP} Groups set up under Access and identity are made at Create, before these files are added.`;
 
 const MB = 1024 * 1024;
-const ADD_FILE_HELP = `A PDF up to ${CONTEXT_SOURCE_LIMITS.pdfBytes / MB} MB, or Markdown, text, CSV or JSON up to ${CONTEXT_SOURCE_LIMITS.textFileBytes / MB} MB. It is added to the session after Create, for the people you choose in its Visible to.`;
+// Images are taken where the session will have Context cards on.
+const addFileHelp = (cards: boolean) =>
+  `A PDF up to ${CONTEXT_SOURCE_LIMITS.pdfBytes / MB} MB, ${cards ? `a PNG, JPEG or WebP image up to ${CONTEXT_SOURCE_LIMITS.imageBytes / MB} MB, ` : ''}or Markdown, text, CSV or JSON up to ${CONTEXT_SOURCE_LIMITS.textFileBytes / MB} MB. It is added to the session after Create, for the people you choose in its Visible to.${cards ? '' : ' Images can be added with Context cards on.'}`;
 const ATTACH_AGAIN_HELP =
   'The page holds chosen files only until it reloads. Choose this file again so Create can add it.';
 
@@ -85,7 +89,8 @@ const withAccess = (entry: ContextFileEntry, access: ContextFileAccess): Context
   };
 };
 
-const isPdf = (file: File) => resolveContextFileType(file) === CONTEXT_FILE_TYPES.pdf;
+// A PDF or an image: a file the session's AI reads to give its text.
+const isAiRead = (file: File) => contextFileIsReadByAi(resolveContextFileType(file));
 
 type FilesProps = {
   draft: SetupDraft;
@@ -93,18 +98,22 @@ type FilesProps = {
   pending: PendingContextFiles;
   /** Before Create, the groups set up so far; after it, the groups Create made. */
   groups?: SetupGroupOption[];
+  /** The session's public config once it exists: its Context cards setting then decides, not the draft's. */
+  sessionConfig?: Record<string, unknown> | null;
 };
 
 // Before Create: the files to add. A name without its file (from a template
 // or a reload) asks for the file again.
-export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: FilesProps) => {
+export const SetupContextFiles = ({ draft, onChange, pending, groups = [], sessionConfig = null }: FilesProps) => {
   const entries = readContextFiles(draft);
+  // As the session will: images only with Context cards on. Once it exists, Settings changes the setting.
+  const cards = sessionConfig ? contextCardsOn(sessionConfig) : draft.contextCardsEnabled === true;
   const named = groups.flatMap(({ groupId, label }) => (label.trim() ? [{ groupId, label: label.trim() }] : []));
   const [problem, setProblem] = useState('');
   const save = (next: ContextFileEntry[]) => onChange(['contextFiles'], next);
   const attach = (file: File | undefined, replacing = '') => {
     if (!file) return;
-    const reason = checkContextFile(file);
+    const reason = checkContextFile(file, { images: cards });
     setProblem(reason);
     if (reason) return;
     if (replacing && replacing !== file.name) pending.set(replacing, null);
@@ -115,6 +124,17 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
   };
   return (
     <div className={styles.listRowBody} data-testid="ce-setup-context-files">
+      <SetupCheck
+        id="ce-setup-context-cards"
+        label="Context cards"
+        help={
+          sessionConfig ? `${CONTEXT_CARDS_HELP} The session is made: change this in its Settings.` : CONTEXT_CARDS_HELP
+        }
+        checked={cards}
+        disabled={!!sessionConfig}
+        testId="ce-setup-context-cards"
+        onChange={(checked) => onChange(['contextCardsEnabled'], checked)}
+      />
       {entries.map((entry, index) => {
         const chosen = pending.files[entry.name];
         return (
@@ -145,7 +165,7 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
                   }
                 />
               </SetupField>
-              {chosen && isPdf(chosen.file) ? (
+              {chosen && isAiRead(chosen.file) ? (
                 <SetupCheck
                   id={`ce-setup-context-file-analyze-${index}`}
                   label="Analyze with the session’s AI"
@@ -169,12 +189,12 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
           </div>
         );
       })}
-      <SetupField id="ce-setup-context-file" label="Add a file" help={ADD_FILE_HELP}>
+      <SetupField id="ce-setup-context-file" label="Add a file" help={addFileHelp(cards)}>
         <Input
           id="ce-setup-context-file"
           type="file"
           aria-describedby={setupHelpId('ce-setup-context-file')}
-          accept=".pdf,.md,.markdown,.txt,.csv,.json,application/pdf,text/markdown,text/plain,text/csv,application/json"
+          accept={contextFileAccept({ images: cards })}
           data-testid="ce-setup-context-file-input"
           onChange={(event) => {
             attach((event.target as HTMLInputElement).files?.[0]);
@@ -187,7 +207,7 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
   );
 };
 
-type PublisherProps = FilesProps & {
+type PublisherProps = Omit<FilesProps, 'sessionConfig'> & {
   /** The session's public config once it exists; null before creation. */
   sessionConfig: Record<string, unknown> | null;
   sessionSlug: string;
@@ -250,7 +270,7 @@ export const SetupContextPublisher = ({
         const id = await uploadContextFile({ file: chosen.file, ...access }, options);
         added.push(entry.name);
         pending.set(entry.name, null);
-        if (chosen.analyze && isPdf(chosen.file)) {
+        if (chosen.analyze && isAiRead(chosen.file)) {
           setStatus(`The session’s AI is reading ${entry.name}…`);
           await readContextPdf(id, options).catch((error: unknown) =>
             problems.push(

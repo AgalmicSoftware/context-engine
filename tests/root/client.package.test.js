@@ -131,7 +131,7 @@ test('client HTML shell seeds structured data with the public GitHub repository'
   assert.doesNotMatch(html, /"@type":\s*"WebPage"/);
 });
 
-test('client serves its own fonts: Open Sans 300-800 with italics and Poppins 400-800', () => {
+test('client serves its own fonts: Open Sans 300-800 with italics, Poppins 400-800 and Barlow Condensed 800', () => {
   const css = readText('client/src/assets/css/_webFonts.scss');
   const faces = [...css.matchAll(/@font-face \{([^}]*)\}/g)].map(([, body]) => ({
     family: body.match(/font-family: '([^']+)'/)[1],
@@ -142,9 +142,11 @@ test('client serves its own fonts: Open Sans 300-800 with italics and Poppins 40
   }));
   const kinds = new Set(faces.map(({ family, style, weight }) => `${family} ${style} ${weight}`));
   // Minimal uses Open Sans at 600-800, so the variable weight range comes instead of synthesized bold.
+  // Barlow Condensed 800 is the headline face of the personal analysis picture card.
   assert.deepEqual(
     [...kinds].sort(),
     [
+      'Barlow Condensed normal 800',
       'Open Sans italic 300 800',
       'Open Sans normal 300 800',
       'Poppins normal 400',

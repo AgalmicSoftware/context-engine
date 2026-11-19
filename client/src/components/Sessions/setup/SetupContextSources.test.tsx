@@ -28,11 +28,13 @@ const Harness = ({
   created = false,
   groups = [],
   made = [],
+  config = { slug: 'salon' },
 }: {
   initial: SetupDraft;
   created?: boolean;
   groups?: SetupGroupOption[];
   made?: SetupGroupOption[];
+  config?: Record<string, unknown>;
 }) => {
   const [draft, setDraft] = useState<SetupDraft>(initial);
   const pending = usePendingContextFiles();
@@ -40,12 +42,18 @@ const Harness = ({
   const onChange = ([key]: string[], value: unknown) => setDraft((prev) => ({ ...prev, [key]: value }));
   return (
     <>
-      <SetupContextFiles draft={draft} onChange={onChange} pending={pending} groups={created ? made : groups} />
+      <SetupContextFiles
+        draft={draft}
+        onChange={onChange}
+        pending={pending}
+        groups={created ? made : groups}
+        sessionConfig={created ? config : null}
+      />
       <SetupContextPublisher
         draft={draft}
         onChange={onChange}
         pending={pending}
-        sessionConfig={created ? { slug: 'salon' } : null}
+        sessionConfig={created ? config : null}
         sessionSlug="salon"
         account="0xadmin"
         groups={made}
@@ -85,11 +93,53 @@ describe('setup context files', () => {
     ]);
     expect(screen.getByText('Files are added to the session once it is created.')).toBeInTheDocument();
     fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), {
-      target: { files: [new File(['x'], 'photo.png', { type: 'image/png' })] },
+      target: { files: [new File(['x'], 'clip.mp4', { type: 'video/mp4' })] },
     });
-    expect(screen.getByText(/Add a PDF, Markdown, plain text, CSV or JSON file/)).toBeInTheDocument();
+    expect(screen.getByText('Add a PDF, or a Markdown, plain text, CSV or JSON file.')).toBeInTheDocument();
+    // A new session has cards off unless they are turned on here, so setup takes no image yet.
+    expect(screen.getByTestId('ce-setup-context-cards')).not.toBeChecked();
+    expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).not.toMatch(/image|\.png/);
+    fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), {
+      target: { files: [new File(['png'], 'chart.png', { type: 'image/png' })] },
+    });
+    expect(
+      screen.getByText('A session takes images only once Context cards are on in its settings.'),
+    ).toBeInTheDocument();
+    expect(latest.contextFiles).toEqual([
+      { name: 'brief.pdf', adminsOnly: false },
+      { name: 'deck.pdf', adminsOnly: true },
+    ]);
     fireEvent.click(screen.getByRole('button', { name: 'Remove brief.pdf' }));
     expect(latest.contextFiles).toEqual([{ name: 'deck.pdf', adminsOnly: true }]);
+  });
+
+  it('takes images once Context cards are turned on for the new session', () => {
+    render(<Harness initial={{}} />);
+    fireEvent.click(screen.getByTestId('ce-setup-context-cards'));
+    expect(latest.contextCardsEnabled).toBe(true);
+    expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).toMatch(/image\/png/);
+    fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), {
+      target: { files: [new File(['png'], 'chart.png', { type: 'image/png' })] },
+    });
+    expect(latest.contextFiles).toEqual([{ name: 'chart.png', adminsOnly: false }]);
+    // An image is read by the session's AI, as a PDF is.
+    expect(screen.getByLabelText('Analyze with the session’s AI')).toBeChecked();
+    fireEvent.click(screen.getByTestId('ce-setup-context-cards'));
+    expect(latest.contextCardsEnabled).toBe(false);
+    expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).not.toMatch(/image/);
+  });
+
+  it('after Create, the session’s own setting decides on images, and the tick box is fixed', () => {
+    const made = render(<Harness initial={{}} created config={{ slug: 'salon', contextCardsEnabled: true }} />);
+    expect(screen.getByTestId('ce-setup-context-cards')).toBeChecked();
+    expect(screen.getByTestId('ce-setup-context-cards')).toBeDisabled();
+    expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).toMatch(/image\/png/);
+    made.unmount();
+    // A draft ticked after a session was made without cards changes nothing: Settings does.
+    render(<Harness initial={{ contextCardsEnabled: true }} created />);
+    expect(screen.getByTestId('ce-setup-context-cards')).not.toBeChecked();
+    expect(screen.getByTestId('ce-setup-context-cards')).toBeDisabled();
+    expect(screen.getByTestId('ce-setup-context-file-input').getAttribute('accept')).not.toMatch(/image/);
   });
 
   it('after Create, adds the files, reads the PDFs asked for and the links, once', async () => {

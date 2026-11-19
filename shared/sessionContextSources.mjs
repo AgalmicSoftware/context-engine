@@ -1,7 +1,7 @@
 // Context sources: files and links added to a session for its AI. They are
 // doc-library records (resource docsContext) whose CE-DocRole tag says which:
 // 'context' for a file or link someone added, 'context-text' for the text the
-// session's AI read from one of those PDFs. Each is for everyone with access
+// session's AI read from one of those PDFs or images. Each is for everyone with access
 // to the session, for the members of some of its groups, or for admins only.
 export const CONTEXT_ROLE = 'context';
 export const CONTEXT_TEXT_ROLE = 'context-text';
@@ -24,11 +24,13 @@ export const CONTEXT_TAGS = Object.freeze({
 
 export const CONTEXT_SOURCE_LIMITS = Object.freeze({
   pdfBytes: 20 * 1024 * 1024,
+  // An image as stored. Sent as base64 it is a third larger, inside what each provider takes for one image.
+  imageBytes: 5 * 1024 * 1024,
   textFileBytes: 1024 * 1024,
   // A linked page as fetched, before its text is taken out.
   pageBytes: 2 * 1024 * 1024,
   snapshotChars: 100_000,
-  // Text the session's AI returns for a PDF.
+  // Text the session's AI returns for a PDF or an image.
   readTextChars: 100_000,
   titleChars: 120,
   // A link is also a storage tag, and tag values stop at 1,024 characters.
@@ -41,7 +43,7 @@ export const CONTEXT_SOURCE_LIMITS = Object.freeze({
   perAdder: 20,
 });
 
-// File types a context source may have; others (Office files, images) are refused.
+// File types a context source may have; others (Office files, video, SVG and animated images) are refused.
 export const CONTEXT_FILE_TYPES = Object.freeze({
   pdf: 'application/pdf',
   md: 'text/markdown',
@@ -49,8 +51,26 @@ export const CONTEXT_FILE_TYPES = Object.freeze({
   txt: 'text/plain',
   csv: 'text/csv',
   json: 'application/json',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
 });
 const CONTEXT_FILE_MIMES = new Set(Object.values(CONTEXT_FILE_TYPES));
+const CONTEXT_IMAGE_MIMES = new Set([CONTEXT_FILE_TYPES.png, CONTEXT_FILE_TYPES.jpeg, CONTEXT_FILE_TYPES.webp]);
+
+/** True for an image a context source may be. */
+export const isContextImage = (contentType) => CONTEXT_IMAGE_MIMES.has(contentType);
+
+/**
+ * True for a file whose text is the session's AI's reading of it: a PDF or an
+ * image. Any other file is its own text.
+ */
+export const contextFileIsReadByAi = (contentType) => contentType === CONTEXT_FILE_TYPES.pdf || isContextImage(contentType);
+
+/** What a file of this type is called in a message: 'PDF', 'image' or 'text file'. */
+export const contextFileNoun = (contentType) =>
+  contentType === CONTEXT_FILE_TYPES.pdf ? 'PDF' : isContextImage(contentType) ? 'image' : 'text file';
 
 export const ADMINS_ONLY_ACCESS = Object.freeze({
   match: 'all',
@@ -62,6 +82,14 @@ const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArr
 
 /** Everyone the session admits may add files and links, unless an admin limits it to admins. */
 export const participantsMayAddContext = (config) => config?.contextAdditionPolicy !== 'admin_only';
+
+/**
+ * Context cards are off unless an admin turns them on. On, the session's AI
+ * writes a card for each source added, people may write and edit cards, the AI
+ * is told of sources it had no room to read, and whoever adds a PDF or image
+ * may have the AI read it once.
+ */
+export const contextCardsOn = (config) => config?.contextCardsEnabled === true;
 
 /** The one adder mark an item may carry: an agent's. */
 export const CONTEXT_AGENT_ADDER = 'agent';
@@ -175,4 +203,6 @@ export const resolveContextFileType = ({ name = '', type = '' } = {}) => {
 
 /** The most bytes a context file of this type may have. */
 export const contextFileByteLimit = (contentType) =>
-  contentType === CONTEXT_FILE_TYPES.pdf ? CONTEXT_SOURCE_LIMITS.pdfBytes : CONTEXT_SOURCE_LIMITS.textFileBytes;
+  contentType === CONTEXT_FILE_TYPES.pdf
+    ? CONTEXT_SOURCE_LIMITS.pdfBytes
+    : isContextImage(contentType) ? CONTEXT_SOURCE_LIMITS.imageBytes : CONTEXT_SOURCE_LIMITS.textFileBytes;

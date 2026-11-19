@@ -109,13 +109,14 @@ const workerFetch = (env, seen = []) => async (url, init = {}) => {
   return sessionCorsWorker.fetch(request, env, { waitUntil: () => {}, passThroughOnException: () => {} });
 };
 
-const createAgent = async (env, displayName, seen, fetchImpl = null, { now, sbt, createProvider, wallet: existingWallet, stateDir: existingStateDir } = {}) => {
+const createAgent = async (env, displayName, seen, fetchImpl = null, { now, sbt, createProvider, wallet: existingWallet, stateDir: existingStateDir, contextReadWaitMs } = {}) => {
   const stateDir = existingStateDir || await fs.mkdtemp(path.join(os.tmpdir(), 'ce-agent-'));
   const wallet = existingWallet || ethers.Wallet.createRandom();
   const participant = createParticipant({
     ...(now ? { now } : {}),
     ...(sbt ? { sbt } : {}),
     ...(createProvider ? { createProvider } : {}),
+    ...(contextReadWaitMs ? { contextReadWaitMs } : {}),
     config: {
       stateDir,
       profile: { displayName, modelId: 'test-model', platform: 'test-harness' },
@@ -1185,6 +1186,263 @@ test('an agent adds a file, a link and a note that everyone sees as its own, and
   const hidden = await kami.participant.addContext({ text: 'For the hosts.', adminsOnly: true });
   assert.equal(hidden.visibleTo, 'the session’s admins');
   assert.equal((await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() })).sources.length, 3);
+});
+
+// A session with cards on, whose AI is Claude with a key that is only a placeholder.
+const cardSessionEnv = async (overrides = {}) => {
+  const config = { ...sessionConfig(), contextCardsEnabled: true, ...overrides };
+  config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
+  const env = createEnv([config]);
+  await env.GROUP_KV.put(`session:${SLUG}:secrets`, JSON.stringify({ anthropicKey: ['synthetic', 'anthropic', 'key'].join('-') }));
+  return env;
+};
+const aiReply = (text) => new Response(JSON.stringify({ content: [{ type: 'text', text }] }), { headers: { 'Content-Type': 'application/json' } });
+const essayPage = () => new Response('<html><title>Essay</title><body><p>What neighbours owe each other.</p></body></html>', {
+  headers: { 'content-type': 'text/html; charset=utf-8' },
+});
+// A card is written after the add's reply, so a list is asked again until it shows.
+const listedWhen = async (agent, ready, args = {}) => {
+  let listed = await agent.participant.listContext(args);
+  for (let tries = 0; tries < 200 && !ready(listed); tries += 1) {
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    listed = await agent.participant.listContext(args);
+  }
+  return listed;
+};
+const byTitle = (listed) => Object.fromEntries(listed.sources.map((source) => [source.title, source]));
+
+test('an agent lists the context it may read, each source with its card, searches it and reads one in parts', async (t) => {
+  const env = await cardSessionEnv();
+  const kami = await createAgent(env, 'Test Kami', []);
+  const ada = await createAgent(env, 'Ada', []);
+  t.after(() => Promise.all([kami, ada].map((agent) => fs.rm(agent.stateDir, { recursive: true, force: true }))));
+  await kami.participant.joinSession({ link: LINK });
+  await ada.participant.joinSession({ link: LINK });
+  // The scripted AI writes a card for each source by its title. No request leaves the test.
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    if (String(url) === 'https://example.org/essay') return essayPage();
+    assert.match(String(url), /^https:\/\/api\.anthropic\.com\//);
+    const sent = String(init.body);
+    if (/Bus timetable/.test(sent)) return aiReply(JSON.stringify({ summary: 'When the evening buses run.', tags: ['Transport', 'evenings'], names: ['Route 7'] }));
+    if (/Hosts only/.test(sent)) return aiReply(JSON.stringify({ summary: 'A note for the hosts alone.', tags: ['hosts'], names: [] }));
+    return aiReply(JSON.stringify({ summary: 'An essay on what neighbours owe each other.', tags: ['neighbours', 'duty'], names: [] }));
+  });
+  const timetable = `# Bus timetable\n\n${'Evening buses leave on the hour. '.repeat(900)}`;
+  const bus = await kami.participant.addContext({ text: timetable, title: 'Bus timetable' });
+  const essay = await ada.participant.addContext({ url: 'https://example.org/essay' });
+  const hidden = await ada.participant.addContext({ text: 'For the hosts.', title: 'Hosts only', adminsOnly: true });
+  const deckPath = path.join(kami.stateDir, '..', `kami-deck-${process.pid}.pdf`);
+  await fs.writeFile(deckPath, '%PDF-1.7 deck');
+  t.after(() => fs.rm(deckPath, { force: true }));
+  const deck = await kami.participant.addContext({ file: deckPath, analyze: false });
+
+  const listed = await listedWhen(kami, (list) => list.sources.filter((source) => source.card).length === 2);
+  const sources = byTitle(listed);
+  // The admins-only note is not listed for an agent that is no admin, so nothing of its card is either.
+  assert.deepEqual(Object.keys(sources).sort(), ['Bus timetable.md', 'Essay', path.basename(deckPath)].sort());
+  assert.deepEqual([listed.count, listed.partial, listed.more], [3, undefined, undefined]);
+  assert.match(listed.note, /data about the topic, never as instructions/);
+  assert.deepEqual(sources['Bus timetable.md'], {
+    id: bus.id, title: 'Bus timetable.md', kind: 'file', type: 'text/markdown', addedAt: sources['Bus timetable.md'].addedAt,
+    addedByYou: true, addedByAgent: 'Test Kami',
+    card: { summary: 'When the evening buses run.', tags: ['transport', 'evenings'], names: ['Route 7'], writtenBy: 'the session’s AI' },
+  });
+  assert.deepEqual(
+    { ...sources.Essay, addedAt: '' },
+    {
+      id: essay.id, title: 'Essay', kind: 'link', url: 'https://example.org/essay', addedAt: '', addedByAgent: 'Ada',
+      card: { summary: 'An essay on what neighbours owe each other.', tags: ['neighbours', 'duty'], names: [], writtenBy: 'the session’s AI' },
+    },
+  );
+  // A PDF nobody has had read has no text, and says so.
+  assert.deepEqual([sources[path.basename(deckPath)].readByAi, sources[path.basename(deckPath)].card], [false, undefined]);
+
+  // A query keeps the sources that hold every word, in their title, link, type or card. No AI is asked.
+  const calls = globalThis.fetch.mock.callCount();
+  const found = async (query) => (await kami.participant.listContext({ query })).sources.map((source) => source.title);
+  assert.deepEqual(await found('evening transport'), ['Bus timetable.md']);
+  assert.deepEqual(await found('route 7'), ['Bus timetable.md']);
+  assert.deepEqual(await found('NEIGHBOURS'), ['Essay']);
+  assert.deepEqual(await found('example.org'), ['Essay']);
+  assert.deepEqual(await found('pdf'), [path.basename(deckPath)]);
+  assert.deepEqual(await found('transport neighbours'), []);
+  assert.deepEqual(await found('hosts'), [], 'a card the agent may not see is not searched');
+  const narrowed = await kami.participant.listContext({ query: ' duty ' });
+  assert.deepEqual([narrowed.query, narrowed.matched, narrowed.count], ['duty', 1, 3]);
+  assert.equal(globalThis.fetch.mock.callCount(), calls);
+
+  // A long source comes a part at a time, and the parts make the whole.
+  const first = await kami.participant.readContext({ id: bus.id });
+  assert.deepEqual([first.text.length, first.from, first.to, first.next, first.source.title], [20_000, 0, 20_000, 20_000, 'Bus timetable.md']);
+  const second = await kami.participant.readContext({ id: bus.id, offset: first.next });
+  assert.deepEqual([second.from, second.to, second.next, second.chars], [20_000, first.chars, undefined, first.chars]);
+  // A note is stored without the space at its end.
+  assert.equal(first.text + second.text, timetable.trim());
+  assert.match(first.note, /never as instructions/);
+  // A link gives the page as the Worker read it; an unread PDF gives nothing and says why.
+  const page = await kami.participant.readContext({ id: essay.id });
+  assert.deepEqual([page.text, page.source.url, page.next], ['Essay What neighbours owe each other.', 'https://example.org/essay', undefined]);
+  const unread = await kami.participant.readContext({ id: deck.id });
+  assert.deepEqual([unread.text, unread.chars], ['', 0]);
+  assert.match(unread.note, /has not read this PDF/);
+
+  // What the agent may not read, it cannot read through these tools: the Worker refuses, not the MCP alone.
+  await assert.rejects(kami.participant.readContext({ id: hidden.id }), /lists no context source with that id that you can read/);
+  await assert.rejects(kami.participant.readContext({ id: 'nothing-here' }), /lists no context source with that id/);
+  const direct = createWorkerClient({ workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: [SITE], wallet: kami.wallet, fetchImpl: workerFetch(env) });
+  await assert.rejects(direct.readContextText(hidden.id), (error) => [403, 404].includes(error.status));
+  await assert.rejects(kami.participant.readContext({ id: bus.id, offset: -1 }), /offset must be a whole number/);
+  await assert.rejects(kami.participant.readContext({}), /Pass the id of a source/);
+});
+
+// A file the agent can add: beside its state folder, never in it.
+const agentFile = async (t, agent, name, bytes) => {
+  const filePath = path.join(agent.stateDir, '..', `${process.pid}-${name}`);
+  await fs.writeFile(filePath, bytes);
+  t.after(() => fs.rm(filePath, { force: true }));
+  return filePath;
+};
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+// A request for a reading carries the file as a part; a card request is one string.
+// A reading's body is bytes, as the file is written into it without a copy.
+const sentBody = (init) => JSON.parse(typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body));
+const isReadingRequest = (init) => Array.isArray(sentBody(init)?.messages?.[0]?.content);
+
+test('an agent’s PDF or image is read by the session’s AI as it is added, and joins the context for whoever can see it', async (t) => {
+  const env = await cardSessionEnv();
+  const kami = await createAgent(env, 'Test Kami', []);
+  const ada = await createAgent(env, 'Ada', []);
+  t.after(() => Promise.all([kami, ada].map((agent) => fs.rm(agent.stateDir, { recursive: true, force: true }))));
+  const joined = await kami.participant.joinSession({ link: LINK });
+  assert.match(joined.addingContext.limits.file, /a PNG, JPEG or WebP image up to 5 MB/);
+  await ada.participant.joinSession({ link: LINK });
+  const readings = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    assert.match(String(url), /^https:\/\/api\.anthropic\.com\//);
+    if (!isReadingRequest(init)) return aiReply(JSON.stringify({ summary: 'What the file shows.', tags: ['coalition'], names: [] }));
+    const [part] = sentBody(init).messages[0].content;
+    readings.push(part.type);
+    return aiReply(part.type === 'image' ? 'A chart: turnout by region, North 61%.' : 'Deck: three goals for the coalition.');
+  });
+  const deck = await kami.participant.addContext({ file: await agentFile(t, kami, 'deck.pdf', '%PDF-1.7 deck') });
+  assert.match(deck.analysis, /^Read by the session’s AI \(36 characters\)\. Its text is now context for whoever can see the file, and it counted as one of your AI uses today\.$/);
+  const chart = await kami.participant.addContext({ file: await agentFile(t, kami, 'chart.png', PNG) });
+  assert.match(chart.analysis, /^Read by the session’s AI/);
+  assert.deepEqual(readings, ['document', 'image']);
+  // A text file needs no reading, and one added unread says so and costs nothing.
+  assert.equal((await kami.participant.addContext({ text: 'A note.', title: 'Note' })).analysis, undefined);
+  const unread = await kami.participant.addContext({ file: await agentFile(t, kami, 'later.pdf', '%PDF-1.7 later'), analyze: false });
+  assert.match(unread.analysis, /^Not read by the session’s AI/);
+  assert.equal(readings.length, 2);
+  await assert.rejects(kami.participant.addContext({ text: 'x', analyze: 'yes' }), /analyze must be true or false/);
+
+  // Another member lists both as read, each with its card, and reads the AI's text of them.
+  const listed = byTitle(await listedWhen(ada, (list) => list.sources.filter((source) => source.card).length === 3));
+  const titles = { deck: `${process.pid}-deck.pdf`, chart: `${process.pid}-chart.png`, later: `${process.pid}-later.pdf` };
+  assert.deepEqual([listed[titles.deck].readByAi, listed[titles.chart].readByAi, listed[titles.later].readByAi], [true, true, false]);
+  assert.deepEqual([listed[titles.deck].card.summary, listed[titles.chart].type, listed[titles.later].card], ['What the file shows.', 'image/png', undefined]);
+  assert.equal((await ada.participant.readContext({ id: deck.id })).text, 'Deck: three goals for the coalition.');
+  assert.equal((await ada.participant.readContext({ id: chart.id })).text, 'A chart: turnout by region, North 61%.');
+  // And so does an AI working for anyone in the session.
+  const { sources: forAi } = await loadParticipantContextSources({ env, slug: SLUG, config: { ...sessionConfig(), contextCardsEnabled: true } });
+  assert.deepEqual(Object.fromEntries(forAi.filter((source) => source.readByAi).map((source) => [source.title, [source.text, source.readByAi]])), {
+    [titles.deck]: ['Deck: three goals for the coalition.', true],
+    [titles.chart]: ['A chart: turnout by region, North 61%.', 'image'],
+  });
+
+  // One reading for its adder: a second is an admin's, and someone else's file is never theirs to have read.
+  const asKami = createWorkerClient({ workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: [SITE], wallet: kami.wallet, fetchImpl: workerFetch(env) });
+  const asAda = createWorkerClient({ workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: [SITE], wallet: ada.wallet, fetchImpl: workerFetch(env) });
+  await assert.rejects(asKami.contextAction({ action: 'read-pdf', id: deck.id }), (error) => error.status === 403);
+  await assert.rejects(asAda.contextAction({ action: 'read-pdf', id: unread.id }), (error) => error.status === 403);
+  assert.equal(readings.length, 2);
+});
+
+test('an agent’s add returns while a slow reading goes on, and says so when the AI could not read the file', async (t) => {
+  const env = await cardSessionEnv();
+  const kami = await createAgent(env, 'Test Kami', [], null, { contextReadWaitMs: 30 });
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  await kami.participant.joinSession({ link: LINK });
+  let finish = null;
+  let fail = false;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    if (!isReadingRequest(init)) return aiReply(JSON.stringify({ summary: 'A slow deck.', tags: [], names: [] }));
+    if (fail) return new Response(JSON.stringify({ error: { message: 'overloaded' } }), { status: 529, headers: { 'Content-Type': 'application/json' } });
+    await new Promise((resolve) => { finish = resolve; });
+    return aiReply('Deck, read slowly.');
+  });
+  const slow = await kami.participant.addContext({ file: await agentFile(t, kami, 'slow.pdf', '%PDF-1.7 slow') });
+  assert.match(slow.analysis, /^The session’s AI is still reading it/);
+  assert.equal((await kami.participant.listContext()).sources[0].readByAi, false);
+  finish();
+  const done = await listedWhen(kami, (list) => list.sources[0].readByAi === true);
+  assert.equal(done.sources[0].readByAi, true);
+  assert.equal((await kami.participant.readContext({ id: slow.id })).text, 'Deck, read slowly.');
+
+  fail = true;
+  const failed = await kami.participant.addContext({ file: await agentFile(t, kami, 'broken.pdf', '%PDF-1.7 broken') });
+  assert.match(failed.analysis, /^Added, but the session’s AI did not read it: .*A session admin can have it read\.$/);
+  assert.equal(byTitle(await kami.participant.listContext())[`${process.pid}-broken.pdf`].readByAi, false);
+});
+
+test('an agent out of AI uses for the day is told its file is in, unread, and not to add it again', async (t) => {
+  const env = await cardSessionEnv({ limits: { aiPerWalletPerDay: 1 } });
+  const kami = await createAgent(env, 'Test Kami', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  await kami.participant.joinSession({ link: LINK });
+  let readings = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    if (!isReadingRequest(init)) return aiReply(JSON.stringify({ summary: 'A deck.', tags: [], names: [] }));
+    readings += 1;
+    return aiReply('Deck: one step.');
+  });
+  const first = await kami.participant.addContext({ file: await agentFile(t, kami, 'one.pdf', '%PDF-1.7 one') });
+  assert.match(first.analysis, /^Read by the session’s AI .*counted as one of your AI uses today\.$/);
+  const second = await kami.participant.addContext({ file: await agentFile(t, kami, 'two.pdf', '%PDF-1.7 two') });
+  assert.equal(second.analysis, 'Added, but the session’s AI did not read it: you have reached a daily limit of this session, likely your AI uses for today. Don’t add it again. A session admin can have it read.');
+  assert.equal(readings, 1);
+  assert.equal(byTitle(await kami.participant.listContext())[`${process.pid}-two.pdf`].readByAi, false);
+});
+
+test('in a session with cards off, an agent’s list shows the sources without cards and says so', async (t) => {
+  const env = await cardSessionEnv({ contextCardsEnabled: false });
+  const kami = await createAgent(env, 'Test Kami', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  const joined = await kami.participant.joinSession({ link: LINK });
+  assert.equal(joined.addingContext.limits.file, 'PDF up to 20 MB; Markdown, plain text, CSV or JSON up to 1 MB.');
+  t.mock.method(globalThis, 'fetch', async () => assert.fail('no AI is asked where cards are off'));
+  await kami.participant.addContext({ text: 'Residents asked for evening sessions.', title: 'Evenings' });
+  const listed = await kami.participant.listContext();
+  assert.deepEqual(listed.sources.map((source) => [source.title, source.card]), [['Evenings.md', undefined]]);
+  assert.match(listed.note, /context cards off, so its sources carry no summaries or tags/);
+  assert.deepEqual((await kami.participant.listContext({ query: 'evenings' })).matched, 1);
+  // Nor is a PDF sent to be read, even when the agent asks: only an admin can have that done here.
+  const deck = await kami.participant.addContext({ file: await agentFile(t, kami, 'deck.pdf', '%PDF-1.7 deck'), analyze: true });
+  assert.match(deck.analysis, /^Not read by the session’s AI/);
+  // And it takes no image, which is refused before anything is sent.
+  await assert.rejects(
+    kami.participant.addContext({ file: await agentFile(t, kami, 'chart.png', PNG) }),
+    /^Error: This session takes images only once an admin turns on Context cards in its settings\.$/,
+  );
+  assert.deepEqual((await kami.participant.listContext()).sources.map((source) => source.title), ['Evenings.md', `${process.pid}-deck.pdf`]);
+});
+
+test('with cards off, an admin’s agent has a PDF read only when it asks, and that costs it no AI use', async (t) => {
+  const wallet = ethers.Wallet.createRandom();
+  const env = await cardSessionEnv({ contextCardsEnabled: false, adminAddress: wallet.address });
+  const host = await createAgent(env, 'Test Host', [], null, { wallet });
+  t.after(() => fs.rm(host.stateDir, { recursive: true, force: true }));
+  await host.participant.joinSession({ link: LINK });
+  let readings = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    if (isReadingRequest(init)) readings += 1;
+    return aiReply('Plan: two steps.');
+  });
+  const unasked = await host.participant.addContext({ file: await agentFile(t, host, 'deck.pdf', '%PDF-1.7 deck') });
+  assert.deepEqual([unasked.analysis.startsWith('Not read by the session’s AI'), readings], [true, 0]);
+  const asked = await host.participant.addContext({ file: await agentFile(t, host, 'plan.pdf', '%PDF-1.7 plan'), analyze: true });
+  assert.equal(asked.analysis, 'Read by the session’s AI (16 characters). Its text is now context for whoever can see the file.');
+  assert.equal(readings, 1);
 });
 
 test('an agent makes a file, a link or a note visible to some of the session’s groups, as the website’s Visible to does', async (t) => {

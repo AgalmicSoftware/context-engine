@@ -19,9 +19,11 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'agentInstructions',
   'interviewMode',
   'interviewModeEnabled',
+  'analysisCardEnabled',
   'pileAutoAdvanceEnabled',
   'feedbackEnabled',
   'namesEnabled',
+  'contextCardsEnabled',
   'defaultFilterState',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
@@ -101,10 +103,14 @@ const CONTENT_FIELDS = new Set([
   'sessionAgent',
   // Checked on each group join, the same way.
   'groupMemberCeiling',
+  // Checked on each analysis card picture, save and read, the same way.
+  'analysisCardEnabled',
   // Checked on each feedback send, the same way.
   'feedbackEnabled',
   // Checked on each name read and change, the same way.
   'namesEnabled',
+  // Checked on each context add, card change and AI prompt, the same way.
+  'contextCardsEnabled',
   ...CURATED_ID_LIST_KEYS,
 ]);
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);

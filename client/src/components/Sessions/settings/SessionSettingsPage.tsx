@@ -44,10 +44,12 @@ import { describeWorkerModeError, listSessionModeConflicts } from '../../../util
 import {
   readWorkerCountsAiLimit,
   readWorkerRunsWorkersAi,
+  readWorkerHasAnalysisCard,
   readWorkerSessionAgentOptions,
   readWorkerKeepsDraftText,
   readWorkerTakesDataNote,
   readWorkerReleaseLabel,
+  readWorkerKeepsContextCards,
   readWorkerTakesFeedback,
 } from '../../../domains/worker/workerRelease';
 import { workerOffersGroupJoinChoices } from '@ce-shared/workerGroupJoin.mjs';
@@ -77,7 +79,13 @@ import {
 import { SettingsAiSection } from './SettingsAiSection';
 import { SettingsChainFacts, SettingsChainFields } from './SettingsChainFields';
 import SettingsFeedbackPanel from './SettingsFeedbackPanel';
-import { SettingsFeedbackField, SettingsQuestionListFields, SettingsSbtFields } from './SettingsListFields';
+import {
+  SettingsContextCardsField,
+  SettingsFeedbackField,
+  SettingsQuestionListFields,
+  SettingsSbtFields,
+} from './SettingsListFields';
+import { AnalysisCardChoice } from '../setup/SetupAiSection';
 import SettingsResultsAdminsField from './SettingsResultsAdminsField';
 
 type SessionSettingsPageProps = {
@@ -111,6 +119,8 @@ const SESSION_AGENT_LOCKED_REASON =
 const LISTS_LOCKED_REASON =
   'The ID lists are read-only here: this Session Worker is older and refuses them. Update the Worker to edit them.';
 
+// Settings a template changes only when it names them (see importTemplate).
+const CARD_SWITCHES = ['contextCardsEnabled', 'analysisCardEnabled'] as const;
 const lower = (value: unknown) => toStr(value).trim().toLowerCase();
 const sameJson = (left: unknown, right: unknown) =>
   JSON.stringify(canonicalizeSessionWizardJson(left ?? null)) ===
@@ -229,9 +239,13 @@ const SessionSettingsPage = ({
   const [workerKeepsDraftText, setWorkerKeepsDraftText] = useState<boolean | null>(null);
   // Whether it takes feedback about the app; an older one shows no Feedback section here or button on the session page.
   const [workerTakesFeedback, setWorkerTakesFeedback] = useState(false);
+  // Whether it keeps context cards; an older one would refuse the setting, so it isn't offered there.
+  const [workerKeepsCards, setWorkerKeepsCards] = useState(false);
   // Whether it counts a separate AI daily limit; an older one would store the field and ignore it.
   const [workerCountsAiLimit, setWorkerCountsAiLimit] = useState(false);
   const [workerRunsWorkersAi, setWorkerRunsWorkersAi] = useState(false);
+  // Whether it has the analysis card; an older one would refuse the setting, so it isn't offered there.
+  const [workerHasAnalysisCard, setWorkerHasAnalysisCard] = useState(false);
   // Whether it accepts the note on where research data goes; an older one would refuse the whole save.
   // On-chain sessions save to the registry, which takes it.
   const [workerTakesDataNote, setWorkerTakesDataNote] = useState(false);
@@ -242,8 +256,10 @@ const SessionSettingsPage = ({
     setWorkerRelease('');
     setWorkerKeepsDraftText(null);
     setWorkerTakesFeedback(false);
+    setWorkerKeepsCards(false);
     setWorkerCountsAiLimit(false);
     setWorkerRunsWorkersAi(false);
+    setWorkerHasAnalysisCard(false);
     setWorkerTakesDataNote(false);
     setWorkerAgentOptions({ recordChats: false, anyoneCanAsk: false });
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
@@ -255,11 +271,17 @@ const SessionSettingsPage = ({
     void readWorkerTakesFeedback(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesFeedback(takes);
     });
+    void readWorkerKeepsContextCards(workerOrigin, sessionSlug, fetchImpl).then((keeps) => {
+      if (!stale) setWorkerKeepsCards(keeps);
+    });
     void readWorkerCountsAiLimit(workerOrigin, sessionSlug, fetchImpl).then((counts) => {
       if (!stale) setWorkerCountsAiLimit(counts);
     });
     void readWorkerRunsWorkersAi(workerOrigin, sessionSlug, fetchImpl).then((runs) => {
       if (!stale) setWorkerRunsWorkersAi(runs);
+    });
+    void readWorkerHasAnalysisCard(workerOrigin, sessionSlug, fetchImpl).then((has) => {
+      if (!stale) setWorkerHasAnalysisCard(has);
     });
     void readWorkerTakesDataNote(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesDataNote(takes);
@@ -411,10 +433,18 @@ const SessionSettingsPage = ({
     }
   };
 
-  const importTemplate = (template: Record<string, unknown>) => {
+  const importTemplate = (template: Record<string, unknown>, named: string[] = []) => {
     const { draft: next, keptHosting } = applyTemplateToSessionSettingsDraft(draft, template);
     // An on-chain session's questions are published from its session page.
     if (onChain) next.questions = draft.questions;
+    // Context cards and the analysis card follow a template only where this page offers the setting, and only
+    // when the template names it: one made before the switch existed says nothing, so what is saved stays.
+    if (workerKeepsCards && !onChain && named.includes('contextCardsEnabled')) {
+      next.contextCardsEnabled = template.contextCardsEnabled === true;
+    }
+    if (workerHasAnalysisCard && !onChain && named.includes('analysisCardEnabled')) {
+      next.analysisCardEnabled = template.analysisCardEnabled === true;
+    }
     setDraft(next);
     setStatus(
       keptHosting
@@ -435,6 +465,7 @@ const SessionSettingsPage = ({
             })
           }
           onImport={importTemplate}
+          keptUnlessNamed={CARD_SWITCHES}
           fromLink={false}
           fileName={sessionSlug}
           linkBase={`${typeof window === 'undefined' ? '' : window.location.origin}/new`}
@@ -557,6 +588,7 @@ const SessionSettingsPage = ({
                   <option value="admin_only">Admins only</option>
                 </Input>
               </SetupField>
+              {workerKeepsCards && !onChain ? <SettingsContextCardsField draft={draft} onChange={updateDraft} /> : null}
               <ContextSourcesPanel
                 sessionSlug={sessionSlug}
                 sessionConfig={saved}
@@ -675,6 +707,11 @@ const SessionSettingsPage = ({
           lockedReason={onChain || workerMergesAi(saved) ? '' : AI_LOCKED_REASON}
           dailyLimit={!onChain && workerCountsAiLimit}
           workersAi={!onChain && workerRunsWorkersAi}
+          analysisCard={
+            !onChain && workerHasAnalysisCard ? (
+              <AnalysisCardChoice id="ce-settings-analysis-card" draft={draft} onChange={updateDraft} />
+            ) : null
+          }
           sessionAgent={
             onChain ? null : workerAnswersSessionAgent(saved) ? (
               <SetupSessionAgent

@@ -1,4 +1,4 @@
-import { CONTEXT_ROLE, CONTEXT_SOURCE_LIMITS, CONTEXT_TEXT_ROLE, contextRoleOf, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { CONTEXT_ROLE, CONTEXT_SOURCE_LIMITS, CONTEXT_TEXT_ROLE, contextCardsOn, contextRoleOf, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import { markStorageBackupWrite } from './storageBackupRevision.js';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
@@ -76,6 +76,7 @@ import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
 import { DRAFT_TEXT_PATHS, draftTextRoute } from './draftTextRoute.js';
+import { cardAfterContextUpload } from './contextCard.js';
 import { checkContextSourceUpload, contextSourceListFields } from './contextSourcePolicy.js';
 import { contextSourceRoute } from './contextSourceRoute.js';
 import { toStr } from './stringCoercion.js';
@@ -2453,7 +2454,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
           encryption: metadataAccess.encryption,
         },
         payloadAccessMode: deriveLegacyPayloadAccessMode(metadataAccess),
-        ...contextSourceListFields(metadata),
+        ...contextSourceListFields(metadata, { cards: contextCardsOn(config) }),
       },
     });
   }
@@ -3142,7 +3143,7 @@ export const removeCloudflareStorageRecords = async ({ env, slug, rows = [], mar
 };
 
 export const storageRoute = async ({
-  path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, checkFetchAccess, deps,
+  path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, checkFetchAccess, checkAiAccess, deps,
   answersChecked = false,
 } = {}) => {
   // A read invite opens reads only: never an upload, a context addition or a field key.
@@ -3197,10 +3198,13 @@ export const storageRoute = async ({
       return responseJson(deps, { error: 'Storage route upload is only available for Cloudflare storage.' }, 400, baseHeaders);
     }
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
-    return handleCloudflareUpload({
+    const uploaded = await handleCloudflareUpload({
       env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, parsedPayload: checked.payload || null, answersChecked,
       resourceId: checked.resourceId, baseHeaders, deps: routeDeps,
     });
+    // A text file added as context gets its card once it is stored.
+    if (payload.resource === 'docsContext') await cardAfterContextUpload({ response: uploaded, payload, env, config, slug, deps: routeDeps });
+    return uploaded;
   }
 
   const configuredBackend = resolveConfiguredStorageBackend({ config });
@@ -3210,7 +3214,7 @@ export const storageRoute = async ({
   if (path === '/storage/context' && method === 'POST') {
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
     return contextSourceRoute({
-      request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps, checkFetchAccess,
+      request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps, checkFetchAccess, checkAiAccess,
       // The upload's own access check, run before the Worker fetches a link's page.
       authorizeAdd: () => authorizeCloudflareStorageAccess({
         env, config, slug, resource: 'docsContext', operation: 'upload', requesterAddress: uploaderAddress, authScopes,

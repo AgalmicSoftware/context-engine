@@ -1,3 +1,4 @@
+import { normalizeAnalysisCard } from '../../utilities/analysisCard/analysisCardModel';
 import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
 export type UserPageAnalysisFingerprintInput = {
@@ -307,6 +308,7 @@ export const normalizeUserAnalysisResult = (result: unknown = {}) => {
       figure: historicalAlignment.figure || '',
       reasoning: historicalAlignment.reasoning || '',
     },
+    card: normalizeAnalysisCard(resultRecord.card),
   };
 };
 
@@ -327,6 +329,13 @@ export const buildUserPageAnalysisResultStatePatch = ({
     analysisName: normalizedResult.name,
     analysisHistoricalFigure: normalizedResult.historicalAlignment.figure,
     analysisHistoricalReasoning: normalizedResult.historicalAlignment.reasoning,
+    // A card kept with the analysis is shown by the card step, once the session and its Worker are known to
+    // have the card: shown here, it would flash up where the card is off.
+    analysisCard: null,
+    analysisCardPending: false,
+    analysisCardPicture: null,
+    analysisCardPublish: null,
+    analysisCardSavedAt: null,
     ...(includeElapsed ? { analysisElapsedMs: 0 } : {}),
     ...(includeError ? { analysisError: '', analysisErrorAction: '' } : {}),
     analyzing: false,
@@ -349,6 +358,11 @@ export const buildUserPageAnalysisResetStatePatch = ({
   analysisElapsedMs: 0,
   analysisHistoricalFigure: '',
   analysisHistoricalReasoning: '',
+  analysisCard: null,
+  analysisCardPending: false,
+  analysisCardPicture: null,
+  analysisCardPublish: null,
+  analysisCardSavedAt: null,
   analysisServedFromCache: false,
   analysisCachedAt: null,
 });

@@ -503,6 +503,33 @@ describe('saving the edit page through the Session Worker', () => {
     expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
   });
 
+  it('saves the Context cards choice only when it changes, and signs no one out', () => {
+    const stored = publishedSession();
+    // Off unless turned on: a session that never set it shows the box clear.
+    const on = editAndSave(stored, (draft) => {
+      expect(draft.contextCardsEnabled).toBe(false);
+      draft.contextCardsEnabled = true;
+    });
+    expect(on.save.patch).toEqual({ contextCardsEnabled: true });
+    expect(on.save.classification).toMatchObject({ content: ['contextCardsEnabled'], signsParticipantsOut: false });
+    expect(describeSessionSettingsPath('contextCardsEnabled')).toBe('Context cards');
+    expect(on.result).toMatchObject({ ok: true });
+    expect(projectPublicWorkerSessionConfig(on.result.config).contextCardsEnabled).toBe(true);
+
+    const off = editAndSave(on.result.config, (draft) => {
+      expect(draft.contextCardsEnabled).toBe(true);
+      draft.contextCardsEnabled = false;
+    });
+    expect(off.save.patch).toEqual({ contextCardsEnabled: false });
+    expect(off.result).toMatchObject({ ok: true });
+
+    // Left alone, it is never sent, so a Worker too old to know it refuses nothing.
+    const untouched = editAndSave(stored, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
+  });
+
   it('saves SBT defaults only where SBTs grant access, as the Worker requires', () => {
     const plain = editAndSave(publishedSession(), (draft) => {
       draft.defaultSbtTags = 'members';
@@ -700,6 +727,35 @@ describe('saving the edit page through the Session Worker', () => {
     expect(() => buildSessionSettingsSave(before, draft)).toThrow(
       'Session Agent: Audience 1, rule 1, needs at least one group.',
     );
+  });
+
+  it('saves the Analysis card choice only when it changes, and signs no one out', () => {
+    // A session made on /new has the card on, as the box there starts ticked.
+    const { analysisCardEnabled: made, ...stored } = publishedSession();
+    expect(made).toBe(true);
+    // Off unless turned on: a session that never set it, as every one from before the card, shows the box unticked.
+    const on = editAndSave(stored, (draft) => {
+      expect(draft.analysisCardEnabled).toBe(false);
+      draft.analysisCardEnabled = true;
+    });
+    expect(on.save.patch).toEqual({ analysisCardEnabled: true });
+    expect(on.save.classification).toMatchObject({ content: ['analysisCardEnabled'], signsParticipantsOut: false });
+    expect(describeSessionSettingsPath('analysisCardEnabled')).toBe('Analysis card');
+    expect(on.result).toMatchObject({ ok: true });
+    expect(projectPublicWorkerSessionConfig(on.result.config).analysisCardEnabled).toBe(true);
+
+    const off = editAndSave(on.result.config, (draft) => {
+      expect(draft.analysisCardEnabled).toBe(true);
+      draft.analysisCardEnabled = false;
+    });
+    expect(off.save.patch).toEqual({ analysisCardEnabled: false });
+    expect(off.result).toMatchObject({ ok: true });
+
+    // Left alone, it is never sent, so a Worker too old to know it refuses nothing.
+    const untouched = editAndSave(stored, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
   });
 
   it('saves nothing when nothing changed', () => {

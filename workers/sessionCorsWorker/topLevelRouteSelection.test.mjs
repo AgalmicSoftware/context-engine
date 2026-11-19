@@ -289,3 +289,22 @@ test('resolveTopLevelRouteSelection lets unsigned group discovery try the anonym
 test('routes cached interview opening generation to its dedicated handler', () => {
   assert.deepEqual(resolveTopLevelRouteSelection({ path: '/interview/starter', method: 'POST', request: createRequest(), deps: { toStr: String } }), { kind: 'interview-starter' });
 });
+
+test('an analysis card picture has no signed-out route: with or without a token it goes to sign-in', () => {
+  const select = (headers) => resolveTopLevelRouteSelection({
+    path: '/analysis-card/picture',
+    method: 'POST',
+    request: createRequest(headers),
+    deps: { toStr: String },
+  });
+  assert.deepEqual(select(), { kind: 'authenticated' });
+  assert.deepEqual(select({ Authorization: 'Bearer token' }), { kind: 'authenticated' });
+});
+
+test('a saved analysis card has no signed-out route: saving and reading both go to sign-in', () => {
+  for (const path of ['/analysis-card/publish', '/analysis-card/published']) {
+    const select = (headers) => resolveTopLevelRouteSelection({ path, method: 'POST', request: createRequest(headers), deps: { toStr: String } });
+    assert.deepEqual(select(), { kind: 'authenticated' }, path);
+    assert.deepEqual(select({ Authorization: 'Bearer token' }), { kind: 'authenticated' }, path);
+  }
+});

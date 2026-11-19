@@ -2761,6 +2761,7 @@ const SessionWizard = ({
             onChange={updateDraftValue}
             pending={pendingContextFiles}
             groups={contextFileGroups}
+            sessionConfig={sessionCreated ? publishedSessionConfig : null}
           />
         ) : null
       }

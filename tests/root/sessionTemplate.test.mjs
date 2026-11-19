@@ -89,14 +89,18 @@ test('a template with only its format takes every default', () => {
   const template = valid({ format });
   assert.deepEqual(Object.keys(template), [
     'format', 'draftId', 'sessionName', 'sessionInfo', 'sessionHeader', 'sessionEndsAt', 'appearance',
-    'sessionContext', 'contextFiles', 'questionsGenPrompt', 'questions', 'defaultTags', 'defaultGroupTags', 'groupCreationPolicy',
+    'sessionContext', 'contextFiles', 'contextCardsEnabled', 'questionsGenPrompt', 'questions', 'defaultTags', 'defaultGroupTags', 'groupCreationPolicy',
     'interviewModeEnabled', 'interviewMode', 'resultsAnalysis', 'ai', 'sessionModeProfile',
+    'analysisCardEnabled',
   ]);
   assert.equal(template.format, format);
   assert.equal(template.sessionName, '');
   assert.deepEqual(template.sessionContext, { title: '', paragraphs: [], links: [], html: '' });
   assert.equal(template.groupCreationPolicy, 'participants');
   assert.equal(template.interviewModeEnabled, true);
+  // Context cards are off unless a template turns them on.
+  assert.equal(template.contextCardsEnabled, false);
+  assert.equal(valid({ format, contextCardsEnabled: true }).contextCardsEnabled, true);
   assert.deepEqual(template.interviewMode, { ...DEFAULT_INTERVIEW_SETTINGS, realtimeModel: 'gpt-live-1' });
   assert.deepEqual(template.resultsAnalysis, DEFAULT_RESULTS_ANALYSIS_SETTINGS);
   // New sessions default to the current models: Terra and Sol, and gpt-transcribe.
@@ -106,6 +110,9 @@ test('a template with only its format takes every default', () => {
     transcription: { provider: 'openai', model: 'gpt-transcribe' },
   });
   assert.equal(template.sessionModeProfile, null);
+  // The analysis card is on unless a template turns it off.
+  assert.equal(template.analysisCardEnabled, true);
+  assert.equal(valid({ format, analysisCardEnabled: false }).analysisCardEnabled, false);
 });
 
 test('missing nested fields take defaults; a mode profile is taken whole', () => {
@@ -157,16 +164,20 @@ test('types are checked, and the format is required', () => {
     interviewMode: { groupSuggestionData: 'town' },
     sessionContext: { paragraphs: 'one' },
     contextFiles: [{ name: null }],
+    contextCardsEnabled: 'yes',
     sessionModeProfile: { ...workerProfile(), evm: { registryChainId: '11155420' } },
+    analysisCardEnabled: 'no',
   });
   assert.deepEqual(errors.map((error) => error.path), [
     'format',
     'sessionName',
     'sessionContext.paragraphs',
     'contextFiles.0.name',
+    'contextCardsEnabled',
     'interviewModeEnabled',
     'interviewMode.groupSuggestionData',
     'sessionModeProfile.evm.registryChainId',
+    'analysisCardEnabled',
   ]);
   assert.deepEqual(errorsOf({ format: 'ce.session-template/v2' }).map((error) => error.path), ['format']);
   assert.deepEqual(errorsOf(['not', 'a', 'template']), [{ path: '', message: 'A session template must be a JSON object.' }]);

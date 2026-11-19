@@ -1,5 +1,6 @@
 import { Input } from 'reactstrap';
 
+import { CONTEXT_CARDS_HELP } from '../setup/ContextSourcesPanel';
 import { SetupCheck, SetupField, setupHelpId } from '../setup/SetupPrimitives';
 import { asRecord, text, type SetupDraft } from '../setup/setupSectionTypes';
 import styles from '../setup/SessionSetup.module.scss';
@@ -157,6 +158,18 @@ export const SettingsSbtFields = ({ draft, onChange, onChain }: FieldsProps & { 
       </>
     ) : null}
   </>
+);
+
+// Whether the session's AI writes a card for each context source, the session takes images, and the AI reads a PDF or image for whoever adds it.
+export const SettingsContextCardsField = ({ draft, onChange }: FieldsProps) => (
+  <SetupCheck
+    id="ce-settings-context-cards"
+    label="Context cards"
+    help={CONTEXT_CARDS_HELP}
+    checked={draft.contextCardsEnabled === true}
+    testId="ce-settings-context-cards"
+    onChange={(checked) => onChange(['contextCardsEnabled'], checked)}
+  />
 );
 
 // Whether the session page offers its Feedback button, for feedback about the app itself.

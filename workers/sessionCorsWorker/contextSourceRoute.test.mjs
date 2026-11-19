@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildPdfReadRequest, PDF_READ_PROMPT } from './contextDocumentRead.js';
+import { buildContextReadRequest, IMAGE_READ_PROMPT, PDF_READ_PROMPT } from './contextDocumentRead.js';
+import { loadParticipantContextSources } from './contextSourceLoader.js';
+import { buildSessionContextPrompt } from '../../shared/sessionContextText.mjs';
 import { agentAdderTags, groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, PDF_BYTES, harness, idOf, json, pageResponse } from './contextSourceTestFixture.mjs';
 import { publishCloudflareOwnedStorageMetadata } from './storageRouteExecution.js';
@@ -612,7 +614,7 @@ test('the request body carries the PDF as base64 bytes without copying it into a
   for (const length of [0, 1, 2, 3, 4, 5, 1000]) {
     const bytes = Uint8Array.from({ length }, (_, index) => (index * 37) % 256);
     for (const provider of ['anthropic', 'openai']) {
-      const { body } = buildPdfReadRequest({ provider, model: provider === 'openai' ? 'gpt-4.1' : 'claude-sonnet-5-5', maxTokens: 10, bytes, filename: 'a.pdf' });
+      const { body } = buildContextReadRequest({ provider, model: provider === 'openai' ? 'gpt-4.1' : 'claude-sonnet-5-5', maxTokens: 10, bytes, filename: 'a.pdf' });
       const parsed = JSON.parse(new TextDecoder().decode(body));
       const data = provider === 'anthropic'
         ? parsed.messages[0].content[0].source.data
@@ -624,7 +626,7 @@ test('the request body carries the PDF as base64 bytes without copying it into a
 });
 
 test('a PDF reading sends the session effort to the models that take one', () => {
-  const read = (provider, model, reasoningEffort) => JSON.parse(new TextDecoder().decode(buildPdfReadRequest({
+  const read = (provider, model, reasoningEffort) => JSON.parse(new TextDecoder().decode(buildContextReadRequest({
     provider, model, maxTokens: 10, reasoningEffort, bytes: new Uint8Array(3), filename: 'a.pdf',
   }).body));
   assert.deepEqual(read('openai', 'gpt-6.1-terra', 'low').reasoning, { effort: 'low' });
@@ -694,7 +696,7 @@ test('a second read of a PDF already being read is refused, and the first keeps 
   assert.match((await second.json()).error, /already being read/);
   release();
   const reading = await idOf(await first);
-  assert.equal(h.providerCalls.length, 1);
+  assert.equal(h.pdfReads().length, 1);
   assert.equal(await (await h.read(reading, ADMIN)).text(), 'First text.');
   assert.equal(JSON.parse(await h.kv.get(`ce-storage:salon:docsContext:${pdf}`)).contextReadingId, reading);
   // The finished read frees the PDF, and the next reading replaces this one.
@@ -766,7 +768,7 @@ test('unknown actions and a file name holding the body placeholder are handled',
     const response = await h.context({ action });
     assert.equal(response.status, 400, action);
   }
-  const { body } = buildPdfReadRequest({
+  const { body } = buildContextReadRequest({
     provider: 'openai', model: 'gpt-4.1', maxTokens: 10, bytes: PDF_BYTES, filename: 'x__CE_PDF_BASE64__y.pdf',
   });
   const parsed = JSON.parse(new TextDecoder().decode(body));
@@ -786,4 +788,87 @@ test('a link that looks like it holds a secret is refused before any fetch', asy
     assert.equal((await h.context({ action: 'add-link', url: 'https://example.org/doc', title }, address)).status, 400);
   }
   assert.deepEqual(h.pageCalls, []);
+});
+
+// Not a real picture: the Worker stores and forwards an image's bytes and never decodes them.
+const IMAGE_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5]);
+
+test('an image is context whose text is the AI’s reading of it, as a PDF’s is', async () => {
+  const h = harness({
+    cards: true,
+    provider: async () => json({ content: [{ type: 'text', text: 'Title: Turnout by region. North 61%, South 48%.' }], stop_reason: 'end_turn' }),
+  });
+  const image = await idOf(await h.uploadFile({ name: 'turnout.png', type: 'image/png', bytes: IMAGE_BYTES, adminsOnly: true }));
+  // Nothing of an image reaches an AI until it is read: it has no text of its own.
+  const unread = await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, readable: () => true });
+  assert.deepEqual([unread.sources, unread.unreadable], [[], 0]);
+
+  const response = await h.context({ action: 'read-pdf', id: image });
+  const { text } = await response.json();
+  assert.deepEqual([response.status, text.derivedFrom], [200, image]);
+  const [imageBlock, textBlock] = h.providerCalls[0].body.messages[0].content;
+  assert.deepEqual(imageBlock, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: Buffer.from(IMAGE_BYTES).toString('base64') } });
+  assert.deepEqual(textBlock, { type: 'text', text: IMAGE_READ_PROMPT });
+
+  // The reading sits beside the image under the image's own rule.
+  const reading = (await h.list(ADMIN)).find((item) => item.storageRef.id === text.id);
+  assert.deepEqual([tagOf(reading, 'CE-DocRole'), tagOf(reading, 'CE-DocDerivedFromTx'), reading.metadata.adminsOnly], ['context-text', image, true]);
+  assert.equal((await h.read(text.id, PARTICIPANT)).status, 403);
+  // An AI acting for someone who may read it gets the reading, marked as read from an image.
+  const { sources } = await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps, readable: () => true });
+  assert.deepEqual(sources.map((source) => [source.title, source.text, source.readByAi]), [['turnout.png', 'Title: Turnout by region. North 61%, South 48%.', 'image']]);
+  assert.match(buildSessionContextPrompt({ sources }).text, /"readBy":"the session’s AI, from an image"/);
+  assert.deepEqual((await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps: h.deps })).sources, [], 'not for everyone');
+  // Removing the image removes its reading.
+  assert.deepEqual((await (await h.context({ action: 'remove', id: image })).json()).removed.sort(), [image, text.id].sort());
+});
+
+test('an OpenAI session reads an image through the Responses API image input', async () => {
+  const h = harness({
+    cards: true,
+    ai: { mode: 'openai', model: 'gpt-5.6-terra' },
+    provider: async () => json({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'A photo of a town hall.' }] }], status: 'completed' }),
+  });
+  const image = await idOf(await h.uploadFile({ name: 'hall.jpg', type: 'image/jpeg', bytes: IMAGE_BYTES }));
+  assert.equal((await h.context({ action: 'read-pdf', id: image })).status, 200);
+  const [imagePart, textPart] = h.providerCalls[0].body.input[0].content;
+  assert.deepEqual(imagePart, { type: 'input_image', image_url: `data:image/jpeg;base64,${Buffer.from(IMAGE_BYTES).toString('base64')}` });
+  assert.deepEqual(textPart, { type: 'input_text', text: IMAGE_READ_PROMPT });
+});
+
+test('context images are PNG, JPEG or WebP of at most 5 MB; a text file is never sent to be read', async () => {
+  const h = harness({ cards: true });
+  for (const [options, status, reason] of [
+    [{ name: 'a.webp', type: 'image/webp', bytes: IMAGE_BYTES }, 200, undefined],
+    [{ name: 'a.jpeg', type: 'image/jpeg', bytes: new Uint8Array(5 * 1024 * 1024) }, 200, undefined],
+    [{ name: 'b.png', type: 'image/png', bytes: new Uint8Array(5 * 1024 * 1024 + 1) }, 413, 'context_too_large'],
+    // A script can hide in an SVG, and only a GIF's first frame would be read.
+    [{ name: 'c.svg', type: 'image/svg+xml', bytes: IMAGE_BYTES }, 415, 'context_type_unsupported'],
+    [{ name: 'd.gif', type: 'image/gif', bytes: IMAGE_BYTES }, 415, 'context_type_unsupported'],
+  ]) {
+    const response = await h.uploadFile(options);
+    const body = await response.json();
+    assert.deepEqual([response.status, body.reason], [status, reason], JSON.stringify(body));
+    if (status === 413) assert.match(body.error, /larger than 5 MB, the most a context image may be/);
+  }
+  const notes = await idOf(await h.uploadFile({ name: 'notes.txt', type: 'text/plain', bytes: new TextEncoder().encode('Notes') }));
+  assert.equal((await h.context({ action: 'read-pdf', id: notes })).status, 404);
+  assert.equal(h.pdfReads().length, 0);
+});
+
+test('a session with cards off takes no image, from an admin or anyone: it holds only what it held before', async () => {
+  const h = harness({ provider: async () => json({ content: [{ type: 'text', text: 'A bar chart.' }] }) });
+  for (const address of [ADMIN, PARTICIPANT]) {
+    const refused = await h.uploadFile({ address, name: 'chart.png', type: 'image/png', bytes: IMAGE_BYTES });
+    assert.deepEqual([refused.status, (await refused.json()).reason], [415, 'context_images_off']);
+  }
+  assert.deepEqual(await h.list(ADMIN), []);
+  // An image added while cards were on stays, and an admin can still have it read.
+  h.state.config = { ...h.state.config, contextCardsEnabled: true };
+  const image = await idOf(await h.uploadFile({ name: 'chart.png', type: 'image/png', bytes: IMAGE_BYTES }));
+  h.state.config = { ...h.state.config, contextCardsEnabled: false };
+  assert.deepEqual((await h.list(ADMIN)).map((item) => item.storageRef.id), [image]);
+  assert.equal((await h.context({ action: 'read-pdf', id: image })).status, 200);
+  assert.equal(h.pdfReads().length, 1);
+  assert.equal((await h.uploadFile({ name: 'deck.pdf' })).status, 200, 'a PDF is taken as before');
 });

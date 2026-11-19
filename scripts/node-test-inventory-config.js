@@ -3,7 +3,10 @@
 const ROOT_NODE_TEST_FILES = Object.freeze([
   'tests/root/agentFidelity.test.mjs',
   'tests/root/agentParticipant.worker.test.mjs',
+  'tests/root/analysisCardPicture.test.mjs',
+  'tests/root/analysisCardSaved.test.mjs',
   'tests/root/canonicalJson.test.mjs',
+  'tests/root/contextCards.test.mjs',
   'tests/root/sessionAgent.test.mjs',
   'tests/root/linkPayload.test.mjs',
   'tests/root/protectedResponses.worker.test.mjs',

@@ -137,8 +137,10 @@ test('dispatchAuthenticatedSecretPathRoute blocks participant writes after the s
   // private item, while a participant's new link is refused there.
   const preflights = [];
   let checkFetchAccess = null;
+  let checkAiAccess = null;
   const contextChange = await dispatchAuthenticatedSecretPathRoute({
     ...base,
+    config: { ...base.config, limits: { perWalletPerDay: 50, aiPerWalletPerDay: 3 } },
     path: '/storage/context',
     method: 'POST',
     address: '0xabc',
@@ -148,10 +150,11 @@ test('dispatchAuthenticatedSecretPathRoute blocks participant writes after the s
       ...deps,
       storageRoute: async (value) => {
         checkFetchAccess = value.checkFetchAccess;
+        checkAiAccess = value.checkAiAccess;
         return new Response('context');
       },
-      evaluateAuthenticatedRoutePreflight: async ({ scope, route, address, limit }) => {
-        preflights.push({ scope, route, address, limit });
+      evaluateAuthenticatedRoutePreflight: async ({ scope, route, address, limit, countLater }) => {
+        preflights.push({ scope, route, address, limit, ...(countLater ? { countLater } : {}) });
         return { ok: true };
       },
     },
@@ -162,6 +165,10 @@ test('dispatchAuthenticatedSecretPathRoute blocks participant writes after the s
   assert.deepEqual(preflights, [{ scope: 'storage', route: 'storage', address: '0xabc', limit: 7 }]);
   assert.deepEqual(await checkFetchAccess(), { ok: true });
   assert.deepEqual(preflights[1], { scope: 'fetch', route: 'fetch', address: '0xabc', limit: 7 });
+  // Having the AI read a file they added counts as an AI call does, against the session's AI limit,
+  // but only once the route has begun the reading: the check leaves the counting to it.
+  assert.deepEqual(await checkAiAccess(), { ok: true });
+  assert.deepEqual(preflights[2], { scope: 'ai', route: 'ai', address: '0xabc', limit: 3, countLater: true });
 
   for (const path of ['/groups/list', '/groups/members']) {
     const readable = await dispatchAuthenticatedSecretPathRoute({

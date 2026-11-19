@@ -44,9 +44,11 @@ export type DraftState = UnknownRecord &
     lit?: UnknownRecord;
     rpc?: UnknownRecord;
     sponsored?: DraftSponsoredState;
+    analysisCardEnabled?: boolean;
     sessionModeProfile?: UnknownRecord;
     groupCreationPolicy?: string;
     interviewModeEnabled?: boolean;
+    contextCardsEnabled?: boolean;
     interviewMode?: Partial<import('../../../../shared/interviewSettings.mjs').InterviewSettings> & {
       enabled?: boolean;
       provider?: string;

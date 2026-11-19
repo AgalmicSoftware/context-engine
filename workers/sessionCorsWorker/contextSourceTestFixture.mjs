@@ -6,7 +6,9 @@ import { installSessionCoordinatorBinding } from '../../tests/helpers/sessionCor
 // session coordinator, a session with the default access, pages from a scripted
 // network, and a scripted AI provider. Nothing here reaches a real network or service.
 // `state.scopes` are a signed-in caller's scopes, and `state.fetchAccess` is what
-// the dispatcher's fetch check answers.
+// the dispatcher's fetch check answers. `state.aiAccess` is what its AI check answers, and
+// `state.aiCount` what that check's `count()` does: null counts the call (in `aiCounts`). Work a route leaves for after its reply
+// (a source's card) is held as the runtime holds it; `settled()` waits for it.
 export const ADMIN = `0x${'1'.repeat(40)}`;
 export const PARTICIPANT = `0x${'2'.repeat(40)}`;
 const ADMINS_ONLY = { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] };
@@ -72,7 +74,8 @@ const createR2 = () => {
 export const pageResponse = (body, type = 'text/html; charset=utf-8') => new Response(body, { headers: { 'content-type': type } });
 
 // `r2: false` binds no R2, as deployed Workers do: every item's bytes are then a KV key.
-export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthropic', model: 'claude-sonnet-5-5' }, provider, r2: withR2 = true } = {}) => {
+// `cards: true` turns the session's context cards on; they are off unless an admin does.
+export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthropic', model: 'claude-sonnet-5-5' }, provider, r2: withR2 = true, cards = false } = {}) => {
   const kv = createKv();
   const r2 = withR2 ? createR2() : null;
   const env = installSessionCoordinatorBinding({
@@ -84,12 +87,17 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
       adminAddress: ADMIN,
       storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate', encryption, accessConditions: SESSION_CONDITIONS } },
       ai: { mode: ai.mode, models: { fast: { provider: ai.mode, model: ai.model }, thinking: { provider: ai.mode, model: ai.model } } },
+      ...(cards ? { contextCardsEnabled: true } : {}),
     },
     scopes: { storage: true, fetch: true },
     fetchAccess: { ok: true },
+    aiAccess: { ok: true },
+    aiCount: null,
   };
   const pageCalls = [];
   const fetchChecks = [];
+  const aiChecks = [];
+  const aiCounts = [];
   const network = async (url, init) => {
     pageCalls.push(String(url));
     const page = pages[String(url)];
@@ -97,13 +105,15 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
     return typeof page === 'function' ? page(init) : page;
   };
   const providerCalls = [];
+  const background = [];
   const { safeFetch, isBlockedOutboundUrl } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: network } });
   const deps = {
     json,
+    waitUntil: (work) => { background.push(work); },
     safeFetch,
     isBlockedOutboundUrl,
     fetch: async (url, init) => {
-      providerCalls.push({ url: String(url), init, body: JSON.parse(new TextDecoder().decode(init.body)) });
+      providerCalls.push({ url: String(url), init, body: JSON.parse(typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body)) });
       return provider ? provider(String(url), init) : json({ error: { message: 'no provider' } }, 500);
     },
     getSessionSecrets: async () => ({ anthropicKey: 'synthetic-anthropic-key', openaiKey: 'synthetic-openai-key' }),
@@ -139,6 +149,17 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
       fetchChecks.push(address);
       return state.fetchAccess;
     },
+    checkAiAccess: async () => {
+      aiChecks.push(address);
+      const access = await state.aiAccess;
+      if (!access?.ok) return access;
+      const count = async () => {
+        if (state.aiCount) return state.aiCount;
+        aiCounts.push(address);
+        return null;
+      };
+      return { ...access, count };
+    },
     deps,
   });
   const tags = (role, kind, extra = []) => [
@@ -161,7 +182,12 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
   const context = (body, address = ADMIN) => call('/storage/context', { method: 'POST', body, address });
   const list = async (address) => (await (await call('/storage/list?resource=docsContext&role=context', { address })).json()).items;
   const read = (id, address) => call(`/storage/read?id=${encodeURIComponent(id)}`, { address });
-  return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, fetchChecks, providerCalls };
+  const settled = async () => { while (background.length) await background.shift(); };
+  // The provider calls that read a PDF or an image, apart from the calls that write cards.
+  const pdfReads = () =>
+    providerCalls.filter((made) =>
+      ['document', 'image', 'input_file', 'input_image'].includes(made.body?.messages?.[0]?.content?.[0]?.type ?? made.body?.input?.[0]?.content?.[0]?.type));
+  return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, fetchChecks, aiChecks, aiCounts, providerCalls, pdfReads, settled };
 };
 
 export const idOf = async (response) => {

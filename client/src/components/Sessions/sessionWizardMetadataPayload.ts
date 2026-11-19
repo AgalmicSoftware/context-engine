@@ -71,6 +71,12 @@ export const resolveSessionWizardMetadataPayloadBase = ({
   delete metadata.draftId;
   delete metadata.contextFiles;
   delete metadata.questions;
+  // The analysis card's switch is a Session Worker setting, sent with its
+  // config; an on-chain session keeps none.
+  delete metadata.analysisCardEnabled;
+  // So is Context cards: a box ticked, or a template's choice, before the
+  // hosting became on-chain is not published.
+  delete metadata.contextCardsEnabled;
   if (metadata.defaultFeaturedSBTs != null) {
     metadata.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(metadata.defaultFeaturedSBTs);
   }

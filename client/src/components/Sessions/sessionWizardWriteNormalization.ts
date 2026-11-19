@@ -190,6 +190,8 @@ export const sanitizeSessionWizardMetadataPayload = (
   let next = cloneValue(metadata) as AnyRecord;
   next = stripAuthoritativeSessionGateFields(next) as AnyRecord;
   next = stripWorkerOnlyMetadataFields(next) as AnyRecord;
+  // Context cards are a Session Worker setting; no published metadata carries the switch.
+  delete next.contextCardsEnabled;
   next = normalizeLitMetadataNetwork(next) as AnyRecord;
   next = normalizeSessionNaming(next) as AnyRecord;
   next.sessionName = trimString(next.sessionName);
@@ -505,6 +507,9 @@ export const buildSessionWizardWorkerConfigPayload = ({
     const sessionAgent = validateSessionAgent(resolvedDraft.sessionAgent ?? null);
     if (!sessionAgent.ok) throw new Error(`Fix the Session Agent: ${sessionAgent.errors[0].message}`);
     if (sessionAgent.value) next.sessionAgent = sessionAgent.value;
+    // Context cards. Off is left out, as older Workers refuse the field; the
+    // config writers then keep whatever the Worker's config already holds.
+    if (resolvedDraft.contextCardsEnabled === true) next.contextCardsEnabled = true;
     // The default is left out, so a Worker without the setting takes the session.
     const ceiling = trimString(resolvedDraft.groupMemberCeiling);
     if (ceiling && Number(ceiling) !== WORKER_GROUP_MEMBER_CEILING_DEFAULT) {
@@ -515,6 +520,12 @@ export const buildSessionWizardWorkerConfigPayload = ({
       }
       next.groupMemberCeiling = Number(ceiling);
     }
+    // The analysis card. Its box starts ticked, so a new session has the card
+    // unless the box is unticked. Off is left out, as older Workers refuse the
+    // field. The config writers leave `true` out too for a Worker without the
+    // card and for a session that exists and never saved the switch: a ticked
+    // default is not a choice.
+    if (resolvedDraft.analysisCardEnabled !== false) next.analysisCardEnabled = true;
     if (usesOnChainSbt) {
       next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
       next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(resolvedDraft.defaultFeaturedSBTs);

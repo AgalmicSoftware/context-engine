@@ -694,6 +694,78 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
   }
 }
 
+/**
+ * Write the words of a personal analysis card: a second request, made once the analysis is on screen so the
+ * analysis itself stays quick. Returns the model's reply as it came; the card is built from it, and checked
+ * against the answers it may quote, where it is shown. Throws when the request fails.
+ *
+ * @param {object} userData - the same payload the analysis was given
+ * @param {{name?, summary?, details?, figure?, reasoning?}} analysis - what the analysis said
+ */
+export async function analyzeUserCard(userData: unknown, analysis: unknown = {}, opts: unknown = {}) {
+  const { default: buildUserAnalysisCardPrompt, USER_ANALYSIS_CARD_RESPONSE_FORMAT } =
+    await import('../../prompts/userAnalysisCardPrompt.js');
+  const prompt = buildUserAnalysisCardPrompt(userData, asRecord(analysis));
+  const aiCallOpts = {
+    ...withAiTaskTypeFallback(opts, 'summarize'),
+    response_format: USER_ANALYSIS_CARD_RESPONSE_FORMAT,
+  };
+  const { text: raw } = await enqueueAiCallWithRetry(() => callAICompletion(prompt, aiCallOpts));
+  const card = asParsedJsonRecord(parseJsonFlexible(raw));
+  if (!card) throw new Error('The AI reply was not a card.');
+  return card;
+}
+
+export type AnalysisCardPictureReply = { dataUrl: string; accentHex: string };
+const analysisCardPictures = new Map<string, AnalysisCardPictureReply>();
+// Answers that will not change during a visit: the figure cannot be drawn, or the session has no key to draw with.
+const ANALYSIS_CARD_PICTURE_REFUSALS = new Set([
+  'figure_not_recognised',
+  'picture_refused',
+  'picture_needs_openai_key',
+]);
+const analysisCardPictureRefusals = new Map<string, string>();
+
+/**
+ * Fetch the illustration for a personal analysis card: the matched historical figure, drawn in a style of
+ * their own time. The Session Worker makes it with the session's key and keeps one per figure; only the
+ * figure's name is sent, never an answer. Throws when the session cannot make one.
+ */
+export async function fetchAnalysisCardPicture(figure: string, opts: unknown = {}): Promise<AnalysisCardPictureReply> {
+  const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
+  const key = `${String(sessionSlug || '')}\n${figure}`;
+  const known = analysisCardPictures.get(key);
+  if (known) return known;
+  const refusal = analysisCardPictureRefusals.get(key);
+  if (refusal) throw new Error(refusal);
+  const allowDemoFallback = defaultStrictAllowDemoFallback();
+  const corsWorkerUrl = await getCorsProxyUrlOrThrow({ sessionSlug, sessionConfig, context, allowDemoFallback });
+  const { baseUrl } = resolveAiWorkerEndpoint(corsWorkerUrl);
+  const response = await fetchWorkerWithAuth(
+    `${baseUrl}/analysis-card/picture`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ figure }) },
+    // Asked for by the page, not the person: a lapsed sign-in leaves the card without a picture, it never
+    // raises a sign-in prompt.
+    { sessionSlug, sessionConfig, context, workerUrl: baseUrl, allowDemoFallback, prompt: false },
+  );
+  const data = asRecord(await response.json().catch(() => ({})));
+  const image = asRecord(data.image);
+  const mime = /^image\/(?:jpeg|png|webp)$/.test(String(image.mime)) ? String(image.mime) : '';
+  if (!response.ok || !mime || typeof image.base64 !== 'string' || !image.base64) {
+    const reason = typeof data.error === 'string' && data.error ? data.error : 'picture_unavailable';
+    if (ANALYSIS_CARD_PICTURE_REFUSALS.has(reason)) analysisCardPictureRefusals.set(key, reason);
+    throw new Error(reason);
+  }
+  const picture = {
+    dataUrl: `data:${mime};base64,${image.base64}`,
+    accentHex: String(asRecord(data.look).accentHex || ''),
+  };
+  // A few pictures are kept for the visit, so reopening an analysis does not fetch its picture again.
+  if (analysisCardPictures.size >= 12) analysisCardPictures.delete(analysisCardPictures.keys().next().value as string);
+  analysisCardPictures.set(key, picture);
+  return picture;
+}
+
 /* ======================================================================
  * Compare Toolkit — AI calls only (no math here)
  * ====================================================================== */

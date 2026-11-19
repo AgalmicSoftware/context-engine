@@ -788,6 +788,40 @@ describe('sessionWizardWriteNormalization', () => {
     expect(() => build('2.5')).toThrow('Most members in a group: a whole number from 1 to 10,000.');
   });
 
+  test('buildSessionWizardWorkerConfigPayload sends Context cards only when the draft turns them on', () => {
+    const build = (contextCardsEnabled: unknown) =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'context-cards',
+        draft: {
+          contextCardsEnabled,
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+        workerUrl: 'https://worker.example',
+      });
+
+    expect(build(true)).toHaveProperty('contextCardsEnabled', true);
+    // Off is left out, as older Workers refuse the field; the config writers keep a stored choice.
+    expect(build(false)).not.toHaveProperty('contextCardsEnabled');
+    expect(build(undefined)).not.toHaveProperty('contextCardsEnabled');
+    expect(build('true')).not.toHaveProperty('contextCardsEnabled');
+    // Cards are a Session Worker feature: an on-chain session's Worker config and metadata never carry the switch.
+    const onChain = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    expect(
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'context-cards',
+        draft: { contextCardsEnabled: true, sessionModeProfile: onChain },
+        workerUrl: 'https://worker.example',
+      }),
+    ).not.toHaveProperty('contextCardsEnabled');
+    expect(
+      sanitizeSessionWizardMetadataPayload({
+        slug: 'context-cards',
+        contextCardsEnabled: true,
+        sessionModeProfile: onChain,
+      }),
+    ).not.toHaveProperty('contextCardsEnabled');
+  });
+
   test('buildSessionWizardWorkerConfigPayload sends the Session Agent as the Worker stores it, and leaves it out when off', () => {
     const build = (
       sessionAgent: unknown,
@@ -1239,6 +1273,35 @@ describe('sessionWizardWriteNormalization', () => {
     expect(workerPayload.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
     expect(workerPayload.litCredentials).toEqual({});
   });
+});
+
+test('buildSessionWizardWorkerConfigPayload sends the analysis card on unless the draft unticks it', () => {
+  const build = (analysisCardEnabled: unknown) =>
+    buildSessionWizardWorkerConfigPayload({
+      slug: 'analysis-card',
+      draft: {
+        analysisCardEnabled,
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+      workerUrl: 'https://worker.example',
+    });
+
+  // The box on /new starts ticked, so a new session has the card: a draft that says nothing means on.
+  expect(build(true)).toHaveProperty('analysisCardEnabled', true);
+  expect(build(undefined)).toHaveProperty('analysisCardEnabled', true);
+  // Off is the resting state and is left out, as a Worker without the setting would refuse it.
+  expect(build(false)).not.toHaveProperty('analysisCardEnabled');
+  // The card is a Session Worker's: an on-chain session's Worker config never carries the switch.
+  expect(
+    buildSessionWizardWorkerConfigPayload({
+      slug: 'analysis-card',
+      draft: {
+        analysisCardEnabled: true,
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      },
+      workerUrl: 'https://worker.example',
+    }),
+  ).not.toHaveProperty('analysisCardEnabled');
 });
 
 it('rejects a blank owner opening before either publication write', () => {
