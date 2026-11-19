@@ -243,7 +243,8 @@ test('active agent docs preserve HTTP access and distinguish historical review e
   const readme = read('README.md');
   const research = readIfPresent('docs/session-interview-research.md');
 
-  assert.match(readme, /Agent token login in the browser/);
+  // The log-in dialog's agent token control is hidden for now, so the README doesn't offer it.
+  assert.doesNotMatch(readme, /Agent token login in the browser/);
   assert.doesNotMatch(readme, /Optional Telegram bot and Mini App adapters/);
   assert.match(architecture, /OnePageSessionAgentShell\.tsx/);
   assert.match(architecture, /agentSessionBackend\.ts/);

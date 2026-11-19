@@ -1,3 +1,11 @@
+// The dialog's agent token control is hidden for now; these tests keep the code behind it working.
+let mockAgentTokenLoginOffered = true;
+jest.mock('./agentTokenLoginOffered', () => ({
+  __esModule: true,
+  get AGENT_TOKEN_LOGIN_OFFERED() {
+    return mockAgentTokenLoginOffered;
+  },
+}));
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';

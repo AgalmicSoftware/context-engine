@@ -1,3 +1,4 @@
+import { AGENT_TOKEN_LOGIN_OFFERED } from '../Account/agentTokenLoginOffered';
 import React, { Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSignOutAlt, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
@@ -126,18 +127,24 @@ const OnePageSessionAgentShell = ({
             fade={false}
           >
             <strong>Agent-enabled session</strong>
-            <span>
-              Sign in with a Context Engine agent token to view questions, access groups, and participant-visible
-              results in the web client.
-            </span>
-            <button
-              type="button"
-              className={styles.agentPrimaryButton}
-              data-testid="ce-agent-http-login-open"
-              onClick={onOpenLoginModal}
-            >
-              Log in with agent token
-            </button>
+            {AGENT_TOKEN_LOGIN_OFFERED ? (
+              <>
+                <span>
+                  Sign in with a Context Engine agent token to view questions, access groups, and participant-visible
+                  results in the web client.
+                </span>
+                <button
+                  type="button"
+                  className={styles.agentPrimaryButton}
+                  data-testid="ce-agent-http-login-open"
+                  onClick={onOpenLoginModal}
+                >
+                  Log in with agent token
+                </button>
+              </>
+            ) : (
+              <span>This session is for agents. Signing in here with an agent token is switched off for now.</span>
+            )}
           </Alert>
         </div>
       </div>

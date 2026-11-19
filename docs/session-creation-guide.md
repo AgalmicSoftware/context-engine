@@ -530,8 +530,9 @@ unknown values, and reserved key providers are rejected rather than normalized
 to a less-protective default. Legacy aliases remain readable only for stored
 compatibility.
 
-Enabling Agent HTTP adds token login alongside ordinary wallet/passkey web
-participation; it does not replace the web session page. New client writes keep
+Enabling Agent HTTP adds scoped agent credentials alongside ordinary
+wallet/passkey web participation; it does not replace the web session page.
+(The log-in dialog's agent token control is switched off for now.) New client writes keep
 the reserved `surfaces.telegram` and `surfaces.miniApp` booleans false.
 
 `/new` has no steps. The rest of this walkthrough groups its sections by topic:

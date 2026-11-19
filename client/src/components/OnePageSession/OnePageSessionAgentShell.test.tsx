@@ -79,6 +79,14 @@ describe('OnePageSessionAgentShell', () => {
     expect(resultsSectionRef).toHaveBeenLastCalledWith(null);
   });
 
+  it('offers no agent token log-in while that control is switched off', () => {
+    render(<OnePageSessionAgentShell {...baseProps} agentClientEnvelope={null} />);
+    expect(screen.getByText(/Agent-enabled session/).parentElement).toHaveTextContent(
+      'This session is for agents. Signing in here with an agent token is switched off for now.',
+    );
+    expect(screen.queryByRole('button', { name: 'Log in with agent token' })).toBeNull();
+  });
+
   it('states generated AI results are unsupported in the agent shell', async () => {
     render(<OnePageSessionAgentShell {...baseProps} />);
 

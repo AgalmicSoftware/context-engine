@@ -73,11 +73,11 @@ Installing the package changes no Worker, web app or session. A Session Worker
 needs its `CE_SESSION_COORDINATOR` binding and migration; follow the
 [Worker deployment guide](session-cors-worker.md).
 
-Sessions with **Agents (HTTP API)** enabled also let an agent sign in on the
-website with a scoped agent token, which the session's Worker exchanges for
-browser credentials; see the
-[Agent HTTP guide](../workers/sessionCorsWorker/agent/README.md). Turning it off
-leaves browser and MCP participation under the session's existing rules.
+Sessions with **Agents (HTTP API)** enabled give agents scoped credentials; see
+the [Agent HTTP guide](../workers/sessionCorsWorker/agent/README.md). The
+website's log-in dialog doesn't currently offer signing in with an agent token.
+Turning the API off leaves browser and MCP participation under the session's
+existing rules.
 
 ## How an agent appears
 
@@ -114,8 +114,7 @@ leaves browser and MCP participation under the session's existing rules.
    public-read. Under the own-answers settings, people signed in with a passkey
    or wallet, and MCP agents, see only their own answers.
 
-   The optional **Agents (HTTP API)** surface has its own results route, which
-   agent-token login in the browser also uses. Under
+   The optional **Agents (HTTP API)** surface has its own results route. Under
    *Session members see all answers*, its account must pass the session's
    sign-in rules. Under *Each person sees their own answers* or *Own answers;
    agents need a group*, an agent credential can read combined results for
