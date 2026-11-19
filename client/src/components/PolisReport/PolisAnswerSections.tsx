@@ -124,7 +124,7 @@ function AnswerChart({
                 <rect width="100" height="16" className={styles.choiceTrackBg} />
                 <rect width={(option.count / question.count) * 100} height="16" className={styles.choiceBar} />
               </svg>
-              <span className={styles.numeric} aria-label={`${option.count} of ${question.count}`}>
+              <span className={styles.numeric} role="img" aria-label={`${option.count} of ${question.count}`}>
                 {option.count}/{question.count}
               </span>
             </span>

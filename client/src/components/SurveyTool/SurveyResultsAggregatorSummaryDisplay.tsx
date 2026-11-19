@@ -89,6 +89,7 @@ export const SurveyResultsMultichoiceDistributionDisplay = ({
             </span>
             <span
               className={styles.surveyResultsMultichoiceOptionStats}
+              role="img"
               aria-label={`${option.count} of ${totalResponders}`}
             >
               {option.count}/{totalResponders}

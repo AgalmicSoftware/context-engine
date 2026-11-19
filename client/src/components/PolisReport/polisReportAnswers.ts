@@ -2,6 +2,7 @@ import { validateQuadraticAllocation } from '../../../../shared/questions/quadra
 import { normalizeRatingAnswer } from '../../../../shared/questions/ratingScale.mjs';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue';
+import { takesOnePick } from '../SurveyTool/surveyToolResponseState';
 
 export type ReportRecord = Record<string, unknown>;
 export type AnswerType = 'freeform' | 'rating' | 'multichoice' | 'quadratic';
@@ -20,9 +21,6 @@ export type ReportAnswerQuestion = {
   choiceKind: string;
 };
 
-// One pick only: the same reading that limits which answers the report counts (see the multichoice case below).
-const takesOnePick = (question: ReportRecord): boolean =>
-  !!(question.singleSelect || question.oneSelectionOnly || question.singleChoice) || question.maxSelections === 1;
 export const answerTypeTitles: Record<AnswerType, string> = {
   freeform: 'Freeform',
   rating: 'Ratings',

@@ -1,5 +1,6 @@
 import QuadraticAllocationResults from './QuadraticAllocationResults';
 import { choiceKindLabel } from './MultichoiceQuestionInput';
+import { takesOnePick } from './surveyToolResponseState';
 import { getVoiceCredits } from '../../../../shared/questions/quadraticAllocation.mjs';
 import QuadraticAllocationResponse from './QuadraticAllocationResponse';
 /** @file SingleQuestionResponse.tsx */
@@ -582,11 +583,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       );
     }
     const total = multichoiceSummary.totalResponders;
-    // One pick only, read as the report reads it for the same question.
-    const question = aggregatorQuestion as Record<string, unknown> | null;
-    const onePick =
-      !!(question?.singleSelect || question?.oneSelectionOnly || question?.singleChoice) ||
-      question?.maxSelections === 1;
+    const onePick = takesOnePick(aggregatorQuestion as Record<string, unknown> | null);
 
     return (
       <div className={aggregatorContainerClassName}>
@@ -602,7 +599,11 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
             <span className={styles.optionBar} aria-hidden="true">
               <i style={{ width: `${Math.min(100, (multichoiceSummary.counts[label] / total) * 100)}%` }} />
             </span>
-            <span className={styles.optionStats} aria-label={`${multichoiceSummary.counts[label]} of ${total}`}>
+            <span
+              className={styles.optionStats}
+              role="img"
+              aria-label={`${multichoiceSummary.counts[label]} of ${total}`}
+            >
               {multichoiceSummary.counts[label]}/{total}
             </span>
           </div>

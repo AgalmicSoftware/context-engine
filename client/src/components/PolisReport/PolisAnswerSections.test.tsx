@@ -211,17 +211,21 @@ it('marks a multiple choice question Pick one or Pick any, in the pile\u2019s wo
     {
       one: [{ responder: 'a', response: { type: 'multichoice', prompt: 'One only', answer: { value: 'Garden' } } }],
       any: [{ responder: 'a', response: { type: 'multichoice', prompt: 'Several', answer: { value: ['Bus'] } } }],
+      capped: [{ responder: 'a', response: { type: 'multichoice', prompt: 'Capped', answer: { value: 'Bus' } } }],
       votes: [{ responder: 'a', response: { type: 'quadratic', prompt: 'Votes', answer: { value: [-2, 1, 3] } } }],
     },
     {
       one: { type: 'multichoice', options: ['Garden', 'Bus'], singleSelect: true },
       any: { type: 'multichoice', options: ['Garden', 'Bus'] },
+      // A limit of one is one pick too, flag or no flag, and whether stored as a number or as text.
+      capped: { type: 'multichoice', options: ['Garden', 'Bus'], maxSelections: '1' },
       votes: { type: 'quadratic', options: ['Low', 'Mid', 'High'], voiceCredits: 99 },
     },
   );
   expect(Object.fromEntries(kinds.map((question) => [question.prompt, question.choiceKind]))).toEqual({
     'One only': choiceKindLabel(true),
     Several: choiceKindLabel(false),
+    Capped: choiceKindLabel(true),
     Votes: '',
   });
   render(<PolisAnswerSections questions={kinds} pdfMode />);
