@@ -22,6 +22,8 @@ export type SessionPrefillKickoffInput = {
   sessionUrl?: string;
   /** Names the session in the prompt. */
   sessionName?: string;
+  /** A line of the caller's, after the session's name. */
+  note?: string;
 };
 
 export type SessionPrefillKickoff = {
@@ -44,6 +46,7 @@ export const useSessionPrefillKickoff = ({
   existingResponseSlice,
   sessionUrl: givenSessionUrl,
   sessionName,
+  note,
 }: SessionPrefillKickoffInput): { ready: boolean; kickoff: SessionPrefillKickoff | null } => {
   const [resolved, setResolved] = useState({ key: '', workerUrl: '' });
   const activeWorkerUrl = workerUrl || (resolved.key === sessionSlug ? resolved.workerUrl : '');
@@ -86,6 +89,7 @@ export const useSessionPrefillKickoff = ({
       questionPriority,
       catalogTicket,
       sessionName,
+      note,
     });
   const accountKey = String(account || '').toLowerCase();
   // Someone signed in gets a ticket in their prompt, so their AI reads the questions they may see. They're

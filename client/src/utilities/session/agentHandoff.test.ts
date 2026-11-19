@@ -1,9 +1,4 @@
-import {
-  AgentDelegateKeyError,
-  buildAgentKeyCommand,
-  buildOnMyBehalfPrompt,
-  requestAgentDelegateKey,
-} from './agentHandoff';
+import { AgentDelegateKeyError, MCP_ADD_COMMAND, buildOnMyBehalfPrompt, requestAgentDelegateKey } from './agentHandoff';
 
 const key = {
   token: `ceagt_${'k3Y-_'.repeat(8)}`,
@@ -16,16 +11,18 @@ const key = {
 describe('agent hand-off texts', () => {
   const sessionUrl = 'https://site.example/session/salon?worker=https%3A%2F%2Fce-salon.example.workers.dev';
 
-  it('keeps the key out of the prompt that goes into the chat', () => {
-    // Given the whole key, the prompt still names only the variable that holds it.
+  it('carries the short-lived key in the one prompt, with its expiry and the MCP line', () => {
     const prompt = buildOnMyBehalfPrompt({ key, sessionName: 'Salon', sessionUrl });
-    expect(prompt).not.toContain('ceagt_');
-    expect(prompt).not.toContain(key.token);
-    expect(prompt).toContain('"Authorization: Bearer $CE_AGENT_TOKEN"');
+    expect(prompt).toContain(`Your key is ${key.token}; it works only for this session, until ${key.expiresAt}.`);
+    expect(prompt).toContain('"Authorization: Bearer <key>"');
+    expect(prompt).toContain('Never repeat or print it');
     expect(prompt).toContain('https://ce-salon.example.workers.dev/api/agent/skill');
     expect(prompt).toContain('submit as me only the ones I approve');
-    expect(prompt).not.toMatch(/mcp|join_session/i);
-    expect(buildAgentKeyCommand(key.token)).toBe(`export CE_AGENT_TOKEN='${key.token}'`);
+    expect(prompt).toContain(`add it with: ${MCP_ADD_COMMAND} This task does not need it.`);
+    // The box shows it masked.
+    const shown = buildOnMyBehalfPrompt({ key, sessionName: 'Salon', sessionUrl, shownToken: 'ceagt_••••' });
+    expect(shown).not.toContain(key.token);
+    expect(shown).toContain('Your key is ceagt_••••;');
   });
 
   it('names this session by name, link and slug, and no other', () => {

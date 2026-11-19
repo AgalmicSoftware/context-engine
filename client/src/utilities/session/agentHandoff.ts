@@ -1,8 +1,14 @@
 import { toStr } from '../shared/primitives';
 
-// A person's AI agent working for them in a session, with a key that answers as them.
+// A person's AI agent working for them in a session: suggesting answers, or answering as them with a
+// short-lived key that the one prompt carries.
 
-export const AGENT_KEY_ENV = 'CE_AGENT_TOKEN';
+export const MCP_ADD_COMMAND =
+  'claude mcp add --scope user context-engine -- npx -y --prefer-online @agalmic/contextengine@latest';
+
+// The MCP, in the prompt rather than a box of its own, so the person copies one thing. Its tools act as the
+// agent itself, so neither task needs it.
+export const MCP_PROMPT_LINE = `If you run commands and want the Context Engine MCP for later, add it with: ${MCP_ADD_COMMAND} This task does not need it.`;
 
 export type AgentDelegateKey = {
   token: string;
@@ -23,33 +29,35 @@ export class AgentDelegateKeyError extends Error {
   }
 }
 
-// A key is `ceagt_` and base64url characters, so it holds nothing a shell
-// reads. The command is copied with the key masked on screen, so a reply
-// with any other text in its place is refused, never pasted.
+// A key is `ceagt_` and base64url characters, so a reply with any other text in its place is refused.
 const AGENT_KEY_RE = /^ceagt_[A-Za-z0-9_-]{16,}$/;
 
-export const buildAgentKeyCommand = (token: string): string => `export ${AGENT_KEY_ENV}='${token}'`;
-
-// Names the variable, never the key, so the prompt is safe to paste into a chat. It names the session by its
-// name, link and slug, so an agent that knows several can't take another for it.
+// The one prompt for "Answer and submit": it carries the key, which lives only as long as the person's
+// sign-in and works only in this session, and tells the agent never to repeat it. `shownToken` lets the box
+// show the prompt with the key masked. It names the session by name, link and slug, so an agent that knows
+// several can't take another for it.
 export const buildOnMyBehalfPrompt = ({
   key,
   sessionName,
   sessionUrl,
+  shownToken = key.token,
 }: {
-  key: Pick<AgentDelegateKey, 'sessionSlug' | 'workerUrl' | 'submitAnswers'>;
+  key: AgentDelegateKey;
   sessionName: string;
   sessionUrl: string;
+  shownToken?: string;
 }) =>
   [
     `Take part on my behalf in the Context Engine session ${JSON.stringify(sessionName || key.sessionSlug)}`,
     `(${sessionUrl}, slug "${key.sessionSlug}"), and in no other session you may know.`,
-    `Its agent address is ${key.workerUrl}. Your key is in the ${AGENT_KEY_ENV} environment variable.`,
-    `Send it only as the header "Authorization: Bearer $${AGENT_KEY_ENV}" to that address, and never print it or put it in chat, files or URLs.`,
+    `Its agent address is ${key.workerUrl}. Your key is ${shownToken}; it works only for this session, until ${key.expiresAt}.`,
+    'I give it to you here on purpose, in place of the CE_AGENT_TOKEN variable the skill mentions, as it is short-lived.',
+    'Send it only as the header "Authorization: Bearer <key>" to that address. Never repeat or print it, and never put it in files, URLs or later messages.',
     `Follow ${key.workerUrl}/api/agent/skill.`,
     key.submitAnswers
       ? 'Draft my answers, show them to me, and submit as me only the ones I approve.'
       : "This session doesn't let agents submit, so show me your draft answers and I'll answer on the website.",
+    MCP_PROMPT_LINE,
   ].join(' ');
 
 export const requestAgentDelegateKey = async ({

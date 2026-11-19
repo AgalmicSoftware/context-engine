@@ -3,9 +3,8 @@ import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import {
-  AGENT_KEY_ENV,
   AgentDelegateKeyError,
-  buildAgentKeyCommand,
+  MCP_PROMPT_LINE,
   buildOnMyBehalfPrompt,
   type AgentDelegateKey,
 } from '../../utilities/session/agentHandoff';
@@ -91,44 +90,6 @@ const Help = ({
   </>
 );
 
-type StepProps = {
-  id: string;
-  label: React.ReactNode;
-  shown: string;
-  copyLabel: string;
-  copied: boolean;
-  onCopy: () => void;
-  children?: React.ReactNode;
-};
-
-// The copy icon sits in its box's corner and turns to a tick once copied.
-const Step = ({ id, label, shown, copyLabel, copied, onCopy, children }: StepProps) => (
-  <div className={styles.agentHandoffStep}>
-    <div className={styles.agentHandoffStepLabel}>{label}</div>
-    <div className={styles.agentHandoffCommandBox}>
-      <code
-        id={`ce-agent-handoff-${id}-text`}
-        className={styles.agentHandoffCommand}
-        data-testid={`ce-agent-handoff-${id}`}
-      >
-        {shown}
-      </code>
-      <button
-        type="button"
-        className={styles.agentHandoffCopy}
-        data-ce-control-appearance="frameless"
-        onClick={onCopy}
-        aria-label={copyLabel}
-        title={copied ? 'Copied' : copyLabel}
-        data-testid={`ce-agent-handoff-${id}-copy`}
-      >
-        <FontAwesomeIcon icon={copied ? faCheck : faCopy} />
-      </button>
-    </div>
-    {children ? <div className={styles.agentHandoffActions}>{children}</div> : null}
-  </div>
-);
-
 const OPTIONS: Array<{ way: Way; title: string; detail: string }> = [
   {
     way: 'suggest',
@@ -199,6 +160,7 @@ const SuggestAnswers = ({
     workerUrl,
     sessionUrl: suggestReturnUrl(sessionSlug, sessionUrl),
     sessionName,
+    note: MCP_PROMPT_LINE,
   });
   if (!ready) return <p className={styles.agentHandoffHint}>Checking {sessionName}…</p>;
   if (!kickoff) {
@@ -286,7 +248,7 @@ const LoginAgentHandoffPanel = ({
     } else {
       announce(`Copying isn't allowed here, so the ${what} is selected. Copy it yourself.`);
       // A hidden key is shown, since the masked one is no use to copy.
-      if (step === 'key') setKeyShown(true);
+      if (step === 'submit-prompt') setKeyShown(true);
       setSelectStep(step);
     }
   };
@@ -317,6 +279,9 @@ const LoginAgentHandoffPanel = ({
 
   const expiry = key ? new Date(key.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   const submitPrompt = key ? buildOnMyBehalfPrompt({ key, sessionName, sessionUrl }) : '';
+  const shownSubmitPrompt = key
+    ? buildOnMyBehalfPrompt({ key, sessionName, sessionUrl, shownToken: keyShown ? key.token : MASKED_KEY })
+    : '';
 
   const submitSteps = !agentHttpEnabled ? (
     <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-submit-off">
@@ -337,29 +302,44 @@ const LoginAgentHandoffPanel = ({
         {making ? 'Making a key…' : 'Make a key'}
       </button>
       <Help id="ce-agent-handoff-key-about" placement="bottom">
-        The key lets your agent read the questions, save drafts and submit the answers you approve, as you. It stops
-        when your sign-in ends or when you make a new one. It needs an agent that runs commands on your computer, such
-        as Claude Code or Codex.
+        The key lets your agent read this session&apos;s questions, save drafts and submit the answers you approve, as
+        you. It goes into the prompt you copy, and stops when your sign-in ends (within 4 hours) or when you make a new
+        one. It needs an agent that can send web requests, such as Claude Code or Codex.
       </Help>
     </div>
   ) : (
     <>
-      <Step
-        id="key"
-        label={
-          <>
-            1. Run in your terminal
-            <Help id="ce-agent-handoff-terminal-about">
-              Then start your agent from the same terminal. It reads the key from {AGENT_KEY_ENV}, so the key never goes
-              into the chat. In PowerShell: $env:{AGENT_KEY_ENV} = &apos;…&apos;
-            </Help>
-          </>
-        }
-        shown={buildAgentKeyCommand(keyShown ? key.token : MASKED_KEY)}
-        copyLabel="Copy the key command"
-        copied={copiedStep === 'key'}
-        onCopy={() => copy('key', 'command', buildAgentKeyCommand(key.token))}
-      >
+      <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
+        Your key works in {sessionName} only, until {expiry}.
+        <Help id="ce-agent-handoff-expiry-about" placement="bottom">
+          It ends when your sign-in ends or when you make a new key. The prompt below holds it, so paste the prompt only
+          into your own agent.
+        </Help>
+      </p>
+      {key.submitAnswers ? null : (
+        <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-drafts-only">
+          {sessionName} doesn&apos;t let agents submit, so your agent shows you drafts.
+        </p>
+      )}
+      <div className={styles.agentHandoffCommandBox}>
+        <code
+          id="ce-agent-handoff-submit-prompt-text"
+          className={styles.agentHandoffCommand}
+          data-testid="ce-agent-handoff-submit-prompt"
+        >
+          {shownSubmitPrompt}
+        </code>
+      </div>
+      <div className={styles.agentHandoffCopyRow}>
+        <button
+          type="button"
+          className={styles.agentHandoffPrimary}
+          onClick={() => copy('submit-prompt', 'prompt', submitPrompt)}
+          data-testid="ce-agent-handoff-submit-copy"
+        >
+          <FontAwesomeIcon icon={copiedStep === 'submit-prompt' ? faCheck : faCopy} />
+          {copiedStep === 'submit-prompt' ? 'Copied' : 'Copy the prompt'}
+        </button>
         <button
           type="button"
           className={styles.agentHandoffButton}
@@ -370,21 +350,7 @@ const LoginAgentHandoffPanel = ({
         >
           Show
         </button>
-      </Step>
-      <p className={styles.agentHandoffHint}>Works until {expiry}</p>
-      {key.submitAnswers ? null : (
-        <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-drafts-only">
-          {sessionName} doesn&apos;t let agents submit, so your agent shows you drafts.
-        </p>
-      )}
-      <Step
-        id="submit-prompt"
-        label="2. Ask your agent"
-        shown={submitPrompt}
-        copyLabel="Copy the prompt"
-        copied={copiedStep === 'submit-prompt'}
-        onCopy={() => copy('submit-prompt', 'prompt', submitPrompt)}
-      />
+      </div>
     </>
   );
 
