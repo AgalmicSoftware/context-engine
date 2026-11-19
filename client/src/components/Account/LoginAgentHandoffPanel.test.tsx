@@ -65,7 +65,7 @@ const renderPanel = (props: Partial<React.ComponentProps<typeof LoginAgentHandof
   return view;
 };
 
-const chooseSubmit = () => fireEvent.click(screen.getByRole('radio', { name: 'Answer and submit for me' }));
+const chooseSubmit = () => fireEvent.click(screen.getByRole('radio', { name: 'Full submit' }));
 
 const copySuggestPrompt = async () => {
   const button = await screen.findByTestId('ce-agent-handoff-suggest-copy');
@@ -95,15 +95,19 @@ it('offers one mode, on my behalf, as two choices in a radio group with the firs
   expect(screen.queryByRole('button', { name: 'On my behalf' })).not.toBeInTheDocument();
   expect(screen.queryByText(/claude mcp add/)).not.toBeInTheDocument();
   const group = screen.getByRole('group', { name: 'What should it do?' });
-  const suggest = screen.getByRole('radio', { name: 'Suggest answers for me to review' });
-  const submit = screen.getByRole('radio', { name: 'Answer and submit for me' });
+  const suggest = screen.getByRole('radio', { name: 'Predict responses' });
+  const submit = screen.getByRole('radio', { name: 'Full submit' });
   expect(group).toContainElement(suggest);
   expect(group).toContainElement(submit);
   expect(suggest).toBeChecked();
   expect(suggest).toHaveAccessibleDescription(
-    'You get a link with its suggestions filled in. Nothing is submitted until you submit.',
+    'Your agent drafts your answers. You review and submit them here, on Context Engine.',
   );
-  expect(submit).toHaveAccessibleDescription('Your agent submits as you.');
+  expect(submit).toHaveAccessibleDescription(
+    "Your agent submits as you. You don't need to come back to Context Engine.",
+  );
+  // The tick belongs to Full submit only.
+  expect(screen.queryByRole('checkbox', { name: 'Ask me if I approve' })).not.toBeInTheDocument();
   // One name, so the browser moves between them with the arrow keys.
   expect(suggest).toHaveAttribute('name', submit.getAttribute('name'));
   chooseSubmit();
@@ -117,7 +121,7 @@ it('keeps its choice when closed and opened again', () => {
   chooseSubmit();
   fireEvent.click(toggle);
   fireEvent.click(toggle);
-  expect(screen.getByRole('radio', { name: 'Answer and submit for me' })).toBeChecked();
+  expect(screen.getByRole('radio', { name: 'Full submit' })).toBeChecked();
 });
 
 it('copies one prompt that suggests answers for this session, with no key and the MCP inside it', async () => {
@@ -165,7 +169,9 @@ it('puts the key into the one prompt, masked on screen, which names the session 
   expect(prompt).toHaveTextContent('Your key is ceagt_••••••••');
   expect(prompt).toHaveTextContent(`session "Salon" (${sessionUrl}, slug "salon")`);
   expect(prompt).toHaveTextContent(`until ${key.expiresAt}`);
-  expect(prompt).toHaveTextContent('submit as me only the ones I approve');
+  // Ticked by default: the agent asks in the chat before it submits.
+  expect(screen.getByRole('checkbox', { name: 'Ask me if I approve' })).toBeChecked();
+  expect(prompt).toHaveTextContent('show them to me here in the chat. Submit them as me only after I say yes here');
   expect(screen.getByTestId('ce-agent-handoff-expiry')).toHaveTextContent(/^Your key works in Salon only, until /);
   expect(screen.queryByTestId('ce-agent-handoff-drafts-only')).not.toBeInTheDocument();
 
@@ -194,6 +200,30 @@ it("says when a session doesn't let agents submit, and the prompt asks for draft
   );
   expect(screen.getByTestId('ce-agent-handoff-submit-prompt')).toHaveTextContent("doesn't let agents submit");
   expect(screen.getByTestId('ce-agent-handoff-submit-prompt')).not.toHaveTextContent('submit as me');
+  // Asking first is moot there, so the tick goes.
+  expect(screen.queryByRole('checkbox', { name: 'Ask me if I approve' })).not.toBeInTheDocument();
+});
+
+it('changes the copied prompt with the Ask me if I approve tick', async () => {
+  renderPanel({ requestKey: jest.fn(async () => key) });
+  chooseSubmit();
+  const ask = screen.getByRole('checkbox', { name: 'Ask me if I approve' });
+  expect(ask).toBeChecked();
+  expect(ask).toHaveAccessibleDescription(/Ticked, your agent shows you its answers in the chat/);
+  fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
+  const prompt = await screen.findByTestId('ce-agent-handoff-submit-prompt');
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
+  expect(screen.getByRole('checkbox', { name: 'Ask me if I approve' })).not.toBeChecked();
+  expect(prompt).toHaveTextContent('submit them as me, without asking me again');
+  expect(prompt).not.toHaveTextContent('only after I say yes');
+  fireEvent.click(screen.getByRole('button', { name: 'Copy the prompt' }));
+  expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
+  expect(String(writeText.mock.calls.at(-1)?.[0])).toContain('without asking me again');
+  // Ticked again, the copy asks first again, with the same key.
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
+  fireEvent.click(screen.getByTestId('ce-agent-handoff-submit-copy'));
+  await waitFor(() => expect(String(writeText.mock.calls.at(-1)?.[0])).toContain('only after I say yes here'));
+  expect(String(writeText.mock.calls.at(-1)?.[0])).toContain('Your key is ceagt_secret;');
 });
 
 it('offers no key while the session has Agent HTTP off, and still offers suggestions', async () => {
@@ -262,7 +292,7 @@ it('says when a key cannot be made, and a new choice clears the message', async 
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
   await screen.findByText('Sign in again, then make a key.');
   expect(screen.getByRole('alert')).toHaveTextContent('Sign in again, then make a key.');
-  fireEvent.click(screen.getByRole('radio', { name: 'Suggest answers for me to review' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Predict responses' }));
   expect(screen.getByRole('alert')).toBeEmptyDOMElement();
 });
 

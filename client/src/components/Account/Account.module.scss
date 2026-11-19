@@ -2403,7 +2403,8 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   margin-top: 1px;
 
   // Panel-scoped, to outweigh the theme rule that frames every input as a field.
-  .agentHandoffPanel & input[type='radio'] {
+  .agentHandoffPanel & input[type='radio'],
+  .agentHandoffPanel & input[type='checkbox'] {
     appearance: none;
     width: 24px;
     height: 24px;
@@ -2421,6 +2422,35 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
     &:focus-visible {
       outline: none;
     }
+  }
+}
+
+// The same check, square, for "Ask me if I approve".
+.agentHandoffPanel .agentHandoffCheck input[type='checkbox'] {
+  border-radius: 4px;
+}
+
+.agentHandoffAskRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.agentHandoffAsk {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 650;
+  cursor: pointer;
+
+  &:focus-within {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 

@@ -15,6 +15,9 @@ export const MCP_PROMPT_LINE = `If you run commands and want the Context Engine 
 export const agentHandoffPanelKey = (sessionSlug: string, account: unknown) =>
   `${sessionSlug}\n${toStr(account).toLowerCase()}`;
 
+// "Full submit" asks the person in the chat before submitting unless they untick "Ask me if I approve".
+export const ASK_BEFORE_SUBMIT_DEFAULT = true;
+
 export type AgentDelegateKey = {
   token: string;
   expiresAt: string;
@@ -37,17 +40,21 @@ export class AgentDelegateKeyError extends Error {
 // A key is `ceagt_` and base64url characters, so a reply with any other text in its place is refused.
 const AGENT_KEY_RE = /^ceagt_[A-Za-z0-9_-]{16,}$/;
 
-// The one prompt for "Answer and submit": it carries the key, which lives only as long as the person's
-// sign-in and works only in this session, and tells the agent never to repeat it. `shownToken` lets the box
-// show the prompt with the key masked. It names the session by name, link and slug, so an agent that knows
-// several can't take another for it.
+// The one prompt for "Full submit". With `askFirst`, the agent shows its answers in the chat and submits once
+// the person says yes there; without it, the copied prompt is their approval, given in advance, so it
+// submits without coming back to ask. Either way the person needn't return to the session's page. It carries the key, which lives only as long as
+// the person's sign-in and works only in this session, and tells the agent never to repeat it. `shownToken`
+// lets the box show the prompt with the key masked. It names the session by name, link and slug, so an agent
+// that knows several can't take another for it.
 export const buildOnMyBehalfPrompt = ({
   key,
   sessionName,
   sessionUrl,
   shownToken = key.token,
+  askFirst = ASK_BEFORE_SUBMIT_DEFAULT,
 }: {
   key: AgentDelegateKey;
+  askFirst?: boolean;
   sessionName: string;
   sessionUrl: string;
   shownToken?: string;
@@ -59,9 +66,11 @@ export const buildOnMyBehalfPrompt = ({
     'I give it to you here on purpose, in place of the CE_AGENT_TOKEN variable the skill mentions, as it is short-lived.',
     'Send it only as the header "Authorization: Bearer <key>" to that address. Never repeat or print it, and never put it in files, URLs or later messages.',
     `Follow ${key.workerUrl}/api/agent/skill.`,
-    key.submitAnswers
-      ? 'Draft my answers, show them to me, and submit as me only the ones I approve.'
-      : "This session doesn't let agents submit, so show me your draft answers and I'll answer on the website.",
+    !key.submitAnswers
+      ? "This session doesn't let agents submit, so show me your draft answers and I'll answer on the website."
+      : askFirst
+        ? "Draft my answers from what you know about me and show them to me here in the chat. Submit them as me only after I say yes here; my yes is my approval, so then send submit: true with approved: true. Leave out any question you can't answer well from what you know, and afterwards tell me what you submitted."
+        : "Draft my answers from what you know about me and submit them as me, without asking me again. This prompt is me approving, in advance, each particular answer you submit, so approved: true records my approval truthfully and you needn't show me drafts first; send submit: true with approved: true. Leave out any question you can't answer well from what you know, and afterwards tell me what you submitted.",
     MCP_PROMPT_LINE,
   ].join(' ');
 
