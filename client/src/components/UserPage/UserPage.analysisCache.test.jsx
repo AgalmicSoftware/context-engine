@@ -436,7 +436,9 @@ describe('UserPage analysis cache and routing', () => {
   });
 
   it('shows the analysis first, then makes the card: its words and its picture side by side', async () => {
-    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    // My own page: a card is only ever made by its own person.
+    const mine = '0x00000000000000000000000000000000000000a1';
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ viewAddress: mine, account: mine });
     const picture = { dataUrl: 'data:image/jpeg;base64,AAAA', accentHex: '#aa3311' };
     analyzeUserOpinions.mockResolvedValueOnce({
       summary: 'summary',
@@ -485,7 +487,7 @@ describe('UserPage analysis cache and routing', () => {
     });
     await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
     expect(instance.state.analysisCard).toMatchObject({
-      own: false,
+      own: true,
       // The foot of the card: the account the answers belong to and this site's page for the session.
       account: `${addressLower.slice(0, 6)}…${addressLower.slice(-4)}`,
       link: `${window.location.host}/session/${slug}`,
@@ -553,6 +555,26 @@ describe('UserPage analysis cache and routing', () => {
     await waitFor(() => expect(instance.state.analysisCardPicture?.status).toBe('ready'));
     expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
     expect(instance.state.analysisCardPublish).toBeNull();
+  });
+
+  it.each([
+    ['they saved none', { status: 'none' }, '0x00000000000000000000000000000000000000bb'],
+    ['their saved card cannot be read', null, '0x00000000000000000000000000000000000000bb'],
+    ['nobody is signed in', { status: 'none' }, ''],
+  ])("on someone else's page makes no card when %s", async (_why, saved, account) => {
+    const { instance } = makeAnalysisCacheInstance({ account });
+    matchedAnalysis();
+    readSavedAnalysisCard.mockResolvedValueOnce(saved);
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(instance.state.aiAnalysis).toBe('summary'));
+    await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+
+    // The analysis is theirs to read; a card is made only by its own person, for their own address.
+    expect(analyzeUserCard).not.toHaveBeenCalled();
+    expect(fetchAnalysisCardPicture).not.toHaveBeenCalled();
+    expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
+    expect(instance.state).toMatchObject({ analysisCard: null, analysisCardPicture: null, analysisCardPublish: null });
   });
 
   it("on someone else's page shows no card when they withdrew theirs", async () => {
@@ -946,7 +968,8 @@ describe('UserPage analysis cache and routing', () => {
   });
 
   it('keeps the analysis when the card cannot be written, and tries the card again next time', async () => {
-    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance();
+    const mine = '0x00000000000000000000000000000000000000a2';
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ viewAddress: mine, account: mine });
     analyzeUserOpinions.mockResolvedValueOnce({
       summary: 'summary',
       details: 'details',

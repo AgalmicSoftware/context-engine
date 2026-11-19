@@ -126,11 +126,21 @@ test('a saved card is filed under the signed-in person and every reader gets the
 });
 
 test('nobody can save a card onto someone else\'s page', async () => {
+  // A card is its own person's: a request that names another account is refused, a save or a withdrawal alike,
+  // and nothing is stored or counted.
   const kv = createKv();
-  const result = await run({ kv, address: VISITOR, body: { published: true, card: CARD, account: OWNER } });
-  assert.equal(result.response.status, 200);
-  assert.deepEqual([...kv.rows.keys()], [`session:salon:analysis-card-saved:v1:${VISITOR}`]);
-  assert.deepEqual((await read(kv, OWNER)).body, { published: null });
+  await run({ kv });
+  const before = [...kv.rows.entries()];
+  for (const body of [{ published: true, card: CARD, account: OWNER }, { published: false, account: OWNER }]) {
+    const result = await run({ kv, address: VISITOR, body });
+    assert.deepEqual([result.response.status, result.body], [403, { error: 'analysis_card_own_only' }]);
+    assert.deepEqual(result.counted, []);
+  }
+  assert.deepEqual([...kv.rows.entries()], before);
+  // Naming oneself, in any letter case, is the same as naming nobody: the card is filed under the signed-in address.
+  const own = await run({ kv, address: VISITOR, body: { published: true, card: CARD, account: VISITOR.toUpperCase().replace('0X', '0x') } });
+  assert.equal(own.response.status, 200);
+  assert.deepEqual([...kv.rows.keys()].sort(), [OWNER, VISITOR].sort().map((who) => `session:salon:analysis-card-saved:v1:${who}`));
 });
 
 test('withdrawing deletes the card\'s words and keeps only the person\'s "no"', async () => {

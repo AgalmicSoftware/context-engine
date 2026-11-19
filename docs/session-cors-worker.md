@@ -3269,6 +3269,11 @@ Signed login/bootstrap requests:
   without pressing Analyze. Both take the picture route's rule (the `ai` scope,
   rechecked against the session's current rules, in a session that has not
   ended: 403 or 410 otherwise), call no model and count no AI call.
+  A card is made only by its own person: the page makes one only for the
+  signed-in person's own address, and on anyone else's page shows the card
+  that person saved, or none. (The Worker cannot tell the card's words from
+  any other `/ai` call, and its picture names a historical figure, not a
+  person, so this part is the page's rule; saving is the Worker's.)
   A card is made from its owner's answers and quotes up to three of them, so
   it goes only where those answers go. Where the session keeps each answer to
   its author and the admins (results shown as totals only, or to admins only),
@@ -3284,8 +3289,9 @@ Signed login/bootstrap requests:
   it answers `{ published: null }`.
   - `publish` takes `{ "published": true, "card": {...} }` to save the
     caller's card, or `{ "published": false }` to withdraw it. The card is
-    always filed under the signed-in address, whatever the body names, so
-    nobody can save a card onto someone else's page. It holds the card's words
+    always filed under the signed-in address, and a request that names
+    another `account` is refused with 403 `analysis_card_own_only`, so
+    nobody can save a card onto someone else's page or take one down. It holds the card's words
     only (`shared/analysisCardSaved.mjs`: title, match note, figure, guessed
     works and up to three of the person's answers that are not locked, capped, at most
     8,000 bytes); anything else is dropped, and a card without a title or a

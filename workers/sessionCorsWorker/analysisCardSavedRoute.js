@@ -125,9 +125,13 @@ export const dispatchAnalysisCardSavedRoute = async ({
     return send({ published: true, card, savedAt }, 200);
   }
 
-  // The card is the caller's own: whatever the body names, it is filed under the signed-in address.
+  // The card is the caller's own: it is filed under the signed-in address, and a request that names anyone else
+  // is refused, to save or to withdraw.
   const owner = accountOf(address);
   if (!ACCOUNT_RE.test(owner)) return send({ error: 'invalid_account' }, 400);
+  if (body?.account !== undefined && accountOf(body.account) !== owner) {
+    return send({ error: 'analysis_card_own_only' }, 403);
+  }
   if (typeof body?.published !== 'boolean') return send({ error: 'invalid_request' }, 400);
   const card = body.published ? normalizeSavedAnalysisCard(body.card) : null;
   if (body.published && !card) return send({ error: 'invalid_card' }, 400);

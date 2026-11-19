@@ -286,8 +286,9 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
   // The card is made once the analysis is on screen, by two requests that run side by side: its words (from the
   // answers and the analysis) and its picture (from the figure's name alone). Neither holds the analysis up, and
   // neither failing is an error of the analysis: the card is then left out, or shown without its picture.
-  // First the person's saved card is looked up: on someone else's page it is shown in place of a new one, and a
-  // card they withdrew is not replaced by another; on my own page it decides the "Show this card on my page" box.
+  // A card is made only on my own page, signed in, for my own address. First the person's saved card is looked
+  // up: on someone else's page it is the only card there can be, and where they saved none, or withdrew theirs,
+  // there is none; on my own page it decides the "Show this card on my page" box.
   // No card is written, drawn, read, saved or shown, not even one kept with an earlier analysis.
   const leaveCardOut = (): void => {
     publishContexts.delete(this);
@@ -397,10 +398,10 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
         );
         return;
       }
-      if (!ownProfile && saved?.status === 'withdrawn') {
-        this.setState(() => (isCurrent() ? { analysisCardPending: false, analysisCardPicture: null } : null));
-        return;
-      }
+      // A card is made only by its own person, signed in, for their own address. On anyone else's page there
+      // is the card that person saved, shown above, or none: not one made from what this visitor can see, and
+      // not one kept with an earlier analysis.
+      if (!ownProfile) return leaveCardOut();
       showPicture(figure);
       // The box is ticked unless I withdrew my card. When the saved card could not be read the box is left out
       // and nothing is saved, so a "no" given on another device is never overridden.
