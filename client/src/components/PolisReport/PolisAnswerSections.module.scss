@@ -2,7 +2,8 @@
   color: var(--ce-document-text);
   background: var(--ce-document-canvas);
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 14px;
+  // Larger text and numbers throughout (owner: "numbers and text should be larger"); 17px still fits a phone.
+  font-size: 17px;
   line-height: 1.5;
   padding: 4px 0;
   width: 100%;
@@ -23,7 +24,7 @@
   }
   h4 {
     font:
-      600 16px/1.4 Arial,
+      600 20px/1.35 Arial,
       Helvetica,
       sans-serif;
     color: var(--ce-document-text);
@@ -122,10 +123,17 @@
   gap: 12px;
   margin-bottom: 16px;
 }
+// How many answered, as a pill beside the question.
 .questionHeading > span {
-  color: var(--ce-document-text-muted);
+  flex-shrink: 0;
+  padding: 3px 12px;
+  border: 1px solid var(--ce-document-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ce-status-info-soft) 45%, var(--ce-document-canvas));
+  color: var(--ce-document-text);
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 600;
 }
 // Each written answer in its own block, so it is clear where one ends and the next begins.
 .written {
@@ -157,11 +165,11 @@
   flex-direction: column;
 }
 .average strong {
-  font-size: 26px;
+  font-size: 32px;
   color: var(--ce-document-text);
 }
 .average span {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--ce-document-text-muted);
 }
 .histogram {
@@ -172,7 +180,7 @@
 .histogram text {
   fill: var(--ce-document-text);
   font:
-    12px Arial,
+    14px Arial,
     Helvetica,
     sans-serif;
 }
@@ -185,7 +193,7 @@
 }
 .choices li {
   display: grid;
-  grid-template-columns: minmax(100px, 1fr) 2fr 90px;
+  grid-template-columns: minmax(100px, 1fr) 2fr 112px;
   gap: 12px;
   align-items: center;
   margin: 12px 0;
@@ -210,10 +218,10 @@
 }
 .legend {
   display: grid;
-  grid-template-columns: 1fr 1fr 56px;
+  grid-template-columns: 1fr 1fr 64px;
   gap: 10px;
   margin-left: 30%;
-  font-size: 13px;
+  font-size: 15px;
   text-align: center;
 }
 .legend > :last-child {
@@ -221,7 +229,7 @@
 }
 .quadratic li {
   display: grid;
-  grid-template-columns: minmax(100px, 30%) 1fr 56px;
+  grid-template-columns: minmax(100px, 30%) 1fr 64px;
   gap: 10px;
   align-items: center;
   margin: 12px 0;
@@ -236,17 +244,17 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  min-height: 24px;
+  min-height: 26px;
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: 15px;
 }
 .leftHalf {
   justify-content: flex-end;
   border-right: 1px solid var(--ce-data-viz-axis);
-  padding-left: 32px;
+  padding-left: 40px;
 }
 .rightHalf {
-  padding-right: 32px;
+  padding-right: 40px;
 }
 .leftHalf i,
 .rightHalf i {
@@ -273,8 +281,9 @@
     grid-template-columns: 1fr;
     gap: 6px;
   }
+  // A choice's name takes its own line above its bar and numbers, so larger text has room.
   .choices li {
-    grid-template-columns: 1fr 90px;
+    grid-template-columns: 1fr 104px;
   }
   .choices li > span:first-child {
     grid-column: 1 / -1;
