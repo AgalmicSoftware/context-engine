@@ -295,6 +295,7 @@ Encode exact JSON as unpadded UTF-8 base64url: catalog.reviewUrl + #prefill=PACK
 
 - If your app opens only links a person gave it, show them the URL to fetch
   and ask them to send it back to you.
+- A 503 that says to retry shortly: wait a few seconds and fetch it again.
 - A 404 that says interview mode is disabled: this session takes no drafts.
 - Any other refusal (a 400, 401 or 403, or another 404), such as one that
   says the session is private: its questions need the person's sign-in. Use
