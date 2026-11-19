@@ -98,6 +98,21 @@ describe('aiClient worker auth options', () => {
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
   });
 
+  it('sends the analysis once more when the first request is lost on the way', async () => {
+    getEffectiveAiConfig.mockResolvedValue({ provider: 'openai', model: 'gpt-6.1-sol', apiKeySource: 'session' });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockRejectedValueOnce(new TypeError('Load failed')).mockResolvedValue({
+      ok: true,
+      json: async () => ({ completion: JSON.stringify({ summary: 'A cautious supporter.' }) }),
+    });
+
+    const result = await analyzeUserOpinions({}, { sessionSlug: 'session-a', throwOnError: true });
+
+    expect(result.summary).toBe('A cautious supporter.');
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
+    expect(fetchWorkerWithAuth.mock.calls[1]).toEqual(fetchWorkerWithAuth.mock.calls[0]);
+  });
+
   it('writes the picture card in a second request, after the analysis and without holding it up', async () => {
     getEffectiveAiConfig.mockResolvedValue({ provider: 'openai', model: 'gpt-4o-mini', apiKeySource: 'worker' });
     getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
