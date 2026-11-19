@@ -3467,7 +3467,11 @@ Signed login/bootstrap requests:
     reports.
   - Uses the anonymous AI eligibility policy above and the Worker-held
     `openaiKey`. The key is never accepted from or returned to the browser.
-  - Defaults to `gpt-live-1`. Posts JSON to OpenAI `/v1/live/sessions` with
+  - Defaults to `gpt-live-1.1`; `gpt-live-1` takes the same Live call under its
+    own name. Workers that default to and accept `gpt-live-1.1` list
+    `interview_gpt_live_1_1_v1` in `/capabilities`. Older ones default to
+    `gpt-live-1` and refuse `gpt-live-1.1` on save, so the site never stores
+    the default model. Posts JSON to OpenAI `/v1/live/sessions` with
     `{ session: { model, instructions, store: false, delegation: { type: "client" } },
 transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
     including terminal CRLF, and reads the answer from `transport.sdp`.

@@ -929,13 +929,33 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(payload.groupCreationPolicy).toBe('admin_only');
     expect(payload.interviewModeEnabled).toBe(true);
+    // The default voice model isn't saved, so each Worker runs its own default.
     expect(payload.interviewMode).toEqual({
       ...SAVED_INTERVIEW_DEFAULTS,
       enabled: true,
       provider: 'openai',
-      realtimeModel: 'gpt-live-1',
     });
     expect(payload.resultsAnalysis).toEqual(DEFAULT_RESULTS_ANALYSIS_SETTINGS);
+  });
+
+  test.each([
+    ['gpt-live-1.1', undefined],
+    ['gpt-live-1', 'gpt-live-1'],
+    ['gpt-realtime-2', 'gpt-realtime-2'],
+    ['gpt-live-invented', undefined],
+  ])('buildSessionWizardWorkerConfigPayload saves the voice model %s as %s', (realtimeModel, saved) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'voice-model',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { realtimeModel },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    expect(payload.interviewMode.realtimeModel).toBe(saved);
+    expect(Object.hasOwn(payload.interviewMode, 'realtimeModel')).toBe(saved !== undefined);
   });
 
   test('buildSessionWizardWorkerConfigPayload preserves valid results analysis settings', () => {

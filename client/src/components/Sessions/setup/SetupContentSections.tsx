@@ -575,6 +575,8 @@ type ParticipationProps = SetupSectionProps & {
   groupCeilingSupported?: boolean;
   /** False when the session's Worker would refuse the note on where research data goes. */
   dataNoteSupported?: boolean;
+  /** False when the session's Worker would refuse gpt-live-1.1 as the interview voice model. */
+  gptLive11Supported?: boolean | null;
 };
 
 export const SetupParticipationSection = ({
@@ -586,6 +588,7 @@ export const SetupParticipationSection = ({
   draftTextSupported,
   groupCeilingSupported = true,
   dataNoteSupported = true,
+  gptLive11Supported = true,
 }: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
@@ -611,6 +614,7 @@ export const SetupParticipationSection = ({
           !workerHosted ? DRAFT_TEXT_NEEDS_WORKER : draftTextSupported === false ? DRAFT_TEXT_NEEDS_NEWER_WORKER : ''
         }
         dataNoteSupported={dataNoteSupported}
+        gptLive11Supported={gptLive11Supported}
       />
     ) : null}
     <SetupField id="ce-setup-group-creation" label="Who can create groups" help={GROUP_CREATION_HELP}>

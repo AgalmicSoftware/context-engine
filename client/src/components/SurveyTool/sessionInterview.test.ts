@@ -156,14 +156,14 @@ describe('session interview protocol', () => {
       'gpt-realtime-2.1',
     );
     expect(resolveRealtimeInterviewSource({ interviewMode: { realtimeModel: 'gpt-realtime-invented' } }).modelId).toBe(
-      'gpt-live-1',
+      'gpt-live-1.1',
     );
     const q1 = { id: 'q1', prompt: 'First', type: 'freeform', options: [] };
     const q2 = { id: 'q2', prompt: 'Second', type: 'freeform', options: [] };
     expect(canonicalizeInterviewQuestions([q2, q1])).toEqual([q1, q2]);
     expect(resolveRealtimeInterviewSource({})).toEqual({
       platform: 'other',
-      modelId: 'gpt-live-1',
+      modelId: 'gpt-live-1.1',
       verification: 'self_reported',
     });
     expect(resolveRealtimeInterviewSource({ interviewMode: { realtimeModel: 'gpt-realtime-2' } })).toEqual({

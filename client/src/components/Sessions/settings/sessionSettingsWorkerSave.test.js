@@ -110,6 +110,45 @@ describe('saving the edit page through the Session Worker', () => {
     expect(blank.save.patch).not.toHaveProperty('sessionContext');
   });
 
+  // The default voice model is never stored, so each Worker runs its own; any other is.
+  it('saves the interview voice model only when it is not the default, and a session stays on one it chose', () => {
+    const stored = publishedSession();
+    expect(stored.interviewMode).not.toHaveProperty('realtimeModel');
+    const toOne = editAndSave(stored, (draft) => {
+      draft.interviewMode = { ...draft.interviewMode, realtimeModel: 'gpt-live-1' };
+    });
+    expect(toOne.save.patch.interviewMode.realtimeModel).toBe('gpt-live-1');
+    expect(toOne.save.classification.signsParticipantsOut).toBe(false);
+    expect(toOne.result.config.interviewMode.realtimeModel).toBe('gpt-live-1');
+    // An unrelated edit leaves the chosen model alone.
+    const renamed = editAndSave(toOne.result.config, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    expect(Object.keys(renamed.save.patch)).toEqual(['sessionName']);
+    expect(renamed.result.config.interviewMode.realtimeModel).toBe('gpt-live-1');
+    // Choosing gpt-live-1.1, the default, clears the stored model.
+    const toDefault = editAndSave(renamed.result.config, (draft) => {
+      draft.interviewMode = { ...draft.interviewMode, realtimeModel: 'gpt-live-1.1' };
+    });
+    expect(toDefault.save.patch.interviewMode).not.toHaveProperty('realtimeModel');
+    expect(toDefault.result).toMatchObject({ ok: true });
+    expect(toDefault.result.config.interviewMode).not.toHaveProperty('realtimeModel');
+  });
+
+  it('clears a stored gpt-live-1.1 or a model no Worker takes on the next save, so a Worker too old for it saves again', () => {
+    for (const realtimeModel of ['gpt-live-1.1', 'GPT-LIVE-1']) {
+      const stored = publishedSession();
+      stored.interviewMode = { ...stored.interviewMode, realtimeModel };
+      const before = projectPublicWorkerSessionConfig(stored);
+      const draft = buildSessionSettingsDraft(before);
+      draft.sessionName = 'Renamed';
+      const { patch } = buildSessionSettingsSave(before, draft);
+      expect(patch.sessionName).toBe('Renamed');
+      expect(patch.interviewMode).toBeDefined();
+      expect(patch.interviewMode).not.toHaveProperty('realtimeModel');
+    }
+  });
+
   it('keeps an opening-question edit as content, as the Worker does', () => {
     const stored = publishedSession();
     const { save, result } = editAndSave(stored, (draft) => {

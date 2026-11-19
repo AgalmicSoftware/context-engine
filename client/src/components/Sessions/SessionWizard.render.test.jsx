@@ -629,7 +629,7 @@ describe('SessionWizard rendered validation', () => {
     const interviewToggle = within(participation).getByTestId('ce-setup-interviews');
     expect(interviewToggle).toBeChecked();
     const realtimeModel = within(participation).getByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL);
-    expect(realtimeModel).toHaveValue('gpt-live-1');
+    expect(realtimeModel).toHaveValue('gpt-live-1.1');
     fireEvent.change(realtimeModel, { target: { value: 'gpt-realtime-2' } });
     expect(realtimeModel).toHaveValue('gpt-realtime-2');
     fireEvent.click(interviewToggle);

@@ -53,7 +53,7 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   resultsAnalysis:
     'Choose which AI-generated result views can be prepared for this session. Automatic background runs require a Worker-canonical Cloudflare session.',
   'interviewMode.realtimeModel':
-    'OpenAI voice model for Interview mode. Defaults to gpt-live-1 (Live API); supported legacy gpt-realtime models use the Realtime API.',
+    'OpenAI voice model for Interview mode. Defaults to gpt-live-1.1 (Live API), or gpt-live-1 on an older Session Worker; gpt-live-1 is also a choice, and supported legacy gpt-realtime models use the Realtime API.',
   corsWorkerUrl: 'Base URL for the worker (AI, transcription, Arweave uploads, faucet).',
   sessionHeader: 'The banner image for this session. Use an image URL; Arweave-backed sessions can also upload a file.',
   sessionEndsAt:

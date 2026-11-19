@@ -43,7 +43,7 @@ describe('sessionWizardDraftState', () => {
           ...DEFAULT_INTERVIEW_SETTINGS,
           enabled: true,
           provider: 'openai',
-          realtimeModel: 'gpt-live-1',
+          realtimeModel: 'gpt-live-1.1',
         },
         resultsAnalysis: DEFAULT_RESULTS_ANALYSIS_SETTINGS,
         embeddedDeployHelperEnabled: true,
@@ -73,7 +73,7 @@ describe('sessionWizardDraftState', () => {
           ...DEFAULT_INTERVIEW_SETTINGS,
           enabled: true,
           provider: 'openai',
-          realtimeModel: 'gpt-live-1',
+          realtimeModel: 'gpt-live-1.1',
         },
         resultsAnalysis: DEFAULT_RESULTS_ANALYSIS_SETTINGS,
       }),
@@ -98,7 +98,7 @@ describe('sessionWizardDraftState', () => {
           ...DEFAULT_INTERVIEW_SETTINGS,
           enabled: false,
           provider: 'openai',
-          realtimeModel: 'gpt-live-1',
+          realtimeModel: 'gpt-live-1.1',
         },
       }),
     );
@@ -134,7 +134,7 @@ describe('sessionWizardDraftState', () => {
       ...DEFAULT_INTERVIEW_SETTINGS,
       enabled: true,
       provider: 'openai',
-      realtimeModel: 'gpt-live-1',
+      realtimeModel: 'gpt-live-1.1',
     });
   });
 

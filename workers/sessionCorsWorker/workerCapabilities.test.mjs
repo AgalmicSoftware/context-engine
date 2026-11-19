@@ -28,7 +28,9 @@ test('capabilities is public even without config authority and advertises sorted
   for (const feature of ['upload_authority_stamps', 'response_upload_receipts',
     'envelope_export_identity_v1', 'worker_groups', 'results_analysis_retry_v1',
     // Settings offers interviewMode.dataNote only to a Worker that says it accepts it.
-    'interview_data_note_v1']) {
+    'interview_data_note_v1',
+    // ...and gpt-live-1.1 only to a Worker that says it takes it.
+    'interview_gpt_live_1_1_v1']) {
     assert.ok(body.features.includes(feature));
   }
   assert.equal(body.session, undefined);

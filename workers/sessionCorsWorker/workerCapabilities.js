@@ -4,6 +4,7 @@ import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { SESSION_CONFIG_MIGRATION_REQUIRED_REASON } from './sessionConfigSecretsStore.js';
 import { getDefaultWorkerSessionSlug, validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
 import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRouteExecution.js';
+import { GPT_LIVE_1_1_FEATURE } from '../../shared/realtimeInterviewConfig.mjs';
 
 export const FEATURES = Object.freeze([
   'agent_http_v1',
@@ -20,6 +21,8 @@ export const FEATURES = Object.freeze([
   'envelope_export_identity_v1',
   // interviewMode.dataNote, the session's note on where research data goes; older Workers reject the key.
   'interview_data_note_v1',
+  // interviewMode.realtimeModel may be gpt-live-1.1; older Workers refuse it on save.
+  GPT_LIVE_1_1_FEATURE,
   'participant_context_links_v1',
   'participant_context_v1',
   'recovery_key_export',

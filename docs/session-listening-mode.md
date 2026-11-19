@@ -33,13 +33,31 @@ public interview-brief endpoint return `404`.
 Interview mode sends an SDP offer and interviewer instructions to the
 session's own Cloudflare Worker. The Worker creates a GPT-Live session through
 `POST https://api.openai.com/v1/live/sessions` using its own `openaiKey`; the
-browser never receives that key. The default model is `gpt-live-1`. The JSON
+browser never receives that key. The default model is `gpt-live-1.1`. The JSON
 request carries `session: { model, instructions,
 store: false, delegation: { type: "client" } }` and `transport: { type: "webrtc",
 sdp }`. Audio is negotiated through WebRTC; Realtime session type, output
 modalities, VAD, and transcription-model fields are not sent to Live.
 
-The per-session `interviewMode.realtimeModel` setting also accepts the legacy
+The per-session `interviewMode.realtimeModel` setting also accepts
+`gpt-live-1`, the previous default, which uses the same Live request. OpenAI
+describes `gpt-live-1.1` as better at pronunciation, accent consistency and
+transcription in multilingual conversations. Both cost the same per minute, and
+each has its own concurrent-session limit.
+
+Workers that list `interview_gpt_live_1_1_v1` in `/capabilities` default to
+`gpt-live-1.1` and accept it. Older ones default to `gpt-live-1` and refuse
+`gpt-live-1.1` on save. So the site never saves the default model: a session
+with none saved runs each Worker's default, and Settings lists `gpt-live-1.1`
+only where it is accepted.
+
+- **Way back:** a Worker put back on an older bundle runs such a session on
+  `gpt-live-1`, and saves go through.
+- **Stored `gpt-live-1.1`:** a session that has it stored (by a script, say)
+  also runs on `gpt-live-1` there, but every settings save is refused. Saving
+  from Settings drops the stored model and clears the refusal.
+
+The setting also accepts the legacy
 aliases `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, and
 `gpt-realtime-1.5`, which keep the Realtime multipart call contract. Worker
 config writes reject any other value, and an unsupported stored value runs as
