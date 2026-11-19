@@ -262,6 +262,7 @@ class OnePageSession extends Component<any, any> {
       corpusViewerLoadState: DEFAULT_CORPUS_VIEWER_LOAD_STATE,
       generatedResultsAnalysis: buildInitialGeneratedResultsControllerState(),
       generatedResultsStatusBody: null,
+      sessionAgentUpdateUnchanged: false,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -698,6 +699,7 @@ class OnePageSession extends Component<any, any> {
   // The one button: checks a build that has gone quiet; otherwise proves the admin (a signature, once) and
   // starts the build, so a single press does what the label says.
   async handleSessionAgentUpdate() {
+    this.setState({ sessionAgentUpdateUnchanged: false });
     if (this.state.generatedResultsAnalysis?.canCheckStatus) return this.loadGeneratedResultsArtifact();
     if (this.state.generatedResultsAnalysis?.adminAuthorized !== true) {
       // Compared by the build's time: the public read before the proof has no draft id, the status read after it does.
@@ -709,7 +711,26 @@ class OnePageSession extends Component<any, any> {
       if ((this.state.generatedResultsAnalysis?.lastGoodGeneratedAt || '') !== buildBefore) return undefined;
     }
     if (this.state.generatedResultsAnalysis?.canGenerate !== true) return undefined;
-    return this.handleGeneratedResultsGenerate(true);
+    // The Worker builds only when the answers have changed since its last build, and otherwise hands that build
+    // back at no cost. A retry after a failed build forces one.
+    const forced = !!this.state.generatedResultsAnalysis?.lastFailure;
+    const buildBefore = this.state.generatedResultsAnalysis?.lastGoodGeneratedAt || '';
+    await this.handleGeneratedResultsGenerate(forced);
+    await new Promise<void>((resolve) => this.setState({}, resolve));
+    const after = this.state.generatedResultsAnalysis;
+    // Say so when nothing was built, so the press never looks as if it did nothing.
+    if (
+      !forced &&
+      buildBefore &&
+      after &&
+      !after.isRunning &&
+      !after.lastFailure &&
+      !after.error &&
+      (after.lastGoodGeneratedAt || '') === buildBefore
+    ) {
+      this.setState({ sessionAgentUpdateUnchanged: true });
+    }
+    return undefined;
   }
 
   handleGeneratedResultsGenerate(refresh: boolean = true) {
@@ -2547,6 +2568,7 @@ class OnePageSession extends Component<any, any> {
         filterState={this.state.filterState}
         isDemoSlug={isDemoSlug}
         generatedResultsAnalysis={this.state.generatedResultsAnalysis}
+        sessionAgentUpdateUnchanged={this.state.sessionAgentUpdateUnchanged === true}
         generatedResultsAuthAvailable={shouldOfferGeneratedResultsAuthorization({
           account: this.props.account,
           sessionConfig: resolvedSessionConfig,

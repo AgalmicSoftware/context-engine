@@ -468,6 +468,15 @@ describe('OnePageSession results routing', () => {
     expect(button()).toBeEnabled();
     expect(notice()).not.toBeInTheDocument();
 
+    // A press that found no changed answers says so: nothing was built or charged.
+    const unchanged = () => screen.queryByTestId('ce-session-agent-update-unchanged');
+    expect(unchanged()).not.toBeInTheDocument();
+    rerender(shell({ generatedResultsAnalysis: ready, sessionAgentUpdateUnchanged: true }));
+    expect(unchanged()).toHaveTextContent('No answers have changed since the last update');
+    rerender(shell({ generatedResultsAnalysis: { ...ready, isRunning: true }, sessionAgentUpdateUnchanged: true }));
+    expect(unchanged()).not.toBeInTheDocument();
+    rerender(shell({ generatedResultsAnalysis: ready }));
+
     rerender(shell({ generatedResultsAnalysis: { ...ready, isRunning: true, canGenerate: false } }));
     expect(button()).toHaveTextContent('Updating Session Agent…');
     expect(button()).toBeDisabled();
@@ -542,7 +551,7 @@ describe('OnePageSession results routing', () => {
     subject.state = { ...subject.state, generatedResultsAnalysis: { adminAuthorized: false } };
     authorizeTo({ adminAuthorized: true, canGenerate: true });
     await subject.handleSessionAgentUpdate();
-    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledWith(true);
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledWith(false);
 
     // The same build read twice: the public read before the proof has no draft id, the status read after it has.
     // That is not a new build, so the press builds.
@@ -569,6 +578,41 @@ describe('OnePageSession results routing', () => {
     await subject.handleSessionAgentUpdate();
     expect(subject.handleGeneratedResultsAuthorize).not.toHaveBeenCalled();
     expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(3);
+    expect(subject.state.sessionAgentUpdateUnchanged).toBe(false);
+
+    // The Worker handed back the same build: the press says nothing changed.
+    subject.state = {
+      ...subject.state,
+      generatedResultsAnalysis: { adminAuthorized: true, canGenerate: true, lastGoodGeneratedAt: 't1' },
+    };
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenLastCalledWith(false);
+    expect(subject.state.sessionAgentUpdateUnchanged).toBe(true);
+
+    // A new build: no such note.
+    subject.handleGeneratedResultsGenerate = jest.fn(async () => {
+      subject.state = {
+        ...subject.state,
+        generatedResultsAnalysis: { ...subject.state.generatedResultsAnalysis, lastGoodGeneratedAt: 't2' },
+      };
+    });
+    await subject.handleSessionAgentUpdate();
+    expect(subject.state.sessionAgentUpdateUnchanged).toBe(false);
+
+    // Retry after a failed build forces one, and never says nothing changed.
+    subject.handleGeneratedResultsGenerate = jest.fn();
+    subject.state = {
+      ...subject.state,
+      generatedResultsAnalysis: {
+        adminAuthorized: true,
+        canGenerate: true,
+        lastFailure: 'provider timed out',
+        lastGoodGeneratedAt: 't2',
+      },
+    };
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledWith(true);
+    expect(subject.state.sessionAgentUpdateUnchanged).toBe(false);
   });
 
   it('rebuilds a reopened report when the session hidden list changed', () => {

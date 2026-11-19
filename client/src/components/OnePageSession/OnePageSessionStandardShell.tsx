@@ -51,7 +51,7 @@ const SessionAgentModal = React.lazy(() => import('./SessionAgentModal'));
 const SessionFeedback = React.lazy(() => import('./SessionFeedback'));
 
 const SESSION_AGENT_UPDATE_HELP =
-  "Refreshes what this session's Session Agent knows about the results as a whole, from the answers given so far. It is a paid AI call on the session's AI key.";
+  "Refreshes what this session's Session Agent knows about the results as a whole, from the answers given so far. When answers have changed since the last update it is a paid AI call on the session's AI key; when none have, nothing is built or charged.";
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
@@ -110,6 +110,7 @@ type OnePageSessionStandardShellProps = {
   filterState: UnknownRecord | null;
   // The build of the results as a whole, which the Session Agent reads; its one control is Update Session Agent.
   generatedResultsAnalysis?: UnknownRecord | null;
+  sessionAgentUpdateUnchanged?: boolean;
   generatedResultsAuthAvailable?: boolean;
   isDemoSlug: boolean;
   isQuestionCacheReady: boolean;
@@ -330,6 +331,7 @@ export default function OnePageSessionStandardShell({
   onFilterChange,
   onGroupsViewAll,
   onSessionAgentUpdate,
+  sessionAgentUpdateUnchanged = false,
   onKickoffAutoMintIfNeeded,
   onLoadFullCorpusClick,
   onOpenResults,
@@ -976,6 +978,15 @@ export default function OnePageSessionStandardShell({
                   data-testid="ce-session-agent-update-problem"
                 >
                   {agentUpdateProblem}
+                </div>
+              ) : showAgentUpdate && sessionAgentUpdateUnchanged && !agentUpdateRunning ? (
+                <div
+                  className={styles.generatedResultsStatus}
+                  role="status"
+                  data-testid="ce-session-agent-update-unchanged"
+                >
+                  No answers have changed since the last update, so the Session Agent already has them. Nothing was
+                  built or charged.
                 </div>
               ) : null}
               {resultsBuilds.map(({ kind, results, busy }) =>
