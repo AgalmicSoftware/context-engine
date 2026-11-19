@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.20] - 2026-11-19
 
+A Session Worker release. The site deploys at merge; a session gets the new voice model only once its Worker is updated to this release. MCP stays at 0.7.0.
+
+### Session Worker — needs a Worker update
+
+- Voice interviews can run on OpenAI's `gpt-live-1.1`, now the default. It costs the same per minute as `gpt-live-1`; OpenAI says it pronounces, keeps its accent and transcribes better in multilingual conversations. A session with no voice model saved moves to `gpt-live-1.1` when its Worker is updated; a session that saved `gpt-live-1` stays on it until an admin changes it. The Worker reports `interview_gpt_live_1_1_v1`. The session's OpenAI key must have access to the model.
+
+### Client — available when the site deploys
+
+- Settings and `/new`: the interview voice model is a list. It marks the session's Worker's own default, and lists `gpt-live-1.1` only where the Worker takes it. The site never saves the default model, so a session on the default follows its Worker's default, and an older Worker never sees `gpt-live-1.1`. A session that has `gpt-live-1.1` stored on a Worker too old for it says so, and the next save puts it back on the default.
+- Sign-in: the **Your AI agent** box asks one question, what your agent should do. **Suggest answers for me to review** copies a prompt that drafts your answers into a link you review and submit. **Answer and submit for me** makes a key and puts it into the one prompt to copy, masked on screen; the key works in that session only, until the time shown (at most the rest of your sign-in, up to 4 hours), and a new key replaces it. Where a session doesn't let agents submit, the prompt asks for drafts only.
+- The agent guide says the agent box's prompt carries the key, and that an agent must never repeat it.
 ## [0.9.19] - 2026-11-19
 
 A website release: no Session Worker or MCP change, and nothing needs redeploying for it. Its merge also publishes what 0.9.18 could not: the Session Worker bundle with 0.9.18's Worker code (a Worker made from it reports release 0.9.19), under this release's commit, and MCP 0.7.0.
