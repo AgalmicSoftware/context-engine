@@ -800,7 +800,7 @@ describe('sessionWizardWriteNormalization', () => {
       });
 
     expect(build(true)).toHaveProperty('contextCardsEnabled', true);
-    // Off is left out, as older Workers refuse the field; the config writers clear a stored one.
+    // Off is left out, as older Workers refuse the field; the config writers keep a stored choice.
     expect(build(false)).not.toHaveProperty('contextCardsEnabled');
     expect(build(undefined)).not.toHaveProperty('contextCardsEnabled');
     expect(build('true')).not.toHaveProperty('contextCardsEnabled');

@@ -410,8 +410,12 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     expect(older.written()).toBeNull();
   });
 
-  it('turns off Context cards an earlier attempt stored, with the same revision on a retry', async () => {
-    const withoutCards = ({ contextCardsEnabled: _off, ...rest }: Record<string, unknown>) => rest;
+  it('keeps the card switches a session has stored when the config leaves them out, and reads them back', async () => {
+    const withoutCards = ({
+      contextCardsEnabled: _cards,
+      analysisCardEnabled: _card,
+      ...rest
+    }: Record<string, unknown>) => rest;
     const persist = (fetchImpl: SessionWizardWorkerConfigFetchPort) =>
       persistAndVerifySessionWizardWorkerConfig({
         workerUrl: WORKER_ORIGIN,
@@ -423,19 +427,23 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
         fetchImpl,
         retryDelaysMs: [],
       });
+    // As a session whose admin turned Context cards on and the analysis card off in Settings.
     const has = createWorkerFetch(async () =>
-      jsonResponse(200, { config: verifiedConfig('earlier', { contextCardsEnabled: true }) }),
+      jsonResponse(200, {
+        config: verifiedConfig('earlier', { contextCardsEnabled: true, analysisCardEnabled: false }),
+      }),
     );
     const first = await persist(has.fetchImpl);
-    expect(has.written()).toHaveProperty('contextCardsEnabled', false);
-    expect(first.publicConfig).toHaveProperty('contextCardsEnabled', false);
-    // The stored false is sent again, so a retry signs the revision the first write claimed.
+    expect(has.written()).toMatchObject({ contextCardsEnabled: true, analysisCardEnabled: false });
+    expect(first.publicConfig).toMatchObject({ contextCardsEnabled: true, analysisCardEnabled: false });
+    // What is stored is sent again as it is, so a retry signs the revision the first write claimed.
     const second = await persist(has.fetchImpl);
     expect(second.configRevision).toBe(first.configRevision);
     // A Worker whose config never had the setting is not sent it.
     const lacks = createWorkerFetch(async () => jsonResponse(200, { config: withoutCards(verifiedConfig('earlier')) }));
     await persist(lacks.fetchImpl);
     expect(lacks.written()).not.toHaveProperty('contextCardsEnabled');
+    expect(lacks.written()).not.toHaveProperty('analysisCardEnabled');
   });
 
   // Older Workers refuse the field, and none of them has stored it.

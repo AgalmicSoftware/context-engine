@@ -124,7 +124,9 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
   });
 
   it.each([
-    ['turns off Context cards a Worker config has on', { contextCardsEnabled: true }, false],
+    // A switch left at its default says nothing: a session that turned cards on in Settings keeps them on.
+    ['keeps Context cards on where a Worker config has them on', { contextCardsEnabled: true }, true],
+    ['keeps Context cards off where a Worker config says so', { contextCardsEnabled: false }, false],
     ['leaves Context cards out for a Worker config without them', {}, undefined],
   ])('%s when the config leaves them out', async (_label, stored, expected) => {
     const fetchImpl = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({
@@ -222,7 +224,9 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
   });
 
   it.each([
-    ['turns the analysis card back on where a Worker config has it off', { analysisCardEnabled: false }, true],
+    // A session that turned the card off in Settings keeps it off: a /new sync never turns it back on.
+    ['keeps the analysis card off where a Worker config has it off', { analysisCardEnabled: false }, false],
+    ['keeps the analysis card on where a Worker config says so', { analysisCardEnabled: true }, true],
     ['leaves the analysis card out for a Worker config without it', {}, undefined],
   ])('%s when the config leaves it out', async (_label, stored, expected) => {
     const fetchImpl = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({

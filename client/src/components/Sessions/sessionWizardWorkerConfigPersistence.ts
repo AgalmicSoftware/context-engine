@@ -322,20 +322,20 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
 };
 
 // set-config merges fields, so a config that leaves out its instructions for AI
-// agents, its Session Agent or Context cards must clear stored ones, with '',
-// null and false. Older Workers refuse these fields, so each clear is sent only
-// when the Worker's config already has the field. A Worker with no config
-// answers 404. Any other failed read stops before signing: leaving a field out
-// could keep what is stored, and would change the revision a retry signs.
+// agents or its Session Agent must clear stored ones, with '' and null. Older
+// Workers refuse these fields, so each clear is sent only when the Worker's
+// config already has the field. A Worker with no config answers 404. Any other
+// failed read stops before signing: leaving a field out could keep what is
+// stored, and would change the revision a retry signs.
 // set-config replaces limits whole and /new has no AI daily limit, so the one
-// stored (set in Settings) is kept the same way. The analysis card is on unless
-// turned off, so leaving it out sends true where the Worker has it stored.
-const CLEARED_WHEN_LEFT_OUT = {
-  agentInstructions: '',
-  sessionAgent: null,
-  contextCardsEnabled: false,
-  analysisCardEnabled: true,
-} as const;
+// stored (set in Settings) is kept the same way.
+const CLEARED_WHEN_LEFT_OUT = { agentInstructions: '', sessionAgent: null } as const;
+// The two card switches are a session's own choice, made in Settings as well as
+// on /new, and each is left out of a config at its default. Left out, a switch
+// is not a choice of this page: the one the Worker holds is sent back as it is,
+// so it stays and the readback agrees. Otherwise a /new sync onto a session
+// that exists would turn its analysis card back on, or its Context cards off.
+const KEPT_WHEN_LEFT_OUT = ['contextCardsEnabled', 'analysisCardEnabled'] as const;
 
 // A session made with Context cards on is sent only to a Worker that says it
 // keeps them: an older one would refuse the whole save, naming only the field.
@@ -391,9 +391,12 @@ export const withStoredConfigKept = async <T extends UnknownRecord>({
   if (config.analysisCardEnabled === false && profile?.authority?.mode === 'worker_canonical') {
     await assertWorkerHasAnalysisCard(workerOrigin, slug, fetchImpl);
   }
+  const keptOut = KEPT_WHEN_LEFT_OUT.filter((field) => !Object.prototype.hasOwnProperty.call(config, field));
   const limits = config.limits && typeof config.limits === 'object' ? (config.limits as UnknownRecord) : null;
   const keepsAiLimit = !!limits && !Object.prototype.hasOwnProperty.call(limits, 'aiPerWalletPerDay');
-  if ((!leftOut.length && !keepsAiLimit) || profile?.authority?.mode !== 'worker_canonical') return config;
+  if ((!leftOut.length && !keptOut.length && !keepsAiLimit) || profile?.authority?.mode !== 'worker_canonical') {
+    return config;
+  }
   let response: Response;
   try {
     response = await fetchImpl(`${workerOrigin}/session-config`, {
@@ -417,9 +420,12 @@ export const withStoredConfigKept = async <T extends UnknownRecord>({
     keepsAiLimit && storedAiLimit != null
       ? { ...config, limits: { ...limits, aiPerWalletPerDay: storedAiLimit } }
       : config;
+  const withSwitches = keptOut
+    .filter((field) => typeof stored[field] === 'boolean')
+    .reduce<T>((kept, field) => ({ ...kept, [field]: stored[field] }), withAiLimit);
   return leftOut
     .filter((field) => Object.prototype.hasOwnProperty.call(stored, field))
-    .reduce<T>((cleared, field) => ({ ...cleared, [field]: CLEARED_WHEN_LEFT_OUT[field] }), withAiLimit);
+    .reduce<T>((cleared, field) => ({ ...cleared, [field]: CLEARED_WHEN_LEFT_OUT[field] }), withSwitches);
 };
 
 // A session made with the analysis card off is sent only to a Worker that has
