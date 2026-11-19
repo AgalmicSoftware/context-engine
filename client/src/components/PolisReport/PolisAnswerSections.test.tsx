@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import PolisAnswerSections, { writtenAnswerPreview } from './PolisAnswerSections';
 import { buildReportAnswerQuestions } from './polisReportAnswers';
+import { choiceKindLabel } from '../SurveyTool/MultichoiceQuestionInput';
 
 const questions = buildReportAnswerQuestions({
   q1: [{ responder: 'a', response: { type: 'rating', prompt: 'Less answered', answer: { value: 0 } } }],
@@ -103,7 +104,7 @@ it('renders proportional multiple-choice bars with explicit geometry for PDF cap
   });
   render(<PolisAnswerSections questions={multipleChoice} pdfMode />);
   const rows = within(screen.getByRole('list', { name: 'Multiple choice results' })).getAllByRole('listitem');
-  expect(rows.map((row) => row.textContent)).toEqual(['Garden67% (2)', 'Bus33% (1)', 'Paths0% (0)']);
+  expect(rows.map((row) => row.textContent)).toEqual(['Garden2/3', 'Bus1/3', 'Paths0/3']);
   const widths = rows.map((row) => Number(row.querySelector('svg rect:last-child')?.getAttribute('width')));
   expect(widths[0]).toBeCloseTo(200 / 3);
   expect(widths[1]).toBeCloseTo(100 / 3);
@@ -203,4 +204,29 @@ it('leaves an answer of 300 characters whole and cuts a long run without spaces 
   // A little over the limit is shown whole; an emoji at the cut is not split in two.
   expect(writtenAnswerPreview(`${'word '.repeat(60)}and a few more words.`)).toBeNull();
   expect(writtenAnswerPreview(`${'x'.repeat(299)}😀${'x'.repeat(200)}`)).toBe(`${'x'.repeat(299)}…`);
+});
+
+it('marks a multiple choice question Pick one or Pick any, in the pile\u2019s words, and ranks quadratic options by net', () => {
+  const kinds = buildReportAnswerQuestions(
+    {
+      one: [{ responder: 'a', response: { type: 'multichoice', prompt: 'One only', answer: { value: 'Garden' } } }],
+      any: [{ responder: 'a', response: { type: 'multichoice', prompt: 'Several', answer: { value: ['Bus'] } } }],
+      votes: [{ responder: 'a', response: { type: 'quadratic', prompt: 'Votes', answer: { value: [-2, 1, 3] } } }],
+    },
+    {
+      one: { type: 'multichoice', options: ['Garden', 'Bus'], singleSelect: true },
+      any: { type: 'multichoice', options: ['Garden', 'Bus'] },
+      votes: { type: 'quadratic', options: ['Low', 'Mid', 'High'], voiceCredits: 99 },
+    },
+  );
+  expect(Object.fromEntries(kinds.map((question) => [question.prompt, question.choiceKind]))).toEqual({
+    'One only': choiceKindLabel(true),
+    Several: choiceKindLabel(false),
+    Votes: '',
+  });
+  render(<PolisAnswerSections questions={kinds} pdfMode />);
+  expect(screen.getByRole('heading', { name: 'One only Pick one' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Several Pick any' })).toBeInTheDocument();
+  const rows = within(screen.getByRole('list', { name: 'Quadratic allocation results' })).getAllByRole('listitem');
+  expect(rows.map((row) => row.textContent)).toEqual(['High0+3+3', 'Mid0+1+1', 'Low−20−2']);
 });

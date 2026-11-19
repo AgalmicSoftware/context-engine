@@ -16,7 +16,13 @@ export type ReportAnswerQuestion = {
   max: number;
   bins: { score: number; count: number }[];
   options: { label: string; count: number; positive: number; negative: number; net: number }[];
+  // "Pick one" or "Pick any" for a multiple choice question, in the pile's own words; '' otherwise.
+  choiceKind: string;
 };
+
+// One pick only: the same reading that limits which answers the report counts (see the multichoice case below).
+const takesOnePick = (question: ReportRecord): boolean =>
+  !!(question.singleSelect || question.oneSelectionOnly || question.singleChoice) || question.maxSelections === 1;
 export const answerTypeTitles: Record<AnswerType, string> = {
   freeform: 'Freeform',
   rating: 'Ratings',
@@ -193,6 +199,7 @@ export function buildReportAnswerQuestions(
       max,
       bins: [],
       options: [],
+      choiceKind: type === 'multichoice' ? (takesOnePick(meta) ? 'Pick one' : 'Pick any') : '',
     };
     if (type === 'freeform') question.texts = [...values.values()] as string[];
     if (type === 'rating') {

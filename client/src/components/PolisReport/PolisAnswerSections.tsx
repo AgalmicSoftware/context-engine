@@ -113,22 +113,28 @@ function AnswerChart({
   }
   if (question.type === 'multichoice')
     return (
+      // One form for "Pick one" and "Pick any": each option has its own bar, the share of those who answered
+      // that chose it, with the count under it. Picks of several options may add up to more than everyone.
       <ul className={styles.choices} aria-label="Multiple choice results">
         {question.options.map((option, index) => (
           <li key={index}>
-            <span>{option.label}</span>
-            <svg className={styles.choiceTrack} viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true">
-              <rect width="100" height="16" className={styles.choiceTrackBg} />
-              <rect width={(option.count / question.count) * 100} height="16" className={styles.choiceBar} />
-            </svg>
-            <span className={styles.numeric}>
-              {Math.round((option.count / question.count) * 100)}% ({option.count})
+            <span className={styles.choiceLabel}>{option.label}</span>
+            <span className={styles.choiceShare}>
+              <svg className={styles.choiceTrack} viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true">
+                <rect width="100" height="16" className={styles.choiceTrackBg} />
+                <rect width={(option.count / question.count) * 100} height="16" className={styles.choiceBar} />
+              </svg>
+              <span className={styles.numeric} aria-label={`${option.count} of ${question.count}`}>
+                {option.count}/{question.count}
+              </span>
             </span>
           </li>
         ))}
       </ul>
     );
   const max = Math.max(1, ...question.options.flatMap((option) => [option.positive, -option.negative]));
+  // Most supported first; options with the same net keep the question's own order.
+  const ranked = [...question.options].sort((a, b) => b.net - a.net);
   return (
     <div className={styles.quadratic}>
       <div className={styles.legend}>
@@ -137,7 +143,7 @@ function AnswerChart({
         <span>Net</span>
       </div>
       <ul aria-label="Quadratic allocation results">
-        {question.options.map((option, index) => (
+        {ranked.map((option, index) => (
           <li key={index}>
             <span className={styles.optionLabel}>{option.label}</span>
             <div className={styles.diverging}>
@@ -150,7 +156,7 @@ function AnswerChart({
                 <span className={styles.positive}>{signed(option.positive)}</span>
               </div>
             </div>
-            <strong className={`${styles.numeric} ${tone(option.net)}`}>{signed(option.net)}</strong>
+            <strong className={`${styles.numeric} ${styles.net} ${tone(option.net)}`}>{signed(option.net)}</strong>
           </li>
         ))}
       </ul>
@@ -223,7 +229,10 @@ export default function PolisAnswerSections({
                       <article key={question.id} data-pdf-keep-together className={styles.question}>
                         {pdfMode && index === 0 && <h3>{sectionTitles[type]}</h3>}
                         <div className={styles.questionHeading} data-pdf-keep-together>
-                          <h4>{question.prompt}</h4>
+                          <h4>
+                            {question.prompt}
+                            {question.choiceKind && <span className={styles.kindPill}>{question.choiceKind}</span>}
+                          </h4>
                           <span>
                             {question.count} {question.count === 1 ? 'response' : 'responses'}
                           </span>
