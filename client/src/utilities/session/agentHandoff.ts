@@ -10,6 +10,11 @@ export const MCP_ADD_COMMAND =
 // agent itself, so neither task needs it.
 export const MCP_PROMPT_LINE = `If you run commands and want the Context Engine MCP for later, add it with: ${MCP_ADD_COMMAND} This task does not need it.`;
 
+// The agent box is remounted per session and per account, so a key made for one
+// account never stays on screen, or in the prompt, for the next.
+export const agentHandoffPanelKey = (sessionSlug: string, account: unknown) =>
+  `${sessionSlug}\n${toStr(account).toLowerCase()}`;
+
 export type AgentDelegateKey = {
   token: string;
   expiresAt: string;

@@ -1,4 +1,10 @@
-import { AgentDelegateKeyError, MCP_ADD_COMMAND, buildOnMyBehalfPrompt, requestAgentDelegateKey } from './agentHandoff';
+import {
+  AgentDelegateKeyError,
+  MCP_ADD_COMMAND,
+  agentHandoffPanelKey,
+  buildOnMyBehalfPrompt,
+  requestAgentDelegateKey,
+} from './agentHandoff';
 
 const key = {
   token: `ceagt_${'k3Y-_'.repeat(8)}`,
@@ -106,4 +112,11 @@ describe('requestAgentDelegateKey', () => {
       requestAgentDelegateKey({ agentWorkerUrl: key.workerUrl, sessionSlug: 'salon', workerToken: 'jwt', fetchImpl }),
     ).resolves.toEqual(key);
   });
+});
+
+it('remounts the agent box for another account, not for the same one', () => {
+  expect(agentHandoffPanelKey('salon', '0xAbC')).toBe(agentHandoffPanelKey('salon', '0xabc'));
+  expect(agentHandoffPanelKey('salon', '0xabc')).not.toBe(agentHandoffPanelKey('salon', '0xdef'));
+  expect(agentHandoffPanelKey('salon', '0xabc')).not.toBe(agentHandoffPanelKey('salon', ''));
+  expect(agentHandoffPanelKey('salon', '0xabc')).not.toBe(agentHandoffPanelKey('forum', '0xabc'));
 });
