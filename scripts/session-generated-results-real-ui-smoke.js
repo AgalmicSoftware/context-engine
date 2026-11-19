@@ -284,7 +284,7 @@ async function assertDesktopReportButtonInsideResultsScroller(page, viewport) {
 }
 
 // AI Views has no tabs of its own: its build feeds the Session Agent. This checks that Results shows none of
-// its views, and that an admin can still check, refresh and retry it.
+// its views, and that an admin can update the Session Agent and retry a failed update.
 async function assertNoAiViewsTabs(page) {
   const nav = page.getByTestId('ce-session-results-view-nav');
   await nav.getByRole('button', { name: 'Report', exact: true }).first().waitFor({ state: 'visible', timeout: 20000 });
@@ -311,16 +311,18 @@ async function run() {
       await assertNoAiViewsTabs(page);
       await assertDesktopReportButtonInsideResultsScroller(page, viewport);
       await capture(page, 'results', viewport);
-      await page.getByRole('button', { name: 'Check AI Views' }).click();
-      await page.getByRole('button', { name: 'Refresh AI Views' }).waitFor();
+      // One press proves the admin and starts the build; later presses start the next ones.
+      const update = page.getByRole('button', { name: 'Update Session Agent', exact: true });
+      const built = page.waitForRequest('https://worker.example/admin/results-analysis/generate');
+      await update.click();
+      await built;
+      await update.and(page.locator(':enabled')).waitFor();
       await capture(page, 'permission', viewport);
-      await page.getByRole('button', { name: 'Refresh AI Views' }).click();
-      await page.getByRole('button', { name: 'Refresh AI Views' }).waitFor();
-      await page.getByRole('button', { name: 'Refresh AI Views' }).click();
+      await update.click();
       await assertVisibleText(page, 'AI provider timeout');
       await capture(page, 'provider-failure', viewport);
-      await page.getByRole('button', { name: 'Retry AI Views' }).click();
-      await page.getByTestId('ce-session-generated-results-check').waitFor({ state: 'visible', timeout: 20000 });
+      await page.getByRole('button', { name: 'Retry Session Agent update' }).click();
+      await page.getByTestId('ce-session-agent-update').waitFor({ state: 'visible', timeout: 20000 });
       await capture(page, 'permission-error', viewport);
       await assertNoAiViewsTabs(page);
       results.push({ viewport, ok: true });
@@ -333,8 +335,7 @@ async function run() {
       await anonPage.getByTestId('ce-real-generated-results-smoke').waitFor();
       await anonPage.getByTestId('ce-session-results-toggle').click();
       await assertNoAiViewsTabs(anonPage);
-      assert.equal(await anonPage.getByTestId('ce-session-generated-results-check').count(), 0);
-      assert.equal(await anonPage.getByTestId('ce-session-generated-results-generate').count(), 0);
+      assert.equal(await anonPage.getByTestId('ce-session-agent-update').count(), 0);
       await capture(anonPage, 'anonymous-viewer', viewport);
       await anonPage.close();
     }

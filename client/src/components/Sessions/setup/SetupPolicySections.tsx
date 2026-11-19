@@ -57,7 +57,7 @@ const VISIBILITY_LABELS: Partial<Record<SessionModeResultsVisibility, string>> =
 };
 
 const VISIBILITY_HELP = [
-  'Session members: everyone signed in to the session sees every answer and the AI Views; signed-out visitors see none. Needs the Session Worker; an older one must be redeployed first.',
+  'Session members: everyone signed in to the session sees every answer, and the Session Agent may tell them about the results as a whole; signed-out visitors see none. Needs the Session Worker; an older one must be redeployed first.',
   'Each person: people see only their own answers.',
   'Own answers; agents need a group: as Each person, and agents get summaries only for accounts in a group at least the smallest group size.',
   'Anyone: everyone sees every answer, signed in or not. Needs answers stored unencrypted.',
@@ -89,10 +89,10 @@ const chainLabel = (chainId: number | null | undefined) =>
 
 export const summarizeResults = (draft: SetupSectionProps['draft']): string => {
   const profile = profileOf(draft);
-  // AI Views has no settings here any more; only a session still building automatically says so.
+  // Only a session whose Session Agent updates automatically, a paid call each time, says so here.
   const analysis = text(asRecord(draft.resultsAnalysis).generationMode);
   const visibility = profile ? VISIBILITY_LABELS[profile.results.visibility] || profile.results.visibility : '';
-  return [visibility, analysis === 'automatic' || analysis === 'both' ? 'automatic AI Views builds' : '']
+  return [visibility, analysis === 'automatic' || analysis === 'both' ? 'automatic Session Agent updates' : '']
     .filter(Boolean)
     .join(' · ');
 };

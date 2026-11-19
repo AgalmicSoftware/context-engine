@@ -162,7 +162,7 @@ describe('stored question and answer versions', () => {
     await show({ storedVersions: await workerCount(20_000) });
     expect(screen.getByTestId('ce-admin-diagnostics-stored-versions')).toHaveTextContent('More than 10,000');
     expect(screen.getByRole('status')).toHaveTextContent(
-      "Over the limit: AI Views, the atlas and the risk matrix can't be built",
+      "Over the limit: the atlas, the risk matrix and the Session Agent's update can't be built",
     );
     expect(screen.getByRole('status')).toHaveTextContent(
       "Each person's latest answer to each question counts; for answers saved before 0.9.10, every saved change counts.",

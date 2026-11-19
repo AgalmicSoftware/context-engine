@@ -633,7 +633,8 @@ What gets stored where:
   can decrypt; it is not decentralized, not end-to-end, and not private from
   the session operator or Cloudflare runtime.
 - New sessions start with `session_member_full`: every signed-in member reads
-  every answer and the AI Views. It needs the Session Worker with Cloudflare
+  every answer, and the Session Agent may tell them about the results as a
+  whole. It needs the Session Worker with Cloudflare
   storage, so choosing on-chain hosting moves it to public results, or to
   participant aggregate when answers are encrypted.
 - Public stored-results visibility requires unencrypted storage; choosing

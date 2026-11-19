@@ -278,7 +278,7 @@ jest.mock('../DemoViews/CorpusViewer', () => {
     default: MockCorpusViewer,
   };
 });
-// AI Views feeds the Session Agent alone, so its buttons show only while the agent is on.
+// The build of the results as a whole feeds the Session Agent alone, so its button shows only with the agent on.
 const AI_VIEWS_AGENT_ON = {
   audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' }],
 };
@@ -343,10 +343,8 @@ describe('OnePageSession results routing', () => {
     return subject;
   };
 
-  it('shows no AI Views controls or notices on any session, whatever its build state', () => {
-    const authorize = jest.fn();
-    const check = jest.fn();
-    const generate = jest.fn();
+  it('offers one Update Session Agent button where the agent is on, and no AI Views wording', () => {
+    const update = jest.fn();
     const shellProps = {
       account: '0xabc',
       aggregatorData: {},
@@ -426,9 +424,7 @@ describe('OnePageSession results routing', () => {
       onEmbeddedAtlasModalClose: jest.fn(),
       onFilterChange: jest.fn(),
       onGroupsViewAll: jest.fn(),
-      onGeneratedResultsAuthorize: authorize,
-      onGeneratedResultsCheck: check,
-      onGeneratedResultsGenerate: generate,
+      onSessionAgentUpdate: update,
       onKickoffAutoMintIfNeeded: jest.fn(),
       onLoadFullCorpusClick: jest.fn(),
       onOpenResults: jest.fn(),
@@ -445,31 +441,121 @@ describe('OnePageSession results routing', () => {
       onViewAllQuestionsClick: jest.fn(),
     };
 
-    const failed = {
+    const ready = {
       adminAuthorized: true,
       viewerAuthorized: true,
       artifact: null,
       viewOptions: [{ key: 'circles', label: 'Circles' }],
       status: 'ready',
       canGenerate: true,
-      canCheckStatus: true,
-      generationMode: 'automatic',
-      lastFailure: 'Automatic retries have stopped.',
+      canCheckStatus: false,
+      generationMode: 'manual',
+      lastFailure: '',
     };
-    // Session Agent on, an admin signed in, a failed automatic build: every case that used to show them.
-    render(
-      <OnePageSessionStandardShell
-        {...shellProps}
-        generatedResultsAuthAvailable={true}
-        generatedResultsAnalysis={failed}
-        resolvedSessionConfig={{ sessionAgent: AI_VIEWS_AGENT_ON, resultsAnalysis: { generationMode: 'automatic' } }}
-      />,
-    );
-    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ce-session-generated-results-check')).not.toBeInTheDocument();
+    const button = () => screen.queryByTestId('ce-session-agent-update');
+    const notice = () => screen.queryByTestId('ce-session-agent-update-failed');
+    const shell = (props) => <OnePageSessionStandardShell {...shellProps} {...props} />;
+
+    // An admin not yet proven: one press does the whole thing, through the host.
+    const { rerender } = render(shell({ generatedResultsAuthAvailable: true }));
+    expect(button()).toHaveTextContent('Update Session Agent');
+    fireEvent.click(button());
+    expect(update).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/AI Views/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Automatic retries have stopped.')).not.toBeInTheDocument();
-    expect([authorize, check, generate].some((handler) => handler.mock.calls.length)).toBe(false);
+
+    rerender(shell({ generatedResultsAnalysis: ready }));
+    expect(button()).toHaveTextContent('Update Session Agent');
+    expect(button()).toBeEnabled();
+    expect(notice()).not.toBeInTheDocument();
+
+    rerender(shell({ generatedResultsAnalysis: { ...ready, isRunning: true, canGenerate: false } }));
+    expect(button()).toHaveTextContent('Updating Session Agent…');
+    expect(button()).toBeDisabled();
+
+    rerender(shell({ generatedResultsAnalysis: { ...ready, lastFailure: 'AI provider timeout' } }));
+    expect(button()).toHaveTextContent('Retry Session Agent update');
+    expect(notice()).toHaveTextContent('Session Agent update failed: AI provider timeout');
+
+    rerender(shell({ generatedResultsAnalysis: { ...ready, canCheckStatus: true, canGenerate: false } }));
+    expect(button()).toHaveTextContent('Check Session Agent update');
+    expect(button()).toBeEnabled();
+
+    // An admin who cannot start one (a session that only builds automatically) sees the button greyed, and why.
+    rerender(shell({ generatedResultsAnalysis: { ...ready, canGenerate: false, generationMode: 'automatic' } }));
+    expect(button()).toBeDisabled();
+    expect(screen.getByTestId('ce-session-agent-update-problem')).toHaveTextContent(
+      'updates its Session Agent automatically',
+    );
+
+    // A press that could not be proven or sent says so.
+    rerender(
+      shell({
+        generatedResultsAuthAvailable: true,
+        generatedResultsAnalysis: { ...ready, adminAuthorized: false, canGenerate: false, error: 'Sign-in declined.' },
+      }),
+    );
+    expect(button()).toBeEnabled();
+    expect(screen.getByTestId('ce-session-agent-update-problem')).toHaveTextContent(
+      'Session Agent update could not start: Sign-in declined.',
+    );
+
+    // Someone who is no admin sees nothing of it.
+    rerender(
+      shell({
+        generatedResultsAuthAvailable: false,
+        generatedResultsAnalysis: { ...ready, adminAuthorized: false, canGenerate: false, error: 'Not allowed.' },
+      }),
+    );
+    expect(button()).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-agent-update-problem')).not.toBeInTheDocument();
+
+    // Agent off: no button. A session still building automatically keeps the notice of a failed build.
+    const failedAutomatic = { ...ready, generationMode: 'automatic', lastFailure: 'Automatic retries have stopped.' };
+    rerender(shell({ generatedResultsAnalysis: failedAutomatic, resolvedSessionConfig: {} }));
+    expect(button()).not.toBeInTheDocument();
+    expect(notice()).toHaveTextContent('Automatic retries have stopped.');
+    rerender(shell({ generatedResultsAnalysis: { ...ready, lastFailure: 'x' }, resolvedSessionConfig: {} }));
+    expect(notice()).not.toBeInTheDocument();
+    expect(screen.queryByText(/AI Views/)).not.toBeInTheDocument();
+  });
+
+  it('updates the Session Agent in one press: checks a quiet build, else proves the admin and builds', async () => {
+    const subject = createSubject({ slug: 'edge' });
+    subject.loadGeneratedResultsArtifact = jest.fn();
+    subject.handleGeneratedResultsGenerate = jest.fn();
+    const authorizeTo = (next) =>
+      (subject.handleGeneratedResultsAuthorize = jest.fn(async () => {
+        subject.state = { ...subject.state, generatedResultsAnalysis: next };
+      }));
+
+    subject.state = { ...subject.state, generatedResultsAnalysis: { canCheckStatus: true, adminAuthorized: true } };
+    await subject.handleSessionAgentUpdate();
+    expect(subject.loadGeneratedResultsArtifact).toHaveBeenCalledTimes(1);
+    expect(subject.handleGeneratedResultsGenerate).not.toHaveBeenCalled();
+
+    subject.state = { ...subject.state, generatedResultsAnalysis: { adminAuthorized: false } };
+    authorizeTo({ adminAuthorized: false, canGenerate: false });
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsAuthorize).toHaveBeenCalledTimes(1);
+    expect(subject.handleGeneratedResultsGenerate).not.toHaveBeenCalled();
+
+    subject.state = { ...subject.state, generatedResultsAnalysis: { adminAuthorized: false } };
+    authorizeTo({ adminAuthorized: true, canGenerate: true });
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledWith(true);
+
+    // Proving the admin waited out a build already under way: the fresh one is not built again.
+    subject.state = { ...subject.state, generatedResultsAnalysis: { adminAuthorized: false, lastGoodDraftId: 'a' } };
+    authorizeTo({ adminAuthorized: true, canGenerate: true, lastGoodDraftId: 'b' });
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(1);
+
+    // Already proven: no second signature.
+    authorizeTo({});
+    subject.state = { ...subject.state, generatedResultsAnalysis: { adminAuthorized: true, canGenerate: true } };
+    await subject.handleSessionAgentUpdate();
+    expect(subject.handleGeneratedResultsAuthorize).not.toHaveBeenCalled();
+    expect(subject.handleGeneratedResultsGenerate).toHaveBeenCalledTimes(2);
   });
 
   it('rebuilds a reopened report when the session hidden list changed', () => {
@@ -1103,8 +1189,7 @@ describe('OnePageSession results routing', () => {
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
-    expect(screen.queryByTestId('ce-session-generated-results-check')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ce-session-generated-results-generate')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-agent-update')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Report$/i })).toBeInTheDocument();
   });
 

@@ -50,6 +50,9 @@ const SessionRiskMatrixView = React.lazy(() => import('../ResultsBuilds/SessionR
 const SessionAgentModal = React.lazy(() => import('./SessionAgentModal'));
 const SessionFeedback = React.lazy(() => import('./SessionFeedback'));
 
+const SESSION_AGENT_UPDATE_HELP =
+  "Refreshes what this session's Session Agent knows about the results as a whole, from the answers given so far. It is a paid AI call on the session's AI key.";
+
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
 
@@ -105,7 +108,7 @@ type OnePageSessionStandardShellProps = {
   embeddedQuestionSessionSlug: string;
   expandedImages: OnePageSessionAutoMintAlertsProps['expandedImages'];
   filterState: UnknownRecord | null;
-  // AI Views has no controls on the site any more; its host still passes these, and the shell ignores them.
+  // The build of the results as a whole, which the Session Agent reads; its one control is Update Session Agent.
   generatedResultsAnalysis?: UnknownRecord | null;
   generatedResultsAuthAvailable?: boolean;
   isDemoSlug: boolean;
@@ -160,9 +163,7 @@ type OnePageSessionStandardShellProps = {
   onEmbeddedAtlasModalClose: () => void;
   onFilterChange: (newFilterState: unknown) => void;
   onGroupsViewAll: (event: React.MouseEvent<HTMLElement>) => void;
-  onGeneratedResultsAuthorize?: () => void;
-  onGeneratedResultsCheck?: () => void;
-  onGeneratedResultsGenerate?: (refresh?: boolean) => void;
+  onSessionAgentUpdate?: () => void;
   onKickoffAutoMintIfNeeded: () => void;
   onLoadFullCorpusClick: (event: React.MouseEvent<HTMLElement>) => void;
   onOpenResults: () => void;
@@ -274,6 +275,8 @@ export default function OnePageSessionStandardShell({
   embeddedQuestionSessionSlug,
   expandedImages,
   filterState,
+  generatedResultsAnalysis,
+  generatedResultsAuthAvailable = false,
   isDemoSlug,
   isQuestionCacheReady,
   isResponsesCacheReady,
@@ -326,6 +329,7 @@ export default function OnePageSessionStandardShell({
   onEmbeddedAtlasModalClose,
   onFilterChange,
   onGroupsViewAll,
+  onSessionAgentUpdate,
   onKickoffAutoMintIfNeeded,
   onLoadFullCorpusClick,
   onOpenResults,
@@ -428,6 +432,51 @@ export default function OnePageSessionStandardShell({
     ? null
     : sessionAgentSettingOf((resolvedSessionConfig as UnknownRecord | null)?.sessionAgent);
   const sessionAgentOn = !!sessionAgentSetting;
+  // The Session Agent answers about the results as a whole from a build an admin starts here. The button shows
+  // only where the agent is on, since nothing else reads that build. A session whose Worker builds it
+  // automatically keeps the notice of a failed build either way, as that goes on whether or not the agent is on.
+  const agentUpdate = (
+    generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}
+  ) as UnknownRecord;
+  const agentUpdateAdmin = agentUpdate.adminAuthorized === true;
+  const agentUpdateRunning = agentUpdate.isRunning === true || agentUpdate.status === 'running';
+  const agentUpdateCanCheck = agentUpdate.canCheckStatus === true;
+  const agentUpdateMode = String(
+    agentUpdate.generationMode ||
+      ((resolvedSessionConfig as UnknownRecord | null)?.resultsAnalysis as UnknownRecord | undefined)?.generationMode ||
+      '',
+  );
+  const agentUpdateAutomatic = agentUpdateMode === 'automatic' || agentUpdateMode === 'both';
+  const showAgentUpdate = sessionAgentOn && (agentUpdateAdmin || generatedResultsAuthAvailable);
+  const agentUpdateFailure =
+    agentUpdateAdmin && (sessionAgentOn || agentUpdateAutomatic) ? String(agentUpdate.lastFailure || '') : '';
+  // Once the admin has pressed, say why nothing started: the press could not be proven or sent, or this
+  // session cannot be updated by hand. Before a press these would be noise from the page's own reads.
+  const [agentUpdatePressed, setAgentUpdatePressed] = React.useState(false);
+  const agentUpdateCannotStart =
+    agentUpdateAdmin && !agentUpdateRunning && !agentUpdateCanCheck && agentUpdate.canGenerate !== true;
+  const agentUpdateProblem =
+    !showAgentUpdate || !agentUpdatePressed || agentUpdateFailure || agentUpdate.status === 'loading'
+      ? ''
+      : agentUpdate.error
+        ? `Session Agent update could not start: ${String(agentUpdate.error)}`
+        : agentUpdateCannotStart
+          ? agentUpdateMode === 'automatic'
+            ? 'This session updates its Session Agent automatically, so it is not updated by hand.'
+            : 'The Session Agent can’t be updated on this session.'
+          : '';
+  const agentUpdateLabel = agentUpdateRunning
+    ? 'Updating Session Agent…'
+    : agentUpdateCanCheck
+      ? 'Check Session Agent update'
+      : agentUpdateFailure
+        ? 'Retry Session Agent update'
+        : 'Update Session Agent';
+  const agentUpdateDisabled =
+    agentUpdateRunning ||
+    agentUpdate.status === 'loading' ||
+    (agentUpdateAdmin && !agentUpdateCanCheck && agentUpdate.canGenerate !== true);
+  const agentUpdateHelpId = `session-agent-update-help-${React.useId().replace(/:/g, '')}`;
   const viewerAccount = loginComplete && typeof account === 'string' ? account : '';
   const showSessionAgent = sessionAgentOn && (!!viewerAccount || sessionAgentOpenToAnyone(sessionAgentSetting));
   const [sessionAgentOpen, setSessionAgentOpen] = React.useState(false);
@@ -883,12 +932,52 @@ export default function OnePageSessionStandardShell({
                       </React.Fragment>
                     ) : null,
                   )}
+                  {showAgentUpdate && (
+                    <>
+                      <button
+                        type="button"
+                        id={agentUpdateHelpId}
+                        onClick={(event: React.MouseEvent<HTMLElement>) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setAgentUpdatePressed(true);
+                          onSessionAgentUpdate?.();
+                        }}
+                        className={styles.sectionHeaderViewModeButton}
+                        disabled={agentUpdateDisabled}
+                        data-testid="ce-session-agent-update"
+                      >
+                        {agentUpdateLabel}
+                        <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+                      </button>
+                      <CETooltip target={agentUpdateHelpId} placement="bottom" trigger="hover focus" autohide={false}>
+                        {SESSION_AGENT_UPDATE_HELP}
+                      </CETooltip>
+                    </>
+                  )}
                 </div>
               </div>
             )}
           </div>
           {showResults && (
             <div className={styles.miniSectionContent}>
+              {agentUpdateFailure ? (
+                <div
+                  className={styles.generatedResultsStatus}
+                  role="status"
+                  data-testid="ce-session-agent-update-failed"
+                >
+                  Session Agent update failed: {agentUpdateFailure}
+                </div>
+              ) : agentUpdateProblem ? (
+                <div
+                  className={styles.generatedResultsStatus}
+                  role="status"
+                  data-testid="ce-session-agent-update-problem"
+                >
+                  {agentUpdateProblem}
+                </div>
+              ) : null}
               {resultsBuilds.map(({ kind, results, busy }) =>
                 results.canBuild && (busy || results.error) ? (
                   <ResultsBuildStatus

@@ -1,6 +1,11 @@
-import { useState } from 'react';
-import { Button } from 'reactstrap';
-import { normalizeResultsAnalysisSettings } from '../../../../shared/resultsAnalysisSettings.mjs';
+import { useId, useState } from 'react';
+import { FormText, Input, Label } from 'reactstrap';
+import {
+  RESULTS_ANALYSIS_THRESHOLD_MAX,
+  RESULTS_ANALYSIS_THRESHOLD_MIN,
+  normalizeResultsAnalysisSettings,
+} from '../../../../shared/resultsAnalysisSettings.mjs';
+import { SetupHelp, setupHelpId } from './setup/SetupPrimitives';
 
 type Props = {
   value: unknown;
@@ -11,41 +16,97 @@ type Props = {
   disabled?: boolean;
 };
 
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+const MODE_HELP =
+  'When what the Session Agent knows about the results as a whole is refreshed. Each update is a paid AI call on the session’s AI key.';
+const THRESHOLD_HELP =
+  'An automatic update starts after this many new participants since the last update. Someone answering again doesn’t count.';
+const ROW = { display: 'flex', alignItems: 'center', gap: 8 } as const;
+
 /**
- * AI Views has been taken off the site: its Results buttons and these settings are gone, and what is stored for
- * a session is left as it is. One thing remains. A session set to build automatically goes on building in its
- * Worker, a paid AI call, with nothing on the site to show for it; this is the way to stop that. A session on
- * manual builds, which is every new one, sees nothing here.
+ * The Session Agent answers about the results as a whole from a build an admin starts with Update Session Agent
+ * in Results. That is the whole feature, so a session on manual updates, which is every new one, sees nothing
+ * here. A session already set to update automatically goes on doing so in its Worker, each one a paid AI call;
+ * it sees when and how often, and can turn it back to manual. What else is stored for the build stays as it is.
  */
 export default function ResultsAnalysisSettingsFields({ value, onChange, disabled = false }: Props) {
+  const id = useId();
   const settings = normalizeResultsAnalysisSettings(value);
-  // Once stopped, the mode is manual; this keeps the reminder to save on the page.
-  const [stopped, setStopped] = useState(false);
-  if (settings.generationMode !== 'automatic' && settings.generationMode !== 'both') {
-    return stopped ? (
-      <p role="status" data-testid="ce-ai-views-stopped">
-        Automatic AI Views builds stop when you save.
-      </p>
-    ) : null;
-  }
+  const automatic = settings.generationMode === 'automatic' || settings.generationMode === 'both';
+  // Once shown the fields stay, so an admin who picks manual can still change their mind before saving.
+  const [shown, setShown] = useState(automatic);
+  if (automatic && !shown) setShown(true);
+  if (!shown) return null;
+
+  const rawAutoAfter = asRecord(asRecord(value).autoAfter);
+  const thresholdValue = Object.prototype.hasOwnProperty.call(rawAutoAfter, 'threshold')
+    ? String(rawAutoAfter.threshold ?? '')
+    : String(settings.autoAfter.threshold);
+  const thresholdNumber = Number(thresholdValue);
+  const thresholdInvalid =
+    thresholdValue === '' ||
+    !Number.isSafeInteger(thresholdNumber) ||
+    thresholdNumber < RESULTS_ANALYSIS_THRESHOLD_MIN ||
+    thresholdNumber > RESULTS_ANALYSIS_THRESHOLD_MAX;
+  // Only the settings the session's validation knows, so a stray stored key cannot block the save.
+  const change = (patch: Record<string, unknown>) => onChange({ ...settings, ...patch });
+
   return (
-    <fieldset disabled={disabled} style={{ minWidth: 0 }} data-testid="ce-ai-views-automatic">
-      <legend>Automatic AI Views builds</legend>
-      <p>
-        This session&apos;s Worker still builds AI Views automatically as people answer. Each build is a paid AI call on
-        the session&apos;s AI key, and the site no longer shows or controls AI Views.
-      </p>
-      <Button
-        type="button"
-        color="secondary"
-        onClick={() => {
-          setStopped(true);
-          // Only the settings the session's validation knows, so a stray stored key cannot block the save.
-          onChange({ ...settings, generationMode: 'manual' });
-        }}
+    <fieldset disabled={disabled} style={{ minWidth: 0 }} data-testid="ce-session-agent-updates">
+      <legend>Session Agent updates</legend>
+      <div style={{ ...ROW, marginBottom: '0.5rem' }}>
+        <Label for={`${id}-mode`} style={{ marginBottom: 0 }}>
+          Update the Session Agent
+        </Label>
+        <SetupHelp id={`${id}-mode`} label="Update the Session Agent" help={MODE_HELP} />
+      </div>
+      <Input
+        id={`${id}-mode`}
+        type="select"
+        value={settings.generationMode}
+        aria-describedby={setupHelpId(`${id}-mode`)}
+        onChange={(event) => change({ generationMode: event.target.value })}
       >
-        Stop automatic builds
-      </Button>
+        <option value="manual">When an admin presses Update Session Agent</option>
+        <option value="automatic">Automatically, after new participants</option>
+        <option value="both">Both</option>
+      </Input>
+      {automatic ? (
+        <div>
+          <div style={{ ...ROW, margin: '12px 0 0.5rem' }}>
+            <Label for={`${id}-threshold`} style={{ marginBottom: 0 }}>
+              New participants before an automatic update
+            </Label>
+            <SetupHelp
+              id={`${id}-threshold`}
+              label="New participants before an automatic update"
+              help={THRESHOLD_HELP}
+            />
+          </div>
+          <Input
+            id={`${id}-threshold`}
+            type="number"
+            min={RESULTS_ANALYSIS_THRESHOLD_MIN}
+            max={RESULTS_ANALYSIS_THRESHOLD_MAX}
+            value={thresholdValue}
+            invalid={thresholdInvalid}
+            aria-describedby={setupHelpId(`${id}-threshold`)}
+            onChange={(event) =>
+              change({
+                autoAfter: {
+                  threshold: event.target.value === '' ? '' : Number(event.target.value),
+                  unit: 'distinctParticipants',
+                },
+              })
+            }
+          />
+          {thresholdInvalid ? <FormText color="danger">Enter a whole number of participants.</FormText> : null}
+        </div>
+      ) : (
+        <FormText>Automatic updates stop when you save.</FormText>
+      )}
     </fieldset>
   );
 }
