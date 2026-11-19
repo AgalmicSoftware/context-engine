@@ -80,12 +80,12 @@ import { SettingsAiSection } from './SettingsAiSection';
 import { SettingsChainFacts, SettingsChainFields } from './SettingsChainFields';
 import SettingsFeedbackPanel from './SettingsFeedbackPanel';
 import {
-  SettingsAnalysisCardField,
   SettingsContextCardsField,
   SettingsFeedbackField,
   SettingsQuestionListFields,
   SettingsSbtFields,
 } from './SettingsListFields';
+import { AnalysisCardChoice } from '../setup/SetupAiSection';
 import SettingsResultsAdminsField from './SettingsResultsAdminsField';
 
 type SessionSettingsPageProps = {
@@ -700,7 +700,7 @@ const SessionSettingsPage = ({
           workersAi={!onChain && workerRunsWorkersAi}
           analysisCard={
             !onChain && workerHasAnalysisCard ? (
-              <SettingsAnalysisCardField draft={draft} onChange={updateDraft} />
+              <AnalysisCardChoice id="ce-settings-analysis-card" draft={draft} onChange={updateDraft} />
             ) : null
           }
           sessionAgent={

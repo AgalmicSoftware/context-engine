@@ -41,6 +41,38 @@ describe('SetupAiSection', () => {
     expect(screen.queryByText(/^Transcription uses OpenAI/)).not.toBeInTheDocument();
   });
 
+  it('offers the Analysis card on a Session Worker, ticked unless turned off, with what it does behind its "?"', () => {
+    const renderCard = (extra: SetupDraft, workerHosted: boolean) => {
+      cleanup();
+      const onChange = jest.fn();
+      render(
+        <SetupAiSection
+          draft={{ ...draft, ...extra }}
+          onChange={onChange}
+          mode="create"
+          open
+          onToggle={() => {}}
+          conflicts={[]}
+          workerHosted={workerHosted}
+        />,
+      );
+      return onChange;
+    };
+    // A new session's draft has it on; turning it off says so on the closed section too.
+    const onChange = renderCard({ analysisCardEnabled: true }, true);
+    const box = screen.getByLabelText('Analysis card');
+    expect(box).toBeChecked();
+    expect(box).toHaveAccessibleDescription(/two-page picture card .* turned back on\.$/);
+    fireEvent.click(box);
+    expect(onChange).toHaveBeenCalledWith(['analysisCardEnabled'], false);
+    renderCard({ analysisCardEnabled: false }, true);
+    expect(screen.getByLabelText('Analysis card')).not.toBeChecked();
+    expect(screen.getByTestId('ce-setup-summary-ai')).toHaveTextContent('Analysis card off');
+    // An on-chain session keeps no such setting.
+    renderCard({ analysisCardEnabled: true }, false);
+    expect(screen.queryByLabelText('Analysis card')).not.toBeInTheDocument();
+  });
+
   describe('Session Agent on Cloudflare', () => {
     const agent = { audiences: [] };
     const cloudflare = { provider: 'workers-ai', model: '@cf/zai-org/glm-5.3' };
