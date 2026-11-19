@@ -82,6 +82,7 @@ import type {
 export { buildExpandedHistoricalCaseBriefMap, buildHistoricalCaseBrief, buildHistoricalCompassPoints };
 
 import DebateMapGeneratedSummary from './DebateMapGeneratedSummary';
+import DebateMapSplit from './DebateMapSplit';
 
 const StandalonePoliticalCompass = React.lazy(() =>
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
@@ -553,7 +554,18 @@ const useAtlasContainerDimensions = (measureKey: AtlasLayoutMode) => {
   return { containerRef, dimensions };
 };
 
-const useAtlasNavigationState = (data: DebateNode[], onNodeClick: (node: DebateNode) => void) => {
+// A session's atlas keeps its Tree and List as they were before its topics gained question circles: those two
+// views show topics and subtopics, and the circles are where the questions sit.
+const withoutQuestionCircles = (node: DebateNode): DebateNode => ({
+  ...node,
+  children: (node.children || []).map((child) => ({ ...child, children: [] })),
+});
+
+const useAtlasNavigationState = (
+  data: DebateNode[],
+  onNodeClick: (node: DebateNode) => void,
+  opensWithItsCircles = false,
+) => {
   const [atlasRootId, setAtlasRootId] = useState<string | null>(null);
   const [atlasHistoryIds, setAtlasHistoryIds] = useState<Array<string | null>>([]);
   const [showActiveDebates, setShowActiveDebates] = useState(false);
@@ -574,8 +586,11 @@ const useAtlasNavigationState = (data: DebateNode[], onNodeClick: (node: DebateN
       setAtlasHistoryIds((prev) => [...prev, atlasRootId]);
       setAtlasRootId(String(node.id || '').trim() || null);
       setShowActiveDebates(false);
+      // On a session's atlas a subtopic still opens in one click, as it did when it was the smallest circle:
+      // its window comes up over its question circles. Anything above it only zooms, as before.
+      if (opensWithItsCircles && node.children.every((child) => child.isQuestion === true)) onNodeClick(node);
     },
-    [atlasRootId, onNodeClick],
+    [atlasRootId, onNodeClick, opensWithItsCircles],
   );
 
   const handleBack = useCallback(
@@ -1102,7 +1117,7 @@ export const AtlasView = ({
 }: AtlasViewProps) => {
   const { containerRef, dimensions } = useAtlasContainerDimensions(atlasLayoutMode);
   const { atlasRoot, showActiveDebates, setShowActiveDebates, topNodes, handleAtlasNodeClick, handleBack } =
-    useAtlasNavigationState(data, onNodeClick);
+    useAtlasNavigationState(data, onNodeClick, readOnly);
 
   if (atlasLayoutMode === ATLAS_LAYOUT_MODES.PACKED) {
     return (
@@ -1220,7 +1235,9 @@ const Modal = ({
   const [argumentsOpen, setArgumentsOpen] = useState(hasDefaultArguments);
   const [historicalCasesOpen, setHistoricalCasesOpen] = useState(false);
   const [expandedHistoricalCaseId, setExpandedHistoricalCaseId] = useState('');
-  const [questionsOpen, setQuestionsOpen] = useState(false);
+  // A question's own window has nothing but its question, so that shows at once.
+  const onlyQuestions = readOnly && !content?.compass && !(Array.isArray(content?.comments) && content.comments.length);
+  const [questionsOpen, setQuestionsOpen] = useState(onlyQuestions);
 
   useEffect(() => {
     if (modalContentRef.current) {
@@ -1231,8 +1248,8 @@ const Modal = ({
     setArgumentsOpen(hasDefaultArguments);
     setHistoricalCasesOpen(false);
     setExpandedHistoricalCaseId('');
-    setQuestionsOpen(false);
-  }, [content?.id, hasDefaultArguments]);
+    setQuestionsOpen(onlyQuestions);
+  }, [content?.id, hasDefaultArguments, onlyQuestions]);
 
   // Escape leaves the panel, as the close button and a tap outside it do.
   useEffect(() => {
@@ -1897,6 +1914,7 @@ const Modal = ({
         {generatedSummaryEntries.length > 0 && (
           <DebateMapGeneratedSummary key={content.id || 'generated-summary'} entries={generatedSummaryEntries} />
         )}
+        {readOnly && content.split && <DebateMapSplit split={content.split} />}
 
         {compassData && (
           <div className={styles.collapseSection}>
@@ -2542,6 +2560,8 @@ const DebateMap = ({
     return treeDataState
       .flatMap((c) => flattenTree(c))
       .filter((n) => {
+        // A session's question circles stay out of the list (see withoutQuestionCircles).
+        if (readOnly && n.parentPath.length > 1) return false;
         if (nodeTypeFilter === 'all') return true;
         if (nodeTypeFilter === 'category' && n.parentPath.length !== 0) return false;
         if (nodeTypeFilter === 'subcategory' && n.parentPath.length !== 1) return false;
@@ -2757,7 +2777,7 @@ const DebateMap = ({
                     data-ce-tree-scale={treeFitScale.toFixed(3)}
                   >
                     <TreeNode
-                      node={selectedCategory}
+                      node={readOnly ? withoutQuestionCircles(selectedCategory) : selectedCategory}
                       depth={0}
                       parentPath={[]}
                       onNodeClick={handleNodeClick}

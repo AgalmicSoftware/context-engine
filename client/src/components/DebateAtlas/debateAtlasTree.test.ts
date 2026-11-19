@@ -52,7 +52,7 @@ const build: DebateAtlasBuild = {
   ],
 };
 
-it('nests topics under branches as leaves that open in one click, under ids unique to the build', () => {
+it('nests topics under branches and each topic\u2019s questions under it, under ids unique to the build', () => {
   const [branch] = buildDebateAtlasTree(build, { sessionSlug: 'salon' });
   expect(branch).toMatchObject({ id: 'atlas_k1_00000001:b1', name: 'Trust', depth: 0 });
   // The summary, then each position with how many of those who answered hold it.
@@ -68,7 +68,23 @@ it('nests topics under branches as leaves that open in one click, under ids uniq
   ]);
   const [identity, privacy] = branch.children || [];
   expect(identity).toMatchObject({ id: 'atlas_k1_00000001:b1t1', name: 'Identity', depth: 1 });
-  expect(identity.children).toBeUndefined();
+  // Each of a topic's questions is a circle of its own under it, opening to that one question.
+  expect(identity.children).toEqual([
+    {
+      id: 'atlas_k1_00000001:b1t1-q1',
+      name: 'Should agents prove they are human?',
+      depth: 2,
+      isQuestion: true,
+      questions: [{ id: 'q1', question: 'Should agents prove they are human?', questionType: 'binary' }],
+    },
+    expect.objectContaining({ id: 'atlas_k1_00000001:b1t1-q2', name: 'Which proof?', depth: 2 }),
+    expect.objectContaining({ id: 'atlas_k1_00000001:b1t1-q3', name: 'Spend credits', depth: 2 }),
+  ]);
+  // A question's circle has no map of its own, and its id still names its build.
+  expect(identity.children?.[0]).not.toHaveProperty('compass');
+  expect(debateAtlasBuildIdOf(String(identity.children?.[0].id))).toBe('atlas_k1_00000001');
+  // A topic without questions, or with one, stays a leaf: one circle, not a circle in a circle.
+  expect(privacy.children).toBeUndefined();
   // With the choices a question offers, so its card shows them.
   expect(identity.questions).toEqual([
     { id: 'q1', question: 'Should agents prove they are human?', questionType: 'binary' },
@@ -269,4 +285,80 @@ it('links a node to its session, with the Worker a fresh browser needs, and know
       'https://site.example',
     ).searchParams.has('worker'),
   ).toBe(false);
+});
+
+it('names a question\u2019s circle by the start of its prompt, cut at a word', () => {
+  const long = 'Should the council publish every contract it signs within thirty days of signing it, in full?';
+  const [branch] = buildDebateAtlasTree({
+    ...build,
+    branches: [
+      {
+        ...build.branches[0],
+        topics: [
+          {
+            id: 'b1t1',
+            label: 'Openness',
+            questions: [
+              { id: 'q1', prompt: long },
+              { id: 'q2', prompt: 'Short one?' },
+            ],
+          },
+          { id: 'b1t2', label: 'Lone', questions: [{ id: 'q3', prompt: 'Only question here?' }] },
+        ],
+      },
+    ],
+  });
+  const [openness, lone] = branch.children || [];
+  const [first, second] = openness.children || [];
+  expect(first.name).toBe('Should the council publish every contract it…');
+  expect(String(first.name).length).toBeLessThanOrEqual(49);
+  expect(first.questions?.[0].question).toBe(long);
+  expect(second.name).toBe('Short one?');
+  expect(lone.children).toBeUndefined();
+  expect(lone.questions).toHaveLength(1);
+});
+
+it('gathers a node\u2019s positions at the two ends of its first axis, only when both ends hold one', () => {
+  const split = (positions: DebateAtlasBuild['branches'][0]['positions'], withCompass = true) =>
+    buildDebateAtlasTree({
+      ...build,
+      branches: [{ ...build.branches[0], compass: withCompass ? compass : null, positions, answered: 10, topics: [] }],
+    })[0].split;
+  const both = split([
+    { label: 'Wait', summary: 'Care first.', participantCount: 4, x: 0.1, y: 0.5 },
+    { label: 'Go', summary: 'Move now.', participantCount: 5, x: 0.9, y: 0.5 },
+    { label: 'Depends', participantCount: 1, x: 0.5, y: 0.5 },
+    { label: 'Unplaced', participantCount: 1 },
+  ]);
+  // Under the axis's own end labels, never "For" and "Against"; the middle and the unplaced join neither.
+  expect(both).toEqual({
+    axis: 'Pace',
+    left: {
+      label: 'Slow',
+      positions: [
+        expect.objectContaining({ label: 'Wait', comment: 'Care first.', participantCount: 4, participantTotal: 10 }),
+      ],
+    },
+    right: {
+      label: 'Fast',
+      positions: [
+        expect.objectContaining({ label: 'Go', comment: 'Move now.', participantCount: 5, participantTotal: 10 }),
+      ],
+    },
+  });
+  // One end only, or no compass: no section.
+  expect(split([{ label: 'Go', participantCount: 5, x: 0.9, y: 0.5 }])).toBeUndefined();
+  expect(
+    split(
+      [
+        { label: 'Wait', participantCount: 4, x: 0.1, y: 0.5 },
+        { label: 'Go', participantCount: 5, x: 0.9, y: 0.5 },
+      ],
+      false,
+    ),
+  ).toBeUndefined();
+  // The fixture's own nodes: the branch has one position, the topic two at the same end.
+  const [branch] = buildDebateAtlasTree(build);
+  expect(branch.split).toBeUndefined();
+  expect(branch.children?.[0].split).toBeUndefined();
 });

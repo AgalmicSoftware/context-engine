@@ -167,6 +167,18 @@ export interface HistoricalCase {
   [key: string]: unknown;
 }
 
+// A node's positions gathered at the two ends of its compass's first axis: where people split, in the axis's
+// own words. Present only when positions sit at both ends.
+export interface DebateSplitSide {
+  label: string;
+  positions: DebateComment[];
+}
+export interface DebateSplit {
+  axis: string;
+  left: DebateSplitSide;
+  right: DebateSplitSide;
+}
+
 export interface DebateNode {
   id?: string;
   name?: string;
@@ -181,6 +193,9 @@ export interface DebateNode {
   scenarioVisualizations?: unknown[];
   compass?: CompassData;
   arguments?: DebateArguments;
+  split?: DebateSplit;
+  // One of a session subtopic's questions, drawn as a circle of its own.
+  isQuestion?: boolean;
   isCenter?: boolean;
   heat?: number;
   disagreementScore?: number;
