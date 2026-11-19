@@ -426,7 +426,10 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     features: string[] | null = ['context_cards_v1', 'analysis_card_v1'],
   ) =>
     withStoredConfigKept({
-      config: { sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE), ...page },
+      config: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        ...page,
+      } as Record<string, unknown>,
       workerOrigin: WORKER_ORIGIN,
       slug: 'worker-session',
       fetchImpl: async (url: RequestInfo | URL) => {
@@ -436,14 +439,18 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
         return stored ? jsonResponse(200, { config: stored }) : jsonResponse(404, { error: 'Session not found.' });
       },
     }).then(
-      ({ contextCardsEnabled, analysisCardEnabled }) => ({ contextCardsEnabled, analysisCardEnabled }),
+      (config: Record<string, unknown>) => ({
+        contextCardsEnabled: config.contextCardsEnabled,
+        analysisCardEnabled: config.analysisCardEnabled,
+      }),
       (error: Error) => error.message,
     );
-  const PUBLISHED = { workerCanonicalPublicationRevision: 'config:published' };
   // As /new sends them: the analysis card's box starts ticked, and off is left out.
   const PAGE_DEFAULT = { analysisCardEnabled: true };
+  // A session that exists, as the Worker shows it; one from before the card never saved either switch.
+  const EXISTS = { sessionName: 'A session that exists', configRevision: 'config:earlier' };
 
-  it('a new session is made as the page says, with the analysis card on where the Worker has it', async () => {
+  it('a session with no config yet is made as the page says, with the analysis card on where the Worker has it', async () => {
     expect(await kept(PAGE_DEFAULT, null)).toEqual({ analysisCardEnabled: true });
     expect(await kept({ ...PAGE_DEFAULT, contextCardsEnabled: true }, null)).toEqual({
       contextCardsEnabled: true,
@@ -453,42 +460,45 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     expect(await kept({}, null)).toEqual({});
     // A Worker without the card: the session is made without it, not refused.
     expect(await kept(PAGE_DEFAULT, null, ['worker_groups'])).toEqual({});
-    // A Worker that cannot be asked is sent nothing it might refuse.
-    expect(await kept(PAGE_DEFAULT, null, null)).toMatch(/couldn't be checked for the Analysis card/);
-    // Context cards were a choice made on the page, so a Worker too old for them stops the save.
+    // Nor is one that cannot be asked: the box is only ticked by default, so the session is still made.
+    expect(await kept(PAGE_DEFAULT, null, null)).toEqual({});
+    // Context cards were a choice made on the page, so a Worker too old for them, or unasked, stops the save.
     expect(await kept({ contextCardsEnabled: true }, null, ['analysis_card_v1'])).toMatch(
+      /too old to keep Context cards/,
+    );
+    expect(await kept({ contextCardsEnabled: true }, null, null)).toMatch(/couldn't be checked for Context cards/);
+  });
+
+  it('never gives the analysis card to a session that exists and never saved it, though the box on /new is ticked', async () => {
+    // The real case: every session from before the card. The box on /new always starts ticked.
+    expect(await kept(PAGE_DEFAULT, EXISTS)).toEqual({});
+    // Nor does a ticked box turn back on a card an admin turned off, or change one that is on.
+    expect(await kept(PAGE_DEFAULT, { ...EXISTS, analysisCardEnabled: false })).toEqual({ analysisCardEnabled: false });
+    expect(await kept(PAGE_DEFAULT, { ...EXISTS, analysisCardEnabled: true })).toEqual({ analysisCardEnabled: true });
+    // What the session holds it could already take, so no Worker is asked what it has.
+    expect(await kept(PAGE_DEFAULT, { ...EXISTS, analysisCardEnabled: true }, null)).toEqual({
+      analysisCardEnabled: true,
+    });
+    // Unticking is a choice: the card is turned off where the session holds the switch.
+    expect(await kept({}, { ...EXISTS, analysisCardEnabled: true })).toEqual({ analysisCardEnabled: false });
+    expect(await kept({}, { ...EXISTS, analysisCardEnabled: false })).toEqual({ analysisCardEnabled: false });
+    expect(await kept({}, EXISTS)).toEqual({});
+  });
+
+  it('keeps the Context cards a session has when the page leaves them unticked, and follows a tick', async () => {
+    // Unticked is where the box starts: it says nothing, so cards an admin turned on in Settings stay on.
+    expect(await kept({}, { ...EXISTS, contextCardsEnabled: true })).toEqual({ contextCardsEnabled: true });
+    expect(await kept({}, { ...EXISTS, contextCardsEnabled: false })).toEqual({ contextCardsEnabled: false });
+    // Ticking is a choice, sent where the Worker keeps cards.
+    expect(await kept({ contextCardsEnabled: true }, { ...EXISTS, contextCardsEnabled: false })).toEqual({
+      contextCardsEnabled: true,
+    });
+    expect(await kept({ contextCardsEnabled: true }, EXISTS, ['worker_groups'])).toMatch(
       /too old to keep Context cards/,
     );
   });
 
-  it('a session still being made follows the page: a box unticked since an earlier attempt is turned off', async () => {
-    const earlier = { contextCardsEnabled: true, analysisCardEnabled: true };
-    expect(await kept({}, earlier)).toEqual({ contextCardsEnabled: false, analysisCardEnabled: false });
-    expect(await kept(PAGE_DEFAULT, earlier)).toEqual({ contextCardsEnabled: false, analysisCardEnabled: true });
-    // Nothing stored and nothing stated: nothing sent.
-    expect(await kept({}, { sessionName: 'In the making' })).toEqual({});
-  });
-
-  it('a published session keeps its own card switches, whatever a /new draft says', async () => {
-    // The real case: the card was never turned on (or was turned off) and /new's box is ticked by default.
-    expect(await kept(PAGE_DEFAULT, { ...PUBLISHED })).toEqual({});
-    expect(await kept(PAGE_DEFAULT, { ...PUBLISHED, analysisCardEnabled: false })).toEqual({
-      analysisCardEnabled: false,
-    });
-    // And the other way: cards an admin turned on in Settings stay on though the page leaves them out.
-    expect(await kept({}, { ...PUBLISHED, contextCardsEnabled: true, analysisCardEnabled: true })).toEqual({
-      contextCardsEnabled: true,
-      analysisCardEnabled: true,
-    });
-    // Even a box ticked on the page does not change it: a published session's switches are set in Settings.
-    expect(await kept({ contextCardsEnabled: true }, { ...PUBLISHED, contextCardsEnabled: false })).toEqual({
-      contextCardsEnabled: false,
-    });
-    // What it holds it could already take, so no Worker is asked what it has.
-    expect(await kept({ ...PAGE_DEFAULT, contextCardsEnabled: true }, { ...PUBLISHED }, null)).toEqual({});
-  });
-
-  it('turns off a card switch an earlier attempt stored, with the same revision on a retry', async () => {
+  it('reads back what it kept or turned off, with the same revision on a retry', async () => {
     const withoutCards = ({
       contextCardsEnabled: _cards,
       analysisCardEnabled: _card,
@@ -505,15 +515,16 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
         fetchImpl,
         retryDelaysMs: [],
       });
+    // An earlier attempt stored both on; the page now has both boxes unticked.
     const has = createWorkerFetch(async () =>
       jsonResponse(200, {
         config: verifiedConfig('earlier', { contextCardsEnabled: true, analysisCardEnabled: true }),
       }),
     );
     const first = await persist(has.fetchImpl);
-    expect(has.written()).toMatchObject({ contextCardsEnabled: false, analysisCardEnabled: false });
-    expect(first.publicConfig).toMatchObject({ contextCardsEnabled: false, analysisCardEnabled: false });
-    // The stored false is sent again, so a retry signs the revision the first write claimed.
+    expect(has.written()).toMatchObject({ contextCardsEnabled: true, analysisCardEnabled: false });
+    expect(first.publicConfig).toMatchObject({ contextCardsEnabled: true, analysisCardEnabled: false });
+    // What was sent is what is stored now, so a retry signs the revision the first write claimed.
     const second = await persist(has.fetchImpl);
     expect(second.configRevision).toBe(first.configRevision);
     // A Worker whose config never had either setting is not sent it.

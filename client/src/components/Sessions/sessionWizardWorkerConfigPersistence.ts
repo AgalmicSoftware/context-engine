@@ -331,15 +331,18 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
 // stored (set in Settings) is kept the same way.
 const CLEARED_WHEN_LEFT_OUT = { agentInstructions: '', sessionAgent: null } as const;
 // The two card switches. Each is off unless true, and a config leaves it out
-// when off.
-// - A session still being made takes what the page says. A switch the page
-//   leaves out is turned off where an earlier attempt stored it, so Create
-//   makes the session match the page.
-// - A published session keeps its own. Its switches are changed in Settings:
-//   a /new sync onto it sends back what it holds, and nothing for a switch it
-//   never saved, whatever this page's draft says. Otherwise pointing /new at a
-//   session that exists would turn its analysis card on (the box on /new
-//   starts ticked) or its Context cards off.
+// when off. Both are a session's own choice, made in Settings as well as on
+// /new, so a /new write onto a session that exists must not undo one: only a
+// box the admin moved off its default is a choice of this page.
+// - Context cards start unticked. Ticked is a choice and is sent. Left out says
+//   nothing: what the Worker holds is sent back as it is.
+// - The analysis card starts ticked. Unticked (left out) is a choice: where the
+//   Worker holds the switch it is turned off. Ticked says nothing: what the
+//   Worker holds is sent back, and a session that never saved the switch is not
+//   given one. Only a session with no config at all, one being made, gets the
+//   ticked default; the deploy seed carries it for a session /new deploys.
+// Without this, pointing /new at a session that exists would turn its analysis
+// card on, since the box always starts ticked, or its Context cards off.
 const CARD_SWITCHES = ['contextCardsEnabled', 'analysisCardEnabled'] as const;
 
 // What the Worker says it has; null when it cannot be asked. Asked afresh each
@@ -368,9 +371,11 @@ const readWorkerFeatures = async (
 // A switch this page turns on is sent only to a Worker that says it has the
 // feature: an older one would refuse the whole save, naming only the field.
 // Context cards are a choice the admin made on the page, so a Worker too old
-// for them stops the save and says so. The analysis card is on because its box
-// starts ticked: on a Worker without it there is simply no card, so the switch
-// is left out and the session is made.
+// for them, or one that cannot be asked, stops the save and says so. The
+// analysis card is on only because its box starts ticked, and every new
+// session passes here: unless the Worker says it has the card, the switch is
+// left out and the session is made without one (an admin can turn it on in
+// Settings). A check that fails must never be what stops a session being made.
 const withSwitchesTheWorkerHas = async <T extends UnknownRecord>(
   config: T,
   fromPage: ReadonlyArray<(typeof CARD_SWITCHES)[number]>,
@@ -393,13 +398,7 @@ const withSwitchesTheWorkerHas = async <T extends UnknownRecord>(
       );
     }
   }
-  if (!asked.includes('analysisCardEnabled')) return config;
-  if (!features) {
-    throw new Error(
-      "The Session Worker couldn't be checked for the Analysis card, so the settings weren't saved. Try again.",
-    );
-  }
-  if (features.includes(ANALYSIS_CARD_FEATURE)) return config;
+  if (!asked.includes('analysisCardEnabled') || features?.includes(ANALYSIS_CARD_FEATURE)) return config;
   const { analysisCardEnabled: _none, ...rest } = config;
   return rest as T;
 };
@@ -450,23 +449,32 @@ export const withStoredConfigKept = async <T extends UnknownRecord>({
     keepsAiLimit && storedAiLimit != null
       ? { ...config, limits: { ...limits, aiPerWalletPerDay: storedAiLimit } }
       : { ...config };
-  const published = !!toTrimmedString(stored[WORKER_CANONICAL_PUBLICATION_REVISION_KEY]);
-  switches.forEach((field) => {
-    const kept = typeof stored[field] === 'boolean' ? stored[field] : undefined;
-    if (published) {
-      if (kept === undefined) delete next[field];
-      else next[field] = kept;
-    } else if (!has(field) && kept !== undefined) {
-      next[field] = false;
+  const held = (field: string): boolean | undefined =>
+    typeof stored[field] === 'boolean' ? (stored[field] as boolean) : undefined;
+  // Context cards left out: what the Worker holds stays. Ticked is this page's choice, checked below.
+  const cardsTicked = switches.includes('contextCardsEnabled') && has('contextCardsEnabled');
+  if (switches.includes('contextCardsEnabled') && !cardsTicked && held('contextCardsEnabled') !== undefined) {
+    next.contextCardsEnabled = held('contextCardsEnabled');
+  }
+  // The analysis card ticked: what the Worker holds stays, and a session that never saved it is given none.
+  // Unticked: turned off where the Worker holds it.
+  if (switches.includes('analysisCardEnabled')) {
+    const kept = held('analysisCardEnabled');
+    if (!has('analysisCardEnabled')) {
+      if (kept !== undefined) next.analysisCardEnabled = false;
+    } else if (kept === undefined) {
+      delete next.analysisCardEnabled;
+    } else {
+      next.analysisCardEnabled = kept;
     }
-  });
+  }
   leftOut
     .filter((field) => Object.prototype.hasOwnProperty.call(stored, field))
     .forEach((field) => {
       next[field] = CLEARED_WHEN_LEFT_OUT[field];
     });
-  // What a published session holds it was already able to take.
-  return withSwitchesTheWorkerHas(next as T, published ? [] : switches, workerOrigin, slug, fetchImpl);
+  // What the Worker already holds it could already take: only this page's own tick is checked.
+  return withSwitchesTheWorkerHas(next as T, cardsTicked ? ['contextCardsEnabled'] : [], workerOrigin, slug, fetchImpl);
 };
 
 const assertReachableWorkerCanonicalProfile = (profile: unknown, context: string): SessionModeProfile => {

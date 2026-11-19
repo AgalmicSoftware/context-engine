@@ -508,7 +508,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     if (!sessionAgent.ok) throw new Error(`Fix the Session Agent: ${sessionAgent.errors[0].message}`);
     if (sessionAgent.value) next.sessionAgent = sessionAgent.value;
     // Context cards. Off is left out, as older Workers refuse the field; the
-    // config writers never send this page's choice over a published session's own.
+    // config writers then keep whatever the Worker's config already holds.
     if (resolvedDraft.contextCardsEnabled === true) next.contextCardsEnabled = true;
     // The default is left out, so a Worker without the setting takes the session.
     const ceiling = trimString(resolvedDraft.groupMemberCeiling);
@@ -522,8 +522,9 @@ export const buildSessionWizardWorkerConfigPayload = ({
     }
     // The analysis card. Its box starts ticked, so a new session has the card
     // unless the box is unticked. Off is left out, as older Workers refuse the
-    // field; the config writers leave it out too for a Worker without the card,
-    // and never send this page's choice over a published session's own.
+    // field. The config writers leave `true` out too for a Worker without the
+    // card and for a session that exists and never saved the switch: a ticked
+    // default is not a choice.
     if (resolvedDraft.analysisCardEnabled !== false) next.analysisCardEnabled = true;
     if (usesOnChainSbt) {
       next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);

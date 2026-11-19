@@ -131,7 +131,13 @@ test('nobody can save a card onto someone else\'s page', async () => {
   const kv = createKv();
   await run({ kv });
   const before = [...kv.rows.entries()];
-  for (const body of [{ published: true, card: CARD, account: OWNER }, { published: false, account: OWNER }]) {
+  for (const body of [
+    { published: true, card: CARD, account: OWNER },
+    { published: false, account: OWNER },
+    // A request that names nobody in particular is not the caller's own either.
+    { published: true, card: CARD, account: null },
+    { published: true, card: CARD, account: '' },
+  ]) {
     const result = await run({ kv, address: VISITOR, body });
     assert.deepEqual([result.response.status, result.body], [403, { error: 'analysis_card_own_only' }]);
     assert.deepEqual(result.counted, []);

@@ -222,6 +222,66 @@ const setLimits = (worker, incomingLimits) => {
 
 // Settings sets the AI daily limit through set-limits; /new has no field for it,
 // and set-config replaces limits whole, so /new carries the stored one.
+// Through the real Worker: what its public config shows is all /new can go by.
+describe('the card switches when /new writes to a Worker', () => {
+  // As /new sends them: the analysis card's box starts ticked; Context cards are left out unless ticked.
+  const pageDefault = () => ({ ...buildConfig(), analysisCardEnabled: true });
+  // The config a deploy helper stages from the deploy request, as deployHelperCore writes it.
+  const staged = (deployRequest) => ({
+    slug,
+    authzEpoch: 1,
+    adminAddress,
+    allowOrigins: deployRequest.allowOrigins,
+    limits: {},
+    scopes: {},
+    corsWorkerUrl: workerUrl,
+    embeddedDeployHelperEnabled: true,
+    ...selectDeployWorkerSessionConfigFields({ ...deployRequest, sessionId, configRevision: 'deploy-attempt' }),
+  });
+  // A session that exists and is published, made before either switch existed.
+  const published = async (extra = {}) => {
+    const worker = createWorker();
+    await persistAndVerifySessionWizardWorkerConfig({ ...buildInput(buildConfig(), worker), retryDelaysMs: [] });
+    expect(worker.stored.workerCanonicalPublicationRevision).toBeTruthy();
+    expect(worker.stored).not.toHaveProperty('analysisCardEnabled');
+    worker.stored = { ...worker.stored, ...extra };
+    return worker;
+  };
+
+  it('a session /new deploys starts with the analysis card on, and keeps it through verify and Create', async () => {
+    const config = pageDefault();
+    const worker = createWorker({ stored: staged(config) });
+    expect(worker.stored.analysisCardEnabled).toBe(true);
+    await verifySessionWizardWorkerPublicDeployment(buildInput(config, worker));
+    const made = await persistAndVerifySessionWizardWorkerConfig({ ...buildInput(config, worker), retryDelaysMs: [] });
+    expect(worker.stored.analysisCardEnabled).toBe(true);
+    expect(made.publicConfig.analysisCardEnabled).toBe(true);
+    // Unticked before Create is pressed again: the card goes off, and the readback agrees.
+    const unticked = createWorker({ stored: staged(config) });
+    await verifySessionWizardWorkerPublicDeployment(buildInput(buildConfig(), unticked));
+    expect(unticked.stored.analysisCardEnabled).toBe(false);
+  });
+
+  it('a session that exists and never saved the switch is not given the card by a /new sync', async () => {
+    // The real session's case: published before the card, and /new's box ticked as it always starts.
+    const worker = await published();
+    await verifySessionWizardWorkerPublicDeployment(buildInput(pageDefault(), worker));
+    expect(worker.stored).not.toHaveProperty('analysisCardEnabled');
+    // The Worker's public config shows no sign that a session is published, so this cannot depend on one.
+    expect(worker.reads.at(-1).config).not.toHaveProperty('workerCanonicalPublicationRevision');
+  });
+
+  it('a /new sync leaves an analysis card that is off, off, and Context cards that are on, on', async () => {
+    const worker = await published({ analysisCardEnabled: false, contextCardsEnabled: true });
+    await verifySessionWizardWorkerPublicDeployment(buildInput(pageDefault(), worker));
+    expect(worker.stored).toMatchObject({ analysisCardEnabled: false, contextCardsEnabled: true });
+    // And one that is on stays on.
+    const on = await published({ analysisCardEnabled: true });
+    await verifySessionWizardWorkerPublicDeployment(buildInput(pageDefault(), on));
+    expect(on.stored.analysisCardEnabled).toBe(true);
+  });
+});
+
 it('keeps the AI daily limit Settings stored when /new verifies and publishes again', async () => {
   const worker = createWorker();
   const config = buildWizardConfig({ sessionEndsAt: '', perWalletPerDay: '100', perAnonymousIpPerDay: '' });

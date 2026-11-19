@@ -392,6 +392,9 @@ const useSessionWizardWorkerDeploy = ({
           'defaultGroupTags',
           'questionsGenPrompt',
           'agentInstructions',
+          // The card switches as the page has them, so a session this deploy makes starts as the page says.
+          'contextCardsEnabled',
+          'analysisCardEnabled',
           'defaultFilterState',
           'defaultSbtTags',
           'defaultFeaturedSBTs',

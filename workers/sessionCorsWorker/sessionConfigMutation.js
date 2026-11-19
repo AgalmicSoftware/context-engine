@@ -76,7 +76,7 @@ const validResultsAnalysisSettingsConfig = (config) => {
 
 const validPileAutoAdvanceConfig = (config) =>
   !hasOwn(config, 'pileAutoAdvanceEnabled') || typeof config.pileAutoAdvanceEnabled === 'boolean';
-// The personal analysis card: absent means on.
+// The personal analysis card: absent means off.
 const validAnalysisCardConfig = (config) =>
   !hasOwn(config, 'analysisCardEnabled') || typeof config.analysisCardEnabled === 'boolean';
 // The Feedback box: absent means on.

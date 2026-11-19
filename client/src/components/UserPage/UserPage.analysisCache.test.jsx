@@ -568,13 +568,38 @@ describe('UserPage analysis cache and routing', () => {
 
     await instance.analyzeUser();
     await waitFor(() => expect(instance.state.aiAnalysis).toBe('summary'));
+    // Past the question to the Worker, which is where a card would have been started.
+    await waitFor(() => expect(readSavedAnalysisCard).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     // The analysis is theirs to read; a card is made only by its own person, for their own address.
     expect(analyzeUserCard).not.toHaveBeenCalled();
     expect(fetchAnalysisCardPicture).not.toHaveBeenCalled();
     expect(publishSavedAnalysisCard).not.toHaveBeenCalled();
     expect(instance.state).toMatchObject({ analysisCard: null, analysisCardPicture: null, analysisCardPublish: null });
+  });
+
+  it("on someone else's page shows no card kept with an earlier analysis", async () => {
+    // As an analysis cached before cards were own-page only, with the card a visitor's Analyze then made.
+    const { instance } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'summary',
+      details: 'details',
+      name: 'name',
+      historicalAlignment: { figure: 'Grace Hopper (1906–1992)', reasoning: 'Reasoning.' },
+      card: { title: 'A card made for a visitor', figure: 'Grace Hopper (1906–1992)' },
+    });
+    readSavedAnalysisCard.mockResolvedValueOnce({ status: 'none' });
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(readSavedAnalysisCard).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(instance.state.analysisCard).toBeNull();
+    expect(analyzeUserCard).not.toHaveBeenCalled();
+    expect(fetchAnalysisCardPicture).not.toHaveBeenCalled();
   });
 
   it("on someone else's page shows no card when they withdrew theirs", async () => {

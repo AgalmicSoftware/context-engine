@@ -148,38 +148,29 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
     const { contextCardsEnabled, analysisCardEnabled } = JSON.parse(String(init?.body)).config;
     return { contextCardsEnabled, analysisCardEnabled };
   };
-  const PUBLISHED = { workerCanonicalPublicationRevision: 'config:published' };
   const HAS_BOTH = ['context_cards_v1', 'analysis_card_v1'];
 
-  it('never changes a published session’s card switches, though the /new draft says otherwise', async () => {
-    // As the real session: the analysis card never turned on, and /new's box ticked as it always starts.
-    expect(await synced({ analysisCardEnabled: true }, { ...PUBLISHED }, HAS_BOTH)).toEqual({});
-    expect(await synced({ analysisCardEnabled: true }, { ...PUBLISHED, analysisCardEnabled: false }, HAS_BOTH)).toEqual(
-      {
-        analysisCardEnabled: false,
-      },
-    );
-    // And Context cards an admin turned on in Settings stay on though the draft's box is unticked.
-    expect(await synced({}, { ...PUBLISHED, contextCardsEnabled: true, analysisCardEnabled: true }, HAS_BOTH)).toEqual({
-      contextCardsEnabled: true,
-      analysisCardEnabled: true,
-    });
-    expect(await synced({ contextCardsEnabled: true }, { ...PUBLISHED }, HAS_BOTH)).toEqual({});
-  });
-
-  it('makes a session as the page says while it is still being made', async () => {
-    // The first sync after a deploy: the analysis card on, as its box starts; Context cards as ticked.
-    expect(await synced({ analysisCardEnabled: true }, {}, HAS_BOTH)).toEqual({ analysisCardEnabled: true });
-    expect(await synced({ analysisCardEnabled: true, contextCardsEnabled: true }, {}, HAS_BOTH)).toEqual({
-      contextCardsEnabled: true,
-      analysisCardEnabled: true,
-    });
-    // A box unticked since an earlier attempt is turned off.
-    expect(await synced({}, { contextCardsEnabled: true, analysisCardEnabled: true }, HAS_BOTH)).toEqual({
-      contextCardsEnabled: false,
+  it('never gives the analysis card to a session that exists, though the /new draft has its box ticked', async () => {
+    // As the real session: it never saved the switch, and /new's box is ticked as it always starts.
+    expect(await synced({ analysisCardEnabled: true }, {}, HAS_BOTH)).toEqual({});
+    expect(await synced({ analysisCardEnabled: true }, { analysisCardEnabled: false }, HAS_BOTH)).toEqual({
       analysisCardEnabled: false,
     });
+    expect(await synced({ analysisCardEnabled: true }, { analysisCardEnabled: true }, HAS_BOTH)).toEqual({
+      analysisCardEnabled: true,
+    });
+    // Unticking is a choice.
+    expect(await synced({}, { analysisCardEnabled: true }, HAS_BOTH)).toEqual({ analysisCardEnabled: false });
+  });
+
+  it('keeps the Context cards a session has when the /new draft leaves them unticked', async () => {
+    expect(await synced({}, { contextCardsEnabled: true }, HAS_BOTH)).toEqual({ contextCardsEnabled: true });
+    expect(await synced({}, { contextCardsEnabled: false }, HAS_BOTH)).toEqual({ contextCardsEnabled: false });
     expect(await synced({}, {}, HAS_BOTH)).toEqual({});
+    // Ticking is a choice.
+    expect(await synced({ contextCardsEnabled: true }, { contextCardsEnabled: false }, HAS_BOTH)).toEqual({
+      contextCardsEnabled: true,
+    });
   });
 
   it('sends Context cards on only to a Worker that says it keeps them', async () => {
@@ -261,7 +252,10 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
     const save = async (capabilities: () => unknown) => {
       const fetchImpl = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
         if (String(url).includes('/capabilities')) return capabilities();
-        return { ok: true, status: 200, json: async () => (init?.method === 'POST' ? { ok: true } : { config: {} }) };
+        // No session there yet: the one being made takes the ticked default.
+        if (init?.method !== 'POST')
+          return { ok: false, status: 404, json: async () => ({ error: 'Session not found.' }) };
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
       });
       const ensureSessionConfig = createSessionWizardEnsureWorkerSessionConfig({
         getWorkerConfig: () => ({
@@ -296,16 +290,15 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
       outcome: 'saved',
       sent: ['left out'],
     });
-    // A Worker that could not be asked is sent nothing.
-    const unchecked = expect.stringContaining('be checked for the Analysis card');
+    // Nor may a check that fails: a Worker that could not be asked is sent the session without the switch.
     expect(await save(() => ({ ok: false, status: 503, json: async () => ({}) }))).toEqual({
-      outcome: unchecked,
-      sent: [],
+      outcome: 'saved',
+      sent: ['left out'],
     });
     expect(
       await save(() => {
         throw new Error('offline');
       }),
-    ).toEqual({ outcome: unchecked, sent: [] });
+    ).toEqual({ outcome: 'saved', sent: ['left out'] });
   });
 });

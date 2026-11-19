@@ -32,7 +32,9 @@ export const SessionAgentModelChoice = ({ draft, onChange }: Pick<SetupSectionPr
 );
 
 // Whether each person's AI analysis comes with the two-page picture card, in
-// setup and in settings. On unless turned off.
+// setup and in settings. In setup the box starts ticked (a draft that says
+// nothing means on). In settings the draft always holds true or false, false
+// for a session that never saved the switch.
 export const AnalysisCardChoice = ({
   id,
   draft,
