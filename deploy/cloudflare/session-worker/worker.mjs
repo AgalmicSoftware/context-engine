@@ -31621,7 +31621,8 @@ var init_sessionConfigMutation = __esm({
       const storedModel = existing?.interviewMode?.realtimeModel;
       const migrateStoredModel = typeof storedModel === "string" && /^gpt-realtime(?:-[a-z0-9.]+)*$/i.test(storedModel) && !isRealtimeInterviewModel(storedModel);
       if (migrateStoredModel) {
-        existing = { ...existing, interviewMode: { ...existing.interviewMode, realtimeModel: normalizeRealtimeInterviewModel(storedModel) } };
+        const { realtimeModel: _legacyModel, ...interviewMode } = existing.interviewMode;
+        existing = { ...existing, interviewMode };
       }
       const kind = toTrimmedString6(mutation?.kind);
       let incomingConfig;
@@ -31633,7 +31634,8 @@ var init_sessionConfigMutation = __esm({
           return { ok: false, status: 400, error: "Invalid session identity." };
         }
         if (migrateStoredModel && incomingConfig?.interviewMode?.realtimeModel === storedModel) {
-          incomingConfig = { ...incomingConfig, interviewMode: { ...incomingConfig.interviewMode, realtimeModel: existing.interviewMode.realtimeModel } };
+          const { realtimeModel: _legacyModel, ...interviewMode } = incomingConfig.interviewMode;
+          incomingConfig = { ...incomingConfig, interviewMode };
         }
         if (hasOwn4(incomingConfig, AUTHORIZATION_EPOCH_KEY)) {
           return { ok: false, status: 400, error: "Authorization epoch is server-managed." };
