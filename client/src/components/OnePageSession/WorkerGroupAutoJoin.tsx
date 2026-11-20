@@ -267,8 +267,6 @@ function AutoJoinIntent({
   if (done && completedAccountRef.current && completedAccountRef.current !== account) return null;
   return (
     <WorkerGroupAutoJoinNotice
-      // Only a join waiting for sign-in moves into the interview's Groups section; joining and its outcome show here.
-      groupId={!ready && !done ? groupId : undefined}
       groupLabel={!ready && !done ? groupLabel : undefined}
       message={!ready && !done ? (asksCode ? NEEDS_CODE_MESSAGE : 'Will be joined upon sign-in') : progress.message}
       isError={progress.phase === 'error'}
@@ -417,7 +415,6 @@ export default function WorkerGroupAutoJoin(props: Props) {
     );
   return (
     <WorkerGroupAutoJoinNotice
-      groupId={intent.groupId}
       groupLabel={intent.groupId}
       message={error || 'Preparing your group invitation…'}
       isError={!!error}
