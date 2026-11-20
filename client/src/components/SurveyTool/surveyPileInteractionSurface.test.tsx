@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
 import {
   PILE_LOADING_ICON_WRAP_STYLE,
@@ -580,6 +580,11 @@ it('sets the Submit count apart, so a narrow row can drop it while the name keep
   expect(submit.querySelector('.pileSubmitButtonCount')).toHaveTextContent('(3)');
   // The brackets are their own spans, which a phone row hides.
   expect(submit.querySelectorAll('.pileSubmitButtonCountBracket')).toHaveLength(2);
+  // The word is marked while it carries a number, so a phone row can set it clear of the number above it.
+  expect(submit.querySelector('.pileSubmitButtonLabel')).toHaveClass('pileSubmitButtonLabelCounted');
+  cleanup();
+  render(renderPileInteractionSurface({ ...buildBaseProps(), finalSubmitText: 'Submit' }));
+  expect(document.querySelector('.pileSubmitButtonLabel')).not.toHaveClass('pileSubmitButtonLabelCounted');
 });
 
 it('reads the submit out from a status region that was already there', () => {

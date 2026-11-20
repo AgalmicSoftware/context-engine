@@ -86,15 +86,18 @@ it('keeps Submit readable on the narrowest phone rows', () => {
   );
   expect(css).toMatch(/\.pileInteractionUnit \.pileFooter \.pileSubmitProgress > svg\s*\{\s*order: -1;/);
   expect(css).toMatch(/\.pileInteractionUnit\s*\{\s*--pile-phone-row-space: 84px;/);
-  // The unsent-answers notice under the row keeps its own room, so a failed save's line below never sits under it.
+  // The unsent-answers notice is not drawn on a phone row (the number on Submit says it), so the row keeps no room
+  // for it; it stays in the page for screen readers.
+  expect(css).not.toMatch(/\.pileControls:has\(\.pilePendingAnswerNotice\)/);
   expect(css).toMatch(
-    /\.pileInteractionUnit \.pileControls:has\(\.pilePendingAnswerNotice\)\s*\{\s*margin-bottom: 16px;/,
+    /\.pileInteractionUnit \.pileFooter \.pilePendingAnswerNotice\s*\{\s*position: absolute;\s*width: 1px;\s*height: 1px;\s*overflow: hidden;\s*clip-path: inset\(50%\);/,
   );
+  expect(css).not.toMatch(/\.pilePendingAnswerNotice\s*\{[^}]*display: none/);
 });
 
 // The arrows sit against the counter, with no margin between: each icon is drawn at the counter's side of its
 // 44px target, and its keyboard ring pulled in to the target's edge. The room goes to Submit, whose count always shows,
-// small and without brackets, in the button's top corner.
+// without brackets, in the button's top corner, as large as the gap above the word holds.
 it('closes the phone arrows up to the counter and keeps the Submit count in view', () => {
   const counter = css.match(/\.pileInteractionUnit \.pileNav \.pileNavCounterText\s*\{([^{}]*)\}/)?.[1] || '';
   expect(counter).toMatch(/margin: 0;/);
@@ -108,8 +111,12 @@ it('closes the phone arrows up to the counter and keeps the Submit count in view
     /\.pileInteractionUnit \.pileControls \.pileNav \.pileNavArrow:focus-visible\s*\{\s*outline-offset: -1px;/,
   );
   expect(css).toMatch(/\.pileInteractionUnit \.pileFooter \.pileSubmitButtonCountBracket\s*\{\s*display: none;/);
+  // The word moves down under the number, by margins that cancel, so the button does not grow.
   expect(css).toMatch(
-    /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonCount\s*\{\s*position: absolute;\s*top: 3px;\s*right: 5px;/,
+    /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonLabelCounted\s*\{\s*margin-top: 5px;\s*margin-bottom: -5px;/,
+  );
+  expect(css).toMatch(
+    /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonCount\s*\{\s*position: absolute;\s*top: 4px;\s*right: 5px;[^}]*font-size: 16px;\s*font-weight: 700;/,
   );
 });
 
