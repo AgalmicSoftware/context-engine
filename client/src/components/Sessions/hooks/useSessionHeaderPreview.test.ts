@@ -280,4 +280,106 @@ describe('useSessionHeaderPreview', () => {
     expect(result.current.sessionHeaderUploadStatusTone).toBe('error');
     expect(updateDraftSessionHeader).not.toHaveBeenCalled();
   });
+
+  describe('for a Centralized session', () => {
+    const png = (name: string) => new File([name], `${name}.png`, { type: 'image/png' });
+    const deferred = () => {
+      let resolve: (value: string) => void = () => {};
+      const promise = new Promise<string>((done) => {
+        resolve = done;
+      });
+      return { promise, resolve };
+    };
+
+    it('keeps only the shrunk picture of the file still chosen, and says when it is ready', async () => {
+      const first = deferred();
+      const second = deferred();
+      const shrinkToDataUrl = jest.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+      const { result } = renderHook(() =>
+        useSessionHeaderPreview({ inlineUpload: true, updateDraftSessionHeader: jest.fn(), shrinkToDataUrl }),
+      );
+      act(() => {
+        result.current.setSessionHeaderMode('upload');
+        result.current.setSessionHeaderFile(png('first'));
+      });
+      expect(result.current.sessionHeaderInlinePending).toBe(true);
+      expect(result.current.sessionHeaderUploadStatusTone).toBe('loading');
+      act(() => {
+        result.current.setSessionHeaderFile(png('second'));
+      });
+      await act(async () => {
+        first.resolve('data:image/webp;base64,Zmlyc3Q=');
+        await first.promise;
+      });
+      expect(result.current.sessionHeaderInline).toBe('');
+      expect(result.current.sessionHeaderInlinePending).toBe(true);
+      await act(async () => {
+        second.resolve('data:image/webp;base64,c2Vjb25k');
+        await second.promise;
+      });
+      expect(result.current.sessionHeaderInline).toBe('data:image/webp;base64,c2Vjb25k');
+      expect(result.current.sessionHeaderPreviewSrc).toBe('data:image/webp;base64,c2Vjb25k');
+      expect(result.current.sessionHeaderInlinePending).toBe(false);
+      expect(result.current.sessionHeaderUploadStatus).toBe('');
+      act(() => result.current.setSessionHeaderMode('url'));
+      expect(result.current.sessionHeaderInline).toBe('');
+    });
+
+    it('drops a picture that cannot be shrunk and shows why', async () => {
+      const shrinkToDataUrl = jest.fn().mockRejectedValue(new Error('Too big to keep.'));
+      const { result } = renderHook(() =>
+        useSessionHeaderPreview({ inlineUpload: true, updateDraftSessionHeader: jest.fn(), shrinkToDataUrl }),
+      );
+      await act(async () => {
+        result.current.setSessionHeaderMode('upload');
+        result.current.setSessionHeaderFile(png('huge'));
+      });
+      expect(result.current.sessionHeaderFile).toBeNull();
+      expect(result.current.sessionHeaderInlinePending).toBe(false);
+      expect(result.current.sessionHeaderUploadStatus).toBe('Too big to keep.');
+      expect(result.current.sessionHeaderUploadStatusTone).toBe('error');
+    });
+
+    it('clears its message when switched to Decentralized mid-way, and does not shrink a file twice', async () => {
+      const pending = deferred();
+      const shrinkToDataUrl = jest
+        .fn()
+        .mockReturnValueOnce(pending.promise)
+        .mockResolvedValueOnce('data:image/webp;base64,cGhvdG8=');
+      const { result, rerender } = renderHook(
+        ({ inlineUpload }) =>
+          useSessionHeaderPreview({ inlineUpload, updateDraftSessionHeader: jest.fn(), shrinkToDataUrl }),
+        { initialProps: { inlineUpload: true } },
+      );
+      act(() => {
+        result.current.setSessionHeaderMode('upload');
+        result.current.setSessionHeaderFile(png('photo'));
+      });
+      expect(result.current.sessionHeaderUploadStatusTone).toBe('loading');
+      rerender({ inlineUpload: false });
+      expect(result.current.sessionHeaderUploadStatus).toBe('');
+      await act(async () => {
+        rerender({ inlineUpload: true });
+      });
+      expect(result.current.sessionHeaderInline).toBe('data:image/webp;base64,cGhvdG8=');
+      rerender({ inlineUpload: false });
+      rerender({ inlineUpload: true });
+      expect(shrinkToDataUrl).toHaveBeenCalledTimes(2);
+      expect(result.current.sessionHeaderInline).toBe('data:image/webp;base64,cGhvdG8=');
+    });
+
+    it('leaves a Decentralized file alone for Arweave', () => {
+      const shrinkToDataUrl = jest.fn();
+      const { result } = renderHook(() =>
+        useSessionHeaderPreview({ updateDraftSessionHeader: jest.fn(), shrinkToDataUrl }),
+      );
+      act(() => {
+        result.current.setSessionHeaderMode('upload');
+        result.current.setSessionHeaderFile(png('arweave'));
+      });
+      expect(shrinkToDataUrl).not.toHaveBeenCalled();
+      expect(result.current.sessionHeaderInline).toBe('');
+      expect(result.current.sessionHeaderInlinePending).toBe(false);
+    });
+  });
 });

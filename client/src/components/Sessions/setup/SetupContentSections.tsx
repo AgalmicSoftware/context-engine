@@ -85,18 +85,38 @@ export const SetupBasicsSection = ({
           onChange={(event) => onChange(['sessionInfo'], event.target.value)}
         />
       </SetupField>
-      {headerImage || (
-        <SetupField id="ce-setup-header-image" label="Header image" help="An https:// image link.">
-          <Input
+      {headerImage ||
+        (text(draft.sessionHeader).startsWith('data:image/') ? (
+          // A picture uploaded on /new is kept with the session, too long to show or edit as a link.
+          <SetupField
             id="ce-setup-header-image"
-            type="url"
-            value={text(draft.sessionHeader)}
-            aria-describedby={setupHelpId('ce-setup-header-image')}
-            data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
-            onChange={(event) => onChange(['sessionHeader'], event.target.value)}
-          />
-        </SetupField>
-      )}
+            label="Header image"
+            help="A picture kept with the session. Remove it to give an image link instead."
+          >
+            <div className={styles.headerPicture}>
+              <img className={styles.headerPicturePreview} src={text(draft.sessionHeader)} alt="Header image" />
+              <button
+                type="button"
+                className={styles.button}
+                aria-describedby={setupHelpId('ce-setup-header-image')}
+                onClick={() => onChange(['sessionHeader'], '')}
+              >
+                Remove picture
+              </button>
+            </div>
+          </SetupField>
+        ) : (
+          <SetupField id="ce-setup-header-image" label="Header image" help="An https:// image link.">
+            <Input
+              id="ce-setup-header-image"
+              type="url"
+              value={text(draft.sessionHeader)}
+              aria-describedby={setupHelpId('ce-setup-header-image')}
+              data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
+              onChange={(event) => onChange(['sessionHeader'], event.target.value)}
+            />
+          </SetupField>
+        ))}
       <div>
         <button
           type="button"

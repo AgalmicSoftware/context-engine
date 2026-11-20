@@ -276,6 +276,22 @@
   min-width: 0;
 }
 
+.headerPicture {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.headerPicturePreview {
+  max-width: 100%;
+  max-height: 96px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-4, 4px);
+  object-fit: contain;
+}
+
 // "Set up with AI" before it is opened: the button alone.
 .aiSetupClosed {
   display: flex;

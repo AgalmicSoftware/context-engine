@@ -140,3 +140,12 @@ describe('session templates and the setup draft', () => {
     expect(applySessionTemplateToDraft(plain, imported).analysisCardEnabled).toBe(true);
   });
 });
+
+describe('a header picture kept with the session', () => {
+  it('stays out of templates and links, while a picture link travels', () => {
+    expect(exportDraft({ sessionHeader: 'data:image/webp;base64,c2hydW5r' }).sessionHeader).toBe('');
+    expect(exportDraft({ sessionHeader: 'https://example.test/header.png' }).sessionHeader).toBe(
+      'https://example.test/header.png',
+    );
+  });
+});

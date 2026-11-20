@@ -588,7 +588,7 @@ The core session metadata:
 - session ID, which the page generates
 - chain-backed profiles only: the network, from **Registry network**. Contract
   defaults and `blockLimits.start` (the current chain head) are filled in for you.
-- optional session header image URL; Arweave-backed sessions can also upload the image file with their metadata
+- optional session header image: a URL, a pasted picture or an uploaded file. Arweave-backed sessions upload the file with their metadata; a Session Worker session keeps it in its config, shrunk in the browser to at most 1,200 px and 100 KB, and the page says so if a picture can't be made that small
 
 AI configuration also lives in the session metadata draft:
 

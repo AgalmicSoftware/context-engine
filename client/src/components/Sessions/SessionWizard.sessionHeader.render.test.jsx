@@ -11,9 +11,20 @@ import {
   resetSessionWizardWorkerPanelTestState,
 } from './SessionWizard.workerPanel.testUtils';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
+import { HEADER_INLINE_TOO_LARGE_MESSAGE, shrinkHeaderImageToDataUrl } from './sessionHeaderInlineImage';
+
+// jsdom can't decode pictures; the shrinking itself is tested on its own.
+const SHRUNK_HEADER = 'data:image/webp;base64,c2hydW5r';
+jest.mock('./sessionHeaderInlineImage', () => ({
+  ...jest.requireActual('./sessionHeaderInlineImage'),
+  shrinkHeaderImageToDataUrl: jest.fn(),
+}));
 
 describe('SessionWizard session header image controls', () => {
-  beforeEach(resetSessionWizardWorkerPanelTestState);
+  beforeEach(() => {
+    resetSessionWizardWorkerPanelTestState();
+    jest.mocked(shrinkHeaderImageToDataUrl).mockReset().mockResolvedValue(SHRUNK_HEADER);
+  });
 
   it('keeps the image URL field hidden in normal mode until URL is clicked', async () => {
     renderSessionWizard();
@@ -26,7 +37,7 @@ describe('SessionWizard session header image controls', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toBeInTheDocument();
   });
 
-  it('offers URL and paste without file upload for Worker-canonical sessions', async () => {
+  it('offers upload, URL and paste for Worker-canonical sessions, and shows the picture as it will be kept', async () => {
     sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
@@ -43,11 +54,37 @@ describe('SessionWizard session header image controls', () => {
     const imageBar = screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR);
     expect(within(imageBar).getByRole('button', { name: 'URL' })).toBeInTheDocument();
     expect(within(imageBar).getByRole('button', { name: 'Paste' })).toBeInTheDocument();
-    expect(within(imageBar).queryByRole('button', { name: 'Upload image' })).not.toBeInTheDocument();
-    expect(imageBar.querySelector('input[type="file"]')).toBeNull();
+    fireEvent.click(within(imageBar).getByRole('button', { name: 'Upload image' }));
+    const file = new File(['header'], 'header.png', { type: 'image/png' });
+    fireEvent.change(imageBar.querySelector('input[type="file"]'), { target: { files: [file] } });
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute('src', SHRUNK_HEADER),
+    );
+    expect(shrinkHeaderImageToDataUrl).toHaveBeenCalledWith(file);
   });
 
-  it('discards an Arweave file preview when switching to a URL-only profile', async () => {
+  it('says so plainly when a picture for a Worker-canonical session cannot be made small enough', async () => {
+    jest.mocked(shrinkHeaderImageToDataUrl).mockRejectedValue(new Error(HEADER_INLINE_TOO_LARGE_MESSAGE));
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          storageProfile: { backend: 'cloudflare' },
+        },
+      }),
+    );
+    renderSessionWizard();
+    const imageBar = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR);
+    fireEvent.click(within(imageBar).getByRole('button', { name: 'Upload image' }));
+    fireEvent.change(imageBar.querySelector('input[type="file"]'), {
+      target: { files: [new File(['huge'], 'huge.png', { type: 'image/png' })] },
+    });
+    expect(await screen.findByText(HEADER_INLINE_TOO_LARGE_MESSAGE)).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Session header preview' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a chosen file when switching to Centralized, shrunk to keep with the config', async () => {
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
     URL.createObjectURL = jest.fn(() => 'blob:transient-session-header');
@@ -90,15 +127,14 @@ describe('SessionWizard session header image controls', () => {
       await waitFor(
         () => {
           expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
-          expect(within(imageBar).queryByRole('button', { name: 'Upload image' })).not.toBeInTheDocument();
-          expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
-            'src',
-            'https://images.example.test/persisted-header.png',
+          expect(within(imageBar).getByRole('button', { name: 'Upload image' })).toHaveAttribute(
+            'aria-pressed',
+            'true',
           );
+          expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute('src', SHRUNK_HEADER);
         },
         { timeout: 8000 },
       );
-      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:transient-session-header');
     } finally {
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;

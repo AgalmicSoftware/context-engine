@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import {
+  SetupBasicsSection,
   SetupContextSection,
   SetupParticipationSection,
   SetupQuestionsSection,
@@ -40,6 +41,17 @@ const ChainParticipation = (props: SetupSectionProps) => <SetupParticipationSect
 describe('setup content sections', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('shows a picture kept with the session as a picture with Remove, not as a link to edit', () => {
+    const Basics = ({ draft, onChange }: SetupSectionProps) => <SetupBasicsSection draft={draft} onChange={onChange} />;
+    const kept = 'data:image/webp;base64,a2VwdA==';
+    render(<Harness initial={{ sessionHeader: kept }} Section={Basics} />);
+    expect(screen.getByRole('img', { name: 'Header image' })).toHaveAttribute('src', kept);
+    expect(screen.queryByRole('textbox', { name: 'Header image' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove picture' }));
+    expect(latest.sessionHeader).toBe('');
+    expect(screen.getByLabelText('Header image')).toHaveValue('');
   });
 
   it('takes instructions for AI agents on Worker-hosted sessions, saying they add to the site’s guide and are public', () => {
