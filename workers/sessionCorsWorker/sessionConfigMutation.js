@@ -88,7 +88,7 @@ const validNamesConfig = (config) =>
 // AI agents taking part with accounts of their own: absent means they may.
 const validAgentParticipationConfig = (config) =>
   !hasOwn(config, 'agentParticipationEnabled') || typeof config.agentParticipationEnabled === 'boolean';
-// Signing in from an agent's link: absent means on, where agents are.
+// Signing in from an agent's link: off unless true, and then only where agents are.
 const validAgentSignInLinksConfig = (config) =>
   !hasOwn(config, 'agentSignInLinksEnabled') || typeof config.agentSignInLinksEnabled === 'boolean';
 // Context cards: absent means off.
