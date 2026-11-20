@@ -310,6 +310,63 @@ $icon-size-standard: 1.25rem;
   }
 }
 
+/* The full profile's "Set username" over "Bookmarks", right beside the address; on a phone, side by side under it. */
+.addressColumn.addressRow {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.identityActions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  // Stays beside the avatar, with the two buttons wrapping under the address.
+  .addressColumn.addressRow {
+    flex: 1 1 0;
+  }
+  .identityActions {
+    flex-direction: row;
+    // "Change username" and "My Bookmarks" go onto two lines on the narrowest phones.
+    flex-wrap: wrap;
+  }
+}
+
+/* A size below the header's Analyze and Compare buttons, in their look. */
+.identityActionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-decoration: none;
+  font-family: var(--ce-font-button);
+  background: var(--ce-document-border);
+  color: var(--ce-document-text);
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-8);
+  cursor: pointer;
+  // The text keeps its colour on hover, so only the edge changes.
+  &:hover,
+  &:focus-visible {
+    color: var(--ce-document-text);
+    border-color: var(--ce-document-text);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
 /* Says where a name typed in the header is kept; the address text's colour keeps its contrast. */
 .usernameHint {
   margin-left: 8px;

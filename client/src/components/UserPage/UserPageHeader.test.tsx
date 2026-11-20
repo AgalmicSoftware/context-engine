@@ -285,6 +285,54 @@ describe('UserPageHeader', () => {
     );
   });
 
+  it('stacks "Set username" over "My Bookmarks" right beside the address on the full profile', () => {
+    const onUsernameEdit = jest.fn();
+    render(<UserPageHeader {...createProps({ isOwner: true, onUsernameEdit })} />);
+    const heading = screen.getByRole('heading', { level: 1 });
+    const setName = screen.getByRole('button', { name: 'Set username' });
+    const bookmarks = screen.getByRole('link', { name: 'My Bookmarks' });
+    expect(bookmarks).toHaveAttribute('href', '/bookmarks');
+    // One group, next to the address and outside it, away from Analyze and Compare.
+    const group = setName.parentElement as HTMLElement;
+    expect(group).toHaveClass(styles.identityActions);
+    expect(group).toContainElement(bookmarks);
+    expect(group.compareDocumentPosition(bookmarks) & Node.DOCUMENT_POSITION_CONTAINED_BY).toBeTruthy();
+    expect(setName.compareDocumentPosition(bookmarks) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading).not.toContainElement(group);
+    expect(heading.parentElement).toContainElement(group);
+    expect(screen.getByRole('button', { name: /Compare/ }).parentElement).not.toContainElement(group);
+    fireEvent.click(setName);
+    expect(onUsernameEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps "My Bookmarks" beside the address while the name field is open, and shows no empty stack', () => {
+    const { rerender } = render(
+      <UserPageHeader {...createProps({ isOwner: true, isEditingUsername: true, showUsernameButton: false })} />,
+    );
+    expect(screen.queryByRole('button', { name: /username/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'My Bookmarks' }).parentElement).toHaveClass(styles.identityActions);
+
+    // Someone else's page: neither control, and no stack.
+    rerender(
+      <UserPageHeader
+        {...createProps({
+          showUsernameButton: false,
+          headerActionVisibility: { ...createProps().headerActionVisibility, showBookmarksLink: false },
+        })}
+      />,
+    );
+    expect(document.querySelector(`.${styles.identityActions}`)).toBeNull();
+  });
+
+  it("leaves the account box's copy of the header as it was", () => {
+    render(<UserPageHeader {...createProps({ isOwner: true, minimized: true })} />);
+    const setName = screen.getByRole('button', { name: 'Set username' });
+    expect(setName).toHaveClass(styles.usernameButton);
+    expect(setName.parentElement).toHaveClass(styles.addressColumn);
+    expect(setName.parentElement).not.toHaveClass(styles.addressRow);
+    expect(document.querySelector(`.${styles.identityActions}`)).toBeNull();
+  });
+
   it('keeps minimized header actions limited to the username error display', () => {
     render(
       <UserPageHeader

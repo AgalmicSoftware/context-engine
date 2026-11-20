@@ -166,7 +166,7 @@ const UserPageHeader = ({
             role="img"
           ></div>
         </div>
-        <div className={styles.addressColumn}>
+        <div className={minimized ? styles.addressColumn : `${styles.addressColumn} ${styles.addressRow}`}>
           <h1 id={styles.userPageAddress}>
             {addressDisplay}
             {privateLabelTag && (
@@ -233,7 +233,7 @@ const UserPageHeader = ({
               </button>
             )}
           </h1>
-          {showUsernameButton && (
+          {minimized && showUsernameButton && (
             <button
               type="button"
               onClick={onUsernameEdit}
@@ -246,9 +246,33 @@ const UserPageHeader = ({
             </button>
           )}
           {analyzeLinkHref ? <AnalyzeUserButton href={analyzeLinkHref} /> : null}
+          {/* On the full profile, "Set username" and "Bookmarks" stand right beside the address, one over the other. */}
+          {!minimized && (showUsernameButton || headerActionVisibility.showBookmarksLink) && (
+            <div className={styles.identityActions}>
+              {showUsernameButton && (
+                <button
+                  type="button"
+                  onClick={onUsernameEdit}
+                  className={styles.identityActionButton}
+                  title={
+                    usernameSavedTo === 'session'
+                      ? 'Your name in this session'
+                      : 'Your username, saved on this device only'
+                  }
+                >
+                  {username.trim() ? 'Change username' : 'Set username'}
+                </button>
+              )}
+              {headerActionVisibility.showBookmarksLink && (
+                <a href={bookmarksHref} className={styles.identityActionButton} data-ce-control-appearance="raised">
+                  My Bookmarks
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
-        {headerActionVisibility.showBookmarksLink && (
+        {minimized && headerActionVisibility.showBookmarksLink && (
           <a
             href={bookmarksHref}
             className={bookmarksLinkDisplayState.className}
