@@ -663,6 +663,30 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter((value) => value < 4.5)).toEqual([]);
   });
 
+  // A saved picture card sits on the user page, whose ground differs by theme, so its box carries its own.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps a saved picture card readable on the page', (themeId) => {
+    const paint = painter(themeValues(css, themeId));
+    const cardCss = compileModule('components/UserPage/UserPageAnalysisCard.module.scss');
+    const rule = (selector: string) => moduleRule(cardCss, selector);
+    const failures: string[] = [];
+    const check = (selector: string, ink: string, ground: string, least: number) => {
+      const [text, backdrop] = [paint(ink), paint(ground)];
+      if (backdrop[3] !== 1) failures.push(`${selector}: its ground is not opaque`);
+      const found = Number(contrastRatio(composite(text, backdrop), backdrop).toFixed(2));
+      if (found < least) failures.push(`${selector}: ${found}`);
+    };
+    for (const box of ['.saved', '.savedLine']) check(box, rule(box).color, rule(box).background, 4.5);
+    // The heading and the "Their card, saved …" line, on the box's ground.
+    for (const line of ['.saved h4', '.savedDate']) check(line, rule(line).color, rule('.saved').background, 4.5);
+    // The page turns and Download, and "Take it off my page": each brings its own fill.
+    for (const control of ['.turn', '.takeOff button']) {
+      check(control, rule(control).color, rule(control).background, 4.5);
+    }
+    // A control that cannot be pressed still says what it is.
+    check('.turn:disabled', rule('.turn:disabled').color, rule('.turn:disabled').background, 3);
+    expect(failures).toEqual([]);
+  });
+
   // A group that needs a password or claim code takes it on its card and in the sign-in notice.
   test.each(registry.themes.map(({ id }) => id))('%s keeps the group code field readable', (themeId) => {
     const values = themeValues(css, themeId);

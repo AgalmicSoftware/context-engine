@@ -49,9 +49,11 @@
   font-weight: 700;
   cursor: pointer;
 
+  // Not pressable: the pale fill says so. The text keeps the document's full colour, as its muted one is too
+  // faint on this fill in one theme.
   &:disabled {
     background: var(--ce-document-border);
-    color: var(--ce-document-text-muted);
+    color: var(--ce-document-text);
     cursor: default;
   }
 }
@@ -101,9 +103,12 @@
   cursor: help;
 }
 
-// A person's saved card, on their page: in the side column on a wide screen, first on the page on a phone.
+// A person's saved card, on their page: in the side column on a wide screen, first on the page on a phone. The
+// box brings its own document surface: the page behind it is dark in one theme, where document text alone was
+// too faint to read.
 .saved {
   margin: 0 0 20px;
+  background: var(--ce-document-canvas);
 
   @media (max-width: 768px) {
     order: -1;
@@ -123,6 +128,7 @@
 // On my own page: one line saying my card is shown, and the button that takes it off.
 .savedLine {
   margin: 0 0 20px;
+  background: var(--ce-document-canvas);
   padding: 10px 14px;
   border: 1px solid var(--ce-document-border);
   border-radius: var(--ce-radius-12);
