@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.25] - 2026-11-20
 
-Fixes on the home page; the site only. No Worker change: sessions keep the 0.9.23 Worker, and the deploy helper still deploys it. MCP stays 0.9.0. Nothing a session already stores is changed.
+Fixes on the home page; the site only. No Worker change: the 0.9.24 Worker bundles, which the deploy helper now uses, differ from 0.9.23's only in the release number they report, so sessions need no update. MCP stays 0.9.0. Nothing a session already stores is changed.
 
 ### Site — available when the site deploys
 
@@ -12,6 +12,7 @@ Fixes on the home page; the site only. No Worker change: sessions keep the 0.9.2
 - **Home > Stats.** The numbers are centred when there are fewer of them than fit a row.
 - **Long session names.** In the session menu, a long name ends in "…" instead of being cut off beside the open-link icon.
 - **Welcome slides on phones.** The slides use their full height: larger text and picture, and no empty band above the arrows.
+- **Deploy helper.** It deploys the 0.9.24 Worker bundles.
 
 ## [0.9.24] - 2026-11-20
 
