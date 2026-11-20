@@ -1,4 +1,4 @@
-import { forgetAgentLinkAccount } from './agentLinkAccount';
+import { forgetAgentLinkAccount, forgetAgentLinkHints } from './agentLinkAccount';
 import { disconnect } from 'wagmi/actions';
 import { markUserExplicitlyDisconnected } from '../web3/wagmiDisconnectState';
 import { createLogger } from '../logging';
@@ -52,6 +52,7 @@ export const logoutClientAuth = async ({
   clearAllAgentClientLoginEnvelopes();
   // Signed in to an agent's account from its link: signing out forgets which account that was.
   forgetAgentLinkAccount();
+  forgetAgentLinkHints();
   // The wallet's disconnect invalidates pending signer operations synchronously,
   // while its queued storage write finishes after mounted consumers are reset.
   let disconnected: Promise<void>;

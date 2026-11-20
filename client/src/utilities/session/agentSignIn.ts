@@ -4,6 +4,7 @@
 // before the router or any request sees it, kept in page memory only, sent once, in the body of one request to
 // the Worker the link names, and then forgotten. It is never stored, logged or put in an address.
 import {
+  AGENT_SIGN_IN_CODE_IN_TEXT,
   AGENT_SIGN_IN_FEATURE,
   AGENT_SIGN_IN_FRAGMENT_KEY,
   AGENT_SIGN_IN_PATHS,
@@ -32,8 +33,31 @@ export type AgentSignInState = {
 
 // The code a link carried, with the session it was for. Page memory only.
 let heldCode: { code: string; sessionSlug: string; workerOrigin: string } | null = null;
+// Whoever acts on a held code hears when a link brings one, also without a page load; the count says nothing of
+// the code. Using or dropping a code is not counted: whoever did that knows.
+let codeArrivals = 0;
+const codeListeners = new Set<() => void>();
+const codeArrived = (): void => {
+  codeArrivals += 1;
+  codeListeners.forEach((listener) => listener());
+};
+export const subscribeAgentSignInCode = (listener: () => void): (() => void) => {
+  codeListeners.add(listener);
+  return () => {
+    codeListeners.delete(listener);
+  };
+};
+export const readAgentSignInCodeArrivals = (): number => codeArrivals;
 
 const segmentsOf = (hash: string): string[] => hash.replace(/^#/, '').split('&');
+// As written, or percent-decoded when it decodes: a key written `agentSignIn%3D…` is the same key.
+const decoded = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
 const originOf = (value: string): string => {
   try {
     return new URL(value).origin;
@@ -51,23 +75,45 @@ export const removeAgentSignInCodeFromAddress = (): void => {
   const { pathname, search, hash } = window.location;
   const prefix = `${AGENT_SIGN_IN_FRAGMENT_KEY}=`;
   const parts = segmentsOf(hash);
-  const carried = parts.filter((part) => part.startsWith(prefix));
-  if (!carried.length) return;
-  const rest = parts.filter((part) => part && !part.startsWith(prefix));
+  const carried = parts.map(decoded).filter((part) => part.startsWith(prefix));
+  // Anything else that holds a code leaves too: a code under another key, or in the query, where it has already
+  // gone to the site's server with the page request. Those are taken out and never used.
+  const stray = (piece: string): boolean =>
+    AGENT_SIGN_IN_CODE_IN_TEXT.test(decoded(piece)) || decoded(piece).startsWith(prefix);
+  const pairs = search.replace(/^\?/, '').split('&');
+  const inQuery = pairs.some(stray);
+  const elsewhere = parts.some((part) => stray(part) && !decoded(part).startsWith(prefix));
+  if (!carried.length && !inQuery && !elsewhere) return;
+  const rest = parts.filter((part) => part && !stray(part));
+  const keptQuery = pairs.filter((pair) => pair && !stray(pair));
   window.history.replaceState(
     window.history.state,
     '',
-    `${pathname}${search}${rest.length ? `#${rest.join('&')}` : ''}`,
+    `${pathname}${keptQuery.length ? `?${keptQuery.join('&')}` : ''}${rest.length ? `#${rest.join('&')}` : ''}`,
   );
-  const code = carried.length === 1 ? carried[0].slice(prefix.length) : '';
-  const [, sessionSlug = ''] = pathname.match(/\/session\/([^/]+)\/?$/) || [];
+  const code = !inQuery && !elsewhere && carried.length === 1 ? carried[0].slice(prefix.length) : '';
+  const [, slugPart = ''] = pathname.match(/\/session\/([^/]+)\/?$/) || [];
+  let sessionSlug = '';
+  try {
+    sessionSlug = decodeURIComponent(slugPart).toLowerCase();
+  } catch {
+    // A slug that can't be read names no session.
+  }
   const workers = new URLSearchParams(search).getAll('worker');
   const workerOrigin = workers.length === 1 ? originOf(workers[0]) : '';
   // Only a well-formed code, for one session on one named Worker, is kept at all.
-  heldCode =
-    isAgentSignInCode(code) && sessionSlug && workerOrigin
-      ? { code, sessionSlug: decodeURIComponent(sessionSlug).toLowerCase(), workerOrigin }
-      : null;
+  heldCode = isAgentSignInCode(code) && sessionSlug && workerOrigin ? { code, sessionSlug, workerOrigin } : null;
+  codeArrived();
+};
+
+/**
+ * A link pasted into a tab that is already on the session changes only what follows `#`, with no page load. The
+ * code is taken out then too, before the router hears of the change: this is set up before the router is.
+ */
+export const watchAddressForAgentSignInCode = (): void => {
+  if (typeof window === 'undefined') return;
+  window.addEventListener('popstate', removeAgentSignInCodeFromAddress);
+  window.addEventListener('hashchange', removeAgentSignInCodeFromAddress);
 };
 
 /** Whether a link's code is waiting for this session; it says nothing of the code. */
@@ -81,6 +127,10 @@ export const hasAgentSignInCodeFor = ({
 export const dropAgentSignInCode = (): void => {
   heldCode = null;
 };
+
+/** A sign-in nonce as a Worker gives one: letters and digits, nothing that could start another line. */
+export const isSignInNonce = (value: unknown): value is string =>
+  typeof value === 'string' && /^[A-Za-z0-9]{8,128}$/.test(value);
 
 export class AgentSignInError extends Error {
   reason: string;
@@ -218,8 +268,8 @@ export const attachPasskeyToAgentAccount = async ({
   appOrigin?: string;
 }): Promise<AgentSignInReply> => {
   const nonce = await post(target, '/auth/nonce', { address: passkeyAddress });
-  if (typeof nonce.nonce !== 'string' || !nonce.nonce)
-    throw new AgentSignInError('unreadable', 'The session’s answer could not be read.');
+  // The nonce goes into what the passkey signs: letters and digits only, so a Worker can add no line of its own.
+  if (!isSignInNonce(nonce.nonce)) throw new AgentSignInError('unreadable', 'The session’s answer could not be read.');
   const message = buildPasskeyAttachMessage({ account, passkeyAddress, nonce: nonce.nonce, target, appOrigin });
   const signature = await sign(message);
   return replyOf(

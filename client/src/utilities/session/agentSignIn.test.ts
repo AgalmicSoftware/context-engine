@@ -7,16 +7,25 @@ import {
   dropAgentSignInCode,
   exchangeHeldAgentSignInCode,
   hasAgentSignInCodeFor,
+  isSignInNonce,
+  readAgentSignInCodeArrivals,
   removeAgentSignInCodeFromAddress,
+  subscribeAgentSignInCode,
+  watchAddressForAgentSignInCode,
   workerHasAgentSignIn,
 } from './agentSignIn';
 import {
   AgentLinkNoKeyError,
   agentLinkProvider,
   forgetAgentLinkAccount,
+  forgetAgentLinkHints,
   holdAgentLinkAccount,
+  holdsAgentLinkAccountForPath,
   isAgentLinkProvider,
+  noteAttachedPasskey,
   noteLinkedAgentAccount,
+  readAttachedPasskeyNotice,
+  readLinkedAgentAccountHintCount,
   readAgentLinkAccount,
   renewAgentLinkSignIn,
   setAgentLinkRenewer,
@@ -162,13 +171,94 @@ describe('a sign-in code in a link', () => {
   });
 });
 
+describe('a sign-in code that arrives without a page load, or in an odd place', () => {
+  it('leaves the address when a link is pasted into a tab already on the session, and whoever waits hears of it', () => {
+    watchAddressForAgentSignInCode();
+    const heard = jest.fn();
+    const stop = subscribeAgentSignInCode(heard);
+    const before = readAgentSignInCodeArrivals();
+    open('');
+    expect(hasAgentSignInCodeFor(target)).toBe(false);
+    // What the browser does for a change after `#`: the address changes, then the page is told.
+    window.history.pushState(
+      { kept: true },
+      '',
+      `/session/salon?worker=${encodeURIComponent(WORKER)}#agentSignIn=${CODE}`,
+    );
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(window.location.href).not.toContain(CODE);
+    expect(hasAgentSignInCodeFor(target)).toBe(true);
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(readAgentSignInCodeArrivals()).toBe(before + 1);
+    // Using or dropping it is not an arrival.
+    dropAgentSignInCode();
+    expect(heard).toHaveBeenCalledTimes(1);
+    window.history.pushState({}, '', `/session/salon?worker=${encodeURIComponent(WORKER)}#agentSignIn=${CODE}`);
+    window.dispatchEvent(new Event('hashchange'));
+    expect(window.location.href).not.toContain(CODE);
+    expect(hasAgentSignInCodeFor(target)).toBe(true);
+    stop();
+    expect(everythingStored()).not.toContain(CODE);
+  });
+
+  it('is found under a percent-encoded key, and taken out of the query without being used', () => {
+    open(`#agentSignIn%3D${CODE}&view=results`);
+    removeAgentSignInCodeFromAddress();
+    expect(window.location.href).not.toContain(CODE);
+    expect(window.location.hash).toBe('#view=results');
+    expect(hasAgentSignInCodeFor(target)).toBe(true);
+    dropAgentSignInCode();
+
+    // In the query it went to the site's server with the page request: removed, and never a sign-in.
+    open('#view=results', `?worker=${encodeURIComponent(WORKER)}&agentSignIn=${CODE}&mode=interview`);
+    removeAgentSignInCodeFromAddress();
+    expect(window.location.href).not.toContain(CODE);
+    expect(window.location.search).toBe(`?worker=${encodeURIComponent(WORKER)}&mode=interview`);
+    expect(window.location.hash).toBe('#view=results');
+    expect(hasAgentSignInCodeFor(target)).toBe(false);
+    // Both places at once: still not used.
+    open(`#agentSignIn=${CODE}`, `?worker=${encodeURIComponent(WORKER)}&agentSignIn%3D=${CODE}`);
+    removeAgentSignInCodeFromAddress();
+    expect(window.location.href).not.toContain(CODE);
+    expect(hasAgentSignInCodeFor(target)).toBe(false);
+  });
+
+  it('is taken out and dropped where the session’s name can’t be read, without stopping the page', () => {
+    open(`#agentSignIn=${CODE}`, `?worker=${encodeURIComponent(WORKER)}`, '/session/%E0%A4%A');
+    expect(() => removeAgentSignInCodeFromAddress()).not.toThrow();
+    expect(window.location.href).not.toContain(CODE);
+    expect(__test__agentSignIn.held()).toBeNull();
+  });
+});
+
 describe('attaching a passkey', () => {
+  it('signs nothing when the Worker’s nonce could add a line to the message', async () => {
+    expect(['0123456789abcdef0123456789abcdef', 'n1abcDEF9'].every(isSignInNonce)).toBe(true);
+    for (const bad of ['', 'short', 'abc12345\nURI: https://evil.example', 'abc 12345', 'abc-12345', 12345678, null]) {
+      expect(isSignInNonce(bad)).toBe(false);
+    }
+    fetchMock.mockResolvedValueOnce(reply({ nonce: 'abc12345\nResources:\n- https://evil.example' }));
+    const sign = jest.fn(async () => '0xsigned');
+    await expect(
+      attachPasskeyToAgentAccount({
+        target,
+        account: ACCOUNT,
+        token: 'from-link',
+        passkeyAddress: PASSKEY,
+        appOrigin: 'https://contextengine.sh',
+        sign,
+      }),
+    ).rejects.toMatchObject({ reason: 'unreadable' });
+    expect(sign).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('has the passkey sign a message that names the account, and sends it with the sign-in from the link', async () => {
     const now = new Date('2026-11-20T10:00:00Z');
     const message = buildPasskeyAttachMessage({
       account: ACCOUNT,
       passkeyAddress: PASSKEY,
-      nonce: 'n1abc',
+      nonce: 'n1abc2345',
       target,
       appOrigin: 'https://contextengine.sh',
       now,
@@ -180,18 +270,16 @@ describe('attaching a passkey', () => {
     expect(message).toContain(`Resources:\n- ${WORKER}\n- urn:context-engine:session:id:${target.sessionId}`);
     expect(message).toContain('Expiration Time: 2026-11-20T10:05:00.000Z');
 
-    fetchMock
-      .mockResolvedValueOnce(reply({ nonce: 'n1abc' }))
-      .mockResolvedValueOnce(
-        reply({
-          token: 'kept',
-          exp: 1800000000,
-          address: ACCOUNT,
-          via: 'passkey_link',
-          passkey: PASSKEY,
-          agentAccess: 'active',
-        }),
-      );
+    fetchMock.mockResolvedValueOnce(reply({ nonce: 'n1abc2345' })).mockResolvedValueOnce(
+      reply({
+        token: 'kept',
+        exp: 1800000000,
+        address: ACCOUNT,
+        via: 'passkey_link',
+        passkey: PASSKEY,
+        agentAccess: 'active',
+      }),
+    );
     const signed: string[] = [];
     const attached = await attachPasskeyToAgentAccount({
       target,
@@ -271,16 +359,46 @@ describe('an account held without its key', () => {
       linked: { address: ACCOUNT },
       token: 'passkey-sign-in',
     };
+    const noted = readLinkedAgentAccountHintCount();
     noteLinkedAgentAccount({ ...said, linked: null });
-    expect(takeLinkedAgentAccountHint('salon', PASSKEY)).toBeNull();
+    expect(takeLinkedAgentAccountHint(target, PASSKEY)).toBeNull();
+    expect(readLinkedAgentAccountHintCount()).toBe(noted);
     noteLinkedAgentAccount(said);
-    expect(takeLinkedAgentAccountHint('another', PASSKEY)).toBeNull();
-    expect(takeLinkedAgentAccountHint('salon', ACCOUNT)).toBeNull();
-    expect(takeLinkedAgentAccountHint('salon', PASSKEY)).toMatchObject({
+    expect(readLinkedAgentAccountHintCount()).toBe(noted + 1);
+    // It carries the passkey's sign-in, so only the Worker and session that sign-in was made at get it: not a
+    // session of the same name on another Worker, nor another session id on the same one.
+    expect(takeLinkedAgentAccountHint({ ...target, sessionSlug: 'another' }, PASSKEY)).toBeNull();
+    expect(takeLinkedAgentAccountHint({ ...target, workerUrl: 'https://impostor.example' }, PASSKEY)).toBeNull();
+    expect(takeLinkedAgentAccountHint({ ...target, sessionId: `0x${'4'.repeat(32)}` }, PASSKEY)).toBeNull();
+    expect(takeLinkedAgentAccountHint({ ...target, sessionId: '' }, PASSKEY)).toBeNull();
+    expect(takeLinkedAgentAccountHint(target, ACCOUNT)).toBeNull();
+    expect(takeLinkedAgentAccountHint({ ...target, workerUrl: `${WORKER}/` }, PASSKEY)).toMatchObject({
       account: ACCOUNT,
       passkeyToken: 'passkey-sign-in',
     });
-    expect(takeLinkedAgentAccountHint('salon', PASSKEY)).toBeNull();
+    expect(takeLinkedAgentAccountHint(target, PASSKEY)).toBeNull();
     expect(everythingStored()).not.toContain('passkey-sign-in');
+  });
+
+  it('forgets on sign-out what a sign-in said of passkeys, and shows it for its own Worker and session only', () => {
+    noteLinkedAgentAccount({ ...target, passkey: PASSKEY, linked: { address: ACCOUNT }, token: 'passkey-sign-in' });
+    noteAttachedPasskey({ ...target, account: ACCOUNT, attached: { address: PASSKEY } });
+    expect(readAttachedPasskeyNotice(target, ACCOUNT)).toMatchObject({ passkey: PASSKEY });
+    expect(readAttachedPasskeyNotice({ ...target, workerUrl: 'https://impostor.example' }, ACCOUNT)).toBeNull();
+    expect(readAttachedPasskeyNotice({ ...target, sessionId: `0x${'4'.repeat(32)}` }, ACCOUNT)).toBeNull();
+    expect(readAttachedPasskeyNotice(null, ACCOUNT)).toBeNull();
+    forgetAgentLinkHints();
+    expect(readAttachedPasskeyNotice(target, ACCOUNT)).toBeNull();
+    expect(takeLinkedAgentAccountHint(target, PASSKEY)).toBeNull();
+  });
+
+  it('knows the session page a held account belongs to, so a reload of it is not taken over by a saved passkey', () => {
+    expect(holdsAgentLinkAccountForPath('/session/salon')).toBe(false);
+    holdAgentLinkAccount({ address: ACCOUNT, ...target, via: 'agent_link', passkey: '', agentAccess: 'active' });
+    expect(holdsAgentLinkAccountForPath('/session/salon')).toBe(true);
+    expect(holdsAgentLinkAccountForPath('/session/Salon/')).toBe(true);
+    for (const elsewhere of ['/', '/session/another', '/session/salon/results', '/session/%E0%A4%A', '']) {
+      expect(holdsAgentLinkAccountForPath(elsewhere)).toBe(false);
+    }
   });
 });

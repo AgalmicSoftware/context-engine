@@ -26,6 +26,8 @@ const lower = (value: unknown): string =>
     .toLowerCase();
 
 let held: AgentLinkAccount | null = null;
+// Whether tab storage has been read: after that, "none held" is answered from memory.
+let heldRead = false;
 const listeners = new Set<() => void>();
 
 const normalize = (value: unknown): AgentLinkAccount | null => {
@@ -57,7 +59,8 @@ const tabStorage = (): Storage | null => {
 
 /** The account this tab is signed in to without its key, or null. */
 export const readAgentLinkAccount = (): AgentLinkAccount | null => {
-  if (held) return held;
+  if (held || heldRead) return held;
+  heldRead = true;
   try {
     held = normalize(JSON.parse(tabStorage()?.getItem(STORAGE_KEY) || 'null'));
   } catch {
@@ -68,6 +71,7 @@ export const readAgentLinkAccount = (): AgentLinkAccount | null => {
 
 export const holdAgentLinkAccount = (account: unknown): AgentLinkAccount | null => {
   held = normalize(account);
+  heldRead = true;
   try {
     if (held) tabStorage()?.setItem(STORAGE_KEY, JSON.stringify(held));
     else tabStorage()?.removeItem(STORAGE_KEY);
@@ -80,6 +84,35 @@ export const holdAgentLinkAccount = (account: unknown): AgentLinkAccount | null 
 
 export const forgetAgentLinkAccount = (): void => {
   holdAgentLinkAccount(null);
+};
+
+const sameWorker = (left: unknown, right: unknown): boolean => {
+  try {
+    return new URL(String(left)).origin === new URL(String(right)).origin;
+  } catch {
+    return false;
+  }
+};
+type SessionTargetLike = { workerUrl: unknown; sessionSlug: unknown; sessionId: unknown };
+const sameSession = (left: SessionTargetLike, right: SessionTargetLike): boolean =>
+  sameWorker(left.workerUrl, right.workerUrl) &&
+  lower(left.sessionSlug) === lower(right.sessionSlug) &&
+  !!lower(left.sessionId) &&
+  lower(left.sessionId) === lower(right.sessionId);
+
+/**
+ * Whether this tab holds an agent's account for the session page at `pathname`. A reload of that page opens the
+ * held account again, so a saved passkey is not signed in over it at start-up.
+ */
+export const holdsAgentLinkAccountForPath = (pathname: unknown): boolean => {
+  const account = readAgentLinkAccount();
+  const [, slug = ''] = String(pathname || '').match(/\/session\/([^/]+)\/?$/) || [];
+  if (!account || !slug) return false;
+  try {
+    return decodeURIComponent(slug).toLowerCase() === account.sessionSlug;
+  } catch {
+    return false;
+  }
 };
 
 export const subscribeAgentLinkAccount = (listener: () => void): (() => void) => {
@@ -158,6 +191,9 @@ export type LinkedAgentAccountHint = {
   passkeyToken: string;
 };
 let hint: LinkedAgentAccountHint | null = null;
+// Counts the hints noted, so whoever waits for one hears of it even when nothing else about the page changed.
+let hintsNoted = 0;
+export const readLinkedAgentAccountHintCount = (): number => hintsNoted;
 export const noteLinkedAgentAccount = (value: {
   workerUrl: unknown;
   sessionSlug: unknown;
@@ -178,11 +214,18 @@ export const noteLinkedAgentAccount = (value: {
     account,
     passkeyToken,
   };
+  hintsNoted += 1;
   listeners.forEach((listener) => listener());
 };
-/** The hint for this session, taken once. */
-export const takeLinkedAgentAccountHint = (sessionSlug: string, passkey: unknown): LinkedAgentAccountHint | null => {
-  if (!hint || hint.sessionSlug !== lower(sessionSlug) || hint.passkey !== lower(passkey)) return null;
+/**
+ * The hint for this session, taken once. It carries the passkey's sign-in, so it is given only for the very
+ * Worker and session that sign-in was made at: a same-named session on another Worker never gets it.
+ */
+export const takeLinkedAgentAccountHint = (
+  target: SessionTargetLike,
+  passkey: unknown,
+): LinkedAgentAccountHint | null => {
+  if (!hint || hint.passkey !== lower(passkey) || !sameSession(hint, target)) return null;
   const taken = hint;
   hint = null;
   return taken;
@@ -190,20 +233,48 @@ export const takeLinkedAgentAccountHint = (sessionSlug: string, passkey: unknown
 
 // An account's own sign-in told the page that a passkey is attached to it: whoever holds that passkey can sign in
 // as the account in this session. Its person is shown, once per tab, and can take it off.
-export type AttachedPasskeyNotice = { sessionSlug: string; account: string; passkey: string };
+export type AttachedPasskeyNotice = {
+  workerUrl: string;
+  sessionSlug: string;
+  sessionId: string;
+  account: string;
+  passkey: string;
+};
 let attachedNotice: AttachedPasskeyNotice | null = null;
-export const noteAttachedPasskey = (value: { sessionSlug: unknown; account: unknown; attached: unknown }): void => {
+export const noteAttachedPasskey = (value: {
+  workerUrl: unknown;
+  sessionSlug: unknown;
+  sessionId: unknown;
+  account: unknown;
+  attached: unknown;
+}): void => {
   const passkey = lower((value.attached as { address?: unknown } | null)?.address);
   const account = lower(value.account);
   if (!ADDRESS_RE.test(passkey) || !ADDRESS_RE.test(account)) return;
-  attachedNotice = { sessionSlug: lower(value.sessionSlug), account, passkey };
+  attachedNotice = {
+    workerUrl: String(value.workerUrl || '').trim(),
+    sessionSlug: lower(value.sessionSlug),
+    sessionId: lower(value.sessionId),
+    account,
+    passkey,
+  };
   listeners.forEach((listener) => listener());
 };
-export const readAttachedPasskeyNotice = (sessionSlug: string, account: unknown): AttachedPasskeyNotice | null =>
-  attachedNotice && attachedNotice.sessionSlug === lower(sessionSlug) && attachedNotice.account === lower(account)
+/** The notice for this session and account: one Worker's word is never shown on another Worker's session. */
+export const readAttachedPasskeyNotice = (
+  target: SessionTargetLike | null,
+  account: unknown,
+): AttachedPasskeyNotice | null =>
+  attachedNotice && target && attachedNotice.account === lower(account) && sameSession(attachedNotice, target)
     ? attachedNotice
     : null;
 export const dismissAttachedPasskeyNotice = (): void => {
+  attachedNotice = null;
+  listeners.forEach((listener) => listener());
+};
+/** On sign-out: what a sign-in said of passkeys and agents' accounts goes with it. */
+export const forgetAgentLinkHints = (): void => {
+  hint = null;
   attachedNotice = null;
   listeners.forEach((listener) => listener());
 };

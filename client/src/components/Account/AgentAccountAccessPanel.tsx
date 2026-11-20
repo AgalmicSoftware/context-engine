@@ -46,6 +46,10 @@ export default function AgentAccountAccessPanel({
 }: Props): React.ReactElement | null {
   const account = useSyncExternalStore(subscribeAgentLinkAccount, readAgentLinkAccount);
   const [busy, setBusy] = useState('');
+  // Where no notice is listening (the account dialog), what happened is said here.
+  const [said, setSaid] = useState<{ text: string; isError: boolean } | null>(null);
+  const tell = (text: string, isError: boolean): void =>
+    onMessage ? onMessage(text, isError) : setSaid({ text, isError });
   if (!account || !isAgentLinkProvider(provider)) return null;
   const target = { workerUrl: account.workerUrl, sessionSlug: account.sessionSlug, sessionId: account.sessionId };
   const run = (name: string, work: () => Promise<unknown>, done: string) => async (): Promise<void> => {
@@ -53,9 +57,9 @@ export default function AgentAccountAccessPanel({
     setBusy(name);
     try {
       await work();
-      onMessage?.(done, false);
+      tell(done, false);
     } catch (error) {
-      onMessage?.(error instanceof Error && error.message ? error.message : 'That could not be done. Try again.', true);
+      tell(error instanceof Error && error.message ? error.message : 'That could not be done. Try again.', true);
     } finally {
       setBusy('');
     }
@@ -126,9 +130,19 @@ export default function AgentAccountAccessPanel({
           )
         : null}
       {withPasskey
-        ? button('own-account', 'Use my own account', HELP.own, () => switchToOwnPasskeyAccount(target))
+        ? button(
+            'own-account',
+            'Use my own account',
+            HELP.own,
+            run('own-account', () => switchToOwnPasskeyAccount(target), 'You are in your own account.'),
+          )
         : null}
       {button('sign-out', 'Sign out', 'Signs this browser out.', run('sign-out', leaveAgentLinkAccount, 'Signed out.'))}
+      {said ? (
+        <span role={said.isError ? 'alert' : 'status'} data-testid="ce-agent-account-said">
+          {said.text}
+        </span>
+      ) : null}
     </>
   );
 }

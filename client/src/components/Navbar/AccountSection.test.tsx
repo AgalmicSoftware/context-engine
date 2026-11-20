@@ -7,6 +7,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import rootReducer from '../../reducers/index.js';
 import { LOGIN_ACCOUNT, LOGIN_IN_PROGRESS, TOGGLE_LOGIN_MODAL } from '../../actions/types';
 import AccountSection from './AccountSection';
+import { forgetAgentLinkAccount, holdAgentLinkAccount } from '../../utilities/session/agentLinkAccount';
 
 const PASSKEY_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const WALLET_ADDRESS = '0x00000000000000000000000000000000000000bb';
@@ -77,6 +78,34 @@ describe('AccountSection passkey restore at app start', () => {
       loginModalToggled: false,
     });
     expect(mockLoginModalLoaded).not.toHaveBeenCalled();
+  });
+
+  it('leaves a reload of the session this tab holds an agent’s account for to that account', async () => {
+    mockRestorePasskeyWalletSession.mockResolvedValue(PASSKEY_ADDRESS);
+    const held = {
+      address: WALLET_ADDRESS,
+      workerUrl: 'https://ce-salon.example.workers.dev',
+      sessionSlug: 'salon',
+      sessionId: `0x${'3'.repeat(32)}`,
+      via: 'agent_link',
+      passkey: '',
+      agentAccess: 'active',
+    };
+    act(() => void holdAgentLinkAccount(held));
+    window.history.replaceState({}, '', '/session/salon');
+    const first = renderAccountSection();
+    await act(async () => undefined);
+    expect(mockRestorePasskeyWalletSession).not.toHaveBeenCalled();
+    expect(first.store.getState().profile.account).toBe('');
+    first.view.unmount();
+
+    // Any other page restores the saved passkey as before.
+    window.history.replaceState({}, '', '/session/another');
+    const second = renderAccountSection();
+    await waitFor(() => expect(second.store.getState().profile.account).toBe(PASSKEY_ADDRESS));
+    second.view.unmount();
+    act(() => forgetAgentLinkAccount());
+    window.history.replaceState({}, '', '/');
   });
 
   it('stays logged out when no passkey account is saved', async () => {

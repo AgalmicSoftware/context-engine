@@ -951,9 +951,20 @@ export const getWorkerSessionToken = async ({
     if (!loginData?.token) {
       throw new Error('Worker login did not return a token.');
     }
+
+    // Regression guard: keep the cache write gated by the same auth epoch that
+    // started this request; otherwise logout/account-switch can resurrect auth.
+    assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, address);
+    // Noted only for a sign-in that is still this tab's: both carry what this Worker said of this session.
     // A passkey is attached to this very account: its person is told, and can take it off.
     if (loginData.attachedPasskey) {
-      noteAttachedPasskey({ sessionSlug: slug, account: address, attached: loginData.attachedPasskey });
+      noteAttachedPasskey({
+        workerUrl: resolvedWorkerUrl,
+        sessionSlug: slug,
+        sessionId,
+        account: address,
+        attached: loginData.attachedPasskey,
+      });
     }
     // This sign-in's key is a passkey attached to an account an AI agent set up: the session page offers that account.
     if (loginData.linkedAgentAccount) {
@@ -966,10 +977,6 @@ export const getWorkerSessionToken = async ({
         token: loginData.token,
       });
     }
-
-    // Regression guard: keep the cache write gated by the same auth epoch that
-    // started this request; otherwise logout/account-switch can resurrect auth.
-    assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, address);
     writeTokenCache(
       storageKey,
       buildTokenCacheEnvelope({

@@ -16,6 +16,7 @@ import {
   AGENT_LINK_PROVIDER,
   forgetAgentLinkAccount,
   holdAgentLinkAccount,
+  isAgentLinkProvider,
   readAgentLinkAccount,
   setAgentLinkRenewer,
   type AgentLinkAccount,
@@ -25,6 +26,7 @@ import {
   agentLinkAccountOf,
   attachPasskeyToAgentAccount,
   detachAgentPasskey,
+  isSignInNonce,
   setAgentAccess,
   signInThroughAttachedPasskey,
   type AgentSignInReply,
@@ -84,6 +86,44 @@ const setStaysOnOwnAccount = (target: SessionTarget, stays: boolean): void => {
   } catch {
     /* A reload asks again. */
   }
+};
+/** "Stay here", said in the passkey's own account: the page stops offering the agent's account in this tab. */
+export const stayOnOwnAccount = (target: SessionTarget): void => setStaysOnOwnAccount(target, true);
+
+const liveProfile = (): { account: string; provider: unknown } => {
+  const profile = (store.getState()?.profile || {}) as { account?: unknown; provider?: unknown };
+  return { account: lower(profile.account), provider: profile.provider };
+};
+/** The account the tab is signed in as at this moment, '' when signed out. */
+export const liveAccount = (): string => liveProfile().account;
+
+// The tab holds one account at a time. Once it is anyone but the held agent's account (a wallet connected, a
+// passkey signed in), the held one is forgotten, so it can't come back later as "this sign-in has ended".
+if (typeof store?.subscribe === 'function') {
+  store.subscribe(() => {
+    const account = readAgentLinkAccount();
+    if (!account) return;
+    const live = liveProfile();
+    if (live.account && (live.account !== account.address || !isAgentLinkProvider(live.provider))) {
+      forgetAgentLinkAccount();
+    }
+  });
+}
+
+/**
+ * Who a link's sign-in would replace, asked at the moment it is about to: whoever is signed in now, an agent's
+ * account this tab still holds a sign-in for, or a passkey account this browser would sign back in by itself.
+ * '' when nobody. An agent's account whose sign-in has ended is nobody: its person came for a new link.
+ */
+export const whoALinkWouldReplace = async (): Promise<string> => {
+  const account = readAgentLinkAccount();
+  const heldLive = account && heldSessionToken(account.workerUrl, account.sessionSlug) ? account.address : '';
+  const live = liveProfile();
+  const endedAgentAccount =
+    !!account && !heldLive && live.account === account.address && isAgentLinkProvider(live.provider);
+  if (live.account && !endedAgentAccount) return live.account;
+  if (heldLive) return heldLive;
+  return lower(await passkeyWallet.restorePasskeyWalletSession({ requireSigner: false }).catch(() => null));
 };
 
 /**
@@ -167,9 +207,10 @@ const signInAsPasskey = async (
   const base = target.workerUrl.replace(/\/+$/, '');
   const identity = { address: passkey, sessionSlug: target.sessionSlug, sessionId: target.sessionId };
   const nonce = await postJson(`${base}/auth/nonce`, identity);
+  if (!isSignInNonce(nonce.nonce)) throw new AgentSignInError('unreadable', 'The session’s answer could not be read.');
   const message = buildSiweMessage({
     address: passkey,
-    nonce: String(nonce.nonce || ''),
+    nonce: nonce.nonce,
     workerUrl: target.workerUrl,
     sessionId: target.sessionId,
     sessionSlug: target.sessionSlug,
@@ -229,13 +270,21 @@ export const attachPasskeyHere = async ({
       : await passkeyWallet.createPasskeyWallet(),
   );
   const client = passkeyWallet.getPasskeyWalletClient();
-  const reply = await attachPasskeyToAgentAccount({
-    target,
-    account: account.address,
-    token,
-    passkeyAddress,
-    sign: (message) => client.signMessage(message, passkeyAddress),
-  });
+  let reply: AgentSignInReply;
+  try {
+    reply = await attachPasskeyToAgentAccount({
+      target,
+      account: account.address,
+      token,
+      passkeyAddress,
+      sign: (message) => client.signMessage(message, passkeyAddress),
+    });
+  } catch (error) {
+    // A passkey made for this and then refused is attached to nothing: it is not left as this browser's saved
+    // sign-in, where a reload would open its empty account in place of this one.
+    if (!useExisting) await passkeyWallet.logoutPasskeyWallet().catch(() => undefined);
+    throw error;
+  }
   return enterAgentLinkAccount(target, reply);
 };
 
@@ -247,7 +296,10 @@ export const changeAgentAccess = async (agentAccess: 'active' | 'cancelled'): Pr
   const token = heldSessionToken(target.workerUrl, target.sessionSlug);
   if (!token) throw new AgentSignInError('sign_in_ended', 'Sign in with your passkey again to change this.');
   const now = await setAgentAccess(target, token, agentAccess);
-  return holdAgentLinkAccount({ ...account, agentAccess: now });
+  const kept = holdAgentLinkAccount({ ...account, agentAccess: now });
+  // The Worker's word, not the request's: an answer that leaves it as it was is not reported as done.
+  if (now !== agentAccess) throw new AgentSignInError('unchanged', 'The session did not make that change. Try again.');
+  return kept;
 };
 
 /** Takes the passkey off the account and signs the tab out of it: the account is the agent's alone again. */
@@ -268,12 +320,23 @@ export const leaveAgentLinkAccount = async (): Promise<void> => {
   await logoutClientAuth();
 };
 
-/** "Use my own account": back to the passkey's own account for this tab, without signing the passkey out. */
-export const switchToOwnPasskeyAccount = (target: SessionTarget): void => {
+/**
+ * "Use my own account": back to the passkey's own account for this tab, without signing the passkey out. The
+ * address is the one this browser's passkey wallet holds, never one a Worker named; without one, the tab signs out.
+ */
+export const switchToOwnPasskeyAccount = async (target: SessionTarget): Promise<void> => {
   const account = readAgentLinkAccount();
   if (!account?.passkey) return;
+  const own = lower(
+    passkeyWallet.getPasskeyWalletClient().getAddress() ||
+      (await passkeyWallet.restorePasskeyWalletSession({ requireSigner: false }).catch(() => null)),
+  );
+  if (!own) {
+    await leaveAgentLinkAccount();
+    return;
+  }
   setStaysOnOwnAccount(target, true);
   forgetAgentLinkAccount();
-  changeAccount({ account: account.passkey, provider: 'passkey_eoa' })(store.dispatch);
+  changeAccount({ account: own, provider: 'passkey_eoa' })(store.dispatch);
   updateLoginInfo({ loginInProgress: false, loginComplete: true, provider: 'passkey_eoa' })(store.dispatch);
 };

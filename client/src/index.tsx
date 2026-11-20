@@ -4,11 +4,12 @@ import { initLogging } from 'utilities/logging.js';
 import { initializeRuntimeConfig } from 'utilities/session/runtimeConfig';
 import App from 'components/App';
 import { removeGroupInviteFromAddress } from './domains/worker/workerGroupAutoJoinIntent';
-import { removeAgentSignInCodeFromAddress } from './utilities/session/agentSignIn';
+import { removeAgentSignInCodeFromAddress, watchAddressForAgentSignInCode } from './utilities/session/agentSignIn';
 
 // A link's group invite, and a sign-in code from a person's AI agent, leave the address before the router reads
 // it and before anything is fetched.
 removeAgentSignInCodeFromAddress();
+watchAddressForAgentSignInCode();
 removeGroupInviteFromAddress();
 initializeRuntimeConfig();
 initLogging({ showGuide: process.env.NODE_ENV !== 'production' });
