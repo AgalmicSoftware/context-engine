@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-import { faRobot } from '@fortawesome/free-solid-svg-icons';
+import { faMagic } from '@fortawesome/free-solid-svg-icons';
 
 import { AccountMenuRow } from '../Account/AccountMenu';
 import { openAnalyzeLink, takeAnalyzeLinkArrival } from './userPageAnalyzeLink';
@@ -9,18 +9,18 @@ import { openAnalyzeLink, takeAnalyzeLinkArrival } from './userPageAnalyzeLink';
 export const ANALYZE_LINK_SETTLE_MS = 1500;
 
 /** In the account dialog's list, first. */
-export const AnalyzeUserButton = ({ href }: { href: string }): React.ReactElement => (
+export const AnalyzeMeButton = ({ href }: { href: string }): React.ReactElement => (
   <AccountMenuRow
-    icon={faRobot}
+    icon={faMagic}
     title="Opens your page and makes your AI analysis"
     onClick={() => openAnalyzeLink(href)}
-    testId="ce-account-analyze-user"
+    testId="ce-account-analyze-me"
   >
-    Analyze user
+    Analyze me
   </AccountMenuRow>
 );
 
-/** On my own page: starts Analyze once, where "Analyze user" was pressed just before and the page is ready. */
+/** On my own page: starts Analyze once, where "Analyze me" was pressed just before and the page is ready. */
 export const AnalyzeLinkArrival = ({ ready, onStart }: { ready: boolean; onStart: () => void }): null => {
   const [deadline, setDeadline] = useState(0);
   const taken = useRef(false);

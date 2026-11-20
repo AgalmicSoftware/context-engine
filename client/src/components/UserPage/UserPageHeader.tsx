@@ -15,7 +15,7 @@ import {
 
 import { AccountMenu, AccountMenuRow } from '../Account/AccountMenu';
 import CETooltip from '../Shared/CETooltip';
-import { AnalyzeLinkArrival, AnalyzeUserButton } from './UserPageAnalyzeLinkControls';
+import { AnalyzeLinkArrival, AnalyzeMeButton } from './UserPageAnalyzeLinkControls';
 import styles from './UserPage.module.scss';
 
 type UserPageAnalyzeButtonDisplayState = {
@@ -75,14 +75,14 @@ type UserPageHeaderProps = {
   /** Where your own username is saved: the session's store, or only this device. */
   usernameSavedTo?: 'session' | 'device';
   analyzeButtonDisplayState: UserPageAnalyzeButtonDisplayState;
-  /** Whether my answers have finished loading, for an Analyze that "Analyze user" starts on arrival. */
+  /** Whether my answers have finished loading, for an Analyze that "Analyze me" starts on arrival. */
   analyzeLinkReady?: boolean;
   avatarDisplayState: UserPageAvatarDisplayState;
   bookmarkButtonDisplayState: UserPageBookmarkButtonDisplayState;
   bookmarksHref: string;
   compareButtonDisplayState: UserPageCompareButtonDisplayState;
   copyIconDisplayState: UserPageCopyIconDisplayState;
-  /** The link the account dialog's "Analyze user" opens; '' where the button is not offered. */
+  /** The link the account dialog's "Analyze me" opens; '' where the button is not offered. */
   analyzeLinkHref?: string;
   explorerUrl?: string | null;
   headerActionVisibility: UserPageHeaderActionVisibility;
@@ -376,7 +376,7 @@ const UserPageHeader = ({
       {/* The account dialog's list: this page's two actions, then the dialog's own rows. */}
       {minimized && (
         <AccountMenu>
-          {analyzeLinkHref ? <AnalyzeUserButton href={analyzeLinkHref} /> : null}
+          {analyzeLinkHref ? <AnalyzeMeButton href={analyzeLinkHref} /> : null}
           {showUsernameButton && (
             <AccountMenuRow
               icon={faUser}

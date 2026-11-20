@@ -339,7 +339,7 @@ describe('UserPageHeader', () => {
     );
     const menu = screen.getByTestId('ce-account-menu');
     const rows = Array.from(menu.querySelectorAll(':scope > li > button')).map((row) => row.textContent);
-    expect(rows).toEqual(['Analyze user', 'Set username', 'Disconnect']);
+    expect(rows).toEqual(['Analyze me', 'Set username', 'Disconnect']);
     fireEvent.click(screen.getByRole('button', { name: 'Set username' }));
     expect(onUsernameEdit).toHaveBeenCalledTimes(1);
     expect(document.querySelector(`.${styles.identityActions}`)).toBeNull();
@@ -368,15 +368,15 @@ describe('UserPageHeader', () => {
     expect(screen.getByText('Cannot persist username.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Compare/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Analyze' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Analyze user' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Analyze me' })).toBeNull();
   });
 
-  it('offers Analyze user first in the menu only where it is given a link', () => {
+  it('offers Analyze me first in the menu only where it is given a link', () => {
     const props = { isOwner: true, minimized: true, showUsernameButton: true };
     const { rerender } = render(<UserPageHeader {...createProps(props)} />);
-    expect(screen.queryByRole('button', { name: 'Analyze user' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Analyze me' })).toBeNull();
     rerender(<UserPageHeader {...createProps({ ...props, analyzeLinkHref: '/u/0xabc?session=demo-one&analyze=1' })} />);
-    const create = screen.getByRole('button', { name: 'Analyze user' });
+    const create = screen.getByRole('button', { name: 'Analyze me' });
     const setName = screen.getByRole('button', { name: 'Set username' });
     expect(create.compareDocumentPosition(setName) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(create.closest('ul')).toBe(setName.closest('ul'));

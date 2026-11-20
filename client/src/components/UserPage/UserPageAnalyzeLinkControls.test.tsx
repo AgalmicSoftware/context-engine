@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
-import { ANALYZE_LINK_SETTLE_MS, AnalyzeLinkArrival, AnalyzeUserButton } from './UserPageAnalyzeLinkControls';
+import { ANALYZE_LINK_SETTLE_MS, AnalyzeLinkArrival, AnalyzeMeButton } from './UserPageAnalyzeLinkControls';
 import { openAnalyzeLink, takeAnalyzeLinkArrival } from './userPageAnalyzeLink';
 
 jest.mock('./userPageAnalyzeLink', () => ({
@@ -10,7 +10,7 @@ jest.mock('./userPageAnalyzeLink', () => ({
 
 const take = takeAnalyzeLinkArrival as jest.Mock;
 
-describe('Analyze user button and arrival', () => {
+describe('Analyze me button and arrival', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.setSystemTime(10_000);
@@ -22,15 +22,15 @@ describe('Analyze user button and arrival', () => {
   });
 
   it('opens the link it was given', () => {
-    render(<AnalyzeUserButton href="/u/0xaa?session=demo-one&analyze=1" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Analyze user' }));
+    render(<AnalyzeMeButton href="/u/0xaa?session=demo-one&analyze=1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze me' }));
     expect(openAnalyzeLink).toHaveBeenCalledWith('/u/0xaa?session=demo-one&analyze=1');
   });
 
-  it("shows the site's AI icon, not a search icon", () => {
-    render(<AnalyzeUserButton href="/u/0xaa?analyze=1" />);
-    const row = screen.getByRole('button', { name: 'Analyze user' });
-    expect(row.querySelector('svg')).toHaveAttribute('data-icon', 'robot');
+  it("shows the site's AI wand, not a search icon", () => {
+    render(<AnalyzeMeButton href="/u/0xaa?analyze=1" />);
+    const row = screen.getByRole('button', { name: 'Analyze me' });
+    expect(row.querySelector('svg')).toHaveAttribute('data-icon', 'magic');
   });
 
   it('starts Analyze once, after the page has stayed ready', () => {
