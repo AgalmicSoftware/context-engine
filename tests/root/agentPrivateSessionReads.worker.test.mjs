@@ -195,8 +195,8 @@ test('a one-use code, a wrong password and a plain link read nothing, and each s
       told.push(error.message);
     }
   };
-  // A code for a group that takes none, or that nobody was given: never sent, and it reads nothing.
-  await refused(groupLink(CODE), /one-use code no longer opens it/);
+  // A one-use code on a Worker that doesn't offer reading with one: never sent, and it reads nothing.
+  await refused(groupLink(CODE), /doesn’t offer reading with a code/);
   assert.equal(JSON.stringify(seen).includes(CODE), false);
   await refused(groupLink('gp:a wrong password here'), /group password no longer opens it/);
   await refused(pageLink, /private/);
@@ -315,9 +315,10 @@ test('two links to one session read as the group each names, and a session opene
   assert.ok([...sent].every((invite) => invite.startsWith(`v2:${GROUP}:`)));
 });
 
-const codeSetup = async (t) => {
+const codeSetup = async (t, { codeReads = true } = {}) => {
   const made = await setup(t);
   const { env, admin } = made;
+  if (codeReads) env.CE_GROUP_CODE_READS = 'on';
   const signed = (action, body) => signedAdminRequest({ env, wallet: admin, action, body });
   assert.equal((await signed('groups/create', { group: { groupId: CODES, label: 'By code', joinMode: 'one_use', memberVisibility: 'session' } })).status, 200);
   assert.equal((await signed('groups/invites/add', { groupId: CODES, hashes: [await hashOneUseSecret(CODE)] })).status, 200);
@@ -403,4 +404,16 @@ test('a code withdrawn while an agent is reading with it ends the reading', asyn
   assert.equal((await signed('groups/invites/revoke', { groupId: CODES, allUnused: true })).body.revoked, 1);
   clock.advance(31_000);
   await assert.rejects(participant.listQuestions({ session: link }), /one-use code no longer opens it/);
+});
+
+test('where a Worker has reading by code off, the agent is told joining would use the code up, and nothing of the code is sent', async (t) => {
+  const { participant, seen, counts, link } = await codeSetup(t, { codeReads: false });
+  for (const read of [() => participant.getSession({ session: link }), () => participant.listQuestions({ session: link }), () => participant.getInterviewCatalog({ link })]) {
+    await assert.rejects(read(), /reading with a code.*uses the code up.*ask the person/);
+  }
+  assert.ok(seen.every((call) => !call.invite && !call.authorization));
+  // Joining still asks first, and still works when told to.
+  assert.equal((await participant.joinSession({ link })).joined, false);
+  assert.deepEqual(await counts(), { unused: 1, used: 0, revoked: 0 });
+  assert.equal((await participant.joinSession({ link, spendInviteCode: true })).joinedGroup, CODES);
 });

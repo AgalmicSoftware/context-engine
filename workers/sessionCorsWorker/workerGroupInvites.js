@@ -123,6 +123,12 @@ export const readWorkerGroupReadInvite = ({ header, sessionId, workerOrigin, now
 	}
 };
 
+// Reading with a one-use code is off unless the Worker is deployed with CE_GROUP_CODE_READS set to "on". While
+// off, the Worker does not list the capability and refuses every code proof like any other unreadable invite, so
+// nothing is asked to send one. It is off by default because the hash kept for an unused code is enough to make
+// a proof: until codes have a read key of their own, a listing of codes or a backup would hold read access.
+export const workerGroupCodeReadsOn = (env) => String(env?.CE_GROUP_CODE_READS ?? '').trim().toLowerCase() === 'on';
+
 // Wrong one-use code proofs one sender may offer a session's groups before further ones go unlooked-at for the
 // rest of the window. Kept in the coordinator's memory: a read writes nothing, and a restart only forgives.
 export const WORKER_GROUP_READ_CODE_MISSES = Object.freeze({ limit: 20, windowMs: 10 * 60 * 1000, senders: 2000 });

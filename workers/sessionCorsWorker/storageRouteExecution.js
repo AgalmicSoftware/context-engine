@@ -28,7 +28,7 @@ import {
   writeStorageVisibilityAudit,
 } from './storageEnvelopeEncryption.js';
 import { checkWorkerGroupReadInvite, isWorkerGroupMember } from './workerGroups.js';
-import { readWorkerGroupReadInvite } from './workerGroupInvites.js';
+import { readWorkerGroupReadInvite, workerGroupCodeReadsOn } from './workerGroupInvites.js';
 import { AGENT_SIGN_IN_CODE_IN_TEXT, agentParticipationOn } from '../../shared/agentSignIn.mjs';
 import {
   PRIVATE_SESSION_INVITE_INVALID,
@@ -823,7 +823,8 @@ const checkGroupReadInvite = async ({ env, slug, config, groupId, deps }) => {
   const invite = readWorkerGroupReadInvite({ header, sessionId, workerOrigin: deps?.[STORAGE_GROUP_READ_INVITE_ORIGIN] });
   const refused = { ok: false, outcome: 'denied', status: 403, reason: 'worker_group_read_invite_invalid' };
   const check = typeof deps?.checkWorkerGroupReadInvite === 'function' ? deps.checkWorkerGroupReadInvite : checkWorkerGroupReadInvite;
-  const pending = invite?.groupId !== groupId || (invite.code && deps?.[STORAGE_GROUP_READ_CODE_READS] !== true)
+  const codeRefused = !!invite?.code && (deps?.[STORAGE_GROUP_READ_CODE_READS] !== true || !workerGroupCodeReadsOn(env));
+  const pending = invite?.groupId !== groupId || codeRefused
     ? Promise.resolve(refused)
     : Promise.resolve().then(() => check({
       env, slug, sessionId, groupId, signer: invite.signer, code: invite.code, from: deps?.[STORAGE_GROUP_READ_INVITE_FROM],

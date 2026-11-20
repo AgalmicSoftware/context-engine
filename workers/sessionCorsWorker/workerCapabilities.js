@@ -4,6 +4,7 @@ import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { SESSION_CONFIG_MIGRATION_REQUIRED_REASON } from './sessionConfigSecretsStore.js';
 import { getDefaultWorkerSessionSlug, validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
 import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRouteExecution.js';
+import { workerGroupCodeReadsOn } from './workerGroupInvites.js';
 import { GPT_LIVE_1_1_FEATURE } from '../../shared/realtimeInterviewConfig.mjs';
 import { ANALYSIS_CARD_DRAWING_FEATURE } from '../../shared/analysisCardSaved.mjs';
 import { AGENT_SIGN_IN_FEATURE } from '../../shared/agentSignIn.mjs';
@@ -27,7 +28,8 @@ export const FEATURES = Object.freeze([
   'context_sources_v1',
   'draft_text_v1',
   'envelope_export_identity_v1',
-  // A one-use group code can read without being spent, with a proof made for this Worker.
+  // A one-use group code can read without being spent, with a proof made for this Worker. Listed only by a
+  // Worker deployed with CE_GROUP_CODE_READS on (see workerGroupCodeReadsOn).
   WORKER_GROUP_READ_CODE_FEATURE,
   // A read invite may name this Worker, and is then refused by every other one.
   WORKER_GROUP_READ_PROOF_V2_FEATURE,
@@ -62,9 +64,10 @@ export const workerRelease = () => (
 );
 
 export const dispatchWorkerCapabilities = async ({ request, env = {}, headers = {} }) => {
+  const deployed = FEATURES.filter((feature) => feature !== WORKER_GROUP_READ_CODE_FEATURE || workerGroupCodeReadsOn(env));
   const body = {
     type: 'ce_worker_capabilities', version: 1, apiVersion: 1,
-    bundle: env.CE_BUNDLE_SHA256 || null, release: workerRelease(), features: FEATURES.filter((feature) => feature !== 'recovery_key_export'),
+    bundle: env.CE_BUNDLE_SHA256 || null, release: workerRelease(), features: deployed.filter((feature) => feature !== 'recovery_key_export'),
   };
   const ai = typeof env.AI?.run === 'function' ? [WORKERS_AI_FEATURE] : [];
   body.features = [...body.features, ...ai];
@@ -75,7 +78,7 @@ export const dispatchWorkerCapabilities = async ({ request, env = {}, headers = 
     const validated = validateInboundWorkerSessionSlug(url.searchParams.get('slug'));
     if (!validated.ok) return Response.json({ error: validated.error }, { status: 400, headers: responseHeaders });
     const pinnedSlug = getDefaultWorkerSessionSlug(env);
-    if (pinnedSlug && pinnedSlug === validated.slug) body.features = [...FEATURES, ...ai];
+    if (pinnedSlug && pinnedSlug === validated.slug) body.features = [...deployed, ...ai];
     const bound = !!env.CE_SESSION_COORDINATOR?.idFromName && !!env.CE_SESSION_COORDINATOR?.get;
     const current = bound
       ? await callSessionConfigCoordinator({ env, slug: validated.slug, path: 'current' })

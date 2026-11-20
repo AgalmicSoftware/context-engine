@@ -146,11 +146,11 @@ test('a one-use code is used up by joining only when the call says so; nothing i
   assert.equal(JSON.stringify(joined).includes(CODE), false);
 });
 
-test('a Worker from before reading with a code is sent no code proof, and the agent is told joining would use the code up', async (t) => {
+test('a Worker that doesn’t offer reading with a code is sent no code proof, and the agent is told joining would use the code up', async (t) => {
   for (const olderWorker of [false, true]) {
     const { participant, seen } = await setup(t, { olderWorker });
     for (const read of [() => participant.getSession({ session: link(`#groupInvite=${CODE}`) }), () => participant.getInterviewCatalog({ link: link(`#groupInvite=${CODE}`) })]) {
-      await assert.rejects(read(), /from before reading with a code.*uses the code up.*ask the person/);
+      await assert.rejects(read(), /doesn’t offer reading with a code.*uses the code up.*ask the person/);
     }
     assert.ok(seen.invites.every((invite) => invite === ''));
     assert.deepEqual(seen.joins, []);

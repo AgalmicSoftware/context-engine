@@ -258,7 +258,9 @@ Worker each tool says so and does nothing new.
   names the session, the group and the Worker it is for; a one-use code keys
   a proof that names the same and a time a few minutes off. Both go in a
   header. Reading leaves a code unused, and stops once someone joins with it
-  or an admin withdraws it.
+  or an admin withdraws it. Reading by code needs a Worker that offers it
+  (`group_read_code_v1`, off unless the Worker is deployed with it on); on
+  any other the tools say reading needs joining, which uses the code up.
 - **Joining asks before it uses up a one-use code.** `join_session` on a
   private session, and `join_group`, join with a one-use code only when the
   call passes `spendInviteCode: true`. Without it they return `joined: false`

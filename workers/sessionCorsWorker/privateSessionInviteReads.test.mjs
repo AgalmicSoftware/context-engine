@@ -276,9 +276,11 @@ const CODE = '0123456789abcdef0123456789abcdef';
 const soon = (seconds = 600) => Math.floor(Date.now() / 1000) + seconds;
 const codeInvite = async (code = CODE, { groupId = CODES, workerOrigin = WORKER_ORIGIN, expires = soon(), sessionId = SESSION_ID } = {}) =>
   buildWorkerGroupReadCodeInvite({ codeHash: await hashOneUseSecret(code), sessionId, groupId, workerOrigin, expires });
-const setupCodes = async () => {
+const setupCodes = async ({ codeReads = true } = {}) => {
   const base = await setup({ groupIds: [GROUP, CODES] });
   const { env, admin } = base;
+  // Reading with a code is a Worker's deploy-time choice, off unless set.
+  if (codeReads) env.CE_GROUP_CODE_READS = 'on';
   const signed = (action, body) => signedAdminRequest({ env, wallet: admin, action, body });
   const created = await signed('groups/create', { group: { groupId: CODES, label: 'By code', joinMode: 'one_use', memberVisibility: 'session' } });
   assert.equal(created.status, 200, JSON.stringify(created.body));
@@ -288,6 +290,26 @@ const setupCodes = async () => {
   return { ...base, signed, counts };
 };
 const questionsPath = '/storage/list?resource=questions&limit=100';
+
+test('reading with a one-use code is off unless the Worker is deployed with it on: not listed, and every code proof refused', async () => {
+  for (const value of [undefined, '', 'off', 'true', '1']) {
+    const { env, key, counts } = await setupCodes({ codeReads: false });
+    if (value !== undefined) env.CE_GROUP_CODE_READS = value;
+    const features = (await readJson(await ask(env, '/capabilities'))).body.features;
+    assert.equal(features.includes(WORKER_GROUP_READ_CODE_FEATURE), false, String(value));
+    assert.deepEqual(features, [...features].sort());
+    const invite = await codeInvite();
+    for (const path of [catalogPath, questionsPath, `/session-config?slug=${SLUG}`]) {
+      const refused = await readJson(await ask(env, path, { invite }));
+      assert.equal(JSON.stringify(refused.body).includes('Private statement'), false, path);
+      if (path !== `/session-config?slug=${SLUG}`) assert.equal(refused.body.reason, 'private_session_invite_invalid', path);
+      else assert.equal(refused.body.privateSession, 'invite_invalid');
+    }
+    // The password group's invite reads as ever, and the codes are untouched.
+    assert.equal((await ask(env, questionsPath, { invite: await boundInvite(key) })).status, 200);
+    assert.deepEqual(await counts(), { unused: 2, used: 0, revoked: 0 });
+  }
+});
 
 test('an unused one-use code reads what its group reads, and reading never spends it', async () => {
   const { env, ids, counts } = await setupCodes();
