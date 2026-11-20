@@ -449,6 +449,9 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
             ...(includePredictionComparison && researchTier && interviewProvenanceRecord.voiceModel
               ? { voiceModel: String(interviewProvenanceRecord.voiceModel).slice(0, 128) }
               : {}),
+            ...(includePredictionComparison && researchTier && interviewProvenanceRecord.voiceBriefRevision
+              ? { voiceBriefRevision: String(interviewProvenanceRecord.voiceBriefRevision).slice(0, 64) }
+              : {}),
             ...(interviewId ? { interviewId } : {}),
             // Only the person and the session's admins read it: the Worker withholds the whole record from others.
             ...(transcript ? { transcript } : {}),

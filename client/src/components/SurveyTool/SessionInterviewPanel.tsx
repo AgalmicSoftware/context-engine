@@ -252,6 +252,8 @@ export default function SessionInterviewPanel({
   // The questions an imported AI prefill drafted; its status line counts those still in review.
   const [prefillDraftIds, setPrefillDraftIds] = useState<string[]>(kept.prefillDraftIds);
   const prefillDraftCount = drafts.filter((draft) => prefillDraftIds.includes(draft.questionId)).length;
+  // An AI prefill's drafts, hidden ones included, stay its own: a voice round never asks or redrafts them.
+  const heldIds = useMemo(() => new Set(hasAiPrefill ? prefillDraftIds : []), [hasAiPrefill, prefillDraftIds]);
   const [contextExpanded, setContextExpanded] = useState(false);
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
   // After a submit, how well the person's AI predicted them, and the panel height it keeps
@@ -646,20 +648,21 @@ export default function SessionInterviewPanel({
             account: authenticatedForSubmit ? String(account) : '',
           });
           if (disposedRef.current) return;
-          // The mapper hears no AI prediction for an answered question, so it can't hand one back
-          // as new evidence. Drafts under review keep theirs.
-          const inReview = new Set(latestReviewRef.current.drafts.map((draft) => draft.questionId));
+          // The mapper hears no AI prediction for an answered or AI-drafted question, so it can't hand one back.
           if (usedClaimRef.current) reconsidered = readAnswersToReconsider(questions, existingResponsesRef.current);
+          const asked =
+            !nextTranscript.trim() && prefillPacket ? validatedPrefillQuestionsRef.current || questions : questions;
+          // With every question held it still suggests questions and groups; its drafts are dropped below.
+          const open = asked.filter((question) => !heldIds.has(question.id));
           mapped = await mapInterviewEvidenceToResponses({
-            questions:
-              !nextTranscript.trim() && prefillPacket ? validatedPrefillQuestionsRef.current || questions : questions,
+            questions: open.length ? open : asked,
             transcript: nextTranscript,
             prefillPacket: contextPacket?.responses
               ? {
                   ...contextPacket,
                   responses: contextPacket.responses.filter(
                     ({ questionId }) =>
-                      inReview.has(questionId) ||
+                      !heldIds.has(questionId) &&
                       !hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', questionId)),
                   ),
                 }
@@ -669,7 +672,7 @@ export default function SessionInterviewPanel({
             workerUrl: url,
             // A hidden draft isn't part of the review until its guess is shown.
             previousResponses: drafts
-              .filter((draft) => !isDraftConcealed(draft.questionId))
+              .filter((draft) => !isDraftConcealed(draft.questionId) && !heldIds.has(draft.questionId))
               .map(({ revisions: _revisions, ...prediction }) => ({
                 // The mapping prompt rates importance/conviction 0-100.
                 prediction: {
@@ -702,10 +705,11 @@ export default function SessionInterviewPanel({
                 }
               : null,
           });
+          mapped = mapped.filter((draft) => !heldIds.has(draft.questionId));
         }
         if (disposedRef.current) return;
         const combinedQuestions = [...suggestedQuestions];
-        const knownPrompts = new Set(combinedQuestions.map((question) => question.prompt.trim().toLowerCase()));
+        const knownPrompts = new Set([...combinedQuestions, ...questions].map((q) => q.prompt.trim().toLowerCase()));
         for (const question of proposedQuestions) {
           if (!knownPrompts.has(question.prompt.trim().toLowerCase())) {
             combinedQuestions.push(question);
@@ -762,7 +766,10 @@ export default function SessionInterviewPanel({
         setSelected(review.selected);
         setLeftOutIds((current) => [...new Set([...current, ...review.leftOut])]);
         setStillFitIds(readAnswersThatStillFit(review.leftOut, mapped, reconsidered, questions));
-        if (importedDrafts) setPrefillDraftIds(importedDrafts.map((draft) => draft.questionId));
+        if (importedDrafts)
+          setPrefillDraftIds(
+            importedDrafts.map(({ questionId }) => questionId).filter((id) => !review.leftOut.includes(id)),
+          );
         let newlyHidden: string[] = [];
         if (review.drafts.length) {
           // Chosen once per review, and only while research sharing is on.
@@ -824,6 +831,7 @@ export default function SessionInterviewPanel({
       context,
       drafts,
       hasAiPrefill,
+      heldIds,
       includePredictionComparison,
       isDraftConcealed,
       reviewedDraftValues,
@@ -946,15 +954,16 @@ export default function SessionInterviewPanel({
           validatedPrefillQuestionsRef.current || questions,
         )?.filter(shown) || null
       : null;
-    // It spends the conversation on unanswered questions while any remain.
-    const openQuestions = questions.filter((question) => !answered(question.id));
+    // It spends the conversation on unanswered questions while any remain, and leaves an AI's drafts to review.
+    const openQuestions = questions.filter((question) => !answered(question.id) && !heldIds.has(question.id));
     try {
       const instructions = buildRealtimeInterviewInstructions({
         questions: openQuestions.length ? openQuestions : questions,
         answeredQuestions: questions.filter((question) => answered(question.id)),
+        draftedQuestions: questions.filter((question) => !answered(question.id) && heldIds.has(question.id)),
         suggestQuestions,
         responderContext: voiceContext,
-        openingPrompt: openQuestions.length === questions.length ? interviewOpening.opening : undefined,
+        openingPrompt: questions.some((question) => answered(question.id)) ? undefined : interviewOpening.opening,
         steeringPrompt: interviewOpening.steeringPrompt,
         sessionContext: sessionContextPrompt.text,
         previousTranscript: transcriptRef.current,

@@ -167,6 +167,7 @@ const PREDICTION_RESEARCH_KEYS = [
   'draftOrigin',
   'mappingPromptVersion',
   'voiceModel',
+  'voiceBriefRevision',
   'interviewId',
   'transcript',
   'predictionCondition',

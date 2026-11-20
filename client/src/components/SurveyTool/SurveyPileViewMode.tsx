@@ -143,6 +143,7 @@ import {
   resolveRealtimeInterviewSource,
   resolveSessionVoiceMode,
   INTERVIEW_MAPPING_PROMPT_VERSION,
+  VOICE_BRIEF_REVISION,
   type InterviewDraftResponse,
   type InterviewPrefillRead,
   type InterviewPrefillPacket,
@@ -2049,7 +2050,9 @@ export const recordInterviewProvenance = (
                   ...(draftOrigin === 'external_prefill'
                     ? {}
                     : { mappingPromptVersion: INTERVIEW_MAPPING_PROMPT_VERSION }),
-                  ...(draftOrigin === 'voice_interview' ? { voiceModel } : {}),
+                  ...(draftOrigin === 'voice_interview'
+                    ? { voiceModel, voiceBriefRevision: VOICE_BRIEF_REVISION }
+                    : {}),
                   // Read by research without the AI provenance choice, which carries the prompt version.
                   confidenceMeaning: confidenceMeaningOf(packet?.promptVersion || INTERVIEW_PROMPT_VERSION),
                   predictionCondition: reviewed.predictionCondition === 'blind' ? 'blind' : 'shown',

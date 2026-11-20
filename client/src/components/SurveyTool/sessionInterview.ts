@@ -33,7 +33,7 @@ import {
   SESSION_VOICE_MODE_QUERY_VALUES,
   VOICE_CHOOSER_QUERY_VALUE,
 } from './sessionVoiceModeQuery';
-export { buildRealtimeInterviewInstructions } from './sessionInterviewRealtimeInstructions';
+export { buildRealtimeInterviewInstructions, VOICE_BRIEF_REVISION } from './sessionInterviewRealtimeInstructions';
 
 export { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
 export { isInterviewFeatureEnabled } from '../../utilities/session/interviewFeature';
@@ -666,7 +666,7 @@ const RECONSIDERATION_RULES = `
  * (buildInterviewResponseMappingPrompt). Research records it with those drafts, so change it whenever the prompt's
  * wording or rules change.
  */
-export const INTERVIEW_MAPPING_PROMPT_VERSION = 'ce-interview-mapping-v2';
+export const INTERVIEW_MAPPING_PROMPT_VERSION = 'ce-interview-mapping-v3';
 
 export const buildInterviewResponseMappingPrompt = ({
   questions,

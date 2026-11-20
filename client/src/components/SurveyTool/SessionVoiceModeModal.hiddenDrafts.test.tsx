@@ -48,6 +48,8 @@ const questionPool = [
   ...statements.map((id) => ({ id, prompt: `Statement ${id}?`, type: 'binary' })),
   { id: 'r1', prompt: 'How much?', type: 'rating', scale: { min: 0, max: 10 } },
   { id: 'f1', prompt: 'Why?', type: 'freeform' },
+  // The one question the AI left undrafted.
+  { id: 'o1', prompt: 'What else?', type: 'freeform' },
 ];
 const prefillPacket = {
   version: 1 as const,
@@ -315,7 +317,7 @@ it('shows every hidden draft when research sharing is turned off, and never hide
   expect(reviewed(props, hiddenStatement).predictionCondition).toBeUndefined();
 });
 
-it('keeps hidden guesses from the voice interviewer and the drafting request', async () => {
+it('leaves every AI-drafted question, hidden ones included, out of the voice round', async () => {
   let instructions = '';
   const transcript = 'Responder: Safety matters to me.';
   jest.mocked(startSessionRealtimeInterview).mockImplementation(async (options) => {
@@ -343,13 +345,60 @@ it('keeps hidden guesses from the voice interviewer and the drafting request', a
     expect(instructions).not.toContain(`EVIDENCE-${id}`);
     expect(instructions).not.toContain(`FACT-${id}`);
   }
+  // The interviewer opens from the shown drafts and asks only the undrafted question.
+  expect(instructions).toContain('digs into what the AI drafts below say');
+  expect(instructions).toContain('[o1]');
+  for (const id of [...eligible, 'f1']) expect(instructions).not.toContain(`[${id}]`);
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
   await waitFor(() => expect(mapInterviewEvidenceToResponses).toHaveBeenCalled());
-  const [request] = jest.mocked(mapInterviewEvidenceToResponses).mock.calls[0];
-  const { previousResponses = [] } = request as { previousResponses?: Array<{ prediction: { questionId: string } }> };
-  const sent = previousResponses.map((entry) => entry.prediction.questionId);
-  expect(sent).toContain(shownStatement);
-  for (const id of hiddenIds) expect(sent).not.toContain(id);
+  const [request] = jest.mocked(mapInterviewEvidenceToResponses).mock.calls[0] as unknown as [
+    {
+      questions: Array<{ id: string }>;
+      previousResponses?: Array<{ prediction: { questionId: string } }>;
+      prefillPacket?: { responses?: unknown[] };
+    },
+  ];
+  expect(request.questions.map((question) => question.id)).toEqual(['o1']);
+  expect(request.previousResponses || []).toEqual([]);
+  expect(request.prefillPacket?.responses).toEqual([]);
+});
+
+it('drafts only undrafted questions from a voice round, leaving prefill and hidden drafts as they were', async () => {
+  const transcript = 'Responder: I disagree with all of it.';
+  jest.mocked(startSessionRealtimeInterview).mockImplementation(async (options) => {
+    options.onRecordingState?.('recording');
+    options.onTranscript?.(transcript, []);
+    return {
+      mediaStream: {} as MediaStream,
+      stop: jest.fn(async () => ({ transcript, turns: [] })),
+      pause: jest.fn(),
+      resume: jest.fn(),
+      getTranscript: () => transcript,
+    };
+  });
+  // The reply drafts AI-drafted questions too, which must change none of them.
+  jest.mocked(mapInterviewEvidenceToResponses).mockResolvedValue([
+    { questionId: 'o1', answer: 'More audits.', evidence: 'Said so', confidence: 0.7 },
+    { questionId: hiddenStatement, answer: 'Disagree', evidence: 'Said so', confidence: 0.9 },
+    { questionId: shownStatement, answer: 'Disagree', evidence: 'Said so', confidence: 0.9 },
+  ]);
+  const props = renderReview();
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const hiddenCard = card(hiddenStatement).textContent;
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+  await screen.findByLabelText('Pause interview');
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+  await waitFor(() => expect(mapInterviewEvidenceToResponses).toHaveBeenCalled());
+  await waitFor(() => expect(card('o1')).toHaveTextContent('More audits.'));
+  // Still only the AI's own drafts are counted as its.
+  expect(screen.getByText('Your AI drafted 6 answers')).toBeInTheDocument();
+  expect(card(hiddenStatement).textContent).toBe(hiddenCard);
+  expect(answer(shownStatement)).toHaveValue('Agree');
+  answerWith(hiddenStatement, 'Disagree');
+  submit();
+  await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalled());
+  // The hidden draft is still scored as held out against the AI's first guess.
+  expect(reviewed(props, hiddenStatement)).toMatchObject({ predictionCondition: 'blind' });
 });
 
 it('keeps hidden guesses out of group suggestions until they are shown', async () => {

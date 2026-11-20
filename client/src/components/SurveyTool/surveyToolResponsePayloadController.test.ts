@@ -907,6 +907,18 @@ describe('research detail tiers', () => {
     expect(JSON.stringify(record)).not.toMatch(/nurse|hospital|Basis|Guess|My own note/);
   });
 
+  it('keeps the drafting prompt, voice model and interviewer revision of a voice draft', () => {
+    const versions = {
+      mappingPromptVersion: 'ce-interview-mapping-v3',
+      voiceModel: 'gpt-live-1.1',
+      voiceBriefRevision: 'ce-voice-brief-2',
+    };
+    const voice = { researchTier: 'minimal', draftOrigin: 'voice_interview', ...versions };
+    expect(submit(provenance(voice))).toMatchObject(versions);
+    const off = submit(provenance({ ...voice, includePredictionComparison: false, includeAiProvenance: true }));
+    expect(off).not.toHaveProperty('voiceBriefRevision');
+  });
+
   it('keeps a known draft origin and drops an unknown one', () => {
     expect(submit(provenance({ researchTier: 'minimal', draftOrigin: 'group_recording' })).draftOrigin).toBe(
       'group_recording',

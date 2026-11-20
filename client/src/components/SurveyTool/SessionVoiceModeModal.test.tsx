@@ -1335,7 +1335,7 @@ describe('SessionVoiceModeModal', () => {
     },
   );
 
-  it('after a submit, a voice interview adds drafts only for new questions and keeps updating submitted ones', async () => {
+  it('after a submit, a voice interview adds drafts only for new questions and leaves the AI draft as it was', async () => {
     let instructions = '';
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
       instructions = options.instructions;
@@ -1403,7 +1403,8 @@ describe('SessionVoiceModeModal', () => {
     expect(instructions).not.toContain('Ask which earlier answer');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
     await expectReadableDraftText('Draft answer for Third question?', 'New answer');
-    await expectReadableDraftText('Draft answer for What matters?', 'Refined answer');
+    // The AI prefill's submitted draft stays its own, whatever the voice round drafts for it.
+    await expectReadableDraftText('Draft answer for What matters?', 'Drafted one');
     expect(screen.queryByText('Second question?')).not.toBeInTheDocument();
     expect(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).toHaveLength(2);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
@@ -1411,45 +1412,25 @@ describe('SessionVoiceModeModal', () => {
     );
   });
 
-  it('keeps a voice correction to an AI-prefill draft when the saved answer loads after login', async () => {
+  it('leaves an AI-prefill draft for the person to correct, whatever the voice round drafts', async () => {
     mockVoiceRound('Responder: Actually, I disagree.');
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Disagree', confidence: 0.9 },
     ]);
-    const onLoadSavedResponses = jest.fn().mockResolvedValue({
-      answers: { q1: { value: 'Agree' } },
-      additionalComments: {},
-      importance: {},
-      conviction: {},
-    });
-    const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'login-required' });
-    const props = {
-      ...baseProps,
-      mode: 'interview' as const,
-      onLoadSavedResponses,
-      onSubmitResponses,
-      prefillPacket: aiPrefill([{ questionId: 'q1', answer: 'Agree' }]),
-    };
-    const view = render(<SessionVoiceModeModal {...props} account="" loginComplete={false} />);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={aiPrefill([{ questionId: 'q1', answer: 'Agree' }])}
+      />,
+    );
     await expectReadableDraftText('Draft answer for What matters?', 'Agree');
     await speak();
-    await expectReadableDraftText('Draft answer for What matters?', 'Disagree');
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
-    // Signing in loads the earlier "Agree": the spoken correction stays, says what it changes,
-    // and the queued submit waits for the person to check it.
-    view.rerender(<SessionVoiceModeModal {...props} />);
-    await waitFor(() =>
-      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
-        'Saved answers loaded. Check drafts that change an earlier answer or comment, then submit.',
-      ),
-    );
-    await expectReadableDraftText('Draft answer for What matters?', 'Disagree');
-    expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).not.toBeInTheDocument();
-    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
-    expect(onSubmitResponses).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    // Its guess is what research compares the person's answer with, so only the person changes it.
+    await expectReadableDraftText('Draft answer for What matters?', 'Agree');
+    expect(mockedMapInterviewEvidenceToResponses.mock.calls[0][0].previousResponses).toEqual([]);
   });
 
   it('leaves out an answered question even when the voice mapper hands back its AI-prefill guess', async () => {
@@ -1474,12 +1455,10 @@ describe('SessionVoiceModeModal', () => {
     await expectReadableDraftText('Draft answer for Second question?', 'Agree');
     await speak();
     await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
-    // The mapper never hears the guess for the answered question.
-    expect(
-      mockedMapInterviewEvidenceToResponses.mock.calls[0][0].prefillPacket?.responses?.map(
-        ({ questionId }) => questionId,
-      ),
-    ).toEqual(['q2']);
+    // The mapper hears neither the guess for the answered question nor the drafted one's, and drafts only q1.
+    const [request] = mockedMapInterviewEvidenceToResponses.mock.calls[0];
+    expect(request.prefillPacket?.responses).toEqual([]);
+    expect(request.questions.map(({ id }) => id)).toEqual(['q1']);
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     expect(draftIds()).toEqual(['q2']);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
@@ -1520,7 +1499,8 @@ describe('SessionVoiceModeModal', () => {
       ]),
     );
     await expectReadableDraftText('Draft answer for Third question?', 'New three');
-    await expectReadableDraftText('Draft answer for Second question?', 'Refined two');
+    // The AI-drafted q2 isn't redrafted.
+    await expectReadableDraftText('Draft answer for Second question?', 'Drafted two');
     expect(draftIds()).toEqual(['q2', 'q3']);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
       'Left out 1 draft for a question you’ve already answered.',
@@ -1594,7 +1574,7 @@ describe('SessionVoiceModeModal', () => {
     },
   );
 
-  it('gives the voice interviewer only unanswered questions and their drafts, or every question once all are answered', async () => {
+  it('gives the voice interviewer only undrafted unanswered questions, or every question once all are answered', async () => {
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
       options.onRecordingState?.('recording');
       return {
@@ -1608,7 +1588,11 @@ describe('SessionVoiceModeModal', () => {
     const props = {
       ...baseProps,
       mode: 'interview' as const,
-      questionPool: [...baseProps.questionPool, { id: 'q2', prompt: 'Second question?', type: 'freeform' }],
+      questionPool: [
+        ...baseProps.questionPool,
+        { id: 'q2', prompt: 'Second question?', type: 'freeform' },
+        { id: 'q3', prompt: 'Third question?', type: 'freeform' },
+      ],
       prefillPacket: {
         version: 1 as const,
         sessionSlug: 'demo',
@@ -1627,8 +1611,11 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     await screen.findByLabelText('Pause interview');
     const open = mockedStartSessionRealtimeInterview.mock.calls[0][0].instructions;
-    expect(open).toContain('[q2]');
+    // q2's draft is background for the open q3; the drafted q2 itself is not to be asked.
+    expect(open).toContain('[q3]');
     expect(open).toContain('EVIDENCE-q2');
+    expect(open).not.toContain('[q2]');
+    expect(open).toContain('Already drafted by their AI (reference only; not to ask):\n- Second question?');
     expect(open).not.toContain('[q1]');
     expect(open).not.toContain('EVIDENCE-q1');
     first.unmount();
@@ -1637,7 +1624,7 @@ describe('SessionVoiceModeModal', () => {
     render(
       <SessionVoiceModeModal
         {...props}
-        existingResponseSlice={{ answers: { q1: { value: 'Saved' }, q2: { value: 'Saved' } } }}
+        existingResponseSlice={{ answers: { q1: { value: 'Saved' }, q2: { value: 'Saved' }, q3: { value: 'Saved' } } }}
       />,
     );
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE);
@@ -1646,6 +1633,7 @@ describe('SessionVoiceModeModal', () => {
     const answered = mockedStartSessionRealtimeInterview.mock.calls[1][0].instructions;
     expect(answered).toContain('[q1]');
     expect(answered).toContain('[q2]');
+    expect(answered).toContain('[q3]');
     expect(answered).toContain('Ask which earlier answer, if any, the responder wants to change');
     expect(answered).not.toContain('Already answered (reference only');
     expect(answered).not.toContain('EVIDENCE-q1');
@@ -3956,6 +3944,7 @@ describe('Interview cancellation and recovery', () => {
 
   it('maps new speech instead of reusing imported response predictions', async () => {
     sessionMock();
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q2', answer: 'New evidence' }]);
     render(
       <SessionVoiceModeModal
         {...baseProps}
@@ -3967,6 +3956,7 @@ describe('Interview cancellation and recovery', () => {
           responderContext: {},
           responses: [{ questionId: 'q1', answer: 'Old prediction', confidence: 0.5 }],
         }}
+        questionPool={[...baseProps.questionPool, { id: 'q2', prompt: 'Next?', type: 'freeform' }]}
       />,
     );
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
@@ -3979,7 +3969,8 @@ describe('Interview cancellation and recovery', () => {
         expect.objectContaining({ transcript: 'Responder: New evidence.' }),
       ),
     );
-    await expectReadableDraftText('Draft answer for What matters?', 'New evidence');
+    await expectReadableDraftText('Draft answer for Next?', 'New evidence');
+    await expectReadableDraftText('Draft answer for What matters?', 'Old prediction');
   });
   it('opens the interview and personal AI prompt with the newest unanswered breakout questions', async () => {
     const props = {

@@ -2,7 +2,6 @@
 // detail and where the draft came from.
 import { recordInterviewProvenance } from './SurveyPileViewMode';
 import { keepConsentWithdrawals } from './sessionInterviewConsent';
-import { INTERVIEW_MAPPING_PROMPT_VERSION } from './sessionInterview';
 
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionListeningPanel', () => ({ __esModule: true, default: () => null }));
@@ -80,7 +79,8 @@ it('labels voice drafts that did not come from a prefill packet', async () => {
     confidenceMeaning: 'keep',
     // Which voice model and drafting prompt made it, so a change between interviews shows in the records.
     voiceModel: 'gpt-live-1.1',
-    mappingPromptVersion: INTERVIEW_MAPPING_PROMPT_VERSION,
+    voiceBriefRevision: 'ce-voice-brief-2',
+    mappingPromptVersion: 'ce-interview-mapping-v3',
   });
 });
 
@@ -96,6 +96,7 @@ it('records the voice model the session names, and neither on a prefill draft', 
   const record = prefill.state.surveysResponseState[0].interviewProvenance.q1;
   expect(record.draftOrigin).toBe('external_prefill');
   expect(record).not.toHaveProperty('voiceModel');
+  expect(record).not.toHaveProperty('voiceBriefRevision');
   expect(record).not.toHaveProperty('mappingPromptVersion');
 });
 
