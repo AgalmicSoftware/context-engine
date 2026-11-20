@@ -138,7 +138,13 @@ export type InterviewDraftResponse = {
   revealedAt?: number;
   // From the mapping, when it read someone's claimed part of a group recording; review moves it into the version.
   origin?: 'group_recording';
+  // From the mapping, when the responder spoke another language: their own words, shown beside the English in
+  // review. Kept on this device only; never submitted or kept for research.
+  spokenOriginal?: SpokenOriginal;
 };
+
+/** What the responder said in their own language, for a draft written in English. */
+export type SpokenOriginal = { language: string; answer?: string; additionalComments?: string };
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -219,6 +225,18 @@ const normalizeResearchCoverage = (value: unknown): InterviewResearchCoverage | 
   };
 };
 
+// The responder's own words, when the reply gives them with a language.
+const readSpokenOriginal = (value: unknown): { spokenOriginal?: SpokenOriginal } => {
+  const original = asRecord(value);
+  const language = toTrimmedString(original.language).slice(0, 60);
+  const answer = toTrimmedString(original.answer).slice(0, 12000);
+  const additionalComments = toTrimmedString(original.additionalComments).slice(0, 8000);
+  if (!language || (!answer && !additionalComments)) return {};
+  return {
+    spokenOriginal: { language, ...(answer ? { answer } : {}), ...(additionalComments ? { additionalComments } : {}) },
+  };
+};
+
 const normalizeDraftCandidates = (
   candidates: unknown,
   questions?: InterviewQuestion[],
@@ -277,6 +295,7 @@ const normalizeDraftCandidates = (
           : {}),
         ...(toTrimmedString(response.evidence) ? { evidence: toTrimmedString(response.evidence).slice(0, 2000) } : {}),
         ...(Number.isFinite(confidence) ? { confidence: Math.max(0, Math.min(1, confidence)) } : {}),
+        ...readSpokenOriginal(response.original),
       });
       return normalized;
     }, []);
@@ -633,7 +652,7 @@ const RECONSIDERATION_RULES = `
  * (buildInterviewResponseMappingPrompt). Research records it with those drafts, so change it whenever the prompt's
  * wording or rules change.
  */
-export const INTERVIEW_MAPPING_PROMPT_VERSION = 'ce-interview-mapping-v1';
+export const INTERVIEW_MAPPING_PROMPT_VERSION = 'ce-interview-mapping-v2';
 
 export const buildInterviewResponseMappingPrompt = ({
   questions,
@@ -665,10 +684,11 @@ Rules:
 - Match the question type and listed options exactly when options exist. For rating questions, return a JSON number on the stated scale (for example, 4), not prose or "4/10".
 - Interviewer turns supply question context only; never treat their suggestions as the responder's beliefs. Resolve short replies such as "four", "yes", or "no" against the preceding question. Check every explicit responder answer, including numeric ratings, before returning drafts.
 - additionalComments holds only what the responder said that bears on this question but doesn't fit the main answer: an explanation, qualification or example, in their meaning, without inventing details or repeating the answer. When they said nothing like that, return "". Never use it to say what they haven't said, considered or compared, or to explain a guess: a guess's basis goes in evidence and its weakness in confidence.
+- Write prose answers and additionalComments in English. Where the responder said them in another language, translate faithfully, end each translated text with " (translated from <language>)", naming the language in English, and add "original" with the language and their own words for each field you translated, as they said them: {"language":"French","answer":"...","additionalComments":"..."}. Options, ratings and votes stay the exact option strings and numbers. Write evidence in English too, and never quote the responder's words in another language there.
 - Write prose answers and additionalComments in the responder's first person when the source supports prose. Do not add an "(Agent):" prefix or speak as the interviewer. Keep the responder's uncertainty and wording faithful instead of strengthening the claim. importance (0-100) and conviction (0-100) are optional and require explicit evidence.
 - Reconsider earlier predictions against the complete transcript, giving new corrections and clarifications priority. Refine prior answers when supported; prior predictions are not independent evidence. Reviewed user edits are supplied as context and should not be silently contradicted.
 - confidence is required for every response: the chance from 0 to 1 that the responder keeps this answer unchanged when they review it. As anchors, use 0.00-0.39 for weak inference, 0.40-0.69 for moderate support, and 0.70-1.00 for direct or repeated support.
-- Return JSON only, with shape {"responses":[{"questionId":"...","answer":...,"additionalComments":"...","importance":50,"conviction":50,"evidence":"short basis","confidence":0.0}]}.${reconsideration ? RECONSIDERATION_RULES : ''}${extraRules}
+- Return JSON only, with shape {"responses":[{"questionId":"...","answer":...,"additionalComments":"...","importance":50,"conviction":50,"evidence":"short basis","confidence":0.0,"original":{"language":"...","answer":"...","additionalComments":"..."}}]}, leaving out "original" when nothing was translated.${reconsideration ? RECONSIDERATION_RULES : ''}${extraRules}
 
 Questions:
 ${JSON.stringify(questions)}

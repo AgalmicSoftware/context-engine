@@ -624,6 +624,48 @@ describe('session interview protocol', () => {
     ]);
   });
 
+  it('drafts in English, marks a translation, and keeps the responder’s own words beside it', () => {
+    const prompt = buildInterviewResponseMappingPrompt({
+      questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
+    });
+    expect(prompt).toContain('Write prose answers and additionalComments in English.');
+    expect(prompt).toContain('end each translated text with " (translated from <language>)"');
+    // The basis is uploaded at full research detail, so it holds no words in another language either.
+    expect(prompt).toContain(
+      "Write evidence in English too, and never quote the responder's words in another language",
+    );
+    expect(prompt).toContain('Options, ratings and votes stay the exact option strings and numbers.');
+    const reply = {
+      responses: [
+        {
+          questionId: 'q1',
+          answer: 'Audits people can check (translated from French)',
+          confidence: 0.8,
+          original: { language: 'French', answer: 'Des audits vérifiables' },
+        },
+      ],
+    };
+    expect(
+      parseInterviewDraftResponses(JSON.stringify(reply), [
+        { id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] },
+      ]),
+    ).toEqual([
+      {
+        questionId: 'q1',
+        answer: 'Audits people can check (translated from French)',
+        confidence: 0.8,
+        spokenOriginal: { language: 'French', answer: 'Des audits vérifiables' },
+      },
+    ]);
+    // Without a language, or without words, there is nothing to show.
+    const bare = { responses: [{ ...reply.responses[0], original: { answer: 'Des audits' } }] };
+    expect(
+      parseInterviewDraftResponses(JSON.stringify(bare), [
+        { id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] },
+      ])[0],
+    ).not.toHaveProperty('spokenOriginal');
+  });
+
   it('uses agent-authored response drafts directly and requires confidence', () => {
     const directPacket: InterviewPrefillPacket = {
       ...packet,

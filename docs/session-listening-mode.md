@@ -196,7 +196,9 @@ New speech is mapped even if the interview started with imported predictions. Wh
 expand a read-only transcript disclosure while the session's configured thinking model,
 with at most 8,000 output tokens and reasoning effort capped by the owner's setting,
 maps the transcript and any responder context imported by an AI prefill link
-to response drafts. Imported context remains editable in a collapsed
+to response drafts, written in English; a translated answer or comment ends with
+"(translated from <language>)", with the person's own words shown beside it in
+review and kept in the page’s memory only. Imported context remains editable in a collapsed
 **Imported responder context** disclosure; during a normal voice-only interview
 that context editor is absent, keeping the microphone as the primary action.
 Drafts may include comments,

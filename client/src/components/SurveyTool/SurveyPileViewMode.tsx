@@ -1905,6 +1905,9 @@ const openSessionResults = (engine: PileViewModeEngine) => {
   window.dispatchEvent(new Event('popstate'));
 };
 
+const withoutSpokenOriginal = ({ spokenOriginal: _words, ...draft }: InterviewDraftResponse): InterviewDraftResponse =>
+  draft;
+
 export const recordInterviewProvenance = (
   engine: PileViewModeEngine,
   drafts: InterviewDraftResponse[],
@@ -1913,9 +1916,14 @@ export const recordInterviewProvenance = (
   included = true,
   includePredictionComparison = false,
   responderName = '',
-  review: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }> = [],
+  reviewEntries: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }> = [],
   consentOverrides?: InterviewConsentOverrides,
 ) => {
+  // The person's own words in another language stay on the page: never in the page draft or the upload.
+  const review = reviewEntries.map(({ spokenOriginal: _entryWords, original, ...entry }) => ({
+    ...entry,
+    original: original && withoutSpokenOriginal(original),
+  }));
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
   const { researchDetail: sessionResearchDetail, keepDraftTextForAdmins } = normalizeInterviewSettings(
     (engine.props?.sessionConfig as { interviewMode?: unknown } | undefined)?.interviewMode,

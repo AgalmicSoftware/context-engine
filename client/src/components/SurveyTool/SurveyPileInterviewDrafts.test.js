@@ -296,6 +296,51 @@ it('does not upload a draft removed after a failed interview submit', async () =
   expect(pile.engine().getPendingEditStats().total).toBe(0);
 });
 
+it('shows the responder’s own words beside a translated draft, and never uploads them', async () => {
+  sessionConfig = { ...SESSION_CONFIG, interviewMode: { researchDetail: 'full', shareDraftChangesByDefault: true } };
+  const upload = mockSession();
+  const pile = await mountWithInterview(null);
+  await openInterview(pile);
+  await speak([
+    {
+      questionId: 'q1',
+      answer: 'Agree',
+      additionalComments: 'Only with outside audits (translated from French)',
+      confidence: 0.9,
+      spokenOriginal: { language: 'French', additionalComments: 'Seulement avec des audits externes' },
+    },
+    {
+      questionId: 'q3',
+      answer: 'Disagree',
+      additionalComments: 'Too slow (translated from French)',
+      confidence: 0.8,
+      spokenOriginal: { language: 'French', additionalComments: 'Seulement trop lent' },
+    },
+  ]);
+  expect(
+    screen.getByText(/Your comment in your words \(French\): Seulement avec des audits externes/),
+  ).toBeInTheDocument();
+  // A dismissed draft is kept for research at full detail, without the person's words.
+  fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Q3' }));
+  // A refused upload leaves the page draft and the kept review (written as the page goes) in place.
+  upload.mockRejectedValueOnce(new Error('User rejected the request.'));
+  await submitDrafts();
+  act(() => {
+    window.dispatchEvent(new Event('pagehide'));
+  });
+  const kept = [sessionStorage, localStorage].flatMap((store) =>
+    Object.keys(store).map((key) => `${key}=${store.getItem(key) || ''}`),
+  );
+  expect(kept.join('\n')).toMatch(/Too slow/);
+  expect(kept.join('\n')).not.toMatch(/Seulement|spokenOriginal/);
+  await submitDrafts();
+  const rows = upload.mock.calls[1][2];
+  expect(rows[0].additional.value).toBe('Only with outside audits (translated from French)');
+  expect(rows[0].interviewProvenance.unselectedPredictions?.map((entry) => entry.questionId)).toEqual(['q3']);
+  // Not in the answer, nor with the research sharing kept beside it.
+  expect(JSON.stringify(rows)).not.toMatch(/Seulement|spokenOriginal/);
+});
+
 it('keeps an unsaved pile comment when the AI proposes no comment', async () => {
   const upload = mockSession();
   await mountWithInterview(
@@ -709,7 +754,7 @@ it.each([
       predictionCondition: 'shown',
       draftOrigin: 'voice_interview',
       voiceModel: 'gpt-live-1.1',
-      mappingPromptVersion: 'ce-interview-mapping-v1',
+      mappingPromptVersion: 'ce-interview-mapping-v2',
     });
     expect(rows[0].interviewProvenance.unselectedPredictions?.map((entry) => entry.questionId)).toEqual(unselected);
   },
