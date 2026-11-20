@@ -29,7 +29,7 @@ import {
 } from './storageEnvelopeEncryption.js';
 import { checkWorkerGroupReadInvite, isWorkerGroupMember } from './workerGroups.js';
 import { readWorkerGroupReadInvite } from './workerGroupInvites.js';
-import { agentParticipationOn } from '../../shared/agentSignIn.mjs';
+import { AGENT_SIGN_IN_CODE_IN_TEXT, agentParticipationOn } from '../../shared/agentSignIn.mjs';
 import {
   PRIVATE_SESSION_INVITE_INVALID,
   PRIVATE_SESSION_INVITE_REQUIRED,
@@ -3201,6 +3201,12 @@ export const storageRoute = async ({
       payloadEncrypted: payload.payloadEncrypted === true,
     });
     if (!checked.ok) return responseJson(deps, { error: checked.error }, checked.status, baseHeaders);
+    // A link that signs someone in is for one person: nothing the session stores may carry one.
+    if (checked.payload && AGENT_SIGN_IN_CODE_IN_TEXT.test(JSON.stringify(checked.payload))) {
+      return responseJson(deps, {
+        error: 'This holds a sign-in link, which is for one person only. Take it out and send again.', reason: 'sign_in_link_in_content',
+      }, 400, baseHeaders);
+    }
     // A session with AI agents off stores nothing that says an agent made it, whoever sends it.
     if (!agentParticipationOn(config) && checked.payload?.participant?.kind === 'agent' &&
         !resolveRoleAddressSet({ config, role: 'admin' }).has(normalizeAddress(uploaderAddress))) {

@@ -105,6 +105,10 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
   if (list && (auth.payload?.agentSource || auth.payload?.via)) {
     return deps?.json?.({ error: list.refused }, 403, withPrivateNoStoreHeaders(baseHeaders));
   }
+  // A sign-in from an agent's link or an attached passkey reads nothing that is for admins.
+  if (auth.payload?.via) {
+    return deps?.json?.({ error: 'Sign in as an admin to read this.' }, 403, withPrivateNoStoreHeaders(baseHeaders));
+  }
 
   const targetSlug = auth.slug || slug;
   let snapshot;

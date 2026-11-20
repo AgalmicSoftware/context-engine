@@ -38,6 +38,8 @@ export const AGENT_SIGN_IN_CODE_TTL_SECONDS = 30 * 60;
 const CODE_PREFIX = 'cesi_';
 const CODE_RE = /^cesi_[A-Za-z0-9_-]{43}$/;
 export const isAgentSignInCode = (value) => typeof value === 'string' && CODE_RE.test(value);
+/** A sign-in code anywhere in a text: what must never be stored, posted or sent on. */
+export const AGENT_SIGN_IN_CODE_IN_TEXT = /cesi_[A-Za-z0-9_-]{43}/;
 /** A code from 32 random bytes, as unpadded base64url. */
 export const formatAgentSignInCode = (bytes) => {
   let binary = '';

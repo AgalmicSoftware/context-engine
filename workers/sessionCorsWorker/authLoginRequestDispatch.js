@@ -10,6 +10,7 @@ import {
   recordAbuseEvent as recordAbuseEventBoundary,
 } from './abuseObservability.js';
 import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
+import { AGENT_SIGN_IN_LINK_STATEMENT } from '../../shared/agentSignIn.mjs';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 
 const recordAuthFailure = async ({ env, deps } = {}) => {
@@ -36,6 +37,12 @@ export const dispatchAuthLoginRequest = async ({
     body = await request?.json?.();
   } catch {
     return deps?.json?.({ error: 'Invalid JSON.' }, 400, baseHeaders);
+  }
+
+  // A message that asks for a sign-in link, or attaches a passkey, is not a sign-in: refused before its nonce is spent.
+  if (typeof body?.message === 'string' && (body.message.includes(`\n\n${AGENT_SIGN_IN_LINK_STATEMENT}\n`) ||
+      /\n\nAttach this passkey to the Context Engine account /.test(body.message))) {
+    return deps?.json?.({ error: 'This message is not a sign-in.', reason: 'wrong_statement' }, 400, baseHeaders);
   }
 
   const authorityResult = await (

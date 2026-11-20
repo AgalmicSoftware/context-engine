@@ -1,3 +1,4 @@
+import { clearAgentLinkAsAdmin } from './agentSignInLink.js';
 import { executeCoordinatedStorageVisibilityMutation } from './sessionConfigAuthority.js';
 import { exportSessionBackup } from './sessionBackup.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
@@ -310,6 +311,14 @@ export const dispatchAdminRequest = async ({
     return result?.status === 400
       ? deps?.json?.({ error: 'Name the messages to delete.', reason: result.body?.reason }, 400, privateHeaders)
       : deps?.json?.({ error: 'Feedback couldn’t be reached just now. Try again shortly.', reason: 'feedback_unavailable' }, 503, privateHeaders);
+  }
+
+  // A full admin may take a passkey off an agent's account, which also lifts a cancellation of the agent's access:
+  // the way back when the passkey is lost, or was attached by someone it shouldn't have been.
+  if (action === 'agent-link/clear') {
+    const privateHeaders = withPrivateNoStoreHeaders(headers);
+    const result = await (deps?.clearAgentLinkAsAdmin || clearAgentLinkAsAdmin)({ env, slug: targetSlug, account: body?.member });
+    return deps?.json?.(result.body, result.status, privateHeaders);
   }
 
   // A full admin may clear anyone's name, as for abuse, and never set one.

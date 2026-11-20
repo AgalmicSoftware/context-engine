@@ -10,6 +10,7 @@ import { backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJo
 import { listSessionAgentOptOuts, listSessionAgentUnattributed } from './sessionAgentOptOuts.js';
 import { listSessionAgentHistory } from './sessionAgentHistory.js';
 import { listSessionNames } from './sessionNames.js';
+import { listAgentLinks } from './agentSignInStore.js';
 
 const json = (body, status = 200) => Response.json(body, { status });
 const fail = (message, status = 503) => { throw Object.assign(new Error(message), { status }); };
@@ -68,6 +69,8 @@ export const exportCoordinatorBackup = async (coordinator, payload) => {
     sessionAgentHistory: await listSessionAgentHistory(coordinator.state.storage),
     // The names people gave themselves; a backup is the admins' complete copy.
     sessionNames: await listSessionNames(coordinator.state.storage),
+    // Passkeys attached to agents' accounts, and agents whose access was ended: a restore keeps both.
+    agentSignInLinks: await listAgentLinks(coordinator.state.storage),
   } });
 };
 

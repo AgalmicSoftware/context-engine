@@ -43,7 +43,13 @@ const operations = {
     const earlier = await txn.get(liveKey(account));
     if (HASH_RE.test(earlier || '')) await txn.delete(codeKey(earlier));
     const stale = await txn.list({ prefix: codeKey(''), limit: SWEEP_LIMIT });
-    for (const [key, value] of stale) if (!(Number(value?.expiresAt) > now)) await txn.delete(key);
+    for (const [key, value] of stale) {
+      if (Number(value?.expiresAt) > now) continue;
+      await txn.delete(key);
+      // With the pointer that named it, so neither outlives the other.
+      const owner = addressOf(value?.account);
+      if (owner && (await txn.get(liveKey(owner))) === key.slice(codeKey('').length)) await txn.delete(liveKey(owner));
+    }
     await txn.put(codeKey(codeHash), { account, origin, expiresAt });
     await txn.put(liveKey(account), codeHash);
     return { ok: true, expiresAt };
@@ -94,6 +100,19 @@ const operations = {
     return { ok: true, link: { ...link, agentAccess } };
   },
 
+  // A session admin takes the passkey off whatever its state, and with it any cancellation: the way back for an
+  // account whose passkey is lost, or was attached by someone it shouldn't have been.
+  'admin-clear': async (txn, { address: account }) => {
+    const link = linkOf(await txn.get(accountKey(account)));
+    if (!link) return { ok: true, cleared: false };
+    await txn.delete(accountKey(account));
+    await txn.delete(passkeyKey(link.passkey));
+    const live = await txn.get(liveKey(account));
+    if (HASH_RE.test(live || '')) await txn.delete(codeKey(live));
+    await txn.delete(liveKey(account));
+    return { ok: true, cleared: true, passkey: link.passkey };
+  },
+
   // The passkey comes off only while the agent can still use the account, so no account is left with no way in.
   detach: async (txn, { address: account, passkey }) => {
     const link = linkOf(await txn.get(accountKey(account)));
@@ -104,6 +123,45 @@ const operations = {
     await txn.delete(passkeyKey(link.passkey));
     return { ok: true, detached: true };
   },
+};
+
+// For a backup: which passkey is attached to which account, and whether the agent may use it. Never a code.
+const ACCOUNT_PREFIX = accountKey('');
+const PAGE = 500;
+export const listAgentLinks = async (storage) => {
+  const rows = [];
+  for (let startAfter = ''; ;) {
+    const page = await storage.list({ prefix: ACCOUNT_PREFIX, startAfter, limit: PAGE });
+    for (const [key, value] of page) {
+      const link = linkOf(value);
+      if (link) rows.push({ account: key.slice(ACCOUNT_PREFIX.length), passkey: link.passkey, linkedAt: link.linkedAt, agentAccess: link.agentAccess });
+    }
+    if (page.size < PAGE) return rows;
+    startAfter = [...page.keys()].at(-1);
+  }
+};
+/** Whether a backup's rows are each one account's attached passkey, no account or passkey twice. */
+export const isAgentLinksBackup = (rows) => Array.isArray(rows) &&
+  rows.every((row) => !!row && typeof row === 'object' &&
+    Object.keys(row).every((key) => ['account', 'passkey', 'linkedAt', 'agentAccess'].includes(key)) &&
+    addressOf(row.account) === row.account && addressOf(row.passkey) === row.passkey && row.account !== row.passkey &&
+    [AGENT_ACCESS.ACTIVE, AGENT_ACCESS.CANCELLED].includes(row.agentAccess) &&
+    (row.linkedAt === null || (typeof row.linkedAt === 'string' && !Number.isNaN(Date.parse(row.linkedAt))))) &&
+  new Set(rows.flatMap((row) => [row.account, row.passkey])).size === rows.length * 2;
+/** Puts a backup's attachments back, so a restore neither lets a cancelled agent in nor drops a person's passkey. */
+export const restoreAgentLinks = async (storage, rows, journal = async () => {}) => {
+  let written = 0;
+  let skipped = 0;
+  for (const { account, passkey, linkedAt, agentAccess } of rows) {
+    const taken = await Promise.all([accountKey(account), passkeyKey(passkey), accountKey(passkey), passkeyKey(account)].map((key) => storage.get(key)));
+    if (taken.some((value) => value != null)) { skipped += 1; continue; }
+    await journal(accountKey(account));
+    await storage.put(accountKey(account), { passkey, linkedAt, agentAccess });
+    await journal(passkeyKey(passkey));
+    await storage.put(passkeyKey(passkey), { account });
+    written += 1;
+  }
+  return { written, skipped };
 };
 
 export const dispatchAgentSignInStore = async (coordinator, operation, payload = {}) => {

@@ -13,6 +13,7 @@ export const AGENT_SIGN_IN_PATHS: Readonly<{
 }>;
 export const AGENT_SIGN_IN_CODE_TTL_SECONDS: number;
 export function isAgentSignInCode(value: unknown): value is string;
+export const AGENT_SIGN_IN_CODE_IN_TEXT: RegExp;
 export function formatAgentSignInCode(bytes: Uint8Array): string;
 export const AGENT_SIGN_IN_FRAGMENT_KEY: 'agentSignIn';
 export const AGENT_SIGN_IN_VIA: Readonly<{ LINK: 'agent_link'; PASSKEY: 'passkey_link' }>;

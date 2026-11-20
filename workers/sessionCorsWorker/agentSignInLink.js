@@ -26,7 +26,9 @@ import {
 } from '../../shared/agentSignIn.mjs';
 import { callAgentSignInStore } from './agentSignInStore.js';
 import { resolveAuthLoginRequestAuthority } from './authLoginRequestAuthority.js';
-import { buildAuthTokenJti, buildAuthTokenKey, persistAuthTokenRecord, revokeAuthTokenRecord } from './authTokenClaims.js';
+import {
+  buildAuthTokenJti, buildAuthTokenKey, persistAuthTokenRecord, revokeAuthTokenRecord, setAuthTokenRecordCheck,
+} from './authTokenClaims.js';
 import { resolveAuthenticatedRouteContext } from './authenticatedRouteContextResolution.js';
 import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
 import { rateLimitRefusal } from './rateLimitRefusal.js';
@@ -38,7 +40,27 @@ export const AGENT_SIGN_IN_ROUTE_PATHS = Object.freeze(Object.values(AGENT_SIGN_
 
 // How often each may be asked in a day: codes and attachments by the account, exchanges by the network they come
 // from (a code is 256 random bits, so this bounds cost, not guessing), the rest by the account.
-export const AGENT_SIGN_IN_LIMITS = Object.freeze({ create: 24, exchange: 300, attach: 6, passkeySignIn: 200, access: 20 });
+export const AGENT_SIGN_IN_LIMITS = Object.freeze({ create: 24, exchange: 300, attach: 6, passkeySignIn: 200, access: 20, detach: 20 });
+// A sign-in from a link is for looking in and attaching a passkey, so it is short; one through the passkey
+// lasts as an ordinary sign-in does, and never past the passkey's own.
+export const AGENT_LINK_SIGN_IN_TTL_SECONDS = 60 * 60;
+// Marks, beside an account's sign-in records, that a passkey is attached to it: every sign-in of an account so
+// marked is checked against the coordinator's record, whenever it was made and whatever it says of itself.
+const LINKED_FLAG = 'linked';
+const linkedFlagKey = (slug, account) => {
+  const slugPart = sessionSlugStorageKey(slug);
+  return slugPart && account ? `agentLinkAccount:${slugPart}:${account}` : '';
+};
+const setLinkedFlag = async (env, slug, account, linked) => {
+  const key = linkedFlagKey(slug, account);
+  try {
+    if (!key) return;
+    if (linked) await env?.GROUP_KV?.put?.(key, LINKED_FLAG);
+    else await env?.GROUP_KV?.delete?.(key);
+  } catch {
+    // Sign-ins made from here on say so themselves; the sweep covers the ones before.
+  }
+};
 
 const CODE_INVALID = Object.freeze({
   error: 'This sign-in link has expired or was already used. Ask your agent for a new one.',
@@ -76,8 +98,13 @@ const originOf = (value) => {
   }
 };
 
-// A browser sends these with every request a page makes, and a page can't remove them.
-const fromBrowserPage = (request) => ['sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest'].some((name) => request?.headers?.get?.(name));
+// A browser sends this with every request a page makes, and a page can't remove it. (Node's own fetch sends
+// Sec-Fetch-Mode, so that one says nothing.) The header an agent's client must send is what keeps pages out: the
+// Worker's CORS answer doesn't allow it. This is one more sign, not the guard.
+const fromBrowserPage = (request) => !!request?.headers?.get?.('sec-fetch-site');
+// Anyone the session's config gives a power to: such an account is never signed in to from a link.
+const namedForPower = (config, account) => [config?.adminAddress, config?.adminAddresses, config?.resultsAdminAddresses]
+  .flat().some((entry) => lower(entry) === account);
 export const saysItIsAnAgent = (request) => !!String(request?.headers?.get?.(AGENT_CLIENT_HEADER) || '').trim();
 
 /** What the store answered, as a reply: a refusal in words, or unavailable. */
@@ -89,7 +116,10 @@ const storeRefusal = (result, json, headers) => {
 };
 
 // A sign-in for `account` that names how it was made. It never carries admin power.
-const mintSignIn = async ({ env, slug, config, account, via, actor, deps }) => {
+const mintSignIn = async ({ env, slug, config, account, via, actor, maxExp, deps }) => {
+  if (namedForPower(config, lower(account))) {
+    return { ok: false, status: 403, body: { error: 'An admin’s account can’t be signed in to this way.', reason: 'admin_account_not_supported' } };
+  }
   let scopes;
   try {
     scopes = await deps.computeScopesForLogin({ env, slug, address: account, config });
@@ -100,13 +130,16 @@ const mintSignIn = async ({ env, slug, config, account, via, actor, deps }) => {
   const authzEpoch = readAuthorizationEpoch(config);
   const sessionId = resolveCanonicalWorkerSessionIdHex(config);
   if (authzEpoch === null || !sessionId) return { ok: false, status: 500, body: { error: 'Worker session identity is invalid.' } };
-  const exp = Math.floor(nowMs(deps) / 1000) + deps.TOKEN_TTL_SECONDS;
+  const ttl = via === AGENT_SIGN_IN_VIA.LINK ? Math.min(AGENT_LINK_SIGN_IN_TTL_SECONDS, deps.TOKEN_TTL_SECONDS) : deps.TOKEN_TTL_SECONDS;
+  const now = Math.floor(nowMs(deps) / 1000);
+  const exp = Math.min(now + ttl, Number.isFinite(maxExp) && maxExp > 0 ? maxExp : Infinity);
+  if (exp - now < 30) return { ok: false, status: 401, body: { error: 'Sign in with your passkey again.', reason: 'passkey_sign_in_required' } };
   const sub = deps.getAddress(account);
   const jti = (deps.buildAuthTokenJti || buildAuthTokenJti)({});
   const payload = { sub, slug, sessionId, authzEpoch, scopes, exp, jti, via, ...(actor ? { actor: lower(actor) } : {}) };
   try {
     const token = await deps.signToken(payload, env?.TOKEN_HMAC_SECRET);
-    await (deps.persistAuthTokenRecord || persistAuthTokenRecord)({ env, slug, sub, jti, ttlSeconds: deps.TOKEN_TTL_SECONDS });
+    await (deps.persistAuthTokenRecord || persistAuthTokenRecord)({ env, slug, sub, jti, ttlSeconds: Math.max(60, exp - now) });
     return { ok: true, token, exp, sub, jti, sessionId };
   } catch {
     return { ok: false, status: 500, body: { error: 'Sign-in could not be made.' } };
@@ -121,15 +154,26 @@ const endOtherSignIns = async ({ env, slug, account, keepJti }) => {
   const keep = buildAuthTokenKey({ slug, sub: account, jti: keepJti || 'none' });
   if (!prefix || typeof kv?.list !== 'function' || typeof kv?.delete !== 'function') return { ended: 0, complete: false };
   let ended = 0;
+  let failed = 0;
   let cursor;
-  for (let page = 0; page < 20; page += 1) {
-    const listed = await kv.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });
+  // One account's live sign-ins are bounded by how often it may sign in; this many pages is far past that.
+  for (let page = 0; page < 50; page += 1) {
+    let listed;
+    try {
+      listed = await kv.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });
+    } catch {
+      return { ended, complete: false };
+    }
     for (const { name } of listed?.keys || []) {
       if (name === keep) continue;
-      await kv.delete(name);
-      ended += 1;
+      try {
+        await kv.delete(name);
+        ended += 1;
+      } catch {
+        failed += 1;
+      }
     }
-    if (listed?.list_complete !== false || !listed?.cursor) return { ended, complete: true };
+    if (listed?.list_complete !== false || !listed?.cursor) return { ended, complete: failed === 0 };
     cursor = listed.cursor;
   }
   return { ended, complete: false };
@@ -195,8 +239,10 @@ const create = async ({ request, env, baseHeaders, slug, deps }) => {
   reply.set('cache-control', 'no-store');
   if (!isWorkerCanonical(config)) return deps.json({ error: 'Not available in this session.', reason: 'hosted_session_required' }, 400, reply);
   if (!agentParticipationOn(config)) return deps.json(OFF, 403, reply);
-  if (scopes?.admin === true) return deps.json({ error: 'An admin’s account can’t be signed in to this way.', reason: 'admin_account_not_supported' }, 403, reply);
   const account = lower(address);
+  if (scopes?.admin === true || namedForPower(config, account)) {
+    return deps.json({ error: 'An admin’s account can’t be signed in to this way.', reason: 'admin_account_not_supported' }, 403, reply);
+  }
   const limited = await countOrRefuse({ deps, env, slug: targetSlug, identity: account, route: 'agent-link-create', limit: AGENT_SIGN_IN_LIMITS.create, headers: reply });
   if (limited) return limited;
   // The site the code is for: the one the signed message names, which the request's own origin was held to.
@@ -234,12 +280,13 @@ const exchange = async ({ request, env, baseHeaders, slug, deps }) => {
   if (resolveCanonicalWorkerSessionIdHex({ sessionId: body.sessionId }) !== resolveCanonicalWorkerSessionIdHex(config)) {
     return deps.json({ error: 'Session identity does not match worker session.' }, 409, headers);
   }
+  if (!agentParticipationOn(config)) return deps.json(OFF, 403, headers);
+  // Something that isn't a code is answered at once, and spends none of the network's count.
+  if (!isAgentSignInCode(body.code)) return deps.json(CODE_INVALID, 401, headers);
   const limited = await countOrRefuse({
     deps, env, slug: targetSlug, identity: deps.resolveAnonymousRateIdentity(request), route: 'agent-link-exchange', limit: AGENT_SIGN_IN_LIMITS.exchange, headers,
   });
   if (limited) return limited;
-  if (!agentParticipationOn(config)) return deps.json(OFF, 403, headers);
-  if (!isAgentSignInCode(body.code)) return deps.json(CODE_INVALID, 401, headers);
   const redeemed = await callAgentSignInStore(env, targetSlug, 'code-redeem', { codeHash: await sha256Hex(body.code), origin, now: nowMs(deps) });
   if (!redeemed.ok) return storeRefusal(redeemed, deps.json, headers);
   const minted = await mintSignIn({ env, slug: targetSlug, config, account: redeemed.account, via: AGENT_SIGN_IN_VIA.LINK, deps });
@@ -273,10 +320,11 @@ const attach = async ({ request, env, baseHeaders, slug, deps }) => {
   if (limited) return limited;
   const attached = await callAgentSignInStore(env, context.slug, 'attach', { address: account, passkey: passkeyAddress, now: nowMs(deps) });
   if (!attached.ok) return storeRefusal(attached, deps.json, headers);
+  // From here every sign-in of the account is checked against the record on each request.
+  await setLinkedFlag(env, context.slug, account, true);
   const minted = await mintSignIn({ env, slug: context.slug, config: context.config, account, via: AGENT_SIGN_IN_VIA.PASSKEY, actor: passkeyAddress, deps });
   if (!minted.ok) return deps.json(minted.body, minted.status, headers);
-  // Every sign-in the account had is ended, the agent's included: its next one says a passkey is attached, and
-  // is then checked on each request. The agent's client signs in again by itself.
+  // Every sign-in the account had is also ended, the agent's included; the agent's client signs in again by itself.
   await endOtherSignIns({ env, slug: context.slug, account, keepJti: minted.jti });
   return deps.json({
     ok: true, token: minted.token, exp: minted.exp, sessionSlug: context.slug, sessionId: minted.sessionId, address: minted.sub,
@@ -299,8 +347,13 @@ const passkeySignIn = async ({ request, env, baseHeaders, slug, deps }) => {
   const link = await callAgentSignInStore(env, context.slug, 'state', { address: account });
   if (!link.ok) return storeRefusal(link, deps.json, headers);
   if (link.asAccount?.passkey !== passkeyAddress) return deps.json({ error: REASON_TEXT.passkey_not_attached, reason: 'passkey_not_attached' }, 404, headers);
-  const minted = await mintSignIn({ env, slug: context.slug, config: context.config, account, via: AGENT_SIGN_IN_VIA.PASSKEY, actor: passkeyAddress, deps });
+  // Never past the passkey's own sign-in, which it came from.
+  const minted = await mintSignIn({
+    env, slug: context.slug, config: context.config, account, via: AGENT_SIGN_IN_VIA.PASSKEY, actor: passkeyAddress, maxExp: Number(claims.exp), deps,
+  });
   if (!minted.ok) return deps.json(minted.body, minted.status, headers);
+  // In case the mark was lost, as after a restore from a backup.
+  await setLinkedFlag(env, context.slug, account, true);
   return deps.json({
     token: minted.token, exp: minted.exp, sessionSlug: context.slug, sessionId: minted.sessionId, address: minted.sub,
     via: AGENT_SIGN_IN_VIA.PASSKEY, passkey: deps.getAddress(passkeyAddress), agentAccess: link.asAccount.agentAccess,
@@ -316,7 +369,10 @@ const access = async ({ request, env, baseHeaders, slug, deps }) => {
     return deps.json({ error: 'Sign in with the passkey attached to this account to change this.', reason: 'passkey_sign_in_required' }, 403, headers);
   }
   const body = await readBody(request);
-  const limited = await countOrRefuse({ deps, env, slug: context.slug, identity: account, route: 'agent-link-access', limit: AGENT_SIGN_IN_LIMITS.access, headers });
+  // Counted for the passkey alone: nothing the account's own key does can use this up.
+  const limited = await countOrRefuse({
+    deps, env, slug: context.slug, identity: `${account}|${lower(claims.actor)}`, route: 'agent-link-access', limit: AGENT_SIGN_IN_LIMITS.access, headers,
+  });
   if (limited) return limited;
   const changed = await callAgentSignInStore(env, context.slug, 'access', { address: account, passkey: claims.actor, agentAccess: body?.agentAccess, now: nowMs(deps) });
   if (!changed.ok) return storeRefusal(changed, deps.json, headers);
@@ -324,7 +380,9 @@ const access = async ({ request, env, baseHeaders, slug, deps }) => {
   const ended = changed.link.agentAccess === AGENT_ACCESS.CANCELLED
     ? await endOtherSignIns({ env, slug: context.slug, account, keepJti: claims.jti })
     : null;
-  return deps.json({ ok: true, agentAccess: changed.link.agentAccess, ...(ended ? { signInsEnded: ended.ended } : {}) }, 200, headers);
+  return deps.json({
+    ok: true, agentAccess: changed.link.agentAccess, ...(ended ? { signInsEnded: ended.ended, signInsEndedAll: ended.complete } : {}),
+  }, 200, headers);
 };
 
 const detach = async ({ request, env, baseHeaders, slug, deps }) => {
@@ -336,10 +394,16 @@ const detach = async ({ request, env, baseHeaders, slug, deps }) => {
   if (!byPasskey && (claims.via || claims.agentSource)) {
     return deps.json({ error: 'Sign in with the passkey, or as the account itself, to remove its passkey.', reason: 'passkey_sign_in_required' }, 403, headers);
   }
-  const limited = await countOrRefuse({ deps, env, slug: context.slug, identity: account, route: 'agent-link-access', limit: AGENT_SIGN_IN_LIMITS.access, headers });
-  if (limited) return limited;
   const removed = await callAgentSignInStore(env, context.slug, 'detach', { address: account, ...(byPasskey ? { passkey: claims.actor } : {}) });
   if (!removed.ok) return storeRefusal(removed, deps.json, headers);
+  // A passkey that came off is counted, for whoever took it off and nobody else; asking when there is none is not.
+  if (removed.detached === true) {
+    await setLinkedFlag(env, context.slug, account, false);
+    await deps.checkRateLimit({
+      env, slug: context.slug, identity: `${account}|${byPasskey ? lower(claims.actor) : 'own'}`, address: `${account}|${byPasskey ? lower(claims.actor) : 'own'}`,
+      route: 'agent-link-detach', limit: AGENT_SIGN_IN_LIMITS.detach,
+    });
+  }
   // The passkey's sign-ins as this account stop with the record; the one asking with, if it was the passkey's.
   if (byPasskey) await revokeAuthTokenRecord({ env, slug: context.slug, sub: claims.sub, jti: claims.jti });
   return deps.json({ ok: true, detached: removed.detached === true }, 200, headers);
@@ -412,4 +476,33 @@ export const validateAgentSignInToken = async ({ env, payload, slug } = {}) => {
   }
   if (payload.via && payload.via !== AGENT_SIGN_IN_VIA.LINK) return { ok: false, status: 401, error: 'Invalid token.' };
   return link?.agentAccess === AGENT_ACCESS.CANCELLED ? { ok: false, status: 401, error: 'Invalid token.' } : { ok: true };
+};
+
+// Every check of a sign-in's record, wherever it is made, asks this too: the request's own token, and the
+// sign-in a delegated key or a catalog ticket came from. A sign-in that says how it was made, or whose account
+// is marked as having a passkey attached, is held to the coordinator's record; no other is looked up.
+setAuthTokenRecordCheck(async ({ env, payload, slug } = {}) => {
+  if (payload?.via || payload?.agentLinked === true) return validateAgentSignInToken({ env, payload, slug });
+  const key = linkedFlagKey(slug, lower(payload?.sub));
+  let flagged = false;
+  try {
+    flagged = !!key && (await env?.GROUP_KV?.get?.(key)) === LINKED_FLAG;
+  } catch {
+    // The same store holds the sign-in's own record, read beside this: unreadable, that read refuses.
+  }
+  return flagged ? validateAgentSignInToken({ env, payload: { ...payload, agentLinked: true }, slug }) : { ok: true };
+});
+
+/** A session admin takes the passkey off an account, and with it any cancellation of the agent's access. */
+export const clearAgentLinkAsAdmin = async ({ env, slug, account } = {}) => {
+  const address = lower(account);
+  if (!/^0x[0-9a-f]{40}$/.test(address)) return { ok: false, status: 400, body: { error: 'Name the account whose passkey to remove.', reason: 'invalid_account' } };
+  const cleared = await callAgentSignInStore(env, slug, 'admin-clear', { address });
+  if (!cleared.ok) return { ok: false, status: 503, body: UNAVAILABLE };
+  if (cleared.cleared === true) {
+    await setLinkedFlag(env, slug, address, false);
+    // The passkey's sign-ins as the account, and any other, end with the record.
+    await endOtherSignIns({ env, slug, account: address, keepJti: '' });
+  }
+  return { ok: true, status: 200, body: { cleared: cleared.cleared === true } };
 };

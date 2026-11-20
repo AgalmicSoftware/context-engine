@@ -311,7 +311,7 @@ export const dispatchInterviewCatalogTicketRequest = async ({ request, env, base
     return deps?.json?.({ error: 'Interview mode is disabled for this session.' }, 404, headers);
   }
   // An agent's own key reads the session directly, and a ticket would outlive revoking that key.
-  if (auth.payload?.agentSource) {
+  if (auth.payload?.agentSource || auth.payload?.via) {
     return deps?.json?.({
       error: 'Catalog tickets are for people signed in on the session page.',
       reason: 'catalog_ticket_person_only',

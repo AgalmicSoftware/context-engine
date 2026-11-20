@@ -300,15 +300,21 @@ test('only the account’s key, from an agent’s own client, can ask for a code
   }), env);
   assert.equal((preflight.headers.get('access-control-allow-headers') || '').toLowerCase().includes('x-ce-agent-client'), false);
   assert.equal((await makeCode(env, agent, { headers: {} })).body.reason, 'agent_client_required');
-  for (const header of ['Sec-Fetch-Site', 'Sec-Fetch-Mode', 'Sec-Fetch-Dest']) {
-    assert.equal((await makeCode(env, agent, { headers: { ...AGENT, [header]: 'cors' } })).body.reason, 'agent_client_required', header);
-  }
+  assert.equal((await makeCode(env, agent, { headers: { ...AGENT, 'Sec-Fetch-Site': 'cross-site' } })).body.reason, 'agent_client_required');
+  // Node's own fetch, which the MCP uses, sends Sec-Fetch-Mode with every request: that is no browser.
+  assert.equal((await makeCode(env, agent, { headers: { ...AGENT, 'Sec-Fetch-Mode': 'cors', 'User-Agent': 'node' } })).status, 200);
 
   // A sign-in message is not a request for a code, and refusing it spends nothing: it still signs in.
   const ordinary = await signed(env, agent, SIGN_IN, { headers: AGENT });
   const wrong = await send(env, AGENT_SIGN_IN_PATHS.create, { body: ordinary, headers: AGENT });
   assert.deepEqual([wrong.status, wrong.body.reason], [400, 'wrong_statement']);
   assert.equal((await send(env, '/auth/login', { body: ordinary, headers: AGENT })).status, 200);
+  // Nor is a request for a code, or a passkey's consent, a sign-in: refused there with its nonce unspent.
+  const forCode = await signed(env, agent, AGENT_SIGN_IN_LINK_STATEMENT, { headers: AGENT });
+  assert.deepEqual([(await send(env, '/auth/login', { body: forCode, headers: AGENT })).body.reason], ['wrong_statement']);
+  assert.equal((await send(env, AGENT_SIGN_IN_PATHS.create, { body: forCode, headers: AGENT })).status, 200);
+  const consent = await signed(env, agent, agentPasskeyAttachStatement(Wallet.createRandom().address));
+  assert.equal((await send(env, '/auth/login', { body: consent })).body.reason, 'wrong_statement');
   // A signed request is used once.
   const asked = await signed(env, agent, AGENT_SIGN_IN_LINK_STATEMENT, { headers: AGENT });
   assert.equal((await send(env, AGENT_SIGN_IN_PATHS.create, { body: asked, headers: AGENT })).status, 200);
@@ -471,4 +477,156 @@ test('the coordinator keeps a code only as its hash, and judges it only after de
   ]) {
     assert.equal((await call(operation, payload)).ok, false, operation);
   }
+});
+
+// --- From the security audit ---
+
+const decode = (token) => JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString('utf8'));
+
+test('a sign-in from a link is short, and one through the passkey never outlasts the passkey’s own', async () => {
+  const { env } = await setup();
+  const agent = Wallet.createRandom();
+  const passkey = Wallet.createRandom();
+  const now = Math.floor(Date.now() / 1000);
+  const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+  assert.ok(decode(linkToken).exp - now <= 60 * 60 + 5 && decode(linkToken).exp - now > 59 * 60);
+  await attach(env, linkToken, passkey, agent.address.toLowerCase());
+  const own = await tokenOf(env, passkey);
+  const swapped = await passkeySignIn(env, own);
+  assert.ok(decode(swapped.body.token).exp <= decode(own).exp);
+});
+
+test('nothing the account’s own key does can keep its person from ending the agent’s access', async () => {
+  const { env } = await setup();
+  const agent = Wallet.createRandom();
+  const passkey = Wallet.createRandom();
+  // The agent asks to remove a passkey that isn't there, as often as it likes, before sending its link.
+  const agentToken = await tokenOf(env, agent, { headers: AGENT });
+  for (let asked = 0; asked < 30; asked += 1) assert.deepEqual((await detach(env, agentToken)).body, { ok: true, detached: false });
+  const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+  const kept = (await attach(env, linkToken, passkey, agent.address.toLowerCase())).body.token;
+  const cancelled = await setAccess(env, kept, 'cancelled');
+  assert.deepEqual([cancelled.status, cancelled.body.agentAccess, cancelled.body.signInsEndedAll], [200, 'cancelled', true]);
+  assert.equal((await setAccess(env, kept, 'active')).status, 200);
+  assert.deepEqual((await detach(env, kept)).body, { ok: true, detached: true });
+});
+
+test('a sign-in the sweep never finds is still ended: every sign-in of an account with a passkey is checked', async () => {
+  const { env } = await setup();
+  const agent = Wallet.createRandom();
+  const passkey = Wallet.createRandom();
+  // Signed in before any passkey: this sign-in says nothing of one.
+  const early = await tokenOf(env, agent, { headers: AGENT });
+  assert.equal(decode(early).agentLinked, undefined);
+  const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+  // The store lists nothing and deletes nothing, as when a list lags or a delete fails.
+  const kv = env.GROUP_KV;
+  const [list, remove] = [kv.list.bind(kv), kv.delete.bind(kv)];
+  kv.list = async (options) => (String(options?.prefix).startsWith('authToken:') ? { keys: [], list_complete: true } : list(options));
+  const kept = (await attach(env, linkToken, passkey, agent.address.toLowerCase())).body.token;
+  // Still standing after the attach, while the agent may use the account.
+  assert.equal(await stands(env, early, AGENT), true);
+  kv.list = list;
+  kv.delete = async (key) => { if (String(key).startsWith('authToken:')) throw new Error('store unavailable'); return remove(key); };
+  const cancelled = await setAccess(env, kept, 'cancelled');
+  assert.deepEqual([cancelled.status, cancelled.body.agentAccess, cancelled.body.signInsEndedAll], [200, 'cancelled', false]);
+  kv.delete = remove;
+  // Its record is still there, and it is refused all the same; so is anything made from it.
+  assert.equal(await stands(env, early, AGENT), false);
+  assert.equal((await answer(env, early, agentAnswer(agent), AGENT)).status, 401);
+  const { validateAuthTokenRecord } = await import('./authTokenClaims.js');
+  const { sub, jti } = decode(early);
+  assert.equal((await validateAuthTokenRecord({ env, payload: { sub, jti }, slug: SLUG })).ok, false);
+  assert.equal((await validateAuthTokenRecord({ env, payload: decode(kept), slug: SLUG })).ok, true);
+  // Allowed again, it stands again, as a new sign-in would.
+  assert.equal((await setAccess(env, kept, 'active')).status, 200);
+  assert.equal(await stands(env, early, AGENT), true);
+  // The passkey gone, the account is no longer looked up.
+  assert.equal((await detach(env, kept)).status, 200);
+  assert.equal([...env.GROUP_KV.values.keys()].some((key) => key.startsWith('agentLinkAccount:')), false);
+  assert.equal(await stands(env, early, AGENT), true);
+});
+
+test('a session admin can take a passkey off, which also lifts a cancellation; nobody else can', async () => {
+  const { env, admin } = await setup();
+  const agent = Wallet.createRandom();
+  const passkey = Wallet.createRandom();
+  const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+  const kept = (await attach(env, linkToken, passkey, agent.address.toLowerCase())).body.token;
+  assert.equal((await setAccess(env, kept, 'cancelled')).status, 200);
+  assert.equal((await signIn(env, agent, { headers: AGENT })).body.reason, 'agent_access_cancelled');
+  // Not by the passkey's holder, who is no admin.
+  assert.notEqual((await signedAdminRequest({ env, wallet: passkey, action: 'agent-link/clear', body: { member: agent.address } })).status, 200);
+  assert.equal((await signedAdminRequest({ env, wallet: admin, action: 'agent-link/clear', body: { member: 'nobody' } })).status, 400);
+  const cleared = await signedAdminRequest({ env, wallet: admin, action: 'agent-link/clear', body: { member: agent.address } });
+  assert.deepEqual([cleared.status, cleared.body], [200, { cleared: true }]);
+  // The account is its key's again; the passkey's sign-ins as it are over.
+  assert.equal(await stands(env, kept), false);
+  assert.equal((await signIn(env, agent, { headers: AGENT })).status, 200);
+  assert.equal((await passkeySignIn(env, await tokenOf(env, passkey))).body.reason, 'passkey_not_attached');
+  assert.deepEqual((await signedAdminRequest({ env, wallet: admin, action: 'agent-link/clear', body: { member: agent.address } })).body, { cleared: false });
+});
+
+test('an account the session gives a power to is never signed in to from a link, and a link sign-in reads nothing for admins', async () => {
+  const resultsAdmin = Wallet.createRandom();
+  const { env } = await setup({ resultsAdminAddresses: [resultsAdmin.address] });
+  assert.equal((await makeCode(env, resultsAdmin)).body.reason, 'admin_account_not_supported');
+  const agent = Wallet.createRandom();
+  const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+  for (const path of ['/admin/results-analysis/status', '/admin/diagnostics', '/admin/feedback', '/admin/session-agent/chats']) {
+    assert.equal((await send(env, path, { method: 'GET', token: linkToken })).status, 403, path);
+  }
+});
+
+test('a sign-in link is never stored in the session, and junk spends none of a network’s exchanges', async () => {
+  const { env } = await setup();
+  const agent = Wallet.createRandom();
+  const token = await tokenOf(env, agent, { headers: AGENT });
+  const made = await makeCode(env, agent);
+  for (const text of [made.body.code, `Open https://app.example/session/x?worker=y#agentSignIn=${made.body.code} now`]) {
+    const posted = await answer(env, token, { ...agentAnswer(agent), additional: { value: text } }, AGENT);
+    assert.deepEqual([posted.status, posted.body.reason], [400, 'sign_in_link_in_content']);
+  }
+  assert.equal(JSON.stringify([...env.CE_STORAGE_INDEX_KV.values.entries()]).includes(made.body.code), false);
+  // Far past the day's count of real tries, something that isn't a code is still just refused.
+  for (let tried = 0; tried < 12; tried += 1) assert.equal((await exchange(env, `junk-${tried}`)).status, 401);
+  assert.equal((await exchange(env, made.body.code)).status, 200);
+});
+
+test('a backup carries which passkey is attached and whose agent is cancelled, and never a code', async () => {
+  const { isAgentLinksBackup, listAgentLinks, restoreAgentLinks } = await import('./agentSignInStore.js');
+  const values = new Map();
+  const storage = {
+    get: async (key) => values.get(key),
+    put: async (key, value) => { values.set(key, structuredClone(value)); },
+    delete: async (key) => values.delete(key),
+    list: async ({ prefix = '', startAfter = '', limit = Infinity } = {}) => new Map([...values].filter(([key]) => key.startsWith(prefix) && key > startAfter).sort().slice(0, limit)),
+    transaction: (run) => run(storage),
+  };
+  const call = async (operation, payload) => (await dispatchAgentSignInStore({ state: { storage } }, operation, payload)).json();
+  const [account, passkey, other, otherKey] = ['a1', 'b2', 'c3', 'd4'].map((byte) => `0x${byte.repeat(20)}`);
+  const now = Date.parse('2026-11-20T10:00:00Z');
+  await call('code-create', { address: account, codeHash: 'ab'.repeat(32), origin: APP_ORIGIN, expiresAt: now + 1000, now });
+  await call('attach', { address: account, passkey, now });
+  await call('access', { address: account, passkey, agentAccess: 'cancelled', now });
+  await call('attach', { address: other, passkey: otherKey, now });
+  const rows = await listAgentLinks(storage);
+  assert.deepEqual(rows, [
+    { account, passkey, linkedAt: '2026-11-20T10:00:00.000Z', agentAccess: 'cancelled' },
+    { account: other, passkey: otherKey, linkedAt: '2026-11-20T10:00:00.000Z', agentAccess: 'active' },
+  ]);
+  assert.equal(isAgentLinksBackup(rows), true);
+  assert.equal(JSON.stringify(rows).includes('ab'.repeat(32)), false);
+  for (const bad of [null, [{ account, passkey: account, linkedAt: null, agentAccess: 'active' }], [{ ...rows[0], extra: 1 }], [rows[0], { ...rows[1], passkey }],
+    [{ ...rows[0], agentAccess: 'maybe' }], [{ ...rows[0], account: account.toUpperCase() }]]) {
+    assert.equal(isAgentLinksBackup(bad), false, JSON.stringify(bad));
+  }
+  // Restored onto a fresh session: the cancelled agent stays out, and the passkey still opens its account.
+  values.clear();
+  assert.deepEqual(await restoreAgentLinks(storage, rows), { written: 2, skipped: 0 });
+  assert.equal((await call('state', { address: account })).asAccount.agentAccess, 'cancelled');
+  assert.deepEqual((await call('state', { address: passkey })).asPasskey, { account });
+  assert.equal((await call('code-create', { address: account, codeHash: 'cd'.repeat(32), origin: APP_ORIGIN, expiresAt: now + 1000, now })).reason, 'agent_access_cancelled');
+  // What is already there is the newer word, and stays.
+  assert.deepEqual(await restoreAgentLinks(storage, rows), { written: 0, skipped: 2 });
 });

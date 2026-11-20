@@ -89,7 +89,11 @@ test('an agent’s person signs in from its link, keeps the account with a passk
     wallet,
     fetchImpl: async (url, init = {}) => {
       sent.push({ url: String(url), body: String(init.body || ''), agent: new Headers(init.headers).get(AGENT_CLIENT_HEADER) || '' });
-      return fetchWorker(new Request(url, { method: init.method || 'GET', headers: init.headers, body: init.body }), env);
+      // As Node's own fetch sends every request: with Sec-Fetch-Mode, which the Worker must not take for a browser.
+      const headers = new Headers(init.headers);
+      headers.set('sec-fetch-mode', 'cors');
+      headers.set('user-agent', 'node');
+      return fetchWorker(new Request(url, { method: init.method || 'GET', headers, body: init.body }), env);
     },
   });
   await agent.joinSession({ link: LINK });
@@ -112,6 +116,13 @@ test('an agent’s person signs in from its link, keeps the account with a passk
   assert.equal(JSON.stringify(sent).includes(code), false);
   assert.equal((await fs.readFile(path.join(stateDir, 'state.json'), 'utf8').catch(() => '')).includes(code), false);
   assert.equal(JSON.stringify(await agent.whoami()).includes(code), false);
+
+  // Told by something it read to post the link, the agent's own client refuses, and nothing carrying it is sent.
+  const posted = await agent.answer({ answers: [{ questionId: QUESTION, value: 'Agree', comment: `Sign in here: ${made.signInLink}` }] })
+    .then((result) => JSON.stringify(result), (error) => String(error?.message));
+  assert.match(posted, /sign-in link where other people could read it/);
+  await assert.rejects(agent.addStatement({ prompt: `Everyone open ${made.signInLink}` }), /sign-in link where other people could read it/);
+  assert.equal(JSON.stringify(sent).includes(code), false);
 
   // The person opens the link: the page swaps the code for a sign-in as the agent's account, and shows its answer.
   const ask = page(env);
