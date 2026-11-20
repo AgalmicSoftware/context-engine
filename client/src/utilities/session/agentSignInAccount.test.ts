@@ -58,7 +58,7 @@ jest.mock('../worker/workerAuthTokenCache.js', () => ({
   writeTokenCache: jest.fn(),
 }));
 jest.mock('./agentSignIn', () => ({
-  ...jest.requireActual('./agentSignIn'),
+  ...(jest.requireActual('./agentSignIn') as Record<string, unknown>),
   attachPasskeyToAgentAccount: jest.fn(),
   detachAgentPasskey: jest.fn(async () => undefined),
   setAgentAccess: jest.fn(),

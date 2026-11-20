@@ -69,9 +69,9 @@ it('reads a private session with the password’s signature over the session and
   });
   const parsed = parseWorkerGroupReadInvite(header);
   expect(parsed?.groupId).toBe(groupId);
-  expect(ethers.utils.verifyMessage(workerGroupReadStatement({ sessionId, groupId }), parsed!.proof)).toBe(
-    await workerGroupPasswordSigner('river-stone-lamp-oak-tide', sessionId, groupId),
-  );
+  expect(
+    ethers.utils.verifyMessage(workerGroupReadStatement({ sessionId, groupId }), (parsed as { proof: string }).proof),
+  ).toBe(await workerGroupPasswordSigner('river-stone-lamp-oak-tide', sessionId, groupId));
   expect(header).not.toContain('river');
   // A claim code is spent by joining, so it makes no read proof.
   const [{ secret }] = await makeOneUseInvites(1);

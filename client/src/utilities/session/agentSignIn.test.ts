@@ -335,7 +335,7 @@ describe('an account held without its key', () => {
   });
 
   it('gets a new sign-in only through its attached passkey, for the same account, session and Worker', async () => {
-    const renewer = jest.fn(async () => ({ token: 'renewed', exp: 1800000000 }));
+    const renewer = jest.fn(async (_account: unknown, _options: unknown) => ({ token: 'renewed', exp: 1800000000 }));
     setAgentLinkRenewer(renewer);
     const ask = { address: ACCOUNT, workerUrl: WORKER, sessionSlug: 'salon', prompt: false };
     // From the link alone there is nothing to renew with.
