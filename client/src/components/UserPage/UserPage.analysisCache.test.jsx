@@ -1,6 +1,7 @@
 /** @file UserPage.analysisCache.test.jsx */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import UserPage from './UserPage';
+import UserPageHeader from './UserPageHeader';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
@@ -86,6 +87,9 @@ const makeInstance = (props = {}) => {
 };
 
 let analysisCacheTestSeq = 0;
+
+// The page's header element; the session switch, where shown, comes before it.
+const renderedHeader = (instance) => instance.render().props.children.find((child) => child?.type === UserPageHeader);
 
 const makeAnalysisCacheInstance = (props = {}) => {
   analysisCacheTestSeq += 1;
@@ -1101,7 +1105,7 @@ describe('UserPage analysis cache and routing', () => {
     async (_, props, networkID) => {
       const { instance, slug, addressLower } = makeAnalysisCacheInstance(props);
       analyzeUserOpinions.mockResolvedValueOnce({ summary: 'Original analysis' });
-      const view = render(instance.render().props.children[0]);
+      const view = render(renderedHeader(instance));
 
       fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
       await waitFor(() => {
@@ -1112,7 +1116,7 @@ describe('UserPage analysis cache and routing', () => {
       expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
 
       const { instance: reopened } = makeAnalysisCacheInstance({ ...props, activeSessionSlug: slug });
-      view.rerender(reopened.render().props.children[0]);
+      view.rerender(renderedHeader(reopened));
       fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
       await waitFor(() => expect(reopened.state.analysisServedFromCache).toBe(true));
       expect(reopened.state.aiAnalysis).toBe('Original analysis');
@@ -1120,7 +1124,7 @@ describe('UserPage analysis cache and routing', () => {
 
       reopened.state.detailedQuestionResponses.q1.answer.value = 'A changed answer';
       analyzeUserOpinions.mockResolvedValueOnce({ summary: 'Updated analysis' });
-      view.rerender(reopened.render().props.children[0]);
+      view.rerender(renderedHeader(reopened));
       fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
       await waitFor(() => expect(reopened.state.aiAnalysis).toBe('Updated analysis'));
       expect(reopened.state.analysisServedFromCache).toBe(false);
@@ -1135,7 +1139,7 @@ describe('UserPage analysis cache and routing', () => {
         );
       });
 
-      view.rerender(reopened.render().props.children[0]);
+      view.rerender(renderedHeader(reopened));
       fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
       await waitFor(() => expect(reopened.state.analysisServedFromCache).toBe(true));
       expect(reopened.state.aiAnalysis).toBe('Updated analysis');
@@ -1801,7 +1805,7 @@ describe('UserPage analysis cache and routing', () => {
       isSBTCacheReady: undefined,
     });
     const offered = () => {
-      const view = render(instance.render().props.children[0]);
+      const view = render(renderedHeader(instance));
       const button = view.queryByRole('button', { name: 'Analyze user' });
       view.unmount();
       return !!button;
