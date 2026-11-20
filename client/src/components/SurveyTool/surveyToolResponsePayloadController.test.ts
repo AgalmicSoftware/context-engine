@@ -205,7 +205,6 @@ describe('surveyToolResponsePayloadController', () => {
                 },
               },
               promptVersion: 'ce-interview-brief-v1',
-              promptRevision: 'ce-prefill-prompt-2',
               questionSetHash: 'hash',
               originalPrediction: { answer: 'Original agent prediction', confidence: 0.22 },
               submissionValueSnapshot: {
@@ -241,8 +240,6 @@ describe('surveyToolResponsePayloadController', () => {
             },
           },
           promptVersion: 'ce-interview-brief-v1',
-          // The copied prompt's wording goes with the catalog's version.
-          promptRevision: 'ce-prefill-prompt-2',
           questionSetHash: 'hash',
           originalPrediction: {
             answer: 'Original agent prediction',
@@ -915,6 +912,12 @@ describe('research detail tiers', () => {
     };
     const voice = { researchTier: 'minimal', draftOrigin: 'voice_interview', ...versions };
     expect(submit(provenance(voice))).toMatchObject(versions);
+    // The copied prompt's wording stays with research even when AI attribution isn't shared.
+    const prefill = submit(
+      provenance({ researchTier: 'minimal', promptRevision: 'ce-prefill-prompt-2', includeAiProvenance: false }),
+    );
+    expect(prefill).toMatchObject({ promptRevision: 'ce-prefill-prompt-2' });
+    expect(prefill).not.toHaveProperty('source');
     const off = submit(provenance({ ...voice, includePredictionComparison: false, includeAiProvenance: true }));
     expect(off).not.toHaveProperty('voiceBriefRevision');
   });

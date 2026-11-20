@@ -2023,8 +2023,6 @@ export const recordInterviewProvenance = (
               ? {
                   source: normalizedSource,
                   promptVersion: packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
-                  // The copied prompt's wording, which the catalog's version doesn't tell.
-                  ...(packet?.promptRevision ? { promptRevision: packet.promptRevision } : {}),
                   questionSetHash: packet?.questionSetHash || '',
                 }
               : {}),
@@ -2055,6 +2053,10 @@ export const recordInterviewProvenance = (
                     : {}),
                   // Read by research without the AI provenance choice, which carries the prompt version.
                   confidenceMeaning: confidenceMeaningOf(packet?.promptVersion || INTERVIEW_PROMPT_VERSION),
+                  // The copied prompt's wording, which the catalog's version doesn't tell.
+                  ...(draftOrigin === 'external_prefill' && packet?.promptRevision
+                    ? { promptRevision: packet.promptRevision }
+                    : {}),
                   predictionCondition: reviewed.predictionCondition === 'blind' ? 'blind' : 'shown',
                   // A hidden draft keeps the answer given before its guess was shown.
                   ...(reviewed.predictionCondition === 'blind' && reviewed.revealedAt !== undefined

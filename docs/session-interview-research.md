@@ -30,7 +30,7 @@ change consent.
 
 | Control | Initial default | Submitted effect |
 | --- | --- | --- |
-| Include platform/model provenance | On when AI prefill provenance is available | Adds `source`, `promptVersion`, `promptRevision` when the packet names one, `questionSetHash`, and available `source.researchCoverage` details to `interviewProvenance`. |
+| Include platform/model provenance | On when AI prefill provenance is available | Adds `source`, `promptVersion`, `questionSetHash`, and available `source.researchCoverage` details to `interviewProvenance`. |
 | Share for research | Session default; on when unset | Adds the draft comparison, at the session's research detail (below): `originalPrediction`, `predictionRevisions`, `finalSubmitted`, `changedFields`, `userEditedFields`, `redactedFields`, `predictionComparison`, and, at full detail only, `unselectedPredictions`. |
 
 Owners set **Share AI draft changes for research by default** under **Interview
@@ -217,7 +217,7 @@ Cloudflare encrypted-envelope export is a different route: `/storage/export-enve
 | `source.verification` | AI provenance is included | Always written as `self_reported`; the app does not independently verify provider/model identity. |
 | `source.researchCoverage` | AI provenance is included and coverage details exist | Optional counts for searched/used chat history, memory items, connected sources, and user statements. Counts are normalized and capped; an optional search-scope note is trimmed. |
 | `promptVersion` | AI provenance is included | Interview prompt/schema version supplied by the prefill packet. |
-| `promptRevision` | AI provenance is included and the packet names one | The copied prompt's wording, such as `ce-prefill-prompt-2`. The catalog's version, set by the Worker, doesn't change with it; a record without one came from the wording before revision 2. |
+| `promptRevision` | Draft-comparison sharing is included (version 2), on `external_prefill` drafts whose packet names one | The copied prompt's wording, such as `ce-prefill-prompt-2`. The catalog's version, set by the Worker, doesn't change with it; a record without one came from the wording before revision 2. |
 | `questionSetHash` | AI provenance is included | Hash of the question set shown to the model, when available. |
 | `originalPrediction` | Draft-comparison sharing is included | Redacted-safe snapshot of the selected AI draft before review: answer, additional comments, importance, conviction, confidence, and evidence. At minimal detail, only the answer (or `null` for freeform), importance, conviction and confidence. |
 | `predictionRevisions` | Draft-comparison sharing is included and saved revisions exist | Up to 100 saved AI draft versions with revision number, model ID, answer/comment text when unencrypted, ratings, confidence, and evidence. This is record truncation for saved AI versions, not a complete history of every human edit. |

@@ -153,7 +153,7 @@ export const getChangedInterviewConsentQids = (
 };
 
 const SAVED_CONSENT_KEYS = ['consentSavedAt', 'consentStorageRefId', 'consentReadAuthority'];
-const AI_ATTRIBUTION_KEYS = ['source', 'promptVersion', 'promptRevision', 'questionSetHash'];
+const AI_ATTRIBUTION_KEYS = ['source', 'promptVersion', 'questionSetHash'];
 const PREDICTION_RESEARCH_KEYS = [
   'questionId',
   'selection',
@@ -174,6 +174,7 @@ const PREDICTION_RESEARCH_KEYS = [
   'blindAnswer',
   'revealedAt',
   'confidenceMeaning',
+  'promptRevision',
   'includeDraftText',
   'draftTextConsent',
 ];

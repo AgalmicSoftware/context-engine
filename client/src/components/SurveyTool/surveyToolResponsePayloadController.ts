@@ -457,6 +457,9 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
             ...(transcript ? { transcript } : {}),
             ...(includePredictionComparison && researchTier ? { predictionCondition } : {}),
             ...(includePredictionComparison && researchTier && confidenceMeaning ? { confidenceMeaning } : {}),
+            ...(includePredictionComparison && researchTier && interviewProvenanceRecord.promptRevision
+              ? { promptRevision: String(interviewProvenanceRecord.promptRevision).slice(0, 64) }
+              : {}),
             // Only the consent is public; the text itself is kept apart, for config admins only.
             ...(includePredictionComparison && researchTier === 'minimal' && includeDraftText
               ? { draftTextConsent: true }
@@ -473,9 +476,6 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
                     ...(researchCoverage ? { researchCoverage } : {}),
                   },
                   promptVersion: String(interviewProvenanceRecord.promptVersion || '').slice(0, 128),
-                  ...(interviewProvenanceRecord.promptRevision
-                    ? { promptRevision: String(interviewProvenanceRecord.promptRevision).slice(0, 64) }
-                    : {}),
                   questionSetHash: String(interviewProvenanceRecord.questionSetHash || '').slice(0, 256),
                 }
               : {}),

@@ -98,6 +98,20 @@ it('records the voice model the session names, and neither on a prefill draft', 
   expect(record).not.toHaveProperty('voiceModel');
   expect(record).not.toHaveProperty('voiceBriefRevision');
   expect(record).not.toHaveProperty('mappingPromptVersion');
+  // The copied prompt's wording is research data, kept even without AI attribution; a voice draft has none.
+  const revised = fakeEngine({ slug: 'demo' });
+  await recordInterviewProvenance(
+    revised,
+    drafts,
+    SOURCE,
+    { ...PACKET, promptRevision: 'ce-prefill-prompt-2' },
+    false,
+    true,
+    '',
+    review,
+  );
+  expect(revised.state.surveysResponseState[0].interviewProvenance.q1.promptRevision).toBe('ce-prefill-prompt-2');
+  expect(engine.state.surveysResponseState[0].interviewProvenance.q1).not.toHaveProperty('promptRevision');
 });
 
 it('records minimal detail when that is what the participant was shown, even if the session now asks for full', async () => {
