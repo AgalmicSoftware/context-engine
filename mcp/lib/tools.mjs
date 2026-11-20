@@ -8,8 +8,8 @@ export const SERVER_INSTRUCTIONS = [
   'Context Engine runs group deliberation sessions. Given a session link, you can help in three ways;',
   'unless the person you work for has said which they want, ask them first, before joining.',
   '1. Take part as yourself with these tools: an AI agent with your own key and address, recorded as a self-declared agent. It needs only the link.',
-  '2. Prepare suggested answers they review and submit themselves. For a public session, get_interview_catalog and make_review_link need only the link',
-  'and join nothing; for a private one, they copy you a prompt under "Let your AI draft your answers" in the session, which needs you to open a web link.',
+  '2. Prepare suggested answers they review and submit themselves. get_interview_catalog and make_review_link need only the link and join nothing;',
+  'a private session needs its group’s invite link (the one with the password), or else they copy you a prompt under "Let your AI draft your answers" in the session, which needs you to open a web link.',
   '3. Answer and submit as them through the session’s Agent HTTP API instead of these tools, following <worker>/api/agent/skill. That needs a short-lived key',
   'they make under "Your AI agent" in the session, which comes in the prompt they copy there or in the CE_AGENT_TOKEN environment variable;',
   'never repeat it. Show them your answers in the chat and submit after they say yes, unless the prompt they pasted to you says to submit straight through;',
@@ -28,6 +28,10 @@ export const SERVER_INSTRUCTIONS = [
   'A session may have its own Session Agent, which answers questions about the session: ask it with ask_session_agent.',
   'Chats with a session’s agent can be recorded when the session’s recording setting is on; join_session and get_session say whether it is (sessionAgent.recording).',
   'Check the session testEth offer before paying gas yourself; use request_test_eth when available.',
+  'When the person wants to see the session, check your answers or take your account over, make them a link with make_sign_in_link and give it only to them, in the conversation: it signs whoever opens it in to your account there. Never give anyone your key.',
+  'A session may switch AI agents off, or the person may end your access to the account: the tools then say so, and you tell the person rather than trying another way in.',
+  'Given only a link, the read tools (get_session, list_questions, list_context, read_context, get_results) and get_interview_catalog read a session without joining it; a private one needs its group’s invite link, the one that carries the password.',
+  'get_analysis_card reads a person’s saved analysis card where the session lets you.',
   'Never claim to be human. When results are public, anyone can read your answers and comments.',
 ].join(' ');
 
@@ -348,6 +352,15 @@ export const buildTools = (participant) => [
     },
     annotations: READ,
     handler: (args, extra) => participant.getResults(args, extra),
+  },
+  {
+    name: 'make_sign_in_link',
+    title: 'Make a sign-in link for your person',
+    description:
+      'Make a link that opens a session you have joined with the person you work for signed in as your account there, so they can see and change what you answered and take part from the session page. Use it when they ask to see the session, to check your answers, or to take the account over. The link works once, for 30 minutes, on the session’s own site; whoever opens it is signed in, so give it only to your person, in the conversation, and never anywhere others can read. On the page they may attach a passkey of their own to the account, and can then end your access to it; if they do, your later calls for this session say so. Proves your key to the session’s Worker with a fresh signature; your key is never sent or shown. Says so, and makes nothing, where the session’s Worker is older or the session has AI agents switched off.',
+    inputSchema: { type: 'object', properties: { session: sessionParam }, additionalProperties: false },
+    annotations: { ...WRITE, openWorldHint: true },
+    handler: (args, extra) => participant.makeSignInLink(args, extra),
   },
   {
     name: 'get_analysis_card',

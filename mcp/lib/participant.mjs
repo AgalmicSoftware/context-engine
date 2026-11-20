@@ -31,6 +31,7 @@ import {
 import {
   WORKER_GROUP_READ_PROOF_V2_FEATURE, createWorkerGroupPasswordKeys, formatWorkerGroupReadInvite, parseGroupInviteToken,
 } from '../../shared/workerGroupJoin.mjs';
+import { AGENT_SIGN_IN_FEATURE, agentParticipationOn, buildAgentSignInLink } from '../../shared/agentSignIn.mjs';
 import { ethers } from 'ethers';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
@@ -1769,6 +1770,31 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         questions: questions
           .filter((question) => !wanted || wanted.has(question.id))
           .map((question) => summarizeQuestion(question, latest.get(question.id))),
+      };
+    },
+
+    // A link that signs the agent's own person in, on the session page, as the account this agent uses there.
+    // The Worker makes a one-time code for a fresh signature by the agent's key; the code goes after # in the
+    // ordinary session link, where no server sees it. Whoever opens the link is signed in, so it is for one person.
+    async makeSignInLink({ session } = {}) {
+      const ctx = await resolveSession(session);
+      if (ctx.registry) throw new Error('Sign-in links are made only for sessions on a Session Worker.');
+      const sessionConfig = await ensureReady(ctx);
+      if (!(await ctx.client.readFeatures())?.includes(AGENT_SIGN_IN_FEATURE)) {
+        return { session: ctx.info.slug, made: false, note: 'This session’s Worker is from before sign-in links, so none can be made. The person can watch what you did through you, or take part themselves on the session page.' };
+      }
+      if (!agentParticipationOn(sessionConfig)) {
+        return { session: ctx.info.slug, made: false, note: 'This session has AI agents switched off, so it makes no sign-in links.' };
+      }
+      checkpoint();
+      const made = await ctx.client.createSignInCode();
+      return {
+        session: ctx.info.slug,
+        made: true,
+        account: wallet.address,
+        signInLink: buildAgentSignInLink({ appOrigin: made.origin, slug: ctx.info.slug, workerOrigin: ctx.info.workerOrigin, code: made.code }),
+        ...(made.expiresAt ? { expiresAt: new Date(made.expiresAt).toISOString() } : {}),
+        next: 'Give signInLink only to the person you work for, in this conversation, now, as a Markdown link labelled "Open the session signed in". It works once, for 30 minutes, and signs whoever opens it in to your account in this session, where they see and can change your answers. Never post it anywhere others can read, never put it in a file or a page, and never give anyone your key instead. Making another link ends this one. On the page they can attach a passkey of their own, and then end your access to the account if they wish.',
       };
     },
 

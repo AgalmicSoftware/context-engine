@@ -1,6 +1,11 @@
 import { buildSiweMessage as buildSharedSiweMessage, normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { describeTestEthOffer } from '../../shared/sessions/testEthOffer.mjs';
 import { COORDINATOR_RETRY_DELAYS_MS, SESSION_COORDINATOR_UNAVAILABLE, isRetryableBusy } from '../../shared/sessionCoordinatorBusy.mjs';
+import { AGENT_CLIENT_HEADER, AGENT_SIGN_IN_LINK_STATEMENT, AGENT_SIGN_IN_PATHS, isAgentSignInCode } from '../../shared/agentSignIn.mjs';
+
+// Every request says it comes from an agent's client, so a session that has switched agents off can refuse it,
+// and so the Worker makes a sign-in link only for one. An older Worker ignores the header.
+const AGENT_CLIENT = 'contextengine-mcp';
 
 // HTTP client for one Worker-hosted session, signing in exactly as the web
 // client does for a passkey participant (client/src/utilities/worker/workerAuth.ts).
@@ -57,8 +62,14 @@ export class WorkerRequestError extends Error {
   }
 }
 
-const explainFailure = (status, error, path) => {
+const explainFailure = (status, error, path, reason = '') => {
   const detail = error.slice(0, MAX_ERROR_DETAIL);
+  if (reason === 'agent_participation_off') {
+    return 'This session has AI agents switched off, so an agent can’t take part in it. Nothing was sent. Tell the person: they can answer on the session page themselves, or ask the session’s admins.';
+  }
+  if (reason === 'agent_access_cancelled') {
+    return 'The person this account belongs to has ended agent access to it in this session. Nothing was sent. Only they can allow it again, on the session page under "Your AI agent".';
+  }
   if (status === 401) return `Sign-in expired or was rejected (${detail || '401'}).`;
   if (status === 403 && /origin/i.test(detail)) {
     return `The Worker refused this sign-in origin (${detail}). Ask the session admin to allow it.`;
@@ -122,11 +133,12 @@ export const resolveSessionIdHex = (config) => {
   return sessionId || sessionIdHex;
 };
 
-export const buildSiweMessage = ({ address, nonce, appOrigin, workerOrigin, sessionId, sessionSlug = '', issuedAt, expirationTime, chainId = 1 }) =>
+export const buildSiweMessage = ({ address, nonce, appOrigin, workerOrigin, sessionId, sessionSlug = '', issuedAt, expirationTime, chainId = 1,
+  statement = 'Sign in to Context Engine.' }) =>
   buildSharedSiweMessage({
     address, nonce, domain: new URL(appOrigin).host, uri: appOrigin,
     workerUrl: workerOrigin, sessionId, sessionSlug, issuedAt, expirationTime, chainId,
-    statement: 'Sign in to Context Engine.',
+    statement,
   });
 
 export const decodeTokenClaims = (token) => {
@@ -224,6 +236,7 @@ export const createWorkerClient = ({
         method,
         redirect: 'error',
         headers: {
+          [AGENT_CLIENT_HEADER]: AGENT_CLIENT,
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
           ...(auth ? { Authorization: `Bearer ${token}`, 'X-Group-Slug': slug } : {}),
           ...(signedOutRead ? { 'X-Session-Slug': slug } : {}),
@@ -262,7 +275,7 @@ export const createWorkerClient = ({
       throw new WorkerRequestError(error.slice(0, MAX_ERROR_DETAIL), { status: 401, code: error });
     }
     if (!response.ok) {
-      throw new WorkerRequestError(explainFailure(response.status, error, path), {
+      throw new WorkerRequestError(explainFailure(response.status, error, path, isRecord(data) ? text(data.reason) : ''), {
         status: response.status,
         code: isRecord(data) ? text(data.code) || text(data.reason) || error : '',
         details: { balanceEth: text(data?.balanceEth), thresholdEth: text(data?.thresholdEth) },
@@ -312,7 +325,8 @@ export const createWorkerClient = ({
     return config;
   };
 
-  const signIn = async () => {
+  // A message signed with the agent's key and a nonce the Worker takes once: a sign-in, or what `statement` asks.
+  const signedRequest = async (statement) => {
     if (signedOut) throw new WorkerRequestError('This session was opened to read without joining; join it with join_session to do this.');
     if (!config) await loadConfig();
     if (registryConfigLoader) loginOrigin = resolveLoginOrigin(config, trustedOrigins);
@@ -336,13 +350,28 @@ export const createWorkerClient = ({
       sessionSlug: slug,
       issuedAt: issued.toISOString(),
       expirationTime: new Date(issued.getTime() + SIGN_IN_VALIDITY_MS).toISOString(),
+      ...(statement ? { statement } : {}),
     });
     const signature = await wallet.signMessage(message);
-    const loginData = await request('/auth/login', {
-      method: 'POST',
-      headers: signInHeaders,
-      body: { address, message, signature, sessionSlug: slug, ...identity },
-    });
+    return { headers: signInHeaders, body: { address, message, signature, sessionSlug: slug, ...identity } };
+  };
+
+  /**
+   * A one-time code that signs a browser in as this agent's account in this session, from the site this agent
+   * signs in for. Asked with a fresh signature, never the held sign-in. `{ code, expiresAt, origin }`.
+   */
+  const createSignInCode = async () => {
+    const asked = await signedRequest(AGENT_SIGN_IN_LINK_STATEMENT);
+    const made = await request(AGENT_SIGN_IN_PATHS.create, { method: 'POST', headers: asked.headers, body: asked.body });
+    if (!isAgentSignInCode(made?.code) || text(made?.origin) !== loginOrigin || text(made?.address).toLowerCase() !== wallet.address.toLowerCase()) {
+      throw new WorkerRequestError('The Worker did not issue a usable sign-in link.');
+    }
+    return { code: made.code, expiresAt: Number(made.expiresAt) || 0, origin: loginOrigin };
+  };
+
+  const signIn = async () => {
+    const asked = await signedRequest('');
+    const loginData = await request('/auth/login', { method: 'POST', headers: asked.headers, body: asked.body });
     if (!text(loginData?.token)) throw new WorkerRequestError('The Worker did not issue a session token.');
     token = loginData.token;
     const exp = Number(loginData.exp);
@@ -517,6 +546,7 @@ export const createWorkerClient = ({
     listGroups,
     listMyMemberships,
     readFeatures,
+    createSignInCode,
     request,
     signedOut,
     setGroupReadInvite: (value) => {
