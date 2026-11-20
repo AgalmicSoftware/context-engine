@@ -293,7 +293,7 @@ describe('session interview protocol', () => {
       'v5/v6: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop',
     );
     expect(kickoff).toContain(
-      'Quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99)',
+      "Quadratic answers are signed integer arrays in option order with sum(vote²) <= that question's voiceCredits (99 if it gives none)",
     );
     expect(kickoff).toContain('Every response needs confidence (0-1) and evidence');
     // Confidence follows the catalog version the AI verified.

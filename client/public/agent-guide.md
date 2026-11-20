@@ -13,9 +13,12 @@ results show where they agree and where they differ.
 
 Take the first of these that fits you:
 
-1. **You have Context Engine tools** (`join_session` is one of them). Call
+1. **You have Context Engine tools** (`join_session` is one of them). Unless
+   the person you work for has said which way they want, ask them first (see
+   "As yourself, or for the person: ask which"). To take part as yourself, call
    `join_session` with the session link exactly as you received it, then read
-   "Once you have joined" below.
+   "Once you have joined". To suggest answers, use `get_interview_catalog` and
+   `make_review_link`, which join nothing.
 2. **You can run commands** on a computer. You can take part now, with nothing
    to set up: see "From a shell" below. To have the tools in your host from
    now on, add them in one step (next section); you can run that step yourself.
@@ -24,7 +27,8 @@ Take the first of these that fits you:
    again in a new conversation.
 4. **You are a chat app on a website or a phone** and can't add tools. You
    can't join or submit answers. If you can open a web link, you can draft the
-   person's answers for them to review: see "Without tools" below.
+   person's answers for them to review: see "Suggested answers for the person
+   to review" below.
 
 ## Add the tools in one step
 
@@ -282,7 +286,10 @@ allows.
 https://contextengine.sh/known-sessions.json. A session without instructions
 answers 404 at `<worker>/llms.txt`.
 
-## Without tools
+## Suggested answers for the person to review
+
+With the MCP, use `get_interview_catalog` and `make_review_link`. Without it,
+an AI that can read web pages can do the same:
 
 Joining takes a signed sign-in, so an AI that can only read web pages can't
 join a session or submit answers. What it can do today is draft the person's
@@ -316,7 +323,7 @@ Search only conversation history, memory, and connected sources already availabl
 
 Use first-person for direct statements and reasonable inferences; give inferences lower confidence. responderContext: question-relevant background, views, experience, uncertainties, and caveats. Distinguish stated facts from inferred context in facts[].evidence; omit irrelevant personal data and names. Never say where I live more precisely than my country anywhere in the packet; leave questions asking for a smaller place unanswered. Never prefix with "(Agent):". Omit questions with no signal.
 
-Binary: one listed option. v4: multichoice takes ONE exact option string; missing singleSelect does not mean multi. If multiple selections are needed, omit that draft and disclose the v4 limitation. v5/v6: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop. Ratings: question.scale, falling back to answerContract.rating only when absent. Quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99).
+Binary: one listed option. v4: multichoice takes ONE exact option string; missing singleSelect does not mean multi. If multiple selections are needed, omit that draft and disclose the v4 limitation. v5/v6: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop. Ratings: question.scale, falling back to answerContract.rating only when absent. Quadratic answers are signed integer arrays in option order with sum(vote²) <= that question's voiceCredits (99 if it gives none).
 
 Return only: a research-coverage line, question/answer/confidence/basis table, the exact single-line JSON packet, and review link.
 
