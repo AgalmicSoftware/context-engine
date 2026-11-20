@@ -115,14 +115,14 @@ const SessionWizardShell = ({
 
   return (
     <div className={styles.groupWizard}>
-      <div className={setupStyles.page}>
+      <div className={`${setupStyles.page} ${setupStyles.newPage}`}>
         {recoveryKeyDialog}
         <header className={setupStyles.pageHeader}>
           <h1 className={setupStyles.pageTitle}>New session</h1>
-          {templateActions}
+          {aiSetup}
+          {templateActions ? <div className={setupStyles.pageActions}>{templateActions}</div> : null}
         </header>
         {templateNotice}
-        {aiSetup}
         <SessionWizardSponsoredStatus {...sponsoredStatusProps} />
         <SetupBasicsSection
           draft={draft}

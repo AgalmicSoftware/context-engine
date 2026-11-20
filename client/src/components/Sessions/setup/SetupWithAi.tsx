@@ -47,12 +47,9 @@ export const SetupWithAi = ({ setupUrl }: Props) => {
     promptRef.current?.select();
   }, [selectPrompt]);
   return (
-    <section
-      className={open ? styles.banner : styles.aiSetupClosed}
-      aria-label="Set up with AI"
-      data-testid={E2E_TESTIDS.SETUP_WITH_AI}
-    >
-      <div className={styles.fieldLabelRow}>
+    // Its parts lie in the page header: the button beside the title, the choices on a line of their own.
+    <div className={styles.aiSetup} data-testid={E2E_TESTIDS.SETUP_WITH_AI}>
+      <div className={styles.aiSetupToggle}>
         <button
           type="button"
           className={styles.button}
@@ -74,60 +71,64 @@ export const SetupWithAi = ({ setupUrl }: Props) => {
       <span id="ce-setup-ai-about" className={styles.srOnly}>
         {ABOUT}
       </span>
-      {open ? (
-        <div id="ce-setup-ai-choices" className={styles.aiSetupChoices}>
-          <div className={styles.buttonRow}>
-            <button
-              type="button"
+      {/* Always in the page, so the button's aria-controls names a real element. */}
+      <section
+        id="ce-setup-ai-choices"
+        className={`${styles.banner} ${styles.aiSetupChoices}`}
+        aria-label="Set up with AI"
+        hidden={!open}
+      >
+        <div className={styles.buttonRow}>
+          <button
+            type="button"
+            className={styles.button}
+            aria-describedby="ce-setup-ai-about"
+            data-testid={E2E_TESTIDS.SETUP_WITH_AI_COPY}
+            onClick={() => copy('Prompt copied. Paste it into ChatGPT, Claude or another AI.')}
+          >
+            Copy prompt
+          </button>
+          {SESSION_SETUP_AI_APPS.map((app) => (
+            <a
+              key={app.name}
               className={styles.button}
+              data-ce-control-appearance="raised"
+              href={app.url(prompt)}
+              target="_blank"
+              rel="noopener noreferrer"
               aria-describedby="ce-setup-ai-about"
-              data-testid={E2E_TESTIDS.SETUP_WITH_AI_COPY}
-              onClick={() => copy('Prompt copied. Paste it into ChatGPT, Claude or another AI.')}
+              onClick={() => copy(`Prompt copied too. If ${app.name} opens without it, paste it into the chat.`)}
             >
-              Copy prompt
-            </button>
-            {SESSION_SETUP_AI_APPS.map((app) => (
-              <a
-                key={app.name}
-                className={styles.button}
-                data-ce-control-appearance="raised"
-                href={app.url(prompt)}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-describedby="ce-setup-ai-about"
-                onClick={() => copy(`Prompt copied too. If ${app.name} opens without it, paste it into the chat.`)}
-              >
-                Open in {app.name}
-              </a>
-            ))}
-            <button
-              type="button"
-              className={styles.button}
-              aria-expanded={showPrompt}
-              aria-controls="ce-setup-ai-prompt"
-              onClick={() => setShowPrompt((open) => !open)}
-            >
-              {showPrompt ? 'Hide prompt' : 'Show prompt'}
-            </button>
-          </div>
-          {status ? (
-            <p className={styles.statusText} role="status">
-              {status}
-            </p>
-          ) : null}
-          {showPrompt ? (
-            <textarea
-              id="ce-setup-ai-prompt"
-              className={styles.textarea}
-              aria-label="Setup prompt"
-              ref={promptRef}
-              readOnly
-              rows={8}
-              value={prompt}
-            />
-          ) : null}
+              Open in {app.name}
+            </a>
+          ))}
+          <button
+            type="button"
+            className={styles.button}
+            aria-expanded={showPrompt}
+            aria-controls="ce-setup-ai-prompt"
+            onClick={() => setShowPrompt((open) => !open)}
+          >
+            {showPrompt ? 'Hide prompt' : 'Show prompt'}
+          </button>
         </div>
-      ) : null}
-    </section>
+        {status ? (
+          <p className={styles.statusText} role="status">
+            {status}
+          </p>
+        ) : null}
+        {showPrompt ? (
+          <textarea
+            id="ce-setup-ai-prompt"
+            className={styles.textarea}
+            aria-label="Setup prompt"
+            ref={promptRef}
+            readOnly
+            rows={8}
+            value={prompt}
+          />
+        ) : null}
+      </section>
+    </div>
   );
 };

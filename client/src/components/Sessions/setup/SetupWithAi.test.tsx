@@ -25,7 +25,7 @@ describe('Set up with AI', () => {
     const toggle = screen.getByTestId('ce-setup-with-ai-open');
     expect(toggle).toHaveAccessibleName('Set up with AI');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('ce-setup-with-ai-copy')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-setup-with-ai-copy')).not.toBeVisible();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -33,8 +33,9 @@ describe('Set up with AI', () => {
       screen.getByTestId('ce-setup-with-ai-copy'),
     );
     expect(screen.getByRole('button', { name: 'Show prompt' })).toBeInTheDocument();
+    expect(screen.getByTestId('ce-setup-with-ai-copy')).toBeVisible();
     fireEvent.click(toggle);
-    expect(screen.queryByTestId('ce-setup-with-ai-copy')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-setup-with-ai-copy')).not.toBeVisible();
   });
 
   it('copies the setup prompt, whose link comes back to this page', async () => {
