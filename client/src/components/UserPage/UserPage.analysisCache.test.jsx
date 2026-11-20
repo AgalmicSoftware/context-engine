@@ -86,6 +86,31 @@ const makeInstance = (props = {}) => {
   return instance;
 };
 
+// Entries as the page lists them: each names the session it came from. The analysis reads the page's own only.
+const ENTRY_LISTS = [
+  'sbtList',
+  'questionResponseInfo',
+  'surveyResponseInfo',
+  'questionCreationInfo',
+  'surveyCreationInfo',
+];
+const tagSession = (instance, slug = instance.props.activeSessionSlug ?? '') => {
+  const tag = (entry) => ({ ...entry, slug, sessionSlug: slug });
+  instance.state = {
+    ...instance.state,
+    ...Object.fromEntries(ENTRY_LISTS.map((key) => [key, (instance.state[key] || []).map(tag)])),
+  };
+  return instance;
+};
+// One group in the page's session, for tests about which session's AI is asked: there must be something to ask about.
+const withAnEntry = (instance) => {
+  instance.state = {
+    ...instance.state,
+    sbtList: [{ sbtInfo: { name: 'Session Badge', sbtAddress: '0x00000000000000000000000000000000000000cc' } }],
+  };
+  return tagSession(instance);
+};
+
 let analysisCacheTestSeq = 0;
 
 // The page's header element; the session switch, where shown, comes before it.
@@ -107,8 +132,10 @@ const makeAnalysisCacheInstance = (props = {}) => {
   instance.state = {
     ...instance.state,
     username: 'Cache Test User',
+    // Every entry the page lists names the session it came from; the analysis reads the page's own only.
     sbtList: [
       {
+        slug,
         sbtInfo: {
           name: 'Cache Badge',
           sbtAddress: '0x00000000000000000000000000000000000000cc',
@@ -120,6 +147,8 @@ const makeAnalysisCacheInstance = (props = {}) => {
         id: 'q1',
         type: 'freeform',
         prompt: 'What should be cached?',
+        slug,
+        sessionSlug: slug,
       },
     ],
     detailedQuestionResponses: {
@@ -237,6 +266,7 @@ describe('UserPage analysis cache and routing', () => {
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: 'active-slug',
     });
+    withAnEntry(instance);
     analyzeUserOpinions.mockResolvedValueOnce({
       summary: 'summary',
       details: 'details',
@@ -263,6 +293,96 @@ describe('UserPage analysis cache and routing', () => {
     );
   });
 
+  it("analyses only the page's own session: another session's answers reach no prompt, card or cache", async () => {
+    const mine = '0x00000000000000000000000000000000000000aa';
+    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ viewAddress: mine, account: mine });
+    const publicField = (value) => ({ value, encrypted: false, encryptionAudience: 'self', encryptedPortion: '' });
+    // The page lists what every session kept in this browser holds for the person: here a private session's
+    // answer, comment, survey, group and created question sit beside this session's one answer.
+    const elsewhere = { slug: 'private-session', sessionSlug: 'private-session' };
+    instance.state = {
+      ...instance.state,
+      sbtList: [
+        ...instance.state.sbtList,
+        { ...elsewhere, sbtInfo: { name: 'Private Circle', sbtAddress: '0x00000000000000000000000000000000000000dd' } },
+      ],
+      questionResponseInfo: [
+        ...instance.state.questionResponseInfo,
+        { ...elsewhere, id: 'q-elsewhere', type: 'freeform', prompt: 'A question asked in private' },
+        // An entry that names no session is left out too.
+        { id: 'q-nowhere', type: 'freeform', prompt: 'A question from nowhere' },
+      ],
+      detailedQuestionResponses: {
+        ...instance.state.detailedQuestionResponses,
+        'q-elsewhere': { answer: publicField('SAID IN PRIVATE'), additional: publicField('PRIVATE COMMENT') },
+        'q-nowhere': { answer: publicField('SAID NOWHERE'), additional: publicField('') },
+      },
+      surveyResponseInfo: [{ ...elsewhere, id: 's-elsewhere', title: 'Private survey', questionsCount: 1 }],
+      detailedSurveyResponses: {
+        's-elsewhere': [
+          {
+            questionData: { prompt: 'Private survey question', type: 'freeform' },
+            responseData: { answer: publicField('SURVEY ANSWER IN PRIVATE') },
+          },
+        ],
+      },
+      questionCreationInfo: [{ ...elsewhere, id: 'q-made', type: 'binary', prompt: 'A question made in private' }],
+      surveyCreationInfo: [{ ...elsewhere, id: 's-made', title: 'A survey made in private', questionsCount: 2 }],
+    };
+    readSavedAnalysisCard.mockResolvedValue({ status: 'none' });
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'summary',
+      details: 'details',
+      name: 'name',
+      historicalAlignment: { figure: 'Elinor Ostrom (1933–2012)', reasoning: 'r' },
+    });
+    // A model that, against its brief, names the other session's question for the card.
+    analyzeUserCard.mockResolvedValueOnce({
+      title: 'A title',
+      matchNote: '',
+      tastes: {},
+      answers: { ownWords: { questionId: 'q-elsewhere', quote: 'SAID IN PRIVATE' }, yesNo: { questionId: 'q1' } },
+    });
+
+    await instance.analyzeUser();
+    await waitFor(() => expect(analyzeUserCard).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+
+    const sent = [
+      analyzeUserOpinions.mock.calls[0][0],
+      analyzeUserFirstRead.mock.calls[0][0],
+      analyzeUserCard.mock.calls[0][0],
+    ];
+    for (const userData of sent) {
+      const text = JSON.stringify(userData);
+      expect(text).toContain('A deterministic answer');
+      expect(text).not.toMatch(/PRIVATE|private|nowhere|NOWHERE/);
+      expect(userData.questions.map((question) => question.id)).toEqual(['q1']);
+      expect(userData.sbts.map((group) => group.name)).toEqual(['Cache Badge']);
+      expect(userData.surveys).toEqual([]);
+      expect(userData.questionsCreated).toEqual([]);
+      expect(userData.surveysCreated).toEqual([]);
+    }
+    // Neither the card on screen, nor the one saved to my page, nor the kept analysis holds any of it.
+    const { entry } = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
+    const kept = JSON.stringify([instance.state.analysisCard, publishSavedAnalysisCard.mock.calls, entry]);
+    expect(kept).not.toMatch(/PRIVATE|private|nowhere|NOWHERE/);
+  });
+
+  it('asks the AI nothing when the person has nothing in this session, whatever other sessions hold', async () => {
+    const { instance } = makeAnalysisCacheInstance();
+    tagSession(instance, 'private-session');
+    await instance.analyzeUser();
+    expect(analyzeUserOpinions).not.toHaveBeenCalled();
+    expect(analyzeUserFirstRead).not.toHaveBeenCalled();
+    expect(checkSponsoredAccess).not.toHaveBeenCalled();
+    expect(instance.state).toMatchObject({
+      analyzing: false,
+      showAnalysisModal: true,
+      analysisError: 'There is nothing from this session to analyze for this account.',
+    });
+  });
+
   it('sends public answers but never an Only me answer this browser decrypted', async () => {
     const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ provider: 'wagmi' });
     const lockedResponse = {
@@ -286,6 +406,7 @@ describe('UserPage analysis cache and routing', () => {
       ],
       detailedQuestionResponses: { ...instance.state.detailedQuestionResponses, q2: lockedResponse },
     };
+    tagSession(instance);
     cryptoUtils.decryptSingleField.mockResolvedValue({
       answers: { q2: { value: 'private plaintext' } },
       additionalComments: {},
@@ -333,6 +454,7 @@ describe('UserPage analysis cache and routing', () => {
         q2: lockedComment,
       },
     };
+    tagSession(instance);
     cryptoUtils.decryptSingleField.mockResolvedValue({
       answers: {},
       additionalComments: { q2: { value: 'only-me remark' } },
@@ -727,6 +849,7 @@ describe('UserPage analysis cache and routing', () => {
   it("shows and saves no saved card in a session other than the page's own", async () => {
     const own = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: 'active-slug' });
+    withAnEntry(instance);
     matchedAnalysis();
     // The Worker that will write the card is asked whether the card is on; a card saved there is not this page's.
     readSavedAnalysisCard.mockResolvedValueOnce({ status: 'ready', card: SAVED_CARD, savedAt: 1763460000000 });
@@ -787,6 +910,7 @@ describe('UserPage analysis cache and routing', () => {
     const own = '0x00000000000000000000000000000000000000e5';
     const { instance } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
     if (props.activeSessionSlug === '') instance.props = { ...instance.props, activeSessionSlug: '', sessionSlug: '' };
+    tagSession(instance);
     matchedAnalysis();
     // This page's copy of the session still says the card is on; the Worker knows better.
     readSavedAnalysisCard.mockResolvedValueOnce({ status: 'off' });
@@ -828,6 +952,7 @@ describe('UserPage analysis cache and routing', () => {
   it("makes no card where the page's own session turned it off, though the AI answers from another", async () => {
     const own = '0x00000000000000000000000000000000000000c3';
     const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: 'active-slug' });
+    withAnEntry(instance);
     matchedAnalysis();
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['active-slug', 'open-slug']);
     jest
@@ -854,6 +979,7 @@ describe('UserPage analysis cache and routing', () => {
     // Not the account above, whose analysis in this session is cached by now.
     const own = '0x00000000000000000000000000000000000000dd';
     const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: '' });
+    withAnEntry(instance);
     matchedAnalysis();
     readSavedAnalysisCard.mockResolvedValueOnce({ status: 'ready', card: SAVED_CARD, savedAt: 1763460000000 });
     analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
@@ -1290,6 +1416,7 @@ describe('UserPage analysis cache and routing', () => {
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: inScopeSlug,
     });
+    withAnEntry(instance);
     jest
       .spyOn(cacheScripts, 'listNamespaceSlugsSync')
       .mockImplementation((namespace) => (namespace === 'userCache' ? [staleCacheSlug, inScopeSlug] : []));
@@ -1536,6 +1663,7 @@ describe('UserPage analysis cache and routing', () => {
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: 'missing-session-slug',
     });
+    withAnEntry(instance);
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['missing-session-slug']);
     jest.spyOn(instance, '_getSessionConfigForSlugExact').mockReturnValue(null);
 
@@ -1556,6 +1684,7 @@ describe('UserPage analysis cache and routing', () => {
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: 'rxc',
     });
+    withAnEntry(instance);
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['rxc']);
     const exactSpy = jest.spyOn(instance, '_getSessionConfigForSlugExact');
     const demoSpy = jest.spyOn(contractScriptsModule, 'getDemoSessionConfigBySlug').mockReturnValue({
@@ -1589,6 +1718,7 @@ describe('UserPage analysis cache and routing', () => {
       activeSessionSlug: 'demo-interview',
       sessionConfig,
     });
+    withAnEntry(instance);
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['demo-interview']);
     checkSponsoredAccess.mockResolvedValue({
       status: 'no-gate',
@@ -1713,6 +1843,7 @@ describe('UserPage analysis cache and routing', () => {
     const firstRun = instance.analyzeUser();
     await waitFor(() => expect(analyzeUserOpinions).toHaveBeenCalledTimes(1));
     switchAnalysisProfile(instance, { viewAddress: '0x00000000000000000000000000000000000000dd' });
+    withAnEntry(instance);
     const secondRun = instance.analyzeUser();
     await waitFor(() => expect(analyzeUserOpinions).toHaveBeenCalledTimes(2));
     const secondTimer = instance.analysisTimer;

@@ -1,4 +1,5 @@
 import { getVoiceCredits, validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
+import { canonicalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 import {
   extractUserPageAnalysisAdditionalComment,
@@ -79,6 +80,24 @@ type UserPageAnalysisSurveyRecord = UserPageUnknownRecord & {
 type UserPageAnalysisSurveyResponseItem = UserPageUnknownRecord & {
   questionData?: unknown;
   responseData?: unknown;
+};
+
+/**
+ * The entries of one session, out of what the page lists. A user page lists what every session kept in this
+ * browser holds for the person; the analysis of a session's page reads that session's entries only. Sent to this
+ * session's AI, or quoted on a card shown to this session, an answer given elsewhere (a private session, a test
+ * one) would leave the place it was given in. An entry that names no session is left out.
+ */
+export const keepUserPageSessionEntries = <Entry>(
+  entries: readonly Entry[] | unknown,
+  sessionSlug: unknown,
+): Entry[] => {
+  const wanted = canonicalizeSessionSlug(sessionSlug || '');
+  return (Array.isArray(entries) ? (entries as Entry[]) : []).filter((entry) => {
+    const record = toAnalysisRecord(entry);
+    const slug = record.sessionSlug ?? record.slug;
+    return typeof slug === 'string' && canonicalizeSessionSlug(slug) === wanted;
+  });
 };
 
 export const isUserPageSbtAggregateEntry = (value: unknown): boolean => {

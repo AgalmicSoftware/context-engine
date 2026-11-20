@@ -1,6 +1,7 @@
 import { analysisCardAnswersArePrivate, analysisCardOn } from '@ce-shared/analysisCardSaved.mjs';
 
 import type UserPage from './UserPage';
+import { keepUserPageSessionEntries } from './userPageAnalysisContentHelpers';
 import { analyzeUserCard, analyzeUserOpinions, fetchAnalysisCardPicture } from 'utilities/ai/aiClient.js';
 import { analyzeUserFirstRead } from 'utilities/ai/userFirstRead';
 import {
@@ -209,25 +210,29 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
   this.clearAnalysisTimer();
 
   // --- Assemble inputs strictly from current state (already hydrated from other caches) ---
+  // Only the page's own session: the page lists every session this browser holds for the person, and none of
+  // the others may reach this session's AI, the analysis or the card.
+  const ownSession = <Entry>(entries: unknown): Entry[] =>
+    keepUserPageSessionEntries<Entry>(entries, this.props.activeSessionSlug || this.props.sessionSlug || '');
   const sbts = buildUserPageAnalysisSbts({
     getSbtDisplayName,
-    sbtList: this.state.sbtList,
+    sbtList: ownSession(this.state.sbtList),
   });
 
   // Question-level responses (all types; only visible)
   const questions = buildUserPageAnalysisQuestions({
     detailedQuestionResponses: this.state.detailedQuestionResponses,
-    questionResponseInfo: this.state.questionResponseInfo,
+    questionResponseInfo: ownSession(this.state.questionResponseInfo),
   });
 
   // Survey-level summaries + samples of answered items (with types & additional comments)
   const surveys = buildUserPageAnalysisSurveys({
     detailedSurveyResponses: this.state.detailedSurveyResponses,
-    surveyResponseInfo: this.state.surveyResponseInfo,
+    surveyResponseInfo: ownSession(this.state.surveyResponseInfo),
   });
 
   // Created content (counts + actual items)
-  const questionsCreated = buildUserPageAnalysisCreatedQuestions(this.state.questionCreationInfo);
+  const questionsCreated = buildUserPageAnalysisCreatedQuestions(ownSession(this.state.questionCreationInfo));
 
   // For surveys the user created, include title + a small sample of question prompts/types
   let surveysCreated: unknown[] = [];
@@ -245,7 +250,7 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
     surveysCreated = buildUserPageAnalysisCreatedSurveys({
       networkID: createdSurveyCacheRead.networkID,
       questionsCache: createdSurveyCacheRead.questionsCache,
-      surveyCreationInfo: this.state.surveyCreationInfo,
+      surveyCreationInfo: ownSession(this.state.surveyCreationInfo),
       surveysCache: createdSurveyCacheRead.surveysCache,
     });
   } catch (e) {
@@ -466,6 +471,11 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
 
   try {
     this.setState(buildUserPageAnalysisResetStatePatch());
+    // The Analyze button counts what the page lists, which may all be from other sessions: nothing is asked of
+    // the AI about a person with nothing in this one.
+    if (![sbts, questions, surveys, questionsCreated, surveysCreated].some((list) => list.length > 0)) {
+      throw new Error('There is nothing from this session to analyze for this account.');
+    }
 
     const analysisSession = await this.resolveAnalysisSessionContext();
     if (!isCurrent()) return;
