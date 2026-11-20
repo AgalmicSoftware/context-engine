@@ -54,6 +54,13 @@ const SESSION_CONFIG = {
   __registry: { registryChainId: 11155420, sessionIdHex: '0x00112233445566778899aabbccddeeff' },
 };
 let sessionConfig = SESSION_CONFIG;
+const WORKER_STORED = {
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: { responses: 'active' },
+    payloadAccessControl: { gate: 'none', encryption: 'none' },
+  },
+};
 const packet = (responses) => ({
   version: 1,
   sessionSlug: 'edge',
@@ -340,6 +347,59 @@ it('shows the responder’s own words beside a translated draft, and never uploa
   // Not in the answer, nor with the research sharing kept beside it.
   expect(JSON.stringify(rows)).not.toMatch(/Seulement|spokenOriginal/);
 });
+
+it.each([false, true])(
+  'shares the voice interview transcript only when ticked (ticked: %s)',
+  async (ticked) => {
+    sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true }, ...WORKER_STORED };
+    const upload = mockSession();
+    const pile = await mountWithInterview(null);
+    await openInterview(pile);
+    await speak([
+      { questionId: 'q1', answer: 'Agree', confidence: 0.9 },
+      { questionId: 'q3', answer: 'Disagree', confidence: 0.8 },
+    ]);
+    fireEvent.click(screen.getByText('AI submission info'));
+    const box = screen.getByLabelText('Let admins read this interview’s transcript');
+    expect(box).not.toBeChecked();
+    if (ticked) fireEvent.click(box);
+    // Without research sharing there is nothing to attach it to, so the box goes too.
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
+    expect(screen.queryByLabelText('Let admins read this interview’s transcript')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
+
+    await submitDrafts();
+
+    const records = upload.mock.calls[0][2].map((row) => row.interviewProvenance);
+    const carrying = records.filter((record) => record.transcript);
+    if (!ticked) {
+      expect(JSON.stringify(records)).not.toMatch(/transcript|interviewId|Here is what I think now/);
+      return;
+    }
+    expect(carrying).toHaveLength(1);
+    expect(carrying[0].transcript).toContain('Here is what I think now.');
+    expect(new Set(records.map((record) => record.interviewId)).size).toBe(1);
+    expect(records[0].interviewId).toMatch(/^interview-/);
+    // Another round asks again: the earlier tick doesn't share the longer transcript.
+    await speak([{ questionId: 'q1', answer: 'Disagree', confidence: 0.9 }]);
+    if (!screen.queryByLabelText('Let admins read this interview’s transcript'))
+      fireEvent.click(screen.getByText('AI submission info'));
+    expect(screen.getByLabelText('Let admins read this interview’s transcript')).not.toBeChecked();
+  },
+  40000,
+);
+
+// An Arweave session publishes answers whole, so admins couldn't be the only readers.
+it('offers no transcript box where answers are stored on Arweave', async () => {
+  sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true } };
+  mockSession();
+  const pile = await mountWithInterview(null);
+  await openInterview(pile);
+  await speak([{ questionId: 'q1', answer: 'Agree', confidence: 0.9 }]);
+  fireEvent.click(screen.getByText('AI submission info'));
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeChecked();
+  expect(screen.queryByLabelText('Let admins read this interview’s transcript')).not.toBeInTheDocument();
+}, 40000);
 
 it('keeps an unsaved pile comment when the AI proposes no comment', async () => {
   const upload = mockSession();

@@ -7,7 +7,7 @@ import {
   isTextInterviewQuestion,
   type InterviewResearchTier,
 } from './sessionInterviewResearch';
-import { isWithheldConsent, resolveConsentFlags } from './sessionInterviewConsent';
+import { INTERVIEW_TRANSCRIPT_MAX_CHARS, isWithheldConsent, resolveConsentFlags } from './sessionInterviewConsent';
 import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 
@@ -273,6 +273,15 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
       })
     : candidateQuestions;
 
+  // Each shared interview transcript goes up once, with the first of its answers. None does while any
+  // answer or comment is encrypted: the conversation may repeat what was encrypted.
+  const interviewTranscripts = asRecord(asRecord(surveyResponseState).interviewTranscripts);
+  const transcriptsPlaced = new Set<string>();
+  const anyFieldEncrypted = answeredQuestions.some((q) => {
+    const answer = surveyResponseState.answers?.[q.id] || {};
+    const additional = surveyResponseState.additionalComments?.[q.id] || {};
+    return Boolean(answer.encrypted) || (hasAdditional(additional.value) && Boolean(additional.encrypted));
+  });
   const responses = answeredQuestions.map((q) => {
     const answer = surveyResponseState.answers?.[q.id] || {};
     const additional = surveyResponseState.additionalComments?.[q.id] || {};
@@ -342,6 +351,17 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const confidenceMeaning = ['keep', 'support'].includes(String(interviewProvenanceRecord.confidenceMeaning))
       ? String(interviewProvenanceRecord.confidenceMeaning)
       : null;
+    const interviewId =
+      includePredictionComparison && researchTier
+        ? String(interviewProvenanceRecord.interviewId || '').slice(0, 64)
+        : '';
+    // The page's copy, or after a reload the one this answer already carries, so a re-save keeps it.
+    const sharedTranscript = interviewTranscripts[interviewId] ?? interviewProvenanceRecord.transcript;
+    const transcript =
+      interviewId && typeof sharedTranscript === 'string' && !transcriptsPlaced.has(interviewId) && !anyFieldEncrypted
+        ? sharedTranscript.slice(0, INTERVIEW_TRANSCRIPT_MAX_CHARS)
+        : '';
+    if (transcript) transcriptsPlaced.add(interviewId);
     // Whether the AI's draft was shown in review or hidden until the person answered.
     const predictionCondition = interviewProvenanceRecord.predictionCondition === 'blind' ? 'blind' : 'shown';
     const blindFields =
@@ -429,6 +449,9 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
             ...(includePredictionComparison && researchTier && interviewProvenanceRecord.voiceModel
               ? { voiceModel: String(interviewProvenanceRecord.voiceModel).slice(0, 128) }
               : {}),
+            ...(interviewId ? { interviewId } : {}),
+            // Only the person and the session's admins read it: the Worker withholds the whole record from others.
+            ...(transcript ? { transcript } : {}),
             ...(includePredictionComparison && researchTier ? { predictionCondition } : {}),
             ...(includePredictionComparison && researchTier && confidenceMeaning ? { confidenceMeaning } : {}),
             // Only the consent is public; the text itself is kept apart, for config admins only.

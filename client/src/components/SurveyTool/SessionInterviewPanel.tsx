@@ -86,7 +86,7 @@ import {
   readAnswersToReconsider,
 } from './sessionInterviewReconsideration';
 import { draftsWithUnseenComments, useStartingInterviewComments } from './sessionInterviewComments';
-import { lockEncryptedFields } from './sessionInterviewResearch';
+import { lockEncryptedFields, transcriptShareable } from './sessionInterviewResearch';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
 import { useKeptInterviewReview } from './sessionInterviewKeptReview';
 
@@ -262,6 +262,8 @@ export default function SessionInterviewPanel({
   const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins, suggestQuestions, dataNote } =
     normalizeInterviewSettings(sessionConfig?.interviewMode);
   const [draftTextShown, setDraftTextShown] = useState(keepDraftTextForAdmins);
+  // Sharing the voice interview's transcript for research: off until the person ticks it.
+  const [transcriptShared, setTranscriptShared] = useState(false);
   if (draftTextShown && !keepDraftTextForAdmins) setDraftTextShown(false);
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
@@ -464,6 +466,8 @@ export default function SessionInterviewPanel({
   const consentDrafts = selectedDrafts.length ? selectedDrafts : drafts;
   const draftTextOverride = draftTextKept?.contextToken === baseSubmitContextToken ? draftTextKept.included : undefined;
   const draftTextForwarded = keepDraftTextForAdmins ? (draftTextShown ? draftTextOverride : false) : undefined;
+  // Only a person's own voice interview: a group recording's transcript holds other people's words.
+  const transcriptOffered = researchAvailable && !claim && transcriptShareable(sessionConfig, mappedTranscript);
   const { aiChoice, comparisonChoice, draftTextChoice, hasSavedAi } = summarizeInterviewConsent({
     drafts: consentDrafts,
     saved: savedConsent,
@@ -918,6 +922,7 @@ export default function SessionInterviewPanel({
     setMappingNotice('');
     setLeftOutIds([]);
     setSubmitSucceeded(false);
+    setTranscriptShared(false);
     roundBaseTranscriptRef.current = transcriptRef.current;
     setShowTranscript(false);
     const voiceContext = omitConcealedInterviewFacts(responderContext, prefillPacket, isDraftConcealed, questions);
@@ -1021,6 +1026,9 @@ export default function SessionInterviewPanel({
         ...(shownResearchDetail === sessionResearchDetail ? {} : { researchDetail: shownResearchDetail }),
         // Said outright, so a name an earlier answer carried is withdrawn however its saved record is read.
         includeResponderName: false,
+        ...(transcriptOffered && transcriptShared && comparisonChoice.checked
+          ? { transcript: mappedTranscript.trim() }
+          : {}),
       },
       isInterviewBusy,
       researchAvailable,
@@ -1071,6 +1079,10 @@ export default function SessionInterviewPanel({
     includePredictionComparison,
     includeProvenance,
     consentOverrides,
+    transcriptOffered,
+    transcriptShared,
+    comparisonChoice.checked,
+    mappedTranscript,
     shownResearchDetail,
     sessionResearchDetail,
     isInterviewBusy,
@@ -1459,6 +1471,8 @@ export default function SessionInterviewPanel({
                           onDraftTextChange={(included) =>
                             setDraftTextKept({ contextToken: baseSubmitContextToken, included })
                           }
+                          transcript={transcriptOffered ? transcriptShared : null}
+                          onTranscriptChange={setTranscriptShared}
                         />
                       ) : null}
                     </div>

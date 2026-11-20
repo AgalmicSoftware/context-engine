@@ -36,7 +36,13 @@ type Props = {
   // Keeping the AI's drafted text for admins only, offered when the session keeps it; null when not.
   draftText?: { checked: boolean; mixed: boolean } | null;
   onDraftTextChange?: (included: boolean) => void;
+  // Sharing a voice interview's transcript, offered after one; null when there's none to share.
+  transcript?: boolean | null;
+  onTranscriptChange?: (included: boolean) => void;
 };
+
+const TRANSCRIPT_NOTE =
+  'Off unless you tick it. For research on how AI voice interviewers read what people say: kept with one of your answers, and only the session’s admins can read it. If any answer or comment is encrypted, none is kept.';
 
 const DRAFT_TEXT_NOTE =
   'The session’s admins can read the text of the AI’s drafts and what you changed; nobody else can. Nothing is kept for answers you encrypt. You can turn this off on its own and still share the rest.';
@@ -57,6 +63,8 @@ export default function SessionInterviewResearchConsent({
   researchDetail = 'minimal',
   draftText = null,
   onDraftTextChange,
+  transcript = null,
+  onTranscriptChange,
 }: Props) {
   const minimal = researchDetail === 'minimal';
   // Mixed saved choices may keep text for some drafts, so the wording doesn't promise none is kept.
@@ -200,13 +208,30 @@ export default function SessionInterviewResearchConsent({
           ) : null}
           {includeProvenance || includeComparison ? (
             <p>
-              Also includes the time drafts were applied. The full interview transcript and imported conversation
-              history are not attached. See{' '}
+              Also includes the time drafts were applied.{' '}
+              {includeComparison && transcript
+                ? 'The interview transcript is attached as below; imported conversation history is not.'
+                : 'The full interview transcript and imported conversation history are not attached.'}{' '}
+              See{' '}
               <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
                 How research data is handled
               </a>
               .
             </p>
+          ) : null}
+          {includeComparison && transcript !== null ? (
+            <>
+              <Label check className={styles.provenanceOption}>
+                <Input
+                  type="checkbox"
+                  checked={transcript}
+                  disabled={disabled}
+                  onChange={(event) => onTranscriptChange?.(event.target.checked)}
+                />{' '}
+                <span>Let admins read this interview’s transcript</span>
+              </Label>
+              <p>{TRANSCRIPT_NOTE}</p>
+            </>
           ) : null}
         </div>
       ) : null}

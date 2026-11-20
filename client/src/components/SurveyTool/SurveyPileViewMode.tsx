@@ -1,5 +1,6 @@
 import {
   getChangedInterviewConsentQids,
+  INTERVIEW_TRANSCRIPT_MAX_CHARS,
   isWithheldConsent,
   keepConsentWithdrawals,
   resolveConsentFlags,
@@ -1952,6 +1953,18 @@ export const recordInterviewProvenance = (
             ? { ...currentProvenance }
             : {};
         const reviewedByQuestionId = new Map(review.map((entry) => [entry.questionId, entry]));
+        // A shared transcript is kept once for the interview; its answers name it, and the upload puts it on
+        // one of them that isn't encrypted.
+        const sharedTranscript = String(consentOverrides?.transcript || '').slice(0, INTERVIEW_TRANSCRIPT_MAX_CHARS);
+        const interviewId = sharedTranscript
+          ? `interview-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+          : '';
+        if (interviewId) {
+          slice.interviewTranscripts = {
+            ...(slice.interviewTranscripts as Record<string, string> | undefined),
+            [interviewId]: sharedTranscript,
+          };
+        }
         const savedConsentFor = (questionId: string) => {
           const consent = provenance[questionId] ?? prev.editBaseline?.interviewProvenance?.[questionId];
           // A copy stripped of research material holds no choices: these drafts take the defaults instead.
@@ -2024,6 +2037,8 @@ export const recordInterviewProvenance = (
                   userEditedFields: reviewed.userEditedFields || [],
                   researchTier,
                   draftOrigin,
+                  // Any draft of this submit, a talked-through prefill's included.
+                  ...(interviewId ? { interviewId } : {}),
                   // Drafts the session's AI wrote: the prompt's version, and for a voice interview its voice model.
                   ...(draftOrigin === 'external_prefill'
                     ? {}

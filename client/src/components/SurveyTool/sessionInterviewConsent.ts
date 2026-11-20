@@ -8,7 +8,12 @@ export type InterviewConsentOverrides = {
   includeDraftText?: boolean;
   // The research detail shown when the participant chose; a later config can't widen it.
   researchDetail?: 'minimal' | 'full';
+  // The voice interview's transcript, given only when the participant ticked to share it for research.
+  transcript?: string;
 };
+
+/** The most of a shared transcript kept with an answer, about a two-hour interview. */
+export const INTERVIEW_TRANSCRIPT_MAX_CHARS = 200_000;
 
 export const summarizeConsentChoice = (values: boolean[], override?: boolean) => ({
   checked: override ?? (values.length > 0 && values.every(Boolean)),
@@ -162,6 +167,8 @@ const PREDICTION_RESEARCH_KEYS = [
   'draftOrigin',
   'mappingPromptVersion',
   'voiceModel',
+  'interviewId',
+  'transcript',
   'predictionCondition',
   'blindAnswer',
   'revealedAt',
