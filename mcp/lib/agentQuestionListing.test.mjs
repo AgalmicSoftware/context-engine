@@ -515,11 +515,14 @@ test('with no platform from the host or the agent, the MCP client’s own name f
   hosted.participant.setClientInfo({ name: 'claude-code' });
   assert.deepEqual(Object.values((({ platform, platformSetBy }) => ({ platform, platformSetBy }))((await hosted.participant.setProfile({})).profile)),
     ['host-harness', 'host']);
+  // The note names what the host kept and only what changed.
+  assert.equal((await hosted.participant.setProfile({ platform: 'mine', modelId: 'model-x' })).note,
+    'Your host set platform, which stays as it set it. The model applies to answers and statements submitted from now on.');
 });
 
 test('without a host value, a model the agent declares is recorded as its own', async (t) => {
   const { participant, calls } = await setup(t, { questions: 1, uploads: true });
-  assert.equal((await participant.setProfile({ modelId: 'gpt-4o' })).note, 'Applies to answers and statements submitted from now on.');
+  assert.equal((await participant.setProfile({ modelId: 'gpt-4o' })).note, 'The model applies to answers and statements submitted from now on.');
   await participant.answer({ answers: [{ questionId: questionId(0), value: 'Agree' }] });
   assert.deepEqual(uploadedMarker(calls), { kind: 'agent', modelId: 'gpt-4o', modelIdSetBy: 'agent', verification: 'self_reported' });
 });

@@ -99,7 +99,8 @@ test('a Worker that keeps names gets the agent’s name on joining and from set_
 test('a session with names turned off gets no name and says so, even with one saved before', async (t) => {
   const { participant, names } = await run(t, { features: ['session_names_v1'], config: { ...fixture.config, namesEnabled: false } });
   const joined = await participant.joinSession({ worker: fixture.config.corsWorkerUrl, session: fixture.config.slug });
-  assert.deepEqual(joined.name, { saved: false, error: 'Names are off in this session.' });
+  assert.deepEqual(joined.name, { saved: false, error: 'Names are off in this session.',
+    next: 'Its admins turned names off, so your address shows there; there is nothing to retry.' });
   assert.deepEqual(names, []);
 });
 
