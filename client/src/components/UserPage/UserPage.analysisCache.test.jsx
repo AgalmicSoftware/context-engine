@@ -2076,7 +2076,7 @@ describe('UserPage analysis cache and routing', () => {
     expect(instance.state).toMatchObject({ analysisDetails: '', analyzing: false, showAnalysisModal: true });
     expect(instance.analysisTimer).toBeNull();
   });
-  it('offers Analyze user in the account dialog, which gives the page no sign-in or cache props', async () => {
+  it('offers Analyze me in the account dialog, which gives the page no sign-in or cache props', async () => {
     const me = '0x00000000000000000000000000000000000000aa';
     const dialogProps = { minimized: true, account: me, viewAddress: me, sessionConfig: { slug: 'dialog-slug' } };
     const { instance } = makeAnalysisCacheInstance({
@@ -2089,7 +2089,7 @@ describe('UserPage analysis cache and routing', () => {
     });
     const offered = () => {
       const view = render(renderedHeader(instance));
-      const button = view.queryByRole('button', { name: 'Analyze user' });
+      const button = view.queryByRole('button', { name: 'Analyze me' });
       view.unmount();
       return !!button;
     };

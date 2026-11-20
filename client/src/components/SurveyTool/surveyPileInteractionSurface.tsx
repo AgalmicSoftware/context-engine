@@ -479,9 +479,13 @@ const renderPileFooterControls = ({
             ) : (
               <span className={styles.pileSubmitButtonContent}>
                 <span className={styles.pileSubmitButtonCopy}>
-                  <span className={styles.pileSubmitButtonLabel}>
+                  <span
+                    className={`${styles.pileSubmitButtonLabel}${
+                      submitLabel.count ? ` ${styles.pileSubmitButtonLabelCounted}` : ''
+                    }`}
+                  >
                     {submitLabel.word}
-                    {/* The brackets are their own spans so a phone row can show the number alone, small. */}
+                    {/* The brackets are their own spans so a phone row can show the number alone. */}
                     {submitLabel.count && (
                       <span className={styles.pileSubmitButtonCount}>
                         <span className={styles.pileSubmitButtonCountBracket}>(</span>

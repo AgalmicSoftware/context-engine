@@ -67,7 +67,7 @@ const denyStorage = () => {
   };
 };
 
-describe('Analyze user, from the account dialog', () => {
+describe('Analyze me, from the account dialog', () => {
   it('offers the link only where the page found AI it may use', () => {
     expect(buildAnalyzeLinkHref(page(true), true)).toBe(HREF);
     expect(buildAnalyzeLinkHref(page(true), false)).toBe('');

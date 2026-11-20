@@ -175,6 +175,12 @@ it('says how many drafts are hidden and why, with the session note on where the 
   expect(status).toHaveTextContent(
     `Your AI drafted 6 answers${hiddenIds.length} are hidden until you answer, to test how well your AI predicts you.`,
   );
+  // Only the sentence about the hidden drafts is bold: not the count line, not the link.
+  const bold = status.querySelectorAll('strong');
+  expect(bold).toHaveLength(1);
+  expect(bold[0]).toHaveTextContent(
+    new RegExp(`^${hiddenIds.length} are hidden until you answer, to test how well your AI predicts you\\.$`),
+  );
   expect(within(status).getByRole('link', { name: 'How it works' })).toHaveAttribute(
     'href',
     'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/research-data.md',

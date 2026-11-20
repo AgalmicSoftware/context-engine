@@ -245,7 +245,7 @@ const LoginModalDisplayBody = ({
   }
 
   if (loginComplete) {
-    // The dialog's rows follow the profile's own two ("Analyze user", "Set username") in one list. While the
+    // The dialog's rows follow the profile's own two ("Analyze me", "Set username") in one list. While the
     // profile is slow to load, Bookmarks and Disconnect show on their own, so "Disconnect" is always there; the agent row
     // waits, so it mounts once and keeps what was chosen or made in it.
     // Disconnect discards this account's unsent answers, so with any it asks once first.

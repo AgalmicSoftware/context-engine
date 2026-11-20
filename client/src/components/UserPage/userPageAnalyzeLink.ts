@@ -1,7 +1,7 @@
 import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
-// "Analyze user", in the account dialog, opens my own page in this session and starts Analyze there: the text
+// "Analyze me", in the account dialog, opens my own page in this session and starts Analyze there: the text
 // analysis, and the picture card where the session has it. Analyze is paid for by the session, so only the press
 // itself may start it: the press leaves a one-use note in this browser and the link carries a marker, and the
 // page starts only where it finds both. A reload, a copied or shared link, or the Back button finds no note and

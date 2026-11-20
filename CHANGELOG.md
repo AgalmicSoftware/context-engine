@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.24] - 2026-11-20
+
+MCP 0.9.0 (published at merge) and the site. No Worker change: sessions keep the 0.9.23 Worker, which the deploy helper now uses. Nothing a session already stores is changed.
+
+### MCP 0.9.0
+
+- The version number only: no tool changes over 0.8.1. The card tools, `make_analysis_card` and `show_analysis_card`, first shipped in 0.8.1; new tools take a minor version, so 0.9.0 carries the number they should have had.
+
+### Site — available when the site deploys
+
+- **Groups by category.** A session's group list puts each group under its first tag, categories A–Z and untagged groups last; with one category or none it stays as cards. Phones get an accordion, wide screens every category side by side, and open groups join in one tap. A group made without choosing tags keeps the create form's defaults and is listed with the untagged ones. The list takes the page's text colour in the light and window themes, and Join, Leave and the "Joined …" line stay readable.
+- **Quickstart.** Step 1 no longer sends people to a "general" session or asks them to edit a link by hand: it offers a shared link, a new session, or the demo session (the one the About page's Demo button opens).
+- **Quickstart sign-in step.** Step 2 now matches the sign-in box: a passkey, with Create or Login, or a wallet you already have where a session uses Ethereum wallets.
+- **Interview.** One answer stored under the session's link for another session no longer stops the interview loading your own answers, so it can submit again; it is left out, as Results already leave it out, and other load failures still show. The saved-answers retry button is readable on the light themes' pale error box. Discard is a small underlined button at the left instead of a full-width red one under the microphone. The sentence saying how many AI drafts are hidden until you answer is in bold.
+- **Account menu.** The row that opens Analyze reads "Analyze me", with the wand the site uses for AI actions; the analysis box keeps its title "Analyze user".
+- **Analysis card.** The picture card's portrait now blends into the card's colour, inside an oval.
+- **Chat AIs reach the questions.** A listed session's questions can be read at `contextengine.sh/questions/<slug>`, which the site passes through to the session without storing them, for chat AIs that cannot open the session's own Worker address. The page every session link serves, the top of the agent guide (`/skill.md`), `llms.txt` and the drafting prompt a person copies from the site show that address in full, ahead of the GitHub links, and the session's own address as a second try; if neither opens, the AI asks the person for the questions instead of making them up. The addresses come from `known-sessions.json`, and a test keeps them the same.
+- **Phone question row.** The count on Submit is the size of the word, and the unsent-answers line under the row is no longer drawn (screen readers still hear it).
+- **Deploy helper.** It deploys the 0.9.23 Worker bundles.
+
 ## [0.9.23] - 2026-11-20
 
 A Session Worker fix, MCP 0.8.1 (published at merge) and the site. Nothing a session already stores is changed.

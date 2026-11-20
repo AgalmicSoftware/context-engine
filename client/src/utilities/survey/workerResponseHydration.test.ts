@@ -464,6 +464,29 @@ it('finishes own-answer pagination beyond the public cap and reads only returned
   expect(rows[0].response.answer).toEqual({ value: 'latest' });
 });
 
+it("leaves out one's own answer stamped for another session and loads the rest", async () => {
+  const payloads: Record<string, Record<string, unknown>> = {
+    mine: { sessionSlug: 'demo-sh', sessionId: SESSION_ID, questionID: 'q1', answer: { value: 'here' } },
+    'other-id': { sessionSlug: 'demo-sh', sessionId: `0x${'9'.repeat(32)}`, questionID: 'q2', answer: { value: 'x' } },
+    'other-link': { sessionSlug: 'rxc-test', sessionId: SESSION_ID, questionID: 'q3', answer: { value: 'y' } },
+  };
+  const rows = await loadWorkerResponses(
+    { sessionSlug: 'demo-sh', sessionConfig: workerConfig, account: '0xabc', ownResponses: true },
+    {
+      listSessionStorageRefsPage: async () => ({
+        items: Object.keys(payloads).map((id) => ({
+          storageRef: { id },
+          metadata: { responder: '0xabc', createdAt: '2026-01-01T00:00:00Z' },
+        })),
+        cursor: null,
+        listComplete: true,
+      }),
+      readSessionStorageBlob: async ({ storageRef }: any) => new Response(JSON.stringify(payloads[storageRef.id])),
+    },
+  );
+  expect(rows.map((row) => row.storageRefId)).toEqual(['mine']);
+});
+
 it('never considers repeated cursors or malformed own payloads a complete empty history', async () => {
   const options = { sessionSlug: 'demo-sh', sessionConfig: workerConfig, account: '0xabc', ownResponses: true };
   await expect(

@@ -129,17 +129,18 @@ test('index.html tells a fetching agent where the guide is, in body text people 
   // fetch only an address they were shown word for word.
   const noViewsFirst = /Don't ask them to state their views first, don't list ways to set up, and don't speak of adding tools, joining, keys or submitting for them\./;
   const literalCatalog =
-    /fetch https:\/\/contextengine\.sh\/known-sessions\.json,? and then the session's `?interviewCatalog`? address exactly as it is written there, never one you put together yourself/;
+    /To draft, fetch the address after the session's link in the list below exactly as it is written, never one you put together yourself/;
   for (const where of [plain, noscript]) {
     assert.match(where, noViewsFirst);
     assert.match(where, literalCatalog);
   }
   assert.match(llmsTxt.replace(/\s+/g, ' '), noViewsFirst);
-  assert.match(llmsTxt.replace(/\s+/g, ' '), /fetch https:\/\/contextengine\.sh\/known-sessions\.json, then the session's `interviewCatalog` address exactly as it is written there/);
-  assert.match(guide, /its entry's `interviewCatalog`: fetch that address exactly as it is written there, never one you put together yourself/);
+  assert.match(llmsTxt.replace(/\s+/g, ' '), /To draft: fetch the address after the session's link in the list below exactly as it is written, never one you put together yourself/);
+  assert.match(guide, /the URL to fetch is the address after its link there: fetch that address exactly as it is written there, never one you put together yourself/);
+  assert.match(guide, /This site passes that address through to the catalog the request below builds for the plain session link, and stores nothing\./);
   assert.match(guide, /Don't ask them to state their views first\. Draft only where you have a real basis, and tell them plainly which questions you had no basis for\./);
   assert.match(guide, /A chat app's own sandbox, which reaches few sites or none, doesn't count: take case 4\./);
-  assert.match(guide, /Build the URL yourself only when the entry has no `interviewCatalog`, the session isn't listed, or the link has `src=` or `joinGroup=`\./);
+  assert.match(guide, /Build the URL yourself only when the session isn't listed there, or the link has `src=` or `joinGroup=`\./);
   for (const opening of [/can't join or submit answers in this conversation\. Open with the reply below\./, /can't join or submit answers\. Open with the reply below\./]) {
     assert.match(guide, opening);
   }
@@ -153,6 +154,73 @@ test('index.html tells a fetching agent where the guide is, in body text people 
       `${entry.worker}/agent/interview-catalog?slug=${encodeURIComponent(slug)}&sessionUrl=${encodeURIComponent(`https://contextengine.sh/session/${slug}`)}`,
       `${slug}'s interviewCatalog`,
     );
+  }
+  // Each listed session's questions have an address on the site, which the host passes through to its
+  // catalog, because some chat AIs refuse a Worker's host. That address is written out whole on the page
+  // every session link serves, in llms.txt and at the top of the guide, so the questions are one fetch from
+  // the link. The text and the host's rules are generated from known-sessions.json.
+  const { expectedFiles, listed } = require('./sync-known-session-catalogs.js');
+  for (const { file, actual, expected } of expectedFiles()) {
+    assert.equal(actual, expected, `${file} differs from known-sessions.json: run node scripts/sync-known-session-catalogs.js`);
+  }
+  const salon = listed(knownSessions).find(({ page }) => page.endsWith('/session/rxc-ra-2'));
+  assert.equal(salon.catalog, knownSessions['rxc-ra-2'].interviewCatalog);
+  assert.equal(salon.questions, 'https://contextengine.sh/questions/rxc-ra-2');
+  for (const where of [plain, noscript]) assert.ok(where.includes(`${salon.page} (${salon.title}): ${salon.questions}`));
+  assert.ok(skillMd.includes(`- ${salon.page} (${salon.title}):\n  ${salon.questions}\n`));
+  assert.ok(llmsTxt.includes(`  - ${salon.page} (${salon.title}): ${salon.questions}\n`));
+  assert.ok(skillMd.indexOf(salon.questions) < skillMd.indexOf('## You were given a session link'));
+  // Where the list is, one sentence says to try the second address, and never to make questions up.
+  const { FALLBACK } = require('./sync-known-session-catalogs.js');
+  assert.match(FALLBACK, /^If the first address does not open, fetch the second exactly as written; if neither opens, say so, ask the person to paste the questions and give your drafts of those as plain text with no review link, and never make questions up\.$/);
+  for (const [text, count] of [[indexHtml, 2], [skillMd, 1], [llmsTxt, 1]]) assert.equal(text.split(FALLBACK).length - 1, count);
+  const redirects = fs.readFileSync(path.join(repoRoot, 'client', 'public', '_redirects'), 'utf8').split('\n');
+  for (const { slug, catalog, questions, target } of listed(knownSessions)) {
+    // Nothing follows an address but a line break, so an address copied whole is the address itself.
+    for (const [text, count] of [[indexHtml, 2], [skillMd, 1], [llmsTxt, 1]]) {
+      const after = text.split(questions).slice(1);
+      assert.equal(after.length, count, `${questions} shown ${count} times`);
+      for (const rest of after) assert.match(rest, /^\n/);
+    }
+    // The Worker's own address is shown only as the second address, whole, right after the site's.
+    for (const [text, count] of [[indexHtml, 2], [skillMd, 1], [llmsTxt, 1]]) {
+      const host = new URL(catalog).host;
+      assert.equal(text.split(host).length - 1, count, `${slug}'s Worker host shown ${count} times`);
+      assert.equal(text.split(`${questions}\n`).length - 1, count);
+      const pair = new RegExp(`${escapeRegExp(questions)}\\n[ \\t]*second address: ${escapeRegExp(catalog)}\\n`, 'g');
+      assert.equal((text.match(pair) || []).length, count, `${slug}: the Worker's address follows the site's`);
+    }
+    // The pass-through reads the same catalog, with sessionUrl left plain, before the host's catch-all.
+    const at = redirects.indexOf(`/questions/${slug} ${target} 200`);
+    assert.ok(at >= 0 && at < redirects.indexOf('/* /index.html 200'), `${slug}'s pass-through rule precedes the catch-all`);
+    const sent = new URL(target);
+    const shown = new URL(catalog);
+    assert.equal(sent.origin + sent.pathname, shown.origin + shown.pathname);
+    assert.deepEqual([...sent.searchParams], [...shown.searchParams]);
+    assert.ok(!target.includes('%'));
+  }
+  // A fetcher that keeps <noscript> reads the agents' paragraph before any GitHub link.
+  assert.ok(noscript.indexOf('AI agents: to take part') < noscript.indexOf('github.com'));
+  // Changing a listed address changes the generated text.
+  const moved = {
+    'rxc-ra-2': {
+      ...knownSessions['rxc-ra-2'],
+      worker: 'https://ce-moved.example.workers.dev',
+      interviewCatalog: 'https://ce-moved.example.workers.dev/agent/interview-catalog?slug=rxc-ra-2&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-2',
+    },
+  };
+  const movedFiles = expectedFiles(moved);
+  assert.ok(movedFiles.every(({ actual, expected }) => actual !== expected));
+  assert.ok(movedFiles.find(({ file }) => file.endsWith('_redirects')).expected.includes('/questions/rxc-ra-2 https://ce-moved.example.workers.dev/agent/interview-catalog?slug=rxc-ra-2&sessionUrl=https://contextengine.sh/session/rxc-ra-2 200\n'));
+  // A catalog address with anything more than its slug and session page gets no rule.
+  const salonEntry = knownSessions['rxc-ra-2'];
+  for (const bad of [
+    { 'rxc-ra-2': { ...salonEntry, interviewCatalog: `${salonEntry.interviewCatalog}&ticket=t` } },
+    { 'rxc-ra-2': { ...salonEntry, worker: 'https://ce-other.example.workers.dev' } },
+    { 'rxc-ra-2': { ...salonEntry, interviewCatalog: salonEntry.interviewCatalog.replace('%2Frxc-ra-2', '%2Fother') } },
+    { 'Rxc:2': { ...salonEntry, interviewCatalog: salonEntry.interviewCatalog.replace(/rxc-ra-2/g, 'Rxc:2') } },
+  ]) {
+    assert.throws(() => expectedFiles(bad));
   }
   assert.match(llmsTxt.replace(/\s+/g, ' '), linkAndOffer);
   assert.match(guide, /### Without tools: give the link, offer to draft In cases 3 and 4, when a person gave you a session link, or a picture showing one, with no instruction, don't ask what they want and don't describe the page\./);
@@ -270,8 +338,12 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   ]) {
     assert.match(skillMd, toUrlMatcher(url));
   }
-  // Every session gets the same guide: no Worker addresses, tokens or group tags.
-  assert.doesNotMatch(skillMd, /workers\.dev|ceagt_|ai-agents/);
+  // Every session gets the same guide: no Worker addresses, tokens or group tags, except each listed
+  // session's second address in the generated list (checked above).
+  const withoutList = skillMd.replace(/<!-- known-session-catalogs:[\s\S]*?<!-- \/known-session-catalogs -->/, '');
+  assert.notEqual(withoutList, skillMd);
+  assert.doesNotMatch(withoutList, /workers\.dev|ceagt_|ai-agents/);
+  assert.doesNotMatch(skillMd, /ceagt_|ai-agents/);
 });
 
 // An agent handed only a link has to find its own case first: tools already there, a computer to add them on,

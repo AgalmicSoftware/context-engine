@@ -1,0 +1,142 @@
+'use strict';
+
+// Gives each session in known-sessions.json with an interviewCatalog an address
+// on the site, https://contextengine.sh/questions/<slug>, which the host passes
+// through to that catalog (a 200 rule in client/public/_redirects). Many chat
+// apps open only an address they were shown, and some refuse a Worker's own
+// host, so the site address is written out word for word in the site's agent
+// note (client/index.html, served for every session link), llms.txt and the top
+// of the agent guide (/skill.md). Nothing stores the questions.
+// Run after editing known-sessions.json: node scripts/sync-known-session-catalogs.js
+// scripts/public-discovery.test.js fails while the files differ from it.
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+const repoRoot = path.resolve(__dirname, '..');
+const SITE = 'https://contextengine.sh';
+const HTML_MARKERS = ['<!-- known-session-catalogs: generated from known-sessions.json -->', '<!-- /known-session-catalogs -->'];
+const RULE_MARKERS = ['# known-session-catalogs: generated from known-sessions.json', '# /known-session-catalogs'];
+// A slug a _redirects path holds as it is (a ':' would make it a placeholder), and a session page
+// a target holds as it is: no space, and nothing to percent-encode.
+const PLAIN_SLUG = /^[a-z0-9][a-z0-9-]*$/;
+
+// The Worker reads the same catalog whether sessionUrl is percent-encoded or not;
+// the rule's target leaves it plain, so the host has nothing to decode or re-encode.
+const passThroughTarget = (slug, entry) => {
+  const url = new URL(entry.interviewCatalog);
+  const page = `${SITE}/session/${slug}`;
+  const keys = [...url.searchParams.keys()];
+  if (
+    !PLAIN_SLUG.test(slug) ||
+    url.origin !== entry.worker ||
+    url.pathname !== '/agent/interview-catalog' ||
+    keys.join() !== 'slug,sessionUrl' ||
+    url.searchParams.get('slug') !== slug ||
+    url.searchParams.get('sessionUrl') !== page
+  ) {
+    throw new Error(`${slug}: interviewCatalog is not its Worker's catalog for ${page}`);
+  }
+  return `${url.origin}${url.pathname}?slug=${slug}&sessionUrl=${page}`;
+};
+
+// The order chat AIs try a listed session's two addresses in: the site's own first, since some chat
+// AIs refuse a Worker's host and stop after a first failure; the Worker's catalog second. The prompt
+// the site builds (knownSessionQuestionsAddresses in client/src/utilities/session/knownSessionsFile.ts)
+// follows this order, and its test checks it.
+const tryOrder = ({ questions, catalog }) => [questions, catalog];
+const FALLBACK =
+  'If the first address does not open, fetch the second exactly as written; if neither opens, say so, ask the person to paste the questions and give your drafts of those as plain text with no review link, and never make questions up.';
+
+const listed = (knownSessions) =>
+  Object.entries(knownSessions)
+    .filter(([, entry]) => entry.interviewCatalog)
+    .map(([slug, entry]) => {
+      const session = {
+        slug,
+        page: `${SITE}/session/${slug}`,
+        title: entry.title || entry.name || slug,
+        catalog: entry.interviewCatalog,
+        questions: `${SITE}/questions/${slug}`,
+        target: passThroughTarget(slug, entry),
+      };
+      const [first, second] = tryOrder(session);
+      return { ...session, first, second };
+    });
+
+const escapeHtml = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// No punctuation follows an address, so one copied whole is the address itself.
+const htmlBlock = (sessions, indent) =>
+  [
+    'The listed sessions follow, each link with the address of its questions after it and a second address on the next line.',
+    FALLBACK,
+    ...sessions.flatMap(({ page, title, first, second }) => [`${page} (${escapeHtml(title)}): ${first}`, `second address: ${second}`]),
+  ]
+    .map((line) => `${indent}${line}`)
+    .join('\n');
+
+const llmsBlock = (sessions) =>
+  [
+    `  - ${FALLBACK}`,
+    ...sessions.map(({ page, title, first, second }) => `  - ${page} (${title}): ${first}\n    second address: ${second}`),
+  ].join('\n');
+
+const mdBlock = (sessions) =>
+  [
+    '## Sessions listed on this site',
+    '',
+    'Each session link, then the address its questions are read from to draft',
+    'answers for review, and a second address. Fetch them exactly as written',
+    'here; "Suggested answers for the person to review" says what to do with',
+    'the questions. Without tools, your first reply still gives the link back',
+    'and offers to draft (see "Without tools: give the link, offer to draft").',
+    '',
+    FALLBACK,
+    '',
+    ...sessions.map(({ page, title, first, second }) => `- ${page} (${title}):\n  ${first}\n  second address: ${second}`),
+  ].join('\n');
+
+// Before the catch-all, so the host's first match is the pass-through.
+const rulesBlock = (sessions) => sessions.map(({ questions, target }) => `${questions.slice(SITE.length)} ${target} 200`).join('\n');
+
+const replaceBlocks = (text, render, file, [begin, end]) => {
+  const parts = text.split(begin);
+  if (parts.length < 2) throw new Error(`${file} has no ${begin} marker`);
+  return parts
+    .map((part, i) => {
+      if (i === 0) return part;
+      const at = part.indexOf(end);
+      if (at < 0) throw new Error(`${file} has a ${begin} marker without ${end}`);
+      const indent = (parts[i - 1].match(/\n([ \t]*)$/) || [, ''])[1];
+      return `\n${render(indent)}\n${indent}${part.slice(at)}`;
+    })
+    .join(begin);
+};
+
+const targets = (knownSessions) => {
+  const sessions = listed(knownSessions);
+  return [
+    ['client/index.html', (indent) => htmlBlock(sessions, indent), HTML_MARKERS],
+    ['client/public/agent-guide.md', () => mdBlock(sessions), HTML_MARKERS],
+    ['client/public/llms.txt', () => llmsBlock(sessions), HTML_MARKERS],
+    ['client/public/_redirects', () => rulesBlock(sessions), RULE_MARKERS],
+  ];
+};
+
+// Returns each target file's text as it should be, beside what is checked in.
+const expectedFiles = (knownSessions = JSON.parse(fs.readFileSync(path.join(repoRoot, 'known-sessions.json'), 'utf8'))) =>
+  targets(knownSessions).map(([file, render, markers]) => {
+    const actual = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+    return { file, actual, expected: replaceBlocks(actual, render, file, markers) };
+  });
+
+if (require.main === module) {
+  for (const { file, actual, expected } of expectedFiles()) {
+    if (actual === expected) continue;
+    fs.writeFileSync(path.join(repoRoot, file), expected);
+    console.log(`updated ${file}`);
+  }
+}
+
+module.exports = { expectedFiles, listed, FALLBACK };

@@ -1336,7 +1336,7 @@ export default function SessionInterviewPanel({
           ) : null}
 
           {ownAnswers.error ? (
-            <div className={styles.sessionListeningError} role="alert">
+            <div className={`${styles.sessionListeningError} ${styles.sessionListeningErrorWithAction}`} role="alert">
               Could not load your saved answers: {ownAnswers.error}
               <Button onClick={ownAnswers.retry}>Retry saved answers</Button>
             </div>

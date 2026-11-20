@@ -93,8 +93,13 @@ test('Netlify builds the client from the repository-root deployment contract', (
   assert.match(notFoundPage, /^<!doctype html>/i);
   assert.doesNotMatch(notFoundPage, /<script|style=/i);
 
+  // Each listed session's questions pass through to its catalog, generated from known-sessions.json
+  // (scripts/sync-known-session-catalogs.js; scripts/public-discovery.test.js checks each rule).
+  const redirects = readText('client/public/_redirects');
+  const generated = /# known-session-catalogs: generated from known-sessions\.json\n((?:\/questions\/[a-z0-9-]+ https:\/\/\S+ 200\n)+)# \/known-session-catalogs\n/;
+  assert.match(redirects, generated);
   assert.equal(
-    readText('client/public/_redirects'),
+    redirects.replace(generated, ''),
     [
       '/demo/dacc /about 301',
       '/assets/img/context-engine-social-preview-square.png /context-engine-social-preview-square.png 301',

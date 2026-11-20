@@ -191,12 +191,18 @@ describe('Interview layout', () => {
   };
 
   // Under the microphone, on the left, away from a right thumb, so it is harder to press by accident.
-  it('sets Discard apart in red in the row under the microphone, which shares it equally on a phone', () => {
+  it('keeps Discard small, red and at the left of the row under the microphone, the transcript at the right', () => {
     expect(rule('.sessionInterviewPrimaryAction')).toMatch(/flex-direction: column;\s*align-items: center;/);
-    expect(rule('.sessionInterviewMicRow')).toMatch(/justify-content: center;/);
+    const row = rule('.sessionInterviewMicRow');
+    expect(row).toMatch(/align-self: stretch;/);
+    expect(row).toMatch(/> section \{\s*margin-inline-start: auto;/);
     const discard = rule('.sessionInterviewPanel .sessionInterviewDiscard');
     expect(discard).toMatch(/color: var\(--ce-status-danger-text\) !important;/);
-    expect(discard).toMatch(/min-height: 44px;/);
+    // Not grown with the transcript on a phone: the rule below outranks the row's `:is(button, section)`.
+    expect(discard).toMatch(/flex: none;/);
+    expect(discard).toMatch(/min-height: 36px;/);
+    expect(discard).toMatch(/text-decoration: underline;/);
+    expect(discard).not.toMatch(/border: 1px/);
     expect(scss).toMatch(/\.sessionInterviewMicRow > :is\(button, section\) \{\s*flex: 1 1 auto;/);
   });
 

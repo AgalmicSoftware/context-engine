@@ -1443,7 +1443,13 @@ site has deployed; until then, share the `worker=` link. Any other session opens
 only from its `worker=` link, except the site's built-in demos, such as
 `demo-interview`, which open from the demo data bundled with the site. The site
 also serves the file at `/known-sessions.json`, so agents can find a session's
-Worker from its slug.
+Worker from its slug. After editing the file, run
+`node scripts/sync-known-session-catalogs.js`. It gives each entry with an
+`interviewCatalog` an address on the site, `/questions/<slug>`, which the
+host passes through to that catalog without storing it, and writes that
+address into the site's agent note, `llms.txt` and the top of `/skill.md`.
+Many chat AIs open only an address they were shown, and some refuse a
+Worker's own host.
 
 The file lists EDDY 2026 (`eddy26`), the Reverse Alignment salon (`rxc-ra-2`),
 the test sessions `rxc-ra-test-5` and `rxc-ra-agent-test-1`, and the demo

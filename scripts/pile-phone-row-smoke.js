@@ -113,7 +113,11 @@ const measureRow = (page) =>
         return range.getBoundingClientRect();
       };
       const digits = [...count.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
-      const box = textBox(digits);
+      // Across, the digits as drawn; up and down, the count's own box, which is set to the digits' height (a glyph
+      // box runs well above and below them).
+      const across = textBox(digits);
+      const line = count.getBoundingClientRect();
+      const box = { left: across.left, right: across.right, width: across.width, top: line.top, bottom: line.bottom };
       const word = textBox(label.firstChild);
       const edge = button.getBoundingClientRect();
       return {
@@ -124,9 +128,9 @@ const measureRow = (page) =>
           box.right <= edge.right - button.clientLeft &&
           box.top >= edge.top + button.clientTop &&
           box.bottom <= edge.bottom - button.clientTop,
-        // A glyph box is taller than its letters; the count is clear when it ends above the word's small letters,
+        // The word's glyph box is taller than its letters; the count is clear when it ends above where they start,
         // or sits past the word's end (give or take a pixel of side bearing).
-        overWord: box.right > word.left + 1 && box.left < word.right - 1 && box.bottom > word.top + word.height * 0.3,
+        overWord: box.right > word.left + 1 && box.left < word.right - 1 && box.bottom > word.top + word.height * 0.22,
         at: `count ${box.left.toFixed(1)},${box.top.toFixed(1)} to ${box.right.toFixed(1)},${box.bottom.toFixed(1)}; word ${word.left.toFixed(1)},${word.top.toFixed(1)} to ${word.right.toFixed(1)},${word.bottom.toFixed(1)}`,
         brackets: [...count.querySelectorAll('span')].some((bracket) => getComputedStyle(bracket).display !== 'none'),
       };
@@ -531,7 +535,7 @@ async function runTheme(browser, baseUrl, browserName, theme, pass, failures) {
           `${where('answered')}: Submit should show in the row`,
         ),
       );
-      // The count always shows: small, without its brackets, in the button's corner and clear of the word.
+      // The count always shows: without its brackets, in the button's corner and clear of the word.
       const submitCount = answered.controls.find((control) => /^Submit/.test(control.name))?.count;
       check(() => assert(submitCount, `${where('answered')}: Submit should carry its count`));
       if (submitCount) {

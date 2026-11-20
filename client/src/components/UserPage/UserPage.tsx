@@ -1289,7 +1289,7 @@ class UserPage extends Component<any, any> {
       subscribeWorkerSessionToken(() => void this.loadSessionNames()),
     ];
     void this.loadSessionNames();
-    // The account dialog's page gets no cache props, so its "Analyze user" button asks about AI here.
+    // The account dialog's page gets no cache props, so its "Analyze me" button asks about AI here.
     if (this.props.minimized) void this._checkAiAvailability();
     try {
       if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {

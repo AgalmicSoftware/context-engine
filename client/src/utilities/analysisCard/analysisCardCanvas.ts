@@ -15,11 +15,19 @@ const MARGIN = 72;
 const INNER = CARD_WIDTH - 2 * MARGIN;
 const MIN_FIT = 0.66;
 // The portrait on page 1 sits to the right of the note about the figure: how wide it is drawn, how much of the
-// page's width it keeps clear of words, the least height it is given, and how far its edges fade into the ground.
+// page's width it keeps clear of words, and the least height it is given.
 const PORTRAIT_WIDTH = 640;
 const PORTRAIT_CLEAR = 450;
 const PORTRAIT_MIN_HEIGHT = 600;
-const PORTRAIT_FADE = 130;
+// How much of the portrait shows, from the heart of its oval (0) to the oval's rim (1).
+const PORTRAIT_OVAL_STOPS: ReadonlyArray<[number, number]> = [
+  [0, 1],
+  [0.5, 1],
+  [0.68, 0.8],
+  [0.84, 0.32],
+  [0.94, 0.07],
+  [1, 0],
+];
 // The site's own colours for these answers (binary-choice-*-bg in the themes), the same on every card.
 const STANCE_COLOURS = new Map<string, [string, string]>([
   ['agree', ['#2e7d32', '#ffffff']],
@@ -521,28 +529,41 @@ const pageOne = (
   };
 };
 
-// The portrait with its left, top and bottom edges faded out, so it sits in the page's ground with no frame.
+/**
+ * The oval a portrait of this size is kept inside. The picture is whole at the oval's heart, where the head is,
+ * and gone at its rim, which touches the picture's left and top edges and stops short of its foot. So whatever
+ * the picture has behind the figure (a block of colour, a circle its own edges cut off) melts into the page's
+ * ground with no straight edge. On the right the page's own edge ends the picture.
+ */
+export const portraitOval = (width: number, height: number): { cx: number; cy: number; rx: number; ry: number } => {
+  const cx = width * 0.52;
+  const cy = height * 0.46;
+  return { cx, cy, rx: cx, ry: cy };
+};
+
+// The portrait inside its oval, so it sits in the page's ground with no frame.
 const fadedPortrait = (picture: AnalysisCardPicture, height: number): CanvasImageSource | null => {
   const scale = PORTRAIT_WIDTH / picture.image.width;
   if (!(scale > 0)) return null;
   const canvas = document.createElement('canvas');
   canvas.width = PORTRAIT_WIDTH;
-  // Never taller than the picture itself, so its foot always fades out.
+  // Never taller than the picture itself, so the oval is never stretched past the picture's foot.
   canvas.height = Math.round(Math.min(height, picture.image.height * scale));
   const context = canvas.getContext('2d');
-  if (!context || canvas.height < PORTRAIT_FADE * 2) return null;
+  if (!context || canvas.height < PORTRAIT_MIN_HEIGHT * MIN_FIT * 0.5) return null;
   context.drawImage(picture.image, 0, 0, picture.image.width, canvas.height / scale, 0, 0, canvas.width, canvas.height);
   context.globalCompositeOperation = 'destination-in';
-  const fade = (x0: number, y0: number, x1: number, y1: number): void => {
-    const gradient = context.createLinearGradient(x0, y0, x1, y1);
-    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-  };
-  fade(0, 0, PORTRAIT_FADE, 0);
-  fade(0, 0, 0, PORTRAIT_FADE * 0.6);
-  fade(0, canvas.height, 0, canvas.height - PORTRAIT_FADE);
+  const { cx, cy, rx, ry } = portraitOval(canvas.width, canvas.height);
+  // A circle of radius rx, squeezed to the oval's height.
+  const squeeze = ry / rx;
+  context.save();
+  context.translate(cx, cy);
+  context.scale(1, squeeze);
+  const gradient = context.createRadialGradient(0, 0, 0, 0, 0, rx);
+  PORTRAIT_OVAL_STOPS.forEach(([at, shown]) => gradient.addColorStop(at, `rgba(0, 0, 0, ${shown})`));
+  context.fillStyle = gradient;
+  context.fillRect(-cx, -cy / squeeze, canvas.width, canvas.height / squeeze);
+  context.restore();
   return canvas;
 };
 

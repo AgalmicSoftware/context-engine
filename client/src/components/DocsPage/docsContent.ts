@@ -70,16 +70,17 @@ export const QUICKSTART_STEPS: readonly QuickstartStep[] = Object.freeze(
     {
       id: 'open-session',
       title: 'Open or create a session',
-      body: 'Follow a shared session link, replace `<slug>` in `/session/<slug>` with the session you want to join, or create a session of your own. On the setup page, “Set up with AI” lets ChatGPT or Claude ask about your session and fill in the page for you to review.',
+      body: 'Follow a shared session link, or create a session of your own. On the setup page, “Set up with AI” lets ChatGPT or Claude ask about your session and fill in the page for you to review.',
       links: [
-        { href: '/session/general', label: 'Open /session/general' },
         { href: '/session/new', label: 'Create a session' },
+        // The session the About page's Demo button opens; a test keeps the two the same.
+        { href: '/session/rxc-ra-test-5', label: 'Try the demo session' },
       ],
     },
     {
       id: 'create-passkey-wallet',
-      title: 'Create your passkey wallet',
-      body: 'Use the browser WebAuthn prompt to create or unlock the embedded wallet. There is no seed phrase to manage, and participants do not need crypto expertise.',
+      title: 'Sign in with a passkey',
+      body: 'Choose Create to make an account with a passkey, or Login to return to one. You control the account: there is no password or seed phrase to manage, and participants do not need crypto expertise. Where a session uses Ethereum wallets, you can connect one you already have instead.',
     },
     {
       id: 'respond',

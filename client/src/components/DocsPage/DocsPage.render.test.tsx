@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import fs from 'fs';
 import path from 'path';
 import { DocsPage } from './DocsPage';
+import { QUICKSTART_STEPS } from './docsContent';
+import { ABOUT_DEMO_SESSION_SLUG } from '../About/AboutPageContent';
 import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-session-worker-mcp.png';
 import { buildDocsContractsHref, getContractViewerSourceTestId } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
@@ -220,13 +222,19 @@ describe('DocsPage contract deep links', () => {
     const quickstartToggle = screen.getByRole('button', { name: 'Quickstart' });
     expect(quickstartToggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('heading', { name: 'Open or create a session' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open /session/general' })).toHaveAttribute('href', '/session/general');
     expect(screen.getByRole('link', { name: 'Create a session' })).toHaveAttribute('href', '/session/new');
+    expect(screen.getByRole('link', { name: 'Try the demo session' })).toHaveAttribute(
+      'href',
+      `/session/${ABOUT_DEMO_SESSION_SLUG}`,
+    );
+    expect(screen.getByRole('heading', { name: 'Sign in with a passkey' })).toBeInTheDocument();
+    // The Quickstart sends nobody to a "general" session, or to an address to edit by hand.
+    const firstStep = QUICKSTART_STEPS[0];
+    expect(`${firstStep.body} ${JSON.stringify(firstStep.links)}`).not.toMatch(/general|<slug>/i);
     fireEvent.click(quickstartToggle);
     expect(quickstartToggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(quickstartToggle);
     expect(screen.getByRole('heading', { name: 'Open or create a session' })).toBeInTheDocument();
-    expect(screen.getByText('<slug>')).toHaveProperty('tagName', 'CODE');
 
     const guideToggle = screen.getByRole('button', { name: 'Session options guide' });
     fireEvent.click(guideToggle);

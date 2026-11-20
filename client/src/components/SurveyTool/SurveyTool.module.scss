@@ -2793,6 +2793,19 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   font-size: 0.86rem;
 }
 
+// The retry takes the error box's own text colour: a theme's plain button is light text for a dark panel.
+.sessionListeningErrorWithAction {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+
+  // The interview panel takes borders off its buttons; this one keeps its outline so it reads as a button.
+  > button {
+    @extend .sessionRecordingButton;
+    border: 1px solid currentColor !important;
+  }
+}
+
 .sessionListeningTranscriptDetails {
   border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent);
   border-radius: var(--ce-radius-8);
@@ -3882,12 +3895,18 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   min-width: 0;
 }
 
+// Discard sits small at the left, the transcript at the right.
 .sessionInterviewMicRow {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  align-items: center;
+  align-self: stretch;
   gap: 12px;
   max-width: 100%;
+
+  > section {
+    margin-inline-start: auto;
+  }
 }
 
 // The prompt card under an interview that hasn't started, flush with the interview above it.
@@ -4021,7 +4040,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     padding: 8px 6px;
   }
 
-  // Discard and the transcript share the row under the microphone equally.
+  // The transcript takes the rest of the row beside a small Discard.
   .sessionInterviewMicRow {
     width: 100%;
   }
@@ -4120,20 +4139,24 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 // Discard on the left of the row under the microphone, in the danger tone.
+// A small text control: findable by its bin and underline, too small to be the thing a thumb lands on.
 .sessionInterviewPanel .sessionInterviewDiscard {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 8px 18px;
-  // The frameless recipe and theme button rules would square it or take its outline off.
-  border: 1px solid currentColor !important;
-  border-radius: var(--ce-radius-pill) !important;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 6px;
+  // The frameless recipe and theme button rules would square or outline it.
+  border: 0 !important;
+  border-radius: var(--ce-radius-6) !important;
   background: transparent !important;
   color: var(--ce-status-danger-text) !important;
   font: inherit;
+  font-size: 0.85rem;
   font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
 
   &:hover:not(:disabled),
@@ -7386,8 +7409,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     min-width: 0;
   }
 
-  // The count shows wherever it fits beside the word; where it does not, it wraps onto a hidden second line. The
-  // button's name keeps it either way.
+  // The word keeps to one line; anything that would wrap under it is out of sight. The count is set in the
+  // button's corner below, outside this clipping.
   .pileInteractionUnit .pileFooter .pileSubmitButtonLabel {
     flex-wrap: wrap;
     max-height: 1.25em;
@@ -7395,21 +7418,31 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     line-height: 1.25;
   }
 
-  // On a phone row the number of answers always shows: small, without its brackets, in the button's top corner
-  // above the end of the word, where it takes none of the word's room. The label's own clipping does not reach it.
+  // On a phone row the number of answers always shows, without its brackets, in the button's top corner above the
+  // end of the word, where it takes none of the word's room: as large as the gap above the word holds. The label's
+  // own clipping does not reach it.
   .pileInteractionUnit .pileFooter .pileSubmitButtonCountBracket {
     display: none;
   }
 
+  // With a number above it the word sits a little lower, so the two never touch. The margins cancel, so the button
+  // keeps its height.
+  .pileInteractionUnit .pileFooter .pileSubmitButtonLabelCounted {
+    margin-top: 5px;
+    margin-bottom: -5px;
+  }
+
   .pileInteractionUnit .pileFooter .pileSubmitButtonCount {
     position: absolute;
-    top: 3px;
+    top: 4px;
     right: 5px;
     margin: 0;
     // Above the button's moving glow.
     z-index: 3;
-    font-size: 11px;
-    line-height: 1;
+    font-size: 16px;
+    font-weight: 700;
+    // The digits' own height, so the box ends where they do, clear of the word.
+    line-height: 0.75;
   }
 
   // While saving, the spinner always shows; the words show where they fit whole and otherwise wrap out of sight.
@@ -7588,19 +7621,15 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     );
   }
 
-  // The unsent-answers notice reads as a line under the whole row, so it never squeezes Submit or moves the arrows.
-  // It fits the row's bottom gap, and the row keeps room for it so the lines below (a failed save) never sit under it.
+  // On a phone row the unsent-answers notice is not shown: the number on Submit says it. Screen readers still hear
+  // it, as they do the submitted status.
   .pileInteractionUnit .pileFooter .pilePendingAnswerNotice {
     position: absolute;
-    top: calc(100% + 1px);
-    right: 0;
-    left: 0;
-    line-height: 1.2;
-    text-align: center;
-  }
-
-  .pileInteractionUnit .pileControls:has(.pilePendingAnswerNotice) {
-    margin-bottom: 16px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   // The adaptive layout below allocates spare answer space to long prompts.
@@ -7922,7 +7951,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     --pile-phone-card-height: max(240px, calc(100svh - var(--pile-card-top, 129px) - var(--pile-phone-row-space)));
   }
 
-  // Classic 95's 48px row leaves the unsent-answers notice under it 4px more.
+  // Classic 95's row is 48px, 4px more. (Both sums still hold the 16px the unsent-answers notice once took.)
   @container ce-theme style(--ce-layout-profile: desktop-window) {
     .pileInteractionUnit {
       --pile-phone-row-space: 84px;
