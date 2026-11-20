@@ -716,7 +716,9 @@ describe('the agents release, back on the pinned bundle', () => {
       expect(await session.readConfig()).toMatchObject({ agentParticipationEnabled: false, sessionName: 'Renamed on the way back' });
       expect((await signIn(agent, agentHeaders)).body.reason).toBe('agent_participation_off');
       expect((await signIn(agent)).body.reason).toBe('agent_access_cancelled');
-      expect(await stands(agentThere.body.token)).toBe(true);
+      // Even the sign-in the agent's key made while the older bundle ran is refused now: every sign-in of an
+      // account with a passkey attached is checked against the record, whenever it was made.
+      expect(await stands(agentThere.body.token)).toBe(false);
       const passkeyHere = await signIn(passkey);
       expect(passkeyHere.body.linkedAgentAccount).toEqual({ address: agent.address.toLowerCase() });
       const swapped = await ask(AGENT_SIGN_IN_PATHS.passkeySignIn, { token: passkeyHere.body.token, body: { sessionSlug: slug, sessionId } });
