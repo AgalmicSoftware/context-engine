@@ -25,6 +25,9 @@ jest.mock('./SessionInterviewPanel', () => {
         <button type="button" onClick={() => onReviewStateChange(true)}>
           Make a review
         </button>
+        <button type="button" onClick={() => onReviewStateChange(false)}>
+          Submit it
+        </button>
       </div>
     );
   }
@@ -87,4 +90,18 @@ it('clears the page’s resume flag when a review is discarded on the way back',
   );
   expect(baseProps.onSelectMode).toHaveBeenCalledWith(null);
   expect(baseProps.onInterviewProgressChange).toHaveBeenLastCalledWith(false);
+});
+
+it('keeps the card off the Interview screen once an interview has begun, after Submit too', () => {
+  const { rerender } = render(<SessionVoiceModeModal {...baseProps} openCount={1} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Make a review' }));
+  // Submitted: nothing is left unsaved, and the screen still shows that interview.
+  fireEvent.click(screen.getByRole('button', { name: 'Submit it' }));
+  expect(card()).toBeNull();
+  // One level back, the choices still offer it.
+  rerender(<SessionVoiceModeModal {...baseProps} mode={null} openCount={1} />);
+  expect(card()).toBeInTheDocument();
+  // The next opening starts a new interview, on the card again.
+  rerender(<SessionVoiceModeModal {...baseProps} openCount={2} />);
+  expect(card()).toBeInTheDocument();
 });

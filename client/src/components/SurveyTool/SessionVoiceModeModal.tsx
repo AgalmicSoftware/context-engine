@@ -80,6 +80,14 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   // What confirming the discard does next: close the dialog, or go back to its two choices.
   const [confirmDiscard, setConfirmDiscard] = useState<'close' | 'back' | null>(null);
   const [interviewVersion, setInterviewVersion] = useState(0);
+  // The interview on screen, as the panel's key counts it: each opening and each fresh start is a new one.
+  const interviewKey = `${props.openCount || 0}:${interviewVersion}`;
+  // Once it has begun, "Let your AI draft your answers" stays off the Interview screen, after Submit too; the
+  // choices one level back still offer it, and the next interview starts on it again.
+  const [begunFor, setBegunFor] = useState('');
+  useEffect(() => {
+    if (hasUnsavedReview) setBegunFor(interviewKey);
+  }, [hasUnsavedReview, interviewKey]);
   const [discardedPrefill, setDiscardedPrefill] = useState<InterviewPrefillPacket | null>(null);
   const prefillPacket = props.prefillPacket === discardedPrefill ? null : props.prefillPacket;
   const [discardedClaim, setDiscardedClaim] = useState<TranscriptClaim | null>(null);
@@ -269,7 +277,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                     value={{ sessionSlug, owner, restored: keptReview, keptFor: keptForRef }}
                   >
                     <SessionInterviewPanel
-                      key={`${props.openCount || 0}:${interviewVersion}:${prefillIdentity}:${keptReview ? 'kept' : ''}`}
+                      key={`${interviewKey}:${prefillIdentity}:${keptReview ? 'kept' : ''}`}
                       {...props}
                       prefillPacket={reviewPacket}
                       claim={claim}
@@ -282,8 +290,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                   </KeptInterviewReviewContext.Provider>
                 </VoiceModeUnjoinedGroupsContext.Provider>
                 <SessionInterviewAgentUse use={agentUse} className={styles.sessionInterviewAgentUse} />
-                {/* Until the interview has something to review. */}
-                {!hasUnsavedReview && !reviewPacket && !claim ? (
+                {/* Until the interview has begun. */}
+                {begunFor !== interviewKey && !hasUnsavedReview && !reviewPacket && !claim ? (
                   <ModalBody className={styles.sessionInterviewPrefill}>{prefillCard}</ModalBody>
                 ) : null}
               </>
