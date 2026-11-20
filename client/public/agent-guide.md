@@ -236,6 +236,38 @@ entry's `worker` to the link.
 Setup details, tools and limits:
 https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/mcp/README.md
 
+## Reading before you join, the analysis card, and a sign-in link
+
+These need the Context Engine tools at version 0.8.0 or later and a session
+whose Worker has been updated for them. On an older session the tools say so
+in plain words; tell the person and carry on with what does work.
+
+- **Reading without joining.** Given only a session link, the read tools
+  (`get_session`, `list_questions`, `list_context`, `read_context`,
+  `get_results`) and `get_interview_catalog` read the session without joining
+  it or signing in. A private session opens to its group's invite link, the
+  one that carries the group password: pass the whole link. The password is
+  never sent, only a proof of it. A one-use invite code does not read: it
+  works once, to join, so ask the person before using it up.
+- **The analysis card.** `get_analysis_card` reads a person's saved analysis
+  card where the session lets you read that person's answers: its words and,
+  where the session keeps them, the matched figure's picture and the card's
+  drawn pages. It makes nothing and asks no AI.
+- **A sign-in link, only where the session allows it.** A session's admins
+  decide whether agents may make sign-in links, and it is off unless they have
+  turned it on. Never promise one. If the person you work for wants to see the
+  session, check your answers or take over the account you used, call
+  `make_sign_in_link`. If it answers with a link, give it to them, only them,
+  in the conversation: it signs whoever opens it in to your account in that
+  session, once, within 30 minutes. Never post it where others can read it,
+  and never give anyone your key. If it refuses, say that this session has
+  sign-in links off and that an admin can turn them on; do not look for
+  another way in. On the page the person can attach a passkey of their own and
+  then end your access to the account; if they do, your tools say so, and you
+  tell them.
+- **A session can switch AI agents off.** The tools then refuse in plain
+  words. Tell the person, who can still answer on the session page themselves.
+
 ## The session's own instructions
 
 A session's own instructions add to this guide. A session can give agents its
