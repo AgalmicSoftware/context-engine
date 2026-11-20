@@ -74,6 +74,43 @@ it('chooses the latest Hosted edit with stable same-time ordering', async () => 
   ]);
   expect(loadWorkerResponses).toHaveBeenCalledWith(expect.objectContaining({ ownResponses: true, account: '0xabc' }));
 });
+it('loads saved answers when one of them was stored under this link for another session', async () => {
+  const sessionId = `0x${'5'.repeat(32)}`;
+  const sessionConfig = {
+    slug: 'alpha',
+    sessionId,
+    corsWorkerUrl: 'https://alpha-worker.example.test/',
+    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    storageProfile: {
+      backend: 'cloudflare',
+      resources: { questions: 'active', surveys: 'active', responses: 'active' },
+      payloadAccessControl: { gate: 'role_gate', encryption: 'worker_envelope', mode: 'worker_sbt_gate' },
+    },
+  };
+  const payloads: Record<string, Record<string, unknown>> = {
+    here: { sessionSlug: 'alpha', sessionId, questionID: 'q1', answer: 'Agree' },
+    elsewhere: { sessionSlug: 'alpha', sessionId: `0x${'9'.repeat(32)}`, questionID: 'q2', answer: 'Disagree' },
+  };
+  const actual = jest.requireActual<typeof import('../../utilities/survey/workerResponseHydration')>(
+    '../../utilities/survey/workerResponseHydration',
+  );
+  jest.mocked(loadWorkerResponses).mockImplementation((options) =>
+    actual.loadWorkerResponses(options, {
+      listSessionStorageRefsPage: async () => ({
+        items: Object.keys(payloads).map((id) => ({
+          storageRef: { id },
+          metadata: { responder: '0xabc', createdAt: '2026-11-20T12:00:00Z' },
+        })),
+        cursor: null,
+        listComplete: true,
+      }),
+      readSessionStorageBlob: async ({ storageRef }: any) => new Response(JSON.stringify(payloads[storageRef.id])),
+    }),
+  );
+  const saved = await loadSessionInterviewSavedAnswers({ ...base, sessionConfig });
+  // Only this session's answer: q2 stays unanswered here, so its draft is kept, shown and submitted as new.
+  expect(saved?.map((row) => [row.questionID, row.answer])).toEqual([['q1', 'Agree']]);
+});
 const field = (value: unknown, policy: Record<string, unknown> = {}) => ({
   value,
   encrypted: false,

@@ -140,7 +140,8 @@ export const loadWorkerResponses = async (
       canonicalizeSessionSlug(payloadSlug) !== target.sessionSlug ||
       payloadSessionId !== target.sessionId
     ) {
-      if (ownResponses) throw new Error('A saved answer belongs to a different session.');
+      // Not this session's answer, even in one's own list: one stored under this link while it named another
+      // session is left out, as Results leave it out, rather than failing the load and with it every submit.
       return null;
     }
     const questionId = readString(payload.questionID || payload.questionId).toLowerCase();
