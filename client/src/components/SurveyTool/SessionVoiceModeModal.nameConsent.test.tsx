@@ -133,7 +133,7 @@ it('puts a username box under the drafts where the session keeps names, apart fr
     const box = screen.getByLabelText('Username (optional)');
     expect(box).toHaveValue('Robin');
     expect(review.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save username' }));
     await waitFor(() => expect(setOwn).toHaveBeenCalledWith('Robin'));
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));

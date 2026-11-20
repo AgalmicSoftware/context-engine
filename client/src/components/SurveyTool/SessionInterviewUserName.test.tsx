@@ -21,44 +21,50 @@ it('shows nothing where the session keeps no names, has them off, or no one is s
   expect(container).toBeEmptyDOMElement();
 });
 
-it('offers the imported name unsaved, and saves only on Save', async () => {
-  const names = source(async (name) => name);
-  render(<SessionInterviewUserName source={names} names={{}} account={ACCOUNT} suggestion="Robin" />);
-  const input = screen.getByLabelText('Username (optional)');
-  expect(input).toHaveValue('Robin');
-  expect(screen.getByRole('status')).toHaveTextContent(
-    'Not saved yet: press Save to use this name. It is not written into your answers.',
-  );
-  expect(names.setOwn).not.toHaveBeenCalled();
+const box = () => screen.getByLabelText('Username (optional)');
+const check = () => screen.queryByRole('button', { name: 'Save username' });
 
-  fireEvent.change(input, { target: { value: '  Robin   Example ' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved.'));
+it('offers the imported name with a checkmark, so it is plainly unsaved, and saves only on the checkmark', async () => {
+  const names = source(async (name) => name);
+  const { container } = render(
+    <SessionInterviewUserName source={names} names={{}} account={ACCOUNT} suggestion="Robin" />,
+  );
+  expect(box()).toHaveValue('Robin');
+  expect(check()).toBeInTheDocument();
+  expect(names.setOwn).not.toHaveBeenCalled();
+  // No helper sentence: the label, the box and the checkmark.
+  expect(container.querySelector('p')).toBeNull();
+
+  fireEvent.change(box(), { target: { value: '  Robin   Example ' } });
+  fireEvent.click(check()!);
+  await waitFor(() => expect(check()).not.toBeInTheDocument());
   expect(names.setOwn).toHaveBeenCalledWith('Robin Example');
+  expect(box()).toHaveValue('Robin Example');
 });
 
-it('shows the stored name, keeps Save off until it changes, and removes it when cleared', async () => {
+it('shows the stored name without a checkmark, offers one when it changes, and removes it when cleared', async () => {
   const names = source(async () => null);
   render(<SessionInterviewUserName source={names} names={{ [ACCOUNT.toLowerCase()]: 'Robin' }} account={ACCOUNT} />);
-  const input = screen.getByLabelText('Username (optional)');
-  expect(input).toHaveValue('Robin');
-  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-  expect(screen.getByRole('status')).toHaveTextContent('People in this session see this name beside your address.');
-  fireEvent.change(input, { target: { value: '' } });
-  expect(screen.getByRole('status')).toHaveTextContent('Not saved yet: press Save to remove your username.');
-  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Your username was removed.'));
-  expect(names.setOwn).toHaveBeenCalledWith('');
+  expect(box()).toHaveValue('Robin');
+  expect(check()).not.toBeInTheDocument();
+  fireEvent.change(box(), { target: { value: 'Robin ' } });
+  expect(check()).not.toBeInTheDocument();
+  fireEvent.change(box(), { target: { value: '' } });
+  fireEvent.click(check()!);
+  await waitFor(() => expect(names.setOwn).toHaveBeenCalledWith(''));
+  await waitFor(() => expect(check()).not.toBeInTheDocument());
 });
 
-it('shows the Worker’s refusal as written', async () => {
+it('saves on Enter and shows the Worker’s refusal as written', async () => {
   const names = source(async () => {
     throw new Error('Names can’t claim a role.');
   });
   render(<SessionInterviewUserName source={names} names={{}} account={ACCOUNT} />);
-  fireEvent.change(screen.getByLabelText('Username (optional)'), { target: { value: 'Admin' } });
-  fireEvent.keyDown(screen.getByLabelText('Username (optional)'), { key: 'Enter' });
-  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Names can’t claim a role.'));
+  expect(check()).not.toBeInTheDocument();
+  fireEvent.change(box(), { target: { value: 'Admin' } });
+  fireEvent.keyDown(box(), { key: 'Enter' });
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Names can’t claim a role.'));
+  expect(check()).toBeInTheDocument();
 });
 
 it('keeps showing what was saved, and offers no imported name after a removal', async () => {
@@ -71,13 +77,12 @@ it('keeps showing what was saved, and offers no imported name after a removal', 
       suggestion="Ada"
     />,
   );
-  const input = screen.getByLabelText('Username (optional)');
-  fireEvent.change(input, { target: { value: '' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Your username was removed.'));
+  fireEvent.change(box(), { target: { value: '' } });
+  fireEvent.click(check()!);
+  await waitFor(() => expect(check()).not.toBeInTheDocument());
   // The session's names haven't caught up yet: the box still shows the removal, not "Robin" or "Ada".
-  expect(input).toHaveValue('');
+  expect(box()).toHaveValue('');
   rerender(<SessionInterviewUserName source={names} names={{}} account={ACCOUNT} suggestion="Ada" />);
-  expect(input).toHaveValue('');
-  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  expect(box()).toHaveValue('');
+  expect(check()).not.toBeInTheDocument();
 });
