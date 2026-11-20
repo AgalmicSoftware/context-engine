@@ -5,7 +5,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseArgs } from './agent-fidelity-report.mjs';
+import { parseArgs, renderFidelityMarkdown } from './agent-fidelity-report.mjs';
+import { scoreAgentFidelity } from '../shared/agentFidelity.mjs';
 
 const script = fileURLToPath(new URL('./agent-fidelity-report.mjs', import.meta.url));
 
@@ -141,6 +142,9 @@ test('the command writes JSON and Markdown reports from a Results export', () =>
     // Always "Agree" is right exactly as often as chance; there are no ratings.
     assert.match(markdown, /\| Cohen's kappa, choice predictions \| 0\.00 \|/);
     assert.match(markdown, /\| Rating error, as a share of the scale \| no data \|/);
+    assert.match(markdown, /\| Quadratic vote strength match \| no data \|/);
+    assert.match(markdown, /\| Quadratic vote match, option by option \| no data \|/);
+    assert.match(markdown, /No quadratic drafts were shared for research\./);
     // These records don't say which prompt version made them, so their confidences aren't calibrated.
     assert.deepEqual(report.coverage.byConfidenceMeaning, { unknown: 12 });
     assert.match(markdown, /12 choice predictions are left out of calibration/);
@@ -522,4 +526,35 @@ test('a draft text file of the wrong kind is an error', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('quadratic vote strength and vote match are headline rows beside the Mirror Score, with totals', () => {
+  const questions = [{ id: 'qq', type: 'quadratic', options: ['P', 'Q'], voiceCredits: 16 }];
+  const ids = [1, 2, 3].map((index) => `0x${String(index).padStart(40, '0')}`);
+  const actual = [[4, 0], [0, 2], [1, 0]];
+  const report = scoreAgentFidelity({
+    questions,
+    pairs: ids.map((participantId, index) => ({
+      participantId, questionId: 'qq', condition: 'blind', origin: 'external_prefill', platform: 'claude', modelId: 'test',
+      prediction: actual[index].map((vote) => -vote), actual: actual[index], confidence: null, at: 1,
+    })),
+    answers: ids.map((participantId, index) => ({ participantId, questionId: 'qq', value: actual[index], at: 1 })),
+    options: { bootstrapSamples: 50, minParticipants: 3 },
+  });
+  const markdown = renderFidelityMarkdown(report);
+  // Opposite votes of the same strength: no direction, full strength.
+  assert.match(markdown, /\| Mirror Score, all predictions \| 0\.00 \|/);
+  assert.match(markdown, /\| Quadratic vote strength match \| 1\.00 \|/);
+  // Strengths 4, 2 and 1 out of a most of 4. Each guessed from the other two's median (1.5, 2.5, 3) is off by 2.5,
+  // 0.5 and 2, so the baseline is (0.375 + 0.875 + 0.5) / 3 = 0.583 and the lift 0.417.
+  assert.match(markdown, /\| Lift in vote strength over the median strength \| 0\.42 \|/);
+  assert.match(markdown, /Vote strength match is scored beside it, not in it/);
+  // 16 credits over two options buy at most 5 votes (3 and 2), so answers differ by at most 10. Reversed, the drafts
+  // are 8, 4 and 2 votes off: 4, 2 and 1 per option, and matches 0.2, 0.6 and 0.8.
+  assert.match(markdown, /\| Quadratic votes: mean difference per option, in votes \| 2\.33 \|/);
+  assert.match(markdown, /\| Quadratic vote match, option by option \| 0\.53 \|/);
+  // Everyone else's mean votes, (0.5, 1), (2.5, 0) and (2, 1), are 4.5, 4.5 and 2 off: 0.55, 0.55 and 0.8.
+  assert.match(markdown, /\| Lift in vote match over everyone else's mean votes \| -0\.10 \|/);
+  assert.match(markdown, /### qq \(3 people\)/);
+  assert.match(markdown, /\| P \| -5 \| 5 \| -10 \|\n\| Q \| -2 \| 2 \| -4 \|/);
 });

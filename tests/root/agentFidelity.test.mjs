@@ -9,6 +9,8 @@ import {
   inferDraftOrigin,
   normalizeFidelityAnswer,
   normalizeFidelityQuestion,
+  quadraticIntensitySimilarity,
+  quadraticVoteAgreement,
   reportableKeys,
   resultsResponseRows,
   scoreAgentFidelity,
@@ -84,6 +86,185 @@ test('similarity gives graded credit by question type', () => {
   assert.equal(answerSimilarity(q.qf, 'a', 'a'), null);
   assert.equal(answerSimilarity(q.qb1, null, 'Agree'), null);
 });
+
+test('quadratic intensity compares how strongly people vote, whatever on, beside the direction', () => {
+  const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} against ${expected}`);
+  const root99 = Math.sqrt(99);
+  // Same direction, 2 votes against 9: the direction is right, the strength far off.
+  assert.equal(answerSimilarity(q.qq, [2, 0, 0], [9, 0, 0]), 1);
+  near(quadraticIntensitySimilarity(q.qq, [2, 0, 0], [9, 0, 0]), 1 - 7 / root99);
+  // Nothing against 3 and -2 (13 credits): unrelated direction, strength √13 apart.
+  assert.equal(answerSimilarity(q.qq, [0, 0, 0], [3, -2, 0]), 0.5);
+  near(quadraticIntensitySimilarity(q.qq, [0, 0, 0], [3, -2, 0]), 1 - Math.sqrt(13) / root99);
+  // Opposite, equally strong: the direction is wrong, the strength right.
+  assert.equal(answerSimilarity(q.qq, [3, 0, 0], [-3, 0, 0]), 0);
+  assert.equal(quadraticIntensitySimilarity(q.qq, [3, 0, 0], [-3, 0, 0]), 1);
+  // Spread or stacked, the same credits are the same strength: 5,5 (50) and 7,1 (50).
+  assert.equal(quadraticIntensitySimilarity(q.qq, [5, 5, 0], [7, 1, 0]), 1);
+  // The whole budget against nothing is 0; both empty is 1.
+  const small = normalizeFidelityQuestion({ id: 'q4', type: 'quadratic', options: ['P', 'Q'], voiceCredits: 4 });
+  assert.equal(quadraticIntensitySimilarity(small, [2, 0], [0, 0]), 0);
+  assert.equal(quadraticIntensitySimilarity(q.qq, [0, 0, 0], [0, 0, 0]), 1);
+  assert.equal(quadraticIntensitySimilarity(q.qr, 3, 4), null);
+  assert.equal(quadraticIntensitySimilarity(q.qq, null, [1, 0, 0]), null);
+});
+
+test('quadratic intensity is reported per person and overall, with a lift over typical strength', () => {
+  // Four people; their AI gets each one's strength right but not always the direction.
+  const ids = [1, 2, 3, 4].map((index) => `0x${String(index).padStart(40, '0')}`);
+  const actual = [[9, 0, 0], [0, 1, 0], [0, 0, 5], [3, 0, 0]];
+  const prediction = [[-9, 0, 0], [1, 0, 0], [0, 5, 0], [3, 0, 0]];
+  const pairs = ids.flatMap((participantId, index) => [
+    { participantId, questionId: 'qq', condition: 'blind', origin: 'external_prefill', platform: 'claude', modelId: 'test', prediction: prediction[index], actual: actual[index], confidence: null, at: 1 },
+    { participantId, questionId: 'qr', condition: 'blind', origin: 'external_prefill', platform: 'claude', modelId: 'test', prediction: 5, actual: 5, confidence: null, at: 1 },
+  ]);
+  const answers = ids.flatMap((participantId, index) => [
+    { participantId, questionId: 'qq', value: actual[index], at: 1 },
+    { participantId, questionId: 'qr', value: 5, at: 1 },
+  ]);
+  const report = scoreAgentFidelity({ questions, pairs, answers, options: fast });
+  assert.equal(report.quadraticIntensity.value, 1);
+  assert.equal(report.quadraticIntensity.participants, 4);
+  assert.deepEqual(report.participants.map((person) => person.quadraticIntensity), [1, 1, 1, 1]);
+  // The Mirror Score is unchanged: the direction is still scored on its own.
+  const before = (index) => answerSimilarity(q.qq, prediction[index], actual[index]);
+  assert.ok(Math.abs(report.mirrorScore.overall.value - [0, 1, 2, 3].reduce((sum, index) => sum + (before(index) + 1) / 2, 0) / 4) < 1e-12);
+  // The baseline guesses the median strength of everyone else: for the first person (9), others are 1, 5 and 3.
+  const root99 = Math.sqrt(99);
+  const strengths = [9, 1, 5, 3];
+  const baselineOf = (index) => {
+    const rest = strengths.filter((_value, other) => other !== index).sort((a, b) => a - b);
+    return 1 - Math.abs(rest[1] - strengths[index]) / root99;
+  };
+  const expected = [0, 1, 2, 3].reduce((sum, index) => sum + baselineOf(index), 0) / 4;
+  const { agent, baseline, lift } = report.baselines.quadraticIntensity;
+  assert.equal(agent.value, 1);
+  assert.ok(Math.abs(baseline.value - expected) < 1e-12);
+  assert.ok(Math.abs(lift.value - (1 - expected)) < 1e-12);
+  // Results doesn't show it: it is for measuring the AI, in this report.
+  assert.equal('quadraticIntensity' in scoreFidelityOverview({ questions, pairs, options: fast }), false);
+  // The baseline counts everyone's answers, drafts or not, and isn't pulled by one outlier: three others spent
+  // everything and one nothing, so for a fifth person who also spent everything the median guesses right.
+  const full = [7, 7, 1];
+  const extra = [5, 6, 7, 8].map((index) => `0x${String(index).padStart(40, '0')}`);
+  const skewed = scoreAgentFidelity({
+    questions,
+    pairs: [{ ...pairs[0], participantId: extra[0], prediction: full, actual: full }],
+    answers: [
+      { participantId: extra[0], questionId: 'qq', value: full, at: 1 },
+      ...extra.slice(1).map((participantId) => ({ participantId, questionId: 'qq', value: full, at: 1 })),
+      { participantId: ids[0], questionId: 'qq', value: [0, 0, 0], at: 1 },
+    ],
+    options: { ...fast, minParticipants: 1 },
+  });
+  assert.equal(skewed.baselines.quadraticIntensity.baseline.value, 1, 'the mean, 7.46 of 9.95, would score 0.75');
+  assert.equal(skewed.baselines.quadraticIntensity.lift.value, 0);
+  // With no quadratic predictions there is nothing to report.
+  const none = scoreAgentFidelity({ questions, pairs: pairs.filter((pair) => pair.questionId === 'qr'), answers, options: fast });
+  assert.equal(none.quadraticIntensity.value, null);
+  assert.equal(none.quadraticIntensity.participants, 0);
+});
+
+test('quadratic votes are compared option by option, sizes included', () => {
+  const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} against ${expected}`);
+  // 99 credits over three options buy at most 17 votes (6, 6 and 5: 97 credits), so two answers differ by at most 34.
+  const votes = (a, b) => quadraticVoteAgreement(q.qq, a, b);
+  assert.deepEqual(votes([6, 6, 5], [-6, -6, -5]), { difference: 34 / 3, match: 0 });
+  assert.deepEqual(votes([2, 0, 1], [2, 0, 1]), { difference: 0, match: 1 });
+  // 2 votes against 9: 7 apart. Opposite but equally strong, 3 against -3: 6 apart, where strength scores 1.
+  near(votes([2, 0, 0], [9, 0, 0]).difference, 7 / 3);
+  near(votes([2, 0, 0], [9, 0, 0]).match, 1 - 7 / 34);
+  near(votes([3, 0, 0], [-3, 0, 0]).match, 1 - 6 / 34);
+  // The same credits spread or stacked, 5,5 against 7,1: the same strength, 6 votes apart.
+  near(votes([5, 5, 0], [7, 1, 0]).match, 1 - 6 / 34);
+  // 99 credits over two options buy 14 votes (7 and 7); 4 credits buy 2 (1 and 1, or 2 on one).
+  const two = normalizeFidelityQuestion({ id: 'q2', type: 'quadratic', options: ['P', 'Q'], voiceCredits: 99 });
+  assert.equal(quadraticVoteAgreement(two, [7, 7], [-7, -7]).match, 0);
+  near(quadraticVoteAgreement(two, [7, 0], [0, 0]).match, 1 - 7 / 28);
+  const small = normalizeFidelityQuestion({ id: 'q4', type: 'quadratic', options: ['P', 'Q'], voiceCredits: 4 });
+  assert.equal(quadraticVoteAgreement(small, [2, 0], [-2, 0]).match, 0);
+  assert.equal(quadraticVoteAgreement(small, [2, 0], [0, 0]).match, 0.5);
+  assert.equal(quadraticVoteAgreement(small, [1, -1], [-1, 1]).match, 0);
+  assert.equal(quadraticVoteAgreement(q.qr, 3, 4), null);
+  assert.equal(quadraticVoteAgreement(q.qq, null, [1, 0, 0]), null);
+});
+
+test('quadratic votes are reported per person, against the group mean, and as totals per option', () => {
+  const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} against ${expected}`);
+  const ids = [1, 2, 3, 4, 5, 6].map((index) => `0x${String(index).padStart(40, '0')}`);
+  const actual = [[3, 0, 0], [0, 3, 0], [0, 0, 3]];
+  const prediction = [[3, 0, 0], [0, 2, 0], [1, 0, 2]];
+  const pairs = actual.map((votes, index) => ({
+    participantId: ids[index], questionId: 'qq', condition: 'blind', origin: 'external_prefill', platform: 'claude', modelId: 'test',
+    prediction: prediction[index], actual: votes, confidence: null, at: 1,
+  }));
+  const answerOf = (participantId, value) => ({ participantId, questionId: 'qq', value, at: 1 });
+  const answers = actual.map((votes, index) => answerOf(ids[index], votes));
+  const report = scoreAgentFidelity({ questions, pairs, answers, options: fast });
+  // 0, 1 and 2 votes apart over three options; the most is 34.
+  assert.deepEqual(report.participants.map((person) => person.quadraticVoteDifference), [0, 1 / 3, 2 / 3]);
+  assert.deepEqual(report.participants.map((person) => person.quadraticVoteMatch), [1, 1 - 1 / 34, 1 - 2 / 34]);
+  near(report.quadraticVotes.difference.value, 1 / 3);
+  near(report.quadraticVotes.match.value, 1 - 1 / 34);
+  assert.equal(report.quadraticVotes.match.participants, 3);
+  // Everyone else's mean votes, for the first person 0, 1.5 and 1.5 against 3, 0 and 0: 6 apart. Each person alike.
+  const { agent, baseline, lift } = report.baselines.quadraticVotes;
+  near(agent.value, 1 - 1 / 34);
+  near(baseline.value, 1 - 6 / 34);
+  near(lift.value, 5 / 34);
+  // The Mirror Score is unchanged.
+  const direction = mean3((index) => answerSimilarity(q.qq, prediction[index], actual[index]));
+  near(report.mirrorScore.overall.value, direction);
+  // Totals per option, as Results charts them: drafted 4, 2, 2 against 3, 3, 3.
+  assert.deepEqual(report.quadraticTotals, [
+    {
+      questionId: 'qq',
+      participants: 3,
+      options: [
+        { option: 'P', drafted: 4, actual: 3, difference: 1 },
+        { option: 'Q', drafted: 2, actual: 3, difference: -1 },
+        { option: 'R', drafted: 2, actual: 3, difference: -1 },
+      ],
+    },
+  ]);
+  // A hidden draft is scored against the answer before it was shown, but the totals use the final answer, as Results
+  // does: the third person moved a vote from R to Q after seeing the draft.
+  const changed = scoreAgentFidelity({
+    questions,
+    pairs,
+    answers: [...answers.slice(0, 2), answerOf(ids[2], [0, 1, 2])],
+    options: fast,
+  });
+  assert.deepEqual(changed.quadraticTotals[0].options.map((option) => option.actual), [3, 4, 2]);
+  assert.deepEqual(changed.participants.map((person) => person.quadraticVoteMatch), [1, 1 - 1 / 34, 1 - 2 / 34]);
+  // One person answering without a draft would show in the Results totals minus these: withheld. Three are safe.
+  const withOne = scoreAgentFidelity({ questions, pairs, answers: [...answers, answerOf(ids[3], [9, 0, 0])], options: fast });
+  assert.deepEqual(withOne.quadraticTotals, [{ questionId: 'qq', participants: 3, suppressed: true }]);
+  // Also when the report leaves that person out.
+  const excluded = { ...fast, excludeParticipants: [ids[3]] };
+  const withExcluded = scoreAgentFidelity({ questions, pairs, answers: [...answers, answerOf(ids[3], [9, 0, 0])], options: excluded });
+  assert.equal(withExcluded.quadraticTotals[0].suppressed, true);
+  const withThree = scoreAgentFidelity({
+    questions,
+    pairs,
+    answers: [...answers, ...ids.slice(3).map((participantId) => answerOf(participantId, [9, 0, 0]))],
+    options: fast,
+  });
+  assert.deepEqual(withThree.quadraticTotals[0].options[0], { option: 'P', drafted: 4, actual: 3, difference: 1 });
+  // Fewer drafters than the minimum: withheld. Session Wrapped's predictions aren't in the Results chart.
+  const fewer = scoreAgentFidelity({ questions, pairs, answers, options: { ...fast, minParticipants: 4 } });
+  assert.deepEqual(fewer.quadraticTotals, [{ questionId: 'qq', participants: 3, suppressed: true }]);
+  const wrapped = scoreAgentFidelity({
+    questions,
+    pairs: [...pairs, { ...pairs[0], participantId: 'wrapped:someone', origin: 'wrapped_agent', condition: 'separate' }],
+    answers,
+    options: fast,
+  });
+  assert.equal(wrapped.quadraticTotals[0].participants, 3);
+  // No quadratic drafts, no totals.
+  assert.deepEqual(scoreAgentFidelity({ questions, pairs: [], answers, options: fast }).quadraticTotals, []);
+});
+const mean3 = (valueOf) => [0, 1, 2].reduce((sum, index) => sum + valueOf(index), 0) / 3;
 
 test('draft origin falls back on the self-reported source', () => {
   assert.equal(inferDraftOrigin({ source: { platform: 'claude', modelId: 'x' } }), 'external_prefill');
