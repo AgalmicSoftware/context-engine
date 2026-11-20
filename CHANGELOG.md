@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.21] - 2026-11-20
+
 ## [0.9.20] - 2026-11-19
 
 A Session Worker release. The site deploys at merge; a session gets the new voice model only once its Worker is updated to this release. MCP stays at 0.7.0.
