@@ -39,22 +39,27 @@ const ParticipantsGraphControls = ({
 }: ParticipantsGraphControlsProps) => {
   const [open, setOpen] = useState(false);
   const controlsRef = useRef<HTMLDivElement | null>(null);
+  const gearRef = useRef<HTMLButtonElement | null>(null);
   const panelId = `graph-settings-${useId().replace(/:/g, '')}`;
 
   // The settings close on Escape or a press anywhere else, as a menu does.
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      // The keyboard's place goes back to the gear, not to a control that is now hidden.
+      gearRef.current?.focus();
     };
-    const onPress = (event: MouseEvent) => {
+    // Pointer events, so a finger's tap elsewhere closes it as a mouse press does.
+    const onPress = (event: Event) => {
       if (!controlsRef.current?.contains(event.target as Node)) setOpen(false);
     };
     document.addEventListener('keydown', onKey);
-    document.addEventListener('mousedown', onPress);
+    document.addEventListener('pointerdown', onPress);
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.removeEventListener('mousedown', onPress);
+      document.removeEventListener('pointerdown', onPress);
     };
   }, [open]);
 
@@ -85,7 +90,8 @@ const ParticipantsGraphControls = ({
           onBlur={onClusterBlur}
           className={styles.clusterNumberInput}
           title={clustersAutomatic ? 'Chosen automatically' : 'Set by you; Reset in the settings returns to automatic'}
-          min="2"
+          // The automatic number may be 1; a person's own number is at least 2.
+          min={clustersAutomatic ? undefined : 2}
         />
         <button
           type="button"
@@ -99,6 +105,7 @@ const ParticipantsGraphControls = ({
       <button
         type="button"
         className={styles.graphSettingsButton}
+        ref={gearRef}
         aria-label="Graph settings"
         aria-expanded={open}
         aria-controls={panelId}

@@ -809,7 +809,8 @@ export default function PolisReport({
   };
 
   const stepManualClusterCount = (delta: number) => {
-    const base = Math.max(activeClusterCount || clusterCount || 0, DEFAULT_EXPLORATORY_CLUSTER_COUNT);
+    // Steps from the number in the box, which is the automatic one until a person changes it.
+    const base = activeClusterCount || clusterCount || DEFAULT_EXPLORATORY_CLUSTER_COUNT;
     setManualClusterCount(String(Math.max(2, base + delta)));
   };
 
@@ -2963,7 +2964,10 @@ export default function PolisReport({
                           { value: 'POLIS', label: REPORT_DEFAULT_EMBEDDING_LABEL },
                         ]}
                         onProjectionChange={(value) => handleEmbeddingChoiceChange(value as EmbeddingChoice)}
-                        projectionHelp={renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)}
+                        // These controls are left out of a PDF, so their help adds no footnote to one.
+                        projectionHelp={
+                          isPdfModeActive ? null : renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)
+                        }
                         toggles={[
                           {
                             label: 'Statements',
@@ -3002,7 +3006,10 @@ export default function PolisReport({
                         }}
                       />
                     ) : null}
-                    <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
+                    <div
+                      className={styles.pdfIgnore}
+                      style={{ textAlign: 'right', marginLeft: participantsGraphOpen ? 0 : 'auto' }}
+                    >
                       <PolisReportSectionToggleLabel open={participantsGraphOpen} />
                     </div>
                   </div>

@@ -3995,6 +3995,7 @@ export const renderHtmlReport = (inputReport) => {
     .aidb-graph-settings-button:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
     .aidb-graph-settings-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; display: grid; gap: 10px; width: min(300px, 86vw); padding: 14px 16px; border: 1px solid #9ca3af; border-radius: 8px; background: #ffffff; color: #111827; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.22); }
     .aidb-graph-settings-title { margin: 0; font-weight: 700; }
+    @media (max-width: 640px) { .participantGraphControls { position: relative; } .aidb-graph-settings { position: static; } .aidb-graph-settings-panel { top: 100%; left: 0; right: 0; width: auto; } }
     .aidb-graph-settings-panel .aidb-layer-toggles { flex-direction: column; align-items: flex-start; }
     .aidb-graph-settings-panel .clusterAutoButton { justify-self: start; margin-left: 0; }
     .aidb-layer-toggles label { cursor: pointer; }

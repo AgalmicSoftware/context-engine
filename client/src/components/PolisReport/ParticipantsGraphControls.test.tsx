@@ -63,7 +63,8 @@ it('closes the settings on Escape or a press elsewhere', () => {
   fireEvent.click(gear);
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(gear).toHaveAttribute('aria-expanded', 'false');
+  expect(gear).toHaveFocus();
   fireEvent.click(gear);
-  fireEvent.mouseDown(document.body);
+  fireEvent.pointerDown(document.body);
   expect(gear).toHaveAttribute('aria-expanded', 'false');
 });

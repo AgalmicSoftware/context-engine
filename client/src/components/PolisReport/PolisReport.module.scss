@@ -663,23 +663,6 @@
   }
 }
 
-.polisReportContainer button.clusterAutoButton {
-  margin-left: 6px;
-  color: var(--ce-document-text);
-  background: var(--ce-document-surface);
-  -webkit-text-fill-color: currentColor;
-
-  &:hover {
-    color: var(--ce-document-text);
-    background: var(--ce-document-border);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--report-control-blue);
-    outline-offset: -2px;
-  }
-}
-
 // The Participants Graph's title line: its name, Clusters, the gear, then Hide.
 .graphTitleRow {
   position: relative;
@@ -698,7 +681,8 @@
 .graphClustersLabel {
   margin: 0;
   font-weight: 600;
-  color: var(--ce-document-text);
+  // The title line's own colour, which each report style sets for its header.
+  color: inherit;
 }
 
 .polisReportContainer button.graphSettingsButton {
@@ -1110,15 +1094,6 @@
 }
 
 /*
-   * 4. Participant Graph controls: Make them wrap compactly.
-   */
-.participantGraphControls {
-  display: flex;
-  flex-wrap: wrap; // Allow control groups to wrap    align-items: center;
-  gap: 15px 20px; // row-gap column-gap    margin-bottom: 15px;
-}
-
-/*
    * 5. "All Questions" list: Fix formatting to prevent overflow.
    */
 .questionVoteRow {
@@ -1241,13 +1216,6 @@
     border-radius: var(--ce-radius-6);
     border: none;
     background: var(--ce-color-white);
-  }
-
-  .participantGraphControls {
-    background: var(--ce-document-surface);
-    border: none;
-    border-radius: var(--ce-radius-6);
-    padding: 10px 12px;
   }
 
   .participantsList {
@@ -1463,13 +1431,6 @@
 
   .participantSvg line {
     stroke: var(--ce-text-muted);
-  }
-
-  .participantGraphControls {
-    background: var(--ce-document-text);
-    border: 1px solid var(--ce-document-border-strong);
-    border-radius: var(--ce-radius-6);
-    padding: 10px 12px;
   }
 
   .participantsList {
