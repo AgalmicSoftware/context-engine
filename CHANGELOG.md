@@ -24,7 +24,7 @@ A Session Worker fix, MCP 0.8.1 (published at merge) and the site. Nothing a ses
 - **Account dialog and user page.** The dialog is one list: Analyze user, Set username, Bookmarks, Your AI agent (both options in the row, each with a Copy prompt button that shows and enlarges its prompt) and Disconnect. On the user page, Set username and Bookmarks stand beside the address, and the session switch sits above the header.
 - **Analyze.** Analyze user in the account dialog opens your page and starts Analyze there, only on that press. The analysis box has Text, Breakdown and, where the session has it, the picture card, which is reached only by its Card button and shown on your page from the Card view; a card you have shown sits in the side column above your groups, on your own page too, with Take it off my page, and has its own surface there. Compare gives a headline, titled cards, sliders or a map (laid out for phones) and agree or split strips. The question filter's box has Clear, Copy, Bookmark and Load. The risk matrix's note window has two columns and opens the atlas topic that holds a note's questions.
 - **Interview.**
-  - Language: the interview shows language flags for ten seconds when it first opens, so on phones the status and close button share the Interview row, says interviews take any language, and drafts answers in English, marked with their language, beside the person's own words, which stay on the device.
+  - Language: the interview shows language flags for ten seconds when it first opens, so on phones the status and close button share the Interview row (a long status ends in "…" and shows whole in its tooltip), says interviews take any language, and drafts answers in English, marked with their language, beside the person's own words, which stay on the device.
   - Names: an interview no longer writes a name into answers and withdraws one an earlier answer carried; where the session keeps names, an optional box sets the session name, saved with its ✓ or Enter.
   - Layout: Discard and the transcript sit under the microphone, and a join link's group is left to its notice; the section is "Suggested groups", each with a small picture.
   - Transcript: the box to share an interview's transcript is not offered in this release, so no transcript is sent.
@@ -40,7 +40,8 @@ A Session Worker fix, MCP 0.8.1 (published at merge) and the site. Nothing a ses
   - Disconnect asks first when this tab holds unsent answers, and still signs out where the browser refuses storage.
   - Copy link in the passkey dialog keeps the group invite and the review drafts the address arrived with, never a sign-in code.
   - On /new, closing the file chooser or picking a refused file keeps the header picture or typed link.
-  - The first salon trial session leaves the session lists; its link still opens it.
+  - The two trial sessions before the salon's leave the session lists; their links still open them.
+  - The Debate Atlas on a phone: circle titles fit their circles, a node's panel and its chart use the phone's width, and the branch name is readable in the white theme.
   - The settings strip's first section reads Config.
   - On phones, the question row's arrows sit against the counter and Submit always shows its count.
   - About's Companies and Groups sections say above their video that it shows future features, in place of the asterisks and footnote.
