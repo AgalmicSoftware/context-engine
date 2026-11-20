@@ -176,16 +176,34 @@ describe('Settings session context', () => {
       });
       render(<LoginAndSettingsModal {...props} />);
       await openSettings();
-      const summary = screen.getByLabelText('Active session: Edge session');
-      expect(summary).toHaveTextContent('Edge session');
-      expect(within(summary).getByRole('link')).toHaveAttribute(
+      const select = screen.getByRole('combobox', { name: 'Session' });
+      expect(select).toHaveValue('edge');
+      expect(screen.queryByRole('option', { name: 'ALL' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Open session Edge session' })).toHaveAttribute(
         'href',
         '/session/edge?worker=https%3A%2F%2Fworker.example.test',
       );
-      expect(screen.queryByRole('combobox', { name: 'Session' })).not.toBeInTheDocument();
       expect(props.updateGlobalSessionSelection).not.toHaveBeenCalled();
     },
   );
+
+  it('opens another session in a new tab from a session route, leaving the page and selection alone', async () => {
+    window.history.replaceState({}, '', '/session/edge?worker=https%3A%2F%2Fworker.example.test');
+    const open = jest.spyOn(window, 'open').mockReturnValue({ opener: window } as unknown as Window);
+    try {
+      const props = propsFor({ primarySessionSlug: 'other', selectedSessionScope: 'active' });
+      render(<LoginAndSettingsModal {...props} />);
+      await openSettings();
+      const select = screen.getByRole('combobox', { name: 'Session' });
+      fireEvent.change(select, { target: { value: 'other' } });
+      expect(open).toHaveBeenCalledWith(expect.stringMatching(/\/session\/other(\?|$)/), '_blank');
+      expect(select).toHaveValue('edge');
+      expect(window.location.pathname).toBe('/session/edge');
+      expect(props.updateGlobalSessionSelection).not.toHaveBeenCalled();
+    } finally {
+      open.mockRestore();
+    }
+  });
 
   it('keeps the global selection editable away from a session route', async () => {
     const props = propsFor({ selectedSessionScope: 'all' });

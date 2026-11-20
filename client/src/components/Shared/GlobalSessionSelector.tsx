@@ -18,6 +18,10 @@ type GlobalSessionSelectorProps = {
   onChange: (selection: Partial<GlobalSessionSelection>) => void;
   sessionConfig?: unknown;
   testId: string;
+  /** Jump menu: keep the current session and open a picked one in a new tab. */
+  opensInNewTab?: boolean;
+  /** Link for the selected session when the page already knows it (keeps its ?worker=). */
+  currentHref?: string;
   className?: string;
   labelClassName?: string;
   selectClassName?: string;
@@ -28,6 +32,8 @@ const GlobalSessionSelector = ({
   onChange,
   sessionConfig,
   testId,
+  opensInNewTab = false,
+  currentHref,
   className = styles.settingsSessionRoute,
   labelClassName = styles.settingsSessionLabel,
   selectClassName = styles.aiSettingsSelect,
@@ -36,6 +42,8 @@ const GlobalSessionSelector = ({
   const requiredSlugsKey = JSON.stringify(['', selection.primarySessionSlug, ...selection.selectedSessionSlugs]);
   const [catalog, setCatalog] = useState<Array<{ slug: string; name: string; href?: string }>>([]);
   const readingCatalog = useRef(false);
+  // A browser may block a tab opened from a menu; then offer a real link instead.
+  const [blockedOpen, setBlockedOpen] = useState<{ href: string; label: string } | null>(null);
   const refresh = useCallback(() => {
     // Registry reads may hydrate caches and notify other mounted views. Keep
     // them outside render and ignore nested notifications from this same read.
@@ -112,30 +120,39 @@ const GlobalSessionSelector = ({
         ? `Selected sessions (${selection.selectedSessionSlugs.length})`
         : options.find((option) => option.slug === value)?.label || 'General';
   const hasConcreteSelection = selection.selectedSessionScope !== 'all' && !isListSummary;
-  const exactConfigEntry =
+  const exactConfigEntryFor = (slug: string) =>
     sessionConfig &&
     typeof sessionConfig === 'object' &&
     'slug' in sessionConfig &&
-    normalizeSessionSlug(sessionConfig.slug) === value
-      ? buildCommunitySessionCatalog({ entries: [[value, sessionConfig]] })[0]
+    normalizeSessionSlug(sessionConfig.slug) === slug
+      ? buildCommunitySessionCatalog({ entries: [[slug, sessionConfig]] })[0]
       : undefined;
-  // An explicit Worker route can share a slug with a different cached authority.
-  // Only a validated Worker query overrides discovery; partial props retain it.
-  const exactWorkerHref =
-    exactConfigEntry?.kind === 'centralized' && exactConfigEntry.href.includes('?worker=')
-      ? exactConfigEntry.href
-      : null;
-  const sessionHref = hasConcreteSelection
-    ? value
-      ? exactWorkerHref ||
-        catalog.find((entry) => entry.slug === value)?.href ||
-        exactConfigEntry?.href ||
-        buildSettingsSessionHref(value)
-      : buildSettingsSessionHref('')
-    : null;
-  const sessionLabel = value
-    ? exactConfigEntry?.name || catalog.find((entry) => entry.slug === value)?.name || value
-    : 'General';
+  const hrefFor = (slug: string) => {
+    if (!slug) return buildSettingsSessionHref('');
+    const exactConfigEntry = exactConfigEntryFor(slug);
+    // An explicit Worker route can share a slug with a different cached authority.
+    // Only a validated Worker query overrides discovery; partial props retain it.
+    const exactWorkerHref =
+      exactConfigEntry?.kind === 'centralized' && exactConfigEntry.href.includes('?worker=')
+        ? exactConfigEntry.href
+        : null;
+    return (
+      exactWorkerHref ||
+      catalog.find((entry) => entry.slug === slug)?.href ||
+      exactConfigEntry?.href ||
+      buildSettingsSessionHref(slug)
+    );
+  };
+  const labelFor = (slug: string) =>
+    slug ? exactConfigEntryFor(slug)?.name || catalog.find((entry) => entry.slug === slug)?.name || slug : 'General';
+  const sessionHref = hasConcreteSelection ? currentHref || hrefFor(value) : null;
+  const sessionLabel = labelFor(value);
+  const openInNewTab = (slug: string) => {
+    const target = { href: hrefFor(slug), label: labelFor(slug) };
+    const opened = window.open(target.href, '_blank');
+    if (opened) opened.opener = null;
+    setBlockedOpen(opened ? null : target);
+  };
 
   return (
     <div className={`${styles.globalSessionSelector} ${className}`}>
@@ -150,6 +167,11 @@ const GlobalSessionSelector = ({
           onChange={(event) => {
             const nextValue = event.target.value;
             if (nextValue === listValue) return;
+            if (opensInNewTab) {
+              // The value stays on the current session; the page beneath is left as it is.
+              if (nextValue !== value && nextValue !== allValue) openInNewTab(nextValue);
+              return;
+            }
             if (nextValue === allValue) {
               onChange({
                 primarySessionSlug: selection.primarySessionSlug,
@@ -161,7 +183,7 @@ const GlobalSessionSelector = ({
             }
           }}
         >
-          <option value={allValue}>ALL</option>
+          {!opensInNewTab && <option value={allValue}>ALL</option>}
           {isListSummary && (
             <option value={listValue}>Selected sessions ({selection.selectedSessionSlugs.length})</option>
           )}
@@ -196,6 +218,18 @@ const GlobalSessionSelector = ({
           <FontAwesomeIcon icon={faExternalLinkAlt} />
         </button>
       )}
+      {blockedOpen ? (
+        <a
+          href={blockedOpen.href}
+          className={styles.globalSessionBlockedLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid={`${testId}-open-new-tab`}
+          onClick={() => setBlockedOpen(null)}
+        >
+          Open {blockedOpen.label} in a new tab
+        </a>
+      ) : null}
     </div>
   );
 };

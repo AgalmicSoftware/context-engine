@@ -397,4 +397,77 @@ describe('GlobalSessionSelector', () => {
       );
     });
   });
+
+  describe('opening sessions in a new tab (a session page)', () => {
+    const renderJumpMenu = (onChange = jest.fn()) =>
+      render(
+        <GlobalSessionSelector
+          selection={{ primarySessionSlug: 'alpha', selectedSessionScope: 'active' }}
+          onChange={onChange}
+          opensInNewTab
+          currentHref="/session/alpha?worker=https%3A%2F%2Fcurrent.example"
+          testId="route-selector"
+        />,
+      );
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('keeps the current session selected, offers no ALL scope and links the page as loaded', () => {
+      renderJumpMenu();
+      expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('alpha');
+      expect(screen.queryByRole('option', { name: 'ALL' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Open session alpha discussion' })).toHaveAttribute(
+        'href',
+        '/session/alpha?worker=https%3A%2F%2Fcurrent.example',
+      );
+    });
+
+    it('opens a picked session in a new tab without changing the selection', () => {
+      const tab = { opener: window } as unknown as Window;
+      const open = jest.spyOn(window, 'open').mockReturnValue(tab);
+      const onChange = jest.fn();
+      renderJumpMenu(onChange);
+      const select = screen.getByRole('combobox', { name: 'Session' });
+      fireEvent.change(select, { target: { value: 'beta' } });
+      expect(open).toHaveBeenCalledWith('/session/beta', '_blank');
+      expect(tab.opener).toBeNull();
+      expect(onChange).not.toHaveBeenCalled();
+      expect(select).toHaveValue('alpha');
+      fireEvent.change(select, { target: { value: 'alpha' } });
+      expect(open).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the ?worker= link when the picked session is unlisted', () => {
+      jest.mocked(getAllDemoSessionConfigs).mockReturnValue([
+        [
+          'hidden-grove',
+          {
+            slug: 'hidden-grove',
+            sessionName: 'Hidden Grove',
+            corsWorkerUrl: 'https://worker.example',
+            sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          },
+        ],
+      ] as never);
+      const open = jest.spyOn(window, 'open').mockReturnValue({ opener: null } as unknown as Window);
+      renderJumpMenu();
+      fireEvent.change(screen.getByRole('combobox', { name: 'Session' }), { target: { value: 'hidden-grove' } });
+      expect(open).toHaveBeenCalledWith('/session/hidden-grove?worker=https%3A%2F%2Fworker.example', '_blank');
+    });
+
+    it('offers a real link when the browser blocks the new tab', () => {
+      jest.spyOn(window, 'open').mockReturnValue(null);
+      renderJumpMenu();
+      fireEvent.change(screen.getByRole('combobox', { name: 'Session' }), { target: { value: 'beta' } });
+      const fallback = screen.getByTestId('route-selector-open-new-tab');
+      expect(fallback).toHaveTextContent('Open beta discussion in a new tab');
+      expect(fallback).toHaveAttribute('href', '/session/beta');
+      expect(fallback).toHaveAttribute('target', '_blank');
+      expect(fallback).toHaveAttribute('rel', 'noopener noreferrer');
+      fireEvent.click(fallback);
+      expect(screen.queryByTestId('route-selector-open-new-tab')).not.toBeInTheDocument();
+    });
+  });
 });
