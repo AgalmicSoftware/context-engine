@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faQuestionCircle,
+  faRobot,
   faSpinner,
   faMagic as faWand,
   faCog,
@@ -113,7 +114,7 @@ import {
 } from './polisReportRuntime';
 import PolisAnswerSections, { type AnswerSectionsOpen } from './PolisAnswerSections';
 import { buildReportResponseStats, buildReportAnswerQuestions } from './polisReportAnswers';
-import { markPolisAgents, readPolisReportCacheContext } from './polisReportRuntime';
+import { polisAgentLabel, readPolisReportCacheContext, type PolisAgentDetail } from './polisReportRuntime';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
 import ShowSessionNames from '../Shared/ShowSessionNames';
 import { sessionNameLabels } from '../../utilities/session/sessionNames';
@@ -218,6 +219,7 @@ export default function PolisReport({
   const [stats, setStats] = useState<PolisStats | null>(null);
   const [demoDisplayNames, setDemoDisplayNames] = useState<StringMap>({});
   const [agentResponders, setAgentResponders] = useState<string[]>([]);
+  const [agentDetails, setAgentDetails] = useState<Record<string, PolisAgentDetail>>({});
 
   // Single SVD-based approach (statements + participants):
   const [participantCoords, setParticipantCoords] = useState<PolisPoint[]>([]);
@@ -309,10 +311,13 @@ export default function PolisReport({
   });
   const participantNames = useMemo(
     () =>
-      effectiveUseDemoData || sessionNames.answerNamesShown
-        ? demoDisplayNames
-        : markPolisAgents(sessionNameLabels(sessionNames.names), agentResponders),
-    [sessionNames, effectiveUseDemoData, agentResponders, demoDisplayNames],
+      effectiveUseDemoData || sessionNames.answerNamesShown ? demoDisplayNames : sessionNameLabels(sessionNames.names),
+    [sessionNames, effectiveUseDemoData, demoDisplayNames],
+  );
+  // An agent's mark says what its answers say about it: on hover or focus only, so the list stays plain.
+  const agentLabels = useMemo(
+    () => new Map(agentResponders.map((addr) => [addr, polisAgentLabel(agentDetails[addr])])),
+    [agentResponders, agentDetails],
   );
   // While the first names read is out, each address still without a name carries a mark saying so; it goes when
   // the read comes back, failed or not, and is never shown to someone names can't be read for.
@@ -966,6 +971,7 @@ export default function PolisReport({
       setQuestionPrompts(buildResult.promptsMap);
       setDemoDisplayNames(buildResult.displayNamesMap || {});
       setAgentResponders(buildResult.agents || []);
+      setAgentDetails(buildResult.agentDetails || {});
 
       const labels = buildResult.questions.map((_q, idx) => `#${idx + 1}`);
       setQuestionLabels(labels);
@@ -1395,6 +1401,29 @@ export default function PolisReport({
     return blockieCacheRef.current[key];
   }
 
+  function renderAgentMark(addr: string) {
+    const label = agentLabels.get(addr);
+    return label ? (
+      // A button so a tap focuses it and opens the tip; Escape closes it. An empty title keeps the row's own
+      // tooltip from showing over it. A PDF has no tips, so it says "AI agent" in words.
+      <button
+        type="button"
+        className={styles.agentMark}
+        aria-label={label}
+        title=""
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') event.currentTarget.blur();
+        }}
+      >
+        <FontAwesomeIcon icon={faRobot} aria-hidden="true" />
+        <span className={styles.showWhenPdf}> AI agent</span>
+        <span className={`${styles.agentTip} ${styles.pdfIgnore}`} aria-hidden="true">
+          {label}
+        </span>
+      </button>
+    ) : null;
+  }
+
   function renderParticipantsList() {
     if (!Array.isArray(allResponders) || allResponders.length === 0) {
       return <p style={{ fontStyle: 'italic', marginLeft: '10px' }}>(No participants found.)</p>;
@@ -1455,6 +1484,7 @@ export default function PolisReport({
                   <span className={styles.participantAddressShort}>{shortLabel}</span>
                 </span>
               )}
+              {renderAgentMark(addr)}
               {displayName ? null : nameLookupMark}
             </div>
           );
@@ -2084,6 +2114,7 @@ export default function PolisReport({
                   });
                   const hasLink = !!linkHref;
                   const linkLabel = displayName || getShortenedAddress(addr, false);
+                  const agentLabel = agentLabels.get(addr);
                   const historicalAvatar =
                     usesSimulatedProfiles && displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : '';
 
@@ -2120,7 +2151,11 @@ export default function PolisReport({
                                   >
                                     {linkLabel}
                                   </a>
+                                  {agentLabel ? (
+                                    <FontAwesomeIcon icon={faRobot} className={styles.agentIcon} aria-hidden="true" />
+                                  ) : null}
                                   {displayName ? null : nameLookupMark}
+                                  {agentLabel ? <div className={styles.agentDetail}>{agentLabel}</div> : null}
                                   <div>Cluster {c}</div>
                                 </div>
                               </div>,

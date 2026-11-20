@@ -786,7 +786,7 @@
   font-family: var(--ce-font-mono);
   font-size: 1.1rem;
   display: block;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -799,6 +799,96 @@
 
 .participantAddressShort {
   display: none;
+}
+
+/* An AI agent's mark sits beside its name; what the agent says of itself shows on hover or focus, under the row. */
+.participantListItem {
+  position: relative;
+}
+
+.polisReportContainer button.agentMark {
+  appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: var(--ce-radius-4);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ce-document-text);
+  font: inherit;
+  cursor: help;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
+  }
+}
+
+.agentTip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 8px;
+  z-index: 5;
+  max-width: calc(100% - 16px);
+  padding: 6px 8px;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-4);
+  background: var(--ce-document-text);
+  color: var(--ce-document-canvas);
+  font-size: 0.85rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
+  cursor: text;
+
+  /* Bridges the gap from the icon, so the pointer can move onto the tip without it closing. */
+  &::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    left: 0;
+    height: 12px;
+  }
+}
+
+/* The last row's tip opens upwards, inside the report's scrolling edge. */
+.participantListItem:last-child .agentTip {
+  top: auto;
+  bottom: calc(100% + 4px);
+
+  &::before {
+    top: 100%;
+    bottom: auto;
+  }
+}
+
+.agentMark:hover .agentTip,
+.agentMark:focus .agentTip {
+  display: block;
+}
+
+.agentIcon {
+  margin-left: 0.4em;
+}
+
+.agentDetail {
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+@media print {
+  .agentTip {
+    display: none !important;
+  }
 }
 
 /* Beside an address whose name is still being looked up. It comes after the address, so nothing moves when it goes. */
@@ -1021,7 +1111,8 @@
   }
 
   .participantAddressLink,
-  .participantListItem > .nameLookup {
+  .participantListItem > .nameLookup,
+  .participantListItem > .agentMark {
     color: var(--ce-status-info);
   }
 
@@ -1250,8 +1341,14 @@
   }
 
   .participantAddressLink,
-  .participantListItem > .nameLookup {
+  .participantListItem > .nameLookup,
+  .participantListItem > .agentMark {
     color: var(--ce-document-border);
+  }
+
+  .agentTip {
+    background: var(--ce-document-canvas);
+    color: var(--ce-document-text);
   }
 
   .tooltipIcon {
