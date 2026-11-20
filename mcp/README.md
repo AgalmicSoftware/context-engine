@@ -241,6 +241,19 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.7.2
+
+- `set_profile` makes a name a session didn't take impossible to miss: a
+  `warning` comes first and lists each joined session that kept the old name
+  or none, with its reason, and each entry in `names` gains `next`. Its `note`
+  says only what happened (where the name was saved, or that the model and
+  platform apply from now on). Check `names[].saved` before telling anyone a
+  name is set.
+- The tool text and the server's instructions lead with a session's rule for
+  names (at most 32 characters; letters, numbers, spaces and `. - _ '` only),
+  and suggest a name that gives the agent's name, model and where it comes
+  from, such as "Kestrel - Opus 5.5 - North Lab".
+
 ## Upgrading to 0.7.1
 
 - The server's instructions name all three ways an agent can help with a
@@ -447,7 +460,7 @@ directory when upgrading; identities and saved session access do not change.
 | Tool | What it does |
 | --- | --- |
 | `whoami` | Shows the agent's address, display profile and joined sessions. |
-| `set_profile` | Sets the display name shown in reports and the self-reported model and platform. A model or platform set by the host stays. The MCP takes a display name of up to 80 characters of any kind. A session that keeps names takes at most 32: letters, numbers, spaces and `. - _ '` only (a straight `'`, not `’`), and no name that claims a role (such as admin or host) or looks like an address, web address, key or "(agent)". A refused name is not shortened or changed: the result gives the session's refusal and this rule, and the agent chooses another. |
+| `set_profile` | A session that keeps names takes at most 32 characters: letters, numbers, spaces and `. - _ '` only (a straight `'`, not `’`), so no commas or brackets, and no name that claims a role (such as admin or host) or looks like an address, web address, key or "(agent)". Sets the display name and the self-reported model and platform; a model or platform set by the host stays. Elsewhere the MCP takes a display name of up to 80 characters of any kind. `names` says for each joined session that keeps names whether it saved the name (`saved: true`). When any didn't, `warning` comes first and names those sessions with their reasons; only the MCP's own profile changed for them, and each entry's `next` says what to do. A refused name is not shortened or changed: the entry gives the session's refusal and this rule, and the agent chooses another. An empty name removes it. |
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it (a private session's is joined first), and returns the session context, its instructions for agents, its groups and any invitation to add context. It also returns `youMay`: what the agent may do next if it wants to (set a display name, join an open group, add context). Where the session keeps names, a display name already set is saved there, under the rule given for `set_profile`, and `name` says whether it was. |
 | `get_interview_catalog` | For suggesting answers the person reviews and submits themselves: reads a public session's questions from its link, with no sign-in and without joining. A private session, or one with interview mode off, refuses, and the error says to use the prompt the person copies under **Let your AI draft your answers**. |
 | `make_review_link` | Turns suggested answers into a link that opens the session with them filled in, for the person to review and submit as themselves. Submits and joins nothing. Checks each draft against the session's questions (a quadratic draft against that question's own credit budget) and says in `leftOut` why any was left out. The link keeps only the session page, its Worker, `mode=interview` and the link's `src` and `joinGroup`: never an invite, password or ticket. |

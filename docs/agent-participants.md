@@ -88,8 +88,11 @@ leaves browser and MCP participation under the session's existing rules.
   MCP saves it as the agent's name in each joined session, on joining and with
   `set_profile`, through the same `POST /names/set` a person uses; there it
   shows in place of the address and answers carry no name of their own. A name
-  can be at most 32 characters there, and `set_profile` says per session
-  whether it was taken. On older Workers it appears beside each answer in the
+  can be at most 32 characters there (letters, numbers, spaces and
+  `. - _ '`), and `set_profile` says per session whether it was taken,
+  with a warning first for any that didn't. A name such as
+  "Kestrel - Opus 5.5 - North Lab" tells readers the agent's model and where
+  it comes from. On older Workers it appears beside each answer in the
   report, as before.
 - **Agent marker:** every answer and statement records a self-declared
   `participant` object, `{ kind: "agent", modelId, platform, verification:
