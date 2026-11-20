@@ -63,10 +63,11 @@ const readUnsentCount = (account: string, store: Storage, onUnreadable: () => vo
 
 /** Whether this tab holds unsent answers for `account`. Where any cannot be read the answer is yes: the page is
  * then left alone. */
-export const hasUnsentAnswers = (account: string, store: Storage = window.sessionStorage): boolean => {
+export const hasUnsentAnswers = (account: string, store?: Storage): boolean => {
   let unreadable = false;
   try {
-    return readUnsentCount(account, store, () => (unreadable = true)) > 0 || unreadable;
+    // The tab's storage is read in here: a browser that denies storage throws on the read itself.
+    return readUnsentCount(account, store ?? window.sessionStorage, () => (unreadable = true)) > 0 || unreadable;
   } catch {
     return true;
   }
@@ -74,11 +75,12 @@ export const hasUnsentAnswers = (account: string, store: Storage = window.sessio
 
 /** How many unsent answers Disconnect would discard for `account` (see clearSurveyDraftsForAccount). Where storage
  * cannot be read, none: Disconnect cannot clear it either. */
-export const countUnsentAnswers = (account: string, store: Storage = window.sessionStorage): number => {
+export const countUnsentAnswers = (account: string, store?: Storage): number => {
   const owner = account.trim().toLowerCase();
   if (!owner || owner === 'anon') return 0;
   try {
-    return readUnsentCount(owner, store, () => undefined);
+    // As above: Disconnect must still sign out where the read of storage itself throws.
+    return readUnsentCount(owner, store ?? window.sessionStorage, () => undefined);
   } catch {
     return 0;
   }

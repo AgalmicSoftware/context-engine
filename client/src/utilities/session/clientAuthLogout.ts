@@ -23,8 +23,10 @@ export const clearSurveyDraftsForAccount = (account: unknown): void => {
   const owner = String(account || '')
     .trim()
     .toLowerCase();
-  if (!owner || owner === 'anon' || typeof sessionStorage === 'undefined') return;
+  if (!owner || owner === 'anon') return;
   try {
+    // Read in here: where the browser denies storage, even asking whether it exists throws.
+    if (typeof sessionStorage === 'undefined') return;
     Object.keys(sessionStorage)
       .filter((key) => key.startsWith('dg:surveyDraft:') && key.split(':')[4] === owner)
       .forEach((key) => sessionStorage.removeItem(key));

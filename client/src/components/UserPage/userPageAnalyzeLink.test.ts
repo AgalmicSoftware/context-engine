@@ -52,6 +52,21 @@ const page = (aiAvailable: boolean | null, slug = 'demo-one') => ({
   getProfileSessionSlug: () => slug,
 });
 
+// A browser that denies storage throws when the page so much as reads window.sessionStorage.
+const denyStorage = () => {
+  const held = Object.getOwnPropertyDescriptor(window, 'sessionStorage');
+  Object.defineProperty(window, 'sessionStorage', {
+    configurable: true,
+    get() {
+      throw new DOMException('The operation is insecure.', 'SecurityError');
+    },
+  });
+  return () => {
+    if (held) Object.defineProperty(window, 'sessionStorage', held);
+    else Reflect.deleteProperty(window, 'sessionStorage');
+  };
+};
+
 describe('Analyze user, from the account dialog', () => {
   it('offers the link only where the page found AI it may use', () => {
     expect(buildAnalyzeLinkHref(page(true), true)).toBe(HREF);
@@ -101,6 +116,18 @@ describe('Analyze user, from the account dialog', () => {
     expect(
       countUnsentAnswers(ME, memoryStore({ [key(ME)]: '{not json', [key(ME, 'survey-7')]: draft({ s1: 1 }) })),
     ).toBe(1);
+  });
+
+  it('answers safely where the browser denies storage, rather than throwing', () => {
+    const allow = denyStorage();
+    try {
+      expect(() => window.sessionStorage).toThrow();
+      expect(countUnsentAnswers(ME)).toBe(0);
+      expect(hasUnsentAnswers(ME)).toBe(true);
+    } finally {
+      allow();
+    }
+    expect(window.sessionStorage.length).toBeGreaterThanOrEqual(0);
   });
 
   it('opens my page in this tab, and in a new one where answers are unsent', () => {

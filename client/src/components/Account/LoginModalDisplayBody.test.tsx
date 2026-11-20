@@ -96,7 +96,7 @@ it('shows the rows on their own only once the profile is slow', () => {
 describe('Disconnect with unsent answers', () => {
   const me = '0x00000000000000000000000000000000000000aa';
   const draftKey = `dg:surveyDraft:meadow-forum:84532:${me}:all`;
-  let confirm: jest.SpyInstance;
+  let confirm: jest.SpyInstance<boolean, [message?: string]>;
   beforeEach(() => {
     confirm = jest.spyOn(window, 'confirm');
   });
@@ -127,6 +127,24 @@ describe('Disconnect with unsent answers', () => {
     const handleLogout = await pressDisconnect();
     expect(confirm).toHaveBeenCalledWith('You have 1 unsent answer. Disconnect and discard it?');
     expect(handleLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it('still disconnects where the browser denies storage', async () => {
+    const held = Object.getOwnPropertyDescriptor(window, 'sessionStorage');
+    Object.defineProperty(window, 'sessionStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('The operation is insecure.', 'SecurityError');
+      },
+    });
+    try {
+      const handleLogout = await pressDisconnect();
+      expect(confirm).not.toHaveBeenCalled();
+      expect(handleLogout).toHaveBeenCalledTimes(1);
+    } finally {
+      if (held) Object.defineProperty(window, 'sessionStorage', held);
+      else Reflect.deleteProperty(window, 'sessionStorage');
+    }
   });
 
   it('disconnects at once with none unsent, or only another account’s', async () => {
