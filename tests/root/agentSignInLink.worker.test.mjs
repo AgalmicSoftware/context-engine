@@ -166,7 +166,7 @@ test('an agent’s person signs in from its link, keeps the account with a passk
 
   // The session's admins switch agents off: the agent is told so, and the person is not signed out.
   assert.equal((await signedAdminRequest({ env, wallet: admin, action: 'set-config', body: { config: { agentParticipationEnabled: false } } })).status, 200);
-  const off = /has AI agents switched off/;
+  const off = /has its agent functions switched off/;
   await assert.rejects(agent.answer({ answers: [{ questionId: QUESTION, value: 'Agree' }] }), off);
   await assert.rejects(agent.joinSession({ link: LINK }), off);
   assert.equal((await ask('/storage/list?resource=responses&limit=10&mine=true', { token: back.body.token, method: 'GET' })).status, 200);
@@ -195,4 +195,21 @@ test('an older Worker, or a session with agents off, makes no link and says why'
   assert.match(none.note, /from before sign-in links/);
   assert.equal(asked.includes(AGENT_SIGN_IN_PATHS.create), false);
   await assert.rejects(agent.makeSignInLink({ session: 'another-session' }), /Join it first/);
+
+  // A session that has turned sign-in links off: said from its settings, with no code asked for.
+  const plain = createSessionEnv({ configOverrides: { ...config, agentSignInLinksEnabled: false } });
+  withoutNonceLimit(plain.env);
+  const requested = [];
+  const other = createParticipant({
+    config: { stateDir, profile: {}, appOrigin: APP_ORIGIN, trustedAppOrigins: [APP_ORIGIN], allowLocalWorkers: false },
+    wallet: ethers.Wallet.createRandom(),
+    fetchImpl: async (url, init = {}) => {
+      requested.push(new URL(url).pathname);
+      return fetchWorker(new Request(url, { method: init.method || 'GET', headers: init.headers, body: init.body }), plain.env);
+    },
+  });
+  await other.joinSession({ link: LINK });
+  const off = await other.makeSignInLink({});
+  assert.deepEqual([off.made, /sign-in links from agents switched off/.test(off.note)], [false, true]);
+  assert.equal(requested.includes(AGENT_SIGN_IN_PATHS.create), false);
 });

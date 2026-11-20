@@ -163,7 +163,20 @@ it('says so, and drops the code, where the Worker can’t sign in from a link, o
   expect(exchangeHeldAgentSignInCode).not.toHaveBeenCalled();
   unmount();
 
+  // Switched off in the session's own settings: said so, with the code dropped unused.
   jest.mocked(workerHasAgentSignIn).mockResolvedValue(true);
+  const offGate = render(
+    <AgentSignInGate
+      sessionConfig={{ slug: 'salon', agentSignInLinksEnabled: false }}
+      sessionSlug="salon"
+      account=""
+      provider=""
+    />,
+  );
+  await waitFor(() => expect(notice()?.textContent).toMatch(/sign-in links from agents switched off/));
+  expect(exchangeHeldAgentSignInCode).not.toHaveBeenCalled();
+  offGate.unmount();
+
   jest
     .mocked(exchangeHeldAgentSignInCode)
     .mockRejectedValue(new Error('This sign-in link has expired or was already used. Ask your agent for a new one.'));

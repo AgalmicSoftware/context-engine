@@ -31,7 +31,7 @@ import {
 import {
   WORKER_GROUP_READ_PROOF_V2_FEATURE, createWorkerGroupPasswordKeys, formatWorkerGroupReadInvite, parseGroupInviteToken,
 } from '../../shared/workerGroupJoin.mjs';
-import { AGENT_SIGN_IN_FEATURE, agentParticipationOn, buildAgentSignInLink } from '../../shared/agentSignIn.mjs';
+import { AGENT_SIGN_IN_FEATURE, agentParticipationOn, agentSignInLinksOn, buildAgentSignInLink } from '../../shared/agentSignIn.mjs';
 import { ethers } from 'ethers';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
@@ -1785,6 +1785,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       }
       if (!agentParticipationOn(sessionConfig)) {
         return { session: ctx.info.slug, made: false, note: 'This session has AI agents switched off, so it makes no sign-in links.' };
+      }
+      if (!agentSignInLinksOn(sessionConfig)) {
+        return { session: ctx.info.slug, made: false, note: 'This session has sign-in links from agents switched off. The person can watch what you did through you, or take part themselves on the session page.' };
       }
       checkpoint();
       const made = await ctx.client.createSignInCode();

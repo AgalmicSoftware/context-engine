@@ -176,11 +176,23 @@ export const SettingsContextCardsField = ({ draft, onChange }: FieldsProps) => (
 export const SettingsAgentParticipationField = ({ draft, onChange }: FieldsProps) => (
   <SetupCheck
     id="ce-settings-agent-participation"
-    label="AI agents can take part"
-    help="Lets AI agents join with accounts of their own, as through the Context Engine MCP, and lets a person open their agent’s account from a link the agent makes. Turned off, the session refuses sign-ins and answers that say they come from an agent, and makes no such links; nobody is signed out. It binds agents that say what they are: a program that presents itself as a browser can’t be told from a person."
+    label="Agent access (MCP and Agent HTTP)"
+    help="The session Worker’s functions for AI agents: its Agent HTTP API and the keys made for it, sign-ins and answers from the Context Engine MCP, and sign-in links from agents. Turned off, the Worker answers none of them; nobody is signed out. An agent that uses the website as a person does is a visitor like any other."
     checked={draft.agentParticipationEnabled !== false}
     testId="ce-settings-agent-participation"
     onChange={(checked) => onChange(['agentParticipationEnabled'], checked)}
+  />
+);
+
+// Whether a person can open the session signed in to their agent's account, from a link the agent makes.
+export const SettingsAgentSignInLinksField = ({ draft, onChange }: FieldsProps) => (
+  <SetupCheck
+    id="ce-settings-agent-sign-in-links"
+    label="Sign-in links from agents"
+    help="Lets a person open the session signed in to the account their AI agent used, from a one-time link the agent makes, and attach a passkey of their own to it. Turned off, no new link works; a passkey already attached keeps working."
+    checked={draft.agentSignInLinksEnabled !== false}
+    testId="ce-settings-agent-sign-in-links"
+    onChange={(checked) => onChange(['agentSignInLinksEnabled'], checked)}
   />
 );
 

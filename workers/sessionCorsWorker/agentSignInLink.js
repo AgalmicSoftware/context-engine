@@ -20,6 +20,7 @@ import {
   AGENT_SIGN_IN_PATHS,
   AGENT_SIGN_IN_VIA,
   agentParticipationOn,
+  agentSignInLinksOn,
   formatAgentSignInCode,
   isAgentSignInCode,
   readAgentPasskeyAttachStatement,
@@ -67,6 +68,9 @@ const CODE_INVALID = Object.freeze({
   reason: 'sign_in_code_invalid',
 });
 const OFF = Object.freeze({ error: 'This session has AI agents switched off.', reason: 'agent_participation_off' });
+const LINKS_OFF = Object.freeze({ error: 'This session doesn’t sign people in from an agent’s link.', reason: 'sign_in_links_off' });
+// Why a session makes and takes no codes, or null when it does.
+const linksRefusal = (config) => (!agentParticipationOn(config) ? OFF : agentSignInLinksOn(config) ? null : LINKS_OFF);
 const CANCELLED = Object.freeze({
   error: 'The person this account belongs to has ended agent access to it in this session.',
   reason: 'agent_access_cancelled',
@@ -238,7 +242,7 @@ const create = async ({ request, env, baseHeaders, slug, deps }) => {
   const reply = new Headers(headers || {});
   reply.set('cache-control', 'no-store');
   if (!isWorkerCanonical(config)) return deps.json({ error: 'Not available in this session.', reason: 'hosted_session_required' }, 400, reply);
-  if (!agentParticipationOn(config)) return deps.json(OFF, 403, reply);
+  if (linksRefusal(config)) return deps.json(linksRefusal(config), 403, reply);
   const account = lower(address);
   if (scopes?.admin === true || namedForPower(config, account)) {
     return deps.json({ error: 'An admin’s account can’t be signed in to this way.', reason: 'admin_account_not_supported' }, 403, reply);
@@ -280,7 +284,7 @@ const exchange = async ({ request, env, baseHeaders, slug, deps }) => {
   if (resolveCanonicalWorkerSessionIdHex({ sessionId: body.sessionId }) !== resolveCanonicalWorkerSessionIdHex(config)) {
     return deps.json({ error: 'Session identity does not match worker session.' }, 409, headers);
   }
-  if (!agentParticipationOn(config)) return deps.json(OFF, 403, headers);
+  if (linksRefusal(config)) return deps.json(linksRefusal(config), 403, headers);
   // Something that isn't a code is answered at once, and spends none of the network's count.
   if (!isAgentSignInCode(body.code)) return deps.json(CODE_INVALID, 401, headers);
   const limited = await countOrRefuse({
@@ -303,6 +307,7 @@ const attach = async ({ request, env, baseHeaders, slug, deps }) => {
   const { context, headers, account, claims } = caller;
   // Only from the sign-in a code gave: the person, in a browser, holding the account now.
   if (claims.via !== AGENT_SIGN_IN_VIA.LINK) return deps.json({ error: 'Open the session from your agent’s sign-in link to attach a passkey.', reason: 'sign_in_link_required' }, 403, headers);
+  if (linksRefusal(context.config)) return deps.json(linksRefusal(context.config), 403, headers);
   const body = await readBody(request);
   const passkey = body?.passkey && typeof body.passkey === 'object' ? body.passkey : null;
   if (!passkey) return deps.json({ error: 'Invalid JSON.' }, 400, headers);
@@ -420,6 +425,7 @@ const state = async ({ request, env, baseHeaders, slug, deps }) => {
     address: deps.getAddress(account),
     via: claims.via || null,
     agentParticipation: agentParticipationOn(context.config),
+    signInLinks: agentSignInLinksOn(context.config),
     attachedPasskey: kept.asAccount ? { address: deps.getAddress(kept.asAccount.passkey), agentAccess: kept.asAccount.agentAccess, linkedAt: kept.asAccount.linkedAt } : null,
     linkedAgentAccount: kept.asPasskey ? { address: deps.getAddress(kept.asPasskey.account) } : null,
   }, 200, headers);

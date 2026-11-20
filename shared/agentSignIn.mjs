@@ -11,13 +11,23 @@
 export const AGENT_SIGN_IN_FEATURE = 'agent_sign_in_link_v1';
 
 /**
- * The session setting that lets AI agents take part with accounts of their own. Absent or true, they may, as in
- * every session from before the setting. False, the Worker refuses a sign-in or an answer that says it is an
- * agent's, and makes and takes no sign-in codes. It binds agents that say what they are, as the MCP does: a
- * program that presents itself as a browser can't be told from a person's own wallet.
+ * The session setting for the Session Worker's functions for AI agents. Absent or true, they are on, as in every
+ * session from before the setting. False, the Worker answers nothing on its Agent HTTP API (`/api/agent/*`, with
+ * the keys made there), refuses sign-ins, requests and answers that come from the Context Engine MCP, and makes
+ * and takes no sign-in codes. It is a switch on what the Worker does for agents; an agent that uses the website
+ * as a person does is a visitor like any other.
  */
 export const AGENT_PARTICIPATION_FIELD = 'agentParticipationEnabled';
 export const agentParticipationOn = (config) => config?.[AGENT_PARTICIPATION_FIELD] !== false;
+
+/**
+ * The session setting that lets a person sign in from a link their agent makes, and attach a passkey to the
+ * agent's account. Absent or true, it is on wherever agents are. False, the Worker makes and takes no sign-in
+ * codes and attaches no passkey; one already attached keeps working, and so does ending or restoring the
+ * agent's access.
+ */
+export const AGENT_SIGN_IN_LINKS_FIELD = 'agentSignInLinksEnabled';
+export const agentSignInLinksOn = (config) => config?.[AGENT_SIGN_IN_LINKS_FIELD] !== false && agentParticipationOn(config);
 
 // Sent by an agent's client with every request. A web page can't send it to a Worker: the Worker's CORS answer
 // doesn't allow the header, so a browser never makes the request.

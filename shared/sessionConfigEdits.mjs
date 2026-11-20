@@ -25,6 +25,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'namesEnabled',
   'contextCardsEnabled',
   'agentParticipationEnabled',
+  'agentSignInLinksEnabled',
   'defaultFilterState',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
@@ -114,6 +115,8 @@ const CONTENT_FIELDS = new Set([
   'contextCardsEnabled',
   // Checked on each sign-in and each signed-in request that says it is an agent's, the same way.
   'agentParticipationEnabled',
+  // Checked on each sign-in code made or used, and each passkey attached, the same way.
+  'agentSignInLinksEnabled',
   ...CURATED_ID_LIST_KEYS,
 ]);
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);

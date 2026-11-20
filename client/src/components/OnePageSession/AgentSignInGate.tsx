@@ -8,6 +8,8 @@
 //   session says so. The page never raises a passkey prompt for this by itself.
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 
+import { agentSignInLinksOn } from '@ce-shared/agentSignIn.mjs';
+
 import { resolveWorkerGroupAutoJoinContext } from '../../domains/worker/workerGroupAutoJoinContext';
 import {
   dismissAttachedPasskeyNotice,
@@ -93,10 +95,12 @@ export default function AgentSignInGate({
     let current = true;
     void workerHasAgentSignIn(target).then((supported) => {
       if (!current || !hasAgentSignInCodeFor(target)) return;
-      if (!supported) {
+      if (!supported || !agentSignInLinksOn(sessionConfig)) {
         dropAgentSignInCode();
         setNote({
-          text: 'This session can’t sign you in from an agent’s link yet. Ask its organisers, or sign in yourself.',
+          text: supported
+            ? 'This session has sign-in links from agents switched off. Sign in yourself to take part.'
+            : 'This session can’t sign you in from an agent’s link yet. Ask its organisers, or sign in yourself.',
           isError: true,
         });
         setPhase('unsupported');

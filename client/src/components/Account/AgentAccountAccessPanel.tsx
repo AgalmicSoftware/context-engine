@@ -3,6 +3,8 @@
 // session's standing notice and under "Your AI agent" in the account dialog; it renders nothing for any other
 // account.
 import React, { useState, useSyncExternalStore } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faFingerprint } from '@fortawesome/free-solid-svg-icons';
 
 import {
   isAgentLinkProvider,
@@ -22,6 +24,8 @@ export const shortAddress = (address: string): string => `${address.slice(0, 6)}
 const HELP = {
   passkey:
     'A passkey of your own lets you sign in to this account again without your agent, in this session. Your agent keeps its access until you cancel it.',
+  existing:
+    'Attaches a passkey you already use. If that passkey has an account of its own in this session, that account stays separate and nothing is merged; you can switch back to it.',
   cancel:
     'Ends your AI agent’s access to this account in this session: its sign-in is refused, every sign-in it had stops, and its unused links stop working. You can allow it again. From then on your passkey is the only way in: if you lose it, only the session’s admins can restore access.',
   remove: 'Takes your passkey off this account and signs you out of it. The account is then your agent’s alone again.',
@@ -56,7 +60,7 @@ export default function AgentAccountAccessPanel({
       setBusy('');
     }
   };
-  const button = (name: string, label: string, help: string, onClick: () => void): React.ReactElement => (
+  const button = (name: string, label: React.ReactNode, help: string, onClick: () => void): React.ReactElement => (
     <button
       type="button"
       className={buttonClassName}
@@ -74,7 +78,7 @@ export default function AgentAccountAccessPanel({
       {!withPasskey
         ? button(
             'add-passkey',
-            'Add a passkey',
+            'Create passkey',
             HELP.passkey,
             run(
               'add-passkey',
@@ -86,8 +90,10 @@ export default function AgentAccountAccessPanel({
       {!withPasskey
         ? button(
             'use-passkey',
-            'Use a passkey I have',
-            HELP.passkey,
+            <>
+              <FontAwesomeIcon icon={faFingerprint} /> I already have one
+            </>,
+            HELP.existing,
             run(
               'use-passkey',
               () => attachPasskeyHere({ useExisting: true }),

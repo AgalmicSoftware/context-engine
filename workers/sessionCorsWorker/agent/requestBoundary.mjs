@@ -12,6 +12,7 @@ import { handleAgentHttpRequest } from './dispatch.mjs';
 import { aggregateResultsEnabledForAgent, authorizeSessionMemberAggregateResults } from './results.mjs';
 import { createAgentServices } from './services.mjs';
 import { evaluatePrivateSessionAccess } from '../privateSessionAccess.js';
+import { agentParticipationOn } from '../../../shared/agentSignIn.mjs';
 
 export const dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders = {} }) => {
   const url = new URL(request.url);
@@ -50,6 +51,8 @@ export const dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders
         'Access-Control-Allow-Headers': 'authorization, content-type, x-session-slug, x-ce-agent-token, x-context-engine-agent-token' } });
     }
     if (!agentHttpEnabled(config) && !route.descriptor) throw authorityError('agent_http_disabled');
+    // The session's switch for the Worker's agent functions closes this API whole, descriptors apart.
+    if (!agentParticipationOn(config) && !route.descriptor) throw authorityError('agent_participation_off');
     const agentEnv = createAgentEnvironment({ env, config, revision, slug, origin: url.origin, now: deps.now, fetchImpl: deps.fetch });
     const ctx = agentEnv.AGENT_CONTEXT;
     const requestedIds = [body.sessionId, body.sessionIdHex, url.searchParams.get('sessionId')].filter(value => value != null);

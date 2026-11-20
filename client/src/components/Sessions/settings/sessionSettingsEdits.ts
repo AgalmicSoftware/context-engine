@@ -140,6 +140,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     pileAutoAdvanceEnabled: resolvePileAutoAdvanceEnabled(source),
     feedbackEnabled: source.feedbackEnabled !== false,
     agentParticipationEnabled: source.agentParticipationEnabled !== false,
+    agentSignInLinksEnabled: source.agentSignInLinksEnabled !== false,
     contextCardsEnabled: source.contextCardsEnabled === true,
     defaultFilterState: formatFilterState(source.defaultFilterState),
     defaultSbtTags: text(source.defaultSbtTags),
@@ -328,6 +329,10 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
   if (!onChain && (draft.agentParticipationEnabled !== false) !== (before.agentParticipationEnabled !== false)) {
     values.agentParticipationEnabled = draft.agentParticipationEnabled !== false;
   }
+  // So are sign-in links from agents.
+  if (!onChain && (draft.agentSignInLinksEnabled !== false) !== (before.agentSignInLinksEnabled !== false)) {
+    values.agentSignInLinksEnabled = draft.agentSignInLinksEnabled !== false;
+  }
   // Context cards are off unless turned on. Only a changed choice is stored, for the same reason.
   if (!onChain && (draft.contextCardsEnabled === true) !== (before.contextCardsEnabled === true)) {
     values.contextCardsEnabled = draft.contextCardsEnabled === true;
@@ -378,7 +383,7 @@ const unchanged = (key: string, before: unknown, after: unknown) => {
   if (key === 'interviewModeEnabled') return (before !== false) === after;
   if (key === 'analysisCardEnabled') return (before === true) === after;
   if (key === 'feedbackEnabled') return (before !== false) === after;
-  if (key === 'agentParticipationEnabled') return (before !== false) === after;
+  if (key === 'agentParticipationEnabled' || key === 'agentSignInLinksEnabled') return (before !== false) === after;
   if (key === 'contextCardsEnabled') return (before === true) === after;
   return same(before, after) || (isBlank(before) && isBlank(after));
 };
@@ -516,7 +521,8 @@ const LABELS: Record<string, string> = {
   storageProfile: 'Storage access',
   pileAutoAdvanceEnabled: 'Next question after an answer',
   feedbackEnabled: 'Feedback box',
-  agentParticipationEnabled: 'AI agents can take part',
+  agentParticipationEnabled: 'Agent access (MCP and Agent HTTP)',
+  agentSignInLinksEnabled: 'Sign-in links from agents',
   contextCardsEnabled: 'Context cards',
   defaultFilterState: 'Default filters',
   defaultSbtTags: 'SBT tags',

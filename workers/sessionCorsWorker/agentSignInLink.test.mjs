@@ -630,3 +630,47 @@ test('a backup carries which passkey is attached and whose agent is cancelled, a
   // What is already there is the newer word, and stays.
   assert.deepEqual(await restoreAgentLinks(storage, rows), { written: 0, skipped: 2 });
 });
+
+test('sign-in links are on unless a session turns them off; an attached passkey keeps working after', async () => {
+  // Turned off from the start: no code is made or taken, and everything else an agent does is as before.
+  const off = await setup({ agentSignInLinksEnabled: false });
+  const first = Wallet.createRandom();
+  const refused = await makeCode(off.env, first);
+  assert.deepEqual([refused.status, refused.body], [403, { error: 'This session doesn’t sign people in from an agent’s link.', reason: 'sign_in_links_off' }]);
+  assert.equal((await exchange(off.env, `cesi_${'A'.repeat(43)}`)).body.reason, 'sign_in_links_off');
+  const token = await tokenOf(off.env, first, { headers: AGENT });
+  assert.equal((await answer(off.env, token, agentAnswer(first), AGENT)).status, 200);
+  assert.equal((await stateOf(off.env, token)).body.signInLinks, false);
+
+  // On, used, then turned off: no new link or passkey, but the person keeps their way in and their say.
+  const { env, admin } = await setup();
+  const agent = Wallet.createRandom();
+  const passkey = Wallet.createRandom();
+  const waiting = await makeCode(env, agent);
+  const visitor = (await exchange(env, (await makeCode(env, Wallet.createRandom())).body.code)).body.token;
+  const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+  assert.equal((await stateOf(env, linkToken)).body.signInLinks, true);
+  const kept = (await attach(env, linkToken, passkey, agent.address.toLowerCase())).body.token;
+  assert.equal((await signedAdminRequest({ env, wallet: admin, action: 'set-config', body: { config: { agentSignInLinksEnabled: false } } })).status, 200);
+  assert.equal((await makeCode(env, agent)).body.reason, 'sign_in_links_off');
+  assert.equal((await exchange(env, waiting.body.code)).body.reason, 'sign_in_links_off');
+  assert.equal((await attach(env, visitor, Wallet.createRandom(), '0x0')).body.reason, 'sign_in_links_off');
+  assert.equal(await stands(env, kept), true);
+  assert.equal((await passkeySignIn(env, await tokenOf(env, passkey))).status, 200);
+  assert.equal((await setAccess(env, kept, 'cancelled')).body.agentAccess, 'cancelled');
+  assert.equal((await signIn(env, agent, { headers: AGENT })).body.reason, 'agent_access_cancelled');
+  assert.equal((await signedAdminRequest({ env, wallet: admin, action: 'set-config', body: { config: { agentSignInLinksEnabled: 'yes' } } })).status, 400);
+});
+
+test('the agents switch also closes the Worker’s Agent HTTP API', async () => {
+  // A session with the Agent HTTP API on.
+  const withApi = { sessionModeProfile: { ...groupsConfig.sessionModeProfile, surfaces: { ...groupsConfig.sessionModeProfile.surfaces, agentHttp: true } } };
+  const on = await setup(withApi);
+  const off = await setup({ ...withApi, agentParticipationEnabled: false });
+  const ask = (env, path) => send(env, `${path}?sessionSlug=${SLUG}`, { method: 'GET' });
+  // Its descriptors still answer, so a client can read why; everything else says the switch is off.
+  const refused = await ask(off.env, '/api/agent/questions');
+  assert.deepEqual([refused.status, refused.body.reason], [403, 'agent_participation_off']);
+  assert.notEqual((await ask(on.env, '/api/agent/questions')).body.reason, 'agent_participation_off');
+  assert.notEqual((await ask(off.env, '/api/agent/session-meta')).body.reason, 'agent_participation_off');
+});

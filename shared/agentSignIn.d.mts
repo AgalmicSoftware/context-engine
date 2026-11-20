@@ -1,6 +1,8 @@
 export const AGENT_SIGN_IN_FEATURE: 'agent_sign_in_link_v1';
 export const AGENT_PARTICIPATION_FIELD: 'agentParticipationEnabled';
 export function agentParticipationOn(config: unknown): boolean;
+export const AGENT_SIGN_IN_LINKS_FIELD: 'agentSignInLinksEnabled';
+export function agentSignInLinksOn(config: unknown): boolean;
 export const AGENT_CLIENT_HEADER: 'X-CE-Agent-Client';
 export const AGENT_SIGN_IN_PATHS: Readonly<{
   create: string;

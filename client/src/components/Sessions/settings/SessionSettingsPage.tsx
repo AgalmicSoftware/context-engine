@@ -85,6 +85,7 @@ import {
   SettingsContextCardsField,
   SettingsFeedbackField,
   SettingsAgentParticipationField,
+  SettingsAgentSignInLinksField,
   SettingsQuestionListFields,
   SettingsSbtFields,
 } from './SettingsListFields';
@@ -761,6 +762,9 @@ const SessionSettingsPage = ({
               AI agents
             </h2>
             <SettingsAgentParticipationField draft={draft} onChange={updateDraft} />
+            {draft.agentParticipationEnabled !== false ? (
+              <SettingsAgentSignInLinksField draft={draft} onChange={updateDraft} />
+            ) : null}
           </section>
         ) : null}
         {capabilities.isWorkerCanonical && workerTakesFeedback ? (

@@ -17,6 +17,7 @@ export const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'namesEnabled',
   'contextCardsEnabled',
   'agentParticipationEnabled',
+  'agentSignInLinksEnabled',
   'interviewMode',
   'defaultTags',
   'defaultGroupTags',

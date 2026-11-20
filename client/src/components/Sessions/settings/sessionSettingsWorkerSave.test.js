@@ -550,8 +550,22 @@ describe('saving the edit page through the Session Worker', () => {
       draft.agentParticipationEnabled = false;
     });
     expect(off.save.patch).toEqual({ agentParticipationEnabled: false });
-    expect(off.save.classification).toMatchObject({ content: ['agentParticipationEnabled'], signsParticipantsOut: false });
-    expect(describeSessionSettingsPath('agentParticipationEnabled')).toBe('AI agents can take part');
+    expect(off.save.classification).toMatchObject({
+      content: ['agentParticipationEnabled'],
+      signsParticipantsOut: false,
+    });
+    expect(describeSessionSettingsPath('agentParticipationEnabled')).toBe('Agent access (MCP and Agent HTTP)');
+    // Sign-in links from agents: on unless turned off, stored only when changed, and nobody signed out.
+    const linksOff = editAndSave(stored, (draft) => {
+      expect(draft.agentSignInLinksEnabled).toBe(true);
+      draft.agentSignInLinksEnabled = false;
+    });
+    expect(linksOff.save.patch).toEqual({ agentSignInLinksEnabled: false });
+    expect(linksOff.save.classification).toMatchObject({
+      content: ['agentSignInLinksEnabled'],
+      signsParticipantsOut: false,
+    });
+    expect(linksOff.result).toMatchObject({ ok: true });
     expect(off.result).toMatchObject({ ok: true });
     expect(projectPublicWorkerSessionConfig(off.result.config).agentParticipationEnabled).toBe(false);
 

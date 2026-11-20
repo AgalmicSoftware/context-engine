@@ -67,7 +67,10 @@ export class WorkerRequestError extends Error {
 const explainFailure = (status, error, path, reason = '') => {
   const detail = error.slice(0, MAX_ERROR_DETAIL);
   if (reason === 'agent_participation_off') {
-    return 'This session has AI agents switched off, so an agent can’t take part in it. Nothing was sent. Tell the person: they can answer on the session page themselves, or ask the session’s admins.';
+    return 'This session has its agent functions switched off, so an agent can’t take part through these tools. Nothing was sent. Tell the person: they can answer on the session page themselves, or ask the session’s admins.';
+  }
+  if (reason === 'sign_in_links_off') {
+    return 'This session has sign-in links from agents switched off.';
   }
   if (reason === 'agent_access_cancelled') {
     return 'The person this account belongs to has ended agent access to it in this session. Nothing was sent. Only they can allow it again, on the session page under "Your AI agent".';
