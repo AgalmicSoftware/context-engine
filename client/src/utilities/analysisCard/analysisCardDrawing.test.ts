@@ -1,4 +1,10 @@
-import { CARD_HEIGHT, CARD_WIDTH, drawAnalysisCardPages, loadAnalysisCardFonts } from './analysisCardCanvas';
+import {
+  CARD_HEIGHT,
+  CARD_WIDTH,
+  drawAnalysisCardPages,
+  loadAnalysisCardFonts,
+  portraitOval,
+} from './analysisCardCanvas';
 import { normalizeAnalysisCard, type AnalysisCard } from './analysisCardModel';
 
 // A stand-in for a canvas that measures every character as half its type size and records what is drawn, so
@@ -35,8 +41,16 @@ class FakeContext {
   getImageData() {
     return { data: Array.from({ length: 16 }, (_, index) => (index % 4 === 3 ? 255 : 220)) };
   }
-  createLinearGradient() {
-    return { addColorStop: () => undefined };
+  // Each oval mask: its radius, how far it is squeezed, and its stops.
+  ovals: Array<{ radius: number; squeeze: number; stops: Array<[number, string]> }> = [];
+  private squeeze = 1;
+  scale(_x: number, y: number) {
+    this.squeeze = y;
+  }
+  createRadialGradient(...circle: number[]) {
+    const stops: Array<[number, string]> = [];
+    this.ovals.push({ radius: circle[5], squeeze: this.squeeze, stops });
+    return { addColorStop: (at: number, colour: string) => stops.push([at, colour]) };
   }
 }
 [
@@ -50,7 +64,6 @@ class FakeContext {
   'save',
   'restore',
   'translate',
-  'scale',
   'arc',
   'ellipse',
 ].forEach((method) => {
@@ -154,7 +167,7 @@ describe('drawAnalysisCardPages', () => {
       expect(link.size).toBeGreaterThanOrEqual(22);
     });
 
-    // The portrait is faded on its own canvas, then set at the right of the page beside the note about the
+    // The portrait is masked on its own canvas, then set at the right of the page beside the note about the
     // figure: the note and the figure's name stay in the column to its left, and the title keeps the full width.
     // (The picture is also drawn once on a tiny canvas, to read the colour its ground settles into.)
     const faded = [...contexts.entries()].find(
@@ -163,6 +176,16 @@ describe('drawAnalysisCardPages', () => {
         context.images.some((image) => image.source === picture.image),
     );
     expect(faded).toBeDefined();
+    // One oval, whole at its heart and gone at its rim, which lies inside the portrait's own canvas on the
+    // left, at the top and at the foot: no straight edge of the picture is left to show.
+    const [oval] = faded![1].ovals;
+    expect(faded![1].ovals).toHaveLength(1);
+    expect(oval.stops[0]).toEqual([0, 'rgba(0, 0, 0, 1)']);
+    expect(oval.stops[oval.stops.length - 1]).toEqual([1, 'rgba(0, 0, 0, 0)']);
+    expect(oval.stops.map(([at]) => at)).toEqual([...oval.stops.map(([at]) => at)].sort((a, b) => a - b));
+    const shape = portraitOval(faded![0].width, faded![0].height);
+    expect(oval.radius).toBeCloseTo(shape.rx);
+    expect(oval.radius * oval.squeeze).toBeCloseTo(shape.ry);
     const placed = first.images.find((image) => image.source === faded?.[0]) as { x: number };
     expect(placed.x).toBeGreaterThan(480);
     const order = first.texts.map((drawn) => drawn.text);
@@ -213,6 +236,22 @@ describe('drawAnalysisCardPages', () => {
     expectOnTheCard(contextOf(pages!.page2));
     // An answer that is not Agree, Unsure or Disagree is still drawn, in the card's own colours.
     expect(contextOf(pages!.page2).texts.some((drawn) => drawn.text === 'CONSTRUCTOR')).toBe(true);
+  });
+
+  it.each([
+    [640, 396],
+    [640, 600],
+    [640, 960],
+    [320, 1200],
+  ])('keeps the portrait oval inside a %i by %i picture on the left, at the top and at the foot', (width, height) => {
+    const { cx, cy, rx, ry } = portraitOval(width, height);
+    expect(cx - rx).toBeGreaterThanOrEqual(0);
+    expect(cy - ry).toBeGreaterThanOrEqual(0);
+    expect(cy + ry).toBeLessThanOrEqual(height);
+    // The heart of the oval is where the head is: the middle of the width, above the middle of the height.
+    expect(cx / width).toBeGreaterThan(0.45);
+    expect(cx / width).toBeLessThan(0.6);
+    expect(cy / height).toBeLessThan(0.5);
   });
 
   it('cuts an answer too long for its chip, inside the chip', () => {
