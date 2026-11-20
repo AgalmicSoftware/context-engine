@@ -58,7 +58,7 @@ const setup = async (t, { joinRefused = false, olderWorker = false } = {}) => {
       member = true;
       return Response.json({ ok: true, group: { groupId: GROUP_ID }, memberCount: 1 });
     }
-    if (path === '/groups/list') return Response.json({ groups: [{ groupId: GROUP_ID, label: 'Salon', joinMode: 'group_password', memberCount: 1 }] });
+    if (path === '/groups/list') return Response.json({ groups: [{ groupId: GROUP_ID, label: 'Reading circle', joinMode: 'group_password', memberCount: 1 }] });
     if (path === '/groups/my-memberships') return Response.json({ memberships: member ? [{ groupId: GROUP_ID }] : [] });
     if (path === '/storage/list') return Response.json({ items: [], cursor: null, listComplete: true });
     throw new Error(`Unexpected route: ${path}`);
@@ -96,7 +96,8 @@ test('a private session with no usable invite says so and shows nothing of itsel
     assert.match(joined.privateSession, /^invite_(required|invalid)$/);
     assert.match(joined.note, /This session is private/);
     assert.equal(joined.joinedGroup, undefined);
-    assert.ok(joined.groupJoinError);
+    // Named as its invite link lists it, before the agent can read anything else.
+    assert.match(joined.groupJoinError, new RegExp(`group "Reading circle" \\(${GROUP_ID}\\)`, 'i'));
     assert.notEqual(joined.title, 'Secret salon');
     assert.equal(JSON.stringify(joined).includes('Only members'), false);
   }

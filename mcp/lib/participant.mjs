@@ -351,14 +351,14 @@ const SELF_JOINING = {
 };
 
 const GROUP_REFUSALS = {
-  worker_group_join_refused: (id) =>
-    `That link, invite or password didn’t work for group "${id}". Ask whoever invited you for a new one.`,
-  worker_group_not_found: (id) => `This session has no group "${id}".`,
-  worker_group_join_denied: (id) => `Group "${id}" isn’t open to joining; its admins add members.`,
-  worker_group_join_ended: (id) => `Joining group "${id}" has closed.`,
-  worker_group_member_cap_exceeded: (id) => `Group "${id}" has no room for more members.`,
-  worker_group_member_not_found: (id) => `You aren’t a member of group "${id}".`,
-  worker_group_leave_denied: (id) => `Group "${id}" doesn’t let members leave.`,
+  worker_group_join_refused: (group) =>
+    `That link, invite or password didn’t work for group ${group}. Ask whoever invited you for a new one.`,
+  worker_group_not_found: (group) => `This session has no group ${group}.`,
+  worker_group_join_denied: (group) => `Group ${group} isn’t open to joining; its admins add members.`,
+  worker_group_join_ended: (group) => `Joining group ${group} has closed.`,
+  worker_group_member_cap_exceeded: (group) => `Group ${group} has no room for more members.`,
+  worker_group_member_not_found: (group) => `You aren’t a member of group ${group}.`,
+  worker_group_leave_denied: (group) => `Group ${group} doesn’t let members leave.`,
 };
 
 // Group answers that a few seconds' wait clears; the client has already resent a join.
@@ -410,20 +410,22 @@ const tokenMark = (token) => (token ? createHash('sha256').update(token).digest(
 // `sentInvite` is false when join_group had no invite to send: the link's is
 // held only until the MCP restarts, so a refusal then is not a bad invite. The
 // Worker refuses an unknown group the same way, so neither is assumed.
-const groupRefusal = (error, id, tool, { sentInvite = true } = {}) => {
+const groupRefusal = (error, id, tool, { sentInvite = true, name = '' } = {}) => {
   if (!(error instanceof WorkerRequestError)) return error;
+  // Named as the site shows it, quoted as data, with the id an agent passes back.
+  const group = name ? `${JSON.stringify(name)} (${id})` : `"${id}"`;
   if (error.code === 'worker_group_join_refused' && !sentInvite) {
-    return new Error(`Group "${id}" didn’t let you in, and no invite was sent. If you were given a link, call join_session again with the full link (an invite it carried isn’t kept when the MCP restarts), or pass invite to join_group; otherwise check the group id with get_session.`);
+    return new Error(`Group ${group} didn’t let you in, and no invite was sent. If you were given a link, call join_session again with the full link (an invite it carried isn’t kept when the MCP restarts), or pass invite to join_group; otherwise check the group id with get_session.`);
   }
-  if (Object.hasOwn(GROUP_REFUSALS, error.code)) return new Error(GROUP_REFUSALS[error.code](id));
+  if (Object.hasOwn(GROUP_REFUSALS, error.code)) return new Error(GROUP_REFUSALS[error.code](group));
   const joining = tool === 'join_group';
   if (error.status === 503 && (BUSY_GROUP_REASONS.has(error.code) || !error.code || error.code === SESSION_COORDINATOR_UNAVAILABLE)) {
     return new Error(joining
-      ? `The session was too busy to confirm that you joined group "${id}", so you may not be in it yet. Wait a few seconds and call join_group again: repeating it is harmless, and it succeeds at once if you are already in.`
-      : `The session was too busy to confirm that you left group "${id}", so you may still be in it. Wait a few seconds and call leave_group again: if you have already left, it says you aren’t a member.`);
+      ? `The session was too busy to confirm that you joined group ${group}, so you may not be in it yet. Wait a few seconds and call join_group again: repeating it is harmless, and it succeeds at once if you are already in.`
+      : `The session was too busy to confirm that you left group ${group}, so you may still be in it. Wait a few seconds and call leave_group again: if you have already left, it says you aren’t a member.`);
   }
   if (!error.status) {
-    return new Error(`No answer came back about ${joining ? 'joining' : 'leaving'} group "${id}", so it may not have gone through. Call get_session to see whether you are in it, or call ${tool} again: repeating it is harmless.`);
+    return new Error(`No answer came back about ${joining ? 'joining' : 'leaving'} group ${group}, so it may not have gone through. Call get_session to see whether you are in it, or call ${tool} again: repeating it is harmless.`);
   }
   return error;
 };
@@ -628,6 +630,26 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   const listContextEntries = async (ctx) => {
     const { items, complete } = await ctx.client.listAll('docsContext', { role: 'context', maxItems: MAX_CONTEXT_ROWS, signal });
     return { entries: contextEntries(items, { self: wallet.address.toLowerCase() }), complete };
+  };
+
+  // A group's refusal, with the group's name where the Worker gave a clear
+  // answer. The name is read only then, once and briefly (3 seconds, no busy
+  // retries): after a busy session or no answer the id alone serves. Listing
+  // with the group named finds it before the agent may see the rest, as a
+  // private session's invite link does.
+  const namedGroupRefusal = async (ctx, error, id, tool, options = {}) => {
+    let name = '';
+    if (error instanceof WorkerRequestError && Object.hasOwn(GROUP_REFUSALS, error.code)) {
+      try {
+        const wanted = id.toLowerCase();
+        const found = (await ctx.client.listGroups({ joinGroup: wanted, signal, quick: true }))
+          .find((group) => text(group.groupId).toLowerCase() === wanted);
+        name = text(found?.label).replace(/\s+/g, ' ').slice(0, MAX_TITLE_LENGTH);
+      } catch {
+        // the id alone
+      }
+    }
+    return groupRefusal(error, id, tool, { ...options, name });
   };
 
   // The groups this agent may see, and whether it's in each. The MCP gives
@@ -1370,7 +1392,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           await ctx.client.joinGroup(id, { signal, ...credential });
           outcome.joinedGroup = id;
         } catch (error) {
-          outcome.groupJoinError = describeError(groupRefusal(error, id, 'join_group', { sentInvite: !!groupInvite }));
+          outcome.groupJoinError = describeError(await namedGroupRefusal(ctx, error, id, 'join_group', { sentInvite: !!groupInvite }));
         }
       }
       // Signed in now, and perhaps joined: read it again, so a member sees it whole from a plain link too.
@@ -1934,8 +1956,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         ? await groupJoinCredential({ token, sessionId: ctx.client.sessionId, groupId: id.toLowerCase(), address: wallet.address })
         : {};
       checkpoint();
-      await ctx.client.joinGroup(id, { signal, ...credential }).catch((error) => {
-        throw groupRefusal(error, id, 'join_group', { sentInvite: !!token });
+      await ctx.client.joinGroup(id, { signal, ...credential }).catch(async (error) => {
+        throw await namedGroupRefusal(ctx, error, id, 'join_group', { sentInvite: !!token });
       });
       // A private session's config is whole once the agent is a member.
       if (ctx.client.privateSession) await ctx.client.loadConfig();
@@ -1949,8 +1971,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const id = trim(groupId);
       if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
       checkpoint();
-      await ctx.client.leaveGroup(id, { signal }).catch((error) => {
-        throw groupRefusal(error, id, 'leave_group');
+      await ctx.client.leaveGroup(id, { signal }).catch(async (error) => {
+        throw await namedGroupRefusal(ctx, error, id, 'leave_group');
       });
       return { session: ctx.info.slug, leftGroup: id };
     },

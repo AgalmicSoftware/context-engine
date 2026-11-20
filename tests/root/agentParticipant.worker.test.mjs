@@ -1629,7 +1629,7 @@ test('an agent sees the session’s instructions and groups, joins the group the
   // A wrong group, joined anyway, is left again.
   await kami.participant.joinGroup({ groupId: salon.groupId });
   assert.deepEqual(await kami.participant.leaveGroup({ groupId: salon.groupId }), { session: SLUG, leftGroup: salon.groupId });
-  await assert.rejects(kami.participant.leaveGroup({ groupId: salon.groupId }), new RegExp(`^Error: You aren’t a member of group "${salon.groupId}"\\.$`));
+  await assert.rejects(kami.participant.leaveGroup({ groupId: salon.groupId }), new RegExp(`^Error: You aren’t a member of group "${salon.label}" \\(${salon.groupId}\\)\\.$`));
   // An unknown group gets the one refusal every refused join gets, so no answer
   // shows whether an unlisted group exists. With no invite sent, the agent is
   // told how to bring one, and to check the id.
@@ -1761,8 +1761,8 @@ test('groups say how joining works and who can end a membership, and a leave the
   assert.equal(groups.find((group) => group.name === 'Full').memberLimit, 1);
   const kept = made['Kept by admins'].groupId;
   await kami.participant.joinGroup({ groupId: kept });
-  await assert.rejects(kami.participant.leaveGroup({ groupId: kept }), new RegExp(`^Error: Group "${kept}" doesn’t let members leave\\.$`));
-  await assert.rejects(kami.participant.joinGroup({ groupId: made.Full.groupId }), new RegExp(`^Error: Group "${made.Full.groupId}" has no room for more members\\.$`));
+  await assert.rejects(kami.participant.leaveGroup({ groupId: kept }), new RegExp(`^Error: Group "Kept by admins" \\(${kept}\\) doesn’t let members leave\\.$`));
+  await assert.rejects(kami.participant.joinGroup({ groupId: made.Full.groupId }), new RegExp(`^Error: Group "Full" \\(${made.Full.groupId}\\) has no room for more members\\.$`));
 });
 
 test('groups a Worker can’t list yet are reported as such, and none are shown where it keeps none', async (t) => {
