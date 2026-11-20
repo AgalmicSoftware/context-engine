@@ -217,3 +217,23 @@ export const signedAdminRequest = async ({ env, wallet, action, body = {}, expir
     body: { ...unsigned, ...typedData.message, signature },
   }), env));
 };
+
+// The Worker gives one account five sign-in nonces a minute. These tests sign far more often than a person or an
+// agent does, so that one count is always answered "allowed" here; every other limit is the real one.
+export const withoutNonceLimit = (env) => {
+  const binding = env.CE_SESSION_COORDINATOR;
+  env.CE_SESSION_COORDINATOR = {
+    idFromName: binding.idFromName,
+    get: (id) => ({
+      fetch: async (input, init) => {
+        const request = input instanceof Request ? input : new Request(input, init);
+        if (new URL(request.url).pathname === '/auth-state/rate/check') {
+          const payload = await request.clone().json();
+          if (String(payload?.route).startsWith('authnonce')) return new Response(JSON.stringify({ ok: true, allowed: true, count: 1, resetAtMs: payload.resetAtMs }), { headers: { 'Content-Type': 'application/json' } });
+        }
+        return binding.get(id).fetch(request);
+      },
+    }),
+  };
+  return env;
+};

@@ -13,7 +13,7 @@ import { AGENT_SIGN_IN_LIMITS } from './agentSignInLink.js';
 import { dispatchAgentSignInStore } from './agentSignInStore.js';
 import {
   APP_ORIGIN, SESSION_ID, SLUG, WORKER_ORIGIN, createSessionEnv, fetchWorker, readJson, signedAdminRequest,
-} from './sessionWorkerRuntimeFixture.mjs';
+withoutNonceLimit, } from './sessionWorkerRuntimeFixture.mjs';
 
 const AGENT = { [AGENT_CLIENT_HEADER]: 'mcp/0.8.0' };
 const SIGN_IN = 'Sign in to Context Engine.';
@@ -26,26 +26,6 @@ const send = (env, path, { method = 'POST', token, body, origin = APP_ORIGIN, he
   return fetchWorker(new Request(`${WORKER_ORIGIN}${path}`, { method, headers: all, body: body === undefined ? undefined : JSON.stringify(body) }), env).then(readJson);
 };
 const session = { sessionSlug: SLUG, sessionId: SESSION_ID };
-
-// The Worker gives one account five sign-in nonces a minute. These tests sign far more often than a person or an
-// agent does, so that one count is always answered "allowed" here; every other limit is the real one.
-const withoutNonceLimit = (env) => {
-  const binding = env.CE_SESSION_COORDINATOR;
-  env.CE_SESSION_COORDINATOR = {
-    idFromName: binding.idFromName,
-    get: (id) => ({
-      fetch: async (input, init) => {
-        const request = input instanceof Request ? input : new Request(input, init);
-        if (new URL(request.url).pathname === '/auth-state/rate/check') {
-          const payload = await request.clone().json();
-          if (String(payload?.route).startsWith('authnonce')) return Response.json({ ok: true, allowed: true, count: 1, resetAtMs: payload.resetAtMs });
-        }
-        return binding.get(id).fetch(request);
-      },
-    }),
-  };
-  return env;
-};
 
 // A message signed as the page and the MCP sign one, saying `statement`.
 const signed = async (env, wallet, statement, { origin = APP_ORIGIN, headers = {} } = {}) => {

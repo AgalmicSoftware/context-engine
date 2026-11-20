@@ -35,7 +35,23 @@ export const WORKER_GROUP_READ_PROOF_V2_FEATURE: 'group_read_proof_v2';
 export function workerGroupReadOrigin(value: unknown): string;
 export function workerGroupReadStatementV2(input: { sessionId: string; groupId: string; workerOrigin: string }): string;
 export function formatWorkerGroupReadInvite(input: { groupId: string; proof: string; version?: 1 | 2 }): string;
-export function parseWorkerGroupReadInvite(value: unknown): { groupId: string; proof: string; version: 1 | 2 } | null;
+export const WORKER_GROUP_READ_CODE_FEATURE: 'group_read_code_v1';
+export const WORKER_GROUP_READ_CODE_MAX_AGE_SECONDS: number;
+export function workerGroupReadCodeStatement(input: { sessionId: string; groupId: string; workerOrigin: string; expires: number }): string;
+export function workerGroupReadCodeMac(input: { codeHash: string; statement: string }): Promise<string>;
+export function buildWorkerGroupReadCodeInvite(input: {
+  codeHash: string;
+  sessionId: string;
+  groupId: string;
+  workerOrigin: string;
+  expires: number;
+}): Promise<string>;
+export function parseWorkerGroupReadInvite(
+  value: unknown,
+):
+  | { groupId: string; proof: string; version: 1 | 2 }
+  | { groupId: string; version: 'code'; hashPrefix: string; expires: number; mac: string }
+  | null;
 
 type PasswordInput = { password: string; sessionId: string; groupId: string };
 export function createWorkerGroupPasswordKeys(ethers: unknown): Readonly<{

@@ -15,6 +15,9 @@ import {
   parseWorkerGroupReadInvite,
   workerGroupReadOrigin,
   workerGroupReadStatementV2,
+  buildWorkerGroupReadCodeInvite,
+  workerGroupReadCodeMac,
+  workerGroupReadCodeStatement,
   workerGroupJoinStatement,
   workerGroupPasswordProblem,
   workerGroupReadStatement,
@@ -170,5 +173,29 @@ test('a read proof that names its Worker is no proof for any other Worker, or fo
   for (const bad of ['', 'not a url', 'ftp://files.example', undefined]) {
     await assert.rejects(keys.signReadFor({ password, sessionId, groupId, workerOrigin: bad }), /needs the Session Worker/);
     assert.equal(workerGroupReadOrigin(bad), '');
+  }
+});
+
+test('a one-use code’s read proof carries the start of its hash and a keyed hash, never the code', async () => {
+  const code = '0123456789ABCDEF0123456789abcdef';
+  const hash = await hashOneUseSecret(code);
+  const input = { codeHash: hash, sessionId, groupId: 'by-code', workerOrigin: 'https://Worker.example/path', expires: 1795000000 };
+  const header = await buildWorkerGroupReadCodeInvite(input);
+  const statement = workerGroupReadCodeStatement(input);
+  assert.equal(statement, `ContextEngine.WorkerGroup.ReadCode:1\nsession:${sessionId.toLowerCase()}\ngroup:by-code\nworker:https://worker.example\nexpires:1795000000`);
+  const mac = await workerGroupReadCodeMac({ codeHash: hash, statement });
+  assert.equal(header, `c1:by-code:${hash.slice(0, 16)}:1795000000:${mac}`);
+  assert.equal(header.includes(hash) || header.toLowerCase().includes(code.toLowerCase()), false);
+  assert.deepEqual(parseWorkerGroupReadInvite(header), { groupId: 'by-code', version: 'code', hashPrefix: hash.slice(0, 16), expires: 1795000000, mac });
+  // Any other session, group, Worker, time or code gives another keyed hash.
+  for (const other of [{ sessionId: '0x01' }, { groupId: 'salon' }, { workerOrigin: 'https://other.example' }, { expires: 1795000001 }]) {
+    assert.notEqual((await buildWorkerGroupReadCodeInvite({ ...input, ...other })).split(':')[4], mac);
+  }
+  assert.notEqual(await workerGroupReadCodeMac({ codeHash: await hashOneUseSecret('f'.repeat(32)), statement }), mac);
+  await assert.rejects(buildWorkerGroupReadCodeInvite({ ...input, codeHash: code }), /hash is required/);
+  await assert.rejects(buildWorkerGroupReadCodeInvite({ ...input, workerOrigin: 'not a url' }), /needs the Session Worker/);
+  for (const bad of [`c1:by-code:${hash.slice(0, 15)}:1795000000:${mac}`, `c1:by-code:${hash.slice(0, 16)}:17950:${mac}`,
+    `c1:by-code:${hash.slice(0, 16)}:1795000000:${mac.slice(2)}`, `c1:-x:${hash.slice(0, 16)}:1795000000:${mac}`, `c1:by-code:${code}`, `c2:by-code:${hash.slice(0, 16)}:1795000000:${mac}`]) {
+    assert.equal(parseWorkerGroupReadInvite(bad), null, bad);
   }
 });

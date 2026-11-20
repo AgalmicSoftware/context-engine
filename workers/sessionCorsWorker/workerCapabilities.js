@@ -7,7 +7,7 @@ import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRo
 import { GPT_LIVE_1_1_FEATURE } from '../../shared/realtimeInterviewConfig.mjs';
 import { ANALYSIS_CARD_DRAWING_FEATURE } from '../../shared/analysisCardSaved.mjs';
 import { AGENT_SIGN_IN_FEATURE } from '../../shared/agentSignIn.mjs';
-import { WORKER_GROUP_READ_PROOF_V2_FEATURE } from '../../shared/workerGroupJoin.mjs';
+import { WORKER_GROUP_READ_CODE_FEATURE, WORKER_GROUP_READ_PROOF_V2_FEATURE } from '../../shared/workerGroupJoin.mjs';
 
 export const FEATURES = Object.freeze([
   'agent_http_v1',
@@ -27,6 +27,8 @@ export const FEATURES = Object.freeze([
   'context_sources_v1',
   'draft_text_v1',
   'envelope_export_identity_v1',
+  // A one-use group code can read without being spent, with a proof made for this Worker.
+  WORKER_GROUP_READ_CODE_FEATURE,
   // A read invite may name this Worker, and is then refused by every other one.
   WORKER_GROUP_READ_PROOF_V2_FEATURE,
   // interviewMode.dataNote, the session's note on where research data goes; older Workers reject the key.

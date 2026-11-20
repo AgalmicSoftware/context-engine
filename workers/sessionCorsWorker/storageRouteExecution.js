@@ -98,7 +98,9 @@ const STORAGE_SESSION_GATE_YES = Symbol('storage-session-gate-yes');
 export const STORAGE_GROUP_READ_INVITE = 'groupReadInvite';
 // This Worker's own origin as the request reached it: a read invite that names its Worker is checked against it.
 export const STORAGE_GROUP_READ_INVITE_ORIGIN = 'groupReadInviteOrigin';
-/** The two deps a request's read invite travels in: its header, and the origin the request was sent to. */
+// Where the request came from, as Cloudflare says: wrong one-use code proofs are counted against it.
+const STORAGE_GROUP_READ_INVITE_FROM = 'groupReadInviteFrom';
+/** The deps a request's read invite travels in: its header, the origin the request was sent to, and its sender. */
 export const groupReadInviteDeps = (request) => {
   let origin = '';
   try {
@@ -109,6 +111,7 @@ export const groupReadInviteDeps = (request) => {
   return {
     [STORAGE_GROUP_READ_INVITE]: request?.headers?.get?.(WORKER_GROUP_READ_INVITE_HEADER) || '',
     [STORAGE_GROUP_READ_INVITE_ORIGIN]: origin,
+    [STORAGE_GROUP_READ_INVITE_FROM]: String(request?.headers?.get?.('CF-Connecting-IP') || '').trim().toLowerCase().slice(0, 64),
   };
 };
 const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
@@ -809,7 +812,9 @@ const checkGroupReadInvite = async ({ env, slug, config, groupId, deps }) => {
   const check = typeof deps?.checkWorkerGroupReadInvite === 'function' ? deps.checkWorkerGroupReadInvite : checkWorkerGroupReadInvite;
   const pending = invite?.groupId !== groupId
     ? Promise.resolve(refused)
-    : Promise.resolve().then(() => check({ env, slug, sessionId, groupId, signer: invite.signer })).then(
+    : Promise.resolve().then(() => check({
+      env, slug, sessionId, groupId, signer: invite.signer, code: invite.code, from: deps?.[STORAGE_GROUP_READ_INVITE_FROM],
+    })).then(
       (result) => (result?.ok === true ? { ok: true, outcome: 'allowed' }
         : [400, 403, 404].includes(Number(result?.status)) ? refused
           : { ok: false, outcome: 'unavailable', status: 503, reason: 'worker_group_membership_unavailable' }),

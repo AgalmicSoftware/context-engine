@@ -6,11 +6,13 @@ import assert from 'node:assert/strict';
 import { Wallet } from 'ethers';
 
 import {
-  WORKER_GROUP_READ_PROOF_V2_FEATURE, formatWorkerGroupReadInvite, parseWorkerGroupReadInvite, workerGroupJoinStatement,
-  workerGroupReadStatement, workerGroupReadStatementV2,
+  WORKER_GROUP_READ_CODE_FEATURE, WORKER_GROUP_READ_PROOF_V2_FEATURE, buildWorkerGroupReadCodeInvite, formatWorkerGroupReadInvite,
+  hashOneUseSecret, parseWorkerGroupReadInvite, workerGroupJoinStatement, workerGroupReadStatement, workerGroupReadStatementV2,
 } from '../../shared/workerGroupJoin.mjs';
+import { WORKER_GROUP_READ_CODE_MISSES, matchesUnusedWorkerGroupInvite } from './workerGroupInvites.js';
 import {
   APP_ORIGIN, SESSION_ID, SLUG, WORKER_ORIGIN, createSessionEnv, fetchWorker, login, readJson, signedAdminRequest, uploadJson,
+  withoutNonceLimit,
 } from './sessionWorkerRuntimeFixture.mjs';
 
 const GROUP = 'salon';
@@ -18,9 +20,9 @@ const rule = (groupIds = [GROUP]) => ({
   match: 'any',
   conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupIds }],
 });
-const privateOverrides = ({ visibility = 'session_member_full' } = {}) => {
+const privateOverrides = ({ visibility = 'session_member_full', groupIds } = {}) => {
   // As a private session is stored: gated, and encrypted at rest by the Worker.
-  const payloadAccessControl = { gate: 'role_gate', encryption: 'worker_envelope', accessConditions: rule() };
+  const payloadAccessControl = { gate: 'role_gate', encryption: 'worker_envelope', accessConditions: rule(groupIds) };
   return {
     workerGroupsBootstrap: { version: 2, state: 'fresh_empty', bootstrapId: 'b0'.repeat(32) },
     workerAuthority: { version: 1, participantScopes: ['storage', 'groups'], anonymousScopes: [] },
@@ -53,8 +55,9 @@ const passwordKey = (byte) => new Wallet(`0x${byte.repeat(32)}`);
 const readInvite = async (key, groupId = GROUP) =>
   formatWorkerGroupReadInvite({ groupId, proof: await key.signMessage(workerGroupReadStatement({ sessionId: SESSION_ID, groupId })) });
 
-const ask = (env, path, { invite, token, method = 'GET', body } = {}) => {
+const ask = (env, path, { invite, token, method = 'GET', body, from } = {}) => {
   const headers = new Headers({ Origin: APP_ORIGIN, 'X-Session-Slug': SLUG });
+  if (from) headers.set('CF-Connecting-IP', from);
   if (invite) headers.set('X-CE-Group-Invite', invite);
   if (token) { headers.set('Authorization', `Bearer ${token}`); headers.set('X-Group-Slug', SLUG); }
   if (body !== undefined) headers.set('Content-Type', 'application/json');
@@ -69,6 +72,8 @@ const question = (id, prompt) => ({
 const setup = async (options) => {
   const { env, admin } = createSessionEnv({ configOverrides: privateOverrides(options) });
   env.CE_STORAGE_ENVELOPE_KEK = 'synthetic-private-session-kek';
+  // These tests sign more admin requests in a minute than one person's sign-in count allows.
+  withoutNonceLimit(env);
   const key = passwordKey('11');
   const created = await signedAdminRequest({
     env, wallet: admin, action: 'groups/create', body: { group: { groupId: GROUP, label: 'Salon', joinMode: 'group_password', memberVisibility: 'session' } },
@@ -262,4 +267,148 @@ test('the catalog never shows an invite holder a question a member of that group
     assert.equal((await ask(env, `/storage/read?id=${encodeURIComponent(stored.body.storageRef.id)}`, { invite: held })).status, 403);
   }
   assert.ok(admin.address);
+});
+
+// One-use codes: a group whose seats are claimed with a code each. An agent handed a link with an unused code reads
+// with a proof made from the code, which is never sent and never spent by reading.
+const CODES = 'by-code';
+const CODE = '0123456789abcdef0123456789abcdef';
+const soon = (seconds = 600) => Math.floor(Date.now() / 1000) + seconds;
+const codeInvite = async (code = CODE, { groupId = CODES, workerOrigin = WORKER_ORIGIN, expires = soon(), sessionId = SESSION_ID } = {}) =>
+  buildWorkerGroupReadCodeInvite({ codeHash: await hashOneUseSecret(code), sessionId, groupId, workerOrigin, expires });
+const setupCodes = async () => {
+  const base = await setup({ groupIds: [GROUP, CODES] });
+  const { env, admin } = base;
+  const signed = (action, body) => signedAdminRequest({ env, wallet: admin, action, body });
+  const created = await signed('groups/create', { group: { groupId: CODES, label: 'By code', joinMode: 'one_use', memberVisibility: 'session' } });
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const added = await signed('groups/invites/add', { groupId: CODES, hashes: [await hashOneUseSecret(CODE), await hashOneUseSecret('f'.repeat(32))] });
+  assert.equal(added.status, 200, JSON.stringify(added.body));
+  const counts = async () => (await signed('groups/invites/list', { groupId: CODES })).body.counts;
+  return { ...base, signed, counts };
+};
+const questionsPath = '/storage/list?resource=questions&limit=100';
+
+test('an unused one-use code reads what its group reads, and reading never spends it', async () => {
+  const { env, ids, counts } = await setupCodes();
+  assert.ok((await readJson(await ask(env, '/capabilities'))).body.features.includes(WORKER_GROUP_READ_CODE_FEATURE));
+
+  const invite = await codeInvite();
+  // The header carries the start of the code's hash and a keyed hash: never the code, nor the whole of its hash.
+  const hash = await hashOneUseSecret(CODE);
+  assert.equal(invite.includes(CODE), false);
+  assert.equal(invite.includes(hash), false);
+  assert.equal(parseWorkerGroupReadInvite(invite).hashPrefix, hash.slice(0, 16));
+
+  for (let round = 0; round < 3; round += 1) {
+    const catalog = await readJson(await ask(env, catalogPath, { invite }));
+    assert.equal(catalog.status, 200, JSON.stringify(catalog.body));
+    assert.deepEqual(catalog.body.questions.map((entry) => entry.id).sort(), ids);
+    assert.equal(JSON.stringify(catalog.body).includes(invite.split(':')[4]), false);
+    assert.equal((await ask(env, questionsPath, { invite })).status, 200);
+    assert.equal((await ask(env, '/storage/list?resource=responses&limit=100', { invite })).status, 200);
+    assert.equal((await readJson(await ask(env, `/session-config?slug=${SLUG}`, { invite }))).body.config.sessionName, 'Runtime session');
+  }
+  // Both codes are as they were: unused, and the group has no member.
+  assert.deepEqual(await counts(), { unused: 2, used: 0, revoked: 0 });
+  // Reading is all it does.
+  const write = await ask(env, '/storage/upload', {
+    invite, method: 'POST', body: { data: JSON.stringify(question(`0x${'d4'.repeat(32)}`, 'Not mine to add')), contentType: 'application/json', resource: 'questions' },
+  });
+  assert.ok([401, 403].includes(write.status));
+});
+
+test('a code proof for another Worker, group, session or time, or without the code, is refused in the same words', async () => {
+  const { env, key } = await setupCodes();
+  const good = await codeInvite();
+  const parts = good.split(':');
+  const hash = await hashOneUseSecret(CODE);
+  const refusals = new Set();
+  for (const invite of [
+    await codeInvite(CODE, { workerOrigin: 'https://impostor.example' }),
+    await codeInvite(CODE, { sessionId: `0x${'9'.repeat(64)}` }),
+    // Made for the password group, and this group's proof under the password group's name.
+    await codeInvite(CODE, { groupId: GROUP }),
+    ['c1', GROUP, ...parts.slice(2)].join(':'),
+    // Already past, and further off than a proof may name.
+    await codeInvite(CODE, { expires: soon(-5) }),
+    await codeInvite(CODE, { expires: soon(3 * 60 * 60) }),
+    // A later time than was signed.
+    ['c1', CODES, parts[2], String(Number(parts[3]) + 60), parts[4]].join(':'),
+    // A code nobody was given; the right start with a made-up keyed hash; the hash itself offered as the keyed hash.
+    await codeInvite('a'.repeat(32)),
+    ['c1', CODES, parts[2], parts[3], '0'.repeat(64)].join(':'),
+    ['c1', CODES, parts[2], parts[3], hash].join(':'),
+    // The code or its whole hash in place of a proof.
+    `c1:${CODES}:${CODE}`,
+    `${CODES}:${CODE}`,
+  ]) {
+    for (const path of [catalogPath, questionsPath]) {
+      const refused = await readJson(await ask(env, path, { invite }));
+      assert.equal(refused.status, 403, `${path} ${invite.slice(0, 24)}`);
+      assert.equal(JSON.stringify(refused.body).includes('Private statement'), false);
+      refusals.add(`${path.split('?')[0]} ${refused.body.reason}`);
+    }
+  }
+  // One answer for every miss, whatever was wrong with it.
+  assert.deepEqual([...refusals].sort(), ['/agent/interview-catalog private_session_invite_invalid', '/storage/list private_session_invite_invalid']);
+  // A password group takes no code proof, and a code group no password proof.
+  assert.equal((await ask(env, catalogPath, { invite: await boundInvite(key, WORKER_ORIGIN, CODES) })).status, 403);
+  assert.equal((await ask(env, catalogPath, { invite: good })).status, 200);
+});
+
+test('a code stops reading once it is spent or withdrawn; whoever joined with it reads on as a member', async () => {
+  const { env, signed, counts } = await setupCodes();
+  const invite = await codeInvite();
+  const other = await codeInvite('f'.repeat(32));
+  assert.equal((await ask(env, catalogPath, { invite })).status, 200);
+  assert.equal((await ask(env, catalogPath, { invite: other })).status, 200);
+
+  const member = Wallet.createRandom();
+  const memberToken = await login({ env, wallet: member });
+  const joined = await readJson(await ask(env, '/groups/join', { token: memberToken, method: 'POST', body: { sessionId: SESSION_ID, groupId: CODES, secret: CODE } }));
+  assert.equal(joined.status, 200, JSON.stringify(joined.body));
+  assert.deepEqual(await counts(), { unused: 1, used: 1, revoked: 0 });
+  for (const path of [catalogPath, questionsPath]) assert.equal((await ask(env, path, { invite })).status, 403, path);
+  // The joiner reads as a member, with or without the spent proof still in hand.
+  assert.equal((await ask(env, questionsPath, { token: memberToken })).status, 200);
+  assert.equal((await ask(env, questionsPath, { token: memberToken, invite })).status, 200);
+
+  assert.equal((await signed('groups/invites/revoke', { groupId: CODES, allUnused: true })).body.revoked, 1);
+  assert.equal((await ask(env, catalogPath, { invite: other })).status, 403);
+  assert.equal((await ask(env, questionsPath, { invite: await codeInvite('f'.repeat(32)) })).status, 403);
+});
+
+test('only an unused, unexpired code admits a read proof', async () => {
+  const hash = await hashOneUseSecret(CODE);
+  const statement = 'ContextEngine.WorkerGroup.ReadCode:1\nsession:x\ngroup:g\nworker:https://w.example\nexpires:1';
+  const { workerGroupReadCodeMac } = await import('../../shared/workerGroupJoin.mjs');
+  const code = { hashPrefix: hash.slice(0, 16), statement, mac: await workerGroupReadCodeMac({ codeHash: hash, statement }) };
+  const nowMs = Date.parse('2026-11-20T00:00:00Z');
+  const admits = (invite, extra = []) => matchesUnusedWorkerGroupInvite({ code, nowMs, candidates: [...extra, [hash, invite]] });
+  assert.equal(await admits({ state: 'unused' }), true);
+  assert.equal(await admits({ state: 'unused', expiresAt: '2026-11-21T00:00:00Z' }), true);
+  assert.equal(await admits({ state: 'unused' }, [[`${hash.slice(0, 16)}${'0'.repeat(48)}`, { state: 'unused' }]]), true);
+  assert.equal(await admits({ state: 'unused', expiresAt: '2026-11-19T00:00:00Z' }), false);
+  for (const state of ['used', 'revoked', 'reserved', undefined]) assert.equal(await admits({ state }), false, String(state));
+  assert.equal(await matchesUnusedWorkerGroupInvite({ code, nowMs, candidates: [] }), false);
+  assert.equal(await matchesUnusedWorkerGroupInvite({ code: { ...code, mac: '0'.repeat(64) }, nowMs, candidates: [[hash, { state: 'unused' }]] }), false);
+});
+
+test('a sender of many wrong code proofs is refused unlooked-at for a while; others read on', async () => {
+  const { env, counts } = await setupCodes();
+  const invite = await codeInvite();
+  const guesser = '203.0.113.9';
+  assert.equal((await ask(env, questionsPath, { invite, from: guesser })).status, 200);
+  for (let guess = 0; guess < WORKER_GROUP_READ_CODE_MISSES.limit; guess += 1) {
+    const wrong = await codeInvite(guess.toString(16).padStart(32, '0'));
+    assert.equal((await ask(env, questionsPath, { invite: wrong, from: guesser })).status, 403);
+  }
+  // The same words as any wrong proof, now for the right one too.
+  const blocked = await readJson(await ask(env, questionsPath, { invite, from: guesser }));
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.body.reason, 'private_session_invite_invalid');
+  assert.equal((await ask(env, questionsPath, { invite, from: '198.51.100.7' })).status, 200);
+  // Counting misses wrote nothing: the codes are as they were.
+  assert.deepEqual(await counts(), { unused: 2, used: 0, revoked: 0 });
 });

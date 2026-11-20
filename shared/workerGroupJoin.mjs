@@ -145,6 +145,36 @@ export const workerGroupReadOrigin = (value) => {
 export const workerGroupReadStatementV2 = ({ sessionId, groupId, workerOrigin }) =>
   `${READ_STATEMENT_V2}\nsession:${String(sessionId).toLowerCase()}\ngroup:${String(groupId)}\nworker:${workerGroupReadOrigin(workerOrigin)}`;
 
+// Reading with a one-use claim code, without spending it. The code is never sent. The reader sends the first
+// 16 characters of its SHA-256 (enough for the Worker to find the code it keeps, and no help in guessing the
+// rest) and a keyed hash of a statement that names the session, the group, the Worker and an expiry within the
+// hour, keyed with the full SHA-256. Only someone who holds the code can make it; a Worker that is sent one made
+// for itself can't use it at another; and it reads only while the code is unused, so it stops when the code is
+// spent or withdrawn. Checking it writes nothing.
+const READ_CODE_STATEMENT = 'ContextEngine.WorkerGroup.ReadCode:1';
+/** What a Session Worker lists when a one-use code can read without being spent. */
+export const WORKER_GROUP_READ_CODE_FEATURE = 'group_read_code_v1';
+export const WORKER_GROUP_READ_CODE_MAX_AGE_SECONDS = 60 * 60;
+const READ_CODE_HEADER = /^c1:([^:]+):([0-9a-f]{16}):([1-9][0-9]{9}):([0-9a-f]{64})$/i;
+
+export const workerGroupReadCodeStatement = ({ sessionId, groupId, workerOrigin, expires }) =>
+  `${READ_CODE_STATEMENT}\nsession:${String(sessionId).toLowerCase()}\ngroup:${String(groupId)}\nworker:${workerGroupReadOrigin(workerOrigin)}\nexpires:${Number(expires)}`;
+
+/** The keyed hash of a read statement, keyed with a code's SHA-256 (64 hex), as 64 lowercase hex. */
+export const workerGroupReadCodeMac = async ({ codeHash, statement }) => {
+  if (!isOneUseSecretHash(codeHash)) throw new Error('A claim code’s hash is required.');
+  const keyBytes = new Uint8Array(codeHash.match(/.{2}/g).map((byte) => Number.parseInt(byte, 16)));
+  const key = await globalThis.crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return hex(new Uint8Array(await globalThis.crypto.subtle.sign('HMAC', key, new TextEncoder().encode(statement))));
+};
+
+/** The header value that reads with a one-use code's hash, at one Worker, until `expires` (seconds). */
+export const buildWorkerGroupReadCodeInvite = async ({ codeHash, sessionId, groupId, workerOrigin, expires }) => {
+  if (!workerGroupReadOrigin(workerOrigin)) throw new Error('A read proof needs the Session Worker it is for.');
+  const mac = await workerGroupReadCodeMac({ codeHash, statement: workerGroupReadCodeStatement({ sessionId, groupId, workerOrigin, expires }) });
+  return `c1:${String(groupId)}:${codeHash.slice(0, 16)}:${Number(expires)}:${mac}`;
+};
+
 /** The header value for a read proof; `version: 2` for one that names its Worker. */
 export const formatWorkerGroupReadInvite = ({ groupId, proof, version = 1 }) =>
   `${version === 2 ? 'v2:' : ''}${String(groupId)}:${String(proof)}`;
@@ -153,6 +183,14 @@ export const formatWorkerGroupReadInvite = ({ groupId, proof, version = 1 }) =>
 export const parseWorkerGroupReadInvite = (value) => {
   const text = typeof value === 'string' ? value.trim() : '';
   if (text.length > 300) return null;
+  // `c1:<group>:<hash start>:<expires>:<keyed hash>`: a one-use code's read proof, which carries no signature.
+  const code = text.match(READ_CODE_HEADER);
+  if (code) {
+    const groupId = code[1].toLowerCase();
+    return /^[a-z0-9][a-z0-9._-]*$/.test(groupId)
+      ? { groupId, version: 'code', hashPrefix: code[2].toLowerCase(), expires: Number(code[3]), mac: code[4].toLowerCase() }
+      : null;
+  }
   // `v2:<group>:<proof>`; a group that happens to be called "v2" has one colon, not two.
   const second = text.match(READ_HEADER_V2);
   const at = text.lastIndexOf(':');
