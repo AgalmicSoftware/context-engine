@@ -1188,7 +1188,7 @@ export default function SessionInterviewPanel({
     if (scoreScreenShown) setSubmissionInfoOpen(false);
   }, [scoreScreenShown]);
   const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
-  // A prefill link goes straight to its drafts; the interview then talks them through.
+  // A prefill link goes straight to its drafts; the interview then asks about the rest.
   const showPrefillStatus = hasAiPrefill && prefillDraftCount > 0;
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
@@ -1197,7 +1197,7 @@ export default function SessionInterviewPanel({
       : transcript.trim()
         ? 'Continue interview'
         : showPrefillStatus
-          ? 'Talk through your drafts'
+          ? 'Add more by voice'
           : 'Start voice interview';
   const leftOutCount = leftOutIds.length;
   const leftOutNotice = describeLeftOutDrafts(leftOutIds, stillFitIds, drafts.length > 0);

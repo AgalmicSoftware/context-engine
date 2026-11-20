@@ -454,15 +454,15 @@ silently: a notice counts those left out because they were incomplete or
 repeated, and those that fit none of the session's questions or their options.
 A prefill link opens the interview on its drafts with one status line, such as
 “Your AI drafted 6 answers”, and the microphone reads
-**Talk through your drafts**.
+**Add more by voice**.
 When the participant starts or continues the live voice interview after a valid
 prefill is loaded, the realtime interviewer receives a bounded JSON background
 block with the imported summary/facts, question-matched predictions, and any
 fields the participant already edited in review. That block is labeled as
-untrusted, unconfirmed AI prediction data: the interviewer can ask useful
-confirmation, correction, and gap-filling follow-ups, but it must not treat
-predicted answers as spoken beliefs, skip all predicted questions, or override
-later spoken clarifications. If the prefill hash is stale or belongs to a
+untrusted, unconfirmed AI prediction data: the interviewer uses it for related,
+deeper and gap-filling questions, never asks the questions the AI drafted, and
+must not treat predicted answers as spoken beliefs or override later spoken
+clarifications. If the prefill hash is stale or belongs to a
 different question set, the live interviewer is not started with the imported
 context.
 The account used at final normal submission owns the response. If an older

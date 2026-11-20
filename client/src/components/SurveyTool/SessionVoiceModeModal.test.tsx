@@ -1621,7 +1621,7 @@ describe('SessionVoiceModeModal', () => {
     expect(open).toContain('[q3]');
     expect(open).toContain('EVIDENCE-q2');
     expect(open).not.toContain('[q2]');
-    expect(open).toContain('Already drafted by their AI (reference only; not to ask):\n- Second question?');
+    expect(open).toContain('drafts use:\n- (q2) Second question?');
     expect(open).not.toContain('[q1]');
     expect(open).not.toContain('EVIDENCE-q1');
     first.unmount();
@@ -3227,11 +3227,11 @@ describe('SessionVoiceModeModal', () => {
     render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
 
     await expectReadableDraftText('Draft answer for What matters?', 'Predicted answer from memory');
-    // A prefill link opens on its drafts, with a status line, and the interview talks them through.
+    // A prefill link opens on its drafts, with a status line, and the interview asks about the rest.
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
       'Your AI drafted 1 answer',
     );
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Talk through your drafts');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Add more by voice');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeEnabled();
     await editReadableDraftText('Draft answer for What matters?', 'Reviewed correction before speaking');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
@@ -3261,7 +3261,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
       /^Your AI drafted 1 answer$/,
     );
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Talk through your drafts');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Add more by voice');
   });
 
   it('sends only the reviewed responder context to the interviewer and the draft mapper', async () => {
