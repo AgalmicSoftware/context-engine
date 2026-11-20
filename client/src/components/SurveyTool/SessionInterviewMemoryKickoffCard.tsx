@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
@@ -20,8 +20,16 @@ type SessionInterviewMemoryKickoffCardProps = {
   /** Resolves false when the prompt could not be copied, so it is shown selected instead. */
   onCopyPrompt: (prompt: string) => Promise<boolean>;
   onTogglePrompt: () => void;
-  /** Shows one copy button in place of the card's copy row and its prompt toggle. */
-  copyButton?: { className: string; testId: string };
+  /** Shows one copy button in place of the card's copy row and its prompt toggle, and under it, once the
+   * session is checked, whatever `renderPreview` makes of the prompt that a copy would give. */
+  copyButton?: {
+    className: string;
+    testId: string;
+    /** Beside the button, in a row of `rowClassName`, such as the caret of a split button. */
+    addon?: ReactNode;
+    rowClassName?: string;
+    renderPreview?: (prompt: string) => ReactNode;
+  };
 };
 
 // A renewal never runs sooner than this, so a link that can't be renewed isn't checked in a loop.
@@ -185,16 +193,21 @@ export default function SessionInterviewMemoryKickoffCard({
   if (copyButton) {
     return (
       <div className={styles.sessionAgentKickoffButtonForm}>
-        <button
-          type="button"
-          className={copyButton.className}
-          onClick={copyPrompt}
-          aria-disabled={!compatible}
-          data-testid={copyButton.testId}
-        >
-          <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
-          {promptCopied ? 'Copied' : 'Copy the prompt'}
-        </button>
+        <div className={copyButton.rowClassName}>
+          <button
+            type="button"
+            className={copyButton.className}
+            onClick={copyPrompt}
+            aria-disabled={!compatible}
+            data-testid={copyButton.testId}
+          >
+            <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
+            {promptCopied ? 'Copied' : 'Copy prompt'}
+          </button>
+          {compatible ? copyButton.addon : null}
+        </div>
+        {/* A refused copy shows the field below instead, so the prompt never shows twice. */}
+        {compatible && !manualPrompt && copyButton.renderPreview ? copyButton.renderPreview(prompt) : null}
         {status}
       </div>
     );

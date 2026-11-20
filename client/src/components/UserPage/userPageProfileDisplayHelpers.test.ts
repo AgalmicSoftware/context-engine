@@ -10,7 +10,7 @@ describe('userPageProfileDisplayHelpers', () => {
   it('lets the owner set a username from the minimized page in the account dialog', () => {
     expect(
       buildUserPageProfileEditVisibility({ account: '0xABC', minimized: true, viewAddress: '0xabc' }),
-    ).toMatchObject({ isOwner: true, showUsernamePen: true, showPen: false });
+    ).toMatchObject({ isOwner: true, showUsernameButton: true, showPen: false });
     expect(
       buildUserPageProfileEditVisibility({
         account: '0xABC',
@@ -18,7 +18,7 @@ describe('userPageProfileDisplayHelpers', () => {
         minimized: true,
         viewAddress: '0xabc',
       }),
-    ).toMatchObject({ showUsernamePen: false });
+    ).toMatchObject({ showUsernameButton: false });
   });
 
   it('resolves owner and nickname editor visibility', () => {
@@ -37,7 +37,7 @@ describe('userPageProfileDisplayHelpers', () => {
       isOwner: true,
       notOwnPage: false,
       showPen: false,
-      showUsernamePen: true,
+      showUsernameButton: true,
     });
 
     expect(
@@ -51,7 +51,7 @@ describe('userPageProfileDisplayHelpers', () => {
       isOwner: false,
       notOwnPage: true,
       showPen: true,
-      showUsernamePen: false,
+      showUsernameButton: false,
     });
   });
 
@@ -109,7 +109,7 @@ describe('userPageProfileDisplayHelpers', () => {
         isOwner: false,
         notOwnPage: true,
         showPen: false,
-        showUsernamePen: false,
+        showUsernameButton: false,
       },
       headerActionVisibility: {
         showBookmarkButton: true,

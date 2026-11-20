@@ -6,7 +6,7 @@ import { KNOWN_SESSION_CONFIGS, KNOWN_SESSIONS } from './knownSessionsFile';
 import { parseSessionWorkerDiscoveryOrigin } from './sessionWorkerDiscovery';
 
 const FILE = path.resolve(__dirname, '../../../../known-sessions.json');
-const FIELDS = new Set(['worker', 'sessionId', 'name']);
+const FIELDS = new Set(['worker', 'sessionId', 'name', 'title']);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
@@ -39,8 +39,10 @@ const knownSessionsProblems = (raw: string): string[] => {
     if (typeof entry.sessionId !== 'string' || !/^0x(?!0{32})[0-9a-f]{32}$/.test(entry.sessionId)) {
       problems.push(`${slug}: sessionId is not 0x and 32 hex digits`);
     }
-    if ('name' in entry && (typeof entry.name !== 'string' || !entry.name.trim())) {
-      problems.push(`${slug}: name is not a name`);
+    for (const field of ['name', 'title']) {
+      if (field in entry && (typeof entry[field] !== 'string' || !String(entry[field]).trim())) {
+        problems.push(`${slug}: ${field} is not a name`);
+      }
     }
   }
   return problems;
@@ -121,6 +123,7 @@ describe('known-sessions.json', () => {
     ],
     ['another field', fileText({ fixture: entry({ admin: '0xabc' }) }), 'fixture: unexpected admin'],
     ['an empty name', fileText({ fixture: entry({ name: ' ' }) }), 'fixture: name is not a name'],
+    ['an empty title', fileText({ fixture: entry({ title: '' }) }), 'fixture: title is not a name'],
     ['an entry that is not an object', fileText({ fixture: WORKER }), 'fixture: not an object'],
     [
       'a file that is not formatted',

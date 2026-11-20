@@ -1,4 +1,5 @@
 /** @file PolisReport.tsx */
+import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
 import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -114,6 +115,7 @@ import PolisAnswerSections, { type AnswerSectionsOpen } from './PolisAnswerSecti
 import { buildReportResponseStats, buildReportAnswerQuestions } from './polisReportAnswers';
 import { markPolisAgents, readPolisReportCacheContext } from './polisReportRuntime';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
+import ShowSessionNames from '../Shared/ShowSessionNames';
 import { sessionNameLabels } from '../../utilities/session/sessionNames';
 import {
   buildPolisDemoSurveyResultsNetworkData,
@@ -173,7 +175,10 @@ export const buildPolisParticipantProfileHref = ({
   const base = simulated && name ? `/su/${encodeURIComponent(name)}` : isEth ? `/u/${encodeURIComponent(addr)}` : '';
   if (!base) return '';
   const normalizedSlug = normalizeSessionSlug(sessionSlug || '');
-  return normalizedSlug ? `${base}?session=${encodeURIComponent(normalizedSlug)}` : base;
+  // An unlisted session is found only through its Worker, so the profile link keeps the page's `worker`.
+  return normalizedSlug
+    ? withWorkerHintForSession(`${base}?session=${encodeURIComponent(normalizedSlug)}`, normalizedSlug)
+    : base;
 };
 
 /***************************************************************
@@ -1397,6 +1402,7 @@ export default function PolisReport({
 
     return (
       <div className={styles.participantsList}>
+        {!effectiveUseDemoData && <ShowSessionNames signIn={sessionNames.signIn} />}
         {unique.map((addr, idx) => {
           const displayName = participantNames[addr];
           const simulatedName = usesSimulatedProfiles ? displayName : '';

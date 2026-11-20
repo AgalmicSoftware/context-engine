@@ -19,10 +19,15 @@ export type SessionNamesState = {
    * or a Worker from before names). False while that's unknown or couldn't be learned.
    */
   answerNamesShown: boolean;
+  /**
+   * Set when the person is connected but this tab holds no session sign-in, so names read as none: signs them
+   * in, after which the names reload by themselves. Null when names are already read as this person, or as no one.
+   */
+  signIn: (() => Promise<void>) | null;
 };
 
-const NO_STORE: SessionNamesState = { source: null, names: {}, answerNamesShown: true };
-const UNKNOWN: SessionNamesState = { source: null, names: {}, answerNamesShown: false };
+const NO_STORE: SessionNamesState = { source: null, names: {}, answerNamesShown: true, signIn: null };
+const UNKNOWN: SessionNamesState = { source: null, names: {}, answerNamesShown: false, signIn: null };
 
 /**
  * Only a loaded config whose authority isn't a Worker (on-chain, or the older registry) says the session has no
@@ -77,7 +82,13 @@ export const useSessionNames = (options: SessionNamesOptions): SessionNamesState
       let failed = false;
       try {
         const source = await resolveSessionNamesSource(latest.current);
-        next = { source, names: source ? await source.readAll() : {}, answerNamesShown: !source };
+        const names = source ? await source.readAll() : {};
+        next = {
+          source,
+          names,
+          answerNamesShown: !source,
+          signIn: source && !(await source.hasSignIn()) ? source.signIn : null,
+        };
       } catch {
         next = UNKNOWN;
         failed = true;
@@ -87,6 +98,7 @@ export const useSessionNames = (options: SessionNamesOptions): SessionNamesState
         setState((was) =>
           was.source === next.source &&
           was.answerNamesShown === next.answerNamesShown &&
+          was.signIn === next.signIn &&
           sameNames(was.names, next.names)
             ? was
             : next,

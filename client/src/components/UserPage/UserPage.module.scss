@@ -272,6 +272,32 @@ $icon-size-standard: 1.25rem;
   }
 }
 
+/* The address, with "Set username" on its own line under it. */
+.addressColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.usernameButton {
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 6px 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  // The look of the header's Compare and Analyze buttons, a size down.
+  background: var(--ce-document-border);
+  color: var(--ce-document-text);
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-10);
+  cursor: pointer;
+  // The text keeps its colour on hover, so only the edge changes.
+  &:hover {
+    border-color: var(--ce-document-text);
+  }
+}
+
 /* Says where a name typed in the header is kept; the address text's colour keeps its contrast. */
 .usernameHint {
   margin-left: 8px;
@@ -803,6 +829,47 @@ $icon-size-standard: 1.25rem;
 }
 
 /* === New light-touch styles used by CompareAddresses.tsx === */
+
+/* A Compare box with the accounts whose name matches what was typed listed under it. */
+.nameSearch {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nameMatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nameMatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  color: $user-page-text-color;
+  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
+  border-radius: var(--ce-radius-8);
+  cursor: pointer;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  text-align: left;
+  img {
+    flex: 0 0 auto;
+    border-radius: var(--ce-radius-round);
+  }
+  &:hover {
+    background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  }
+}
 
 .addrInputsContainer {
   max-width: 500px;
@@ -1341,7 +1408,8 @@ $icon-size-standard: 1.25rem;
     width: 32px;
     height: 32px;
   }
-  .addAddressBtn {
+  .addAddressBtn,
+  .nameMatch {
     color: var(--ce-control-text);
     background: var(--ce-control-face);
     border: var(--ce-border-control-width) solid;
@@ -1349,6 +1417,9 @@ $icon-size-standard: 1.25rem;
     border-radius: var(--ce-radius-pill);
     box-shadow: var(--ce-shadow-raised);
     min-height: 36px;
+  }
+  .nameMatch {
+    min-height: 44px;
   }
   h5 {
     color: var(--ce-panel-text);

@@ -1,4 +1,11 @@
-import { createQueuedAiCallRunner, isTransientAiQueueError } from './aiClientQueue';
+import { asSignInRequestFailure } from '../worker/coordinatorRetry';
+
+import {
+  LOST_REQUEST_RESEND_WINDOW_MS,
+  createQueuedAiCallRunner,
+  isAiRequestWithoutReply,
+  isTransientAiQueueError,
+} from './aiClientQueue';
 
 const flushMicrotasks = (): Promise<void> => Promise.resolve();
 
@@ -40,6 +47,108 @@ describe('aiClientQueue', () => {
 
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(delay).not.toHaveBeenCalled();
+  });
+
+  it("knows each browser's words for a request that got no reply", () => {
+    expect(isAiRequestWithoutReply('Failed to fetch')).toBe(true);
+    expect(isAiRequestWithoutReply('Load failed')).toBe(true);
+    expect(isAiRequestWithoutReply('NetworkError when attempting to fetch resource.')).toBe(true);
+    expect(isAiRequestWithoutReply('NetworkError when attempting to fetch resource')).toBe(true);
+    expect(isAiRequestWithoutReply('Failed to fetch dynamically imported module')).toBe(false);
+    expect(isAiRequestWithoutReply('Rate limit exceeded.')).toBe(false);
+  });
+
+  it.each(['Load failed', 'Failed to fetch'])(
+    'sends a request lost on the way (%s) once more, without waiting',
+    async (lost) => {
+      const delay = jest.fn<Promise<void>, [number]>();
+      const enqueue = createQueuedAiCallRunner({ delay });
+      const invoke = jest
+        .fn<Promise<string>, []>()
+        .mockRejectedValueOnce(new TypeError(lost))
+        .mockResolvedValueOnce('ok');
+
+      await expect(enqueue(invoke)).resolves.toBe('ok');
+
+      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(delay).not.toHaveBeenCalled();
+    },
+  );
+
+  // A clock the test moves: each failure comes `afterMs` after its request was sent.
+  const failingAfter = (afterMs: number, error: unknown) => {
+    let clock = 0;
+    const invoke = jest.fn<Promise<string>, []>().mockImplementationOnce(async () => {
+      clock += afterMs;
+      throw error;
+    });
+    invoke.mockResolvedValue('ok');
+    return { invoke, enqueue: createQueuedAiCallRunner({ delay: async () => {}, now: () => clock }) };
+  };
+
+  it.each([4_000, LOST_REQUEST_RESEND_WINDOW_MS])(
+    'sends again a request that failed soon after it was sent (%i ms): it never arrived',
+    async (afterMs) => {
+      const { invoke, enqueue } = failingAfter(afterMs, new TypeError('Load failed'));
+      await expect(enqueue(invoke)).resolves.toBe('ok');
+      expect(invoke).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('does not send again one that failed later: the reply may have been written, and paid for', async () => {
+    const lost = new TypeError('Load failed');
+    const { invoke, enqueue } = failingAfter(LOST_REQUEST_RESEND_WINDOW_MS + 1, lost);
+    await expect(enqueue(invoke)).rejects.toBe(lost);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('never sends a lost sign-in request again: the person would be asked to sign twice', async () => {
+    const lost = new TypeError('Load failed');
+    const enqueue = createQueuedAiCallRunner({ delay: async () => {} });
+    const invoke = jest.fn<Promise<string>, []>(() => Promise.reject(lost).catch(asSignInRequestFailure));
+    await expect(enqueue(invoke)).rejects.toBe(lost);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up when the second try gets no reply either', async () => {
+    const enqueue = createQueuedAiCallRunner({ delay: async () => {} });
+    const lost = new TypeError('Load failed');
+    const invoke = jest.fn<Promise<string>, []>().mockRejectedValue(lost);
+
+    await expect(enqueue(invoke)).rejects.toBe(lost);
+
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends again once per call: a second lost request ends the call, the next call gets its own', async () => {
+    const enqueue = createQueuedAiCallRunner({ delay: async () => {}, random: () => 0 });
+    const lost = new TypeError('Load failed');
+    const first = jest
+      .fn<Promise<string>, []>()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockRejectedValueOnce(new Error('rate limit exceeded'))
+      .mockRejectedValueOnce(lost)
+      .mockResolvedValueOnce('too late');
+    const second = jest
+      .fn<Promise<string>, []>()
+      .mockRejectedValueOnce(new TypeError('Load failed'))
+      .mockResolvedValueOnce('ok');
+
+    await expect(enqueue(first)).rejects.toBe(lost);
+    await expect(enqueue(second)).resolves.toBe('ok');
+
+    expect(first).toHaveBeenCalledTimes(3);
+    expect(second).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not send again an error that only reads like a lost request', async () => {
+    const enqueue = createQueuedAiCallRunner({ delay: async () => {} });
+    const refused = new Error('Load failed');
+    const invoke = jest.fn<Promise<string>, []>().mockRejectedValue(refused);
+
+    await expect(enqueue(invoke)).rejects.toBe(refused);
+
+    expect(invoke).toHaveBeenCalledTimes(1);
   });
 
   it('serializes calls and continues after a queued failure', async () => {

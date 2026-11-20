@@ -15,6 +15,7 @@ import {
   noteWorkerAccessChanged,
 } from './workerAuth.js';
 import { forgetGroupReadHeader, saveGroupReadHeader } from './workerGroupReadProof';
+import { isSignInRequestFailure } from './coordinatorRetry';
 import { getCorsProxyUrlOrThrow } from './corsProxy.js';
 import { invalidateClientAuthGeneration } from '../session/clientAuthGeneration';
 import {
@@ -438,6 +439,36 @@ describe('workerAuth canonical session resolution', () => {
       }),
     );
   });
+
+  it.each(['nonce', 'login'])(
+    'marks a lost /auth/%s request, so nothing sends the whole call again',
+    async (lostStep) => {
+      const workerOrigin = `https://lost-${lostStep}-worker.example.com`;
+      const sessionId = CANONICAL_SESSION_ID;
+      const slug = `lost-${lostStep}`;
+      const workerConfig = {
+        slug,
+        sessionId,
+        corsWorkerUrl: workerOrigin,
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      };
+      upsertWorkerCanonicalSessionBootstrap({ slug, sessionIdHex: sessionId, workerOrigin, config: workerConfig });
+      markWorkerCanonicalSessionBootstrapVerified({ slug, sessionIdHex: sessionId, workerOrigin });
+      window.history.replaceState({}, '', `/session/${slug}?worker=${encodeURIComponent(workerOrigin)}`);
+      getCorsProxyUrlOrThrow.mockResolvedValueOnce(workerOrigin);
+      const lost = new TypeError('Load failed');
+      global.fetch = jest.fn();
+      if (lostStep === 'login') {
+        global.fetch.mockResolvedValueOnce(jsonResp(200, { nonce: 'worker-nonce', sessionSlug: slug, sessionId }));
+      }
+      global.fetch.mockRejectedValueOnce(lost);
+
+      await expect(getWorkerSessionToken({ sessionSlug: slug, context: authContext })).rejects.toBe(lost);
+
+      expect(isSignInRequestFailure(lost)).toBe(true);
+      expect(String(global.fetch.mock.calls.at(-1)[0])).toBe(`${workerOrigin}/auth/${lostStep}`);
+    },
+  );
 
   it('rejects a worker-canonical nonce response for a different exact session identity', async () => {
     const sessionConfig = {

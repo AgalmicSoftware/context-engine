@@ -3613,7 +3613,7 @@ class UserPage extends Component<any, any> {
       propViewAddress,
       viewAddress: propViewAddress,
     });
-    const { isOwner, showPen, showUsernamePen } = headerPassiveDisplayState.profileEditVisibility;
+    const { isOwner, showPen, showUsernameButton } = headerPassiveDisplayState.profileEditVisibility;
     const headerActionVisibility = headerPassiveDisplayState.headerActionVisibility;
     const bookmarkActionPlan = {
       blockedReason: 'none',
@@ -3721,7 +3721,7 @@ class UserPage extends Component<any, any> {
           onUsernameEdit={this.onUsernamePenClick}
           onUsernameKeyDown={this.handleUsernameKeyDown}
           showPen={showPen}
-          showUsernamePen={showUsernamePen}
+          showUsernameButton={showUsernameButton}
           username={this.state.username}
           usernameEnteredIndicatorDisplayState={usernameEnteredIndicatorDisplayState}
           usernameErrorDisplayState={usernameErrorDisplayState}

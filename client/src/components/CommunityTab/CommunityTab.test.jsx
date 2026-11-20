@@ -1163,6 +1163,7 @@ describe('CommunityTab helpers', () => {
     const priorUrl = window.location.href;
     try {
       localStorage.setItem('ce:sessionScanScope', 'list');
+      localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['demo-sh']));
       window.history.replaceState({}, '', '/session/demo');
 
       const instance = new CommunityTab({ activeSessionSlug: null });

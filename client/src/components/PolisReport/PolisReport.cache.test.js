@@ -304,8 +304,10 @@ describe('PolisReport participant profile links', () => {
       render(<PolisReport {...baseReportProps} slug="rxc-ra-test" questionResponses={responses} />);
 
       // The list shows each label twice: in full, and short for narrow screens.
-      expect(await screen.findByRole('link', { name: new RegExp(`^Sam · ${addresses[1]}`) })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: new RegExp(`^Sam · ${addresses[2]} \\(agent\\)`) })).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: new RegExp(`^Sam \\(${addresses[1]}\\)`) })).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: new RegExp(`^Sam \\(${addresses[2]}\\) \\(agent\\)`) }),
+      ).toBeInTheDocument();
       expect(screen.queryByText(/Franklin/)).not.toBeInTheDocument();
       expect(screen.getByRole('link', { name: new RegExp(`^${addresses[0]}`) })).toBeInTheDocument();
     } finally {

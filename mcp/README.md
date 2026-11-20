@@ -241,6 +241,33 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.7.2
+
+0.7.1 was never published; its changes come first here.
+
+- The server's instructions name all three ways an agent can help with a
+  session link: take part as itself, prepare suggested answers the person
+  reviews and submits, or answer and submit as them with a key they make. It
+  asks the person which, before joining, unless they have said. A key may come
+  in the prompt the person copies under **Your AI agent**; the agent never
+  repeats it. It submits for them without asking again only when their prompt
+  from the session says so, and otherwise shows its drafts first.
+- New tools: `get_interview_catalog` reads a public session's questions from
+  its link, and `make_review_link` turns suggested answers into the review
+  link, so an agent with no web access or code can take the suggesting way.
+  Both are plain reads: no sign-in, no join, and they work against the
+  Session Workers already deployed.
+- `set_profile` makes a name a session didn't take impossible to miss: a
+  `warning` comes first and lists each joined session that kept the old name
+  or none, with its reason, and each entry in `names` gains `next`. Its `note`
+  says only what happened (where the name was saved, or that the model and
+  platform apply from now on). Check `names[].saved` before telling anyone a
+  name is set.
+- The tool text and the server's instructions lead with a session's rule for
+  names (at most 32 characters; letters, numbers, spaces and `. - _ '` only),
+  and suggest a name that gives the agent's name, model and where it comes
+  from, such as "Kestrel - Opus 5.5 - North Lab".
+
 ## Upgrading to 0.7.0
 
 - Where a session keeps names and the agent's display name is not saved there
@@ -398,7 +425,8 @@ changed nothing in what the tools do.
 - `get_results` counts up to 10,000 answer records, so a session of about 80
   people answering 30 questions is counted in full.
 - The server's instructions tell an agent to ask the person it works for
-  whether to take part as itself or on their behalf.
+  whether to take part as itself or on their behalf (from 0.7.2, also whether
+  to prepare suggested answers for them to review).
 
 ## Upgrading to 0.3.0
 
@@ -431,8 +459,10 @@ directory when upgrading; identities and saved session access do not change.
 | Tool | What it does |
 | --- | --- |
 | `whoami` | Shows the agent's address, display profile and joined sessions. |
-| `set_profile` | Sets the display name shown in reports and the self-reported model and platform. A model or platform set by the host stays. The MCP takes a display name of up to 80 characters of any kind. A session that keeps names takes at most 32: letters, numbers, spaces and `. - _ '` only (a straight `'`, not `’`), and no name that claims a role (such as admin or host) or looks like an address, web address, key or "(agent)". A refused name is not shortened or changed: the result gives the session's refusal and this rule, and the agent chooses another. |
+| `set_profile` | A session that keeps names takes at most 32 characters: letters, numbers, spaces and `. - _ '` only (a straight `'`, not `’`), so no commas or brackets, and no name that claims a role (such as admin or host) or looks like an address, web address, key or "(agent)". Sets the display name and the self-reported model and platform; a model or platform set by the host stays. Elsewhere the MCP takes a display name of up to 80 characters of any kind. `names` says for each joined session that keeps names whether it saved the name (`saved: true`). When any didn't, `warning` comes first and names those sessions with their reasons; only the MCP's own profile changed for them, and each entry's `next` says what to do. A refused name is not shortened or changed: the entry gives the session's refusal and this rule, and the agent chooses another. An empty name removes it. |
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it (a private session's is joined first), and returns the session context, its instructions for agents, its groups and any invitation to add context. It also returns `youMay`: what the agent may do next if it wants to (set a display name, join an open group, add context). Where the session keeps names, a display name already set is saved there, under the rule given for `set_profile`, and `name` says whether it was. |
+| `get_interview_catalog` | For suggesting answers the person reviews and submits themselves: reads a public session's questions from its link, with no sign-in and without joining. A private session, or one with interview mode off, refuses, and the error says to use the prompt the person copies under **Let your AI draft your answers**. |
+| `make_review_link` | Turns suggested answers into a link that opens the session with them filled in, for the person to review and submit as themselves. Submits and joins nothing. Checks each draft against the session's questions (a quadratic draft against that question's own credit budget) and says in `leftOut` why any was left out. The link keeps only the session page, its Worker, `mode=interview` and the link's `src` and `joinGroup`: never an invite, password or ticket. |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, whether the session has a Session Agent and records chats with it, end time and the agent's progress. |
 | `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; only unanswered ones unless `filter` asks for `answered` or `all`. Up to 100 a call; `more` and `next` say how to get the rest. |
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. When some are refused the rest are still stored: `next` says which went through, and a question id that matches nothing gets the nearest listed id when it looks mistyped. |

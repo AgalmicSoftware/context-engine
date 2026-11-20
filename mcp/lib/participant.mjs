@@ -18,6 +18,7 @@ import {
   CONTEXT_DATA_NOTE, CONTEXT_LIST_MAX, contextEntries, contextEntryMatches, contextTextOf, contextTextPart, publicContextEntry,
 } from './contextLibrary.mjs';
 import { createKnownSessions } from './knownSessions.mjs';
+import { createInterviewPrefill } from './interviewPrefill.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
@@ -440,6 +441,8 @@ const progressNotes = (questions, mine) => ({
     : {}),
 });
 
+const NAMES_OFF_NEXT = 'Its admins turned names off, so your address shows there; there is nothing to retry.';
+
 export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), sbt = null, createProvider, sleep, registry = {},
   ownAnswerWaitMs = OWN_ANSWER_WAIT_MS, contextReadWaitMs = CONTEXT_READ_WAIT_MS }) => {
   const requestTestEth = createTestEthRequester({ config, wallet, createProvider, now, sleep });
@@ -697,7 +700,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   const saveName = async (ctx, { signal } = {}) => {
     if (!(await keepsNames(ctx))) return null;
     // A name saved before the admin turned names off is still readable, so ask the setting.
-    if (ctx.client.config?.namesEnabled === false) return { saved: false, error: 'Names are off in this session.' };
+    if (ctx.client.config?.namesEnabled === false) return { saved: false, error: 'Names are off in this session.', next: NAMES_OFF_NEXT };
     const wanted = profile().displayName;
     try {
       // Each change counts against a daily limit, so a name already saved is left as it is.
@@ -711,8 +714,13 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       return { saved: true, name: saved?.name ?? null };
     } catch (error) {
       // A name the session refused comes back with its rule, so the next try can fit it.
+      // A 403 is names turned off since the session's settings were read.
+      const refused = error?.status === 400;
       return { saved: false, error: text(error?.message) || 'The session didn’t save your name.',
-        ...(error?.status === 400 ? { rule: SESSION_NAME_RULE } : {}) };
+        ...(refused ? { rule: SESSION_NAME_RULE } : {}),
+        next: refused
+          ? 'Choose a name that fits the rule yourself and call set_profile with it; nothing shortens or changes it for you.'
+          : error?.status === 403 ? NAMES_OFF_NEXT : 'Call set_profile with your displayName again later.' };
     }
   };
 
@@ -1053,7 +1061,20 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     resultsPublic: sessionConfig?.sessionModeProfile?.results?.visibility === PUBLIC_RESULTS,
   });
 
+  // Suggested answers for the person to review need no sign-in or join.
+  const prefill = createInterviewPrefill({
+    fetchImpl,
+    resolveLink,
+    profile: async () => {
+      await loadState();
+      return profile();
+    },
+  });
+
   const methods = {
+    getInterviewCatalog: prefill.getInterviewCatalog,
+    makeReviewLink: prefill.makeReviewLink,
+
     async whoami() {
       await loadState();
       return {
@@ -1095,17 +1116,32 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         ? (await mapLimit(Object.values(state.sessions).filter((entry) => isRecord(entry) && entry.kind !== 'registry'), READ_CONCURRENCY,
           async (entry) => {
             const saved = await openEntry(entry).then(async (ctx) => { await ensureReady(ctx); return saveName(ctx); })
-              .catch((error) => ({ saved: false, error: text(error?.message) || 'The session couldn’t be reached.' }));
+              .catch((error) => ({ saved: false, error: text(error?.message) || 'The session couldn’t be reached.',
+                next: 'Call set_profile with your displayName again later.' }));
             return saved && { session: entry.slug, ...saved };
           })).filter(Boolean)
         : [];
+      // The profile here always changes, so this is never an error; a session that didn't take the
+      // name says so first, so it can't be read as set where it isn't.
+      const notSaved = names.filter((entry) => !entry.saved);
       return {
+        ...(notSaved.length ? {
+          warning: `${next.displayName ? 'Your name was not saved' : 'Your name was not removed'} in ${notSaved.length} of ${names.length} joined session${names.length > 1 ? 's' : ''} `
+            + `that keep${names.length > 1 ? '' : 's'} names: ${notSaved.map((entry) => `${entry.session} (${entry.error})`).join('; ')}. `
+            + 'Only this MCP’s profile changed for them, so they still show your address or your earlier name. Each entry in names says what to do next. Don’t say your name is set there.',
+        } : {}),
         profile: profile(),
         // Sessions whose Worker keeps names: whether each saved the new one.
         ...(names.length ? { names } : {}),
-        note: kept.length
-          ? `Your host set ${kept.join(' and ')}, which stay${kept.length > 1 ? '' : 's'} as it set ${kept.length > 1 ? 'them' : 'it'}. The rest applies to answers and statements submitted from now on.`
-          : 'Applies to answers and statements submitted from now on.',
+        note: [
+          kept.length ? `Your host set ${kept.join(' and ')}, which stay${kept.length > 1 ? '' : 's'} as it set ${kept.length > 1 ? 'them' : 'it'}.` : '',
+          'displayName' in next && names.length > notSaved.length
+            ? `${next.displayName ? 'Saved as your name' : 'Your name was removed'} in ${names.filter((entry) => entry.saved).map((entry) => entry.session).join(', ')}.` : '',
+          'displayName' in next && !names.length
+            ? 'No session you have joined keeps names: answers and statements carry the name, and a session that keeps names checks it against its rule when you join, where join_session’s name says whether it took it.' : '',
+          ['modelId', 'platform'].some((field) => field in next)
+            ? `The ${['modelId', 'platform'].filter((field) => field in next).map((field) => (field === 'modelId' ? 'model' : 'platform')).join(' and ')} appl${['modelId', 'platform'].filter((field) => field in next).length > 1 ? 'y' : 'ies'} to answers and statements submitted from now on.` : '',
+        ].filter(Boolean).join(' ') || (notSaved.length ? 'Only this MCP’s profile changed: see warning.' : 'Nothing changed.'),
       };
     },
 

@@ -71,7 +71,7 @@ const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageHead
   onUsernameEdit: jest.fn(),
   onUsernameKeyDown: jest.fn(),
   showPen: true,
-  showUsernamePen: true,
+  showUsernameButton: true,
   username: '',
   usernameEnteredIndicatorDisplayState: {
     shouldRenderEnteredIndicator: false,
@@ -206,7 +206,7 @@ describe('UserPageHeader', () => {
           onUsernameChange,
           onUsernameKeyDown,
           showPen: false,
-          showUsernamePen: false,
+          showUsernameButton: false,
           username: 'owner-name',
           usernameEnteredIndicatorDisplayState: {
             shouldRenderEnteredIndicator: true,
@@ -254,8 +254,26 @@ describe('UserPageHeader', () => {
     expect(screen.queryByText(/your label/)).toBeNull();
   });
 
+  it('offers the username as a button under the address, named for whether one is set', () => {
+    const onUsernameEdit = jest.fn();
+    const { rerender } = render(<UserPageHeader {...createProps({ isOwner: true, onUsernameEdit })} />);
+    const button = screen.getByRole('button', { name: 'Set username' });
+    // Under the address, not among the icons beside it.
+    expect(screen.getByRole('heading', { level: 1 })).not.toContainElement(button);
+    expect(screen.getByRole('heading', { level: 1 }).parentElement).toContainElement(button);
+    fireEvent.click(button);
+    expect(onUsernameEdit).toHaveBeenCalledTimes(1);
+
+    rerender(<UserPageHeader {...createProps({ isOwner: true, username: 'Sam' })} />);
+    expect(screen.getByRole('button', { name: 'Change username' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set username' })).toBeNull();
+
+    rerender(<UserPageHeader {...createProps({ showUsernameButton: false })} />);
+    expect(screen.queryByRole('button', { name: /username/ })).toBeNull();
+  });
+
   it('says where your own username is saved', () => {
-    const props = { isOwner: true, isEditingUsername: true, showUsernamePen: false, username: 'Sam' };
+    const props = { isOwner: true, isEditingUsername: true, showUsernameButton: false, username: 'Sam' };
     const { rerender } = render(<UserPageHeader {...createProps(props)} />);
     expect(screen.getByRole('textbox', { name: 'Set username' })).toHaveAccessibleDescription(
       'Saved on this device only',

@@ -613,65 +613,133 @@ h1 {
   width: 100%;
 }
 
-.settingsQuickControlsGrid {
+// Settings strip: labelled cells in one bordered bar; the session cell stretches.
+.settingsStrip {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 56px;
-  gap: 12px;
+  grid-template-columns: auto minmax(12rem, 1fr) auto auto;
+  grid-template-areas: 'config session explainers appearance';
   width: 100%;
+  border: var(--ce-settings-control-border-width) solid var(--ce-settings-control-border);
+  border-radius: var(--ce-radius-10);
+  text-align: left;
 }
 
-.settingsQuickControlCell {
+.settingsStripCell {
   display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
   min-width: 0;
-  min-height: 56px;
+  padding: 8px 12px 10px;
+
+  & + & {
+    border-left: var(--ce-settings-control-border-width) solid var(--ce-settings-control-border);
+  }
+
+  &[data-cell='config'] {
+    grid-area: config;
+  }
+  &[data-cell='session'] {
+    grid-area: session;
+  }
+  &[data-cell='explainers'] {
+    grid-area: explainers;
+  }
+  &[data-cell='appearance'] {
+    grid-area: appearance;
+  }
+
+  // The cell label names each control, so inner labels step aside.
+  .settingsSessionLabel,
+  .preferenceToggleLabel {
+    display: none;
+  }
+
+  .settingsSessionRoute,
+  .globalSessionSelector {
+    width: 100%;
+    max-width: none;
+    flex-wrap: wrap;
+  }
+
+  // Zero basis keeps the open icon beside the menu; only the fallback link wraps.
+  .globalSessionSelectField {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+
+  // Match the 44px buttons beside it; left-aligned like the other cells.
+  .settingsSessionRoute {
+    justify-content: flex-start;
+  }
+
+  .settingsSessionRoute {
+    min-height: 44px;
+    padding-block: 0;
+  }
+
+  .globalSessionSelector .globalSessionSelectField > select {
+    min-height: 42px;
+  }
+
+  .settingsConfigToggleButton {
+    flex: 0 0 auto;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .tooltipsToggleControl {
+    width: auto;
+    justify-content: flex-start;
+  }
+
+  // Older narrow-screen rules stretch this button; in a cell it keeps its size.
+  .tooltipsToggleButton {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 6px 10px;
+  }
 }
 
-// A lone control on the last row takes the whole row.
-.settingsQuickControlCell:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
+.settingsStripLabel {
+  margin: 0;
+  color: var(--ce-settings-text);
+  font-family: var(--ce-font-button);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
-.settingsQuickControlCell > * {
-  width: 100%;
-  height: 100%;
+.settingsStripValue {
   min-width: 0;
-  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
 }
 
-.settingsQuickControlCell .settingsConfigToggleButton,
-.settingsQuickControlCell .settingsSessionRoute,
-.settingsQuickControlCell .tooltipsToggleButton {
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 56px;
-  justify-content: center;
-}
-
-.settingsQuickControlCell .settingsSessionSummary,
-.settingsQuickControlCell .tooltipsToggleControl {
+.settingsAppearancePanel {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 20px;
   width: 100%;
-  height: 100%;
-  max-width: none;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: var(--ce-settings-control-border-width) solid var(--ce-settings-control-border);
+  border-radius: var(--ce-radius-10);
+  background: var(--ce-settings-control-bg);
+  text-align: left;
 }
 
-.settingsQuickControlCell .tooltipsToggleControl {
-  position: relative;
-}
-
-.settingsQuickControlCell .tooltipsToggleInfoIcon {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--ce-settings-control-text);
-  opacity: 0.78;
-}
-
-.settingsThemeQuickSlot {
-  width: 100%;
+.settingsAppearanceTheme {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 1 220px;
+  min-width: 0;
 }
 
 .settingsThemeQuickControl {
@@ -838,14 +906,6 @@ h1 {
   flex: 0 0 auto;
 }
 
-.settingsSessionSummary {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-}
-
 .settingsSessionRoute {
   display: inline-flex;
   align-items: center;
@@ -956,6 +1016,21 @@ h1 {
   }
 }
 
+// Shown when the browser blocked a new tab opened from the session menu.
+.globalSessionSelector .globalSessionBlockedLink {
+  flex: 1 0 100%;
+  padding: 2px 6px 4px;
+  color: var(--ce-control-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: underline;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
 .globalSessionSelector .globalSessionLink {
   display: inline-flex;
   flex: 0 0 32px;
@@ -995,31 +1070,6 @@ h1 {
   font-weight: 700;
 }
 
-.settingsSessionLink {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  border-radius: var(--ce-radius-6);
-  color: color-mix(in srgb, var(--ce-status-info-text) 86%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  transition:
-    background-color 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
-
-  &:hover,
-  &:focus-visible {
-    color: var(--ce-status-info-text);
-    background: color-mix(in srgb, var(--ce-status-info) 26%, transparent);
-    transform: translateY(-1px);
-    outline: none;
-    text-decoration: none;
-  }
-}
-
 .aiSettingsToggleIcon {
   margin-left: 0;
   opacity: 0.8;
@@ -1042,11 +1092,6 @@ h1 {
     text-align: center;
   }
 
-  .settingsSessionSummary {
-    width: 100%;
-    justify-content: center;
-  }
-
   .settingsSessionRoute {
     justify-content: center;
   }
@@ -1067,31 +1112,36 @@ h1 {
   }
 }
 
+@media (max-width: 768px) {
+  // Phones and narrow tablets: session first, then Config and Explainers, then Appearance.
+  .settingsStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      'session session'
+      'config explainers'
+      'appearance appearance';
+  }
+
+  .settingsStripCell {
+    padding: 8px;
+
+    & + & {
+      border-left: 0;
+    }
+
+    &:not([data-cell='session']) {
+      border-top: var(--ce-settings-control-border-width) solid var(--ce-settings-control-border);
+    }
+
+    &[data-cell='explainers'] {
+      border-left: var(--ce-settings-control-border-width) solid var(--ce-settings-control-border);
+    }
+  }
+}
+
 @media (max-width: 480px) {
   .settingsContainer {
     padding-inline: 8px;
-  }
-
-  .settingsQuickControlsGrid {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .settingsQuickControlCell .settingsConfigToggleButton,
-  .settingsQuickControlCell .settingsSessionRoute,
-  .settingsQuickControlCell .tooltipsToggleButton {
-    gap: 6px;
-    padding-inline: 8px;
-    font-size: 0.78rem;
-  }
-
-  .settingsQuickControlCell .tooltipsToggleInfoIcon,
-  .settingsQuickControlCell .preferenceToggleState {
-    display: none;
-  }
-
-  .settingsQuickControlCell .preferenceToggleTrack {
-    transform: scale(0.86);
   }
 
   .settingsSessionLabel,
@@ -2053,16 +2103,19 @@ h1 {
   }
 }
 
+// The button's light end is the info colour deepened a little, so its pale label reads at 4.5:1 or better there.
+$passkey-primary-face: color-mix(in srgb, var(--ce-status-info) 72%, var(--ce-overlay-surface));
+
 .passkeyButtonPrimary {
-  background-color: var(--ce-status-info);
-  background-image: linear-gradient(150deg, var(--ce-status-info), var(--ce-overlay-surface));
+  background-color: $passkey-primary-face;
+  background-image: linear-gradient(150deg, $passkey-primary-face, var(--ce-overlay-surface));
   border-color: color-mix(in srgb, var(--ce-status-info) 22%, transparent);
   color: var(--ce-document-surface);
   box-shadow:
     -3px 3px 6px color-mix(in srgb, var(--ce-overlay-base) 62%, transparent),
     3px -3px 8px color-mix(in srgb, var(--ce-status-info) 20%, transparent);
   &:hover {
-    background-color: var(--ce-status-info);
+    background-color: $passkey-primary-face;
     box-shadow:
       -4px 4px 10px color-mix(in srgb, var(--ce-overlay-base) 68%, transparent),
       4px -4px 12px color-mix(in srgb, var(--ce-status-info) 22%, transparent);
@@ -2102,8 +2155,8 @@ h1 {
 // these light labels on the dialog behind them (white on white for Minimal's Create). The element selector outranks
 // them. Pressing also repaints the labels, dark for `.btn-outline-secondary`.
 button.passkeyButtonPrimary:is(:hover, :focus, :active):not(:disabled) {
-  background-color: var(--ce-status-info) !important;
-  background-image: linear-gradient(150deg, var(--ce-status-info), var(--ce-overlay-surface)) !important;
+  background-color: $passkey-primary-face !important;
+  background-image: linear-gradient(150deg, $passkey-primary-face, var(--ce-overlay-surface)) !important;
   color: var(--ce-document-surface) !important;
 }
 
@@ -2350,7 +2403,8 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   margin-top: 1px;
 
   // Panel-scoped, to outweigh the theme rule that frames every input as a field.
-  .agentHandoffPanel & input[type='radio'] {
+  .agentHandoffPanel & input[type='radio'],
+  .agentHandoffPanel & input[type='checkbox'] {
     appearance: none;
     width: 24px;
     height: 24px;
@@ -2368,6 +2422,35 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
     &:focus-visible {
       outline: none;
     }
+  }
+}
+
+// The same check, square, for "Ask me if I approve".
+.agentHandoffPanel .agentHandoffCheck input[type='checkbox'] {
+  border-radius: 4px;
+}
+
+.agentHandoffAskRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.agentHandoffAsk {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 650;
+  cursor: pointer;
+
+  &:focus-within {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
@@ -2484,15 +2567,33 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   opacity: 0.75;
 }
 
-.agentHandoffCommandBox {
-  position: relative;
-  margin: 6px 0 8px;
+// "Copy prompt" and its caret as one split button: the caret opens the whole prompt to read.
+.agentHandoffSplit {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+
+  > .agentHandoffPrimary:first-child {
+    flex: 1 1 auto;
+    width: auto;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+
+.agentHandoffSplit > .agentHandoffPrimary.agentHandoffCaret {
+  flex: none;
+  width: 52px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 // Bootstrap colours code pink; commands here read as the panel's text.
 .agentHandoffCommand {
   display: block;
-  margin: 0;
+  margin: 8px 0 0;
   padding: 8px 10px;
   border: 1px solid var(--ce-settings-border);
   border-radius: var(--ce-radius-6);
@@ -2501,6 +2602,11 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   font-size: 0.9rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+
+  // Its display: block would otherwise outweigh the hidden attribute.
+  &[hidden] {
+    display: none;
+  }
 }
 
 .agentHandoffHint,

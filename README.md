@@ -98,7 +98,7 @@ Setup, limits and routes: [docs/session-agent.md](docs/session-agent.md).
   server; it does not deploy or upgrade the web app or Session Workers.
 - Optional Agent HTTP with scoped `/api/agent/*` credentials and
   versioned runtime instructions
-- Agent token login in the browser, one-time invites, and Session Wrapped over HTTPS
+- One-time invites and Session Wrapped over HTTPS
 - Delegated membership, gate, storage, and chain authority rather than a second
   copy of canonical session state
 - Setup and endpoint reference in

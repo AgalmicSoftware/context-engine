@@ -51,6 +51,9 @@ import { buildNicknameByAddressMap, type CompareBookmark } from './compareMember
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import { useCompareSessionData } from './useCompareSessionData';
 import CompareSubjectInputList from './CompareSubjectInputList';
+import CompareSubjectNameSearch, { resolveTypedCompareNames } from './CompareSubjectNameSearch';
+import { useSessionNames } from '../../utilities/session/useSessionNames';
+import ShowSessionNames from '../Shared/ShowSessionNames';
 import CompareSubjectParticipants from './CompareSubjectParticipants';
 import {
   buildCompareSubjectsRoutePath,
@@ -221,6 +224,9 @@ const CompareAddress = ({
   const [bulletsLoading, setBulletsLoading] = useState(false);
   const [compassLoading, setCompassLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState('');
+  // A typed name Compare couldn't settle on one account for; cleared as soon as a box changes.
+  const [nameProblem, setNameProblem] = useState('');
+  const sectionRef = useRef<HTMLDivElement | null>(null);
   const [generation, setGeneration] = useState<ComparisonGeneration | null>(null);
   const [aiUnavailableReason, setAiUnavailableReason] = useState('');
   const [axesSource, setAxesSource] = useState<'ai' | 'fallback' | 'mock'>('fallback');
@@ -265,6 +271,13 @@ const CompareAddress = ({
     },
     [activeSessionSlug],
   );
+
+  // Only the names the session's Worker shows this viewer; none where the session keeps no names.
+  const { names: sessionNames, signIn: signInForNames } = useSessionNames({
+    sessionSlug: activeSessionSlug,
+    sessionConfig,
+    account: account || '',
+  });
 
   // Keep the exact user payloads used for the latest comparison (for drill-down + viz)
   const [currentUsers, setCurrentUsers] = useState<CompareUser[]>([]);
@@ -329,7 +342,7 @@ const CompareAddress = ({
       const next = Array.isArray(prev) && prev.length > 0 ? [...prev] : [firstAddress || '', ''];
       if (next.length < 2) next.push('');
       const alreadyHasAccount = next.some((value) => parseCompareSubject(value)?.key === accountToken);
-      if (!alreadyHasAccount && (next[1] || '') === '') {
+      if (!alreadyHasAccount && String(next[1] || '').trim() === '') {
         next[1] = accountToken;
         return next;
       }
@@ -660,12 +673,23 @@ const CompareAddress = ({
   };
   runComparisonRef.current = runComparison;
 
-  const performComparison = async () => runComparison(compareAddresses, { skipNavigate: false });
+  const performComparison = async () => {
+    const typed = resolveTypedCompareNames(compareAddresses, sessionNames);
+    setCompareAddresses(typed.values);
+    setNameProblem(typed.problem);
+    return typed.problem ? undefined : runComparison(typed.values, { skipNavigate: false });
+  };
 
-  const handleCompareAddressChange = (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+  // Not trimmed while typing, so a name can have a space in it; subjects are trimmed when read.
+  const handleCompareAddressChange = (index: number, value: string) => {
     let newCompareAddresses = [...compareAddresses];
-    newCompareAddresses[index] = event.target.value.trim();
+    newCompareAddresses[index] = value;
     setCompareAddresses(newCompareAddresses);
+    setNameProblem('');
+    // A picked name turns the box into a pill; the keyboard's place moves to that pill's clear button.
+    if (parseCompareSubject(value)) {
+      setTimeout(() => sectionRef.current?.querySelector<HTMLElement>(`[data-compare-clear="${index}"]`)?.focus());
+    }
   };
 
   const addCompareAddress = () => setCompareAddresses([...(compareAddresses || []), '']);
@@ -703,6 +727,7 @@ const CompareAddress = ({
             type="button"
             className={styles.youPillClear}
             onClick={() => clearAddressAt(index)}
+            data-compare-clear={index}
             aria-label="Clear this subject"
           >
             ×
@@ -711,17 +736,16 @@ const CompareAddress = ({
       );
     }
 
-    // Nickname pill (bookmarked user with nickname)
-    const nickname =
-      nicknameByAddress.get(
-        String(walletId || '')
-          .trim()
-          .toLowerCase(),
-      ) || '';
+    // Your private label for a bookmarked account comes first, then the name they set in this session.
+    const walletLower = String(walletId || '')
+      .trim()
+      .toLowerCase();
+    const privateLabel = nicknameByAddress.get(walletLower) || '';
+    const nickname = privateLabel || sessionNames[walletLower] || '';
 
     if (walletId) {
       const shortened = String(getShortenedAddress(walletId, false) || '').replace('...', '…');
-      const title = nickname ? `${nickname} (${shortened}), your private label` : shortened;
+      const title = nickname ? `${nickname} (${shortened})${privateLabel ? ', your private label' : ''}` : shortened;
       const blockieUrl = generateBlockieDataUrl(walletId.toLowerCase(), 8, 4);
       return (
         <div className={styles.youPill} title={title} aria-label={title}>
@@ -736,13 +760,14 @@ const CompareAddress = ({
             />
             <span>
               {nickname || shortened} {nickname && <span className={styles.pillAddress}>({shortened})</span>}
-              {nickname && <span className={styles.visuallyHidden}>, your private label</span>}
+              {privateLabel && <span className={styles.visuallyHidden}>, your private label</span>}
             </span>
           </span>
           <button
             type="button"
             className={styles.youPillClear}
             onClick={() => clearAddressAt(index)}
+            data-compare-clear={index}
             aria-label="Clear this subject"
           >
             ×
@@ -752,15 +777,12 @@ const CompareAddress = ({
     }
 
     return (
-      <input
-        type="text"
-        data-testid={
-          index === 0 ? E2E_TESTIDS.COMPARE_ADDRESS_A : index === 1 ? E2E_TESTIDS.COMPARE_ADDRESS_B : undefined
-        }
-        placeholder="wallet:0x…, worker:…, or sim:…"
-        aria-label={`Comparison subject ${index + 1}`}
+      <CompareSubjectNameSearch
+        index={index}
+        names={sessionNames}
+        onChange={(value) => handleCompareAddressChange(index, value)}
+        taken={compareAddresses.map((value) => parseCompareSubject(value)?.id.toLowerCase() || '')}
         value={address}
-        onChange={(e) => handleCompareAddressChange(index, e)}
       />
     );
   };
@@ -768,10 +790,17 @@ const CompareAddress = ({
   const nicknameByAddress = useMemo(() => buildNicknameByAddressMap(bookmarks), [bookmarks]);
 
   // Labels (nickname/username/shortened)
-  const userLabels = useMemo(() => deriveUserLabels(currentUsers, bookmarks), [currentUsers, bookmarks]);
+  const userLabels = useMemo(
+    () =>
+      deriveUserLabels(currentUsers, bookmarks).map((label, index) => {
+        const lower = String(currentUsers[index]?.address || '').toLowerCase();
+        return nicknameByAddress.get(lower) || sessionNames[lower] || label;
+      }),
+    [currentUsers, bookmarks, nicknameByAddress, sessionNames],
+  );
 
   return (
-    <div className={styles.compareSection}>
+    <div className={styles.compareSection} ref={sectionRef}>
       <details className={presentationStyles.participantControls} open={!showComparison || !!comparisonError}>
         <summary>Change participants</summary>
         {bookmarks.length > 0 && (
@@ -818,6 +847,7 @@ const CompareAddress = ({
           </div>
         )}
 
+        <ShowSessionNames signIn={signInForNames} />
         <CompareSubjectInputList
           onAddSubject={addCompareAddress}
           renderSubjectInput={renderInputOrYouPill}
@@ -846,6 +876,11 @@ const CompareAddress = ({
           )}
         </button>
       </details>
+      {nameProblem && (
+        <div className={styles.comparisonError} role="alert" style={resolveCompareErrorStyle()}>
+          {nameProblem}
+        </div>
+      )}
       {comparisonError && (
         <div className={styles.comparisonError} role="alert" style={resolveCompareErrorStyle()}>
           {comparisonError}

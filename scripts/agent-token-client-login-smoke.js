@@ -1,5 +1,8 @@
 "use strict";
 
+// The dialog's agent token control is hidden (client/src/components/Account/agentTokenLoginOffered.ts).
+// This smoke passes only against a build made with that constant set to true.
+
 const assert = require("node:assert/strict");
 const { chromium } = require("playwright");
 const { normalizeBaseUrl } = require("./vite-navigation-smoke");

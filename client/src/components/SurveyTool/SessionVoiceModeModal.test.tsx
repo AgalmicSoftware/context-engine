@@ -17,6 +17,10 @@ import { loadDraftingGroupChoices } from './sessionInterviewGroupRecommendations
 
 const mockGroupArea = jest.fn();
 const mockGroupAreaMounts = jest.fn();
+// These sessions have no place for names, so an answer may carry one.
+jest.mock('../../utilities/session/useSessionNames', () => ({
+  useSessionNames: jest.fn(() => ({ source: null, names: {}, answerNamesShown: true, signIn: null })),
+}));
 jest.mock('./SessionInterviewRecommendedGroups', () => ({
   __esModule: true,
   default: (props: { recommendations?: unknown[]; onRefresh?: () => void }) => {

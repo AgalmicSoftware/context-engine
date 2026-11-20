@@ -1,3 +1,4 @@
+import { AGENT_TOKEN_LOGIN_OFFERED } from './agentTokenLoginOffered';
 import { getClientAuthGeneration } from '../../utilities/session/clientAuthGeneration';
 import type { FormEvent } from 'react';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
@@ -170,6 +171,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
   };
 
   const shouldShowAgentTokenLogin = (): boolean => {
+    if (!AGENT_TOKEN_LOGIN_OFFERED) return false;
     const { sessionSlug, sessionConfig } = getAgentTokenLoginSessionContext();
     if (!sessionSlug) return false;
     return deps.isHostedAgentSessionConfig(sessionConfig);

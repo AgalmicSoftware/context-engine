@@ -33,13 +33,21 @@ join; it can draft the person's answers for them to review, from the session's
 the person it works for which way to take part. As itself, it joins through the MCP with the
 session link as received, under a name that says whose agent it is. On their
 behalf, it answers as them with a key they make in the account menu under
-**Your AI agent**, **Answer and submit for me**, which needs **Agents (HTTP
+**Your AI agent**, **Full submit**, which needs **Agents (HTTP
 API)** on. **Make a key** puts the key, which ends with the person's sign-in
 (within 4 hours) and works only in that session, into the one prompt they copy;
 the prompt names the session, tells the agent never to repeat the key, and
-gives the MCP install line in case the agent wants it. Its other choice,
-**Suggest answers for me to review**, copies the session's draft-your-answers
-prompt, named for the session, with the same MCP line and no key. When a session lets
+gives the MCP install line in case the agent wants it. With **Ask me if I approve**
+ticked (the default), it asks the agent to show its answers in the chat and
+submit once the person says yes there; unticked, to submit without asking
+again and then say what it submitted. The guide treats that copied prompt as
+the person's approval, and otherwise keeps "submit only the answers they
+approve". Its other choice,
+**Predict responses**, copies the session's draft-your-answers
+prompt, named for the session, with the same MCP line and no key. From the
+link alone, an agent can also suggest answers for a public session: the guide
+says how, and the MCP's `get_interview_catalog` and `make_review_link` do it
+without web access. When a session lets
 participants add context, it invites agents to add a file, a link or text that
 every participant sees.
 
@@ -70,11 +78,11 @@ Installing the package changes no Worker, web app or session. A Session Worker
 needs its `CE_SESSION_COORDINATOR` binding and migration; follow the
 [Worker deployment guide](session-cors-worker.md).
 
-Sessions with **Agents (HTTP API)** enabled also let an agent sign in on the
-website with a scoped agent token, which the session's Worker exchanges for
-browser credentials; see the
-[Agent HTTP guide](../workers/sessionCorsWorker/agent/README.md). Turning it off
-leaves browser and MCP participation under the session's existing rules.
+Sessions with **Agents (HTTP API)** enabled give agents scoped credentials; see
+the [Agent HTTP guide](../workers/sessionCorsWorker/agent/README.md). The
+website's log-in dialog doesn't currently offer signing in with an agent token.
+Turning the API off leaves browser and MCP participation under the session's
+existing rules.
 
 ## How an agent appears
 
@@ -85,8 +93,11 @@ leaves browser and MCP participation under the session's existing rules.
   MCP saves it as the agent's name in each joined session, on joining and with
   `set_profile`, through the same `POST /names/set` a person uses; there it
   shows in place of the address and answers carry no name of their own. A name
-  can be at most 32 characters there, and `set_profile` says per session
-  whether it was taken. On older Workers it appears beside each answer in the
+  can be at most 32 characters there (letters, numbers, spaces and
+  `. - _ '`), and `set_profile` says per session whether it was taken,
+  with a warning first for any that didn't. A name such as
+  "Kestrel - Opus 5.5 - North Lab" tells readers the agent's model and where
+  it comes from. On older Workers it appears beside each answer in the
   report, as before.
 - **Agent marker:** every answer and statement records a self-declared
   `participant` object, `{ kind: "agent", modelId, platform, verification:
@@ -108,8 +119,7 @@ leaves browser and MCP participation under the session's existing rules.
    public-read. Under the own-answers settings, people signed in with a passkey
    or wallet, and MCP agents, see only their own answers.
 
-   The optional **Agents (HTTP API)** surface has its own results route, which
-   agent-token login in the browser also uses. Under
+   The optional **Agents (HTTP API)** surface has its own results route. Under
    *Session members see all answers*, its account must pass the session's
    sign-in rules. Under *Each person sees their own answers* or *Own answers;
    agents need a group*, an agent credential can read combined results for

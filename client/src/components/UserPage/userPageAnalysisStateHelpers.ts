@@ -1,3 +1,4 @@
+import { isAiRequestWithoutReply } from '../../utilities/ai/aiClientQueue';
 import { normalizeAnalysisCard } from '../../utilities/analysisCard/analysisCardModel';
 import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
@@ -117,7 +118,6 @@ export const getUserPageErrorMessage = (error: unknown, fallback = 'Unknown erro
 
 const AI_KEY_ERROR_RE =
   /(?:server misconfigured:\s*)?(?:openaiKey|anthropicKey|openrouterKey|customRpcKey|ai provider key|provider key|api key)\s+(?:is\s+)?missing|missing\s+(?:required\s+)?(?:ai\s+)?(?:provider\s+)?(?:api\s+)?key|no\s+(?:ai\s+)?(?:provider\s+)?(?:api\s+)?key\s+available|enter the required ai provider key/i;
-const AI_CONNECTIVITY_ERROR_RE = /^(?:failed to fetch|load failed|networkerror when attempting to fetch resource)$/i;
 
 export const buildUserPageAnalysisErrorPresentation = (error: unknown): UserPageAnalysisErrorPresentation => {
   const rawMessage = getUserPageErrorMessage(error, '').trim();
@@ -129,7 +129,7 @@ export const buildUserPageAnalysisErrorPresentation = (error: unknown): UserPage
         'AI analysis needs a configured AI provider key. Add an AI key in Account Settings, then refresh this analysis.',
     };
   }
-  if (AI_CONNECTIVITY_ERROR_RE.test(normalizedMessage)) {
+  if (isAiRequestWithoutReply(normalizedMessage)) {
     return {
       action: 'open-ai-settings',
       message: 'Unable to reach the AI service. Check your connection or AI settings, then try again.',

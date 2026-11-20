@@ -1,3 +1,11 @@
+// The dialog's agent token control is hidden for now; these tests keep the code behind it working.
+let mockAgentTokenLoginOffered = true;
+jest.mock('./agentTokenLoginOffered', () => ({
+  __esModule: true,
+  get AGENT_TOKEN_LOGIN_OFFERED() {
+    return mockAgentTokenLoginOffered;
+  },
+}));
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -656,15 +664,19 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByRole('button', { name: /Resource keys/i })).not.toBeInTheDocument();
   });
 
-  it('keeps the theme selector visible beside the signed-in quick controls when config is collapsed', () => {
+  it('keeps theme and color-blind mode behind the signed-in Appearance button', () => {
     const subject = buildWrongNetworkSubject({ aiSettingsOpen: false });
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByTestId('ce-settings-quick-controls').children).toHaveLength(3);
+    expect(screen.getByTestId('ce-settings-quick-controls').children).toHaveLength(4);
+    expect(screen.queryByTestId('ce-settings-theme')).not.toBeInTheDocument();
+    const appearance = screen.getByRole('button', { name: /^Appearance/ });
+    expect(appearance).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(appearance);
+    expect(appearance).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('ce-settings-theme')).toHaveAccessibleName('App theme');
     expect(screen.getByTestId('ce-settings-color-blind')).toHaveAccessibleName('Color-blind mode');
-    expect(screen.getByText('Appearance')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Appearance & colors/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Bundled app themes')).not.toBeInTheDocument();
     expect(screen.queryByText(/Changes the complete app appearance/i)).not.toBeInTheDocument();
@@ -956,7 +968,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
         />,
       );
       if (!signedIn) await openPreLoginSettingsDrawer();
-      else await clickAndSettle(screen.getByRole('button', { name: 'Config' }));
+      else await clickAndSettle(screen.getByRole('button', { name: /^Config/ }));
       await waitFor(
         () =>
           expect(ref.current.state).toMatchObject({ sponsoredAccessLoading: false, sponsoredSessionConfig: config }),
@@ -1039,15 +1051,21 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(props.toggleTooltips).toHaveBeenCalledTimes(1);
   });
 
-  it('shows Config, Session and Explainers, and no Demo Mode, in the signed-in quick controls', () => {
+  it('shows Config, Session, Explainers and Appearance, and no Demo Mode, in the signed-in strip', () => {
     const subject = buildWrongNetworkSubject({ aiSettingsOpen: true });
 
     render(subject.getSettingsDisplay());
 
     const cells = Array.from(screen.getByTestId('ce-settings-quick-controls').children);
-    expect(cells).toHaveLength(3);
-    expect(within(cells[0]).getByRole('button', { name: /Config/ })).toBeInTheDocument();
+    expect(cells.map((cell) => cell.getAttribute('data-cell'))).toEqual([
+      'config',
+      'session',
+      'explainers',
+      'appearance',
+    ]);
+    expect(within(cells[0]).getByRole('button', { name: 'Config Advanced' })).toHaveAttribute('aria-expanded', 'true');
     expect(within(cells[2]).getByRole('button', { name: /Explainers/ })).toBeInTheDocument();
+    expect(within(cells[3]).getByRole('button', { name: /^Appearance/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Demo Mode/ })).not.toBeInTheDocument();
   });
 

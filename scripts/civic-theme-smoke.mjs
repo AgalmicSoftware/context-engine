@@ -181,10 +181,13 @@ export async function inspectCivicStats(page) {
       const usersSelector = dialog.getByTestId('ce-community-users-session-select');
       await usersSelector.waitFor({ state: 'visible' });
       const previousSelection = await usersSelector.inputValue();
-      await usersSelector.selectOption('');
-      await page.waitForFunction(() => document.querySelector('[data-testid="ce-community-session-select"]')?.value === '');
+      // A listed session; the fixture answers only its own Worker, so this one's reads are aborted.
+      await usersSelector.selectOption('eddy26');
+      await page.waitForFunction(() => document.querySelector('[data-testid="ce-community-session-select"]')?.value === 'eddy26');
       await usersSelector.selectOption(previousSelection);
       await page.waitForFunction((value) => document.querySelector('[data-testid="ce-community-session-select"]')?.value === value, previousSelection);
+      // Later pages load from storage: put the fixture session back as the primary one.
+      await page.evaluate(() => localStorage.setItem('ce:primarySessionSlug', 'demo-sh'));
       const [profilePage] = await Promise.all([
         page.waitForEvent('popup'),
         dialog.locator('[class*="userItem_"]').first().click(),
@@ -226,11 +229,13 @@ export async function inspectCivicStats(page) {
 export async function inspectStatsCounters(page) {
   const selector = page.getByTestId('ce-community-session-select');
   await selector.waitFor({ state: 'visible' });
-  await selector.selectOption({ label: 'General' });
+  // General shows only while it is the current choice; the fixture starts on its own session.
+  assert.equal(await selector.locator('option', { hasText: /^General$/ }).count(), 0, 'General is not offered');
+  await selector.selectOption('demo-sh');
   await inspectSessionSelectorLayout(selector, 'center');
   const sessionLink = page.getByTestId('ce-community-session-select-link');
   assert.equal(await sessionLink.getAttribute('target'), '_blank', 'A concrete session opens in a new tab');
-  assert(new URL(await sessionLink.getAttribute('href'), page.url()).pathname.endsWith('/session'), 'General links to its session page');
+  assert(new URL(await sessionLink.getAttribute('href'), page.url()).pathname.endsWith('/session/demo-sh'), 'A session links to its page');
   assert.equal(await page.getByTestId('ce-community-stat-sessions').count(), 0, 'Specific session scope hides the Sessions total');
   await selector.selectOption({ label: 'ALL' });
   assert.equal(await sessionLink.isDisabled(), true, 'Aggregate scope has no single-session destination');

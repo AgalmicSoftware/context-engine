@@ -1,7 +1,7 @@
 /** @file sessionNames.ts: the names people give themselves in a session, read from where the session keeps them. */
 import { getShortenedAddress } from '../ui/displayHelpers';
 import { readWorkerCapabilities } from '../worker/workerCapabilities';
-import { fetchWorkerWithAuth, getCachedWorkerSessionToken } from '../worker/workerAuth';
+import { fetchWorkerWithAuth, getCachedWorkerSessionToken, getWorkerSessionToken } from '../worker/workerAuth';
 import { groupReadHeaders } from '../worker/workerGroupReadProof';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { getUsableSessionWorkerUrl } from './sessionWorkerAvailability';
@@ -17,6 +17,13 @@ export type SessionNamesSource = {
   enabled: boolean;
   /** Every name this reader may see; empty, not an error, for someone the session doesn't let read them. */
   readAll: () => Promise<SessionNames>;
+  /**
+   * Whether this tab holds the session sign-in names are read with. A person whose wallet is connected can lack
+   * it (a new tab starts without one), and is then shown addresses until they sign in.
+   */
+  hasSignIn: () => Promise<boolean>;
+  /** Signs the person in to the session because they asked to see names; this may open their wallet or passkey. */
+  signIn: () => Promise<void>;
   /** Sets the signed-in person's own name; '' removes it. Resolves to the name as stored, or null. */
   setOwn: (name: string) => Promise<string | null>;
 };
@@ -55,6 +62,8 @@ export const subscribeSessionNames = (listener: () => void): (() => void) => {
 const NAMES_OFF: SessionNamesSource = {
   enabled: false,
   readAll: async () => ({}),
+  hasSignIn: async () => true,
+  signIn: async () => {},
   setOwn: async () => {
     throw new Error('Names are off in this session.');
   },
@@ -71,6 +80,10 @@ const workerSource = (base: string, options: SessionNamesOptions): SessionNamesS
   const slugQuery = `slug=${encodeURIComponent(options.sessionSlug)}`;
   return {
     enabled: true,
+    hasSignIn: async () => !options.account || !!(await getCachedWorkerSessionToken(session)),
+    signIn: async () => {
+      await getWorkerSessionToken(session);
+    },
     // Reading never asks for a sign-in: a held token widens what the Worker shows, and without one it answers
     // as it would anyone signed out.
     readAll: async () => {
@@ -149,22 +162,39 @@ export const resolveSessionNamesSource = async (options: SessionNamesOptions): P
   return kept;
 };
 
+/** An address as the site shortens it, with a real ellipsis. */
+export const shortSessionAddress = (address: string): string =>
+  String(getShortenedAddress(address, false)).replace('...', '…');
+
 /**
- * What to show for each named address. Names aren't unique, so a name two people share keeps each one's short
- * address beside it.
+ * What to show for each named address: the name, then the short address in brackets. Names aren't unique and
+ * anyone can pick any name, so the address always stays in sight.
  */
 export const sessionNameLabels = (names: SessionNames): Record<string, string> => {
-  const counts = new Map<string, number>();
-  for (const name of Object.values(names)) {
-    const key = name.toLocaleLowerCase();
-    counts.set(key, (counts.get(key) || 0) + 1);
-  }
   const labels: Record<string, string> = {};
-  for (const [address, name] of Object.entries(names)) {
-    labels[address] =
-      (counts.get(name.toLocaleLowerCase()) || 0) > 1
-        ? `${name} · ${String(getShortenedAddress(address, false)).replace('...', '…')}`
-        : name;
-  }
+  for (const [address, name] of Object.entries(names)) labels[address] = `${name} (${shortSessionAddress(address)})`;
   return labels;
+};
+
+export type SessionNameMatch = { address: string; name: string; label: string };
+
+/**
+ * The named accounts whose name contains what was typed, ignoring case and spacing; names that start with it
+ * come first. Two accounts with one name are two matches, told apart by their short address.
+ */
+export const findSessionNameMatches = (names: SessionNames, typed: string, limit = 6): SessionNameMatch[] => {
+  const query = normalizeSessionName(typed).toLocaleLowerCase();
+  if (!query) return [];
+  const labels = sessionNameLabels(names);
+  return Object.entries(names)
+    .map(([address, name]) => ({ address, name, label: labels[address], at: name.toLocaleLowerCase().indexOf(query) }))
+    .filter((match) => match.at >= 0)
+    .sort(
+      (a, b) =>
+        Math.min(a.at, 1) - Math.min(b.at, 1) ||
+        a.name.toLocaleLowerCase().localeCompare(b.name.toLocaleLowerCase()) ||
+        (a.address < b.address ? -1 : 1),
+    )
+    .slice(0, limit)
+    .map(({ address, name, label }) => ({ address, name, label }));
 };

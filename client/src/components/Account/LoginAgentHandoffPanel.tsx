@@ -3,6 +3,7 @@ import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import {
+  ASK_BEFORE_SUBMIT_DEFAULT,
   AgentDelegateKeyError,
   MCP_PROMPT_LINE,
   buildOnMyBehalfPrompt,
@@ -11,6 +12,7 @@ import {
 import { copyText, selectText } from '../../utilities/ui/copyText';
 import SessionInterviewMemoryKickoffCard from '../SurveyTool/SessionInterviewMemoryKickoffCard';
 import { useSessionPrefillKickoff } from '../SurveyTool/useSessionPrefillKickoff';
+import AgentPromptPreview, { PromptCaret, maskPromptTicket } from './AgentPromptPreview';
 import styles from './Account.module.scss';
 
 export type LoginAgentHandoffPanelProps = {
@@ -93,10 +95,14 @@ const Help = ({
 const OPTIONS: Array<{ way: Way; title: string; detail: string }> = [
   {
     way: 'suggest',
-    title: 'Suggest answers for me to review',
-    detail: 'You get a link with its suggestions filled in. Nothing is submitted until you submit.',
+    title: 'Predict responses',
+    detail: 'Your agent drafts your answers. You review and submit them here, on Context Engine.',
   },
-  { way: 'submit', title: 'Answer and submit for me', detail: 'Your agent submits as you.' },
+  {
+    way: 'submit',
+    title: 'Full submit',
+    detail: "Your agent submits as you. You don't need to come back to Context Engine.",
+  },
 ];
 
 // The two things the agent may do, as a radio group: arrow keys move between them, and each card is its label.
@@ -137,7 +143,7 @@ const WayChoice = ({ way, onChange }: { way: Way; onChange: (next: Way) => void 
   </fieldset>
 );
 
-// "Suggest answers": the voice dialog's prefill prompt, named for this session, behind one copy button.
+// "Predict responses": the voice dialog's prefill prompt, named for this session, behind one copy button.
 const SuggestAnswers = ({
   sessionSlug,
   sessionUrl,
@@ -151,6 +157,7 @@ const SuggestAnswers = ({
   'sessionSlug' | 'sessionUrl' | 'sessionName' | 'sessionConfig' | 'context' | 'workerUrl'
 > & { onCopied: () => void }) => {
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
   const { ready, kickoff } = useSessionPrefillKickoff({
@@ -194,7 +201,27 @@ const SuggestAnswers = ({
           showAgentPrompt={false}
           onCopyPrompt={copyPrompt}
           onTogglePrompt={() => undefined}
-          copyButton={{ className: styles.agentHandoffPrimary, testId: 'ce-agent-handoff-suggest-copy' }}
+          copyButton={{
+            className: styles.agentHandoffPrimary,
+            testId: 'ce-agent-handoff-suggest-copy',
+            rowClassName: styles.agentHandoffSplit,
+            addon: (
+              <PromptCaret
+                textId="ce-agent-handoff-suggest-prompt-text"
+                testId="ce-agent-handoff-suggest-prompt-expand"
+                expanded={expanded}
+                onToggle={() => setExpanded(!expanded)}
+              />
+            ),
+            renderPreview: (prompt) => (
+              <AgentPromptPreview
+                prompt={maskPromptTicket(prompt)}
+                textId="ce-agent-handoff-suggest-prompt-text"
+                testId="ce-agent-handoff-suggest-prompt"
+                expanded={expanded}
+              />
+            ),
+          }}
         />
         <Help id="ce-agent-handoff-suggest-about" placement="bottom">
           Paste it into ChatGPT, Claude or another AI. It reads this session&apos;s questions, drafts answers from what
@@ -221,6 +248,8 @@ const LoginAgentHandoffPanel = ({
   // The key lives only here, never in browser storage, and goes when the dialog closes.
   const [key, setKey] = useState<AgentDelegateKey | null>(null);
   const [keyShown, setKeyShown] = useState(false);
+  const [submitExpanded, setSubmitExpanded] = useState(false);
+  const [askFirst, setAskFirst] = useState(ASK_BEFORE_SUBMIT_DEFAULT);
   const [making, setMaking] = useState(false);
   const [error, setError] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
@@ -247,8 +276,11 @@ const LoginAgentHandoffPanel = ({
       copiedTimer.current = setTimeout(() => setCopiedStep(''), 1800);
     } else {
       announce(`Copying isn't allowed here, so the ${what} is selected. Copy it yourself.`);
-      // A hidden key is shown, since the masked one is no use to copy.
-      if (step === 'submit-prompt') setKeyShown(true);
+      // A hidden key is shown, and the whole prompt, since the masked or shortened one is no use to copy.
+      if (step === 'submit-prompt') {
+        setKeyShown(true);
+        setSubmitExpanded(true);
+      }
       setSelectStep(step);
     }
   };
@@ -278,10 +310,39 @@ const LoginAgentHandoffPanel = ({
   };
 
   const expiry = key ? new Date(key.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-  const submitPrompt = key ? buildOnMyBehalfPrompt({ key, sessionName, sessionUrl }) : '';
+  const submitPrompt = key ? buildOnMyBehalfPrompt({ key, sessionName, sessionUrl, askFirst }) : '';
   const shownSubmitPrompt = key
-    ? buildOnMyBehalfPrompt({ key, sessionName, sessionUrl, shownToken: keyShown ? key.token : MASKED_KEY })
+    ? buildOnMyBehalfPrompt({ key, sessionName, sessionUrl, askFirst, shownToken: keyShown ? key.token : MASKED_KEY })
     : '';
+
+  // Moot once the key's reply says the session doesn't let agents submit.
+  const askChoice =
+    key && !key.submitAnswers ? null : (
+      <div className={styles.agentHandoffAskRow}>
+        <label className={styles.agentHandoffAsk} data-testid="ce-agent-handoff-ask">
+          <span className={`${styles.agentHandoffRadio} ${styles.agentHandoffCheck}`}>
+            <input
+              type="checkbox"
+              checked={askFirst}
+              onChange={(event) => {
+                setAskFirst(event.target.checked);
+                setCopyStatus('');
+                // The prompt just changed, so an earlier "Copied" no longer describes it.
+                clearTimeout(copiedTimer.current);
+                setCopiedStep('');
+              }}
+              aria-describedby="ce-agent-handoff-ask-help-about"
+            />
+            {askFirst ? <FontAwesomeIcon icon={faCheck} className={styles.agentHandoffRadioTick} /> : null}
+          </span>
+          Ask me if I approve
+        </label>
+        <Help id="ce-agent-handoff-ask-help" placement="bottom">
+          Ticked, your agent shows you its answers in the chat and submits them once you say yes there. Unticked, it
+          submits without asking and tells you afterwards what it submitted. The prompt you copy follows this tick.
+        </Help>
+      </div>
+    );
 
   const submitSteps = !agentHttpEnabled ? (
     <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-submit-off">
@@ -291,29 +352,34 @@ const LoginAgentHandoffPanel = ({
       </Help>
     </p>
   ) : !key ? (
-    <div className={styles.agentHandoffActions}>
-      <button
-        type="button"
-        className={styles.agentHandoffPrimary}
-        onClick={makeKey}
-        disabled={making}
-        data-testid="ce-agent-handoff-make-key"
-      >
-        {making ? 'Making a key…' : 'Make a key'}
-      </button>
-      <Help id="ce-agent-handoff-key-about" placement="bottom">
-        The key lets your agent read this session&apos;s questions, save drafts and submit the answers you approve, as
-        you. It goes into the prompt you copy, and stops when your sign-in ends (within 4 hours) or when you make a new
-        one. It needs an agent that can send web requests, such as Claude Code or Codex.
-      </Help>
-    </div>
+    <>
+      {askChoice}
+      <div className={styles.agentHandoffActions}>
+        <button
+          type="button"
+          className={styles.agentHandoffPrimary}
+          onClick={makeKey}
+          disabled={making}
+          data-testid="ce-agent-handoff-make-key"
+        >
+          {making ? 'Making a key…' : 'Make a key'}
+        </button>
+        <Help id="ce-agent-handoff-key-about" placement="bottom">
+          The key goes into the prompt you copy. With it, your agent reads this session&apos;s questions and submits
+          answers as you (once you say yes in the chat, while Ask me if I approve is ticked), where the session lets
+          agents submit; otherwise it shows you drafts. It stops when your sign-in ends (within 4 hours) or when you
+          make a new one. It needs an agent that can send web requests, such as Claude Code or Codex.
+        </Help>
+      </div>
+    </>
   ) : (
     <>
+      {askChoice}
       <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
         Your key works in {sessionName} only, until {expiry}.
         <Help id="ce-agent-handoff-expiry-about" placement="bottom">
-          It ends when your sign-in ends or when you make a new key. The prompt below holds it, so paste the prompt only
-          into your own agent.
+          It ends when your sign-in ends or when you make a new key. The prompt you copy holds it, so paste it only into
+          your own agent.
         </Help>
       </p>
       {key.submitAnswers ? null : (
@@ -321,36 +387,45 @@ const LoginAgentHandoffPanel = ({
           {sessionName} doesn&apos;t let agents submit, so your agent shows you drafts.
         </p>
       )}
-      <div className={styles.agentHandoffCommandBox}>
-        <code
-          id="ce-agent-handoff-submit-prompt-text"
-          className={styles.agentHandoffCommand}
-          data-testid="ce-agent-handoff-submit-prompt"
-        >
-          {shownSubmitPrompt}
-        </code>
-      </div>
       <div className={styles.agentHandoffCopyRow}>
-        <button
-          type="button"
-          className={styles.agentHandoffPrimary}
-          onClick={() => copy('submit-prompt', 'prompt', submitPrompt)}
-          data-testid="ce-agent-handoff-submit-copy"
-        >
-          <FontAwesomeIcon icon={copiedStep === 'submit-prompt' ? faCheck : faCopy} />
-          {copiedStep === 'submit-prompt' ? 'Copied' : 'Copy the prompt'}
-        </button>
+        <div className={styles.agentHandoffSplit}>
+          <button
+            type="button"
+            className={styles.agentHandoffPrimary}
+            onClick={() => copy('submit-prompt', 'prompt', submitPrompt)}
+            data-testid="ce-agent-handoff-submit-copy"
+          >
+            <FontAwesomeIcon icon={copiedStep === 'submit-prompt' ? faCheck : faCopy} />
+            {copiedStep === 'submit-prompt' ? 'Copied' : 'Copy prompt'}
+          </button>
+          <PromptCaret
+            textId="ce-agent-handoff-submit-prompt-text"
+            testId="ce-agent-handoff-submit-prompt-expand"
+            expanded={submitExpanded}
+            onToggle={() => setSubmitExpanded(!submitExpanded)}
+          />
+        </div>
         <button
           type="button"
           className={styles.agentHandoffButton}
           aria-pressed={keyShown}
           aria-label="Show the key"
-          onClick={() => setKeyShown(!keyShown)}
+          onClick={() => {
+            // The key sits past the prompt's start, so showing it shows all of the prompt.
+            if (!keyShown) setSubmitExpanded(true);
+            setKeyShown(!keyShown);
+          }}
           data-testid="ce-agent-handoff-key-show"
         >
           {keyShown ? 'Hide' : 'Show'}
         </button>
       </div>
+      <AgentPromptPreview
+        prompt={shownSubmitPrompt}
+        textId="ce-agent-handoff-submit-prompt-text"
+        testId="ce-agent-handoff-submit-prompt"
+        expanded={submitExpanded}
+      />
     </>
   );
 
@@ -375,8 +450,8 @@ const LoginAgentHandoffPanel = ({
           </button>
         </h3>
         <Help id="ce-agent-handoff-about">
-          Your AI agent can work for you in this session. It can suggest answers, which come back to you as a link to
-          review and submit yourself, or, with a key you make here, answer and submit as you.
+          Your AI agent can work for you in this session. It can predict your responses, which come back to you as a
+          link to review and submit yourself, or, with a key you make here, submit as you in full.
         </Help>
       </div>
       <div id="ce-agent-handoff-body" hidden={!open}>

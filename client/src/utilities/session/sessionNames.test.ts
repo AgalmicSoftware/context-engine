@@ -1,17 +1,22 @@
 import {
   normalizeSessionName,
   resolveSessionNamesSource,
+  findSessionNameMatches,
   sessionNameLabels,
   subscribeSessionNames,
   SESSION_NAMES_FEATURE,
 } from './sessionNames';
 import { getUsableSessionWorkerUrl } from './sessionWorkerAvailability';
 import { readWorkerCapabilities } from '../worker/workerCapabilities';
-import { fetchWorkerWithAuth, getCachedWorkerSessionToken } from '../worker/workerAuth';
+import { fetchWorkerWithAuth, getCachedWorkerSessionToken, getWorkerSessionToken } from '../worker/workerAuth';
 
 jest.mock('./sessionWorkerAvailability', () => ({ getUsableSessionWorkerUrl: jest.fn() }));
 jest.mock('../worker/workerCapabilities', () => ({ readWorkerCapabilities: jest.fn() }));
-jest.mock('../worker/workerAuth', () => ({ fetchWorkerWithAuth: jest.fn(), getCachedWorkerSessionToken: jest.fn() }));
+jest.mock('../worker/workerAuth', () => ({
+  fetchWorkerWithAuth: jest.fn(),
+  getCachedWorkerSessionToken: jest.fn(),
+  getWorkerSessionToken: jest.fn(),
+}));
 jest.mock('../worker/workerGroupReadProof', () => ({ groupReadHeaders: () => ({}) }));
 
 const WORKER = 'https://names.worker.test';
@@ -32,12 +37,25 @@ beforeEach(() => {
   global.fetch = fetchMock as unknown as typeof fetch;
 });
 
-it('keeps the short address beside a name two people share', () => {
+it('shows the short address in brackets after every name', () => {
   expect(sessionNameLabels({ [A]: 'Sam', [B]: 'sam', [C]: 'Ada' })).toEqual({
-    [A]: 'Sam · 0x000…00aa',
-    [B]: 'sam · 0x000…00bb',
-    [C]: 'Ada',
+    [A]: 'Sam (0x000…00aa)',
+    [B]: 'sam (0x000…00bb)',
+    [C]: 'Ada (0x000…00cc)',
   });
+});
+
+it('finds accounts by a part of their name, whatever its case, one match per account', () => {
+  const names = { [A]: 'Sam', [B]: 'sam', [C]: 'Ada Sampson' };
+  expect(findSessionNameMatches(names, '  SAM ')).toEqual([
+    { address: A, name: 'Sam', label: 'Sam (0x000…00aa)' },
+    { address: B, name: 'sam', label: 'sam (0x000…00bb)' },
+    { address: C, name: 'Ada Sampson', label: 'Ada Sampson (0x000…00cc)' },
+  ]);
+  expect(findSessionNameMatches(names, 'ada  s').map((match) => match.address)).toEqual([C]);
+  expect(findSessionNameMatches(names, 'sam', 2)).toHaveLength(2);
+  expect(findSessionNameMatches(names, '')).toEqual([]);
+  expect(findSessionNameMatches(names, 'zed')).toEqual([]);
 });
 
 it('has no source for an on-chain session or a Worker from before names', async () => {
@@ -56,6 +74,32 @@ it("shows and sets no names once the session's admins turn them off", async () =
   await expect(source?.setOwn('Sam')).rejects.toThrow('Names are off in this session.');
   expect(fetchMock).not.toHaveBeenCalled();
   expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  expect(getWorkerSessionToken).not.toHaveBeenCalled();
+  expect(await source?.hasSignIn()).toBe(true);
+});
+
+it('reads as signed out in a tab with no sign-in, never signs in by itself, and offers the sign-in', async () => {
+  const E = '0x00000000000000000000000000000000000000ee';
+  // A refused read isn't kept, so this signed-out read leaves nothing behind for other tests.
+  fetchMock.mockResolvedValue(json({ error: 'nope' }, 500));
+  const source = await resolveSessionNamesSource(options(E));
+
+  expect(await source?.readAll()).toEqual({});
+  expect((fetchMock.mock.calls[0][1].headers as Record<string, string>).Authorization).toBeUndefined();
+  expect(await source?.hasSignIn()).toBe(false);
+  // Reading starts no sign-in, quiet or otherwise.
+  expect(getWorkerSessionToken).not.toHaveBeenCalled();
+
+  // Asked for by the person, the sign-in may prompt.
+  jest.mocked(getWorkerSessionToken).mockResolvedValue('asked-token');
+  await source?.signIn();
+  expect(getWorkerSessionToken).toHaveBeenCalledTimes(1);
+  expect(jest.mocked(getWorkerSessionToken).mock.calls[0][0]).not.toHaveProperty('prompt');
+
+  // Someone not connected is never signed in and is offered nothing.
+  const signedOut = await resolveSessionNamesSource(options());
+  expect(await signedOut?.hasSignIn()).toBe(true);
+  expect(getWorkerSessionToken).toHaveBeenCalledTimes(1);
 });
 
 it('reads names with a held sign-in, never starting one, and shares one read between views', async () => {

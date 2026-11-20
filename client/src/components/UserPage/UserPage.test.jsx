@@ -288,6 +288,25 @@ describe('UserPage username editing', () => {
     expect(localStorage.getItem(`userPageUsername_${viewAddress}`)).toBeNull();
   });
 
+  it('opens the name field without signing in, even in a tab with no session sign-in', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000e1';
+    const source = {
+      enabled: true,
+      setOwn: jest.fn(),
+      hasSignIn: jest.fn(async () => false),
+      signIn: jest.fn(async () => undefined),
+      readAll: jest.fn(async () => ({})),
+    };
+    const instance = makeInstance({ account: viewAddress, viewAddress, network: undefined });
+    instance.state = { ...instance.state, sessionNamesSource: source, sessionNames: {}, username: '' };
+
+    // The sign-in stays where it was: at Save, which needs it to store the name.
+    instance.onUsernamePenClick();
+    expect(instance.state.isEditingUsername).toBe(true);
+    expect(source.signIn).not.toHaveBeenCalled();
+    expect(source.hasSignIn).not.toHaveBeenCalled();
+  });
+
   it("reopens the field with the Worker's reason when it refuses a name", async () => {
     const viewAddress = '0x00000000000000000000000000000000000000ef';
     const setOwn = jest.fn(async () => {

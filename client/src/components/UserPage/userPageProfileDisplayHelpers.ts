@@ -1,3 +1,5 @@
+import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
+
 export type BuildUserPageProfileEditVisibilityArgs = {
   account?: unknown;
   cachedNickname?: unknown;
@@ -52,7 +54,7 @@ export type UserPageProfileEditVisibility = {
   isOwner: boolean;
   notOwnPage: boolean;
   showPen: boolean;
-  showUsernamePen: boolean;
+  showUsernameButton: boolean;
 };
 
 export type UserPageHeaderActionVisibility = {
@@ -97,7 +99,7 @@ export const buildUserPageProfileEditVisibility = ({
     notOwnPage,
     showPen: !minimized && notOwnPage && !isEditingNickname,
     // The account dialog shows the page minimized; its owner can still set a username there.
-    showUsernamePen: isOwner && !isEditingUsername,
+    showUsernameButton: isOwner && !isEditingUsername,
   };
 };
 
@@ -178,7 +180,10 @@ export const resolveUserPageAddressDisplayState = ({
   // Without its session the full profile opens on the default session, not the one in view.
   const session = String(sessionSlug || '').trim();
   const profileUrl = propViewAddress
-    ? `/u/${propViewAddress}${session ? `?session=${encodeURIComponent(session)}` : ''}`
+    ? withWorkerHintForSession(
+        `/u/${propViewAddress}${session ? `?session=${encodeURIComponent(session)}` : ''}`,
+        session,
+      )
     : '';
   const usernameText = String(username || '');
   const shortAddress = propViewAddress

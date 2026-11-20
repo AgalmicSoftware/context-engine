@@ -178,10 +178,10 @@ describe('globalSessionState helpers', () => {
     );
   });
 
-  it('starts at ALL while retaining the public demo primary, and preserves an explicit saved General choice', () => {
+  it('starts a new visitor at ALL on the Reverse Alignment Salon, and preserves an explicit saved General choice', () => {
     expect(readStoredGlobalSessionSelection()).toMatchObject({
       selectedSessionScope: 'all',
-      primarySessionSlug: 'demo-sh',
+      primarySessionSlug: 'rxc-ra-2',
       primarySessionExplicit: false,
     });
     writeGlobalSessionSelection({ primarySessionSlug: '', selectedSessionScope: 'general' });
@@ -189,6 +189,21 @@ describe('globalSessionState helpers', () => {
       selectedSessionScope: 'general',
       primarySessionSlug: '',
       primarySessionExplicit: true,
+    });
+  });
+
+  it("keeps a returning visitor's remembered session instead of the new default", () => {
+    localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
+    expect(readStoredGlobalSessionSelection()).toMatchObject({
+      selectedSessionScope: 'all',
+      primarySessionSlug: 'demo-sh',
+    });
+    localStorage.clear();
+    writeGlobalSessionSelection({ primarySessionSlug: 'eddy26' });
+    writeGlobalSessionSelection({ selectedSessionScope: 'active' });
+    expect(readStoredGlobalSessionSelection()).toMatchObject({
+      selectedSessionScope: 'active',
+      primarySessionSlug: 'eddy26',
     });
   });
 

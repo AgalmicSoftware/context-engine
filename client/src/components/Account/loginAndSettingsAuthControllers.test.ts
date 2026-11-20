@@ -4,6 +4,15 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 import { buildPasskeyWalletNetwork, createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
 import { createLoginAgentActions, formatAgentTokenError } from './loginAndSettingsAgentTokenActions';
 
+// The dialog's agent token control is hidden for now; these tests keep the code behind it working.
+let mockAgentTokenLoginOffered = true;
+jest.mock('./agentTokenLoginOffered', () => ({
+  __esModule: true,
+  get AGENT_TOKEN_LOGIN_OFFERED() {
+    return mockAgentTokenLoginOffered;
+  },
+}));
+
 const envelope: AgentClientLoginEnvelope = {
   v: 3,
   sessionSlug: 'alpha',
@@ -194,6 +203,18 @@ describe('loginAndSettings auth controllers', () => {
       workerUrl: '',
     });
     expect(actions.shouldShowAgentTokenLogin()).toBe(true);
+
+    // As shipped, the control is hidden everywhere, whatever the session offers.
+    expect(
+      jest.requireActual<typeof import('./agentTokenLoginOffered')>('./agentTokenLoginOffered')
+        .AGENT_TOKEN_LOGIN_OFFERED,
+    ).toBe(false);
+    mockAgentTokenLoginOffered = false;
+    try {
+      expect(actions.shouldShowAgentTokenLogin()).toBe(false);
+    } finally {
+      mockAgentTokenLoginOffered = true;
+    }
   });
 
   it('keeps an exact worker-canonical prop authoritative during a same-slug registry collision', () => {

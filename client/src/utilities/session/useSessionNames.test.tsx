@@ -12,6 +12,8 @@ const options = { sessionSlug: 'names-session', sessionConfig: {}, account: A };
 const source = (names: Record<string, string>): SessionNamesSource => ({
   enabled: true,
   readAll: jest.fn(async () => names),
+  hasSignIn: jest.fn(async () => true),
+  signIn: jest.fn(async () => undefined),
   setOwn: jest.fn(),
 });
 
@@ -48,12 +50,24 @@ it("keeps answers' own names hidden while a Worker's names load or can't be lear
   expect(result.current).toMatchObject({ source: null, names: {}, answerNamesShown: false });
 });
 
+it('offers the sign-in only while this tab holds none', async () => {
+  const kept = source({});
+  jest.mocked(kept.hasSignIn).mockResolvedValue(false);
+  jest.mocked(resolveSessionNamesSource).mockResolvedValue(kept);
+  const { result } = renderHook(() => useSessionNames(options));
+  await waitFor(() => expect(result.current.signIn).toBe(kept.signIn));
+
+  jest.mocked(kept.hasSignIn).mockResolvedValue(true);
+  await act(async () => reload());
+  expect(result.current.signIn).toBeNull();
+});
+
 it('shows the names and keeps the same state when a reload changes nothing', async () => {
   const kept = source({ [A]: 'Sam' });
   jest.mocked(resolveSessionNamesSource).mockResolvedValue(kept);
   const { result } = renderHook(() => useSessionNames(options));
   await waitFor(() => expect(result.current.names).toEqual({ [A]: 'Sam' }));
-  expect(result.current).toMatchObject({ source: kept, answerNamesShown: false });
+  expect(result.current).toMatchObject({ source: kept, answerNamesShown: false, signIn: null });
 
   const before = result.current;
   await act(async () => reload());

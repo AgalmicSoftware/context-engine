@@ -194,6 +194,9 @@ describe('userPageAnalysisStateHelpers', () => {
       action: 'open-ai-settings',
       message: 'Unable to reach the AI service. Check your connection or AI settings, then try again.',
     });
+    expect(
+      buildUserPageAnalysisErrorPresentation(new TypeError('NetworkError when attempting to fetch resource.')).action,
+    ).toBe('open-ai-settings');
     expect(buildUserPageAnalysisErrorPresentation(new Error('No AI provider key available.'))).toEqual({
       action: 'add-ai-key',
       message:

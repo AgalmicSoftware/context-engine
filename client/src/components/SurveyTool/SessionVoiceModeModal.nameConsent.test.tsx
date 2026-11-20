@@ -2,7 +2,12 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { useSessionNames } from '../../utilities/session/useSessionNames';
 
+// These sessions have no place for names, so an answer may carry one.
+jest.mock('../../utilities/session/useSessionNames', () => ({
+  useSessionNames: jest.fn(() => ({ source: null, names: {}, answerNamesShown: true, signIn: null })),
+}));
 jest.mock('./SessionInterviewRecommendedGroups', () => ({ __esModule: true, default: () => null }));
 jest.mock('./useSessionInterviewGroupRecommendations', () => ({
   useSessionInterviewGroupRecommendations: jest.fn(() => ({ availability: 'idle', recommendations: [] })),
@@ -32,6 +37,54 @@ jest.mock('../../utilities/worker/corsProxy.js', () => ({
   getCorsProxyUrlOrThrow: jest.fn(async () => 'https://worker.example'),
 }));
 jest.mock('../../utilities/audio/realtimeInterviewClient', () => ({ startSessionRealtimeInterview: jest.fn() }));
+
+it('offers no responder name and sends none where the session keeps names', async () => {
+  jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: false, signIn: null });
+  const onRecordProvenance = jest.fn();
+  const onSubmitResponses = jest.fn(async () => ({ status: 'submitted' as const }));
+  try {
+    render(
+      <SessionVoiceModeModal
+        isOpen
+        mode="interview"
+        onSelectMode={jest.fn()}
+        onClose={jest.fn()}
+        toggleLoginModal={jest.fn()}
+        sessionSlug="demo"
+        account="0x0000000000000000000000000000000000000001"
+        loginComplete
+        workerUrl="https://worker.example"
+        questionPool={[{ id: 'q1', prompt: 'Proceed?', type: 'binary' }]}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v4',
+          source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+          responderContext: { name: 'Fixture Responder' },
+          responses: [{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }],
+        }}
+        onApplyAnswer={jest.fn()}
+        onApplyAdditional={jest.fn()}
+        onApplyImportance={jest.fn()}
+        onApplyConviction={jest.fn()}
+        onRecordProvenance={onRecordProvenance}
+        onSubmitResponses={onSubmitResponses}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    fireEvent.click(screen.getByText('AI submission info'));
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)).toBeNull();
+    expect(screen.queryByText(/as the responder name/)).toBeNull();
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(onRecordProvenance).toHaveBeenCalledTimes(1));
+    expect(onRecordProvenance.mock.calls[0][5]).toBe('');
+    expect(onRecordProvenance.mock.calls[0][7]).toMatchObject({ includeResponderName: false });
+  } finally {
+    jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: true, signIn: null });
+  }
+});
 
 it('the responder-name consent is locked while a submission that already carries it is in flight', async () => {
   const onRecordProvenance = jest.fn();

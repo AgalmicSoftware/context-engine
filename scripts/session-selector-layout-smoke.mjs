@@ -175,7 +175,8 @@ export async function runSmoke() {
         const stats = page.getByTestId('ce-community-session-select');
         await stats.waitFor({ state: 'visible' });
         await page.evaluate(() => document.fonts.ready);
-        for (const label of ['ALL', 'General', 'Demo Session (demo-sh)']) {
+        // demo-sh is left off the list once another choice replaces it; General shows only while chosen.
+        for (const label of ['Demo Session (demo-sh)', 'ALL']) {
           await stats.selectOption({ label });
           await inspectSessionSelectorLayout(stats, 'center');
         }
@@ -192,7 +193,7 @@ export async function runSmoke() {
           await inspectSessionSelectorLayout(selector, 'right');
           await selector.selectOption({ label: 'General' });
           await inspectSessionSelectorLayout(selector, 'right');
-          await selector.selectOption({ label: 'Demo Session (demo-sh)' });
+          await selector.selectOption({ label: 'RA agent test (rxc-ra-agent-test-1)' });
           await inspectSessionSelectorLayout(selector, 'right');
           await page.getByRole('button', { name: '← Back', exact: true }).click();
         }
@@ -292,16 +293,16 @@ export async function runOfflineLayoutSmoke({ themes = ['civic', 'classic-95', '
         const routePath = `/session/${config.slug}?worker=${encodeURIComponent(config.corsWorkerUrl)}`;
         await page.goto(`${baseUrl}${routePath}`, { waitUntil: 'domcontentloaded' });
         await page.getByRole('button', { name: /^LOG IN$/i }).click();
-        const summary = page.getByLabel(`Active session: ${config.sessionName}`, { exact: true });
-        await summary.waitFor({ state: 'visible' });
-        assert.equal(await page.getByRole('combobox', { name: 'Session', exact: true }).count(), 0,
-          'Route Settings does not show an unrelated global scope selector');
-        assert.equal(await summary.getByRole('link').getAttribute('href'), routePath,
+        // On a session page the picker stays on that session and opens others in a new tab.
+        const routeSelector = page.getByTestId('ce-prelogin-session-select');
+        await routeSelector.waitFor({ state: 'visible' });
+        assert.equal(await routeSelector.inputValue(), config.slug,
+          'Route Settings shows the route session, not the unrelated global ALL scope');
+        assert.equal(await routeSelector.locator('option', { hasText: /^ALL$/ }).count(), 0,
+          'Route Settings offers no ALL scope');
+        assert.equal(await page.getByTestId('ce-prelogin-session-select-link').getAttribute('href'), routePath,
           'Route Settings preserves its Worker discovery link');
-        assert(await summary.evaluate(el => {
-          const rect = el.getBoundingClientRect();
-          return rect.left >= 0 && rect.right <= innerWidth;
-        }), 'Route session summary fits the viewport');
+        await inspectSessionSelectorLayout(routeSelector, 'settings');
         await page.getByRole('button', { name: 'Toggle pre-login settings' }).click();
         console.log(`PASS offline selector/settings layout: ${theme} ${width}`);
         await page.close();

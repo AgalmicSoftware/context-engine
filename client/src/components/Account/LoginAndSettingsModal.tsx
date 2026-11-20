@@ -34,18 +34,13 @@ import SessionChipSelector from '../Shared/SessionChipSelector';
 import GlobalSessionSelector from '../Shared/GlobalSessionSelector';
 import { LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSummary';
 import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';
-import {
-  LoginSettingsConfigToggleControl,
-  LoginSettingsControlRow,
-  LoginSettingsSessionSummary,
-} from './LoginSettingsControlRow';
+import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './LoginSettingsControlRow';
 import { getLoginSettingsSponsoredConfigKey } from './loginSettingsConfigIdentity';
 import LoginSettingsSectionCard from './LoginSettingsSectionCard';
 import LoginModalDisplayBody from './LoginModalDisplayBody';
 import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
 import LoginPreLoginConfigPanel from './LoginPreLoginConfigPanel';
 import LoginPreLoginSettingsDisplay from './LoginPreLoginSettingsDisplay';
-import LoginThemeQuickControl from './LoginThemeQuickControl';
 import { DEFAULT_AUTO_REQUEST_TESTNET_FUNDS, DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import contractScripts, {
   getAllSessionSlugs,
@@ -1705,7 +1700,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     rowClassName = '',
     showSession = true,
     layout = 'row',
-    themeControl = null,
+    showAppearance = false,
   }: any = {}) =>
     LoginSettingsControlRow({
       configOpen,
@@ -1725,25 +1720,26 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       rowClassName,
       showSession,
       sessionControl: this.renderGlobalSessionSelector(),
-      themeControl,
+      showAppearance,
     });
 
   renderGlobalSessionSelector = ({ testId = 'ce-web3modal-session-select' }: { testId?: string } = {}) => {
     // Settings on a session route belong to that route, even when global scan
-    // scope selects another session or ALL. Preserve its Worker discovery URL.
-    if (typeof window !== 'undefined' && resolveSessionSlugFromPathname(window.location.pathname) !== null) {
-      return (
-        <LoginSettingsSessionSummary
-          label={this.getSessionDescriptor(this.getActiveSessionSlug()).label}
-          sessionHref={`${window.location.pathname}${window.location.search}`}
-        />
-      );
-    }
+    // scope selects another session or ALL: there, picking a session opens it in
+    // a new tab and the page beneath stays as it is. Keep its Worker discovery URL.
+    const onSessionPage =
+      typeof window !== 'undefined' && resolveSessionSlugFromPathname(window.location.pathname) !== null;
     return (
       <GlobalSessionSelector
-        selection={this.getGlobalSessionSelection()}
+        selection={
+          onSessionPage
+            ? { primarySessionSlug: this.getActiveSessionSlug(), selectedSessionScope: 'active' }
+            : this.getGlobalSessionSelection()
+        }
         sessionConfig={this.props.sessionConfig}
         onChange={this.handleGlobalSessionSelectionChange}
+        opensInNewTab={onSessionPage}
+        currentHref={onSessionPage ? `${window.location.pathname}${window.location.search}` : undefined}
         testId={testId}
       />
     );
@@ -2323,7 +2319,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         {this.renderSettingsControlRow({
           activeSession,
           configOpen: this.state.aiSettingsOpen,
-          layout: 'quick-grid',
+          layout: 'strip',
           onToggleConfig: this.toggleAiSettingsPanel,
           betweenSessionAndTooltips:
             cryptoTerminology && overview.capabilities.showNetworkControls
@@ -2342,7 +2338,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             ) : null,
           tooltipsInfoId: 'postLoginTooltipsToggleTooltip',
           tooltipPlacement: 'right',
-          themeControl: <LoginThemeQuickControl />,
+          showAppearance: true,
         })}
 
         {this.state.aiSettingsOpen &&

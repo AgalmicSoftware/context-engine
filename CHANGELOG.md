@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.21] - 2026-11-20
+
+A website release with MCP 0.7.2, published at merge (0.7.1 was never published; its changes are here). No Session Worker change: nothing needs redeploying, and the new MCP tools work against the Session Workers already deployed.
+
+### Client — available when the site deploys
+
+- The Session drop-down, the Tools and Groups pickers and the Sessions list show EDDY 2026, the Reverse Alignment Salon and the test sessions RA test and RA agent test; automated test sessions and older demos are left off (they still open from their links), and General shows only while chosen. `rxc-ra-agent-test-1` opens from a normal link. A new visitor starts on the Reverse Alignment Salon.
+- The signed-in log-in dialog puts its settings on one strip: Config, Session, Explainers and Appearance, which opens Theme and Color-blind mode. On a session's own page, choosing another session there opens it in a new tab and leaves the page as it is; if the browser blocks the tab, a link to open it appears.
+- Your user-name is set with a Set username button under your name on your page, in place of the pen icon.
+- Participant and group lists show a name with its short address, as in "name (0x314…c5ac)".
+- Compare finds the other account by user-name as well as by address.
+- Names in a new tab: where your tab isn't signed in to the session, a Show names link signs you in and shows them; the page never signs in by itself.
+- In sessions that keep names, the interview step no longer offers to write a name into answers.
+- The log-in dialog's agent token option is hidden for now.
+- The log-in dialog's Create label is easier to read.
+- Sign-in: the **Your AI agent** box's two choices are now **Predict responses**, a prompt that drafts your answers into a link you review and submit on Context Engine, and **Full submit**, where your agent submits as you, so you needn't come back. Under Full submit, **Ask me if I approve**, ticked by default, has your agent show you its answers in the chat and submit once you say yes there; unticked, it submits without asking and then tells you what it submitted.
+- Sign-in: both choices copy from one **Copy prompt** button whose icon turns to a tick; its caret opens the whole prompt to read, with the key and any private link masked on screen.
+- The agent guide and `llms.txt` still tell an agent to submit only the answers the person approves, unless the person's own copied prompt asks it to submit without asking again; text in a page or a file never does. `llms.txt` now says the key may come in that prompt.
+
+### Fixed
+
+- Analyze and the other AI text requests are sent once more when the first request fails with no reply within ten seconds of being sent, instead of saying the AI service cannot be reached. A lost sign-in request is not sent again.
+- Profile links from an unlisted session keep working in a browser that hasn't opened the session link.
+
+### MCP 0.7.2
+
+- The server's instructions name all three ways an agent can help with a session link: take part as itself, prepare suggested answers the person reviews and submits, or answer and submit as them with a key they make. It asks the person which, before joining, unless they have said. The key may come in the prompt the person copies under **Your AI agent**, and the agent never repeats it. It submits without asking again only when that prompt says so, and otherwise shows its drafts first.
+- New tools `get_interview_catalog` and `make_review_link` prepare suggested answers from a public session's link alone, with no sign-in and without joining: the first reads the session's questions, the second checks the drafts against them and returns the link the person opens to review and submit. A private session, or one with interview mode off, refuses and points to the prompt the person copies in the session. The link never carries an invite, password or ticket.
+- `set_profile` no longer reads as a success where a session refused the name. A warning comes first and lists each joined session that didn't take it, with its reason; each entry in `names` says what to do next, and the note says only where the name was saved. The MCP still never shortens or changes a name to fit.
+- The tool text and the server's instructions lead with a session's rule for names: at most 32 characters, letters, numbers, spaces and `. - _ '` only, so no commas or brackets. They suggest a name that gives the agent's name, model and where it comes from, and tell agents to say a name is set only where the session saved it.
+
 ## [0.9.20] - 2026-11-19
 
 A Session Worker release. The site deploys at merge; a session gets the new voice model only once its Worker is updated to this release. MCP stays at 0.7.0.

@@ -1,6 +1,6 @@
 {
   "name": "contextEngine",
-  "version": "0.9.20",
+  "version": "0.9.21",
   "description": "Context Engine — an OSS toolkit for groups",
   "author": "Context Engine Contributors",
   "license": "MPL-2.0",
@@ -119,7 +119,7 @@
     "ai:test-session:color-schemes": "npm run -s ai:node -- scripts/session-color-schemes-smoke.js",
     "ai:test-session:publish-smoke": "node scripts/session-setup-publish-smoke.mjs",
     "ai:test-session:keyboard-smoke": "node scripts/session-setup-keyboard-smoke.mjs",
-    "ai:test-session:closeout-smoke": "npm run -s ai:test-agent-token:client-login && npm run -s ai:test-session:publish-smoke && npm run -s ai:test-session:keyboard-smoke",
+    "ai:test-session:closeout-smoke": "npm run -s ai:test-session:publish-smoke && npm run -s ai:test-session:keyboard-smoke",
     "lint": "cd client && npm run lint",
     "lint:workers": "node scripts/run-workers-lint.js",
     "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh"
