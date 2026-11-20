@@ -172,6 +172,18 @@ export const SettingsContextCardsField = ({ draft, onChange }: FieldsProps) => (
   />
 );
 
+// Whether AI agents may take part with accounts of their own, as through the MCP.
+export const SettingsAgentParticipationField = ({ draft, onChange }: FieldsProps) => (
+  <SetupCheck
+    id="ce-settings-agent-participation"
+    label="AI agents can take part"
+    help="Lets AI agents join with accounts of their own, as through the Context Engine MCP, and lets a person open their agent’s account from a link the agent makes. Turned off, the session refuses sign-ins and answers that say they come from an agent, and makes no such links; nobody is signed out. It binds agents that say what they are: a program that presents itself as a browser can’t be told from a person."
+    checked={draft.agentParticipationEnabled !== false}
+    testId="ce-settings-agent-participation"
+    onChange={(checked) => onChange(['agentParticipationEnabled'], checked)}
+  />
+);
+
 // Whether the session page offers its Feedback button, for feedback about the app itself.
 export const SettingsFeedbackField = ({ draft, onChange }: FieldsProps) => (
   <SetupCheck

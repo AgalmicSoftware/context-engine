@@ -39,6 +39,20 @@ export const readWorkerTakesFeedback = async (
   return found.features.includes('session_feedback');
 };
 
+/**
+ * Whether the Session Worker signs people in from an agent's link and has the switch for AI agents; false when it
+ * can't be read. An older one would refuse the setting.
+ */
+export const readWorkerHasAgentSignIn = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> => {
+  if (!workerOrigin) return false;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.features.includes('agent_sign_in_link_v1');
+};
+
 /** Whether the Session Worker keeps context cards; false when it can't be read. An older one would refuse the setting. */
 export const readWorkerKeepsContextCards = async (
   workerOrigin: string,

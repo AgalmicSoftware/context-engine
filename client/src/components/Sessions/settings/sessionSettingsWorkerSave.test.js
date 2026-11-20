@@ -542,6 +542,33 @@ describe('saving the edit page through the Session Worker', () => {
     expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
   });
 
+  it('saves the AI agents choice only when it changes, and signs no one out', () => {
+    const stored = publishedSession();
+    // On unless turned off: a session that never set it lets agents take part, as before the setting.
+    const off = editAndSave(stored, (draft) => {
+      expect(draft.agentParticipationEnabled).toBe(true);
+      draft.agentParticipationEnabled = false;
+    });
+    expect(off.save.patch).toEqual({ agentParticipationEnabled: false });
+    expect(off.save.classification).toMatchObject({ content: ['agentParticipationEnabled'], signsParticipantsOut: false });
+    expect(describeSessionSettingsPath('agentParticipationEnabled')).toBe('AI agents can take part');
+    expect(off.result).toMatchObject({ ok: true });
+    expect(projectPublicWorkerSessionConfig(off.result.config).agentParticipationEnabled).toBe(false);
+
+    const on = editAndSave(off.result.config, (draft) => {
+      expect(draft.agentParticipationEnabled).toBe(false);
+      draft.agentParticipationEnabled = true;
+    });
+    expect(on.save.patch).toEqual({ agentParticipationEnabled: true });
+    expect(on.result).toMatchObject({ ok: true });
+
+    // Left alone, it is never sent, so a Worker too old to know it refuses nothing.
+    const untouched = editAndSave(stored, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
+  });
+
   it('saves the Context cards choice only when it changes, and signs no one out', () => {
     const stored = publishedSession();
     // Off unless turned on: a session that never set it shows the box clear.

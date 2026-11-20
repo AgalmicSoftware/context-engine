@@ -51,6 +51,7 @@ import {
   readWorkerTakesGptLive11,
   readWorkerReleaseLabel,
   readWorkerKeepsContextCards,
+  readWorkerHasAgentSignIn,
   readWorkerTakesFeedback,
 } from '../../../domains/worker/workerRelease';
 import { workerOffersGroupJoinChoices } from '@ce-shared/workerGroupJoin.mjs';
@@ -83,6 +84,7 @@ import SettingsFeedbackPanel from './SettingsFeedbackPanel';
 import {
   SettingsContextCardsField,
   SettingsFeedbackField,
+  SettingsAgentParticipationField,
   SettingsQuestionListFields,
   SettingsSbtFields,
 } from './SettingsListFields';
@@ -240,6 +242,7 @@ const SessionSettingsPage = ({
   const [workerKeepsDraftText, setWorkerKeepsDraftText] = useState<boolean | null>(null);
   // Whether it takes feedback about the app; an older one shows no Feedback section here or button on the session page.
   const [workerTakesFeedback, setWorkerTakesFeedback] = useState(false);
+  const [workerHasAgentSwitch, setWorkerHasAgentSwitch] = useState(false);
   // Whether it keeps context cards; an older one would refuse the setting, so it isn't offered there.
   const [workerKeepsCards, setWorkerKeepsCards] = useState(false);
   // Whether it counts a separate AI daily limit; an older one would store the field and ignore it.
@@ -260,6 +263,7 @@ const SessionSettingsPage = ({
     setWorkerRelease('');
     setWorkerKeepsDraftText(null);
     setWorkerTakesFeedback(false);
+    setWorkerHasAgentSwitch(false);
     setWorkerKeepsCards(false);
     setWorkerCountsAiLimit(false);
     setWorkerRunsWorkersAi(false);
@@ -278,6 +282,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerKeepsContextCards(workerOrigin, sessionSlug, fetchImpl).then((keeps) => {
       if (!stale) setWorkerKeepsCards(keeps);
+    });
+    void readWorkerHasAgentSignIn(workerOrigin, sessionSlug, fetchImpl).then((has) => {
+      if (!stale) setWorkerHasAgentSwitch(has);
     });
     void readWorkerCountsAiLimit(workerOrigin, sessionSlug, fetchImpl).then((counts) => {
       if (!stale) setWorkerCountsAiLimit(counts);
@@ -744,6 +751,18 @@ const SessionSettingsPage = ({
             </p>
           }
         />
+        {capabilities.isWorkerCanonical && workerHasAgentSwitch ? (
+          <section
+            className={styles.section}
+            aria-labelledby="ce-settings-agents-title"
+            data-testid="ce-settings-agents"
+          >
+            <h2 id="ce-settings-agents-title" className={styles.sectionTitle}>
+              AI agents
+            </h2>
+            <SettingsAgentParticipationField draft={draft} onChange={updateDraft} />
+          </section>
+        ) : null}
         {capabilities.isWorkerCanonical && workerTakesFeedback ? (
           <SettingsFeedbackPanel
             admin={{
