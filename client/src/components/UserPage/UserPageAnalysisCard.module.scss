@@ -5,70 +5,71 @@
   gap: 12px;
 }
 
-.stage {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-}
-
+// The card takes the width it is given, up to the size it still reads well at; its controls sit under it.
 .preview {
-  width: min(100%, 300px);
+  width: min(100%, 440px);
   height: auto;
   aspect-ratio: 9 / 16;
   border-radius: var(--ce-radius-12);
   border: 1px solid var(--ce-document-border);
 }
 
-.turn {
-  flex: 0 0 auto;
-  min-width: 40px;
-  min-height: 40px;
-  border: 1px solid var(--ce-action-accent);
-  border-radius: var(--ce-radius-8);
-  background: var(--ce-action-accent);
-  color: var(--ce-action-accent-text);
-  font: inherit;
-  font-size: 1.4rem;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
+// Where the card will be, while its words and picture are on their way.
+.drawing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 440px);
+  aspect-ratio: 9 / 16;
+  margin: 0;
+  border: 1px dashed var(--ce-document-border);
+  border-radius: var(--ce-radius-12);
+  color: var(--ce-document-text);
+  text-align: center;
 }
 
 .actions {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
 }
 
-.download.download {
-  min-height: 40px;
-  border: 1px solid var(--ce-action-accent);
+// One look for the three controls under the card. They are plain buttons with their own fill and text colours,
+// set for the disabled state too: a disabled button left to the theme lost its fill and kept white text. The card
+// always sits on a document surface, so the disabled pair is the document's, not the dark panels'.
+.turn,
+.download {
+  min-width: 44px;
+  min-height: 44px;
   border-radius: var(--ce-radius-8);
   background: var(--ce-action-accent);
   color: var(--ce-action-accent-text);
   font: inherit;
   font-weight: 700;
-  padding: 8px 14px;
+  cursor: pointer;
 
   &:disabled {
-    opacity: 0.5;
+    background: var(--ce-document-border);
+    color: var(--ce-document-text-muted);
+    cursor: default;
   }
+}
+
+.turn {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.download {
+  padding: 8px 14px;
 }
 
 .status {
   margin: 0;
-  min-height: 1.4em;
   font-size: 0.9rem;
   text-align: center;
-  color: var(--ce-document-text-muted);
+  color: var(--ce-document-text);
 }
 
 // "Show this card on my page", under the card on my own page.

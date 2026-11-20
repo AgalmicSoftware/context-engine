@@ -489,7 +489,7 @@ const pageOne = (
   if (widest > INNER) titleStyle.size *= Math.max(0.5, INNER / widest);
   const column = pictured ? INNER - PORTRAIT_CLEAR : INNER;
   const match: Array<Row | null> = [
-    label(context, 'Closest historical match', 36, theme, MARGIN, column),
+    label(context, 'Historical match', 36, theme, MARGIN, column),
     nameRow(context, card, theme, fit, column),
     card.matchNote
       ? textRow(
@@ -613,7 +613,7 @@ const chipRow = (
   x: number,
   width: number,
 ): Row => {
-  const style: Style = { weight: 800, size: 88 * fit, family: DISPLAY, upper: true };
+  const style: Style = { weight: 800, size: 80 * fit, family: DISPLAY, upper: true };
   const lineHeight = style.size * 1.1;
   const [fill, ink] = STANCE_COLOURS.get(answer.trim().toLowerCase()) || [theme.accent, theme.chip];
   const height = lineHeight + 14;
@@ -644,12 +644,14 @@ const pageTwoBoxes = (
   const lines = (count: number): number => (tight ? Math.ceil(count / 2) : count);
   const x = MARGIN + 42;
   const width = INNER - 84;
-  const big: Style = { weight: 600, size: 72 * fit, family: BODY };
+  // The page's sizes sit close together: an answer is the largest text, and the question it answers is small
+  // beside it but still read at a glance, where a wide gap made the page look lopsided.
+  const big: Style = { weight: 600, size: 62 * fit, family: BODY };
   const about = (text: string, gap: number): Row =>
     textRow(
       context,
       text,
-      { weight: 400, size: 44 * fit, family: BODY },
+      { weight: 400, size: 48 * fit, family: BODY },
       { x, width, lead: 1.26, colour: theme.soft, gap, maxLines: 2 },
     );
   const boxes: Row[] = [];
@@ -680,7 +682,7 @@ const pageTwoBoxes = (
   }
   if (vote) {
     const whose = card.own ? ['I chose', 'Most of my votes went to'] : ['They chose', 'Most of their votes went to'];
-    const item: Style = { weight: 700, size: 66 * fit, family: BODY };
+    const item: Style = { weight: 700, size: 60 * fit, family: BODY };
     const items = vote.items.slice(0, 3).map((text, index): Row => {
       const row = textRow(context, text, item, {
         x: x + 44,
@@ -706,7 +708,7 @@ const pageTwoBoxes = (
         textRow(
           context,
           `+ ${vote.items.length - 3} more`,
-          { weight: 500, size: 44 * fit, family: BODY },
+          { weight: 500, size: 48 * fit, family: BODY },
           { x: x + 44, width: width - 44, lead: 1.1, colour: theme.soft, gap: 12 },
         ),
       );

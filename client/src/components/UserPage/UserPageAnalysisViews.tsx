@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { UncontrolledTooltip } from 'reactstrap';
@@ -32,11 +32,10 @@ export type UserPageAnalysisViewsProps = {
   onAnalysisCardShownChange?: (shown: boolean) => void;
 };
 
-type View = 'text' | 'breakdown' | 'card';
+type View = 'text' | 'breakdown';
 const VIEW_LABELS: ReadonlyArray<[View, string]> = [
   ['text', 'Text'],
   ['breakdown', 'Breakdown'],
-  ['card', 'Card'],
 ];
 const BREAKDOWN_LINES: ReadonlyArray<[keyof UserAnalysisBreakdown, string]> = [
   ['holds', 'Holds most strongly'],
@@ -63,7 +62,10 @@ const HistoricalAlignment = ({
     </div>
   ) : null;
 
-/** One analysis, three ways to read it. The Card button is there only where the session makes a picture card. */
+/**
+ * One analysis, two ways to read it, with the picture card under either where the session makes one. The card
+ * stays below the analysis; "View User Card" appears at the top right once the card is whole and goes to it.
+ */
 const UserPageAnalysisViews = ({
   aiAnalysis,
   analysisBreakdown = null,
@@ -79,25 +81,36 @@ const UserPageAnalysisViews = ({
   analysisName,
   onAnalysisCardShownChange,
 }: UserPageAnalysisViewsProps): React.ReactElement => {
-  const hasCard = !!(analysisCard || analysisCardPending);
-  const [chosen, setChosen] = useState<View>('breakdown');
-  // A card that is taken away (the session turned it off) leaves the Breakdown, not an empty view.
-  const view = chosen === 'card' && !hasCard ? 'breakdown' : chosen;
+  const [view, setView] = useState<View>('breakdown');
+  const cardPlace = useRef<HTMLDivElement>(null);
+  // Whole: its words are written and its picture is in, or known to be absent.
+  const cardRendered = !!analysisCard && analysisCardPicture?.status !== 'loading';
+  const showCard = (): void => {
+    cardPlace.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    cardPlace.current?.focus({ preventScroll: true });
+  };
   const lines = BREAKDOWN_LINES.filter(([key]) => analysisBreakdown?.[key]);
   return (
     <>
-      <div className={viewStyles.switch} role="group" aria-label="How to show the analysis">
-        {VIEW_LABELS.filter(([id]) => id !== 'card' || hasCard).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={viewStyles.switchButton}
-            aria-pressed={view === id}
-            onClick={() => setChosen(id)}
-          >
-            {label}
+      <div className={viewStyles.top}>
+        <div className={viewStyles.switch} role="group" aria-label="How to show the analysis">
+          {VIEW_LABELS.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={viewStyles.switchButton}
+              aria-pressed={view === id}
+              onClick={() => setView(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {cardRendered ? (
+          <button type="button" className={viewStyles.viewCard} onClick={showCard}>
+            View User Card
           </button>
-        ))}
+        ) : null}
       </div>
 
       {view === 'text' && (
@@ -138,52 +151,54 @@ const UserPageAnalysisViews = ({
         </>
       )}
 
-      {view === 'card' &&
-        (analysisCard ? (
-          <>
-            <UserPageAnalysisCard card={analysisCard} picture={analysisCardPicture} />
-            {analysisCardSavedAt ? (
-              <p className={styles.placeholderNote}>
-                Their saved card, from {formatSavedAnalysisCardDate(analysisCardSavedAt)}
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className={styles.placeholderNote} role="status">
-            <FontAwesomeIcon icon={faSpinner} spin /> Making the card…
-          </p>
-        ))}
-
-      {/* On my own page a new card goes on my page at once, so its box stays in sight in every view. */}
-      {analysisCard && analysisCardPublish && onAnalysisCardShownChange ? (
-        <div className={`${cardStyles.publish} ${viewStyles.publish}`}>
-          <label>
-            <input
-              type="checkbox"
-              checked={analysisCardPublish.shown}
-              disabled={analysisCardPublish.saving}
-              onChange={(event) => onAnalysisCardShownChange(event.target.checked)}
-            />{' '}
-            Show this card on my page
-          </label>{' '}
-          <button
-            type="button"
-            id="analysisCardPublishHelp"
-            className={cardStyles.publishHelp}
-            data-ce-control-appearance="frameless"
-            aria-label="About showing this card on your page"
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} />
-          </button>
-          <UncontrolledTooltip target="analysisCardPublishHelp" trigger="hover focus" autohide={false}>
-            Anyone signed in to this session who may use its AI and read your answers sees this card on your page, with
-            up to three of those answers. Untick to remove it.
-          </UncontrolledTooltip>
-          {analysisCardPublish.note ? (
+      {analysisCard || analysisCardPending ? (
+        <div ref={cardPlace} tabIndex={-1} className={`${styles.historicalAlignment} ${viewStyles.cardPlace}`}>
+          <h4>Picture card</h4>
+          {analysisCard ? (
+            <>
+              <UserPageAnalysisCard card={analysisCard} picture={analysisCardPicture} />
+              {analysisCardSavedAt ? (
+                <p className={styles.placeholderNote}>
+                  Their saved card, from {formatSavedAnalysisCardDate(analysisCardSavedAt)}
+                </p>
+              ) : null}
+              {analysisCardPublish && onAnalysisCardShownChange ? (
+                <div className={cardStyles.publish}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={analysisCardPublish.shown}
+                      disabled={analysisCardPublish.saving}
+                      onChange={(event) => onAnalysisCardShownChange(event.target.checked)}
+                    />{' '}
+                    Show this card on my page
+                  </label>{' '}
+                  <button
+                    type="button"
+                    id="analysisCardPublishHelp"
+                    className={cardStyles.publishHelp}
+                    data-ce-control-appearance="frameless"
+                    aria-label="About showing this card on your page"
+                  >
+                    <FontAwesomeIcon icon={faQuestionCircle} />
+                  </button>
+                  <UncontrolledTooltip target="analysisCardPublishHelp" trigger="hover focus" autohide={false}>
+                    Anyone signed in to this session who may use its AI and read your answers sees this card on your
+                    page, with up to three of those answers. Untick to remove it.
+                  </UncontrolledTooltip>
+                  {analysisCardPublish.note ? (
+                    <p className={styles.placeholderNote} role="status">
+                      {analysisCardPublish.note}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : (
             <p className={styles.placeholderNote} role="status">
-              {analysisCardPublish.note}
+              <FontAwesomeIcon icon={faSpinner} spin /> Making the card…
             </p>
-          ) : null}
+          )}
         </div>
       ) : null}
 

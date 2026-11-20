@@ -121,7 +121,7 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getAllByRole('heading').map((node) => node.textContent)).toEqual(['Historical Alignment']);
   });
 
-  it('offers the picture card as a third view, only when the analysis has one', () => {
+  it('keeps the picture card under the analysis, with View User Card at the top once the card is whole', () => {
     const card = {
       own: true,
       link: 'contextengine.sh',
@@ -134,28 +134,45 @@ describe('UserPageAnalysisModal', () => {
       tastes: { book: null, game: null, film: null, song: null },
       answers: { yesNo: null, ownWords: null, vote: null },
     };
+    const scrollIntoView = jest.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
     const { rerender } = render(<UserPageAnalysisModal {...createProps()} />);
+    expect(screen.queryByText('Picture card')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Card' })).toBeNull();
 
-    // The analysis is readable while the card is still being written.
+    // The analysis is readable while the card is still being written, and no button points at a card yet.
     rerender(<UserPageAnalysisModal {...createProps({ analysisCardPending: true })} />);
     expect(screen.getByText('Profile synthesis')).toBeTruthy();
-    expect(screen.queryByRole('status')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Card' }));
     expect(screen.getByRole('status').textContent).toContain('Making the card…');
-    expect(screen.queryByText('Profile synthesis')).toBeNull();
     expect(screen.queryByTestId('analysis-card')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
 
+    // Its words are in but its picture is still being drawn: still no button.
     rerender(
       <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'loading' } })} />,
     );
     expect(screen.getByTestId('analysis-card').textContent).toBe('Wants AI doing paperwork / loading');
+    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
 
-    // A card that is taken away leaves the Breakdown, not an empty view.
-    rerender(<UserPageAnalysisModal {...createProps()} />);
-    expect(screen.queryByTestId('analysis-card')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Breakdown' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByText('Profile synthesis')).toBeTruthy();
+    // Whole: one card, under the analysis in either view, and the button goes to it.
+    rerender(
+      <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'ready' } })} />,
+    );
+    const after = screen.getByText('Profile synthesis').compareDocumentPosition(screen.getByText('Picture card'));
+    expect(after & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'View User Card' }));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView.mock.instances[0]).toBe(screen.getByText('Picture card').parentElement);
+    expect(document.activeElement).toBe(screen.getByText('Picture card').parentElement);
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    expect(screen.getAllByTestId('analysis-card')).toHaveLength(1);
+
+    // A card with no picture to wait for is whole too.
+    rerender(
+      <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'none' } })} />,
+    );
+    expect(screen.getByRole('button', { name: 'View User Card' })).toBeTruthy();
 
     // While an analysis is running or has failed there is no card to show.
     rerender(
@@ -167,7 +184,7 @@ describe('UserPageAnalysisModal', () => {
       />,
     );
     expect(screen.queryByTestId('analysis-card')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Card' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
   });
 
   it('on my own page puts a "Show this card on my page" box under the card; on another page, their date', () => {
@@ -193,13 +210,6 @@ describe('UserPageAnalysisModal', () => {
         })}
       />,
     );
-    // A new card goes on my page at once, so the box is in sight in the view the analysis opens on, and in
-    // the other two.
-    expect(screen.getByRole('button', { name: 'Breakdown' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('checkbox', { name: 'Show this card on my page' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
-    expect(screen.getByRole('checkbox', { name: 'Show this card on my page' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Card' }));
     const box = screen.getByRole('checkbox', { name: 'Show this card on my page' }) as HTMLInputElement;
     expect(box.checked).toBe(true);
     expect(screen.getByRole('tooltip').textContent).toMatch(
