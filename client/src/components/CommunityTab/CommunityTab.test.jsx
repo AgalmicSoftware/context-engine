@@ -44,6 +44,7 @@ jest.mock('./communityWorkerListingCounts', () => ({
   // People are counted here as on a session whose answers every reader may list; the module's own tests cover
   // sessions where each person is listed only their own.
   listsEveryAnswer: () => true,
+  settingsHiddenQuestionIds: jest.requireActual('./communityWorkerListingCounts').settingsHiddenQuestionIds,
   loadWorkerListingCounts: jest.fn(async ({ sessionSlug }) => {
     const counts = mockListingCounts[sessionSlug];
     if (counts instanceof Error) throw counts;
@@ -1016,7 +1017,12 @@ describe('CommunityTab helpers', () => {
     const entry = {
       slug: 'other',
       isWorkerCanonical: true,
-      sessionConfig: { slug: 'other', corsWorkerUrl: 'https://other.example.workers.dev' },
+      // Its Settings hide one question: the count leaves it out, as the session page does.
+      sessionConfig: {
+        slug: 'other',
+        corsWorkerUrl: 'https://other.example.workers.dev',
+        BLOCKED_QUESTION_IDS: ['Q-Hidden'],
+      },
       workerGroupsStatus: 'ready',
       questionsCache: {},
       surveysCache: {},
@@ -1045,7 +1051,13 @@ describe('CommunityTab helpers', () => {
 
     // While its listings are being read the three tiles say loading: never a zero that was not read.
     await instance._runStatsRefreshCycle({ force: true });
-    expect(loadWorkerListingCounts).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'other' }));
+    expect(loadWorkerListingCounts).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'other', hiddenQuestionIds: ['q-hidden'] }),
+    );
+    // A changed list is a new read, not the held count.
+    expect(instance._workerListingKey(entry)).not.toBe(
+      instance._workerListingKey({ ...entry, sessionConfig: { ...entry.sessionConfig, BLOCKED_QUESTION_IDS: [] } }),
+    );
     expect(tile('questions').props['aria-busy']).toBe(true);
     expect(collectNodeText(tile('questions'))).toBe('Questions');
     expect(tile('users').props['aria-busy']).toBe(true);

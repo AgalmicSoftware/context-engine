@@ -1,6 +1,7 @@
 /** @file communityWorkerListingCounts.test.ts */
 import {
   countShown,
+  settingsHiddenQuestionIds,
   listedResponders,
   listsEveryAnswer,
   loadWorkerListingCounts,
@@ -127,4 +128,20 @@ it('gives no counts at all when nothing could be read, or a listing never finish
   await expect(loadWorkerListingCounts(everyone, { listPage: refused })).rejects.toThrow('listings_unread');
   const stuck = jest.fn(async (_options: Options) => ({ items: [], cursor: 'same', listComplete: false }));
   await expect(loadWorkerListingCounts(everyone, { listPage: stuck })).rejects.toThrow('listings_unread');
+});
+
+// A question hidden in the session's Settings is still stored and listed unmarked; the session page leaves it out,
+// so the tile does too (a session showing 40 of its 43 stored questions counted 43).
+it("leaves out the questions the session's Settings hide, as the session page does", async () => {
+  expect(settingsHiddenQuestionIds({ BLOCKED_QUESTION_IDS: [' Q2 ', 'q2', '', 7, 'q3'] })).toEqual(['q2', 'q3']);
+  expect(settingsHiddenQuestionIds({})).toEqual([]);
+  expect(settingsHiddenQuestionIds(null)).toEqual([]);
+  const listed = [item('q1'), item('Q2'), item('q2'), item('q3'), { hidden: true, metadata: { resourceId: 'q4' } }];
+  expect(countShown(listed)).toBe(3);
+  expect(countShown(listed, ['q2', 'q3', 'q9'])).toBe(1);
+  const listPage = jest.fn(async () => ({ items: listed, listComplete: true }));
+  const counts = await loadWorkerListingCounts({ ...everyone, hiddenQuestionIds: ['q2'] }, { listPage });
+  // Only questions: a survey's id is its own.
+  expect(counts.questions).toBe(2);
+  expect(counts.surveys).toBe(3);
 });

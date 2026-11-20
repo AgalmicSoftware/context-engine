@@ -79,9 +79,17 @@ import {
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
 import { readKnownSessionCatalog } from '../../utilities/session/sessionCatalog';
-import { listsEveryAnswer, loadWorkerListingCounts, type WorkerListingCounts } from './communityWorkerListingCounts';
+import {
+  listsEveryAnswer,
+  loadWorkerListingCounts,
+  settingsHiddenQuestionIds,
+  type WorkerListingCounts,
+} from './communityWorkerListingCounts';
 import { compareSessionListEntries, isListedSession, sessionListName } from '../../utilities/session/sessionListing';
-import { SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT } from '../../utilities/session/sessionWorkerConfigCache';
+import {
+  getWorkerCanonicalSessionBootstrapBySlug,
+  SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT,
+} from '../../utilities/session/sessionWorkerConfigCache';
 import {
   countCommunitySessions,
   createCommunitySessionFilters,
@@ -1263,11 +1271,18 @@ export class CommunityTab extends Component<any, any> {
 
   _chainTileParts: { users: string[]; questions: number; surveys: number } | null = null;
 
+  // The questions a session's Settings hide, from the Worker's own config where the app holds it, as the session
+  // page reads them. The bundled entry for a session never opened here has no such list.
+  _settingsHiddenQuestionIds = (scopeEntry: ScopeCacheEntry) =>
+    settingsHiddenQuestionIds(getWorkerCanonicalSessionBootstrapBySlug(scopeEntry.slug) || scopeEntry.sessionConfig);
+
+  // The hidden list is part of the key: once the session's config arrives or changes, the count is read again.
   _workerListingKey = (scopeEntry: ScopeCacheEntry) =>
     [
       normalizeSessionSlug(scopeEntry.slug),
       String(scopeEntry.sessionConfig?.corsWorkerUrl || ''),
       String(this._workerGroupCountAccount(scopeEntry.slug) || '').toLowerCase(),
+      this._settingsHiddenQuestionIds(scopeEntry).join(','),
     ].join('|');
 
   // Starts a read for each Worker session in view that has none, or whose count is a minute old. Never awaited:
@@ -1287,6 +1302,7 @@ export class CommunityTab extends Component<any, any> {
         account: this._workerGroupCountAccount(scopeEntry.slug) || '',
         providerLike: this.props.provider,
         everyAnswerListed: listsEveryAnswer(scopeEntry.sessionConfig),
+        hiddenQuestionIds: this._settingsHiddenQuestionIds(scopeEntry),
       })
         .then((counts) => Object.assign(entry, { counts, failed: false }))
         // A refused or broken listing leaves no number: the tile says so rather than showing an older or partial one.

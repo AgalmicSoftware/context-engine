@@ -31,6 +31,8 @@ export type WorkerListingCountsInput = {
   everyAnswerListed: boolean;
   account?: string;
   providerLike?: unknown;
+  /** Questions the session's Settings hide (see settingsHiddenQuestionIds); left out of the count as on its page. */
+  hiddenQuestionIds?: readonly string[];
 };
 
 // Answers come 500 to a page where the Worker allows it; an older Worker simply returns fewer per page.
@@ -74,10 +76,23 @@ const listAll = async (
   throw new Error('listing_too_long');
 };
 
-/** Distinct ids among what is listed and not hidden. A stored version without an id counts by its own record. */
-export const countShown = (items: ListedItem[]): number => {
+/**
+ * A session's "Hidden questions" list in its Settings, lowercased as the session page reads it. It is in the
+ * Worker's own config, which the app holds once the session has been opened in this browser; before that the list
+ * is not known here and only an admin's hide, which the listing itself marks, is left out.
+ */
+export const settingsHiddenQuestionIds = (sessionConfig: unknown): string[] => {
+  const listed = asRecord(sessionConfig).BLOCKED_QUESTION_IDS;
+  return Array.isArray(listed) ? [...new Set(listed.map((id) => text(id).toLowerCase()).filter(Boolean))].sort() : [];
+};
+
+/**
+ * Distinct ids among what is listed and not hidden, by the listing's own mark or by `alsoHidden`. A stored version
+ * without an id counts by its own record.
+ */
+export const countShown = (items: ListedItem[], alsoHidden: readonly string[] = []): number => {
   const shown = new Set<string>();
-  const hidden = new Set<string>();
+  const hidden = new Set<string>(alsoHidden);
   for (const item of items) {
     const metadata = asRecord(item.metadata);
     const id = text(metadata.resourceId).toLowerCase();
@@ -121,7 +136,7 @@ export const loadWorkerListingCounts = async (
   const read = <T>(result: PromiseSettledResult<ListedItem[]>, count: (items: ListedItem[]) => T): T | null =>
     result.status === 'fulfilled' ? count(result.value) : null;
   const counts = {
-    questions: read(questions, countShown),
+    questions: read(questions, (items) => countShown(items, input.hiddenQuestionIds)),
     surveys: read(surveys, countShown),
     responders: read(responses, listedResponders),
   };
