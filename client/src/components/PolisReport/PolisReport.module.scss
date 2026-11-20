@@ -1463,3 +1463,27 @@
     }
   }
 }
+
+/* Screens only: a printed page is narrower than this too, and print keeps its desktop spacing. */
+@media screen and (max-width: 767px) {
+  /* A phone has room for one small gutter, not one per layer: the report's edge and page keep a little and the
+     layers inside give theirs up, so answers use the width. A PDF keeps its desktop spacing. */
+  .polisReportContainer:not(.sessionEmbeddedReport) {
+    padding: 6px;
+  }
+
+  .polisReportContainer .reportInner:not(.pdfDesktopWidth) {
+    padding: 8px;
+  }
+
+  .reportInner:not(.pdfMode) .allQuestionsBody {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .reportInnerModern:not(.pdfMode) .sectionCollapse,
+  .reportInnerDark:not(.pdfMode) .sectionCollapse {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+}

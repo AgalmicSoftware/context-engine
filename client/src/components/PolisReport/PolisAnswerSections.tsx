@@ -189,7 +189,10 @@ export default function PolisAnswerSections({
   const toggleSection =
     onToggleSection || ((type: AnswerSectionType) => setLocalOpen((prev) => ({ ...prev, [type]: !prev[type] })));
   return (
-    <div className={styles.sections} data-testid="ce-polis-answer-sections">
+    <div
+      className={pdfMode ? `${styles.sections} ${styles.pdf}` : styles.sections}
+      data-testid="ce-polis-answer-sections"
+    >
       {(Object.keys(sectionTitles) as AnswerSectionType[]).map((type) => {
         const items = questions.filter((question) => question.type === type);
         if (type === 'binary' ? !renderBinaryQuestions : !items.length) return null;
