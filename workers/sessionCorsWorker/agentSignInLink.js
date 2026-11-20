@@ -36,7 +36,6 @@ import { rateLimitRefusal } from './rateLimitRefusal.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { validateTrustedLoginRequestOrigin } from './siweMessageValidation.js';
-import { callSessionNamesStore } from './sessionNames.js';
 import { buildIndexPrefix, getStorageIndexBinding } from './storageRouteExecution.js';
 import { readCoordinatedWorkerGroupMemberships } from './workerGroups.js';
 
@@ -132,17 +131,17 @@ const groupsOf = async ({ env, slug, config, address }) => {
   if (read?.ok === true && Array.isArray(read.groups)) return read.groups;
   return read?.reason === NO_GROUPS_HERE ? [] : null;
 };
-const passkeyHasOwnAccount = async ({ env, slug, config, address }) => {
+const passkeyHasOwnAccount = async ({ env, slug, config, address, deps }) => {
   if (namedForPower(config, address)) return 'yes';
   try {
     const [groups, name, answer] = await Promise.all([
       groupsOf({ env, slug, config, address }),
-      callSessionNamesStore(env, slug, 'read', { address }),
+      deps?.hasSessionName ? deps.hasSessionName({ slug, address }) : null,
       hasStoredAnswer({ env, slug, address }),
     ]);
-    if (groups?.length || name?.body?.name || answer === 'yes') return 'yes';
+    if (groups?.length || name === true || answer === 'yes') return 'yes';
     // Only three clear answers make a "no".
-    return groups && name?.ok === true && answer === 'no' ? 'no' : 'unknown';
+    return groups && name === false && answer === 'no' ? 'no' : 'unknown';
   } catch {
     return 'unknown';
   }
@@ -390,7 +389,7 @@ const attach = async ({ request, env, baseHeaders, slug, deps }) => {
   // decides: one it says it has just made ("Create passkey") is attached, so the main way never fails for a
   // session's size; one the person already had ("I already have one") is not. A page that lies about that gains
   // only what its own person could have had by pressing the other button on a smaller session.
-  const own = await passkeyHasOwnAccount({ env, slug: context.slug, config: context.config, address: passkeyAddress });
+  const own = await passkeyHasOwnAccount({ env, slug: context.slug, config: context.config, address: passkeyAddress, deps });
   if (own === 'yes' || (own === 'unknown' && body.newPasskey !== true)) {
     const reason = own === 'yes' ? 'passkey_has_account' : 'passkey_account_unknown';
     return deps.json({ error: REASON_TEXT[reason], reason }, own === 'yes' ? 409 : 503, headers);

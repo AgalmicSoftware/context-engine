@@ -9,7 +9,7 @@ import { dispatchAnonymousFeedbackRequest } from './sessionFeedbackRoute.js';
 import { dispatchSignedOutSessionAgentRequest } from './sessionAgentSignedOut.js';
 import { evaluatePrivateSessionAccess, privateSessionRefusal, readGroupReadInviteHeader } from './privateSessionAccess.js';
 import { createRequesterAccessChecks, groupReadInviteDeps } from './storageRouteExecution.js';
-import { readSessionNames } from './sessionNames.js';
+import { callSessionNamesStore, readSessionNames } from './sessionNames.js';
 import { checkAgentSignInAtLogin, dispatchAgentSignInLinkRequest } from './agentSignInLink.js';
 import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
@@ -463,6 +463,12 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           deps: {
             json: deps?.json,
             now: deps?.now,
+            // Whether an address has a saved name: true, false, or null where the store can't say. The name
+            // itself never goes to the sign-in routes.
+            hasSessionName: async ({ slug: nameSlug, address }) => {
+              const read = await callSessionNamesStore(env, nameSlug, 'read', { address }).catch(() => null);
+              return read?.ok === true ? !!read.body?.name : null;
+            },
             loginDeps: loginDeps(),
             requireAuth: deps?.requireAuth,
             readCurrentSessionConfig: deps?.readCurrentSessionConfig,
