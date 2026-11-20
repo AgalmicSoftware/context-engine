@@ -799,4 +799,18 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
     consoleSpy.mockRestore();
   });
+
+  it('never shows the first read as the full profile summary', () => {
+    const instance = makeInstance({ viewAddress: '0x00000000000000000000000000000000000000aa' });
+    const summaryOf = () =>
+      collectTreeNodes(instance.render(), (node) => getNodeTypeName(node) === 'UserPageFullProfileModal')[0].props
+        .aiAnalysis;
+
+    instance.state = { ...instance.state, aiAnalysis: 'A first read', analyzing: true, analysisError: '' };
+    expect(summaryOf()).toBe('');
+    instance.state = { ...instance.state, analyzing: false, analysisError: 'The analysis failed.' };
+    expect(summaryOf()).toBe('');
+    instance.state = { ...instance.state, aiAnalysis: 'The summary', analysisError: '' };
+    expect(summaryOf()).toBe('The summary');
+  });
 });

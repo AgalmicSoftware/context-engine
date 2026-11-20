@@ -3927,7 +3927,8 @@ class UserPage extends Component<any, any> {
         />
 
         <UserPageFullProfileModal
-          aiAnalysis={aiAnalysis}
+          // While analysing, or after a failed analysis, aiAnalysis holds the first read, not a summary.
+          aiAnalysis={analysisModalDisplayState.shouldRenderAnalysisBody ? aiAnalysis : ''}
           bookmarksHref={buildPublicRoute('/bookmarks')}
           collapseOpen={collapseOpen}
           explorerUrl={explorerUrl}
