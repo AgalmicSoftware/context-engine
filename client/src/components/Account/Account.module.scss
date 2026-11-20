@@ -1744,7 +1744,8 @@ h1 {
 }
 
 .accountModalProfileShell {
-  // The profile and its list of actions take the panel's width.
+  // The profile and its list of actions take the panel's width. An enlarged agent prompt lies over it.
+  position: relative;
   width: 100%;
   min-width: 0;
 }
@@ -1870,10 +1871,6 @@ h1 {
     &:focus-visible {
       background: color-mix(in srgb, currentColor 8%, transparent);
     }
-  }
-  .agentHandoffLead {
-    flex: 1 1 100%;
-    padding: 0 16px 8px;
   }
   :global(#ce-agent-handoff-body) {
     --ce-text: var(--ce-settings-text);
@@ -2438,65 +2435,72 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   font-weight: 700;
 }
 
-.agentHandoffLead {
-  flex: 1 1 16rem;
-  margin: 0;
-  font-size: 1rem;
-  line-height: 1.4;
-}
-
-// Two cards in a row where the panel has room for both, stacked on a phone.
-.agentHandoffOptions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-  min-width: 0;
-  margin: 12px 0;
-  padding: 0;
-  border: 0;
-}
-
-.agentHandoffLegend {
-  grid-column: 1 / -1;
-  float: left;
-  width: 100%;
-  margin: 0 0 2px;
-  padding: 0;
-  color: inherit;
-  font-size: 1rem;
-  font-weight: 700;
-}
-
+// An option: its title and line, with its Copy prompt button beside them; its tick and prompt below.
 .agentHandoffOption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  align-items: start;
+  padding: 12px 0;
+
+  & + & {
+    border-top: 1px solid var(--ce-settings-border);
+  }
+
+  // The prompt card's own wrappers step aside, so its button and prompt take this grid's places.
+  // No type selector here, so the slot rule below, as specific and later, still places the button.
+  .agentHandoffKickoff,
+  .agentHandoffKickoff > * {
+    display: contents;
+  }
+
+  > *,
+  .agentHandoffKickoff > * > * {
+    grid-column: 1 / -1;
+  }
+
+  > .agentHandoffOptionText {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .agentHandoffOptionSlot {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    min-width: 11rem;
+    margin: 0;
+  }
+
+  // "Make a key" and its "?" on one line.
+  .agentHandoffActions.agentHandoffOptionSlot {
+    flex-wrap: nowrap;
+
+    .agentHandoffPrimary {
+      flex: 1 1 auto;
+      width: auto;
+    }
+  }
+
+  // On a phone, one column in the page's order: title and line, the tick, the full-width Copy prompt button, its prompt.
+  @media (max-width: 768px) {
+    grid-template-columns: minmax(0, 1fr);
+
+    .agentHandoffOptionSlot {
+      grid-column: 1;
+      grid-row: auto;
+      min-width: 0;
+    }
+  }
+}
+
+.agentHandoffOptionTitleRow {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid var(--ce-settings-border);
-  border-radius: var(--ce-radius-8);
-  background: var(--ce-settings-field-bg);
-  color: inherit;
-  cursor: pointer;
-
-  &:hover {
-    border-color: color-mix(in srgb, currentColor 45%, var(--ce-settings-border));
-  }
-
-  &:focus-within {
-    outline: 2px solid var(--ce-action-accent);
-    outline-offset: 2px;
-  }
+  align-items: center;
+  gap: 6px;
 }
 
-.agentHandoffOptionChecked {
-  border: 2px solid var(--ce-action-accent);
-  // The border is a pixel wider, so the text stays where it was.
-  padding: 11px;
-  background: color-mix(in srgb, var(--ce-action-accent) 12%, var(--ce-settings-field-bg));
-}
-
-// A round check: the native radio, drawn as a ring that fills and takes a tick when chosen.
+// A check drawn as a box that fills and takes a tick when ticked.
 .agentHandoffRadio {
   position: relative;
   display: inline-flex;
@@ -2506,7 +2510,6 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   margin-top: 1px;
 
   // Panel-scoped, to outweigh the theme rule that frames every input as a field.
-  .agentHandoffPanel & input[type='radio'],
   .agentHandoffPanel & input[type='checkbox'] {
     appearance: none;
     width: 24px;
@@ -2528,7 +2531,7 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// The same check, square, for "Ask me if I approve".
+// Square, for "Ask me before submitting".
 .agentHandoffPanel .agentHandoffCheck input[type='checkbox'] {
   border-radius: 4px;
 }
@@ -2583,17 +2586,6 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
 .agentHandoffOptionDetail {
   font-size: 0.92rem;
   line-height: 1.4;
-}
-
-.agentHandoffCopyRow {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-
-  > :first-child {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
 }
 
 // The box's one main action: full width and tall enough to tap.
@@ -2709,6 +2701,58 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   // Its display: block would otherwise outweigh the hidden attribute.
   &[hidden] {
     display: none;
+  }
+}
+
+// An option's prompt, to read: a small box under it, or large over the account panel.
+.agentHandoffPromptBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+
+  &[hidden] {
+    display: none;
+  }
+
+  .agentHandoffCommand {
+    max-height: 9rem;
+    margin: 0;
+    overflow: auto;
+  }
+}
+
+.agentHandoffPromptTools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+
+  .agentHandoffButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+  }
+}
+
+// Over the whole account panel, scrolling inside, until Minimize or Escape.
+.agentHandoffPromptLarge {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  padding: 16px;
+  border: 1px solid var(--ce-settings-border);
+  border-radius: var(--ce-radius-8);
+  // The panel colour over the surface: some themes' panel colour is a tint, and the rows must not show through.
+  background: linear-gradient(var(--ce-settings-panel-bg), var(--ce-settings-panel-bg)), var(--ce-surface);
+  color: var(--ce-settings-text);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ce-overlay-base) 35%, transparent);
+
+  .agentHandoffCommand {
+    flex: 1 1 auto;
+    max-height: none;
+    font-size: 1rem;
   }
 }
 

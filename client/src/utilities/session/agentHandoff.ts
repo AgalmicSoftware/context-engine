@@ -15,7 +15,7 @@ export const MCP_PROMPT_LINE = `If you run commands and want the Context Engine 
 export const agentHandoffPanelKey = (sessionSlug: string, account: unknown) =>
   `${sessionSlug}\n${toStr(account).toLowerCase()}`;
 
-// "Full submit" asks the person in the chat before submitting unless they untick "Ask me if I approve".
+// "Answer for me" asks the person in the chat before submitting unless they untick "Ask me before submitting".
 export const ASK_BEFORE_SUBMIT_DEFAULT = true;
 
 export type AgentDelegateKey = {
@@ -40,7 +40,7 @@ export class AgentDelegateKeyError extends Error {
 // A key is `ceagt_` and base64url characters, so a reply with any other text in its place is refused.
 const AGENT_KEY_RE = /^ceagt_[A-Za-z0-9_-]{16,}$/;
 
-// The one prompt for "Full submit". With `askFirst`, the agent shows its answers in the chat and submits once
+// The one prompt for "Answer for me". With `askFirst`, the agent shows its answers in the chat and submits once
 // the person says yes there; without it, the copied prompt is their approval, given in advance, so it
 // submits without coming back to ask. Either way the person needn't return to the session's page. It carries the key, which lives only as long as
 // the person's sign-in and works only in this session, and tells the agent never to repeat it. `shownToken`
