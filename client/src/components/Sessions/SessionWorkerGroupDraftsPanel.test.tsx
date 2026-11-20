@@ -4,7 +4,7 @@ import SessionWorkerGroupDraftsPanel from './SessionWorkerGroupDraftsPanel';
 import { createPendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups';
 
 describe('SessionWorkerGroupDraftsPanel', () => {
-  it('queues a named group and exposes editable access defaults', () => {
+  it('asks Create group for an empty group', () => {
     const onAdd = jest.fn();
     render(
       <SessionWorkerGroupDraftsPanel
@@ -16,12 +16,10 @@ describe('SessionWorkerGroupDraftsPanel', () => {
       />,
     );
 
-    fireEvent.change(screen.getByTestId('ce-new-worker-group-name'), { target: { value: 'Research team' } });
-    fireEvent.click(screen.getByTestId('ce-new-worker-group-add'));
+    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
 
-    expect(onAdd).toHaveBeenCalledWith('Research team');
-    expect(screen.getByTestId('ce-new-worker-group-name')).toHaveValue('');
-    expect(screen.getByText(/created after this session/i)).toBeInTheDocument();
+    expect(onAdd).toHaveBeenCalledWith('');
+    expect(screen.getByText(/made after this session/i)).toBeInTheDocument();
   });
 
   it('offers the normal Worker Group metadata and image controls for queued drafts', () => {
@@ -165,5 +163,31 @@ describe('SessionWorkerGroupDraftsPanel', () => {
       .map((button) => button.getAttribute('id'));
     expect(helpIds).toHaveLength(2);
     expect(new Set(helpIds).size).toBe(2);
+  });
+
+  it('opens each new group at its own name field, with ids no other group shares', () => {
+    const Queue = () => {
+      const [drafts, setDrafts] = useState<ReturnType<typeof createPendingWorkerGroupDraft>[]>([]);
+      return (
+        <SessionWorkerGroupDraftsPanel
+          memberCeiling={1000}
+          drafts={drafts}
+          onAdd={(label) => setDrafts((current) => [...current, createPendingWorkerGroupDraft(label)])}
+          onRemove={jest.fn()}
+          onUpdate={(groupId, patch) =>
+            setDrafts((current) => current.map((draft) => (draft.groupId === groupId ? { ...draft, ...patch } : draft)))
+          }
+        />
+      );
+    };
+    render(<Queue />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
+    const names = screen.getAllByLabelText('Group name');
+    expect(names).toHaveLength(2);
+    expect(names[1]).toHaveFocus();
+    expect(new Set(names.map((name) => name.id)).size).toBe(2);
+    fireEvent.change(names[1], { target: { value: 'Organisers' } });
+    expect(screen.getByRole('heading', { name: 'Group 2: Organisers' })).toBeInTheDocument();
   });
 });
