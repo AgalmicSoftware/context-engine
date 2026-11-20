@@ -449,6 +449,7 @@ const renderPileFooterControls = ({
   endOfSetShown = false,
 }: PileFooterControlsProps): React.ReactElement => {
   const submitLabel = splitPileSubmitLabel(finalSubmitText);
+  const submitDigits = submitLabel.count.replace(/\D/g, '');
   return (
     <div className={buildPileFooterClassName(styles, pileTopRailVisible)}>
       {/* Always present, so screen readers hear the text that arrives in it. */}
@@ -480,7 +481,14 @@ const renderPileFooterControls = ({
                 <span className={styles.pileSubmitButtonCopy}>
                   <span className={styles.pileSubmitButtonLabel}>
                     {submitLabel.word}
-                    {submitLabel.count && <span className={styles.pileSubmitButtonCount}>{submitLabel.count}</span>}
+                    {/* The brackets are their own spans so a phone row can show the number alone, small. */}
+                    {submitLabel.count && (
+                      <span className={styles.pileSubmitButtonCount}>
+                        <span className={styles.pileSubmitButtonCountBracket}>(</span>
+                        {submitDigits}
+                        <span className={styles.pileSubmitButtonCountBracket}>)</span>
+                      </span>
+                    )}
                   </span>
                 </span>
                 <span className={styles.pileSubmitButtonTrail} aria-hidden="true">

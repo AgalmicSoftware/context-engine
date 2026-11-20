@@ -7333,6 +7333,23 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     line-height: 1.25;
   }
 
+  // On a phone row the number of answers always shows: small, without its brackets, in the button's top corner
+  // above the end of the word, where it takes none of the word's room. The label's own clipping does not reach it.
+  .pileInteractionUnit .pileFooter .pileSubmitButtonCountBracket {
+    display: none;
+  }
+
+  .pileInteractionUnit .pileFooter .pileSubmitButtonCount {
+    position: absolute;
+    top: 3px;
+    right: 5px;
+    margin: 0;
+    // Above the button's moving glow.
+    z-index: 3;
+    font-size: 11px;
+    line-height: 1;
+  }
+
   // While saving, the spinner always shows; the words show where they fit whole and otherwise wrap out of sight.
   // The button's name keeps them.
   .pileInteractionUnit .pileFooter .pileSubmitProgress {
@@ -7449,13 +7466,37 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
       max(0px, var(--pile-room-stack)),
       clamp(var(--pile-counter-stack), var(--pile-counter-stack) + var(--pile-room-line), var(--pile-counter-line))
     );
-    // Clear of an arrow's focus ring (2px, 3px out).
-    margin: 0 clamp(0px, var(--pile-room-stack), 5px);
+    // No margin: the arrows sit close to the counter, and the room goes to Submit. The row's sums above still set
+    // aside the 10px these margins took, so nothing else moves. An arrow's focus ring is pulled in below, so it
+    // stays out of the counter's slot.
+    margin: 0;
     overflow: hidden;
     line-height: 1.1;
     white-space: nowrap;
     opacity: 1 !important;
     pointer-events: none;
+  }
+
+  // Each arrow's icon sits at the counter's side of its tap target, which keeps its size.
+  .pileInteractionUnit .pileNav .pileNavArrow {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .pileInteractionUnit .pileNav .pileNavArrow:first-child {
+    justify-content: flex-end;
+    padding-right: 4px;
+  }
+
+  .pileInteractionUnit .pileNav .pileNavArrow:last-child {
+    justify-content: flex-start;
+    padding-left: 4px;
+  }
+
+  // With no margin round the counter, an arrow's keyboard ring is pulled in to straddle its target's edge (1px
+  // out, 1px in), so it fits the gap beside the counter and stays clear of its numbers.
+  .pileInteractionUnit .pileControls .pileNav .pileNavArrow:focus-visible {
+    outline-offset: -1px;
   }
 
   // Stacked, the first number takes a whole line, so a short count (1 of 11) never runs together, and the slash
