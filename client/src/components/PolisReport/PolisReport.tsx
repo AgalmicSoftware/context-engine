@@ -117,6 +117,7 @@ import { buildReportResponseStats, buildReportAnswerQuestions } from './polisRep
 import { polisAgentLabel, readPolisReportCacheContext, type PolisAgentDetail } from './polisReportRuntime';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
 import ShowSessionNames from '../Shared/ShowSessionNames';
+import ParticipantsGraphControls from './ParticipantsGraphControls';
 import { sessionNameLabels } from '../../utilities/session/sessionNames';
 import {
   buildPolisDemoSurveyResultsNetworkData,
@@ -274,7 +275,8 @@ export default function PolisReport({
   // starting in the shared exploratory UMAP view instead of special-casing
   // a first-load Polis Auto mode.
   const defaultEmbeddingChoice = 'UMAP' as EmbeddingChoice;
-  const defaultManualClusterCount = String(DEFAULT_EXPLORATORY_CLUSTER_COUNT);
+  // Every report opens on the automatic number of clusters; a person's own number replaces it until Reset.
+  const defaultManualClusterCount = '';
   const currentPathname = typeof window !== 'undefined' && window.location?.pathname ? window.location.pathname : '';
   const currentSearch =
     typeof window !== 'undefined' && typeof window.location?.search === 'string' ? window.location.search : '';
@@ -813,11 +815,7 @@ export default function PolisReport({
 
   const handleEmbeddingChoiceChange = (nextChoice: EmbeddingChoice) => {
     setEmbeddingChoice(nextChoice);
-    if (nextChoice === 'POLIS') {
-      setManualClusterCount('');
-    } else if (manualClusterCountValue === null) {
-      setManualClusterCount(String(DEFAULT_EXPLORATORY_CLUSTER_COUNT));
-    }
+    if (nextChoice === 'POLIS') setManualClusterCount('');
     if (nextChoice !== 'SVD') {
       setShowComments(false);
     }
@@ -2937,7 +2935,7 @@ export default function PolisReport({
                 {/* PARTICIPANTS + STATEMENTS GRAPH */}
                 <div className={styles.sectionCollapse}>
                   <div
-                    className={styles.sectionHeaderRow}
+                    className={`${styles.sectionHeaderRow} ${styles.graphTitleRow}`}
                     style={{ width: '100%', cursor: 'pointer' }}
                     onClick={() => setParticipantsGraphOpen(!participantsGraphOpen)}
                   >
@@ -2951,135 +2949,65 @@ export default function PolisReport({
                         ariaLabel: 'Participants graph view details',
                       })}
                     </h5>
+                    {participantsGraphOpen ? (
+                      <ParticipantsGraphControls
+                        clusterCount={manualClusterCount === '' ? String(activeClusterCount || 0) : manualClusterCount}
+                        clustersAutomatic={manualClusterCountValue === null}
+                        onClusterStep={stepManualClusterCount}
+                        onClusterChange={handleManualClusterCountChange}
+                        onClusterBlur={handleManualClusterCountBlur}
+                        projection={embeddingChoice}
+                        projections={[
+                          { value: 'UMAP', label: 'UMAP' },
+                          { value: 'SVD', label: 'SVD/PCA' },
+                          { value: 'POLIS', label: REPORT_DEFAULT_EMBEDDING_LABEL },
+                        ]}
+                        onProjectionChange={(value) => handleEmbeddingChoiceChange(value as EmbeddingChoice)}
+                        projectionHelp={renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)}
+                        toggles={[
+                          {
+                            label: 'Statements',
+                            checked: showComments && embeddingChoice === 'SVD',
+                            // Statements are placed only in the SVD/PCA view, so ticking this switches to it.
+                            onChange: () => {
+                              const shown = showComments && embeddingChoice === 'SVD';
+                              if (!shown && embeddingChoice !== 'SVD') handleEmbeddingChoiceChange('SVD');
+                              setShowComments(!shown);
+                            },
+                          },
+                          {
+                            label: 'Participants',
+                            checked: showParticipants,
+                            onChange: () => setShowParticipants(!showParticipants),
+                          },
+                          {
+                            label: 'Outline',
+                            checked: showGroupOutline,
+                            onChange: () => setShowGroupOutline(!showGroupOutline),
+                          },
+                          { label: 'Axes', checked: showAxes, onChange: () => setShowAxes(!showAxes) },
+                          {
+                            label: 'Radial axes',
+                            checked: showRadialAxes,
+                            onChange: () => setShowRadialAxes(!showRadialAxes),
+                          },
+                        ]}
+                        onReset={() => {
+                          handleEmbeddingChoiceChange(defaultEmbeddingChoice);
+                          setManualClusterCount('');
+                          setShowParticipants(true);
+                          setShowGroupOutline(true);
+                          setShowAxes(true);
+                          setShowRadialAxes(true);
+                        }}
+                      />
+                    ) : null}
                     <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
                       <PolisReportSectionToggleLabel open={participantsGraphOpen} />
                     </div>
                   </div>
                   {participantsGraphOpen ? (
                     <>
-                      <div className={styles.participantGraphControls}>
-                        <div className={styles.controlGroup}>
-                          <label htmlFor="embedding-choice-select">
-                            Embedding:
-                            {renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)}
-                          </label>
-                          <select
-                            id="embedding-choice-select"
-                            value={embeddingChoice}
-                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                              handleEmbeddingChoiceChange(e.target.value as EmbeddingChoice)
-                            }
-                            style={{ padding: '4px' }}
-                          >
-                            <option value="UMAP">UMAP</option>
-                            <option value="SVD">SVD/PCA</option>
-                            <option value="POLIS">{REPORT_DEFAULT_EMBEDDING_LABEL}</option>
-                          </select>
-                        </div>
-
-                        <div className={styles.controlGroup}>
-                          <label>
-                            Opinion clusters:
-                            {renderTooltipReference(OPINION_GROUPS_TOOLTIP_TEXT)}
-                          </label>
-                          <div className={styles.numberInputWrapper}>
-                            <button
-                              className={styles.stepperButton}
-                              onClick={() => stepManualClusterCount(-1)}
-                              aria-label="Decrease cluster count"
-                            >
-                              -
-                            </button>
-                            <input
-                              id="cluster-count-input"
-                              type="number"
-                              value={manualClusterCount === '' ? String(activeClusterCount || 0) : manualClusterCount}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                handleManualClusterCountChange(e.target.value)
-                              }
-                              onBlur={handleManualClusterCountBlur}
-                              className={styles.clusterNumberInput}
-                              min="2"
-                            />
-                            <button
-                              className={styles.stepperButton}
-                              onClick={() => stepManualClusterCount(1)}
-                              aria-label="Increase cluster count"
-                            >
-                              +
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setManualClusterCount('')}
-                              className={styles.clusterAutoButton}
-                            >
-                              Auto
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className={styles.controlGroup} style={{ flexBasis: '100%' }}>
-                          <label style={{ cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showComments && embeddingChoice === 'SVD'}
-                              onChange={() => {
-                                if (showComments && embeddingChoice === 'SVD') {
-                                  setShowComments(false);
-                                  return;
-                                }
-                                if (embeddingChoice !== 'SVD') {
-                                  handleEmbeddingChoiceChange('SVD');
-                                }
-                                setShowComments(true);
-                              }}
-                              style={{ marginRight: '4px' }}
-                            />
-                            Statements
-                          </label>
-
-                          <label style={{ cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showParticipants}
-                              onChange={() => setShowParticipants(!showParticipants)}
-                              style={{ marginRight: '4px' }}
-                            />
-                            Participants
-                          </label>
-
-                          <label style={{ cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showGroupOutline}
-                              onChange={() => setShowGroupOutline(!showGroupOutline)}
-                              style={{ marginRight: '4px' }}
-                            />
-                            Outline
-                          </label>
-
-                          <label style={{ cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showAxes}
-                              onChange={() => setShowAxes(!showAxes)}
-                              style={{ marginRight: '4px' }}
-                            />
-                            Axes
-                          </label>
-
-                          <label style={{ cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showRadialAxes}
-                              onChange={() => setShowRadialAxes(!showRadialAxes)}
-                              style={{ marginRight: '4px' }}
-                            />
-                            Radial Axes
-                          </label>
-                        </div>
-                      </div>
-
                       <div className={styles.graphSection}>{renderParticipantGraph()}</div>
 
                       {renderClusterLegend()}

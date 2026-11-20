@@ -1817,6 +1817,15 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="stepperButton" data-ce-cluster-step="1" aria-label="Increase opinion-group count"/);
   assert.match(html, /class="clusterNumberInput"/);
   assert.match(html, /class="clusterAutoButton clusterAutoButtonActive" data-ce-cluster-auto aria-pressed="true" title="Choose a deterministic K-medoids grouping/);
+  // As in the live report: the count stays on the controls line, and the embedding, the layers and the way back
+  // to the generated groups sit behind the gear.
+  assert.match(html, /<details class="aidb-graph-settings">\s*<summary class="aidb-graph-settings-button" aria-label="Graph settings"/);
+  const graphSettings = html.slice(html.indexOf('<details class="aidb-graph-settings">'), html.indexOf('data-ce-participant-graph>'));
+  assert.match(graphSettings, /id="embedding-choice-select"/);
+  assert.match(graphSettings, /data-ce-graph-toggle="radial-axes" checked/);
+  assert.match(graphSettings, /data-ce-cluster-auto[^>]*>Reset<\/button>/);
+  assert.doesNotMatch(html, />Auto<\/button>/);
+  assert.ok(html.indexOf('id="cluster-count-input"') < html.indexOf('<details class="aidb-graph-settings">'));
   assert.match(html, /data-ce-opinion-group-status aria-live="polite"/);
   assert.match(html, /\.controlGroup \{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; \}/);
   assert.match(html, /\.controlGroup select \{ padding: 4px; \}/);

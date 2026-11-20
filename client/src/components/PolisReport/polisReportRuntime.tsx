@@ -1312,7 +1312,7 @@ export function getUTCDataTimestamp() {
 }
 
 export const REPORT_DEFAULT_EMBEDDING_LABEL = 'Polis Auto';
-export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.`;
+export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with the number of clusters chosen automatically. The gear holds the other views: SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.`;
 export const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT =
   "Polis Auto uses Context Engine's Polis-inspired automatic clustering. It keeps the report's PCA-based participant layout and auto-selects opinion clusters from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
 export const OPINION_GROUPS_TOOLTIP_TEXT =

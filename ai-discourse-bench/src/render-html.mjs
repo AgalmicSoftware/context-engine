@@ -516,7 +516,7 @@ const selectDefaultRiskMatrixIntersection = (comments = [], heatmap = new Map())
 const REPORT_DEFAULT_EMBEDDING_LABEL = 'Polis Auto';
 const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This static diagram uses distributional answer similarity and places models with classical MDS. ${REPORT_DEFAULT_EMBEDDING_LABEL} assigns connected opinion groups while preserving insufficient-overlap participants separately; the opinion-group control can preview deterministic K-medoids alternatives without changing the report data.`;
 const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT = "Polis Auto is the closest live control vocabulary for this static export. The generated position is classical MDS over Jensen-Shannon answer-distribution distance, and opinion groups are connected components over the report threshold. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
-const OPINION_GROUPS_TOOLTIP_TEXT = "Choose a deterministic K-medoids grouping over the report similarity matrix. Auto restores the generated connected-component opinion groups.";
+const OPINION_GROUPS_TOOLTIP_TEXT = "Choose a deterministic K-medoids grouping over the report similarity matrix. Reset, behind the gear, restores the generated connected-component opinion groups.";
 const D3_CATEGORY10 = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
 const WORLD_MAP_ANSWER_COLORS = Object.freeze({
   Agree: '#4dffa4',
@@ -1939,7 +1939,7 @@ const renderParticipantGraph = (report) => {
   const width = 500;
   const height = 400;
   const staticEmbeddingControlTitle = 'Static benchmark exports preserve the generated participant embedding. Re-render the report after a new run to change this control.';
-  const manualClusterControlTitle = 'Choose a deterministic K-medoids grouping over the report similarity matrix. Auto restores the generated connected-component grouping.';
+  const manualClusterControlTitle = 'Choose a deterministic K-medoids grouping over the report similarity matrix. Reset, behind the gear, restores the generated connected-component grouping.';
   const staticClusterAnalysisTitle = "Use AI to summarize each cluster's unique viewpoint";
   const embeddedNodes = buildParticipantEmbedding(report, width, height);
   const edges = report.participantGraph?.edges || [];
@@ -2165,30 +2165,36 @@ const renderParticipantGraph = (report) => {
       <p class="ce-report-muted" data-ce-opinion-group-caveat>Exploratory opinion groups describe this sample; their stability has not been established.</p>
       <div class="participantGraphControls">
         <div class="controlGroup">
-          <label for="embedding-choice-select">Embedding:${renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)}</label>
-          <select id="embedding-choice-select" disabled aria-disabled="true" title="${escapeHtml(staticEmbeddingControlTitle)}">
-            <option value="UMAP">UMAP</option>
-            <option value="SVD">SVD/PCA</option>
-            <option value="POLIS" selected>${escapeHtml(REPORT_DEFAULT_EMBEDDING_LABEL)}</option>
-          </select>
-        </div>
-        <div class="controlGroup">
           <label for="cluster-count-input">Opinion groups:${renderTooltipReference(OPINION_GROUPS_TOOLTIP_TEXT)}</label>
           <div class="numberInputWrapper">
             <button type="button" class="stepperButton" data-ce-cluster-step="-1" aria-label="Decrease opinion-group count" aria-disabled="false" title="${escapeHtml(manualClusterControlTitle)}">-</button>
             <input id="cluster-count-input" class="clusterNumberInput" data-ce-cluster-count-input type="number" value="${escapeHtml(activeClusterCount)}" min="${eligibleClusterNodeIds.length ? 1 : 0}" max="${escapeHtml(eligibleClusterNodeIds.length)}" aria-label="Opinion-group count" title="${escapeHtml(manualClusterControlTitle)}" ${eligibleClusterNodeIds.length ? '' : 'disabled aria-disabled="true"'}>
             <button type="button" class="stepperButton" data-ce-cluster-step="1" aria-label="Increase opinion-group count" aria-disabled="false" title="${escapeHtml(manualClusterControlTitle)}">+</button>
-            <button type="button" class="clusterAutoButton clusterAutoButtonActive" data-ce-cluster-auto aria-pressed="true" title="${escapeHtml(manualClusterControlTitle)}">Auto</button>
           </div>
           <span class="aidb-sr-only" data-ce-opinion-group-status aria-live="polite"></span>
         </div>
-        <div class="controlGroup aidb-layer-toggles" aria-label="Participant graph layers">
-          <label><input type="checkbox" data-ce-graph-toggle="statements"> Statements</label>
-          <label><input type="checkbox" data-ce-graph-toggle="participants" checked> Participants</label>
-          <label><input type="checkbox" data-ce-graph-toggle="outline" checked> Outline</label>
-          <label><input type="checkbox" data-ce-graph-toggle="axes" checked> Axes</label>
-          <label><input type="checkbox" data-ce-graph-toggle="radial-axes" checked> Radial Axes</label>
-        </div>
+        <details class="aidb-graph-settings">
+          <summary class="aidb-graph-settings-button" aria-label="Graph settings" title="Graph settings"><span aria-hidden="true">&#9881;</span></summary>
+          <div class="aidb-graph-settings-panel" role="group" aria-label="Graph settings">
+            <p class="aidb-graph-settings-title">Graph settings</p>
+            <div class="controlGroup">
+              <label for="embedding-choice-select">Embedding:${renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)}</label>
+              <select id="embedding-choice-select" disabled aria-disabled="true" title="${escapeHtml(staticEmbeddingControlTitle)}">
+                <option value="UMAP">UMAP</option>
+                <option value="SVD">SVD/PCA</option>
+                <option value="POLIS" selected>${escapeHtml(REPORT_DEFAULT_EMBEDDING_LABEL)}</option>
+              </select>
+            </div>
+            <div class="controlGroup aidb-layer-toggles" aria-label="Participant graph layers">
+              <label><input type="checkbox" data-ce-graph-toggle="statements"> Statements</label>
+              <label><input type="checkbox" data-ce-graph-toggle="participants" checked> Participants</label>
+              <label><input type="checkbox" data-ce-graph-toggle="outline" checked> Outline</label>
+              <label><input type="checkbox" data-ce-graph-toggle="axes" checked> Axes</label>
+              <label><input type="checkbox" data-ce-graph-toggle="radial-axes" checked> Radial Axes</label>
+            </div>
+            <button type="button" class="clusterAutoButton clusterAutoButtonActive" data-ce-cluster-auto aria-pressed="true" title="${escapeHtml(manualClusterControlTitle)}">Reset</button>
+          </div>
+        </details>
       </div>
       <div class="graphSection aidb-graph-layout" data-ce-participant-graph>
         <div class="graphItem">
@@ -3982,6 +3988,15 @@ export const renderHtmlReport = (inputReport) => {
     .polisReportContainer button.clusterAutoButtonActive { background: #e5e7eb; box-shadow: inset 0 0 0 1px #9ca3af; }
     .aidb-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .aidb-layer-toggles { flex: 1 1 100%; flex-wrap: wrap; }
+    .aidb-graph-settings { position: relative; }
+    .aidb-graph-settings-button { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 1px solid var(--ce-color-border-light); border-radius: 50%; background: #f7f7f7; color: #111827; font-size: 1.2rem; cursor: pointer; list-style: none; }
+    .aidb-graph-settings-button::-webkit-details-marker { display: none; }
+    .aidb-graph-settings[open] > .aidb-graph-settings-button { background: #e5e7eb; }
+    .aidb-graph-settings-button:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
+    .aidb-graph-settings-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; display: grid; gap: 10px; width: min(300px, 86vw); padding: 14px 16px; border: 1px solid #9ca3af; border-radius: 8px; background: #ffffff; color: #111827; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.22); }
+    .aidb-graph-settings-title { margin: 0; font-weight: 700; }
+    .aidb-graph-settings-panel .aidb-layer-toggles { flex-direction: column; align-items: flex-start; }
+    .aidb-graph-settings-panel .clusterAutoButton { justify-self: start; margin-left: 0; }
     .aidb-layer-toggles label { cursor: pointer; }
     .aidb-layer-toggles input { margin-right: 4px; }
     .analyzeClustersBtn { display: inline-flex; align-items: center; gap: 8px; background-color: #7063f5; color: var(--ce-color-white); border: 1px solid #5e54e5; border-radius: var(--ce-radius-4); font-weight: 600; cursor: pointer; margin-left: 0; }

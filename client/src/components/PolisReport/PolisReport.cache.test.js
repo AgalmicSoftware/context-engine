@@ -966,7 +966,7 @@ describe('PolisReport cache read options', () => {
   it('keeps participant graph tooltip copy aligned with the Polis graph modes', () => {
     expect(REPORT_DEFAULT_EMBEDDING_LABEL).toBe('Polis Auto');
     expect(PARTICIPANTS_GRAPH_TOOLTIP_TEXT).toBe(
-      "This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.",
+      "This diagram opens in UMAP with the number of clusters chosen automatically. The gear holds the other views: SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.",
     );
     expect(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT).toBe(
       "Polis Auto uses Context Engine's Polis-inspired automatic clustering. It keeps the report's PCA-based participant layout and auto-selects opinion clusters from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.",
@@ -2126,7 +2126,7 @@ describe('PolisReport demo data defaults', () => {
     });
   });
 
-  it('defaults built-in /session/demo to UMAP with 3 groups and still exposes precomputed Polis analysis after switching modes', async () => {
+  it('defaults built-in /session/demo to UMAP with the automatic group count and still exposes precomputed Polis analysis after switching modes', async () => {
     computePolisConversationMath.mockReturnValue({
       stats: {
         nParticipants: 4,
@@ -2153,7 +2153,8 @@ describe('PolisReport demo data defaults', () => {
     const clusterInput = screen.getByRole('spinbutton');
 
     expect(screen.getByDisplayValue('UMAP')).toBeInTheDocument();
-    expect(clusterInput).toHaveValue(3);
+    // No one has set a number, so the box shows the automatic one.
+    expect(clusterInput).toHaveValue(2);
 
     fireEvent.change(embeddingSelect, { target: { value: 'POLIS' } });
 
@@ -2245,7 +2246,7 @@ describe('PolisReport demo data defaults', () => {
     ).not.toBe(before);
   });
 
-  it('defaults custom demo datasets to UMAP with 3 groups and clears manual K in Polis Auto mode', () => {
+  it('defaults custom demo datasets to UMAP with the automatic group count and clears manual K in Polis Auto mode', () => {
     computePolisConversationMath.mockReturnValue({
       stats: {
         nParticipants: 4,
@@ -2279,11 +2280,17 @@ describe('PolisReport demo data defaults', () => {
     const embeddingSelect = screen.getByDisplayValue('UMAP');
     const clusterInput = screen.getByRole('spinbutton');
     const statementsToggle = screen.getByLabelText('Statements');
+    // The projection and the layers sit behind the gear.
+    const gear = screen.getByRole('button', { name: 'Graph settings' });
+    expect(gear).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(gear);
+    expect(gear).toHaveAttribute('aria-expanded', 'true');
     const options = screen.getAllByRole('option');
 
     expect(screen.getByDisplayValue('UMAP')).toBeInTheDocument();
     expect(options[0]).toHaveTextContent('UMAP');
-    expect(clusterInput).toHaveValue(3);
+    // No one has set a number, so the box shows the automatic one.
+    expect(clusterInput).toHaveValue(2);
     expect(statementsToggle).not.toBeChecked();
 
     fireEvent.click(statementsToggle);
@@ -2297,6 +2304,16 @@ describe('PolisReport demo data defaults', () => {
     expect(screen.getByDisplayValue(REPORT_DEFAULT_EMBEDDING_LABEL)).toBeInTheDocument();
     expect(clusterInput).toHaveValue(2);
     expect(statementsToggle).not.toBeChecked();
+
+    // The title line carries Clusters and the gear; the old Auto button is gone, and Reset is the way back.
+    expect(screen.queryByRole('button', { name: 'Auto' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Graph settings' })).toBeVisible();
+    fireEvent.change(clusterInput, { target: { value: '5' } });
+    expect(screen.getByRole('status')).toHaveTextContent('You set 5 clusters. Reset returns to the automatic number.');
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(clusterInput).toHaveValue(2);
+    expect(screen.getByDisplayValue('UMAP')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('The number of clusters is chosen automatically.');
   });
 
   it('hides statement dots when switching from SVD/PCA back to Polis Auto', () => {

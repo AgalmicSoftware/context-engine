@@ -680,6 +680,156 @@
   }
 }
 
+// The Participants Graph's title line: its name, Clusters, the gear, then Hide.
+.graphTitleRow {
+  position: relative;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.graphTitleControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  cursor: default;
+}
+
+.graphClustersLabel {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ce-document-text);
+}
+
+.polisReportContainer button.graphSettingsButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ce-color-border-light);
+  border-radius: var(--ce-radius-round);
+  background: var(--ce-document-surface);
+  background-image: none;
+  box-shadow: none;
+  color: var(--ce-document-text);
+  -webkit-text-fill-color: currentColor;
+  font-size: 1.1rem;
+  cursor: pointer;
+  &:hover,
+  &[aria-expanded='true'] {
+    background: var(--ce-document-border);
+    color: var(--ce-document-text);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ce-document-text);
+    outline-offset: 2px;
+  }
+}
+
+// Opens under the title line and over the top of the graph, so on a phone it is in view where it was asked for.
+.graphSettingsPanel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 10px;
+  width: min(300px, 100%);
+  padding: 14px 16px;
+  border: 1px solid var(--ce-document-border-strong, var(--ce-document-border));
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-document-canvas);
+  color: var(--ce-document-text);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 400;
+
+  &[hidden] {
+    display: none;
+  }
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    min-height: 32px;
+    color: var(--ce-document-text);
+    cursor: pointer;
+  }
+  select {
+    min-height: 36px;
+    padding: 4px 8px;
+    color: var(--ce-document-text);
+    background: var(--ce-document-canvas);
+    border: 1px solid var(--ce-color-border-light);
+    border-radius: var(--ce-radius-4);
+  }
+}
+
+.graphSettingsTitle {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.graphSettingsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.graphSettingsShow {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  legend {
+    float: none;
+    width: auto;
+    margin: 0 0 2px;
+    padding: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ce-document-text);
+  }
+}
+
+.graphSettingsNote {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ce-document-text-muted);
+}
+
+.polisReportContainer button.graphSettingsReset {
+  justify-self: start;
+  min-height: 36px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+  color: var(--ce-document-text);
+  -webkit-text-fill-color: currentColor;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .graphTitleControls {
+    margin-left: 0;
+  }
+  .graphSettingsPanel {
+    left: 0;
+    width: auto;
+  }
+}
+
 /* =========================
    NEW: AI Cluster Analysis   ========================= */
 
