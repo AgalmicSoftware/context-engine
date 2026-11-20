@@ -1,4 +1,4 @@
-import InterviewResponderNameOption from './InterviewResponderNameOption';
+import SessionInterviewUserName from './SessionInterviewUserName';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
 import { summarizeInterviewConsent, type InterviewConsentOverrides } from './sessionInterviewConsent';
 import { useInterviewSavedAnswers } from './useInterviewSavedAnswers';
@@ -233,11 +233,10 @@ export default function SessionInterviewPanel({
     contextToken: string;
     included: boolean;
   } | null>(kept.researchSharingChoice);
-  // A session that keeps names shows them only to the people it admits. A name written into an answer would
-  // reach everyone who can read answers, so there the choice isn't offered and no name is sent, as with the MCP.
-  // Unknown counts as kept.
-  const namesKept = !useSessionNames({ sessionSlug, sessionConfig, account: String(account || '') }).answerNamesShown;
-  const [includeResponderName, setIncludeResponderName] = useState(kept.includeResponderName);
+  // A name belongs to the account, set in the box under the drafts; no answer carries one. Withdrawing is sent on
+  // every submit, so an answer that carried a name from before loses it when it is submitted again.
+  const sessionNames = useSessionNames({ sessionSlug, sessionConfig, account: String(account || '') });
+  const includeResponderName = false;
   // Like research sharing, kept across signing in to submit, which resets consentOverrides.
   const [draftTextKept, setDraftTextKept] = useState(kept.draftText);
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
@@ -465,18 +464,17 @@ export default function SessionInterviewPanel({
   const consentDrafts = selectedDrafts.length ? selectedDrafts : drafts;
   const draftTextOverride = draftTextKept?.contextToken === baseSubmitContextToken ? draftTextKept.included : undefined;
   const draftTextForwarded = keepDraftTextForAdmins ? (draftTextShown ? draftTextOverride : false) : undefined;
-  const { aiChoice, comparisonChoice, nameChoice, draftTextChoice, hasSavedName, hasSavedAi } =
-    summarizeInterviewConsent({
-      drafts: consentDrafts,
-      saved: savedConsent,
-      overrides: { ...consentOverrides, includeDraftText: draftTextOverride },
-      defaults: {
-        ai: hasAiPrefill && includeProvenance,
-        comparison: includePredictionComparison,
-        name: includeResponderName,
-        draftText: true,
-      },
-    });
+  const { aiChoice, comparisonChoice, draftTextChoice, hasSavedAi } = summarizeInterviewConsent({
+    drafts: consentDrafts,
+    saved: savedConsent,
+    overrides: { ...consentOverrides, includeDraftText: draftTextOverride },
+    defaults: {
+      ai: hasAiPrefill && includeProvenance,
+      comparison: includePredictionComparison,
+      name: includeResponderName,
+      draftText: true,
+    },
+  });
 
   const existingResponsesRef = useRef(existingResponseSlice);
   existingResponsesRef.current = existingResponseSlice;
@@ -1015,13 +1013,14 @@ export default function SessionInterviewPanel({
       hasAiPrefill,
       includePredictionComparison,
       includeProvenance,
-      includeResponderName: namesKept ? false : includeResponderName,
+      includeResponderName: false,
       // Forward the shown detail only when it is narrower than the session's current one.
       consentOverrides: {
         ...consentOverrides,
         ...(draftTextForwarded === undefined ? {} : { includeDraftText: draftTextForwarded }),
         ...(shownResearchDetail === sessionResearchDetail ? {} : { researchDetail: shownResearchDetail }),
-        ...(namesKept ? { includeResponderName: false } : {}),
+        // Said outright, so a name an earlier answer carried is withdrawn however its saved record is read.
+        includeResponderName: false,
       },
       isInterviewBusy,
       researchAvailable,
@@ -1071,8 +1070,6 @@ export default function SessionInterviewPanel({
     hasAiPrefill,
     includePredictionComparison,
     includeProvenance,
-    includeResponderName,
-    namesKept,
     consentOverrides,
     shownResearchDetail,
     sessionResearchDetail,
@@ -1129,23 +1126,6 @@ export default function SessionInterviewPanel({
 
   const importedContext = prefillPacket?.responderContext;
   const importedResponderName = String(importedContext?.name || '').trim();
-  const displayedResponderNames =
-    hasSavedName && (consentOverrides.includeResponderName === undefined || !importedResponderName)
-      ? [...new Set(consentDrafts.map((draft) => savedConsent[draft.questionId]?.responderName).filter(Boolean))]
-      : [importedResponderName];
-  // The responder-name choice sits with the other sharing choices.
-  const nameOption =
-    !namesKept && (importedResponderName || hasSavedName) ? (
-      <InterviewResponderNameOption
-        names={displayedResponderNames as string[]}
-        choice={nameChoice}
-        disabled={applying}
-        onChange={(included) => {
-          setIncludeResponderName(included);
-          setConsentOverrides((prev) => ({ ...prev, includeResponderName: included }));
-        }}
-      />
-    ) : null;
   const researchCoverage = prefillPacket?.source?.researchCoverage;
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
@@ -1399,6 +1379,16 @@ export default function SessionInterviewPanel({
               })}
             </SessionInterviewReviewSection>
           ) : null}
+          {drafts.length && !mapping ? (
+            <SessionInterviewUserName
+              key={authenticatedForSubmit ? String(account).toLowerCase() : ''}
+              source={sessionNames.source}
+              names={sessionNames.names}
+              account={authenticatedForSubmit ? String(account) : ''}
+              suggestion={importedResponderName}
+              disabled={applying}
+            />
+          ) : null}
           {joinMatchingGroups && drafts.length ? (
             <SessionInterviewRecommendedGroups
               hidden={isInterviewBusy || mapping}
@@ -1436,7 +1426,7 @@ export default function SessionInterviewPanel({
           ) : null}
           {drafts.length && !isInterviewBusy && !mapping ? (
             <div className={styles.sessionInterviewReviewActions} role="group" aria-label="Response submission">
-              {researchAvailable || importedResponderName || hasSavedName || hasSavedAi ? (
+              {researchAvailable || hasSavedAi ? (
                 <div
                   className={`${styles.sessionInterviewConsentGroup} ${submissionInfoOpen ? styles.sessionInterviewConsentGroupOpen : ''}`}
                 >
@@ -1469,11 +1459,8 @@ export default function SessionInterviewPanel({
                           onDraftTextChange={(included) =>
                             setDraftTextKept({ contextToken: baseSubmitContextToken, included })
                           }
-                        >
-                          {nameOption}
-                        </SessionInterviewResearchConsent>
+                        />
                       ) : null}
-                      {researchAvailable || hasSavedAi ? null : nameOption}
                     </div>
                   </details>
                   {researchAvailable || hasSavedAi ? (

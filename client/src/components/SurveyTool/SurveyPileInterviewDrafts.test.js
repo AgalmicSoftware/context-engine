@@ -404,7 +404,7 @@ it('treats an unsaved pile answer as answered, so the interview leaves its draft
   expect(screen.queryByText(/answer.*on the page.*submitted yet/)).not.toBeInTheDocument();
 });
 
-it('names every submitted response once the saved name box is ticked', async () => {
+it('writes no name into submitted responses and withdraws a saved one', async () => {
   const upload = mockSession([savedNamedQ1], { late: true });
   await mountWithInterview(
     packet([
@@ -415,19 +415,14 @@ it('names every submitted response once the saved name box is ticked', async () 
   await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
   expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
   fireEvent.click(screen.getByText('AI submission info'));
-  const name = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
-  expect(name).toHaveAttribute('aria-checked', 'mixed');
-  fireEvent.click(name);
-  expect(name.closest('label')).toHaveTextContent(
-    'Include “Participant A” as the responder name with submitted responses',
-  );
+  expect(screen.queryByText(/as the responder name/)).not.toBeInTheDocument();
 
   await submitDrafts();
 
   expect(upload).toHaveBeenCalledTimes(1);
-  expect(upload.mock.calls[0][2].map((row) => [row.questionID, row.responderName]).sort()).toEqual([
-    ['q1', 'Participant A'],
-    ['q3', 'Participant A'],
+  expect(upload.mock.calls[0][2].map((row) => [row.questionID, 'responderName' in row]).sort()).toEqual([
+    ['q1', false],
+    ['q3', false],
   ]);
 });
 
@@ -437,10 +432,6 @@ it('undoes a rejected draft but keeps its name withdrawal for the next pile Subm
   const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Unsure', confidence: 0.8 }]));
   await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
   expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
-  fireEvent.click(screen.getByText('AI submission info'));
-  const name = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
-  expect(name).toBeChecked();
-  fireEvent.click(name);
 
   await submitDrafts();
   await act(async () => pile.engine().closeSessionVoiceModeModal());
@@ -531,8 +522,6 @@ it('keeps a withdrawal from a rejected interview upload through Clear changes', 
   const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Unsure', confidence: 0.8 }]));
   await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
   expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
-  fireEvent.click(screen.getByText('AI submission info'));
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
   await submitDrafts();
   await act(async () => pile.engine().closeSessionVoiceModeModal());
   await settle(300);
@@ -569,8 +558,6 @@ it('stores every kept withdrawal on Clear changes, not only the cards near the c
   );
   await answerBeforeSavedAnswersLoad(Object.fromEntries(questionIds.map((id) => [id, 'Disagree'])));
   expect(screen.getAllByText('Changes your earlier answer: Agree')).toHaveLength(questionIds.length);
-  fireEvent.click(screen.getByText('AI submission info'));
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
   await submitDrafts();
   await act(async () => pile.engine().closeSessionVoiceModeModal());
   await settle(300);
@@ -610,8 +597,6 @@ it('makes every stored withdrawal pending after a reload, and uploads them all',
   );
   await answerBeforeSavedAnswersLoad(Object.fromEntries(questionIds.map((id) => [id, 'Disagree'])));
   expect(screen.getAllByText('Changes your earlier answer: Agree')).toHaveLength(questionIds.length);
-  fireEvent.click(screen.getByText('AI submission info'));
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
   await submitDrafts();
   await act(async () => pile.engine().closeSessionVoiceModeModal());
   await settle(300);

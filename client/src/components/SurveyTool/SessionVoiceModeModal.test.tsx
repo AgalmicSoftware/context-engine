@@ -490,7 +490,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.arrayContaining([expect.objectContaining({ questionId: 'q1', answer: 'Agent: A reviewed answer' })]),
-        {},
+        { includeResponderName: false },
       ),
     );
   });
@@ -2761,7 +2761,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
-        {},
+        { includeResponderName: false },
       ),
     );
   });
@@ -2864,7 +2864,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
-        {},
+        { includeResponderName: false },
       ),
     );
     expect(baseProps.onClose).not.toHaveBeenCalled();
@@ -3145,7 +3145,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
-        {},
+        { includeResponderName: false },
       ),
     );
   });
@@ -3384,7 +3384,7 @@ describe('SessionVoiceModeModal', () => {
           original: expect.objectContaining({ answer: [3, -4] }),
         }),
       ],
-      {},
+      { includeResponderName: false },
     );
   });
 
@@ -3488,14 +3488,14 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
-        { includePredictionComparison: true },
+        { includePredictionComparison: true, includeResponderName: false },
       ),
     );
     expect(baseProps.onClose).not.toHaveBeenCalled();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
   });
 
-  it('keeps an imported responder name private until the responder opts in', async () => {
+  it('never writes an imported name into the answers', async () => {
     const prefillPacket = {
       version: 1 as const,
       sessionSlug: 'demo',
@@ -3505,11 +3505,10 @@ describe('SessionVoiceModeModal', () => {
       responderContext: { name: 'Ada Example' },
       responses: [{ questionId: 'q1', answer: 'Draft answer', confidence: 0.8 }],
     };
-    const first = render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
 
-    const includeName = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
-    expect(includeName).not.toBeChecked();
-    expect(screen.getByText(/Include “Ada Example” as the responder name/i)).toBeInTheDocument();
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(screen.queryByText(/as the responder name/i)).toBeNull();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() =>
       expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
@@ -3520,28 +3519,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
-        {},
-      ),
-    );
-    first.unmount();
-
-    jest.clearAllMocks();
-    jest
-      .mocked(useInterviewReadiness)
-      .mockReturnValue({ state: 'ready', detail: 'Voice setup ready.', retry: jest.fn() });
-    render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await waitFor(() =>
-      expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
-        expect.any(Array),
-        prefillPacket.source,
-        prefillPacket,
-        true,
-        true,
-        'Ada Example',
-        expect.any(Array),
-        { includeResponderName: true },
+        { includeResponderName: false },
       ),
     );
   });

@@ -284,11 +284,10 @@ basis from that metadata. See [Session interview research metadata](session-inte
 for the submitted JSON shape and the differences from the Edge2026 agent-village
 agent-only experiment.
 An external AI may also include a preferred responder name that it already
-knows from the permitted context. The review modal shows a separate
-**Include “name” as the responder name** checkbox only when a name was supplied,
-and that checkbox is off by default. The name is attached to submitted answers
-only after this explicit opt-in; declining it does not affect the drafts or the
-platform/model provenance choice.
+knows from the permitted context. It is never attached to answers. Where the
+session keeps names, the review offers it in an optional **Username (optional)**
+box under the drafts, unsaved until the person presses **Save**; that sets their
+name in the session, with the same rules and messages as **Set username**.
 
 ## Ordinary ChatGPT or Claude, without MCP
 
@@ -380,8 +379,8 @@ multiple-selection answer, the prompt also requires omitting that draft and
 disclosing the limitation instead of losing some selections. Model identity is collected to measure prediction
 fidelity across models and may be `unknown` when the interface does not expose
 one. The copied prompt does not ask for a responder name; if a packet includes
-one, the client submits it only when the responder ticks the default-off name
-control. The packet contains no
+one, the client only offers it in the optional username box and never submits
+it with answers. The packet contains no
 credential and is carried in `#prefill=...` (or, deflated first for a shorter
 link, `#prefillz=...`, which the page unpacks after it loads; the site's
 `manifest.json` lists both under `context_engine_review_links`, and the MCP
@@ -464,9 +463,7 @@ Binary drafts reuse the normal pile-view
 Agree/Unsure/Disagree controls. The bullhorn opens both Conviction and Importance
 choices. Both values remain editable through review and are carried into submission. Applied source/model provenance is persisted in
 the anonymous draft together with its answer, so logging in after review does
-not remove the attribution before final submission. An explicitly opted-in
-responder name follows the same draft migration and becomes the report display
-name for that response address. The accuracy-research choice and original
+not remove the attribution before final submission. The accuracy-research choice and original
 prediction use the same draft migration; final comparison values are captured
 immediately before encryption and normal submission.
 

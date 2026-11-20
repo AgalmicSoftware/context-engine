@@ -1,4 +1,3 @@
-import type React from 'react';
 import { Input, Label } from 'reactstrap';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { INTERVIEW_PROMPT_VERSION, type InterviewPrefillPacket } from './sessionInterview';
@@ -37,8 +36,6 @@ type Props = {
   // Keeping the AI's drafted text for admins only, offered when the session keeps it; null when not.
   draftText?: { checked: boolean; mixed: boolean } | null;
   onDraftTextChange?: (included: boolean) => void;
-  // Further sharing choices, such as the responder name, listed with these.
-  children?: React.ReactNode;
 };
 
 const DRAFT_TEXT_NOTE =
@@ -60,7 +57,6 @@ export default function SessionInterviewResearchConsent({
   researchDetail = 'minimal',
   draftText = null,
   onDraftTextChange,
-  children,
 }: Props) {
   const minimal = researchDetail === 'minimal';
   // Mixed saved choices may keep text for some drafts, so the wording doesn't promise none is kept.
@@ -69,7 +65,7 @@ export default function SessionInterviewResearchConsent({
   const platform = describeInterviewPlatform(packet.source.platform);
   const sharesMetadata = preserveSavedProvenance || (showProvenance && includeProvenance) || includeComparison;
   // Drafts from the session's own AI offer no provenance choice, so with nothing shared there'd be nothing to show.
-  if (!showProvenance && !children && !sharesMetadata) {
+  if (!showProvenance && !sharesMetadata) {
     // A packet from the person's own typed context names no model.
     const drafter = packet.source.modelId === 'direct-user-context' ? '' : packet.source.modelId;
     return (
@@ -81,24 +77,21 @@ export default function SessionInterviewResearchConsent({
   }
   return (
     <>
-      {showProvenance || children ? (
+      {showProvenance ? (
         <div className={styles.optionGroup}>
-          {showProvenance && (
-            <Label check className={styles.provenanceOption}>
-              <Input
-                type="checkbox"
-                checked={provenanceMixed ? false : includeProvenance}
-                aria-checked={provenanceMixed ? 'mixed' : includeProvenance}
-                innerRef={(element: HTMLInputElement | null) => {
-                  if (element) element.indeterminate = provenanceMixed;
-                }}
-                disabled={disabled}
-                onChange={(event) => onProvenanceChange(event.target.checked)}
-              />{' '}
-              <span>Include platform/model provenance{provenanceMixed ? ' (mixed saved choices)' : ''}</span>
-            </Label>
-          )}
-          {children}
+          <Label check className={styles.provenanceOption}>
+            <Input
+              type="checkbox"
+              checked={provenanceMixed ? false : includeProvenance}
+              aria-checked={provenanceMixed ? 'mixed' : includeProvenance}
+              innerRef={(element: HTMLInputElement | null) => {
+                if (element) element.indeterminate = provenanceMixed;
+              }}
+              disabled={disabled}
+              onChange={(event) => onProvenanceChange(event.target.checked)}
+            />{' '}
+            <span>Include platform/model provenance{provenanceMixed ? ' (mixed saved choices)' : ''}</span>
+          </Label>
         </div>
       ) : null}
       {/* An unticked box already says what is left out; with nothing shared there is nothing to describe. Shown

@@ -80,9 +80,7 @@ describe('SessionInterviewResearchConsent', () => {
     );
   });
 
-  it('leaves the line out when it has a choice or something to show', () => {
-    renderConsent({ showProvenance: false, children: <label>Name choice</label> });
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).not.toBeInTheDocument();
+  it('leaves the line out when it has something to show', () => {
     renderConsent({ showProvenance: false, includeComparison: true });
     renderConsent({ includeProvenance: false });
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).not.toBeInTheDocument();

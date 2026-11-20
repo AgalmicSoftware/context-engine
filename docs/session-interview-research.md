@@ -185,7 +185,7 @@ The draft-comparison checkbox does not control whether an AI provider processed 
 
 These controls are component state. Their values can persist while the same interview component remains mounted, including continued interview work or reopening review UI that does not remount the component.
 
-The optional responder name is submitted separately as `responderName` on the submitted response; it is not part of `interviewProvenance`.
+An interview writes no name into answers: it sends no `responderName`, and a name an earlier answer carried is withdrawn when the interview replaces that answer. Where the session keeps names, an optional **Username** box under the drafts sets the person's name for the session, the same name and rules as **Set username**; it is saved only on **Save** and is never part of `interviewProvenance`.
 
 ## Submission and Storage Shape
 
@@ -479,7 +479,7 @@ for Hosted and chain-authoritative lookup behavior.
 The voice-mode chooser describes the interview; AI prompt-copy guidance stays inside the interview. Draft prose opens for editing by click, Enter, or Space. Edits update immediately; leaving the editor or pressing Escape returns to the readable answer without a separate Done button. AI confidence and its support meter appear only inside the collapsed Basis disclosure alongside the evidence.
 
 Consent choices count as response edits even when the answer, comment and ratings
-are unchanged. Submitting can add or remove the responder name, AI attribution or
+are unchanged. Submitting can remove an earlier responder name and add or remove AI attribution or
 prediction comparison on the selected responses. Repeating the saved choices
 does not create another pending edit. Changes to research content alone, including
 new predictions, revisions and recording timestamps, are not submitted when
