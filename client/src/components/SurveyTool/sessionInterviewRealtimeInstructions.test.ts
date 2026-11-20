@@ -207,7 +207,8 @@ describe('after an AI prefill', () => {
 
   it('opens from the drafts, not the session opening, and never asks a drafted question', () => {
     const instructions = brief();
-    expect(instructions).toContain('digs into what the AI drafts below say');
+    expect(instructions).toContain('digs into what the drafts below say');
+    expect(instructions).toContain('I see your drafts, and was wondering');
     expect(instructions).not.toContain('Configured opening?');
     expect(instructions).toContain('Never ask them or about their drafts');
     // The bank holds only the undrafted question; the drafted ones are listed by prompt for reference.
@@ -225,12 +226,12 @@ describe('after an AI prefill', () => {
     expect(brief({ importedDrafts: [] })).toContain('Ask this opening question immediately: "Configured opening?"');
     const covered = brief({ questions: [drafted, held], openingPrompt: undefined });
     expect(covered).toContain('Ask none of them; ask only whether there is anything else');
-    expect(covered).not.toContain('digs into what the AI drafts');
+    expect(covered).not.toContain('I see your drafts');
   });
 
   it('continues a prior interview without repeating the opening', () => {
     const instructions = brief({ previousTranscript: 'Interviewer: Hello?\nResponder: Floods.' });
     expect(instructions).toContain('Continue the prior interview');
-    expect(instructions).not.toContain('digs into what the AI drafts');
+    expect(instructions).not.toContain('I see your drafts');
   });
 });

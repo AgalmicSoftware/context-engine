@@ -908,7 +908,7 @@ describe('research detail tiers', () => {
     const versions = {
       mappingPromptVersion: 'ce-interview-mapping-v3',
       voiceModel: 'gpt-live-1.1',
-      voiceBriefRevision: 'ce-voice-brief-2',
+      voiceBriefRevision: 'ce-voice-brief-3',
     };
     const voice = { researchTier: 'minimal', draftOrigin: 'voice_interview', ...versions };
     expect(submit(provenance(voice))).toMatchObject(versions);

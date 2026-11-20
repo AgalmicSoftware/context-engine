@@ -79,7 +79,7 @@ it('labels voice drafts that did not come from a prefill packet', async () => {
     confidenceMeaning: 'keep',
     // Which voice model and drafting prompt made it, so a change between interviews shows in the records.
     voiceModel: 'gpt-live-1.1',
-    voiceBriefRevision: 'ce-voice-brief-2',
+    voiceBriefRevision: 'ce-voice-brief-3',
     mappingPromptVersion: 'ce-interview-mapping-v3',
   });
 });

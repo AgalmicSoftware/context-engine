@@ -6,7 +6,7 @@ import {
 } from './sessionInterviewRealtimePrefill';
 
 // Kept on voice-made records, so research can tell what the interviewer was told; absent means 1.
-export const VOICE_BRIEF_REVISION = 'ce-voice-brief-2';
+export const VOICE_BRIEF_REVISION = 'ce-voice-brief-3';
 
 const LIMIT = 31_500; // Leave headroom below the Worker's 32,000-character transport boundary.
 // The session's context gets this share of the voice instructions; questions keep the rest.
@@ -115,7 +115,7 @@ export const buildRealtimeInterviewInstructions = ({
         : previousTranscript?.trim()
           ? `Continue the prior interview with a relevant follow-up or an unanswered session question. Do not repeat the opening or questions already answered.${opening ? ` Configured opening (already used; do not repeat): ${JSON.stringify(opening)}` : ''}`
           : fromDrafts
-            ? 'Open with one question from the question bank that digs into what the AI drafts below say: the question they relate to most, or a gap they leave, bridging in a few words from the drafts. No greeting or preamble.'
+            ? 'Open by saying you have seen their AI’s drafts, then ask one question from the question bank that digs into what the drafts below say: the question they relate to most, or a gap they leave. One sentence, like “I see your drafts, and was wondering …”. No other greeting or preamble.'
             : opening
               ? `Ask this opening question immediately: ${JSON.stringify(opening)}`
               : 'Begin directly with one relevant question from the question bank. No greeting, preamble, or general getting-to-know-you questions.',

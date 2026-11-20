@@ -346,7 +346,7 @@ it('leaves every AI-drafted question, hidden ones included, out of the voice rou
     expect(instructions).not.toContain(`FACT-${id}`);
   }
   // The interviewer opens from the shown drafts and asks only the undrafted question.
-  expect(instructions).toContain('digs into what the AI drafts below say');
+  expect(instructions).toContain('digs into what the drafts below say');
   expect(instructions).toContain('[o1]');
   for (const id of [...eligible, 'f1']) expect(instructions).not.toContain(`[${id}]`);
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
