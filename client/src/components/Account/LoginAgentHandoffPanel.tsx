@@ -1,7 +1,14 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCaretDown,
+  faCaretUp,
+  faCheck,
+  faCopy,
+  faQuestionCircle,
+  faUserCog,
+} from '@fortawesome/free-solid-svg-icons';
 import {
   ASK_BEFORE_SUBMIT_DEFAULT,
   AgentDelegateKeyError,
@@ -440,11 +447,14 @@ const LoginAgentHandoffPanel = ({
           <button
             type="button"
             className={styles.agentHandoffToggle}
+            data-ce-control-appearance="frameless"
             aria-expanded={open}
             aria-controls="ce-agent-handoff-body"
             onClick={() => setOpen((wasOpen) => !wasOpen)}
             data-testid="ce-agent-handoff-toggle"
           >
+            {/* Its row's icon in the account dialog's list. */}
+            <FontAwesomeIcon icon={faUserCog} className={styles.accountMenuIcon} aria-hidden="true" fixedWidth />
             Your AI agent
             <FontAwesomeIcon icon={open ? faCaretUp : faCaretDown} className={styles.settingsSectionChevron} />
           </button>

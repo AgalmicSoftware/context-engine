@@ -27,6 +27,12 @@ describe('Analyze user button and arrival', () => {
     expect(openAnalyzeLink).toHaveBeenCalledWith('/u/0xaa?session=demo-one&analyze=1');
   });
 
+  it("shows the site's AI icon, not a search icon", () => {
+    render(<AnalyzeUserButton href="/u/0xaa?analyze=1" />);
+    const row = screen.getByRole('button', { name: 'Analyze user' });
+    expect(row.querySelector('svg')).toHaveAttribute('data-icon', 'robot');
+  });
+
   it('starts Analyze once, after the page has stayed ready', () => {
     take.mockReturnValue(60_000);
     const onStart = jest.fn();

@@ -1,6 +1,14 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import LoginModalDisplayBody from './LoginModalDisplayBody';
+
+// The profile, as the dialog's lazy chunk: it puts the dialog's rows in its own list.
+jest.mock('components/UserPage/UserPage', () => ({
+  __esModule: true,
+  default: ({ accountMenuRows }: { accountMenuRows?: React.ReactNode }) => (
+    <ul data-testid="profile-menu">{accountMenuRows}</ul>
+  ),
+}));
 
 type Props = React.ComponentProps<typeof LoginModalDisplayBody>;
 
@@ -39,4 +47,29 @@ it('offers Your AI agent only once someone is signed in', () => {
 it('shows Your AI agent to a signed-in person', () => {
   expect(renderBody({ loginComplete: true })).toHaveBeenCalled();
   expect(screen.getByTestId('agent-box')).toBeInTheDocument();
+});
+
+it('lists Bookmarks, Your AI agent and a red Disconnect, in that order, with no account to show', () => {
+  const handleLogout = jest.fn();
+  const openBookmarks = jest.fn();
+  renderBody({ loginComplete: true, handleLogout, openBookmarks });
+  const menu = screen.getByTestId('ce-account-menu');
+  expect(Array.from(menu.children).map((row) => row.textContent)).toEqual(['Bookmarks', '', 'Disconnect']);
+  expect(menu.children[1]).toContainElement(screen.getByTestId('agent-box'));
+  fireEvent.click(screen.getByRole('button', { name: 'Bookmarks' }));
+  expect(openBookmarks).toHaveBeenCalledTimes(1);
+  const disconnect = screen.getByTestId('ce-account-disconnect');
+  expect(disconnect.className).toMatch(/accountMenuRowDanger/);
+  fireEvent.click(disconnect);
+  expect(handleLogout).toHaveBeenCalledTimes(1);
+});
+
+it('keeps Disconnect in the menu while the profile loads, and mounts Your AI agent only once it has', async () => {
+  renderBody({ loginComplete: true, account: '0x00000000000000000000000000000000000000aa' });
+  expect(screen.getByTestId('ce-account-menu')).toContainElement(screen.getByTestId('ce-account-disconnect'));
+  expect(screen.queryByTestId('agent-box')).not.toBeInTheDocument();
+  const profile = await screen.findByTestId('profile-menu');
+  expect(profile).toContainElement(screen.getByTestId('agent-box'));
+  expect(profile).toContainElement(screen.getByTestId('ce-account-disconnect'));
+  expect(screen.getAllByTestId('agent-box')).toHaveLength(1);
 });

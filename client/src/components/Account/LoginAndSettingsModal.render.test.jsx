@@ -41,7 +41,9 @@ jest.mock('components/UserPage/UserPage', () => (props) => (
     data-active-session-slug={props.activeSessionSlug || ''}
     data-network-chain-id={props.networkChainId || ''}
     data-session-config-chain-id={props.sessionConfig?.networkChainId || ''}
-  />
+  >
+    <ul>{props.accountMenuRows}</ul>
+  </div>
 ));
 
 jest.mock('../Shared/CETooltip', () => ({
@@ -1373,7 +1375,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getModalDisplay());
 
-    const profileShell = screen.getByTestId('mock-user-page').closest(`.${styles.accountModalProfileShell}`);
+    // The profile loads lazily; the dialog's rows then sit in its list.
+    const profileShell = (await screen.findByTestId('mock-user-page')).closest(`.${styles.accountModalProfileShell}`);
 
     expect(profileShell).toBeTruthy();
     expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-view-address', WAGMI_ADDRESS);

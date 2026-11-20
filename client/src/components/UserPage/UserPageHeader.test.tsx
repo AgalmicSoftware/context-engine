@@ -27,10 +27,6 @@ const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageHead
     title: 'Bookmark this user',
   },
   bookmarksHref: '/bookmarks',
-  bookmarksLinkDisplayState: {
-    className: styles.bookmarksLink,
-    style: { display: 'inline-flex' },
-  },
   compareButtonDisplayState: {
     disabled: false,
     shouldRenderCollapseClosedIcon: true,
@@ -324,13 +320,36 @@ describe('UserPageHeader', () => {
     expect(document.querySelector(`.${styles.identityActions}`)).toBeNull();
   });
 
-  it("leaves the account box's copy of the header as it was", () => {
-    render(<UserPageHeader {...createProps({ isOwner: true, minimized: true })} />);
-    const setName = screen.getByRole('button', { name: 'Set username' });
-    expect(setName).toHaveClass(styles.usernameButton);
-    expect(setName.parentElement).toHaveClass(styles.addressColumn);
-    expect(setName.parentElement).not.toHaveClass(styles.addressRow);
+  it("lists the account box's actions in one menu, the dialog's own rows last", () => {
+    const onUsernameEdit = jest.fn();
+    render(
+      <UserPageHeader
+        {...createProps({
+          isOwner: true,
+          minimized: true,
+          onUsernameEdit,
+          analyzeLinkHref: '/u/0xabc?session=demo-one&analyze=1',
+          accountMenuRows: (
+            <li>
+              <button type="button">Disconnect</button>
+            </li>
+          ),
+        })}
+      />,
+    );
+    const menu = screen.getByTestId('ce-account-menu');
+    const rows = Array.from(menu.querySelectorAll(':scope > li > button')).map((row) => row.textContent);
+    expect(rows).toEqual(['Analyze user', 'Set username', 'Disconnect']);
+    fireEvent.click(screen.getByRole('button', { name: 'Set username' }));
+    expect(onUsernameEdit).toHaveBeenCalledTimes(1);
     expect(document.querySelector(`.${styles.identityActions}`)).toBeNull();
+    expect(screen.queryByRole('link', { name: /My Bookmarks/ })).toBeNull();
+  });
+
+  it('keeps the menu off the full profile', () => {
+    render(<UserPageHeader {...createProps({ isOwner: true, accountMenuRows: <li>Disconnect</li> })} />);
+    expect(screen.queryByTestId('ce-account-menu')).toBeNull();
+    expect(screen.queryByText('Disconnect')).toBeNull();
   });
 
   it('keeps minimized header actions limited to the username error display', () => {
@@ -352,13 +371,15 @@ describe('UserPageHeader', () => {
     expect(screen.queryByRole('button', { name: 'Analyze user' })).toBeNull();
   });
 
-  it('offers Analyze user under the username button only where it is given a link', () => {
+  it('offers Analyze user first in the menu only where it is given a link', () => {
     const props = { isOwner: true, minimized: true, showUsernameButton: true };
-    render(<UserPageHeader {...createProps({ ...props, analyzeLinkHref: '/u/0xabc?session=demo-one&analyze=1' })} />);
-    const setName = screen.getByRole('button', { name: 'Set username' });
+    const { rerender } = render(<UserPageHeader {...createProps(props)} />);
+    expect(screen.queryByRole('button', { name: 'Analyze user' })).toBeNull();
+    rerender(<UserPageHeader {...createProps({ ...props, analyzeLinkHref: '/u/0xabc?session=demo-one&analyze=1' })} />);
     const create = screen.getByRole('button', { name: 'Analyze user' });
-    expect(setName.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(create.parentElement).toBe(setName.parentElement);
+    const setName = screen.getByRole('button', { name: 'Set username' });
+    expect(create.compareDocumentPosition(setName) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(create.closest('ul')).toBe(setName.closest('ul'));
   });
 
   it('starts no Analyze by itself on a page nobody sent here', () => {

@@ -126,7 +126,6 @@ import {
   resolveUserPageBookmarkButtonDisplayState,
   resolveUserPageBookmarkNickname,
   resolveUserPageBookmarkStatus,
-  resolveUserPageBookmarksLinkDisplayState,
   resolveUserPageCopyIconDisplayState,
   resolveUserPageInlineEnteredIndicatorDisplayState,
   resolveUserPageFullProfileModalDisplayState,
@@ -3685,10 +3684,6 @@ class UserPage extends Component<any, any> {
     const avatarDisplayState = resolveUserPageAvatarDisplayState({
       blockieUrl,
     });
-    const bookmarksLinkDisplayState = resolveUserPageBookmarksLinkDisplayState({
-      baseClassName: styles.bookmarksLink,
-      inlineClassName: styles.bookmarksLinkInline,
-    });
     const createdQuestionWrapperClassName = buildUserPageCreatedQuestionWrapperClassName({
       baseClassName: styles.createdQuestionWrapper,
       bolderClassName: styles.createdQuestionBolder,
@@ -3707,6 +3702,7 @@ class UserPage extends Component<any, any> {
 
         <UserPageHeader
           addressDisplay={addressDisplay}
+          accountMenuRows={this.props.accountMenuRows}
           privateLabelTag={
             !isOwner && nicknameToUse ? (theirSessionName ? `your label: ${nicknameToUse}` : 'your label') : ''
           }
@@ -3716,7 +3712,6 @@ class UserPage extends Component<any, any> {
           avatarDisplayState={avatarDisplayState}
           bookmarkButtonDisplayState={bookmarkButtonDisplayState}
           bookmarksHref={buildPublicRoute('/bookmarks')}
-          bookmarksLinkDisplayState={bookmarksLinkDisplayState}
           compareButtonDisplayState={compareButtonDisplayState}
           copyIconDisplayState={copyIconDisplayState}
           analyzeLinkHref={buildAnalyzeLinkHref(this, !!minimized && isOwner)}

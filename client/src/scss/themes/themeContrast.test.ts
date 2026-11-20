@@ -146,6 +146,7 @@ describe('bundled app-theme contrast', () => {
       ['status-info-text', 'surface', 'canvas'],
       ['status-success-text', 'surface', 'canvas'],
       ['status-warning-text', 'surface', 'canvas'],
+      // Also the account dialog's menu list, where "Disconnect" is red on the surface (its rows: panel-text).
       ['status-danger-text', 'surface', 'canvas'],
     ] as const;
 

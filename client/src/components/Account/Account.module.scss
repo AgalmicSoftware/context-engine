@@ -1744,6 +1744,8 @@ h1 {
 }
 
 .accountModalProfileShell {
+  // The profile and its list of actions take the panel's width.
+  width: 100%;
   min-width: 0;
 }
 
@@ -1758,22 +1760,129 @@ h1 {
     width: auto;
     flex-shrink: 0;
   }
+}
 
-  .walletButton,
-  .disconnectButton {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    font-size: 1.25em;
+// The account dialog's list of actions: Analyze user, Set username, Bookmarks, Your AI agent, Disconnect.
+// It sits on the card colour, where the theme contrast test holds its text and its red "Disconnect".
+.accountMenu {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  // Opaque, as the panel under it is a tint: the rows and red "Disconnect" read on the surface itself.
+  background: var(--ce-surface);
+  color: var(--ce-panel-text);
+  font-family: var(--ce-font-ui);
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-10);
+  overflow: hidden;
+  text-align: left;
+
+  // Beside the avatar on a desktop, the list takes what the avatar column leaves.
+  @media (min-width: 769px) {
+    flex: 1 1 0;
+    width: auto;
+  }
+}
+
+.accountMenuItem + .accountMenuItem {
+  border-top: 1px solid var(--ce-card-border);
+}
+
+.accountMenuRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 16px;
+  background: transparent;
+  color: inherit;
+  font-family: var(--ce-font-ui);
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+}
+
+// Deeper than the theme's focus rule, and inset, so the list's rounded edge doesn't clip it.
+.accountMenu .accountMenuItem .accountMenuRow:focus-visible,
+.accountMenu .accountMenuAgentRow .agentHandoffToggle:focus-visible {
+  outline: 2px solid var(--ce-focus-ring);
+  outline-offset: -3px;
+}
+
+.accountMenuIcon {
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+
+.accountMenuRowDanger {
+  color: var(--ce-status-danger-text);
+  font-weight: 700;
+}
+
+// "Your AI agent" is one row like the others until opened; what it opens keeps the look it had.
+.accountMenuAgentRow {
+  .agentHandoffPanel {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ce-panel-text);
+    --ce-text: var(--ce-panel-text);
+  }
+  .agentHandoffHeader {
+    flex-wrap: wrap;
+    gap: 0 4px;
+    padding: 0 8px 0 0;
+  }
+  .agentHandoffTitle {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 1.05rem;
     font-weight: 600;
-    opacity: 0.8;
-
-    @media (min-width: 769px) {
-      font-size: 1.5em;
-      font-weight: 600;
-      opacity: 0.8;
+  }
+  // Two classes deeper than the theme's raised-button recipe, so the row stays flat.
+  .accountMenu & .agentHandoffToggle {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .agentHandoffToggle {
+    width: 100%;
+    gap: 12px;
+    min-height: 48px;
+    padding: 10px 16px;
+    font-family: var(--ce-font-ui);
+    // The caret at the row's end.
+    > svg:last-child {
+      margin-left: auto;
     }
+    &:hover,
+    &:focus-visible {
+      background: color-mix(in srgb, currentColor 8%, transparent);
+    }
+  }
+  .agentHandoffLead {
+    flex: 1 1 100%;
+    padding: 0 16px 8px;
+  }
+  :global(#ce-agent-handoff-body) {
+    --ce-text: var(--ce-settings-text);
+    margin: 0 12px 12px;
+    padding: 12px;
+    border: 1px solid var(--ce-settings-border);
+    border-radius: var(--ce-radius-8);
+    background: var(--ce-settings-panel-bg);
+    color: var(--ce-settings-text);
   }
 }
 
@@ -1799,13 +1908,6 @@ h1 {
 
   .accountModalControls {
     gap: 0.5rem;
-
-    .walletButton,
-    .disconnectButton {
-      min-height: 44px;
-      padding: 0.5rem;
-      font-size: 1rem;
-    }
   }
 }
 
@@ -2770,26 +2872,6 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
     .accountModalProfileShell {
       --ce-text-inverse: var(--ce-panel-text);
       --ce-status-error: var(--ce-status-danger-text);
-    }
-
-    .walletButton,
-    .disconnectButton {
-      opacity: 1;
-    }
-
-    .disconnectButton {
-      color: var(--ce-action-primary-text);
-    }
-
-    .walletButton {
-      color: var(--ce-panel-text);
-      background: color-mix(in srgb, var(--ce-color-white) 65%, transparent);
-      border: 1px solid color-mix(in srgb, var(--ce-action-primary) 28%, var(--ce-color-white));
-
-      &:hover,
-      &:focus-visible {
-        background: color-mix(in srgb, var(--ce-color-white) 90%, transparent);
-      }
     }
   }
 

@@ -11,6 +11,7 @@ import {
 import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import { copyText } from '../../utilities/ui/copyText';
 import styles from './Account.module.scss';
+import { AccountMenu, AccountMenuRow } from './AccountMenu';
 const AgentAccountAccessPanel = React.lazy(() => import('./AgentAccountAccessPanel'));
 import { PASSKEYS_UNAVAILABLE_MESSAGE, type PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
@@ -48,6 +49,7 @@ type AccountUserPageProps = {
   activeSessionSlug?: string;
   sessionConfig?: unknown;
   networkChainId?: unknown;
+  accountMenuRows?: React.ReactNode;
 };
 
 type LoginModalDisplayBodyProps = {
@@ -228,13 +230,27 @@ const LoginModalDisplayBody = ({
   }
 
   if (loginComplete) {
+    // The dialog's rows follow the profile's own two ("Analyze user", "Set username") in one list. While the
+    // profile loads, Bookmarks and Disconnect show on their own, so "Disconnect" is always there; the agent row
+    // waits, so it mounts once and keeps what was chosen or made in it.
+    const menuRows = (agentRow: React.ReactNode) => (
+      <>
+        <AccountMenuRow icon={faBookmark} onClick={openBookmarks}>
+          Bookmarks
+        </AccountMenuRow>
+        {agentRow ? <li className={`${styles.accountMenuItem} ${styles.accountMenuAgentRow}`}>{agentRow}</li> : null}
+        <AccountMenuRow icon={faSignOutAlt} onClick={handleLogout} danger testId="ce-account-disconnect">
+          Disconnect
+        </AccountMenuRow>
+      </>
+    );
     return (
       <CardBody id={styles.accountModalCard}>
         <div id={styles.accountModalPanel}>
           <div className={styles.accountModalBody}>
-            {account && (
+            {account ? (
               <div className={styles.accountModalProfileShell}>
-                <Suspense fallback={null}>
+                <Suspense fallback={<AccountMenu>{menuRows(null)}</AccountMenu>}>
                   <AccountUserPage
                     viewAddress={account}
                     account={account}
@@ -244,19 +260,13 @@ const LoginModalDisplayBody = ({
                     activeSessionSlug={activeSessionSlug}
                     sessionConfig={activeSessionConfig}
                     networkChainId={activeSessionNetworkChainId || undefined}
+                    accountMenuRows={menuRows(renderAgentHandoffPanel())}
                   />
                 </Suspense>
               </div>
+            ) : (
+              <AccountMenu>{menuRows(renderAgentHandoffPanel())}</AccountMenu>
             )}
-            <div className={styles.accountModalControls}>
-              <Button color="secondary" size="sm" onClick={openBookmarks} className={styles.walletButton}>
-                <FontAwesomeIcon icon={faBookmark} /> Bookmarks
-              </Button>
-              <Button color="danger" size="sm" onClick={handleLogout} className={styles.disconnectButton}>
-                <FontAwesomeIcon icon={faSignOutAlt} /> Disconnect
-              </Button>
-            </div>
-            {renderAgentHandoffPanel()}
             <div className={styles.accountModalControls}>
               <Suspense fallback={null}>
                 <AgentAccountAccessPanel

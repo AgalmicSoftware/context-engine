@@ -1,21 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-import styles from './UserPage.module.scss';
+import { faRobot } from '@fortawesome/free-solid-svg-icons';
+
+import { AccountMenuRow } from '../Account/AccountMenu';
 import { openAnalyzeLink, takeAnalyzeLinkArrival } from './userPageAnalyzeLink';
 
 // How long the page must stay ready before Analyze starts by itself: answers arrive in steps.
 export const ANALYZE_LINK_SETTLE_MS = 1500;
 
-/** In the account dialog, under my address and user-name. */
+/** In the account dialog's list, first. */
 export const AnalyzeUserButton = ({ href }: { href: string }): React.ReactElement => (
-  <button
-    type="button"
-    className={styles.usernameButton}
+  <AccountMenuRow
+    icon={faRobot}
     title="Opens your page and makes your AI analysis"
     onClick={() => openAnalyzeLink(href)}
+    testId="ce-account-analyze-user"
   >
     Analyze user
-  </button>
+  </AccountMenuRow>
 );
 
 /** On my own page: starts Analyze once, where "Analyze user" was pressed just before and the page is ready. */
