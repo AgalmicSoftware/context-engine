@@ -15,6 +15,7 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { readWorkerCapabilities } from '../worker/workerCapabilities';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
+import { forgetAnalysisCardSaved, noteAnalysisCardSaved } from './analysisCardDrawn';
 
 export type SavedAnalysisCardState =
   { status: 'ready'; card: SavedAnalysisCard; savedAt: number } | { status: 'withdrawn' } | { status: 'none' };
@@ -146,6 +147,9 @@ export const publishSavedAnalysisCard = async (
   );
   known.set(keyOf(opts, account), Promise.resolve(state));
   listeners.forEach((listener) => listener());
+  // The saved card's picture, as this page drew it, follows where the Worker keeps one; a withdrawal ends that.
+  if (state.status === 'ready') noteAnalysisCardSaved(account, state.card, opts);
+  else forgetAnalysisCardSaved();
   return state;
 };
 
