@@ -5,6 +5,7 @@ import {
   buildUserPageAnalysisElapsedStatePatch,
   buildUserPageAnalysisErrorStatePatch,
   buildUserPageAnalysisFingerprint,
+  buildUserPageAnalysisFirstReadStatePatch,
   buildUserPageAnalysisResetStatePatch,
   buildUserPageAnalysisResultStatePatch,
   buildUserPageTooltipTargetIds,
@@ -193,6 +194,13 @@ describe('userPageAnalysisStateHelpers', () => {
     expect(formatUserPageAnalysisWait(19999)).toBe('19 of about 19 seconds');
     expect(formatUserPageAnalysisWait(24100)).toBe('24 seconds, longer than usual');
     expect(formatUserPageAnalysisWait(undefined)).toBe('0 of about 19 seconds');
+  });
+
+  it('puts the first read where the summary and details will go, one line per row', () => {
+    expect(
+      buildUserPageAnalysisFirstReadStatePatch({ headline: ' A first read. ', points: [' One ', '', 'Two'] }),
+    ).toEqual({ aiAnalysis: 'A first read.', analysisDetails: 'One\nTwo' });
+    expect(buildUserPageAnalysisFirstReadStatePatch(null)).toEqual({ aiAnalysis: '', analysisDetails: '' });
   });
 
   it('classifies AI missing-key and connectivity analysis errors separately', () => {

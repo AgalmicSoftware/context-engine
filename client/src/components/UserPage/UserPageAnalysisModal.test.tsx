@@ -223,6 +223,7 @@ describe('UserPageAnalysisModal', () => {
           analysisCacheStatusState: {
             shouldRenderAnalysisCacheStatus: false,
           },
+          aiAnalysis: '',
           analysisElapsedMs: 2400,
           analysisError: 'Analysis failed.',
           analysisModalDisplayState: {
@@ -248,6 +249,116 @@ describe('UserPageAnalysisModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh analysis' }));
     expect(onRefreshAnalysis).not.toHaveBeenCalled();
+  });
+
+  const waiting = {
+    shouldRenderAnalysisBody: false,
+    shouldRenderAnalyzing: true,
+    shouldRenderDetails: false,
+    shouldRenderError: false,
+    shouldRenderHistoricalAlignment: false,
+    shouldRenderHistoricalFigure: false,
+    shouldRenderHistoricalReasoning: false,
+  };
+  const failed = { ...waiting, shouldRenderAnalyzing: false, shouldRenderError: true };
+  const firstRead = {
+    aiAnalysis: 'Wants decisions made close to home.',
+    analysisCacheStatusState: { shouldRenderAnalysisCacheStatus: false },
+    analysisDetails: 'Holds hearings dear.\nOpen to national standards.',
+    analysisName: '',
+  };
+
+  it('shows the first read under the waiting line while the full analysis is written', () => {
+    render(
+      <UserPageAnalysisModal
+        {...createProps({ ...firstRead, analysisElapsedMs: 8400, analysisModalDisplayState: waiting, analyzing: true })}
+      />,
+    );
+
+    expect(screen.getByText('Writing the full analysis… 8 of about 19 seconds')).toBeInTheDocument();
+    const block = screen.getByTestId('analysis-first-read');
+    expect(block).toHaveTextContent('First read');
+    expect(block).toHaveTextContent('Wants decisions made close to home.');
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Holds hearings dear.',
+      'Open to national standards.',
+    ]);
+    expect(screen.queryByText(/AI model:/)).not.toBeInTheDocument();
+  });
+
+  it('draws lines that read the same, and none for a blank one', () => {
+    render(
+      <UserPageAnalysisModal
+        {...createProps({
+          ...firstRead,
+          analysisDetails: 'Same line.\n\nSame line.',
+          analysisModalDisplayState: waiting,
+          analyzing: true,
+        })}
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('First read');
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Same line.', 'Same line.']);
+  });
+
+  it('keeps the first read when the full analysis fails, and offers to try again', () => {
+    const onRefreshAnalysis = jest.fn();
+    render(
+      <UserPageAnalysisModal
+        {...createProps({
+          ...firstRead,
+          analysisError: 'Unable to reach the AI service.',
+          analysisErrorAction: 'open-ai-settings',
+          analysisModalDisplayState: failed,
+          onOpenAiSettings: jest.fn(),
+          onRefreshAnalysis,
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('analysis-first-read')).toHaveTextContent('Wants decisions made close to home.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The full analysis did not arrive. Unable to reach the AI service.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRefreshAnalysis).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Open AI settings' })).toBeInTheDocument();
+  });
+
+  it('draws no first read once the analysis is on screen, and none where there was none', () => {
+    const { rerender } = render(<UserPageAnalysisModal {...createProps()} />);
+    expect(screen.queryByTestId('analysis-first-read')).not.toBeInTheDocument();
+    expect(screen.getByText('Profile synthesis')).toBeInTheDocument();
+
+    rerender(
+      <UserPageAnalysisModal
+        {...createProps({ aiAnalysis: '', analysisDetails: '', analysisModalDisplayState: waiting, analyzing: true })}
+      />,
+    );
+    expect(screen.queryByTestId('analysis-first-read')).not.toBeInTheDocument();
+    expect(screen.getByText('Generating insights… 1 of about 19 seconds')).toBeInTheDocument();
+  });
+
+  it('offers Try again after a failure, except where a key has to be added first', () => {
+    const { rerender } = render(
+      <UserPageAnalysisModal
+        {...createProps({ aiAnalysis: '', analysisError: 'It failed.', analysisModalDisplayState: failed })}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+
+    rerender(
+      <UserPageAnalysisModal
+        {...createProps({
+          aiAnalysis: '',
+          analysisError: 'A key is needed.',
+          analysisErrorAction: 'add-ai-key',
+          analysisModalDisplayState: failed,
+          onOpenAiSettings: jest.fn(),
+        })}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
   });
 
   it('renders an AI settings action only for missing-key analysis errors', () => {

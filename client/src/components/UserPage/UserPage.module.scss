@@ -1334,6 +1334,42 @@ $icon-size-standard: 1.25rem;
   margin-bottom: 12px;
 }
 
+// The quick first read, shown under the waiting line until the analysis takes its place.
+.analysisFirstRead {
+  margin-top: 14px;
+  padding-left: 12px;
+  border-left: 3px solid var(--ce-action-accent);
+
+  ul {
+    margin: 8px 0 0;
+    padding-left: 1.1rem;
+  }
+
+  li + li {
+    margin-top: 4px;
+  }
+}
+
+.analysisFirstReadLabel {
+  margin: 0 0 4px;
+  color: var(--ce-document-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.analysisFirstReadHeadline {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.analysisFirstRead + .analysisErrorNotice {
+  margin-top: 16px;
+}
+
 // Preserve the comparison's pill treatment across the shared control recipes.
 :global(:root) .compareSection.compareSection {
   color: var(--ce-panel-text);

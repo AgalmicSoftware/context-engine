@@ -379,6 +379,20 @@ export const formatUserPageAnalysisWait = (elapsedMs: unknown): string => {
     : `${seconds} seconds, longer than usual`;
 };
 
+// The quick first read, shown while the analysis is written. It sits in the summary's and the details' own places,
+// so the analysis replaces it when it arrives and the two never stand side by side; its lines are kept one per row.
+export const buildUserPageAnalysisFirstReadStatePatch = (firstRead: unknown): UserPageUnknownRecord => {
+  const record = toAnalysisRecord(firstRead);
+  const points = Array.isArray(record.points) ? record.points : [];
+  return {
+    aiAnalysis: String(record.headline || '').trim(),
+    analysisDetails: points
+      .map((point: unknown) => String(point || '').trim())
+      .filter(Boolean)
+      .join('\n'),
+  };
+};
+
 export const buildUserPageAnalysisElapsedStatePatch = ({
   nowMs = Date.now(),
   startedAt = 0,
