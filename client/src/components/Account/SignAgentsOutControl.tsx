@@ -1,5 +1,5 @@
 // "Sign Agents Out", for the "Your AI agent" menu of the account dialog: ends every prompt and key the person
-// copied for an agent from this tab's sign-in, and says to copy a new one to let an agent in again. It renders
+// copied for an agent in this tab, and says to copy a new one to let an agent in again. It renders
 // nothing in an account an AI agent set up, where there is no such key to end (see signAgentsOut.ts).
 import React, { useState } from 'react';
 
@@ -7,7 +7,7 @@ import { isAgentLinkProvider } from '../../utilities/session/agentLinkAccount';
 import { signAgentsOut } from '../../utilities/session/signAgentsOut';
 
 export const SIGN_AGENTS_OUT_HELP =
-  'Ends every prompt and key you copied for an AI agent from this tab’s sign-in to this session. You stay signed in. To let an agent in again, copy a new prompt from Your AI agent. A prompt you copied in another tab or on another device has to be ended there.';
+  'Ends every prompt and key you copied for an AI agent in this tab, for this session. You stay signed in. To let an agent in again, copy a new prompt from Your AI agent. A prompt you copied in another tab or on another device has to be ended there; left alone, it runs out within four hours.';
 
 type Props = {
   provider: unknown;

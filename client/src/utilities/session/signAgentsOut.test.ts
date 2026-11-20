@@ -4,7 +4,9 @@ import {
   buildTokenCacheEnvelope,
   buildTokenCacheKey,
   clearAllTokenCaches,
+  clearTokenCache,
   heldSessionToken,
+  listReplacedTokens,
   writeTokenCache,
 } from '../worker/workerAuthTokenCache';
 import { signAgentsOut } from './signAgentsOut';
@@ -65,4 +67,31 @@ it('has nothing to end at the Worker when the tab holds no sign-in to the sessio
   await signAgentsOut('salon');
   expect(fetchMock).not.toHaveBeenCalled();
   await expect(signAgentsOut('')).rejects.toThrow('Open a session first.');
+});
+
+it('also ends a sign-in the page replaced without ending it, whose keys would otherwise live on', async () => {
+  fetchMock.mockResolvedValue({ ok: true, status: 200 });
+  // Written over by a new sign-in, as after a refused scope; then that one dropped, as after a refusal.
+  hold(WORKER, 'salon', 'second-sign-in');
+  clearTokenCache(buildTokenCacheKey({ workerUrl: WORKER, slug: 'salon', address: ADDRESS }));
+  hold(WORKER, 'salon', 'third-sign-in');
+  expect(listReplacedTokens().map((entry) => entry.token)).toEqual(['sign-in-here', 'second-sign-in']);
+  await signAgentsOut('salon');
+  const ended = fetchMock.mock.calls.map(
+    ([, init]) => (init as { headers: Record<string, string> }).headers.Authorization,
+  );
+  expect(ended.sort()).toEqual(['Bearer second-sign-in', 'Bearer sign-in-here', 'Bearer third-sign-in']);
+  expect(listReplacedTokens()).toEqual([]);
+  expect(heldSessionToken(WORKER, 'salon')).toBe('');
+  // The other session's sign-in was never touched.
+  expect(heldSessionToken(FORUM, 'forum')).toBe('another-session');
+});
+
+it('keeps a replaced sign-in to end later when the Worker could not be told, and drops them all on a sign-out', async () => {
+  hold(WORKER, 'salon', 'second-sign-in');
+  fetchMock.mockRejectedValue(new Error('offline'));
+  await expect(signAgentsOut('salon')).rejects.toThrow(/still signed in/);
+  expect(listReplacedTokens().map((entry) => entry.token)).toEqual(['sign-in-here']);
+  clearAllTokenCaches();
+  expect(listReplacedTokens()).toEqual([]);
 });
