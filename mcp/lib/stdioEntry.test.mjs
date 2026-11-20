@@ -47,7 +47,7 @@ test('the executable answers MCP over stdio and keeps one agent identity per sta
   assert.match(byId[1].result.instructions, /api\/agent\/skill/);
   assert.deepEqual(
     byId[2].result.tools.map((tool) => tool.name).sort(),
-    ['add_context', 'add_statement', 'answer', 'ask_session_agent', 'claim_sbt', 'get_interview_catalog', 'get_results', 'get_session', 'join_group',
+    ['add_context', 'add_statement', 'answer', 'ask_session_agent', 'claim_sbt', 'get_analysis_card', 'get_interview_catalog', 'get_results', 'get_session', 'join_group',
       'join_session', 'leave_group', 'list_context', 'list_questions', 'make_review_link', 'read_context', 'request_test_eth', 'set_profile', 'whoami'],
   );
   const whoami = byId[3].result.structuredContent;

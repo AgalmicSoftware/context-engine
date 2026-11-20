@@ -34,6 +34,9 @@ const hostOnly = (url) => (/<\w+>/.test(url) ? url : url.replace(/^([^:]+:\/\/)(
 // A tool's reply that reports nothing done, so the host marks it isError.
 const TOOL_FAILED = Symbol('toolFailed');
 export const failedToolResult = (value) => Object.defineProperty(value, TOOL_FAILED, { value: true });
+// Pictures a tool's reply carries beside its JSON, as `[{ mimeType, data }]` with base64 data.
+const TOOL_IMAGES = Symbol('toolImages');
+export const withToolImages = (value, images) => Object.defineProperty(value, TOOL_IMAGES, { value: images });
 
 export const describeError = (error) => {
   const text = String(error?.message || error || '').slice(0, MAX_ERROR_LENGTH);
@@ -77,6 +80,9 @@ export const createMcpServer = ({
   const toolResult = (value, isError = value?.[TOOL_FAILED] === true) => {
     const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
     const result = { content: [{ type: 'text', text }] };
+    for (const image of Array.isArray(value?.[TOOL_IMAGES]) ? value[TOOL_IMAGES] : []) {
+      result.content.push({ type: 'image', data: image.data, mimeType: image.mimeType });
+    }
     if (isRecord(value) && protocolVersion >= STRUCTURED_CONTENT_SINCE) {
       result.structuredContent = value;
     }
