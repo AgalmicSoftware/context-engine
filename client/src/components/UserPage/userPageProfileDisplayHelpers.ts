@@ -1,3 +1,5 @@
+import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
+
 export type BuildUserPageProfileEditVisibilityArgs = {
   account?: unknown;
   cachedNickname?: unknown;
@@ -178,7 +180,10 @@ export const resolveUserPageAddressDisplayState = ({
   // Without its session the full profile opens on the default session, not the one in view.
   const session = String(sessionSlug || '').trim();
   const profileUrl = propViewAddress
-    ? `/u/${propViewAddress}${session ? `?session=${encodeURIComponent(session)}` : ''}`
+    ? withWorkerHintForSession(
+        `/u/${propViewAddress}${session ? `?session=${encodeURIComponent(session)}` : ''}`,
+        session,
+      )
     : '';
   const usernameText = String(username || '');
   const shortAddress = propViewAddress

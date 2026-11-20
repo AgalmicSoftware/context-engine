@@ -1,3 +1,4 @@
+import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
 import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
@@ -144,7 +145,10 @@ const compassPoints = (mapping: DebateAtlasMapping, sessionSlug: string): Histor
         ? {
             // The same avatar and profile link the Report shows for this address.
             avatarUrl: generateBlockieDataUrl(address.toLowerCase(), 8, 4),
-            profileUrl: `/u/${encodeURIComponent(address)}${sessionSlug ? `?session=${encodeURIComponent(sessionSlug)}` : ''}`,
+            profileUrl: withWorkerHintForSession(
+              `/u/${encodeURIComponent(address)}${sessionSlug ? `?session=${encodeURIComponent(sessionSlug)}` : ''}`,
+              sessionSlug,
+            ),
           }
         : {}),
     };

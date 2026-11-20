@@ -1,4 +1,5 @@
 /** @file PolisReport.tsx */
+import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
 import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -174,7 +175,10 @@ export const buildPolisParticipantProfileHref = ({
   const base = simulated && name ? `/su/${encodeURIComponent(name)}` : isEth ? `/u/${encodeURIComponent(addr)}` : '';
   if (!base) return '';
   const normalizedSlug = normalizeSessionSlug(sessionSlug || '');
-  return normalizedSlug ? `${base}?session=${encodeURIComponent(normalizedSlug)}` : base;
+  // An unlisted session is found only through its Worker, so the profile link keeps the page's `worker`.
+  return normalizedSlug
+    ? withWorkerHintForSession(`${base}?session=${encodeURIComponent(normalizedSlug)}`, normalizedSlug)
+    : base;
 };
 
 /***************************************************************

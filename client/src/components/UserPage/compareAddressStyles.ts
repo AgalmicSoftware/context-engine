@@ -1,3 +1,4 @@
+import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
 import type { CSSProperties } from 'react';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
@@ -17,7 +18,7 @@ export const buildCompareProfileHref = (address: unknown, sessionSlug: unknown =
   if (!normalizedAddress) return '';
   const normalizedSessionSlug = normalizeSessionSlug(sessionSlug);
   const query = normalizedSessionSlug ? `?session=${encodeURIComponent(normalizedSessionSlug)}` : '';
-  return buildPublicRoute(`/u/${normalizedAddress}${query}`);
+  return buildPublicRoute(withWorkerHintForSession(`/u/${normalizedAddress}${query}`, normalizedSessionSlug));
 };
 
 export const buildCompareClassName = (...classNames: unknown[]): string =>
