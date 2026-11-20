@@ -3956,10 +3956,26 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// The status takes what the title row leaves, so it never wraps under the title; a long one ends in "…",
+// and its full words are its label.
+.sessionInterviewHeader > [role='status'] {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline-end: 4px;
+}
+
 .sessionInterviewStatusPill {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   min-height: 36px;
+
+  > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   padding: 6px 12px;
   border: 0 !important;
   border-radius: 999px !important;
@@ -4022,6 +4038,28 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     margin-inline-start: 4px;
     padding-inline: 9px;
     font-size: 0.8rem;
+  }
+}
+
+// The narrowest phones leave the status room for a word or two: slimmer buttons, a smaller title, and no
+// globe. The flags still show on opening, and the "?" still names the languages.
+@media (max-width: 360px) {
+  .sessionVoiceModeModal :global(.modal-title) {
+    min-width: 0;
+    font-size: 1rem;
+  }
+
+  .sessionInterviewHeader .sessionInterviewHeaderButton {
+    min-width: 30px;
+    padding-inline: 3px;
+  }
+
+  .sessionInterviewHeader .sessionInterviewLanguageToggle {
+    display: none;
+  }
+
+  .sessionInterviewStatusPill {
+    padding-inline: 7px;
   }
 }
 

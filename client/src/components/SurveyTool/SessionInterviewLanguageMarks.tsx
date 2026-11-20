@@ -108,7 +108,7 @@ export default function SessionInterviewLanguageMarks() {
     <>
       <button
         type="button"
-        className={styles.sessionInterviewHeaderButton}
+        className={`${styles.sessionInterviewHeaderButton} ${styles.sessionInterviewLanguageToggle}`}
         data-ce-control-appearance="frameless"
         aria-label="Languages you can answer in"
         aria-expanded={shown}
