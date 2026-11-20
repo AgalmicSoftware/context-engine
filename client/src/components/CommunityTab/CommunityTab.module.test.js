@@ -69,10 +69,22 @@ describe('CommunityTab module styles', () => {
 
     expect(scss).toContain('@container ce-theme style(--ce-layout-profile: desktop-window)');
     expect(scss).not.toContain('data-ce-theme');
-    expect(scss).toMatch(/\.communityTab \.statsGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(5,/);
+    expect(scss).toMatch(/\.communityTab \.statsGrid\s*{\s*--stat-gap:\s*0px;/);
     expect(scss).toMatch(/\.communityTab \.beeswarmSection\s*{[\s\S]*?background:\s*var\(--ce-data-viz-surface\);/);
     expect(scss).toMatch(
       /\.communityTab \.beeswarmPlot\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;[\s\S]*?justify-content:\s*center;/,
+    );
+  });
+
+  it('centres the stat tiles, however many a row holds', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
+    const grid = scss.match(/\n  \.statsGrid\s*{[\s\S]*?\n  }\n/)[0];
+
+    expect(grid).toMatch(/--stat-columns:\s*5;/);
+    expect(grid).toMatch(/display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?justify-content:\s*center;/);
+    expect(grid).not.toMatch(/grid-template-columns/);
+    expect(scss).toMatch(
+      /\.statItem\s*{[\s\S]*?flex:\s*0 0 calc\(\(100% - \(var\(--stat-columns\) - 1\) \* var\(--stat-gap\)\)/,
     );
   });
 

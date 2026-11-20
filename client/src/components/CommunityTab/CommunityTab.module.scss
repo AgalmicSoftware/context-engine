@@ -213,23 +213,29 @@
     }
   }
 
+  // Tiles keep the width of a full row's and sit in the middle: a row with fewer of them has equal room each side.
   .statsGrid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 8px;
+    --stat-columns: 5;
+    --stat-gap: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--stat-gap);
     align-content: center;
     height: 100%;
 
     &:has(> .statItem:nth-child(4):last-child) {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      --stat-columns: 4;
 
       @media (max-width: 420px) {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        --stat-columns: 2;
       }
     }
   }
 
   .statItem {
+    // A hair under the exact share, so rounding never pushes the last tile of a full row onto the next.
+    flex: 0 0 calc((100% - (var(--stat-columns) - 1) * var(--stat-gap)) / var(--stat-columns) - 0.01px);
     appearance: none;
     background: transparent;
     box-shadow: none;
@@ -456,8 +462,7 @@
   }
 
   .communityTab .statsGrid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0;
+    --stat-gap: 0px;
     height: 90px;
     border: 2px solid;
     border-color: var(--ce-border-inset);
@@ -1117,8 +1122,9 @@
     flex: 0 0 auto;
   }
 
+  // Four tiles keep their two columns: that rule is the more specific one.
   .communityTab .statsGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    --stat-columns: 3;
     height: auto;
   }
 
