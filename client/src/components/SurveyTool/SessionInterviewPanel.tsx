@@ -929,6 +929,7 @@ export default function SessionInterviewPanel({
       setStatus('Error');
       return;
     }
+    if (error === INTERVIEW_PREFILL_PASTE_NOTE) setError('');
     setMappingNotice('');
     setLeftOutIds([]);
     setSubmitSucceeded(false);
@@ -1256,7 +1257,7 @@ export default function SessionInterviewPanel({
           {interviewOpening.notice ? <p>{interviewOpening.notice}</p> : null}
           {!questions.length ? <p>No accessible questions are available for this interview.</p> : null}
           <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />
-          {idle && readiness.state === 'unavailable' && !error ? (
+          {idle && readiness.state === 'unavailable' && (!error || error === INTERVIEW_PREFILL_PASTE_NOTE) ? (
             <p role="alert">
               {readiness.detail}{' '}
               <button type="button" onClick={readiness.retry}>

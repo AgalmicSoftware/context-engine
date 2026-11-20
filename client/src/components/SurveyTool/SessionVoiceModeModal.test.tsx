@@ -1305,6 +1305,12 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByText(INTERVIEW_PREFILL_PASTE_NOTE)).not.toBeInTheDocument();
     expect(screen.queryByText('Error')).not.toBeInTheDocument();
     expect(screen.getByText('Paste drafts')).toBeInTheDocument();
+    // Talking instead leaves the note behind; the paste box stays.
+    mockVoiceRound('Responder: Hello.');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    expect(screen.queryByText('Paste drafts')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE)).toBeInTheDocument();
   });
 
   it.each([
