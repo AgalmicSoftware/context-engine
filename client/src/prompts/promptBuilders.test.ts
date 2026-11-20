@@ -80,6 +80,8 @@ describe('prompt builders', () => {
     expect(prompt).toContain('never a living person');
     expect(prompt).toContain('End with one position where the two differ.');
     expect(prompt).not.toContain('widely known historical figure');
+    // The figure is chosen in one pass: the silent five-candidates step cost about five seconds.
+    expect(prompt).not.toContain('at least five candidates');
     expect(prompt).toContain('"historicalAlignment": { "figure": "string", "reasoning": "string" }');
   });
 
