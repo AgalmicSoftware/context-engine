@@ -280,13 +280,11 @@ it('says so, and drops the code, where the Worker can’t sign in from a link, o
   staleGate.unmount();
   jest.mocked(enterAgentLinkAccount).mockClear();
   // Where the Worker says they are not on, the page says so in its own words, and that the link is unused.
-  jest
-    .mocked(exchangeHeldAgentSignInCode)
-    .mockRejectedValue(
-      Object.assign(new Error('This session doesn’t sign people in from an agent’s link.'), {
-        reason: 'sign_in_links_off',
-      }),
-    );
+  jest.mocked(exchangeHeldAgentSignInCode).mockRejectedValue(
+    Object.assign(new Error('This session doesn’t sign people in from an agent’s link.'), {
+      reason: 'sign_in_links_off',
+    }),
+  );
   const offGate = gate();
   await waitFor(() => expect(notice()?.textContent).toMatch(/doesn’t have sign-in links from agents switched on/));
   expect(notice()?.textContent).toMatch(
