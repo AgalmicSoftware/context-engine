@@ -3,7 +3,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import type { WorkerGroup } from '../../domains/worker/workerGroupPorts';
 import WorkerGroupMembershipPanel from './WorkerGroupMembershipPanel';
-import { groupWorkerGroupsByCategory } from './workerGroupCategoryOrder';
+import { DEFAULT_NEW_SESSION_SBT_TAGS } from '../Sessions/sessionWizardDraftState';
+import { groupWorkerGroupsByCategory, UNCHOSEN_GROUP_TAGS } from './workerGroupCategoryOrder';
 
 const SESSION_ID = '0x11111111111111111111111111111111';
 const envelope: AgentClientLoginEnvelope = {
@@ -96,6 +97,38 @@ describe('groupWorkerGroupsByCategory', () => {
     const tagged = [group('a', 'A', ['ai-agents']), group('b', 'B', ['UN_regions']), group('c', 'C', ['zebra'])];
     const categories = groupWorkerGroupsByCategory(tagged.map((entry) => ({ group: entry, isMember: false })));
     expect(categories.map(({ name }) => name)).toEqual(['Ai agents', 'UN regions', 'Zebra']);
+  });
+
+  it("puts a group still carrying the create form's untouched default tags with the untagged ones", () => {
+    expect(UNCHOSEN_GROUP_TAGS.join(', ')).toBe(DEFAULT_NEW_SESSION_SBT_TAGS);
+    const tagged = [
+      group('a', 'A', ['Location', 'idea', 'event', 'group', 'demographic']),
+      group('b', 'B', ['group', 'event', 'idea', 'demographic']),
+      group('c', 'C', ['region']),
+    ];
+    const categories = groupWorkerGroupsByCategory(tagged.map((entry) => ({ group: entry, isMember: false })));
+    expect(categories.map(({ name, entries }) => [name, entries.map((entry) => entry.group.label)])).toEqual([
+      ['Group', ['B']],
+      ['Region', ['C']],
+      ['Other groups', ['A']],
+    ]);
+  });
+
+  it("sends a category's catch-all group last, after names that sort before it", () => {
+    const roles = [
+      group('r', 'Researcher', ['role']),
+      group('x', 'Another role', ['role']),
+      group('a', 'AI agents', ['role']),
+    ];
+    const other = group('o', 'Elsewhere', ['region']);
+    const categories = groupWorkerGroupsByCategory(
+      [...roles, other].map((entry) => ({ group: entry, isMember: false })),
+    );
+    expect(categories[1].entries.map((entry) => entry.group.label)).toEqual([
+      'AI agents',
+      'Researcher',
+      'Another role',
+    ]);
   });
 
   it('keeps a tag named Other apart from the untagged groups', () => {

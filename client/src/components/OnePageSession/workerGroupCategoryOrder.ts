@@ -4,6 +4,9 @@ export type WorkerGroupEntry = { group: WorkerGroup; isMember: boolean };
 export type WorkerGroupCategory = { key: string; name: string; entries: WorkerGroupEntry[] };
 
 const OTHER_KEY = '';
+// The tags a new session gives its create forms (DEFAULT_NEW_SESSION_SBT_TAGS in the session wizard). A group that
+// still carries exactly these was made without choosing tags, so it has no category rather than one called "Group".
+export const UNCHOSEN_GROUP_TAGS = ['group', 'event', 'idea', 'demographic', 'location'];
 // "Another country", "Other role": the catch-all goes last in its category.
 const CATCH_ALL = /^(another|other)\b/i;
 
@@ -26,7 +29,11 @@ const byName = (a: WorkerGroupEntry, b: WorkerGroupEntry): number =>
 export const groupWorkerGroupsByCategory = (entries: WorkerGroupEntry[]): WorkerGroupCategory[] => {
   const categories = new Map<string, WorkerGroupCategory>();
   entries.forEach((entry) => {
-    const tag = (entry.group.tags || []).map((value) => value.trim()).find(Boolean) || '';
+    const tags = (entry.group.tags || []).map((value) => value.trim()).filter(Boolean);
+    const unchosen =
+      tags.length === UNCHOSEN_GROUP_TAGS.length &&
+      UNCHOSEN_GROUP_TAGS.every((tag) => tags.some((value) => value.toLowerCase() === tag));
+    const tag = unchosen ? '' : tags[0] || '';
     const key = tag.toLowerCase();
     const category = categories.get(key) || { key, name: tag ? categoryName(tag) : 'Other groups', entries: [] };
     category.entries.push(entry);
