@@ -102,6 +102,7 @@ type OnePageSessionStandardShellProps = {
   embeddedAtlasNodeId: unknown;
   embeddedAtlasReturnState: unknown;
   requestedAtlasNodeId?: string | null;
+  onRequestedAtlasNodeOpen?: (nodeId: string) => void;
   onRequestedAtlasNodeClose?: () => void;
   embeddedGroupsSessionConfig: unknown;
   embeddedGroupsSessionSlug: string;
@@ -270,6 +271,7 @@ export default function OnePageSessionStandardShell({
   embeddedAtlasNodeId,
   embeddedAtlasReturnState,
   requestedAtlasNodeId = null,
+  onRequestedAtlasNodeOpen,
   onRequestedAtlasNodeClose,
   embeddedGroupsSessionConfig,
   embeddedGroupsSessionSlug,
@@ -1081,6 +1083,8 @@ export default function OnePageSessionStandardShell({
                       build={riskMatrix.build}
                       builds={riskMatrix.builds}
                       onSelectBuild={riskMatrix.selectBuild}
+                      atlas={atlas.build}
+                      onOpenAtlasTopic={onRequestedAtlasNodeOpen}
                     />
                   </Suspense>
                 )}

@@ -1,16 +1,43 @@
 $background: var(--ce-surface-sunken);
 $surface: var(--ce-surface-raised);
 $surface-alt: var(--ce-surface-alt);
-$surface-muted: var(--ce-card-bg);
 $text: var(--ce-panel-text);
 $muted-text: var(--ce-panel-text-muted);
 $accent: var(--ce-action-accent);
 $accent-border: color-mix(in srgb, var(--ce-action-accent) 38%, transparent);
-$risk: var(--ce-status-error);
-$risk-border: color-mix(in srgb, var(--ce-status-error) 32%, transparent);
 $card-bg: var(--ce-card-bg);
 $card-border: var(--ce-card-border);
 $card-shadow: var(--ce-card-shadow);
+
+// Each kind has one strong colour and one tint of it, shared by the grid, the bands, the cards and the pills. The
+// window is portalled out of the matrix, so it declares them as well.
+.container,
+.riskMatrixCommentModal {
+  --opportunity: var(--ce-status-success);
+  --opportunity-tint: color-mix(in srgb, var(--ce-status-success) 18%, transparent);
+  --risk: var(--ce-status-error);
+  --risk-tint: color-mix(in srgb, var(--ce-status-error) 18%, transparent);
+}
+
+// A column, card or pill of one kind draws from its pair; words on the strong colour take the theme's text paired
+// with it, so they stay readable in every theme.
+.opportunity {
+  --kind: var(--opportunity);
+  --kind-tint: var(--opportunity-tint);
+  --kind-text: var(--ce-status-success-contrast);
+}
+
+.risk {
+  --kind: var(--risk);
+  --kind-tint: var(--risk-tint);
+  --kind-text: var(--ce-status-error-contrast);
+}
+
+// A demo scenario can lean both ways.
+.mixed {
+  --kind: var(--ce-status-warning);
+  --kind-tint: color-mix(in srgb, var(--ce-status-warning) 18%, transparent);
+}
 
 .container {
   color: $text;
@@ -32,6 +59,7 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .sectionCard {
+  padding: 16px;
   background: $card-bg;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-14);
@@ -41,20 +69,14 @@ $card-shadow: var(--ce-card-shadow);
 .sectionTitle {
   margin: 0;
   color: $text;
+  font-size: 1rem;
   line-height: 1.2;
 }
 
-.sectionTitle {
-  font-size: 1rem;
-}
-
 .emptyState {
+  margin: 0;
   color: $muted-text;
   line-height: 1.6;
-}
-
-.sectionCard {
-  padding: 16px;
 }
 
 .gridScroll {
@@ -65,20 +87,13 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .gridContainer,
-.subgridContainer {
+.generatedSeverityGridContainer,
+.detailGrid {
   display: grid;
   gap: 8px;
-  min-width: 980px;
 }
 
 .generatedSeverityGridContainer {
-  display: grid;
-  gap: 8px;
-  width: 100%;
-}
-
-.subgridContainer {
-  min-width: 100%;
   width: 100%;
 }
 
@@ -145,8 +160,6 @@ button.cell {
 
 .gridCell {
   min-height: 88px;
-  align-items: center;
-  justify-content: center;
   padding: 10px;
   background: $surface;
 
@@ -176,13 +189,7 @@ button.cell {
   letter-spacing: 0.02em;
 }
 
-.generatedSeverityList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-}
-
+.generatedSeverityList,
 .generatedSeverityAssessment {
   display: flex;
   flex-direction: column;
@@ -300,28 +307,6 @@ button.cell {
   box-shadow: 0 14px 30px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent);
 }
 
-.modalButton {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  padding: 10px 14px;
-  border-radius: var(--ce-radius-10);
-  font: inherit;
-  cursor: pointer;
-  transition:
-    transform 0.08s ease,
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
-
-  &:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
-  }
-}
-
 .subgridHeader {
   display: flex;
   align-items: center;
@@ -377,11 +362,11 @@ button.cell {
 }
 
 .detailSwatchOpportunity {
-  background: color-mix(in srgb, var(--ce-risk-opportunity-color, var(--ce-status-success)) 75%, transparent);
+  background: var(--opportunity);
 }
 
 .detailSwatchRisk {
-  background: color-mix(in srgb, var(--ce-risk-danger-color, var(--ce-status-danger)) 75%, transparent);
+  background: var(--risk);
 }
 
 .detailSwatchEmpty {
@@ -398,25 +383,9 @@ button.cell {
   font-size: 0.88rem;
 }
 
-.detailClear {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border-radius: var(--ce-radius-pill);
-  background: $card-bg;
-  color: $text;
-  font: inherit;
-  cursor: pointer;
-
-  &:hover::after {
-    border-color: $accent;
-  }
-}
-
 .detailGrid {
-  min-width: 0;
   gap: 6px;
+  width: 100%;
   // Room for the focus ring, which the scroll box would clip at its edges.
   padding: 5px;
 }
@@ -458,6 +427,22 @@ button.cell {
   }
 }
 
+.detailClear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--ce-radius-pill);
+  background: $card-bg;
+  color: $text;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover::after {
+    border-color: $accent;
+  }
+}
+
 .detailHeading {
   min-height: 56px;
   background: $card-bg;
@@ -485,13 +470,10 @@ button.cell {
 .detailCellEmpty {
   background: transparent;
 
-  &::after {
+  &::after,
+  &.detailCellHighlighted::after {
     border-style: dashed;
   }
-}
-
-.detailCellEmpty.detailCellHighlighted::after {
-  border-style: dashed;
 }
 
 .detailNoteCount {
@@ -507,6 +489,7 @@ button.cell {
   font-size: 0.78rem;
 }
 
+// The window over a cell's notes. Bootstrap's own modal rules weigh as much or more, hence !important.
 .riskMatrixBackdrop {
   position: fixed !important;
   top: 0 !important;
@@ -534,94 +517,302 @@ button.cell {
 
   :global(.modal-dialog) {
     max-width: 920px;
-    width: 90%;
+    width: calc(100% - 16px);
     margin: auto;
     pointer-events: auto;
   }
 }
 
+// The theme frames the window; its own surface fills it, clipped to the theme's corners.
 .riskMatrixModalContent {
-  background: $background !important;
-  border: 1px solid $card-border !important;
-  border-radius: var(--ce-radius-14) !important;
-  box-shadow: 0 24px 60px color-mix(in srgb, var(--ce-compat-dark) 40%, transparent) !important;
-  color: $text !important;
-  overflow: hidden !important;
+  overflow: hidden;
 }
 
-.riskMatrixModalHeader {
+.modalSurface {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: $background;
+  color: $text;
+}
+
+.modalHeader {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 20px 0;
-  margin-bottom: 18px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--ce-action-accent) 8%, transparent), transparent);
-  color: $text;
-  border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-}
-
-.riskMatrixModalBody {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 0 20px 20px;
-}
-
-.modalTitleBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
 }
 
 .modalTitle {
   margin: 0;
   color: $text;
   font-size: 1.4rem;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .modalMeta {
+  margin: 4px 0 0;
   color: $muted-text;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
 }
 
-.atlasScenarioRail {
-  display: block;
+.modalCloseButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  color: $text;
+  font-size: 1.35rem;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, var(--ce-panel-text) 10%, transparent);
+  }
 }
 
-.atlasScenarioGrid {
+// Opportunities and risks side by side, one above the other where two do not fit.
+.noteColumns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  align-items: start;
+  gap: 16px;
 }
 
-.atlasScenarioCard {
+.noteColumn,
+.noteList {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  border-radius: var(--ce-radius-14);
-  background: color-mix(in srgb, var(--ce-overlay-base) 78%, transparent);
-  transition:
-    border-color 0.18s ease,
-    background-color 0.18s ease;
+}
 
-  &:hover,
-  &:focus-within {
-    border-color: color-mix(in srgb, var(--ce-status-info-text) 24%, transparent);
-    background: color-mix(in srgb, var(--ce-overlay-base) 88%, transparent);
+.noteList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.noteBandHeading {
+  margin: 0;
+}
+
+.noteBand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  background: var(--kind);
+  color: var(--kind-text);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover .noteBandTitle {
+    text-decoration: underline;
   }
 }
 
+.noteBandTitle {
+  flex: 1;
+}
+
+// The band's own pair, turned round.
+.noteBandCount {
+  min-width: 30px;
+  padding: 2px 8px;
+  border-radius: var(--ce-radius-pill);
+  background: var(--kind-text);
+  color: var(--kind);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.noteCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid $card-border;
+  border-left: 6px solid var(--kind);
+  border-radius: var(--ce-radius-10);
+  background: $surface;
+  color: $text;
+}
+
+.noteTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.kindPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 10px;
+  border-radius: var(--ce-radius-pill);
+  background: var(--kind-tint);
+  color: $text;
+  font-size: 0.82rem;
+  font-weight: 700;
+
+  svg {
+    color: var(--kind);
+  }
+}
+
+.noteEyebrow {
+  color: $muted-text;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.noteIntensity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.meter {
+  display: inline-flex;
+  gap: 2px;
+
+  > span {
+    width: 8px;
+    height: 10px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--ce-panel-text) 18%, transparent);
+  }
+
+  > .meterOn {
+    background: var(--kind);
+  }
+}
+
+.noteTitle {
+  margin: 0;
+  color: $text;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.noteText {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.noteMuted {
+  margin: 0;
+  color: $muted-text;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.noteLink {
+  color: var(--ce-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:hover {
+    text-decoration-thickness: 2px;
+  }
+}
+
+.noteAtlasLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.commentFigureRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.commentFigureAvatar,
+.commentFigureAvatarFallback {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-pill);
+}
+
+.commentFigureAvatar {
+  display: block;
+  object-fit: cover;
+}
+
+.commentFigureAvatarFallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.commentFigureCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.commentFigureName {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+// The demo's scenarios: each a card of its own above the notes, linked to a node of the demo atlas.
+.atlasScenarioGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+}
+
+.atlasScenarioCard,
 .atlasScenarioContent {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+}
+
+.atlasScenarioCard {
+  padding: 14px;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-14);
+  background: $surface;
 }
 
 .atlasScenarioHeader {
@@ -644,10 +835,8 @@ button.cell {
   flex: 0 0 96px;
   width: 96px;
   height: 96px;
-  min-height: 96px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  border: 1px solid $card-border;
   border-radius: var(--ce-radius-10);
-  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
 }
 
 .atlasScenarioImage {
@@ -660,7 +849,7 @@ button.cell {
   align-items: center;
   justify-content: center;
   padding: 12px;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: $muted-text;
   font-size: 0.82rem;
   font-weight: 800;
   text-align: center;
@@ -674,7 +863,8 @@ button.cell {
   flex: 1 1 auto;
 }
 
-.atlasScenarioNodeLabel {
+.atlasScenarioNodeLabel,
+.atlasScenarioMechanism span {
   color: $muted-text;
   font-size: 0.72rem;
   font-weight: 700;
@@ -683,35 +873,11 @@ button.cell {
 }
 
 .atlasScenarioValence {
-  flex: 0 0 auto;
+  flex: none;
   align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 4px 10px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 9%, transparent);
-  border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-overlay-base) 62%, transparent);
-  color: $text;
   font-size: 0.74rem;
-  font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-}
-
-.atlasScenarioValenceRisk {
-  border-color: color-mix(in srgb, var(--ce-status-error) 22%, transparent) !important;
-  color: var(--ce-status-danger-text);
-}
-
-.atlasScenarioValenceOpportunity {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 22%, transparent) !important;
-  color: var(--ce-status-success-text);
-}
-
-.atlasScenarioValenceMixed {
-  border-color: color-mix(in srgb, var(--ce-status-warning) 24%, transparent) !important;
-  color: color-mix(in srgb, var(--ce-status-warning-text) 96%, transparent);
 }
 
 .atlasScenarioTitle {
@@ -721,29 +887,26 @@ button.cell {
   line-height: 1.28;
 }
 
-.atlasScenarioSummary {
+.atlasScenarioSummary,
+.atlasScenarioMechanism p {
   margin: 0;
-  color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
   font-size: 0.88rem;
   line-height: 1.5;
 }
 
-.atlasScenarioMetaLine {
+.atlasScenarioMetaLine,
+.atlasScenarioAnchors {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
+  gap: 6px 8px;
 }
 
 .atlasScenarioMetaPill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
   padding: 3px 9px;
-  border: 1px solid color-mix(in srgb, var(--ce-status-info-text) 18%, transparent);
+  border: 1px solid $card-border;
   border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
   font-size: 0.74rem;
   font-weight: 700;
   line-height: 1.2;
@@ -753,28 +916,6 @@ button.cell {
   display: flex;
   flex-direction: column;
   gap: 4px;
-
-  span {
-    display: block;
-    color: $muted-text;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  p {
-    margin: 0;
-    color: color-mix(in srgb, var(--ce-control-text) 86%, transparent);
-    font-size: 0.82rem;
-    line-height: 1.5;
-  }
-}
-
-.atlasScenarioAnchors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .atlasScenarioAnchorChip {
@@ -786,12 +927,11 @@ button.cell {
 }
 
 .atlasScenarioAnchorAvatar {
-  flex: 0 0 auto;
+  flex: none;
   width: 32px;
   height: 32px;
   border-radius: var(--ce-radius-round);
   object-fit: cover;
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
 }
 
 .atlasScenarioAnchorCopy {
@@ -801,7 +941,6 @@ button.cell {
 }
 
 .atlasScenarioAnchorName {
-  color: $text;
   font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.2;
@@ -815,33 +954,27 @@ button.cell {
 
 .atlasScenarioLink {
   appearance: none;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
   gap: 8px;
   margin-top: auto;
   padding: 0;
   border: 0;
   background: transparent;
-  color: $accent;
+  color: var(--ce-link);
   font-size: 0.82rem;
   font-weight: 800;
   text-decoration: none;
-  transition:
-    color 0.18s ease,
-    opacity 0.18s ease;
+  cursor: pointer;
 
   &:hover,
   &:focus-visible {
-    outline: none;
-    color: var(--ce-status-success-text);
-    opacity: 1;
+    text-decoration: underline;
   }
 }
 
 .atlasScenarioLinkIcon {
-  flex: 0 0 auto;
+  flex: none;
   font-size: 0.86rem;
 }
 
@@ -851,347 +984,20 @@ button.cell {
 }
 
 .atlasScenarioLinkIconTrailing {
-  flex: 0 0 auto;
+  flex: none;
   font-size: 0.72rem;
   opacity: 0.72;
 }
 
-.modalCloseButton {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  border-radius: var(--ce-radius-10);
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
-  color: $text;
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    transform 0.08s ease;
-
-  &:hover,
-  &:focus-visible {
-    outline: none;
-    border-color: $accent-border;
-    background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-    transform: translateY(-1px);
-  }
-}
-
-.emptyState {
-  margin: 8px 0 0;
-}
-
-.commentSections {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.commentSection {
-  padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  border-radius: var(--ce-radius-14);
-  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
-}
-
-.commentSectionOpportunity {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-base) 28%, transparent);
-}
-
-.commentSectionRisk {
-  border-color: color-mix(in srgb, var(--ce-status-error) 18%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-base) 28%, transparent);
-}
-
-.commentSectionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  margin-bottom: 12px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: $text;
-  text-align: left;
-  cursor: pointer;
-  flex-wrap: wrap;
-
-  &:hover .commentSectionTitle,
-  &:focus-visible .commentSectionTitle {
-    color: $accent;
-  }
-
-  &:focus-visible {
-    outline: 2px solid $accent-border;
-    outline-offset: 4px;
-    border-radius: var(--ce-radius-8);
-  }
-}
-
-.commentSectionHeaderText {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.commentSectionChevron {
-  flex: 0 0 auto;
-  color: $accent;
-  font-size: 0.9rem;
-}
-
-.commentSectionTitle {
-  margin: 0;
-  color: $text;
-  font-size: 1.18rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.commentSectionCount {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  padding: 4px 10px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
-  color: $muted-text;
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
-.commentList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.commentItem {
-  padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  border-radius: var(--ce-radius-14);
-  background: color-mix(in srgb, var(--ce-overlay-base) 92%, transparent);
-  box-shadow: $card-shadow;
-  transition:
-    border-color 0.18s ease,
-    transform 0.08s ease,
-    box-shadow 0.18s ease;
-
-  &:hover,
-  &:focus-within {
-    transform: translateY(-1px);
-  }
-}
-
-.commentItemOpportunity {
-  border-color: $accent-border;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--ce-action-accent) 9%, transparent),
-      color-mix(in srgb, var(--ce-action-accent) 2%, transparent)
-    ),
-    color-mix(in srgb, var(--ce-overlay-base) 96%, transparent);
-}
-
-.commentItemRisk {
-  border-color: $risk-border;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--ce-status-error) 9%, transparent),
-      color-mix(in srgb, var(--ce-status-error) 2%, transparent)
-    ),
-    color-mix(in srgb, var(--ce-overlay-base) 96%, transparent);
-}
-
-.commentHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.commentHeaderMain {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  flex: 1 1 240px;
-}
-
-.commentEyebrow {
-  color: $muted-text;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.commentCardTitle {
-  margin: 0;
-  color: $text;
-  font-size: 0.96rem;
-  line-height: 1.35;
-}
-
-.commentHeaderMeta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.commentBadge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 4px 10px;
-  border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-overlay-base) 72%, transparent);
-  color: $text;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.commentIntensity {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 4px 10px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-overlay-base) 38%, transparent);
-  color: $muted-text;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.emptyState {
-  color: $muted-text;
-}
-
-.commentText {
-  margin: 12px 0 0;
-  color: $text;
-  line-height: 1.55;
-}
-
-.commentHolders {
-  margin: 8px 0 0;
-  color: $muted-text;
-  font-size: 0.82rem;
-}
-
-.commentFigureRow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.commentFigureAvatar,
-.commentFigureAvatarFallback {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--ce-radius-pill);
-  flex: 0 0 auto;
-}
-
-.commentFigureAvatar {
-  display: block;
-  object-fit: cover;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-}
-
-.commentFigureAvatarFallback {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-base) 54%, transparent);
-  color: $text;
-  font-size: 0.92rem;
-  font-weight: 800;
-}
-
-.commentFigureCopy {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.commentFigureName {
-  color: $text;
-  font-size: 0.92rem;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.commentFigureRole {
-  color: color-mix(in srgb, var(--ce-control-text) 74%, transparent);
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
-.commentReferenceLine {
-  margin-top: 12px;
-  color: color-mix(in srgb, var(--ce-status-info) 90%, transparent);
-  font-size: 0.76rem;
-  line-height: 1.45;
-  font-style: italic;
-}
-
-.commentReferenceLink {
-  color: var(--ce-status-info-text);
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--ce-action-accent) 72%, transparent);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-
-  &:hover,
-  &:focus {
-    color: var(--ce-text-inverse);
-    text-decoration-color: var(--ce-action-accent);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--ce-action-accent);
-    outline-offset: 3px;
-    border-radius: var(--ce-radius-4);
-  }
-}
-
-.modalComposer {
+// The demo's composer, for a note of one's own on a square.
+.modalComposer,
+.modalInputGroup {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 .modalInputGroup {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
 }
 
@@ -1213,12 +1019,8 @@ button.cell {
   color: $accent;
 }
 
-.commentInput,
-.intensityInput {
-  width: 100%;
-}
-
 .commentInput {
+  width: 100%;
   min-height: 120px;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
@@ -1260,15 +1062,23 @@ button.cell {
   }
 }
 
+@mixin range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid $background;
+  border-radius: var(--ce-radius-pill);
+  background: $text;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
+  cursor: pointer;
+}
+
+// From risk to opportunity, in the kinds' own colours.
 .intensityInput {
   appearance: none;
+  width: 100%;
   height: 8px;
   border-radius: var(--ce-radius-pill);
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--ce-status-error) 85%, transparent),
-    color-mix(in srgb, var(--ce-action-accent) 92%, transparent)
-  );
+  background: linear-gradient(90deg, var(--risk), var(--opportunity));
 
   &:focus {
     outline: none;
@@ -1276,65 +1086,38 @@ button.cell {
 
   &::-webkit-slider-thumb {
     appearance: none;
-    width: 18px;
-    height: 18px;
-    border: 2px solid $background;
-    border-radius: var(--ce-radius-pill);
-    background: $text;
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
-    cursor: pointer;
+    @include range-thumb;
   }
 
   &::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border: 2px solid $background;
-    border-radius: var(--ce-radius-pill);
-    background: $text;
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
-    cursor: pointer;
+    @include range-thumb;
   }
 }
 
-.riskMatrixModalFooter {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 4px;
-}
-
 .modalButton {
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
+  appearance: none;
+  align-self: flex-end;
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid $accent-border;
+  border-radius: var(--ce-radius-10);
+  background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
   color: $text;
+  font: inherit;
+  cursor: pointer;
 
   &:hover:not(:disabled) {
-    transform: translateY(-1px);
+    background: color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
   }
 
   &:disabled {
     cursor: not-allowed;
     opacity: 0.5;
-    transform: none;
-  }
-}
-
-.modalButtonPrimary {
-  border-color: $accent-border;
-  background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
-  color: $text;
-
-  &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
-  }
-}
-
-.modalButtonSecondary {
-  color: $muted-text;
-
-  &:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
-    background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   }
 }
 
@@ -1343,8 +1126,9 @@ button.cell {
     padding: 18px 12px 30px;
   }
 
+  .modalSurface,
   .atlasScenarioCard {
-    padding: 12px;
+    padding: 16px;
   }
 
   .atlasScenarioHeader {
@@ -1355,22 +1139,9 @@ button.cell {
     width: 100%;
   }
 
-  .atlasScenarioValence {
-    align-self: flex-start;
-  }
-
   .gridContainer,
-  .subgridContainer,
   .generatedSeverityGridContainer {
     gap: 6px;
-  }
-
-  .riskMatrixModalHeader {
-    padding: 16px 16px 0;
-  }
-
-  .riskMatrixModalBody {
-    padding: 0 16px 16px;
   }
 }
 
@@ -1383,7 +1154,6 @@ button.cell {
   .atlasScenarioImageFallback {
     width: 100%;
     height: 120px;
-    min-height: 120px;
   }
 
   .gridCell {
@@ -1473,67 +1243,5 @@ button.cell {
     display: flex;
     align-items: center;
     align-self: stretch;
-  }
-}
-
-@container ce-theme style(--ce-layout-profile: minimal-app) or style(--ce-layout-profile: desktop-window) {
-  .container {
-    // Keep the full heatmap intensity range readable with dark labels.
-    --ce-risk-opportunity-color: color-mix(in srgb, var(--ce-status-success) 60%, var(--ce-surface));
-    --ce-risk-danger-color: color-mix(in srgb, var(--ce-status-danger) 60%, var(--ce-surface));
-  }
-
-  .diagonalCell {
-    color: var(--ce-document-text-muted);
-  }
-
-  .atlasScenarioCard,
-  .atlasScenarioCard:hover,
-  .atlasScenarioCard:focus-within,
-  .commentItem,
-  .commentItemOpportunity,
-  .commentItemRisk {
-    background: var(--ce-document-surface);
-    border-color: var(--ce-document-border);
-  }
-
-  .commentSectionOpportunity,
-  .commentSectionRisk {
-    background: var(--ce-surface);
-  }
-
-  .atlasScenarioValence,
-  .atlasScenarioMetaPill,
-  .commentSectionCount,
-  .commentBadge,
-  .commentIntensity,
-  .commentFigureAvatarFallback {
-    background: var(--ce-control-face);
-    color: var(--ce-control-text);
-  }
-
-  .atlasScenarioValenceRisk {
-    background: var(--ce-response-disagree-bg);
-    color: var(--ce-response-disagree-text);
-  }
-
-  .atlasScenarioValenceOpportunity {
-    background: var(--ce-response-agree-bg);
-    color: var(--ce-response-agree-text);
-  }
-
-  .atlasScenarioValenceMixed {
-    background: var(--ce-response-unsure-bg);
-    color: var(--ce-response-unsure-text);
-  }
-
-  .commentReferenceLine,
-  .commentReferenceLink,
-  .commentReferenceLink:hover,
-  .commentReferenceLink:focus,
-  .commentSectionChevron,
-  .commentSectionHeader:hover .commentSectionTitle,
-  .commentSectionHeader:focus-visible .commentSectionTitle {
-    color: var(--ce-link);
   }
 }

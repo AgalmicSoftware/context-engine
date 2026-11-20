@@ -37,13 +37,12 @@ const balanceOf = (notes: Note[]) =>
 export const formatRiskBalance = (value: number) =>
   value > 0 ? `▲ +${value}` : value < 0 ? `▼ -${Math.abs(value)}` : '±0';
 
-const fillFor = (value: number, max: number) => {
+// A square's fill: its kind's colour (declared on the matrix), from 45% for the faintest balance to full for the
+// strongest. Its figure sits on a surface of its own, so it stays readable on any fill.
+export const riskCellFill = (value: number, max: number) => {
   if (value === 0) return undefined;
-  const share = 35 + Math.min(Math.abs(value) / max, 1) * 55;
-  const color =
-    value > 0
-      ? 'var(--ce-risk-opportunity-color, var(--ce-status-success))'
-      : 'var(--ce-risk-danger-color, var(--ce-status-danger))';
+  const share = Math.round(45 + Math.min(Math.abs(value) / max, 1) * 55);
+  const color = value > 0 ? 'var(--opportunity)' : 'var(--risk)';
   return `color-mix(in srgb, ${color} ${share}%, transparent)`;
 };
 
@@ -152,7 +151,7 @@ export default function RiskMatrixDetail(props: Props) {
       <div className={`${styles.gridScroll} ${styles.pinnedScroll}`}>
         <div
           ref={gridRef}
-          className={clsx(styles.subgridContainer, styles.detailGrid)}
+          className={styles.detailGrid}
           style={{
             gridTemplateColumns: `minmax(112px, 0.9fr) repeat(${columns.subcategories.length}, minmax(96px, 1fr))`,
             // At least its columns' least widths, so a label pinned on a phone travels the whole scroll.
@@ -190,7 +189,7 @@ export default function RiskMatrixDetail(props: Props) {
                     (subX === highlightedColumn || subY === highlightedRow) && styles.detailCellHighlighted,
                   )}
                   data-ce-control-appearance="frameless"
-                  style={{ backgroundColor: fillFor(value, max) }}
+                  style={{ backgroundColor: riskCellFill(value, max) }}
                   data-testid={`ce-risk-matrix-subcell-${testIdFragment(columns.name)}-${testIdFragment(subX)}-vs-${testIdFragment(rows.name)}-${testIdFragment(subY)}`}
                   aria-label={props.cellLabel(subX, subY, value, notes.length)}
                   onClick={() => props.onOpenCell(subY, subX)}

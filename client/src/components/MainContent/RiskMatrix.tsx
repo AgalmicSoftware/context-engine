@@ -3,10 +3,20 @@
 import React, { Component } from 'react';
 import { Modal } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faExternalLinkAlt, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
+import {
+  faArrowRight,
+  faCaretDown,
+  faCaretUp,
+  faExclamationTriangle,
+  faExternalLinkAlt,
+  faNetworkWired,
+  faSeedling,
+  faTimes,
+} from '@fortawesome/free-solid-svg-icons';
 
 import styles from './RiskMatrix.module.scss';
-import RiskMatrixDetail from './RiskMatrixDetail';
+import RiskMatrixDetail, { riskCellFill } from './RiskMatrixDetail';
+import { findAtlasTopicForQuestions, type RiskMatrixAtlasTopic } from '../../domains/riskMatrix/riskMatrixAtlasTopic';
 import RiskMatrixGeneratedSeverity, {
   type RiskMatrixSeverityAssessment,
   type RiskMatrixSeverityAxes,
@@ -37,6 +47,8 @@ export type RiskCommentRecord = {
   corpusRefs?: RiskMatrixCorpusRef[];
   /** How many participants hold the note, where the caller counted them. */
   participantCount?: number;
+  /** The stored ids of the questions the note rests on, where its build kept them. */
+  questionIds?: string[];
 };
 
 export type RiskMatrixRestoreState = {
@@ -58,6 +70,8 @@ export type RiskCategory = {
 };
 
 type RiskMatrixProps = {
+  /** A built atlas's topics: a note whose questions one holds links to it, through onOpenAtlasNode. */
+  atlasTopics?: RiskMatrixAtlasTopic[] | null;
   categories?: RiskCategory[] | null;
   commentEyebrow?: string;
   embedded?: boolean;
@@ -130,8 +144,16 @@ const DEFAULT_VALENCE: RiskValence = 'opportunity';
 const DEFAULT_INTENSITY = 5;
 const VALID_VALENCES = new Set(['opportunity', 'risk']);
 const SEVERITY_LEVELS: RiskSeverityLevel[] = ['low', 'medium', 'high'];
+const INTENSITY_STEPS = Array.from({ length: 10 }, (_, index) => index);
+
+// Each kind carries its icon and word as well as its colour.
+const KINDS = {
+  opportunity: { word: 'Opportunity', title: 'Opportunities', icon: faSeedling, empty: 'No opportunities here.' },
+  risk: { word: 'Risk', title: 'Risks', icon: faExclamationTriangle, empty: 'No risks here.' },
+};
 
 const clsx = (...args: Array<string | false | null | undefined>) => args.filter(Boolean).join(' ');
+const countOf = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 const toTestIdFragment = (value = '') =>
   String(value)
@@ -154,6 +176,7 @@ const normalizeCommentRecord = (entry: RiskCommentRecord): RiskCommentRecord => 
   historicalFigure: entry.historicalFigure || null,
   corpusRefs: Array.isArray(entry.corpusRefs) ? entry.corpusRefs : [],
   ...(Number(entry.participantCount) > 0 ? { participantCount: Number(entry.participantCount) } : {}),
+  ...(Array.isArray(entry.questionIds) && entry.questionIds.length ? { questionIds: entry.questionIds } : {}),
 });
 
 const isValidCommentRecord = (entry: unknown): entry is RiskCommentRecord => {
@@ -537,18 +560,10 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
       hoveredColIndex: null,
     });
 
-  getColorByValue = (value: number) => {
-    if (value === 0) return undefined;
-
-    const maxMagnitude = this.getHeatmapMaxMagnitude();
-    const ratio = Math.min(Math.abs(value) / maxMagnitude, 1);
-    const opacity = 0.35 + ratio * 0.55;
-
-    if (value > 0) {
-      return `color-mix(in srgb, var(--ce-risk-opportunity-color, var(--ce-status-success)) ${opacity * 100}%, transparent)`;
-    }
-
-    return `color-mix(in srgb, var(--ce-risk-danger-color, var(--ce-status-danger)) ${opacity * 100}%, transparent)`;
+  // A note's link to its atlas topic leaves the matrix for the atlas, so the window shuts first.
+  openAtlasTopic = (nodeId: string) => {
+    this.closeModal();
+    this.props.onOpenAtlasNode?.(nodeId);
   };
 
   renderMainGrid = () => {
@@ -652,7 +667,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                       style={{
                         gridColumn: colIndex + 2,
                         gridRow: rowIndex + 2,
-                        backgroundColor: this.getColorByValue(cellValue),
+                        backgroundColor: riskCellFill(cellValue, this.getHeatmapMaxMagnitude()),
                       }}
                       data-testid={`ce-risk-matrix-cell-${toTestIdFragment(catX.name)}-vs-${toTestIdFragment(catY.name)}`}
                       aria-label={this.getCellAriaLabel(catX.name, catY.name, cellValue)}
@@ -767,6 +782,16 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
             onChange={this.handleIntensityChange}
           />
         </div>
+
+        <button
+          type="button"
+          className={styles.modalButton}
+          data-testid="ce-risk-matrix-save-comment"
+          disabled={!comment.trim()}
+          onClick={this.handleSaveComment}
+        >
+          Save
+        </button>
       </div>
     );
   };
@@ -776,7 +801,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     const { onOpenAtlasNode = null } = this.props;
 
     return (
-      <section className={styles.atlasScenarioRail} aria-label="Related atlas scenario visualizations">
+      <section aria-label="Related atlas scenario visualizations">
         <div className={styles.atlasScenarioGrid}>
           {scenarios.map((scenario) => {
             const atlasHref = buildAtlasNodeRoute(scenario.atlasNodeId, {
@@ -820,14 +845,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                         </div>
                       </div>
                     </div>
-                    <span
-                      className={clsx(
-                        styles.atlasScenarioValence,
-                        scenario.valence === 'risk' && styles.atlasScenarioValenceRisk,
-                        scenario.valence === 'opportunity' && styles.atlasScenarioValenceOpportunity,
-                        scenario.valence === 'mixed' && styles.atlasScenarioValenceMixed,
-                      )}
-                    >
+                    <span className={clsx(styles.kindPill, styles.atlasScenarioValence, styles[scenario.valence])}>
                       {scenario.valence}
                     </span>
                   </div>
@@ -885,130 +903,124 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     );
   };
 
-  renderCommentGroup = (
-    title: string,
-    entries: RiskCommentRecord[],
-    isAggregateSelection: boolean,
-    valence: RiskValence,
-  ) => {
-    if (!Array.isArray(entries) || entries.length === 0) return null;
-
-    const isOpen = this.state.openCommentGroups[valence] !== false;
-    const listId = `ce-risk-matrix-comment-list-${valence}`;
-    const commentEyebrow = this.props.commentEyebrow || 'Seeded note';
+  renderNote = (entry: RiskCommentRecord, key: string, isAggregateSelection: boolean) => {
+    const { atlasTopics = null, commentEyebrow, onOpenAtlasNode = null } = this.props;
+    const kind = KINDS[entry.valence];
+    const topic =
+      typeof onOpenAtlasNode === 'function' ? findAtlasTopicForQuestions(entry.questionIds, atlasTopics || []) : null;
+    const figureName = String(entry.historicalFigure?.name || '').trim();
+    const figureAvatar = figureName ? getHistoricalFigureAvatarByName(figureName) : '';
+    const corpusRefs = Array.isArray(entry.corpusRefs) ? entry.corpusRefs.filter(Boolean) : [];
+    const sourceCitations = getRiskMatrixCorpusSourceCitationItems(corpusRefs).slice(0, 2);
 
     return (
-      <section
-        className={clsx(
-          styles.commentSection,
-          valence === 'opportunity' && styles.commentSectionOpportunity,
-          valence === 'risk' && styles.commentSectionRisk,
-        )}
-      >
-        <button
-          type="button"
-          className={styles.commentSectionHeader}
-          aria-expanded={isOpen}
-          aria-controls={listId}
-          onClick={() => this.toggleCommentGroup(valence)}
-        >
-          <span className={styles.commentSectionHeaderText}>
-            <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} className={styles.commentSectionChevron} />
-            <span className={styles.commentSectionTitle}>{title}</span>
+      <li key={key} className={styles.noteCard} data-testid="ce-risk-matrix-note">
+        <div className={styles.noteTop}>
+          <span className={styles.kindPill}>
+            <FontAwesomeIcon icon={kind.icon} aria-hidden="true" /> {kind.word}
           </span>
-          <span className={styles.commentSectionCount}>
-            {entries.length} note{entries.length === 1 ? '' : 's'}
+          <span className={styles.noteEyebrow}>
+            {isAggregateSelection ? 'Sub-overlap' : commentEyebrow || 'Seeded note'}
           </span>
-        </button>
-        {isOpen && (
-          <ul id={listId} className={styles.commentList} data-testid={listId}>
-            {entries.map((entry, index) =>
-              (() => {
-                const figureName = String(entry.historicalFigure?.name || '').trim();
-                const figureAvatar = figureName ? getHistoricalFigureAvatarByName(figureName) : '';
-                const corpusRefs = Array.isArray(entry.corpusRefs) ? entry.corpusRefs.filter(Boolean) : [];
-                const sourceCitations = getRiskMatrixCorpusSourceCitationItems(corpusRefs).slice(0, 2);
+          {/* The meter is drawn for the eye; the words say the same. */}
+          <span className={styles.noteIntensity}>
+            <span className={styles.meter} aria-hidden="true">
+              {INTENSITY_STEPS.map((step) => (
+                <span key={step} className={step < Math.round(entry.intensity) ? styles.meterOn : undefined} />
+              ))}
+            </span>
+            Intensity {entry.intensity}
+          </span>
+        </div>
+        <h5 className={styles.noteTitle}>
+          {isAggregateSelection ? formatCellPath(entry.cell) : `${kind.word} signal`}
+        </h5>
+        <p className={styles.noteText}>{entry.comment}</p>
+        {entry.participantCount ? (
+          <p className={styles.noteMuted}>From {countOf(entry.participantCount, 'participant', 'participants')}</p>
+        ) : null}
 
-                return (
-                  <li
-                    key={`${title}-${entry.cell}-${index}`}
-                    className={clsx(
-                      styles.commentItem,
-                      entry.valence === 'opportunity' && styles.commentItemOpportunity,
-                      entry.valence === 'risk' && styles.commentItemRisk,
-                    )}
-                  >
-                    <div className={styles.commentHeader}>
-                      <div className={styles.commentHeaderMain}>
-                        <span className={styles.commentEyebrow}>
-                          {isAggregateSelection ? 'Sub-overlap' : commentEyebrow}
-                        </span>
-                        <h5 className={styles.commentCardTitle}>
-                          {isAggregateSelection
-                            ? formatCellPath(entry.cell)
-                            : entry.valence === 'opportunity'
-                              ? 'Opportunity signal'
-                              : 'Risk signal'}
-                        </h5>
-                      </div>
-                      <div className={styles.commentHeaderMeta}>
-                        <span className={styles.commentIntensity}>Intensity {entry.intensity}</span>
-                        <span className={styles.commentBadge}>
-                          {entry.valence === 'opportunity' ? 'Opportunity' : 'Risk'}
-                        </span>
-                      </div>
-                    </div>
-                    <p className={styles.commentText}>{entry.comment}</p>
-                    {entry.participantCount ? (
-                      <p className={styles.commentHolders}>
-                        From {entry.participantCount} participant{entry.participantCount === 1 ? '' : 's'}
-                      </p>
-                    ) : null}
-
-                    {figureName && (
-                      <div className={styles.commentFigureRow}>
-                        {figureAvatar ? (
-                          <img className={styles.commentFigureAvatar} src={figureAvatar} alt={figureName} />
-                        ) : (
-                          <div className={styles.commentFigureAvatarFallback} aria-hidden="true">
-                            {figureName.charAt(0)}
-                          </div>
-                        )}
-                        <div className={styles.commentFigureCopy}>
-                          <span className={styles.commentFigureName}>{figureName}</span>
-                          {entry.historicalFigure?.role && (
-                            <span className={styles.commentFigureRole}>{entry.historicalFigure.role}</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {sourceCitations.length > 0 && (
-                      <div className={styles.commentReferenceLine}>
-                        {sourceCitations.length > 1 ? 'Sources: ' : 'Source: '}
-                        {sourceCitations.map((citation, citationIndex) => (
-                          <React.Fragment key={`${citation.label}-${citation.url || citationIndex}`}>
-                            {citationIndex > 0 && <span aria-hidden="true"> • </span>}
-                            {citation.url ? (
-                              <a
-                                className={styles.commentReferenceLink}
-                                href={citation.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {citation.label}
-                              </a>
-                            ) : (
-                              <span>{citation.label}</span>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    )}
-                  </li>
-                );
-              })(),
+        {figureName && (
+          <div className={styles.commentFigureRow}>
+            {figureAvatar ? (
+              <img className={styles.commentFigureAvatar} src={figureAvatar} alt={figureName} />
+            ) : (
+              <div className={styles.commentFigureAvatarFallback} aria-hidden="true">
+                {figureName.charAt(0)}
+              </div>
             )}
+            <div className={styles.commentFigureCopy}>
+              <span className={styles.commentFigureName}>{figureName}</span>
+              {entry.historicalFigure?.role && <span className={styles.noteMuted}>{entry.historicalFigure.role}</span>}
+            </div>
+          </div>
+        )}
+
+        {sourceCitations.length > 0 && (
+          <div className={styles.noteMuted}>
+            {sourceCitations.length > 1 ? 'Sources: ' : 'Source: '}
+            {sourceCitations.map((citation, citationIndex) => (
+              <React.Fragment key={`${citation.label}-${citation.url || citationIndex}`}>
+                {citationIndex > 0 && <span aria-hidden="true"> • </span>}
+                {citation.url ? (
+                  <a className={styles.noteLink} href={citation.url} target="_blank" rel="noopener noreferrer">
+                    {citation.label}
+                  </a>
+                ) : (
+                  <span>{citation.label}</span>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+
+        {topic ? (
+          <button
+            type="button"
+            className={clsx(styles.noteLink, styles.noteAtlasLink)}
+            data-ce-control-appearance="frameless"
+            data-testid="ce-risk-matrix-note-atlas-link"
+            onClick={() => this.openAtlasTopic(topic.nodeId)}
+          >
+            Open in the atlas: {topic.label}
+            <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" />
+          </button>
+        ) : null}
+      </li>
+    );
+  };
+
+  // One column per kind, under a band of its colour that folds its notes away.
+  renderNoteColumn = (valence: RiskValence, entries: RiskCommentRecord[], isAggregateSelection: boolean) => {
+    const kind = KINDS[valence];
+    const isOpen = this.state.openCommentGroups[valence] !== false;
+    const listId = `ce-risk-matrix-comment-list-${valence}`;
+
+    return (
+      <section className={clsx(styles.noteColumn, styles[valence])}>
+        <h4 className={styles.noteBandHeading}>
+          <button
+            type="button"
+            className={styles.noteBand}
+            data-ce-control-appearance="frameless"
+            aria-expanded={isOpen}
+            aria-controls={listId}
+            aria-label={`${kind.title}, ${countOf(entries.length, 'note', 'notes')}`}
+            onClick={() => this.toggleCommentGroup(valence)}
+          >
+            <FontAwesomeIcon icon={kind.icon} aria-hidden="true" />
+            <span className={styles.noteBandTitle}>{kind.title}</span>
+            <span className={styles.noteBandCount}>{entries.length}</span>
+            <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} aria-hidden="true" />
+          </button>
+        </h4>
+        {!isOpen ? null : entries.length === 0 ? (
+          <p id={listId} className={styles.emptyState}>
+            {kind.empty}
+          </p>
+        ) : (
+          <ul id={listId} className={styles.noteList} data-testid={listId}>
+            {entries.map((entry, index) => this.renderNote(entry, `${entry.cell}-${index}`, isAggregateSelection))}
           </ul>
         )}
       </section>
@@ -1016,22 +1028,23 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
   };
 
   renderModal = () => {
-    const { comment, existingComments, modal, selectedCellId } = this.state;
-    const { readOnly = false } = this.props;
+    const { existingComments, modal, selectedCellId } = this.state;
 
     const isAggregateSelection = isAggregateCellId(selectedCellId);
-    const canSaveComment = !readOnly && !isAggregateSelection && comment.trim().length > 0;
-    const modalTitle = formatSelectionTitle(selectedCellId);
     const atlasScenarios = (
       this.isDemo() ? getRiskMatrixAtlasScenariosForCell(selectedCellId) : []
     ) as RiskMatrixAtlasScenario[];
-    const commentsLabel = existingComments.length === 1 ? '1 note' : `${existingComments.length} notes`;
-    const modalMeta =
-      atlasScenarios.length > 0
-        ? `${commentsLabel} • ${atlasScenarios.length} linked atlas overlap${atlasScenarios.length === 1 ? '' : 's'}`
-        : commentsLabel;
     const opportunityComments = existingComments.filter((entry) => entry.valence === 'opportunity');
     const riskComments = existingComments.filter((entry) => entry.valence === 'risk');
+    const notesLabel = countOf(existingComments.length, 'note', 'notes');
+    const modalMeta = [
+      existingComments.length > 0
+        ? `${notesLabel}: ${countOf(opportunityComments.length, 'opportunity', 'opportunities')}, ${countOf(riskComments.length, 'risk', 'risks')}`
+        : notesLabel,
+      atlasScenarios.length > 0 ? countOf(atlasScenarios.length, 'linked atlas overlap', 'linked atlas overlaps') : '',
+    ]
+      .filter(Boolean)
+      .join(' • ');
 
     return (
       <Modal
@@ -1040,54 +1053,42 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
         fade={false}
         size="lg"
         centered
+        labelledBy="ce-risk-matrix-modal-title"
         modalClassName={styles.riskMatrixCommentModal}
         backdropClassName={styles.riskMatrixBackdrop}
         contentClassName={styles.riskMatrixModalContent}
       >
-        <div className={styles.riskMatrixModalBody} data-testid="ce-risk-matrix-modal">
-          <div className={styles.riskMatrixModalHeader}>
-            <div className={styles.modalTitleBlock}>
-              <h3 className={styles.modalTitle}>{modalTitle}</h3>
-              <span className={styles.modalMeta}>{modalMeta}</span>
+        <div className={styles.modalSurface} data-testid="ce-risk-matrix-modal">
+          <header className={styles.modalHeader}>
+            <div>
+              <h3 id="ce-risk-matrix-modal-title" className={styles.modalTitle}>
+                {formatSelectionTitle(selectedCellId)}
+              </h3>
+              <p className={styles.modalMeta}>{modalMeta}</p>
             </div>
-            <button type="button" className={styles.modalCloseButton} aria-label="Close" onClick={this.closeModal}>
-              ×
+            <button
+              type="button"
+              className={styles.modalCloseButton}
+              data-ce-control-appearance="frameless"
+              aria-label="Close"
+              onClick={this.closeModal}
+            >
+              <FontAwesomeIcon icon={faTimes} aria-hidden="true" />
             </button>
-          </div>
+          </header>
 
           {this.renderAtlasScenarioCards(atlasScenarios)}
 
           {existingComments.length > 0 ? (
-            <div className={styles.commentSections} data-testid="ce-risk-matrix-comment-list">
-              {this.renderCommentGroup('Opportunities', opportunityComments, isAggregateSelection, 'opportunity')}
-              {this.renderCommentGroup('Risks', riskComments, isAggregateSelection, 'risk')}
+            <div className={styles.noteColumns} data-testid="ce-risk-matrix-comment-list">
+              {this.renderNoteColumn('opportunity', opportunityComments, isAggregateSelection)}
+              {this.renderNoteColumn('risk', riskComments, isAggregateSelection)}
             </div>
           ) : (
             <p className={styles.emptyState}>No notes yet.</p>
           )}
 
           {this.renderCommentComposer()}
-
-          <div className={styles.riskMatrixModalFooter}>
-            <button
-              type="button"
-              className={clsx(styles.modalButton, styles.modalButtonSecondary)}
-              onClick={this.closeModal}
-            >
-              Close
-            </button>
-            {!readOnly && !isAggregateSelection && (
-              <button
-                type="button"
-                className={clsx(styles.modalButton, styles.modalButtonPrimary)}
-                data-testid="ce-risk-matrix-save-comment"
-                disabled={!canSaveComment}
-                onClick={this.handleSaveComment}
-              >
-                Save
-              </button>
-            )}
-          </div>
         </div>
       </Modal>
     );

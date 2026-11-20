@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import RiskMatrix, { type RiskMatrixRestoreState } from './RiskMatrix';
 import debateMapDemoData from '../../variables/demo/debate_map_demo_data.json';
@@ -502,7 +502,7 @@ describe('RiskMatrix', () => {
     expect(screen.queryByTestId('ce-risk-matrix-atlas-scenario-card')).not.toBeInTheDocument();
     expect(screen.queryByText(/Sources?:/)).not.toBeInTheDocument();
     expect(screen.queryByText('Alan Turing')).not.toBeInTheDocument();
-    expect(screen.getByText('2 notes')).toBeInTheDocument();
+    expect(screen.getByText('2 notes: 1 opportunity, 1 risk')).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Close'));
     fireEvent.click(screen.getByTestId('ce-risk-matrix-subcell-safety-alignment-vs-capabilities-scaling'));
@@ -597,6 +597,109 @@ describe('RiskMatrix', () => {
     expect(within(screen.getByTestId('ce-risk-matrix-comment-list')).getAllByRole('listitem')).toHaveLength(1);
     expect(screen.getByText('Trusted hiring.')).toBeInTheDocument();
     expect(screen.queryByText('Strain on the grid.')).not.toBeInTheDocument();
+  });
+
+  describe('the window over a cell', () => {
+    const categories = [
+      { name: 'Safety', subcategories: ['Lighting', 'Speed'] },
+      { name: 'Transport', subcategories: ['Buses'] },
+    ];
+    const notes = [
+      {
+        cell: 'Safety.Lighting.Transport.Buses',
+        comment: 'Lit stops make late buses usable.',
+        intensity: 7,
+        valence: 'opportunity' as const,
+        participantCount: 2,
+        questionIds: ['q1'],
+      },
+      {
+        cell: 'Safety.Speed.Transport.Buses',
+        comment: 'Calmer roads keep buses on time.',
+        intensity: 4,
+        valence: 'opportunity' as const,
+        questionIds: ['q2', 'q3', 'q1'],
+      },
+      {
+        cell: 'Safety.Speed.Transport.Buses',
+        comment: 'Lower limits lengthen routes.',
+        intensity: 6,
+        valence: 'risk' as const,
+        questionIds: ['q9'],
+      },
+    ];
+    const topics = [
+      { nodeId: 'atlas_k1_00000001:t1', label: 'Night buses', questionIds: ['q1'] },
+      { nodeId: 'atlas_k1_00000001:t2', label: 'Bus speeds', questionIds: ['q2', 'q3'] },
+    ];
+    const open = (props: Partial<React.ComponentProps<typeof RiskMatrix>> = {}) => {
+      render(<RiskMatrix categories={categories} initialComments={notes} readOnly {...props} />);
+      fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-safety-vs-transport'));
+      return within(screen.getByTestId('ce-risk-matrix-modal'));
+    };
+
+    it('has one close control, and a column per kind with its count', () => {
+      const modal = open();
+      expect(modal.getByRole('heading', { name: 'Interaction: Safety vs Transport' })).toBeInTheDocument();
+      expect(modal.getByText('3 notes: 2 opportunities, 1 risk')).toBeInTheDocument();
+      expect(modal.getAllByRole('button', { name: /close/i })).toHaveLength(1);
+      expect(modal.getByRole('button', { name: 'Opportunities, 2 notes' })).toHaveTextContent(/^Opportunities2$/);
+      expect(modal.getByRole('button', { name: 'Risks, 1 note' })).toHaveTextContent(/^Risks1$/);
+      const opportunities = within(modal.getByTestId('ce-risk-matrix-comment-list-opportunity'));
+      expect(opportunities.getAllByRole('listitem')).toHaveLength(2);
+      expect(within(modal.getByTestId('ce-risk-matrix-comment-list-risk')).getAllByRole('listitem')).toHaveLength(1);
+    });
+
+    it('names each note’s kind and intensity in words, with what it rests on', () => {
+      const modal = open();
+      const cards = modal.getAllByTestId('ce-risk-matrix-note');
+      expect(
+        cards.map((card) =>
+          within(card)
+            .getByText(/^(Opportunity|Risk)$/)
+            .textContent?.trim(),
+        ),
+      ).toEqual(['Opportunity', 'Opportunity', 'Risk']);
+      expect(cards[0]).toHaveTextContent('Intensity 7');
+      expect(cards[2]).toHaveTextContent('Intensity 6');
+      expect(within(cards[0]).getByRole('heading', { name: 'Safety / Lighting -> Transport / Buses' })).toBeVisible();
+      expect(cards[0]).toHaveTextContent('From 2 participants');
+      expect(cards[1]).not.toHaveTextContent(/From \d/);
+    });
+
+    it('shows a plain line in a column with no notes', () => {
+      open();
+      fireEvent.click(screen.getByLabelText('Close'));
+      fireEvent.click(screen.getByTestId('ce-risk-matrix-subcell-safety-lighting-vs-transport-buses'));
+      const modal = within(screen.getByTestId('ce-risk-matrix-modal'));
+      expect(modal.getByText('1 note: 1 opportunity, 0 risks')).toBeInTheDocument();
+      expect(modal.getByText('No risks here.')).toBeInTheDocument();
+      expect(modal.getByRole('button', { name: 'Risks, 0 notes' })).toBeInTheDocument();
+    });
+
+    it('links a note to the atlas topic holding most of its questions, and opens it there', async () => {
+      const onOpenAtlasNode = jest.fn();
+      const modal = open({ atlasTopics: topics, onOpenAtlasNode });
+      const links = modal.getAllByTestId('ce-risk-matrix-note-atlas-link');
+      // The risk rests on a question no topic holds, so it has no link.
+      expect(links.map((link) => link.textContent)).toEqual([
+        'Open in the atlas: Night buses',
+        'Open in the atlas: Bus speeds',
+      ]);
+
+      fireEvent.click(links[1]);
+      expect(onOpenAtlasNode).toHaveBeenCalledTimes(1);
+      expect(onOpenAtlasNode).toHaveBeenCalledWith('atlas_k1_00000001:t2');
+      await waitFor(() => expect(screen.queryByTestId('ce-risk-matrix-modal')).not.toBeInTheDocument());
+    });
+
+    it('draws no atlas link without an atlas, or without a way to open one', () => {
+      open({ onOpenAtlasNode: jest.fn() });
+      expect(screen.queryByTestId('ce-risk-matrix-note-atlas-link')).not.toBeInTheDocument();
+      cleanup();
+      open({ atlasTopics: topics });
+      expect(screen.queryByTestId('ce-risk-matrix-note-atlas-link')).not.toBeInTheDocument();
+    });
   });
 
   it('says who holds a note only where the caller counted them', () => {

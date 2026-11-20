@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import SessionRiskMatrixView from './SessionRiskMatrixView';
+import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
 import type { RiskMatrixBuild } from '../../domains/riskMatrix/riskMatrixTypes';
 
 const build: RiskMatrixBuild = {
@@ -41,6 +42,53 @@ it('draws the build read-only as a matrix of its areas, stamped, with its notes'
   expect(screen.getByText('Weak identity checks invite hiring fraud.')).toBeInTheDocument();
   expect(screen.getByText('From 2 participants')).toBeInTheDocument();
   expect(screen.queryByTestId('ce-risk-matrix-comment-input')).not.toBeInTheDocument();
+});
+
+describe('with the session’s atlas', () => {
+  const atlas: DebateAtlasBuild = {
+    id: 'atlas_k3_00000003',
+    builtAt: '2026-11-08T15:00:00.000Z',
+    branches: [
+      {
+        id: 'b1',
+        label: 'Work',
+        topics: [
+          { id: 't1', label: 'Pay', questions: [{ id: 'q7', prompt: 'Pay?' }] },
+          { id: 't2', label: 'Hiring checks', questions: [{ id: 'q1', prompt: 'Checks?' }] },
+        ],
+      },
+    ],
+  };
+  const openCell = () => fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-trust-vs-labor'));
+
+  it('opens the atlas topic holding a note’s questions', () => {
+    const onOpenAtlasTopic = jest.fn();
+    render(
+      <SessionRiskMatrixView
+        build={build}
+        builds={[build]}
+        onSelectBuild={jest.fn()}
+        atlas={atlas}
+        onOpenAtlasTopic={onOpenAtlasTopic}
+      />,
+    );
+    openCell();
+    fireEvent.click(screen.getByRole('button', { name: 'Open in the atlas: Hiring checks' }));
+    expect(onOpenAtlasTopic).toHaveBeenCalledWith('atlas_k3_00000003:t2');
+  });
+
+  it('draws no link without an atlas, or with no way to open it', () => {
+    const { unmount } = render(
+      <SessionRiskMatrixView build={build} builds={[build]} onSelectBuild={jest.fn()} onOpenAtlasTopic={jest.fn()} />,
+    );
+    openCell();
+    expect(screen.queryByRole('button', { name: /Open in the atlas/ })).not.toBeInTheDocument();
+    unmount();
+
+    render(<SessionRiskMatrixView build={build} builds={[build]} onSelectBuild={jest.fn()} atlas={atlas} />);
+    openCell();
+    expect(screen.queryByRole('button', { name: /Open in the atlas/ })).not.toBeInTheDocument();
+  });
 });
 
 it('lets viewers open an earlier build', () => {
