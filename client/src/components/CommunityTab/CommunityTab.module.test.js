@@ -78,7 +78,7 @@ describe('CommunityTab module styles', () => {
 
   it('centres the stat tiles, however many a row holds', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
-    const grid = scss.match(/\n  \.statsGrid\s*{[\s\S]*?\n  }\n/)[0];
+    const grid = scss.match(/\n {2}\.statsGrid\s*{[\s\S]*?\n {2}}\n/)[0];
 
     expect(grid).toMatch(/--stat-columns:\s*5;/);
     expect(grid).toMatch(/display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?justify-content:\s*center;/);
