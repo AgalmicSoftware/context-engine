@@ -146,6 +146,14 @@ export class AgentSignInError extends Error {
   }
 }
 
+// Refusals a person meets on the notice, said in the site's own short words whatever a Worker's wording is.
+const REFUSALS_IN_THE_SITES_WORDS: Record<string, string> = {
+  passkey_has_account:
+    'That passkey already has its own account in this session, so it can’t be added to this one. Create a new passkey instead.',
+  passkey_account_unknown:
+    'This session couldn’t check whether that passkey already has an account here. Create a new passkey instead.',
+};
+
 const post = async (
   target: SessionTarget,
   path: string,
@@ -172,7 +180,9 @@ const post = async (
   const data = ((await response.json().catch(() => ({}))) || {}) as Record<string, unknown>;
   if (!response.ok) {
     const reason = typeof data.reason === 'string' ? data.reason : `http_${response.status}`;
-    const message = typeof data.error === 'string' && data.error ? data.error : 'This could not be done.';
+    const message =
+      REFUSALS_IN_THE_SITES_WORDS[reason] ||
+      (typeof data.error === 'string' && data.error ? data.error : 'This could not be done.');
     throw new AgentSignInError(reason, message, response.status);
   }
   return data;

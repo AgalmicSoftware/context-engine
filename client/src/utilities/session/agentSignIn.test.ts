@@ -232,6 +232,51 @@ describe('a sign-in code that arrives without a page load, or in an odd place', 
 });
 
 describe('attaching a passkey', () => {
+  it('says a refusal in the site’s own short words, whatever the Worker’s wording', async () => {
+    for (const [reason, says] of [
+      [
+        'passkey_has_account',
+        'That passkey already has its own account in this session, so it can’t be added to this one. Create a new passkey instead.',
+      ],
+      [
+        'passkey_account_unknown',
+        'This session couldn’t check whether that passkey already has an account here. Create a new passkey instead.',
+      ],
+    ]) {
+      fetchMock
+        .mockResolvedValueOnce(reply({ nonce: 'n1abc2345' }))
+        .mockResolvedValueOnce(reply({ error: 'A longer sentence from the Worker.', reason }, 409));
+      await expect(
+        attachPasskeyToAgentAccount({
+          target,
+          account: ACCOUNT,
+          token: 'from-link',
+          passkeyAddress: PASSKEY,
+          appOrigin: 'https://contextengine.sh',
+          newPasskey: false,
+          sign: async () => '0xsigned',
+        }),
+      ).rejects.toMatchObject({ reason, message: says });
+    }
+    // Any other refusal keeps the Worker's own words.
+    fetchMock
+      .mockResolvedValueOnce(reply({ nonce: 'n1abc2345' }))
+      .mockResolvedValueOnce(
+        reply({ error: 'This account already has a passkey attached.', reason: 'account_has_passkey' }, 409),
+      );
+    await expect(
+      attachPasskeyToAgentAccount({
+        target,
+        account: ACCOUNT,
+        token: 'from-link',
+        passkeyAddress: PASSKEY,
+        appOrigin: 'https://contextengine.sh',
+        newPasskey: false,
+        sign: async () => '0xsigned',
+      }),
+    ).rejects.toMatchObject({ message: 'This account already has a passkey attached.' });
+  });
+
   it('signs nothing when the Worker’s nonce could add a line to the message', async () => {
     expect(['0123456789abcdef0123456789abcdef', 'n1abcDEF9'].every(isSignInNonce)).toBe(true);
     for (const bad of ['', 'short', 'abc12345\nURI: https://evil.example', 'abc 12345', 'abc-12345', 12345678, null]) {

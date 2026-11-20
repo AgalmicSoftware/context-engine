@@ -26,7 +26,9 @@ const HELP = {
   existing:
     'Attaches a passkey you already use, if it has not yet taken part in this session. A passkey that has answered, saved a name or joined a group here has an account of its own and can’t be attached: create a new passkey for this account instead.',
   cancel:
-    'Ends your AI agent’s access to this account in this session: its sign-in is refused, every sign-in it had stops, and its unused links stop working. You can allow it again. From then on your passkey is the only way in: if you lose it, only the session’s admins can restore access.',
+    'Ends your AI agent’s access to this account in this session: its sign-in is refused, every sign-in it had stops, and its unused links stop working. You can restore it. From then on your passkey is the only way in: if you lose it, only the session’s admins can restore access.',
+  restore:
+    'Lets the AI agent that set this account up sign in to it again with its own key, as before you ended its access. Your passkey keeps working.',
   remove: 'Takes your passkey off this account and signs you out of it. The account is then your agent’s alone again.',
 };
 
@@ -117,15 +119,19 @@ export default function AgentAccountAccessPanel({
             'cancel',
             'Cancel all agent authorizations',
             HELP.cancel,
-            run('cancel', () => changeAgentAccess('cancelled'), 'Your agent’s access to this account is ended.'),
+            run('cancel', () => changeAgentAccess('cancelled'), 'Agent access ended.'),
           )
         : null}
       {withPasskey && account.agentAccess === 'cancelled'
         ? button(
             'allow',
-            'Let my agent sign in again',
-            HELP.cancel,
-            run('allow', () => changeAgentAccess('active'), 'Your agent can sign in to this account again.'),
+            'Restore agent access',
+            HELP.restore,
+            run(
+              'allow',
+              () => changeAgentAccess('active'),
+              'Agent access restored: your agent can sign in to this account again.',
+            ),
           )
         : null}
       {withPasskey && account.agentAccess === 'active'

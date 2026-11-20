@@ -105,6 +105,8 @@ const held = (extra: Record<string, unknown> = {}) =>
     ...extra,
   });
 const notice = () => screen.queryByTestId('ce-agent-sign-in-notice');
+// The question a link raises when it would replace the account in use: a dialog, not part of the notice.
+const askBody = () => screen.queryByTestId('ce-agent-sign-in-ask-body');
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -159,16 +161,26 @@ it('asks before replacing a sign-in, and does nothing until answered', async () 
     .mockResolvedValue({ token: 't', exp: 1, address: ACCOUNT, via: 'agent_link', passkey: '', agentAccess: 'active' });
   jest.mocked(whoALinkWouldReplace).mockResolvedValue(OTHER);
   gate({ account: OTHER, provider: 'passkey_eoa' });
-  await waitFor(() => expect(notice()).not.toBeNull());
-  expect(notice()?.textContent).toMatch(/in place of the account you use here\s+now \(0xc3c3…c3c3\)/);
-  expect(notice()?.textContent).toMatch(/Only switch if your own agent gave you the link/);
+  await waitFor(() => expect(askBody()).not.toBeNull());
+  // Which account is here now, which the link leads to, and the two choices.
+  expect(askBody()?.textContent).toMatch(/Now: you are signed in here as 0xc3c3…c3c3, your own account/);
+  expect(askBody()?.textContent).toMatch(
+    /The link: it signs this tab in to a different account, one that an AI agent set up/,
+  );
+  expect(askBody()?.textContent).toMatch(/Switch only if your own agent gave you this link/);
+  expect(screen.getByTestId('ce-agent-sign-in-ask-confirm').textContent).toBe('Switch to the agent’s account');
+  expect(screen.getByTestId('ce-agent-sign-in-ask-cancel').textContent).toBe('Stay in my account');
+  // It is a dialog that must be answered, and nothing of it sits in a banner.
+  expect(screen.getByRole('dialog')).toBeTruthy();
+  expect(notice()).toBeNull();
   expect(exchangeHeldAgentSignInCode).not.toHaveBeenCalled();
 
   // Staying drops the code unused.
-  fireEvent.click(screen.getByTestId('ce-agent-sign-in-stay'));
+  fireEvent.click(screen.getByTestId('ce-agent-sign-in-ask-cancel'));
   expect(dropAgentSignInCode).toHaveBeenCalled();
   expect(exchangeHeldAgentSignInCode).not.toHaveBeenCalled();
   expect(notice()).toBeNull();
+  await waitFor(() => expect(askBody()).toBeNull());
 });
 
 it('switches only when the person says so', async () => {
@@ -179,7 +191,7 @@ it('switches only when the person says so', async () => {
   jest.mocked(whoALinkWouldReplace).mockResolvedValue(OTHER);
   jest.mocked(liveAccount).mockReturnValue(OTHER);
   gate({ account: OTHER, provider: 'passkey_eoa' });
-  fireEvent.click(await screen.findByTestId('ce-agent-sign-in-switch'));
+  fireEvent.click(await screen.findByTestId('ce-agent-sign-in-ask-confirm'));
   await waitFor(() => expect(enterAgentLinkAccount).toHaveBeenCalled());
 });
 
@@ -198,13 +210,11 @@ it('asks on a reload that holds an agent’s account or a saved passkey, though 
   // Nothing in the page's state: the account this tab would open by itself is who the link replaces.
   jest.mocked(whoALinkWouldReplace).mockResolvedValue(OTHER);
   gate();
-  await waitFor(() =>
-    expect(notice()?.textContent).toMatch(/in place of the account you use here\s+now \(0xc3c3…c3c3\)/),
-  );
+  await waitFor(() => expect(askBody()?.textContent).toMatch(/you are signed in here as 0xc3c3…c3c3/));
   expect(exchangeHeldAgentSignInCode).not.toHaveBeenCalled();
   expect(resumeAgentLinkAccount).not.toHaveBeenCalled();
   // Staying opens the held account again, as a reload without the link would have.
-  fireEvent.click(screen.getByTestId('ce-agent-sign-in-stay'));
+  fireEvent.click(screen.getByTestId('ce-agent-sign-in-ask-cancel'));
   expect(dropAgentSignInCode).toHaveBeenCalled();
   expect(resumeAgentLinkAccount).toHaveBeenCalledWith(TARGET);
   expect(enterAgentLinkAccount).not.toHaveBeenCalled();
@@ -225,10 +235,12 @@ it('does not replace an account that signed in while the Worker was answering: t
   jest.mocked(liveAccount).mockReturnValue(OTHER);
   await act(async () => answer(REPLY));
   expect(enterAgentLinkAccount).not.toHaveBeenCalled();
-  expect(notice()?.textContent).toMatch(/now \(0xc3c3…c3c3\)/);
-  expect(notice()?.textContent).toMatch(/The link has been used/);
+  expect(askBody()?.textContent).toMatch(/you are signed in here as 0xc3c3…c3c3/);
+  // The sign-in is in hand, so the dialog can name the account the link leads to.
+  expect(askBody()?.textContent).toMatch(/a different account, 0xa1a1…a1a1, one that an AI agent set up/);
+  expect(askBody()?.textContent).toMatch(/The link has now been used/);
   // Saying yes uses the sign-in already made: the code works once.
-  fireEvent.click(screen.getByTestId('ce-agent-sign-in-switch'));
+  fireEvent.click(screen.getByTestId('ce-agent-sign-in-ask-confirm'));
   await waitFor(() => expect(enterAgentLinkAccount).toHaveBeenCalledWith(TARGET, REPLY));
   expect(exchangeHeldAgentSignInCode).toHaveBeenCalledTimes(1);
 });
@@ -238,7 +250,7 @@ it('drops a held sign-in when the person stays, and enters the same account with
   jest.mocked(exchangeHeldAgentSignInCode).mockResolvedValue(REPLY);
   jest.mocked(liveAccount).mockReturnValue(OTHER);
   const { unmount } = gate();
-  fireEvent.click(await screen.findByTestId('ce-agent-sign-in-stay'));
+  fireEvent.click(await screen.findByTestId('ce-agent-sign-in-ask-cancel'));
   expect(notice()).toBeNull();
   expect(enterAgentLinkAccount).not.toHaveBeenCalled();
   unmount();
@@ -306,8 +318,9 @@ it('keeps a notice on the page while signed in from a link: whose account, who e
   gate({ account: ACCOUNT, provider: 'agent_link' });
   const text = notice()?.textContent || '';
   expect(text).toMatch(/You are signed in as 0xa1a1…a1a1, the account your AI agent set up/);
-  expect(text).toMatch(/Whoever runs the agent that set this account up can see and change what you answer here/);
-  expect(text).toMatch(/If the link did not come from your own agent, sign out/);
+  // Short: who the account is, and nothing more.
+  expect(text).not.toMatch(/Whoever runs the agent|did not come from your own agent/);
+  expect(notice()?.className).toMatch(/noticeLarge/);
   // No way to close it; a passkey, or out.
   expect(screen.queryByText('Dismiss')).toBeNull();
   expect(screen.getByTestId('ce-agent-account-add-passkey')).toBeTruthy();
@@ -325,7 +338,7 @@ it('says in the Worker’s words why a passkey that already took part here was n
     .mocked(attachPasskeyHere)
     .mockRejectedValue(
       new Error(
-        'This passkey has already taken part in this session under its own account, so it can’t be attached to this one. Create a new passkey for this account instead. Merging two accounts isn’t possible yet.',
+        'That passkey already has its own account in this session, so it can’t be added to this one. Create a new passkey instead.',
       ),
     );
   gate({ account: ACCOUNT, provider: 'agent_link' });
@@ -335,15 +348,17 @@ it('says in the Worker’s words why a passkey that already took part here was n
   fireEvent.click(screen.getByTestId('ce-agent-account-use-passkey'));
   await waitFor(() => expect(attachPasskeyHere).toHaveBeenCalledWith({ useExisting: true }));
   await waitFor(() =>
-    expect(notice()?.textContent).toMatch(/already taken part in this session under its own account/),
+    expect(notice()?.textContent).toMatch(/That passkey already has its own account in this session/),
   );
-  expect(notice()?.textContent).toMatch(/Create a new passkey for this account instead/);
+  expect(notice()?.textContent).toMatch(/Create a new passkey instead/);
   // The refusal is its own message, apart from the notice's standing words.
   const alert = screen.getByTestId('ce-agent-sign-in-alert');
   expect(alert.getAttribute('role')).toBe('alert');
-  expect(alert.textContent).toMatch(/^This passkey has already taken part in this session under its own account/);
+  expect(alert.textContent).toBe(
+    'That passkey already has its own account in this session, so it can’t be added to this one. Create a new passkey instead.',
+  );
   expect(alert.closest('p')?.className).not.toBe(notice()?.querySelector('p')?.className);
-  expect(notice()?.querySelector('p')?.textContent).not.toMatch(/already taken part/);
+  expect(notice()?.querySelector('p')?.textContent).not.toMatch(/already has its own account/);
   // Still signed in from the link, with the main way on offer.
   expect(screen.getByTestId('ce-agent-account-add-passkey').textContent).toBe('Create passkey');
   expect(screen.queryByTestId('ce-agent-account-own-account')).toBeNull();
@@ -375,8 +390,13 @@ it('makes Create passkey the main button, and says what is now so once, not twic
     return null;
   });
   fireEvent.click(screen.getByTestId('ce-agent-account-cancel'));
-  await waitFor(() => expect(notice()?.textContent).toMatch(/Your agent’s access is ended/));
-  expect(notice()?.textContent?.match(/access (to this account )?is ended/g)).toHaveLength(1);
+  await waitFor(() =>
+    expect(notice()?.textContent).toMatch(
+      /Agent access ended\. Your agent can no longer sign in to 0xa1a1…a1a1; only your passkey can/,
+    ),
+  );
+  expect(notice()?.textContent?.match(/Agent access ended/g)).toHaveLength(1);
+  expect(screen.getByTestId('ce-agent-account-allow').textContent).toBe('Restore agent access');
   // What goes wrong is still said, by itself.
   jest.mocked(changeAgentAccess).mockRejectedValue(new Error('The session did not make that change. Try again.'));
   fireEvent.click(screen.getByTestId('ce-agent-account-allow'));
@@ -398,7 +418,9 @@ it('offers Cancel all agent authorizations only once a passkey is attached, and 
   await waitFor(() => expect(changeAgentAccess).toHaveBeenCalledWith('cancelled'));
 
   act(() => void held({ via: 'passkey_link', passkey: PASSKEY, agentAccess: 'cancelled' }));
-  expect(notice()?.textContent).toMatch(/Your agent’s access is ended/);
+  expect(notice()?.textContent).toMatch(
+    /Agent access ended\. Your agent can no longer sign in to 0xa1a1…a1a1; only your passkey can/,
+  );
   expect(screen.queryByTestId('ce-agent-account-cancel')).toBeNull();
   expect(screen.queryByTestId('ce-agent-account-remove-passkey')).toBeNull();
   fireEvent.click(screen.getByTestId('ce-agent-account-allow'));
@@ -498,7 +520,11 @@ it('takes the Worker’s word for whether the agent still has access', async () 
   gate({ account: ACCOUNT, provider: 'agent_link' });
   expect(notice()?.textContent).toMatch(/Your agent can still use it/);
   // Ended from another tab or device: the notice follows.
-  await waitFor(() => expect(notice()?.textContent).toMatch(/Your agent’s access is ended/));
+  await waitFor(() =>
+    expect(notice()?.textContent).toMatch(
+      /Agent access ended\. Your agent can no longer sign in to 0xa1a1…a1a1; only your passkey can/,
+    ),
+  );
   expect(readAgentSignInState).toHaveBeenCalledWith(TARGET, 'held-sign-in');
 });
 

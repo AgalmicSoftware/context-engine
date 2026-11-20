@@ -97,6 +97,21 @@
   }
 }
 
+// The agent's-account notices are read once, by someone who did not expect them: larger than a passing banner.
+.noticeLarge {
+  padding-block: 8px;
+
+  .message,
+  .noticeAlert {
+    font-size: 1rem;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    font-size: 0.9rem;
+  }
+}
+
 // The notice's standing words, with anything that went wrong set apart below them.
 .noticeText {
   min-width: 0;

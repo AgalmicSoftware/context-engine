@@ -42,6 +42,7 @@ import {
 } from '../../utilities/session/agentSignInAccount';
 import { heldSessionToken } from '../../utilities/worker/workerAuthTokenCache.js';
 import AgentAccountAccessPanel, { shortAddress } from '../Account/AgentAccountAccessPanel';
+import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import styles from './WorkerGroupAutoJoinNotice.module.scss';
 
 export type AgentSignInGateProps = { sessionConfig: unknown; sessionSlug: string; account: unknown; provider: unknown };
@@ -53,8 +54,6 @@ const lower = (value: unknown): string =>
     .toLowerCase();
 const LINKS_NOT_ON =
   'This session doesn’t have sign-in links from agents switched on. The link has not been used: open it again once an organiser has turned them on, or sign in yourself to take part.';
-const WHO_ELSE =
-  'Whoever runs the agent that set this account up can see and change what you answer here. If the link did not come from your own agent, sign out.';
 
 export default function AgentSignInGate({
   sessionConfig,
@@ -241,7 +240,11 @@ export default function AgentSignInGate({
     isError = false,
     alert: React.ReactNode = null,
   ): React.ReactElement => (
-    <section className={styles.notice} aria-label="Agent’s account" data-testid="ce-agent-sign-in-notice">
+    <section
+      className={`${styles.notice} ${styles.noticeLarge}`}
+      aria-label="Agent’s account"
+      data-testid="ce-agent-sign-in-notice"
+    >
       <div className={styles.noticeText}>
         <p className={styles.message} role={isError && !alert ? 'alert' : 'status'}>
           {message}
@@ -257,37 +260,49 @@ export default function AgentSignInGate({
   );
   const wentWrong = note?.isError ? note.text : null;
 
+  // A link's sign-in would replace the account this tab uses: asked in a dialog, which is answered one way or
+  // the other before anything changes. Closing it is staying.
   if (phase === 'ask') {
-    return notice(
-      <>
-        This link signs you in to <strong>an account an AI agent set up</strong>, in place of the account you use here
-        now ({shortAddress(replaces || signedInAs)}). Only switch if your own agent gave you the link.
-        {pending.current ? ' The link has been used: if you stay, ask your agent for a new one to switch later.' : ''}
-      </>,
-      <>
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          onClick={() => void signIn({ agreed: true })}
-          data-testid="ce-agent-sign-in-switch"
-        >
-          Switch to it
-        </button>
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          onClick={() => {
-            pending.current = null;
-            dropAgentSignInCode();
-            setPhase('idle');
-            // The agent's account this tab already held, if it was waiting behind the question, is opened again.
-            if (!liveAccount()) resumeAgentLinkAccount(target);
-          }}
-          data-testid="ce-agent-sign-in-stay"
-        >
-          Stay as I am
-        </button>
-      </>,
+    const current = replaces || signedInAs;
+    const other = pending.current?.address || '';
+    const stay = (): void => {
+      pending.current = null;
+      dropAgentSignInCode();
+      setPhase('idle');
+      // The agent's account this tab already held, if it was waiting behind the question, is opened again.
+      if (!liveAccount()) resumeAgentLinkAccount(target);
+    };
+    return (
+      <CEConfirmDialog
+        isOpen
+        testId="ce-agent-sign-in-ask"
+        title="Switch accounts?"
+        body={
+          <>
+            <p>
+              <strong>Now:</strong> you are signed in here as <strong title={current}>{shortAddress(current)}</strong>,
+              your own account.
+            </p>
+            <p>
+              <strong>The link:</strong> it signs this tab in to a different account
+              {other ? (
+                <>
+                  , <strong title={other}>{shortAddress(other)}</strong>
+                </>
+              ) : null}
+              , one that an AI agent set up. Your own account is not changed; you can sign back in to it later.
+            </p>
+            <p>Switch only if your own agent gave you this link.</p>
+            {pending.current ? (
+              <p>The link has now been used. If you stay, ask your agent for a new one to switch later.</p>
+            ) : null}
+          </>
+        }
+        confirmLabel="Switch to the agent’s account"
+        cancelLabel="Stay in my account"
+        onConfirm={() => void signIn({ agreed: true })}
+        onCancel={stay}
+      />
     );
   }
   if (phase === 'working') return notice('Signing you in from your agent’s link…', null);
@@ -418,7 +433,7 @@ export default function AgentSignInGate({
     return notice(
       <>
         {fromLink ? 'Signed in from your agent’s link. ' : ''}You are signed in as {who}, the account your AI agent set
-        up. {WHO_ELSE}
+        up.
         {attachedHere ? (
           <>
             {' '}
@@ -444,7 +459,7 @@ export default function AgentSignInGate({
     );
   }
   return notice(
-    <>You are using {who}, the account your AI agent set up, with your passkey. Your agent’s access is ended.</>,
+    <>Agent access ended. Your agent can no longer sign in to {who}; only your passkey can.</>,
     panel,
     false,
     wentWrong,
