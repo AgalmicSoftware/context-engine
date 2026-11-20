@@ -29,6 +29,7 @@ import {
   attachPasskeyToAgentAccount,
   detachAgentPasskey,
   isSignInNonce,
+  readAgentSignInState,
   setAgentAccess,
   signInThroughAttachedPasskey,
   type AgentSignInReply,
@@ -274,6 +275,23 @@ export const attachPasskeyHere = async (): Promise<AgentLinkAccount | null> => {
     throw error;
   }
   return enterAgentLinkAccount(target, reply);
+};
+
+/**
+ * Whether the account this tab is in already has a passkey attached, by the Worker's word; null where the Worker
+ * can't be asked.
+ */
+export const heldAccountHasPasskey = async (): Promise<boolean | null> => {
+  const account = readAgentLinkAccount();
+  if (!account) return null;
+  const target = targetOf(account);
+  const token = heldSessionToken(target.workerUrl, target.sessionSlug);
+  if (!token) return null;
+  try {
+    return !!(await readAgentSignInState(target, token)).attachedPasskey;
+  } catch {
+    return null;
+  }
 };
 
 /** Ends the agent's access to the account, or allows it again. */

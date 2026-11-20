@@ -12,12 +12,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExtern
 
 import { resolveWorkerGroupAutoJoinContext } from '../../domains/worker/workerGroupAutoJoinContext';
 import {
+  dismissAgentNotice,
   dismissAttachedPasskeyNotice,
   holdAgentLinkAccount,
   isAgentLinkProvider,
+  isAgentNoticeDismissed,
   readAttachedPasskeyNotice,
   readAgentLinkAccount,
   readLinkedAgentAccountHintCount,
+  showAgentNoticeAgain,
   subscribeAgentLinkAccount,
   takeLinkedAgentAccountHint,
 } from '../../utilities/session/agentLinkAccount';
@@ -81,6 +84,8 @@ export default function AgentSignInGate({
   const [phase, setPhase] = useState<Phase>('idle');
   const [note, setNote] = useState<{ text: string; isError: boolean } | null>(null);
   const [fromLink, setFromLink] = useState(false);
+  // Counts the person's dismissals, so the notice goes at once; what is dismissed is kept with the account.
+  const [, setDismissals] = useState(0);
   // Whose place the link's sign-in would take, shown when asking.
   const [replaces, setReplaces] = useState<AccountInUse | null>(null);
   // A sign-in already made from the link, held while the person is asked: the code works once.
@@ -113,6 +118,8 @@ export default function AgentSignInGate({
     (reply: AgentSignInReply): void => {
       if (!target) return;
       pending.current = null;
+      // A new sign-in from a link is told in full, whatever was dismissed before.
+      showAgentNoticeAgain();
       enterAgentLinkAccount(target, reply);
       setFromLink(true);
       setPhase('idle');
@@ -439,6 +446,24 @@ export default function AgentSignInGate({
   if (!here) return null;
   const who = <strong title={here.address}>{shortAddress(here.address)}</strong>;
   const ended = !heldSessionToken(target.workerUrl, target.sessionSlug);
+  // The two standing notices can be dismissed, by the person, once they have seen them. Create passkey and the
+  // rest stay in the account dialog.
+  const dismissed = isAgentNoticeDismissed(here);
+  const dismiss = (
+    <button
+      type="button"
+      className={styles.secondaryButton}
+      title="Hides this notice. Your account’s options, a passkey among them, stay under Account."
+      data-testid="ce-agent-sign-in-dismiss"
+      onClick={() => {
+        dismissAgentNotice(here);
+        setNote(null);
+        setDismissals((count) => count + 1);
+      }}
+    >
+      Dismiss
+    </button>
+  );
   const panel = (
     <AgentAccountAccessPanel
       provider={provider}
@@ -460,24 +485,29 @@ export default function AgentSignInGate({
     );
   }
   if (here.via !== 'passkey_link') {
+    if (dismissed) return null;
     return notice(
       <>
         {fromLink ? 'Signed in from your agent’s link. ' : ''}You are signed in as {who}, the account your AI agent set
         up.
       </>,
-      // With a passkey already attached, or while that is being asked, nothing more is shown.
-      passkeyAttached === false ? panel : null,
+      // With a passkey already attached, or while that is being asked, no passkey button is shown.
+      <>
+        {passkeyAttached === false ? panel : null}
+        {dismiss}
+      </>,
       false,
       wentWrong,
     );
   }
   if (here.agentAccess === 'active') {
+    if (dismissed) return null;
     return notice(
       <>
         You are using {who}, the account your AI agent set up, with your passkey. Your agent can still use it, and see
         and change what you answer here.
       </>,
-      null,
+      dismiss,
       false,
       wentWrong,
     );

@@ -353,14 +353,14 @@ it('keeps a notice on the page while signed in from a link, with one button: Cre
   // Short: who the account is, and nothing more.
   expect(text).not.toMatch(/Whoever runs the agent|did not come from your own agent/);
   expect(notice()?.className).toMatch(/noticeLarge/);
-  // No way to close it, and one step: signing out is the account dialog's, and a passkey the person already
-  // uses is not offered.
-  expect(screen.queryByText('Dismiss')).toBeNull();
-  // Offered once the Worker has said the account has no passkey; not before.
-  expect(notice()?.querySelectorAll('button')).toHaveLength(0);
+  // One step, and a way to put the notice away: signing out is the account dialog's, and a passkey the person
+  // already uses is not offered. Create passkey comes once the Worker has said the account has none; not before.
+  expect(Array.from(notice()?.querySelectorAll('button') || []).map((button) => button.textContent)).toEqual([
+    'Dismiss',
+  ]);
   await screen.findByTestId('ce-agent-account-add-passkey');
   const buttons = Array.from(notice()?.querySelectorAll('button') || []);
-  expect(buttons.map((button) => button.textContent)).toEqual(['Create passkey']);
+  expect(buttons.map((button) => button.textContent)).toEqual(['Create passkey', 'Dismiss']);
   expect(buttons[0].className).toBe('primaryButton');
   expect(buttons[0].getAttribute('title')).not.toMatch(/cancel|already/i);
   // A step that worked changes what the notice says; it adds no second sentence saying the same.
@@ -391,7 +391,9 @@ it('says, once a passkey is attached, that the agent can still use the account, 
     /with your passkey\. Your agent can still use it, and see and\s+change what you answer here/,
   );
   // Ending the agent's access is not offered: the Worker could only let the same agent key back in.
-  expect(notice()?.querySelectorAll('button')).toHaveLength(0);
+  expect(Array.from(notice()?.querySelectorAll('button') || []).map((button) => button.textContent)).toEqual([
+    'Dismiss',
+  ]);
   expect(changeAgentAccess).not.toHaveBeenCalled();
 });
 
@@ -413,6 +415,58 @@ it('still gives the way back to an account whose agent’s access was ended befo
       'The session did not make that change. Try again.',
     ),
   );
+});
+
+it('goes when its person dismisses it, stays away over a reload, and comes back for a new sign-in from a link', async () => {
+  act(() => void held());
+  const first = gate({ account: ACCOUNT, provider: 'agent_link' });
+  // Shown in full first: nothing dismisses it but the person.
+  expect(notice()?.textContent).toMatch(/You are signed in as 0xa1a1…a1a1/);
+  await screen.findByTestId('ce-agent-account-add-passkey');
+  fireEvent.click(screen.getByTestId('ce-agent-sign-in-dismiss'));
+  expect(notice()).toBeNull();
+  // A reload: the page starts again, in the same tab.
+  first.unmount();
+  const reloaded = gate({ account: ACCOUNT, provider: 'agent_link' });
+  await act(async () => {});
+  expect(notice()).toBeNull();
+  reloaded.unmount();
+  // A passkey newly attached is new to say, and is said once.
+  act(() => void held({ via: 'passkey_link', passkey: PASSKEY }));
+  const withPasskey = gate({ account: ACCOUNT, provider: 'agent_link' });
+  expect(notice()?.textContent).toMatch(/with your passkey\. Your agent can still use it/);
+  fireEvent.click(screen.getByTestId('ce-agent-sign-in-dismiss'));
+  expect(notice()).toBeNull();
+  withPasskey.unmount();
+  // Signing out and coming back in from a link: told in full again.
+  act(() => forgetAgentLinkAccount());
+  act(() => void held());
+  gate({ account: ACCOUNT, provider: 'agent_link' });
+  expect(notice()?.textContent).toMatch(/You are signed in as 0xa1a1…a1a1/);
+});
+
+it('shows the notice again after a new link signs in to the same account that was dismissed', async () => {
+  act(() => void held());
+  const first = gate({ account: ACCOUNT, provider: 'agent_link' });
+  fireEvent.click(screen.getByTestId('ce-agent-sign-in-dismiss'));
+  expect(notice()).toBeNull();
+  first.unmount();
+  // A new link for the same account, opened in the same tab: the held sign-in is that account's, so it signs in
+  // without asking, and the notice is back.
+  jest.mocked(hasAgentSignInCodeFor).mockReturnValue(true);
+  jest.mocked(whoALinkWouldReplace).mockResolvedValue(null);
+  jest.mocked(exchangeHeldAgentSignInCode).mockResolvedValue({
+    token: 'from-link',
+    exp: Math.floor(Date.now() / 1000) + 3600,
+    address: ACCOUNT,
+    via: 'agent_link',
+    passkey: '',
+    agentAccess: 'active',
+  } as never);
+  jest.mocked(enterAgentLinkAccount).mockImplementation(() => held() as never);
+  gate({ account: ACCOUNT, provider: 'agent_link' });
+  await waitFor(() => expect(enterAgentLinkAccount).toHaveBeenCalled());
+  await waitFor(() => expect(notice()?.textContent).toMatch(/Signed in from your agent’s link/));
 });
 
 it('says when a sign-in from a link has ended, and shows the notice for no other account', () => {
@@ -495,9 +549,13 @@ it('shows nothing extra to someone signed in from a link whose account already h
   await waitFor(() => expect(readAgentSignInState).toHaveBeenCalled());
   await act(async () => {});
   // Who the account is, and no more: no Create passkey, and no word of the passkey that is there.
-  expect(notice()?.textContent).toMatch(/You are signed in as 0xa1a1…a1a1, the account your AI agent set up\.$/);
-  expect(notice()?.querySelectorAll('button')).toHaveLength(0);
-  expect(notice()?.textContent).not.toMatch(/passkey/i);
+  expect(notice()?.querySelector('p')?.textContent).toMatch(
+    /You are signed in as 0xa1a1…a1a1, the account your AI agent set up\.$/,
+  );
+  expect(Array.from(notice()?.querySelectorAll('button') || []).map((button) => button.textContent)).toEqual([
+    'Dismiss',
+  ]);
+  expect(notice()?.querySelector('p')?.textContent).not.toMatch(/passkey/i);
 });
 
 it('offers Create passkey where the Worker could not be asked: it refuses a second passkey itself', async () => {

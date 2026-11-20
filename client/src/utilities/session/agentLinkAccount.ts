@@ -78,6 +78,8 @@ export const holdAgentLinkAccount = (account: unknown): AgentLinkAccount | null 
   } catch {
     /* The page still holds it until a reload. */
   }
+  // Leaving the account ends a dismissal with it.
+  if (!held) showAgentNoticeAgain();
   listeners.forEach((listener) => listener());
   return held;
 };
@@ -85,6 +87,45 @@ export const holdAgentLinkAccount = (account: unknown): AgentLinkAccount | null 
 export const forgetAgentLinkAccount = (): void => {
   holdAgentLinkAccount(null);
 };
+
+// The standing notice, once its person has dismissed it. Remembered for this tab's sign-in to that account, in
+// the state they saw it in (from a link, or with their passkey), so a reload keeps it away. It is only ever set
+// by the person's own press. A new sign-in from a link, a passkey newly attached, or a sign-out shows the notice
+// again.
+const NOTICE_DISMISSED_KEY = 'ce:agentLinkNoticeDismissed:v1';
+let dismissedNotice: string | null = null;
+const noticeOf = (account: AgentLinkAccount): string =>
+  `${lower(account.sessionSlug)}|${account.address}|${account.via}`;
+
+export const isAgentNoticeDismissed = (account: AgentLinkAccount | null): boolean => {
+  if (!account) return false;
+  if (dismissedNotice === null) {
+    try {
+      dismissedNotice = tabStorage()?.getItem(NOTICE_DISMISSED_KEY) || '';
+    } catch {
+      dismissedNotice = '';
+    }
+  }
+  return dismissedNotice === noticeOf(account);
+};
+
+export const dismissAgentNotice = (account: AgentLinkAccount): void => {
+  dismissedNotice = noticeOf(account);
+  try {
+    tabStorage()?.setItem(NOTICE_DISMISSED_KEY, dismissedNotice);
+  } catch {
+    /* The page still remembers it until a reload. */
+  }
+};
+
+export function showAgentNoticeAgain(): void {
+  dismissedNotice = '';
+  try {
+    tabStorage()?.removeItem(NOTICE_DISMISSED_KEY);
+  } catch {
+    /* Nothing was saved. */
+  }
+}
 
 const sameWorker = (left: unknown, right: unknown): boolean => {
   try {

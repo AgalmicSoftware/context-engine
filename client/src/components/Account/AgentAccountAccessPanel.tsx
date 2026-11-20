@@ -5,7 +5,7 @@
 // The Worker can also end the agent's access to such an account. The site no longer offers that: it only lets
 // the same agent key back in, which is not the "sign agents out, then hand one a new prompt" people expect. An
 // account already in that state still gets the way back.
-import React, { useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   isAgentLinkProvider,
   readAgentLinkAccount,
@@ -14,6 +14,7 @@ import {
 import {
   attachPasskeyHere,
   changeAgentAccess,
+  heldAccountHasPasskey,
   removeAttachedPasskey,
 } from '../../utilities/session/agentSignInAccount';
 
@@ -36,8 +37,8 @@ type Props = {
   onMessage?: (message: string, isError: boolean) => void;
   // The notice keeps to the one step a new arrival needs; the account dialog has the rest.
   inNotice?: boolean;
-  // Create passkey is offered only where the account is known to have no passkey attached: the notice asks the
-  // Worker and says so here. Anywhere else it is not offered.
+  // Create passkey is offered only where the account has no passkey attached. The notice asks the Worker and
+  // says so here; left out, as in the account dialog, the panel asks for itself.
   offerPasskey?: boolean;
 };
 
@@ -47,7 +48,7 @@ export default function AgentAccountAccessPanel({
   primaryButtonClassName = '',
   onMessage,
   inNotice = false,
-  offerPasskey = false,
+  offerPasskey,
 }: Props): React.ReactElement | null {
   const account = useSyncExternalStore(subscribeAgentLinkAccount, readAgentLinkAccount);
   const [busy, setBusy] = useState('');
@@ -55,7 +56,26 @@ export default function AgentAccountAccessPanel({
   const [said, setSaid] = useState<{ text: string; isError: boolean } | null>(null);
   const tell = (text: string, isError: boolean): void =>
     onMessage ? onMessage(text, isError) : setSaid({ text, isError });
+  // The Worker's word on whether a passkey is attached, where nobody passed it in: undefined while asking.
+  const [hasPasskey, setHasPasskey] = useState<boolean | null | undefined>(undefined);
+  const asks =
+    offerPasskey === undefined && !!account && account.via !== 'passkey_link' && isAgentLinkProvider(provider);
+  const askedFor = asks ? account.address : '';
+  useEffect(() => {
+    if (!askedFor) return undefined;
+    let current = true;
+    setHasPasskey(undefined);
+    void heldAccountHasPasskey().then((has) => {
+      if (current) setHasPasskey(has);
+    });
+    return () => {
+      current = false;
+    };
+  }, [askedFor]);
   if (!account || !isAgentLinkProvider(provider)) return null;
+  // Offered once the account is known to have none. Where the Worker can't be asked it is offered too: the
+  // Worker refuses a second passkey itself.
+  const offer = offerPasskey ?? (hasPasskey !== undefined && hasPasskey !== true);
   const run = (name: string, work: () => Promise<unknown>, done: string) => async (): Promise<void> => {
     if (busy) return;
     setBusy(name);
@@ -89,7 +109,7 @@ export default function AgentAccountAccessPanel({
   const withPasskey = account.via === 'passkey_link';
   return (
     <>
-      {!withPasskey && offerPasskey
+      {!withPasskey && offer
         ? button(
             'add-passkey',
             'Create passkey',
