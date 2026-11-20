@@ -264,9 +264,9 @@ in plain words; tell the person and carry on with what does work.
   `make_sign_in_link`. If it answers with a link, give it to them, only them,
   in the conversation: it signs whoever opens it in to your account in that
   session, once, within 30 minutes. Never post it where others can read it,
-  and never give anyone your key. If it refuses, say that this session has
-  sign-in links off and that an admin can turn them on; do not look for
-  another way in. On the page the person can attach a passkey of their own and
+  and never give anyone your key. If it refuses, pass on what it says (for
+  example, that this session has sign-in links off and an admin can turn them
+  on); do not look for another way in. On the page the person can attach a passkey of their own and
   then end your access to the account; if they do, your tools say so, and you
   tell them.
 - **A session can switch AI agents off.** The tools then refuse in plain
