@@ -79,6 +79,7 @@ import {
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
 import { readKnownSessionCatalog } from '../../utilities/session/sessionCatalog';
+import { listsEveryAnswer, loadWorkerListingCounts, type WorkerListingCounts } from './communityWorkerListingCounts';
 import { compareSessionListEntries, isListedSession, sessionListName } from '../../utilities/session/sessionListing';
 import { SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT } from '../../utilities/session/sessionWorkerConfigCache';
 import {
@@ -93,6 +94,8 @@ import {
 const uiLog = createLogger('ui');
 const COMMUNITY_BEESWARM_FALLBACK_DEMO_SLUG = 'demo';
 const SESSION_FILTER_SUMMARY_ID = 'ce-community-session-filter-summary';
+// A session's listing counts are read again after five minutes, in the background.
+const WORKER_LISTING_COUNTS_TTL_MS = 5 * 60000;
 const COMMUNITY_BEESWARM_DOMAIN = [0, 1] as const;
 type CacheReadOptions = { clone?: boolean };
 type CommunityQuestionRow = {
@@ -212,6 +215,9 @@ export class CommunityTab extends Component<any, any> {
         { icon: faUsersCog, count: 0, label: 'Groups' },
       ],
       lastSbtGroupsCount: null,
+      readyTiles: '',
+      readyTilesSelectionKey: null,
+      workerListingState: 'none',
       initialLoadDone: false,
       initialLoadSelectionKey: this._statsSelectionKey(),
       showLeaderboardControls: false,
@@ -245,6 +251,7 @@ export class CommunityTab extends Component<any, any> {
     this._isUnmounted = false;
     this._beeswarmPoints = [];
     this._workerGroupCountCache = new Map<string, CommunityWorkerGroupCountCacheEntry>();
+    this._workerListingCounts = new Map();
     this._workerGroupCountCacheRevisions = new Map<string, number>();
     this._workerGroupsChangedUnsubscribe = null;
     this._leaderboardMemo = {
@@ -1221,24 +1228,134 @@ export class CommunityTab extends Component<any, any> {
     return this._computeUniverseStatsSnapshot(scopeEntries);
   };
 
-  _isWorkerScopeEntryReady = (scopeEntry: ScopeCacheEntry) => {
-    const groupsSettled = ['ready', 'error', 'unavailable'].includes(scopeEntry.workerGroupsStatus);
+  // What has arrived for one Worker-hosted session, tile by tile.
+  _workerScopeEntryReadiness = (scopeEntry: ScopeCacheEntry) => {
+    const groups = ['ready', 'error', 'unavailable'].includes(scopeEntry.workerGroupsStatus);
     // Identity fields and empty initialization maps do not prove metadata has arrived.
     // The global readiness props belong only to the active session.
     const isActive = normalizeSessionSlug(scopeEntry.slug) === normalizeSessionSlug(this._resolveRouteSlug());
-    const questionsReady =
+    const questions =
       scopeEntry.questionsCache?.workerMetadataHydrationStatus === 'complete' ||
       (scopeEntry.questionsCache?.workerMetadataHydrationStatus !== 'loading' &&
         isActive &&
         this.props.isQuestionCacheReady) ||
       this._countKeys(scopeEntry.questionsCache?.questions) > 0;
-    const surveysReady =
+    const surveys =
       scopeEntry.surveysCache?.workerMetadataHydrationStatus === 'complete' ||
       (scopeEntry.surveysCache?.workerMetadataHydrationStatus !== 'loading' &&
         isActive &&
         this.props.isSurveyCacheReady) ||
       this._countKeys(scopeEntry.surveysCache?.surveys) > 0;
-    return groupsSettled && questionsReady && surveysReady;
+    return { groups, questions, surveys };
+  };
+
+  _isWorkerScopeEntryReady = (scopeEntry: ScopeCacheEntry) => {
+    const { groups, questions, surveys } = this._workerScopeEntryReadiness(scopeEntry);
+    return groups && questions && surveys;
+  };
+
+  // Users, Questions and Surveys for a Worker-hosted session are counted from that session's own listings, so a
+  // session picked in the dropdown counts the same whether or not it is the one the app has loaded.
+  _workerListingCounts: Map<
+    string,
+    { counts: WorkerListingCounts | null; failed: boolean; loading: boolean; at: number }
+  >;
+
+  _chainTileParts: { users: string[]; questions: number; surveys: number } | null = null;
+
+  _workerListingKey = (scopeEntry: ScopeCacheEntry) =>
+    [
+      normalizeSessionSlug(scopeEntry.slug),
+      String(scopeEntry.sessionConfig?.corsWorkerUrl || ''),
+      String(this._workerGroupCountAccount(scopeEntry.slug) || '').toLowerCase(),
+    ].join('|');
+
+  // Starts a read for each Worker session in view that has none, or whose count is a minute old. Never awaited:
+  // the tiles wait on it by showing their loading state, and a finished read asks for a refresh.
+  _ensureWorkerListingCounts = (scopeEntries: ScopeCacheEntry[]) => {
+    for (const scopeEntry of scopeEntries) {
+      if (!scopeEntry.isWorkerCanonical) continue;
+      const key = this._workerListingKey(scopeEntry);
+      const held = this._workerListingCounts.get(key);
+      if (held && (held.loading || Date.now() - held.at < WORKER_LISTING_COUNTS_TTL_MS)) continue;
+      // What was last read (or that nothing could be) stays in place while it is read again.
+      const entry = { counts: held?.counts || null, failed: held?.failed || false, loading: true, at: held?.at || 0 };
+      this._workerListingCounts.set(key, entry);
+      void loadWorkerListingCounts({
+        sessionSlug: normalizeSessionSlug(scopeEntry.slug),
+        sessionConfig: scopeEntry.sessionConfig,
+        account: this._workerGroupCountAccount(scopeEntry.slug) || '',
+        providerLike: this.props.provider,
+        everyAnswerListed: listsEveryAnswer(scopeEntry.sessionConfig),
+      })
+        .then((counts) => Object.assign(entry, { counts, failed: false }))
+        // A refused or broken listing leaves no number: the tile says so rather than showing an older or partial one.
+        .catch(() => Object.assign(entry, { counts: null, failed: true }))
+        .finally(() => {
+          Object.assign(entry, { loading: false, at: Date.now() });
+          // Not forced: the caches have not changed, only these counts, which every cycle reads afresh.
+          if (!this._isUnmounted) this._queueCacheDrivenRefresh();
+        });
+    }
+  };
+
+  // What the listings give for the Worker sessions in view, tile by tile. A tile is 'ready' when every one of
+  // them was read for it, 'partial' when some could not be (the ALL view then shows the sum with a plus), and
+  // 'failed' when none could. `state` is 'none' with no Worker session in view and 'loading' until all have answered.
+  _workerListingTotals = (scopeEntries: ScopeCacheEntry[]) => {
+    const held = scopeEntries
+      .filter((scopeEntry) => scopeEntry.isWorkerCanonical)
+      .map((scopeEntry) => this._workerListingCounts.get(this._workerListingKey(scopeEntry)));
+    const responders = new Set<string>();
+    const read = { Users: 0, Questions: 0, Surveys: 0 };
+    let questions = 0;
+    let surveys = 0;
+    for (const entry of held) {
+      const counts = entry?.counts;
+      if (!counts) continue;
+      if (counts.questions !== null) {
+        questions += counts.questions;
+        read.Questions += 1;
+      }
+      if (counts.surveys !== null) {
+        surveys += counts.surveys;
+        read.Surveys += 1;
+      }
+      if (counts.responders !== null) {
+        counts.responders.forEach((responder) => responders.add(responder));
+        read.Users += 1;
+      }
+    }
+    const tileState = (label: keyof typeof read) =>
+      read[label] === held.length ? 'ready' : read[label] ? 'partial' : 'failed';
+    const state = !held.length
+      ? 'none'
+      : held.some((entry) => !entry || (!entry.counts && !entry.failed))
+        ? 'loading'
+        : `${tileState('Users')},${tileState('Questions')},${tileState('Surveys')}`;
+    return { state, questions, surveys, responders };
+  };
+
+  // A listed tile's state out of the string above: 'loading', 'ready', 'partial' or 'failed'.
+  _listedTileState = (state: string, label: string): string => {
+    if (state === 'none' || state === 'loading') return state;
+    return state.split(',')[['Users', 'Questions', 'Surveys'].indexOf(label)] || 'failed';
+  };
+
+  // Which tiles hold their final number, so each shows as soon as its own data is in rather than when all are.
+  // Only where every session in view is Worker-hosted: a chain session's readiness is one check for all tiles.
+  _readyTiles = (scopeEntries: ScopeCacheEntry[]): string => {
+    if (!scopeEntries.length || !scopeEntries.every((scopeEntry) => scopeEntry.isWorkerCanonical)) return '';
+    const { state } = this._workerListingTotals(scopeEntries);
+    const groups = scopeEntries.every((scopeEntry) => this._workerScopeEntryReadiness(scopeEntry).groups);
+    return [
+      ...['Users', 'Questions', 'Surveys'].filter((label) =>
+        ['ready', 'partial'].includes(this._listedTileState(state, label)),
+      ),
+      groups ? 'Groups' : '',
+    ]
+      .filter(Boolean)
+      .join(',');
   };
 
   checkIfInitialLoadDone = async () => {
@@ -1456,6 +1573,7 @@ export class CommunityTab extends Component<any, any> {
     let snapshot: any = null;
 
     const scopeEntries = this._iterScopeCaches({ clone: false });
+    this._ensureWorkerListingCounts(scopeEntries);
     await this._hydrateWorkerGroupCounts(scopeEntries);
     if (!isCurrent()) return { changed: false };
     const coarseSignature = this._buildCoarseCacheSignature(scopeEntries);
@@ -1474,6 +1592,40 @@ export class CommunityTab extends Component<any, any> {
       changed = true;
     } else {
       this._statsUnchangedStreak += 1;
+    }
+
+    // The tiles' numbers. Sessions on a chain count from the caches as before; Worker-hosted ones from their
+    // listings, added to those. Until the listings are in these three hold nothing, and their tiles say loading.
+    const listing = this._workerListingTotals(scopeEntries);
+    let tiles: { users: number; questions: number; surveys: number } | null = null;
+    if (listing.state === 'none') {
+      if (changed && snapshot) {
+        tiles = {
+          users: snapshot.uniqueUsers.length,
+          // This tile opens the all-type table; the separate plot remains binary-only.
+          questions: this._getQuestionDetailsRows(scopeEntries).length,
+          surveys: snapshot.surveysCreatedCount,
+        };
+      }
+    } else {
+      const chainEntries = scopeEntries.filter((scopeEntry) => !scopeEntry.isWorkerCanonical);
+      // The chain sessions' part is recounted only when the caches changed.
+      if (changed || !this._chainTileParts) {
+        const chain = chainEntries.length ? this._computeStatsSnapshot(chainEntries) : null;
+        this._chainTileParts = {
+          users: (chain?.uniqueUsers || []).map((user: unknown) => String(user).toLowerCase()),
+          questions: chainEntries.length ? this._getQuestionDetailsRows(chainEntries).length : 0,
+          surveys: chain?.surveysCreatedCount || 0,
+        };
+      }
+      // A tile holds a number only where its own listings were read (all of them, or some in the ALL view).
+      const counted = (label: string) => ['ready', 'partial'].includes(this._listedTileState(listing.state, label));
+      const parts = this._chainTileParts;
+      tiles = {
+        users: counted('Users') ? new Set([...parts.users, ...listing.responders]).size : 0,
+        questions: counted('Questions') ? parts.questions + listing.questions : 0,
+        surveys: counted('Surveys') ? parts.surveys + listing.surveys : 0,
+      };
     }
 
     this.setState((prevState: Readonly<CommunityTab['state']>) => {
@@ -1506,13 +1658,22 @@ export class CommunityTab extends Component<any, any> {
           next.usersFilterSelectionKey = selectionKey;
           next.loadingFilter = false;
         }
-        next.stats = this._buildStatsArray(prevState.stats, {
-          users: snapshot.uniqueUsers.length,
-          // This tile opens the all-type table; the separate plot remains binary-only.
-          questions: this._getQuestionDetailsRows(scopeEntries).length,
-          surveys: snapshot.surveysCreatedCount,
-          groups: snapshot.sbtsCreatedCount,
+      }
+      if (tiles) {
+        const stats = this._buildStatsArray(prevState.stats, {
+          ...tiles,
+          groups: snapshot ? snapshot.sbtsCreatedCount : prevState.sbtsCreatedCount || 0,
         });
+        const counts = (list: Array<{ count: number }>) => JSON.stringify(list.map((stat) => stat.count));
+        if (counts(stats) !== counts(prevState.stats)) next.stats = stats;
+        if (prevState.usersSnapshotSelectionKey !== selectionKey) next.usersSnapshotSelectionKey = selectionKey;
+      }
+      if (listing.state !== prevState.workerListingState) next.workerListingState = listing.state;
+      // Told apart from the numbers above: a count can be final at zero without the numbers changing.
+      const readyTiles = this._readyTiles(scopeEntries);
+      if (readyTiles !== prevState.readyTiles || prevState.readyTilesSelectionKey !== selectionKey) {
+        next.readyTiles = readyTiles;
+        next.readyTilesSelectionKey = selectionKey;
       }
       if (prevState.loadingSbtsCreated) next.loadingSbtsCreated = false;
       if (prevState.loadingSurveyData) next.loadingSurveyData = false;
@@ -2671,12 +2832,31 @@ export class CommunityTab extends Component<any, any> {
     const selectionKey = this._statsSelectionKey();
     const initialLoadDone = this.state.initialLoadDone && this.state.initialLoadSelectionKey === selectionKey;
     const selectionPublished = this.state.usersSnapshotSelectionKey === selectionKey;
+    const readyTiles =
+      selectionPublished && this.state.readyTilesSelectionKey === selectionKey ? this.state.readyTiles.split(',') : [];
+    // Users, Questions and Surveys of a Worker-hosted session come from its listings: loading until they are in,
+    // and no number at all when they could not be read.
+    const listed = (label: string) => label === 'Users' || label === 'Questions' || label === 'Surveys';
+    const listingState = this.state.readyTilesSelectionKey === selectionKey ? this.state.workerListingState : 'loading';
+    const tileState = (label: string) => (listed(label) ? this._listedTileState(listingState, label) : 'none');
+    const isCountUnread = (stat: { label: string }) => tileState(stat.label) === 'failed';
+    // In the ALL view, a sum that leaves out a session whose listing could not be read says so with a plus.
+    const isCountPartial = (stat: { label: string }) => tileState(stat.label) === 'partial';
     const isCountPending = (stat: { label: string; count: number }) =>
-      (stat.label !== 'Sessions' && (!selectionPublished || (!initialLoadDone && !stat.count))) ||
-      (stat.label === 'Groups' && loadingSbtsCreated);
+      !isCountUnread(stat) &&
+      ((stat.label !== 'Sessions' &&
+        (!selectionPublished ||
+          tileState(stat.label) === 'loading' ||
+          (!initialLoadDone && !stat.count && !readyTiles.includes(stat.label)))) ||
+        (stat.label === 'Groups' && loadingSbtsCreated));
+    // One session with no surveys has no Surveys tile: it shows only once this selection's count is in and is
+    // at least one, so it never shows and then goes. The ALL view always keeps it.
     const displayStats = this._isUniverseEnabled()
       ? [...stats, { icon: faLayerGroup, count: this._listedSessions().length, label: 'Sessions' }]
-      : stats;
+      : stats.filter(
+          (stat: { label: string; count: number }) =>
+            stat.label !== 'Surveys' || (selectionPublished && stat.count > 0),
+        );
     const sessionFiltersActive = Object.values(this.state.sessionFilters).some((value) => String(value).trim());
     return (
       <div className={styles.communityTab}>
@@ -2714,7 +2894,15 @@ export class CommunityTab extends Component<any, any> {
               >
                 <FontAwesomeIcon icon={stat.icon} size="2x" className={styles.statIcon} />
                 <span className={styles.statCount}>
-                  {isCountPending(stat) ? <FontAwesomeIcon icon={faSpinner} spin /> : stat.count}
+                  {isCountPending(stat) ? (
+                    <FontAwesomeIcon icon={faSpinner} spin />
+                  ) : isCountUnread(stat) ? (
+                    <span title="This count can't be read here">–</span>
+                  ) : isCountPartial(stat) ? (
+                    <span title="Some sessions' counts couldn't be read and are left out">{stat.count}+</span>
+                  ) : (
+                    stat.count
+                  )}
                 </span>
                 <span className={styles.statLabel}>{stat.label === 'Groups' ? t('sbts') : stat.label}</span>
               </button>
