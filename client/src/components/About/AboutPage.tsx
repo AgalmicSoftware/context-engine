@@ -1,4 +1,4 @@
-import UseCaseLoop, { showsFutureFeatures } from './UseCaseLoop';
+import UseCaseLoop from './UseCaseLoop';
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -350,20 +350,11 @@ const AboutPage = () => {
               >
                 <span className={styles.useCaseTileContent}>
                   <FontAwesomeIcon icon={useCase.icon} className={styles.useCaseIcon} />
-                  <span className={styles.useCaseLabel}>
-                    {useCase.label}
-                    {showsFutureFeatures(useCase.slug) ? (
-                      <>
-                        <span aria-hidden="true">*</span>
-                        <span className={styles.srOnly}> (its animation shows future features)</span>
-                      </>
-                    ) : null}
-                  </span>
+                  <span className={styles.useCaseLabel}>{useCase.label}</span>
                 </span>
               </button>
             ))}
           </div>
-          <p className={styles.useCaseFootnote}>* Animations marked * show future features.</p>
 
           {activeUseCaseConfig && (
             <article ref={useCaseDetailRef} className={styles.useCaseDetail} aria-live="polite" aria-atomic="true">
