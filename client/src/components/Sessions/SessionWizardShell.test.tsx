@@ -233,6 +233,8 @@ describe('SessionWizardShell', () => {
     const gates = within(access).getByTestId('shell-encryption');
     const sbtTags = within(access).getByTestId('shell-field-defaultSbtTags');
     expect(isAfter(gates, sbtTags)).toBe(true);
+    // Groups come before the access settings.
+    expect(isAfter(gates, within(access).getByTestId(E2E_TESTIDS.SETUP_ENCRYPTION))).toBe(true);
     expect(props.renderField).toHaveBeenCalledWith('defaultSbtTags', 'group, event', []);
 
     fireEvent.click(screen.getByTestId('ce-setup-more-hosting'));
