@@ -3773,16 +3773,6 @@ class UserPage extends Component<any, any> {
         </UserPageComparePanel>
 
         {!minimized && (
-          <UserPageSavedAnalysisCard
-            viewAddress={propViewAddress}
-            account={account}
-            pageSlug={String(this.props.activeSessionSlug || this.props.sessionSlug || '')}
-            profileKey={analysisProfileKey(this.props)}
-            loadOptions={this.resolveSavedAnalysisCardOptions}
-          />
-        )}
-
-        {!minimized && (
           <div className={styles.content}>
             {shownTab === 'surveys' && (
               <UserPageSurveySection
@@ -3871,6 +3861,16 @@ class UserPage extends Component<any, any> {
               isSimulated,
               onChainProfileEnabled: this.props.onChainProfileEnabled,
               provider,
+              // My own card shows only in the Analyze box; another person's sits in the side column.
+              savedCard: isOwner ? null : (
+                <UserPageSavedAnalysisCard
+                  viewAddress={propViewAddress}
+                  account={account}
+                  pageSlug={String(this.props.activeSessionSlug || this.props.sessionSlug || '')}
+                  profileKey={analysisProfileKey(this.props)}
+                  loadOptions={this.resolveSavedAnalysisCardOptions}
+                />
+              ),
               sessionConfig: this.props.sessionConfig,
               sbtSectionProps: {
                 heading: `${t('minted')} ${t('sbts')}:`,

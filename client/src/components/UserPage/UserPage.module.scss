@@ -399,6 +399,12 @@ $icon-size-standard: 1.25rem;
   flex: 1;
 }
 
+// The side column on someone else's page, where their shown picture card sits. Holding nothing (they show no
+// card), it takes no room.
+.cardColumn:empty {
+  display: none;
+}
+
 .surveySection,
 .questionSection,
 .sbtSection {
@@ -756,6 +762,11 @@ $icon-size-standard: 1.25rem;
 
   .content {
     flex-direction: column;
+  }
+
+  // On a phone the card leads the page: the column gives its boxes to the page, and the card's box goes first.
+  .cardColumn {
+    display: contents;
   }
 
   .compareSection {

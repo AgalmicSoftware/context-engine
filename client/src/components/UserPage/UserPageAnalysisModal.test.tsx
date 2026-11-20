@@ -121,7 +121,7 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getAllByRole('heading').map((node) => node.textContent)).toEqual(['Historical Alignment']);
   });
 
-  it('keeps the picture card under the analysis, with View User Card at the top once the card is whole', () => {
+  it('offers the picture card as a third view, and View User Card opens it once the card is whole', () => {
     const card = {
       own: true,
       link: 'contextengine.sh',
@@ -134,45 +134,54 @@ describe('UserPageAnalysisModal', () => {
       tastes: { book: null, game: null, film: null, song: null },
       answers: { yesNo: null, ownWords: null, vote: null },
     };
-    const scrollIntoView = jest.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
+    const pressed = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-pressed');
     const { rerender } = render(<UserPageAnalysisModal {...createProps()} />);
-    expect(screen.queryByText('Picture card')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Card' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
 
-    // The analysis is readable while the card is still being written, and no button points at a card yet.
+    // The analysis is readable while the card is still being written; the Card view says it is on its way.
     rerender(<UserPageAnalysisModal {...createProps({ analysisCardPending: true })} />);
     expect(screen.getByText('Profile synthesis')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toContain('Making the card…');
-    expect(screen.queryByTestId('analysis-card')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
     expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Card' }));
+    expect(screen.getByRole('status').textContent).toContain('Making the card…');
+    expect(screen.queryByText('Profile synthesis')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Breakdown' }));
 
-    // Its words are in but its picture is still being drawn: still no button.
+    // Its words are in but its picture is still being drawn: no button points at it yet.
     rerender(
       <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'loading' } })} />,
     );
-    expect(screen.getByTestId('analysis-card').textContent).toBe('Wants AI doing paperwork / loading');
     expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
+    expect(screen.queryByTestId('analysis-card')).toBeNull();
 
-    // Whole: one card, under the analysis in either view, and the button goes to it.
+    // Whole: the button appears at the top, opens the Card view, and steps aside there. One card, one place.
     rerender(
       <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'ready' } })} />,
     );
-    const after = screen.getByText('Profile synthesis').compareDocumentPosition(screen.getByText('Picture card'));
-    expect(after & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pressed('Breakdown')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: 'View User Card' }));
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(scrollIntoView.mock.instances[0]).toBe(screen.getByText('Picture card').parentElement);
-    expect(document.activeElement).toBe(screen.getByText('Picture card').parentElement);
-    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    expect(pressed('Card')).toBe('true');
     expect(screen.getAllByTestId('analysis-card')).toHaveLength(1);
+    expect(screen.getByTestId('analysis-card').textContent).toBe('Wants AI doing paperwork / ready');
+    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
+    expect(screen.queryByText('Profile synthesis')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    expect(screen.queryByTestId('analysis-card')).toBeNull();
+    expect(screen.getByRole('button', { name: 'View User Card' })).toBeTruthy();
 
     // A card with no picture to wait for is whole too.
     rerender(
       <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'none' } })} />,
     );
     expect(screen.getByRole('button', { name: 'View User Card' })).toBeTruthy();
+
+    // A card that is taken away leaves the Breakdown, not an empty view.
+    fireEvent.click(screen.getByRole('button', { name: 'Card' }));
+    rerender(<UserPageAnalysisModal {...createProps()} />);
+    expect(pressed('Breakdown')).toBe('true');
+    expect(screen.getByText('Profile synthesis')).toBeTruthy();
 
     // While an analysis is running or has failed there is no card to show.
     rerender(
@@ -210,6 +219,8 @@ describe('UserPageAnalysisModal', () => {
         })}
       />,
     );
+    // A new card goes on my page at once, so the box is in sight in the view the analysis opens on.
+    expect(screen.getByRole('button', { name: 'Breakdown' }).getAttribute('aria-pressed')).toBe('true');
     const box = screen.getByRole('checkbox', { name: 'Show this card on my page' }) as HTMLInputElement;
     expect(box.checked).toBe(true);
     expect(screen.getByRole('tooltip').textContent).toMatch(
@@ -232,7 +243,10 @@ describe('UserPageAnalysisModal', () => {
     expect(saving.disabled).toBe(true);
     expect(screen.getByRole('status').textContent).toBe('The card could not be saved to your page.');
 
+    // Another person's saved card: no box in any view, and its date under the card in the Card view.
     rerender(<UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardSavedAt: 7 })} />);
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Card' }));
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.getByText('Their saved card, from day 7')).toBeTruthy();
   });

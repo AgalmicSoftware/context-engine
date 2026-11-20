@@ -101,9 +101,13 @@
   cursor: help;
 }
 
-// A person's saved card, on their page.
+// A person's saved card, on their page: in the side column on a wide screen, first on the page on a phone.
 .saved {
-  margin: 16px 0;
+  margin: 0 0 20px;
+
+  @media (max-width: 768px) {
+    order: -1;
+  }
   padding: 12px 14px;
   border: 1px solid var(--ce-document-border);
   border-radius: var(--ce-radius-12);
