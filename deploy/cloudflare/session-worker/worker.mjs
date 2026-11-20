@@ -109641,6 +109641,7 @@ var access = async ({ request, env, baseHeaders, slug, deps }) => {
   if (limited) return limited;
   const changed = await callAgentSignInStore(env, context.slug, "access", { address: account, passkey: claims.actor, agentAccess: body?.agentAccess, now: nowMs(deps) });
   if (!changed.ok) return storeRefusal(changed, deps.json, headers2);
+  await setLinkedFlag(env, context.slug, account, true);
   const ended = changed.link.agentAccess === AGENT_ACCESS.CANCELLED ? await endOtherSignIns({ env, slug: context.slug, account, keepJti: claims.jti }) : null;
   return deps.json({
     ok: true,
@@ -109702,11 +109703,21 @@ var dispatchAgentSignInLinkRequest = async ({ path, request, env, baseHeaders, s
   if (!route) return deps?.json?.({ error: "Not found." }, 404, baseHeaders);
   return route({ request, env, baseHeaders, slug, deps });
 };
+var linksEverSet = (config) => !!config && Object.hasOwn(config, AGENT_SIGN_IN_LINKS_FIELD);
 var checkAgentSignInAtLogin = async ({ env, request, slug, address: address3, config, scopes } = {}) => {
   if (!isWorkerCanonical(config)) return {};
   if (!agentParticipationOn(config) && saysItIsAnAgent(request) && scopes?.admin !== true) return { refusal: { status: 403, body: OFF } };
-  const kept = await callAgentSignInStore(env, slug, "state", { address: lower13(address3) });
-  if (!kept.ok) return { refusal: { status: 503, body: UNAVAILABLE3 } };
+  if (!linksEverSet(config)) return {};
+  const kept = await callAgentSignInStore(env, slug, "state", { address: lower13(address3) }).catch(() => null);
+  if (!kept?.ok) {
+    let marked = true;
+    try {
+      const key = linkedFlagKey(slug, lower13(address3));
+      marked = !key || await env?.GROUP_KV?.get?.(key) === LINKED_FLAG;
+    } catch {
+    }
+    return marked ? { refusal: { status: 503, body: UNAVAILABLE3 } } : {};
+  }
   if (kept.asAccount?.agentAccess === AGENT_ACCESS.CANCELLED) return { refusal: { status: 403, body: CANCELLED } };
   return {
     claims: kept.asAccount ? { agentLinked: true } : {},
