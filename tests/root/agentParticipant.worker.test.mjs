@@ -2121,5 +2121,6 @@ test('a private session’s catalog refuses the link way and points to the copie
   config.storageProfile.payloadAccessControl.conditions = { match: 'any', conditions: [{ kind: 'worker_group', groupId: 'invited' }] };
   const env = createEnv([config]);
   const carol = await createAgent(env, 'carol', []);
-  await assert.rejects(carol.participant.getInterviewCatalog({ link: LINK }), /Let your AI draft your answers.*Never ask them for an invite code/);
+  // A plain link to a private session: the group's invite link, or the copied prompt, never a typed password.
+  await assert.rejects(carol.participant.getInterviewCatalog({ link: LINK }), /This session is private\..*group’s invite link.*Let your AI draft your answers.*Never ask them to type a code or a password by itself/);
 });
