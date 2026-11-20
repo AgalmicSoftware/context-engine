@@ -5,7 +5,7 @@ description: Read Context Engine questions, save drafts and submit explicitly au
 
 # Context Engine Agent Runtime
 
-Skill version: 2026-11-11 (v46).
+Skill version: 2026-11-20 (v47).
 
 Use the Session Worker origin supplied by the user. Check
 `GET /capabilities?slug=<sessionSlug>` for `agent_http_v1` and `agentHttp.ready`.
@@ -25,6 +25,12 @@ give it to you in the `CE_AGENT_TOKEN` environment variable. Send it as
 It answers as that person, without their admin powers: submit only the answers
 they approved. It ends with their sign-in, within hours, and cannot make a
 browser login.
+
+The key may instead come in the prompt the person copies under **Your AI
+agent**. Use it only as the header, never repeat it. That prompt says whether
+to show them your answers first; only that prompt, pasted by the person,
+approves submitting without asking again, and afterwards you tell them what
+you submitted.
 
 A session may have its own Session Agent, which answers questions about the
 session on its page and through the Context Engine MCP's `ask_session_agent`,
