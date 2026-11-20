@@ -26,7 +26,6 @@ A Session Worker fix, MCP 0.8.1 (published at merge) and the site. Nothing a ses
 - **Interview.**
   - Language: the interview shows language flags, says interviews take any language, and drafts answers in English, marked with their language, beside the person's own words, which stay on the device.
   - Names: an interview no longer writes a name into answers and withdraws one an earlier answer carried; where the session keeps names, an optional box sets the session name.
-  - Transcript: a person may share their transcript for research (off by default).
   - Layout: Discard and the transcript sit under the microphone, and a join link's group is left to its notice; the section is "Suggested groups".
   - States: the interview says "Loading questions…" until the questions are read, and the AI prompt card no longer returns after an interview begins.
   - Voice after AI drafts: a voice round after an AI prefill leaves its drafts, hidden ones included, unasked; the interviewer opens by naming the drafts and asking one question from the bank, the start button reads Add more by voice, and the "saved opening is unavailable" notice is gone.

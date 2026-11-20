@@ -11,6 +11,7 @@ import { mapInterviewEvidenceToResponses } from './sessionInterview';
 import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import { createPileViewRuntimeStrategy, receiveTranscriptClaim } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
+import { TRANSCRIPT_SHARING_OFFERED } from './sessionInterviewResearch';
 
 // Each scenario drives the real pile and modal with real timers, close to Jest's 5s default.
 jest.setTimeout(20_000);
@@ -348,7 +349,30 @@ it('shows the responder’s own words beside a translated draft, and never uploa
   expect(JSON.stringify(rows)).not.toMatch(/Seulement|spokenOriginal/);
 });
 
-it.each([false, true])(
+// Sharing a transcript is held back for now; these run again once the box is offered.
+const whileTranscriptOffered = TRANSCRIPT_SHARING_OFFERED ? it : it.skip;
+
+(TRANSCRIPT_SHARING_OFFERED ? it.skip : it)(
+  'offers no transcript box while sharing is held back, and sends none',
+  async () => {
+    sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true }, ...WORKER_STORED };
+    const upload = mockSession();
+    const pile = await mountWithInterview(null);
+    await openInterview(pile);
+    await speak([
+      { questionId: 'q1', answer: 'Agree', confidence: 0.9 },
+      { questionId: 'q3', answer: 'Disagree', confidence: 0.8 },
+    ]);
+    fireEvent.click(screen.getByText('AI submission info'));
+    expect(screen.queryByLabelText('Let admins read this interview’s transcript')).not.toBeInTheDocument();
+    await submitDrafts();
+    const records = upload.mock.calls[0][2].map((row) => row.interviewProvenance);
+    expect(JSON.stringify(records)).not.toMatch(/transcript|interviewId|Here is what I think now/);
+  },
+  40000,
+);
+
+whileTranscriptOffered.each([false, true])(
   'shares the voice interview transcript only when ticked (ticked: %s)',
   async (ticked) => {
     sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true }, ...WORKER_STORED };
@@ -390,21 +414,25 @@ it.each([false, true])(
 );
 
 // Submitting the AI's drafts, then talking: the next upload sends only the voice drafts, so the transcript rides on one.
-it('keeps a transcript ticked after AI drafts were submitted with an answer the next upload sends', async () => {
-  sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true }, ...WORKER_STORED };
-  const upload = mockSession();
-  await mountWithInterview(packet([{ questionId: 'q1', answer: 'Agree', confidence: 0.8, evidence: 'Said so' }]));
-  await submitDrafts();
-  expect(uploadedRows(upload, 0)).toEqual([['q1', 'Agree']]);
-  await speak([{ questionId: 'q3', answer: 'Disagree', confidence: 0.8 }]);
-  if (!screen.queryByLabelText('Let admins read this interview’s transcript'))
-    fireEvent.click(screen.getByText('AI submission info'));
-  fireEvent.click(screen.getByLabelText('Let admins read this interview’s transcript'));
-  await submitDrafts();
-  const rows = upload.mock.calls[1][2];
-  expect(rows.map((row) => row.questionID)).toEqual(['q3']);
-  expect(rows[0].interviewProvenance.transcript).toContain('Here is what I think now.');
-}, 40000);
+whileTranscriptOffered(
+  'keeps a transcript ticked after AI drafts were submitted with an answer the next upload sends',
+  async () => {
+    sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true }, ...WORKER_STORED };
+    const upload = mockSession();
+    await mountWithInterview(packet([{ questionId: 'q1', answer: 'Agree', confidence: 0.8, evidence: 'Said so' }]));
+    await submitDrafts();
+    expect(uploadedRows(upload, 0)).toEqual([['q1', 'Agree']]);
+    await speak([{ questionId: 'q3', answer: 'Disagree', confidence: 0.8 }]);
+    if (!screen.queryByLabelText('Let admins read this interview’s transcript'))
+      fireEvent.click(screen.getByText('AI submission info'));
+    fireEvent.click(screen.getByLabelText('Let admins read this interview’s transcript'));
+    await submitDrafts();
+    const rows = upload.mock.calls[1][2];
+    expect(rows.map((row) => row.questionID)).toEqual(['q3']);
+    expect(rows[0].interviewProvenance.transcript).toContain('Here is what I think now.');
+  },
+  40000,
+);
 
 // An Arweave session publishes answers whole, so admins couldn't be the only readers.
 it('offers no transcript box where answers are stored on Arweave', async () => {

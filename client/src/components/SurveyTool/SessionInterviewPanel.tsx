@@ -87,7 +87,7 @@ import {
   readAnswersToReconsider,
 } from './sessionInterviewReconsideration';
 import { draftsWithUnseenComments, useStartingInterviewComments } from './sessionInterviewComments';
-import { lockEncryptedFields, transcriptShareable } from './sessionInterviewResearch';
+import { lockEncryptedFields, transcriptOfferable } from './sessionInterviewResearch';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
 import { useKeptInterviewReview } from './sessionInterviewKeptReview';
 
@@ -471,7 +471,7 @@ export default function SessionInterviewPanel({
   const draftTextOverride = draftTextKept?.contextToken === baseSubmitContextToken ? draftTextKept.included : undefined;
   const draftTextForwarded = keepDraftTextForAdmins ? (draftTextShown ? draftTextOverride : false) : undefined;
   // Only a person's own voice interview: a group recording's transcript holds other people's words.
-  const transcriptOffered = researchAvailable && !claim && transcriptShareable(sessionConfig, mappedTranscript);
+  const transcriptOffered = researchAvailable && !claim && transcriptOfferable(sessionConfig, mappedTranscript);
   const { aiChoice, comparisonChoice, draftTextChoice, hasSavedAi } = summarizeInterviewConsent({
     drafts: consentDrafts,
     saved: savedConsent,

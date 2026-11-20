@@ -296,3 +296,10 @@ export const redactInterviewEncryptedRatings = (
  */
 export const transcriptShareable = (sessionConfig: unknown, transcript: string): boolean =>
   Boolean(transcript.trim()) && usesCloudflareSessionStorage(sessionConfig, { resource: 'responses' });
+
+/** Sharing a transcript is held back for now: the box is not offered, so no transcript rides on an answer. */
+export const TRANSCRIPT_SHARING_OFFERED = false;
+
+/** Whether the box is offered for this interview's transcript. */
+export const transcriptOfferable = (sessionConfig: unknown, transcript: string): boolean =>
+  TRANSCRIPT_SHARING_OFFERED && transcriptShareable(sessionConfig, transcript);
