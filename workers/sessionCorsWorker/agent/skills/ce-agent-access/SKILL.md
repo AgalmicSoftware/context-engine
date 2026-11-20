@@ -45,6 +45,24 @@ not infer the scale of a rating or reorder quadratic options. Locked questions
 remain unavailable even if an earlier read was allowed. `/tags` and
 `/questions/next` help select relevant unanswered questions.
 
+Send answers in `preferences`, one entry per question, shaped by the
+question's type as `answer_schema` gives it:
+
+- agree, unsure or disagree: `{ "questionId": "…", "value": "agree" }`
+- rating: `{ "questionId": "…", "value": 4 }`, a step of that question's scale
+- choose one: `{ "questionId": "…", "value": "Exact option text" }`
+- choose several: `{ "questionId": "…", "values": ["First option", "Third option"] }`,
+  every option you mean, together, in their exact text; a list in `value` is
+  read the same way
+- quadratic: `{ "questionId": "…", "value": [2, 0, -1] }`, one whole-number
+  vote per option in the question's order, squares summing within its credits
+- free text: `{ "questionId": "…", "text": "…" }`
+
+Add `"comments"` to an entry for a note. Each save or submit replaces the whole
+answer to that question: sending a choose-several answer one option at a time
+leaves only the last option. An entry the Worker could not read comes back
+under `skipped` with `answer_not_understood`; nothing was stored for it.
+
 POST `/api/agent/preferences` saves a draft by default. Submit only when the
 user authorized the particular answers; send `submit: true` with truthful
 approval metadata. Caller-asserted approval is a record of the claim, not proof
