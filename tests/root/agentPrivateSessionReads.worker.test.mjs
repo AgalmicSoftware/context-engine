@@ -9,9 +9,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { ethers } from 'ethers';
 import { createParticipant } from '../../mcp/lib/participant.mjs';
-import { createWorkerGroupPasswordKeys } from '../../shared/workerGroupJoin.mjs';
+import { createWorkerGroupPasswordKeys, hashOneUseSecret, parseWorkerGroupReadInvite } from '../../shared/workerGroupJoin.mjs';
 import {
-  APP_ORIGIN, SESSION_ID, SLUG, WORKER_ORIGIN, createSessionEnv, fetchWorker, login, signedAdminRequest, uploadJson,
+  APP_ORIGIN, SESSION_ID, SLUG, WORKER_ORIGIN, createSessionEnv, fetchWorker, login, signedAdminRequest, uploadJson, withoutNonceLimit,
 } from '../../workers/sessionCorsWorker/sessionWorkerRuntimeFixture.mjs';
 
 const GROUP = 'salon';
@@ -19,10 +19,12 @@ const PASSWORD = 'correct horse battery';
 const CODE = 'c0'.repeat(16);
 const keys = createWorkerGroupPasswordKeys(ethers);
 const pageLink = `${APP_ORIGIN}/session/${SLUG}?worker=${encodeURIComponent(WORKER_ORIGIN)}`;
-const groupLink = (token) => `${pageLink}&joinGroup=${GROUP}#groupInvite=${encodeURIComponent(token)}`;
+const groupLink = (token, group = GROUP) => `${pageLink}&joinGroup=${group}#groupInvite=${encodeURIComponent(token)}`;
+// A second group, joined by one-use codes.
+const CODES = 'by-code';
 
 const privateOverrides = (visibility) => {
-  const accessConditions = { match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupIds: [GROUP] }] };
+  const accessConditions = { match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupIds: [GROUP, CODES] }] };
   const payloadAccessControl = { gate: 'role_gate', encryption: 'worker_envelope', accessConditions };
   return {
     sessionName: 'Secret salon',
@@ -57,6 +59,7 @@ const privateOverrides = (visibility) => {
 const setup = async (t, { visibility = 'session_member_full' } = {}) => {
   const { env, admin } = createSessionEnv({ configOverrides: privateOverrides(visibility) });
   env.CE_STORAGE_ENVELOPE_KEK = 'synthetic-private-session-kek';
+  withoutNonceLimit(env);
   const created = await signedAdminRequest({
     env, wallet: admin, action: 'groups/create', body: { group: { groupId: GROUP, label: 'Salon', joinMode: 'group_password', memberVisibility: 'session' } },
   });
@@ -192,8 +195,8 @@ test('a one-use code, a wrong password and a plain link read nothing, and each s
       told.push(error.message);
     }
   };
-  // A code works once, to join: reading never spends or sends it.
-  await refused(groupLink(CODE), /one-use code.*can’t be used to read.*join_session/);
+  // A code for a group that takes none, or that nobody was given: never sent, and it reads nothing.
+  await refused(groupLink(CODE), /one-use code no longer opens it/);
   assert.equal(JSON.stringify(seen).includes(CODE), false);
   await refused(groupLink('gp:a wrong password here'), /group password no longer opens it/);
   await refused(pageLink, /private/);
@@ -310,4 +313,94 @@ test('two links to one session read as the group each names, and a session opene
   const after = new Set(seen.map((call) => call.invite).filter(Boolean));
   assert.ok([...after].some((invite) => invite.startsWith('v2:other:')));
   assert.ok([...sent].every((invite) => invite.startsWith(`v2:${GROUP}:`)));
+});
+
+const codeSetup = async (t) => {
+  const made = await setup(t);
+  const { env, admin } = made;
+  const signed = (action, body) => signedAdminRequest({ env, wallet: admin, action, body });
+  assert.equal((await signed('groups/create', { group: { groupId: CODES, label: 'By code', joinMode: 'one_use', memberVisibility: 'session' } })).status, 200);
+  assert.equal((await signed('groups/invites/add', { groupId: CODES, hashes: [await hashOneUseSecret(CODE)] })).status, 200);
+  const counts = async () => (await signed('groups/invites/list', { groupId: CODES })).body.counts;
+  return { ...made, signed, counts, link: groupLink(CODE, CODES) };
+};
+
+test('a link with an unused one-use code reads a private session, and the code is still there for whoever joins', async (t) => {
+  const { participant, seen, questionIds, stateDir, counts, link, clock } = await codeSetup(t);
+
+  const session = await participant.getSession({ session: link });
+  assert.equal(session.title, 'Secret salon');
+  assert.equal(session.joined, false);
+  assert.match(session.note, /one-use invite code in the link is still unused/);
+  const listed = await participant.listQuestions({ session: link });
+  assert.deepEqual(listed.questions.map((question) => question.id).sort(), questionIds);
+  const catalog = await participant.getInterviewCatalog({ link });
+  assert.deepEqual(catalog.questions.map((question) => question.id).sort(), questionIds);
+  const results = await participant.getResults({ session: link });
+  assert.equal(results.participants, 1);
+  const context = await participant.listContext({ session: link });
+
+  // Nothing was signed in, joined, written or kept, and the code is unused.
+  assert.ok(seen.every((call) => !call.authorization));
+  assert.ok(seen.every((call) => !/^\/(auth|groups\/join|storage\/upload)/.test(new URL(call.url).pathname)));
+  assert.deepEqual(await counts(), { unused: 1, used: 0, revoked: 0 });
+  assert.deepEqual((await participant.whoami()).sessions, []);
+  // The code never left, whole or as its hash; what was sent is the start of the hash and a keyed hash.
+  const hash = await hashOneUseSecret(CODE);
+  const everything = JSON.stringify(seen) + JSON.stringify([session, listed, catalog, results, context]) +
+    await fs.readFile(path.join(stateDir, 'state.json'), 'utf8').catch(() => '');
+  assert.equal(everything.includes(CODE) || everything.includes(hash), false);
+  const proofs = [...new Set(seen.map((call) => call.invite).filter(Boolean))];
+  assert.equal(proofs.length, 1);
+  assert.equal(parseWorkerGroupReadInvite(proofs[0]).hashPrefix, hash.slice(0, 16));
+  const told = JSON.stringify([session, listed, catalog, results, context]);
+  assert.equal(told.includes(proofs[0].split(':')[4]) || told.includes('groupInvite'), false);
+  assert.equal(JSON.stringify(seen.map(({ url, body }) => ({ url, body }))).includes(proofs[0].split(':')[4]), false);
+
+  // A proof names a time a few minutes off; a later read makes another, and still spends nothing.
+  clock.advance(20 * 60 * 1000);
+  assert.equal((await participant.listQuestions({ session: link })).total, 2);
+  assert.equal(new Set(seen.map((call) => call.invite).filter(Boolean)).size, 2);
+  assert.deepEqual(await counts(), { unused: 1, used: 0, revoked: 0 });
+});
+
+test('joining with a one-use code asks first, uses it up when told to, and ends reading for anyone else holding it', async (t) => {
+  const { env, participant, seen, counts, link } = await codeSetup(t);
+  assert.equal((await participant.listQuestions({ session: link })).total, 2);
+
+  const asked = await participant.joinSession({ link });
+  assert.equal(asked.joined, false);
+  assert.match(asked.note, /joining uses it up/);
+  assert.ok(seen.every((call) => !call.authorization && !new URL(call.url).pathname.startsWith('/auth/')));
+  assert.deepEqual(await counts(), { unused: 1, used: 0, revoked: 0 });
+  // Still reading, as before.
+  assert.equal((await participant.listQuestions({ session: link })).total, 2);
+
+  const joined = await participant.joinSession({ link, spendInviteCode: true });
+  assert.equal(joined.joinedGroup, CODES);
+  assert.equal(joined.title, 'Secret salon');
+  assert.deepEqual(await counts(), { unused: 0, used: 1, revoked: 0 });
+  // The one who joined reads on as a member, link or no link.
+  assert.equal((await participant.listQuestions({ session: link, filter: 'all' })).joined, undefined);
+  assert.equal((await participant.listQuestions({ filter: 'all' })).total, 2);
+
+  // Another agent handed the same link afterwards reads nothing, and is told why.
+  const otherDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-agent-reader-'));
+  t.after(() => fs.rm(otherDir, { recursive: true, force: true }));
+  const other = createParticipant({
+    config: { stateDir: otherDir, profile: {}, appOrigin: APP_ORIGIN, trustedAppOrigins: [APP_ORIGIN], allowLocalWorkers: false },
+    wallet: ethers.Wallet.createRandom(),
+    fetchImpl: async (url, init = {}) => fetchWorker(new Request(url, { method: init.method || 'GET', headers: init.headers, body: init.body }), env),
+  });
+  for (const read of [() => other.getSession({ session: link }), () => other.getInterviewCatalog({ link })]) {
+    await assert.rejects(read(), /one-use code no longer opens it: the code has been used or withdrawn/);
+  }
+});
+
+test('a code withdrawn while an agent is reading with it ends the reading', async (t) => {
+  const { participant, signed, link, clock } = await codeSetup(t);
+  assert.equal((await participant.listQuestions({ session: link })).total, 2);
+  assert.equal((await signed('groups/invites/revoke', { groupId: CODES, allUnused: true })).body.revoked, 1);
+  clock.advance(31_000);
+  await assert.rejects(participant.listQuestions({ session: link }), /one-use code no longer opens it/);
 });

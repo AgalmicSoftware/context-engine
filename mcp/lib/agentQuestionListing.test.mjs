@@ -395,10 +395,18 @@ test('a link’s one-use code goes with the join to its group, and is never show
   const sent = [];
   const { participant, joined } = await setup(t, { onJoin: joinedGroup(sent), linkSuffix: `#groupInvite=${code}` });
   assert.equal(JSON.stringify(joined).includes(code), false);
-  assert.equal((await callTool(participant, 'join_group', { groupId: GROUP_ID })).result.isError, undefined);
+  // Joining uses the code up, so it waits to be told: nothing is sent until then.
+  const asked = await callTool(participant, 'join_group', { groupId: GROUP_ID });
+  const told = JSON.parse(asked.result.content[0].text);
+  assert.equal(told.joined, false);
+  assert.match(told.note, /spendInviteCode true/);
+  assert.equal(JSON.stringify(asked).includes(code), false);
+  assert.equal((JSON.parse((await callTool(participant, 'join_group', { groupId: GROUP_ID, invite: 'D1'.repeat(16) })).result.content[0].text)).joined, false);
+  assert.deepEqual(sent, []);
+  assert.equal((await callTool(participant, 'join_group', { groupId: GROUP_ID, spendInviteCode: true })).result.isError, undefined);
   assert.deepEqual(sent[0], { sessionId: sessionId.toLowerCase(), groupId: GROUP_ID, secret: code });
   // A code passed to join_group wins over the link's.
-  await callTool(participant, 'join_group', { groupId: GROUP_ID, invite: 'D1'.repeat(16) });
+  await callTool(participant, 'join_group', { groupId: GROUP_ID, invite: 'D1'.repeat(16), spendInviteCode: true });
   assert.equal(sent[1].secret, 'd1'.repeat(16));
 });
 
@@ -424,7 +432,7 @@ test('a refused or unusable invite says what to do', async (t) => {
     sent.push(body);
     return Response.json({ error: 'Worker group request failed.', reason: 'worker_group_join_refused' }, { status: 403 });
   } });
-  const refused = await callTool(participant, 'join_group', { groupId: GROUP_ID, invite: 'ab'.repeat(16) });
+  const refused = await callTool(participant, 'join_group', { groupId: GROUP_ID, invite: 'ab'.repeat(16), spendInviteCode: true });
   assert.match(refused.result.content[0].text, new RegExp(`didn’t work for group "${GROUP_ID}"\\. Ask whoever invited you for a new one`));
   for (const [invite, says] of [['inv:abc', /aren’t supported yet/], ['short', /neither a 32-character code nor a group password/]]) {
     const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID, invite });

@@ -1638,7 +1638,7 @@ test('an agent sees the session’s instructions and groups, joins the group the
     /^Error: Group "no-such-group" didn’t let you in, and no invite was sent\. .*check the group id with get_session\.$/,
   );
   await assert.rejects(
-    kami.participant.joinGroup({ groupId: 'no-such-group', invite: 'ab'.repeat(16) }),
+    kami.participant.joinGroup({ groupId: 'no-such-group', invite: 'ab'.repeat(16), spendInviteCode: true }),
     /^Error: That link, invite or password didn’t work for group "no-such-group"\. Ask whoever invited you for a new one\.$/,
   );
 
@@ -1753,7 +1753,7 @@ test('groups say how joining works and who can end a membership, and a leave the
     'Members only': ['Open: join with join_group.', 'Members can leave with leave_group; admins can’t remove them.'],
     Fixed: ['Open: join with join_group.', 'No one can end a membership.'],
     'By invitation': ['Only admins add members.', 'Members can leave with leave_group, and admins can remove them.'],
-    'By code': ['By one-use code: pass it to join_group as invite, unless the session link carried it.', 'Members can leave with leave_group, and admins can remove them.'],
+    'By code': ['By one-use code: pass it to join_group as invite, unless the session link carried it, with spendInviteCode true. Joining uses the code up.', 'Members can leave with leave_group, and admins can remove them.'],
     'By password': ['By group password: pass it to join_group as invite, unless the session link carried it.', 'Members can leave with leave_group, and admins can remove them.'],
     Closed: ['Joining has closed.', 'Members can leave with leave_group, and admins can remove them.'],
     Full: ['Full.', 'Members can leave with leave_group, and admins can remove them.'],

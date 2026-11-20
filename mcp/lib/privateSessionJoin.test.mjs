@@ -25,7 +25,7 @@ const setup = async (t, { joinRefused = false, olderWorker = false } = {}) => {
   t.after(() => rm(stateDir, { recursive: true, force: true }));
   const { wallet } = await loadOrCreateWallet(stateDir, { privateKey: ethers.Wallet.createRandom().privateKey });
   const signer = await keys.signerOf({ password: PASSWORD, sessionId: sessionId.toLowerCase(), groupId: GROUP_ID });
-  const seen = { invites: [], joins: [], configs: [] };
+  const seen = { invites: [], joins: [], configs: [], paths: [] };
   let member = false;
   const admitted = (headers) => {
     if (member && headers.get('authorization')) return true;
@@ -38,6 +38,7 @@ const setup = async (t, { joinRefused = false, olderWorker = false } = {}) => {
     const path = new URL(input).pathname;
     const headers = new Headers(init.headers);
     seen.invites.push(headers.get('x-ce-group-invite') || '');
+    seen.paths.push(path);
     if (path === '/session-config') {
       const whole = admitted(headers);
       seen.configs.push(whole ? 'whole' : 'shell');
@@ -117,21 +118,43 @@ test('join_group takes a pasted invite link, naming its group, and reads the ses
 
 test('a member rejoining from a plain link reads the session whole once signed in', async (t) => {
   const { participant, seen } = await setup(t);
-  await participant.joinSession({ link: link(`#groupInvite=${CODE}`) });
+  await participant.joinSession({ link: link(`#groupInvite=${CODE}`), spendInviteCode: true });
   const again = await participant.joinSession({ link: `https://contextengine.sh/session/${slug}?worker=${encodeURIComponent(corsWorkerUrl)}` });
   assert.equal(again.privateSession, undefined);
   assert.equal(again.title, 'Secret salon');
   assert.equal(seen.configs.at(-1), 'whole');
 });
 
-test('a one-use code makes no read invite, so the session is read whole once the join it pays for is made', async (t) => {
+test('a one-use code is used up by joining only when the call says so; nothing is signed or stored before', async (t) => {
   const { participant, seen } = await setup(t);
-  const joined = await participant.joinSession({ link: link(`#groupInvite=${CODE}`) });
+  const asked = await participant.joinSession({ link: link(`#groupInvite=${CODE}`) });
+  assert.equal(asked.joined, false);
+  assert.equal(asked.inviteCode, 'unused');
+  assert.match(asked.note, /one-use code: joining uses it up.*spendInviteCode true.*ask them first/);
+  assert.equal(JSON.stringify(asked).includes(CODE), false);
+  assert.deepEqual(seen.joins, []);
+  assert.deepEqual(seen.paths.filter((path) => path.startsWith('/auth/')), []);
+  assert.deepEqual((await participant.whoami()).sessions, []);
+  for (const no of [false, 'true', 1]) assert.equal((await participant.joinSession({ link: link(`#groupInvite=${CODE}`), spendInviteCode: no })).joined, false);
+  assert.deepEqual(seen.joins, []);
+
+  const joined = await participant.joinSession({ link: link(`#groupInvite=${CODE}`), spendInviteCode: true });
   assert.equal(seen.joins[0].secret, CODE);
   assert.ok(seen.invites.every((invite) => invite === ''));
   assert.equal(joined.joinedGroup, GROUP_ID);
   assert.equal(joined.title, 'Secret salon');
   assert.equal(JSON.stringify(joined).includes(CODE), false);
+});
+
+test('a Worker from before reading with a code is sent no code proof, and the agent is told joining would use the code up', async (t) => {
+  for (const olderWorker of [false, true]) {
+    const { participant, seen } = await setup(t, { olderWorker });
+    for (const read of [() => participant.getSession({ session: link(`#groupInvite=${CODE}`) }), () => participant.getInterviewCatalog({ link: link(`#groupInvite=${CODE}`) })]) {
+      await assert.rejects(read(), /from before reading with a code.*uses the code up.*ask the person/);
+    }
+    assert.ok(seen.invites.every((invite) => invite === ''));
+    assert.deepEqual(seen.joins, []);
+  }
 });
 
 test('a Worker from before proofs that name their Worker is sent no read proof; the join still opens the session', async (t) => {

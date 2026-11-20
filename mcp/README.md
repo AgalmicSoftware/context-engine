@@ -124,8 +124,10 @@ A private session, one whose access rule names groups, shows nothing to an
 agent outside them. `join_session` reads it with the link's group password (a
 read statement signed with the same derived key, sent as `X-CE-Group-Invite`
 and spending nothing), signs in, and joins the link's group before anything
-else; a one-use code link joins first and then reads. Without a usable invite
-it returns `privateSession` and a note instead of the session's content.
+else. A link with a one-use code is not joined until the call passes
+`spendInviteCode: true`, since joining uses the code up; reading needs no
+join (see Upgrading to 0.8.0). Without a usable invite `join_session` returns
+`privateSession` and a note instead of the session's content.
 
 ### From a shell
 
@@ -250,11 +252,18 @@ Worker each tool says so and does nothing new.
   `list_context`, `read_context` and `get_results` take the link of a session
   the agent has not joined and read it as a visitor would: no sign-in, no
   join, nothing stored. A private session opens to its group's invite link,
-  the one that carries the password, and shows what that group's members may
-  read. `get_interview_catalog` and `make_review_link` take the same link.
-  The password is never sent: it signs a proof that names the session, the
-  group and the Worker it is for, sent in a header. A one-use code can't
-  read; it works once, to join, and the tools say so.
+  the one that carries the password or a one-use code, and shows what that
+  group's members may read. `get_interview_catalog` and `make_review_link`
+  take the same link. Neither is ever sent. A password signs a proof that
+  names the session, the group and the Worker it is for; a one-use code keys
+  a proof that names the same and a time a few minutes off. Both go in a
+  header. Reading leaves a code unused, and stops once someone joins with it
+  or an admin withdraws it.
+- **Joining asks before it uses up a one-use code.** `join_session` on a
+  private session, and `join_group`, join with a one-use code only when the
+  call passes `spendInviteCode: true`. Without it they return `joined: false`
+  and spend, store and sign nothing. An agent that joined with a code
+  unasked before must now pass the flag.
 - **`get_analysis_card`** reads a person's saved analysis card where the
   session lets the agent read that person's answers: its words on any Worker
   with the card, and the matched figure's picture and the drawn pages, as

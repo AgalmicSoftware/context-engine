@@ -29,7 +29,8 @@ import {
   ANALYSIS_CARD_DRAWING_FEATURE, ANALYSIS_CARD_FEATURE, isAnalysisCardPicture, normalizeAnalysisCardDrawing, normalizeSavedAnalysisCard,
 } from '../../shared/analysisCardSaved.mjs';
 import {
-  WORKER_GROUP_READ_PROOF_V2_FEATURE, createWorkerGroupPasswordKeys, formatWorkerGroupReadInvite, parseGroupInviteToken,
+  WORKER_GROUP_READ_CODE_FEATURE, WORKER_GROUP_READ_PROOF_V2_FEATURE, buildWorkerGroupReadCodeInvite, createWorkerGroupPasswordKeys,
+  formatWorkerGroupReadInvite, hashOneUseSecret, parseGroupInviteToken,
 } from '../../shared/workerGroupJoin.mjs';
 import { AGENT_SIGN_IN_FEATURE, agentParticipationOn, agentSignInLinksOn, buildAgentSignInLink } from '../../shared/agentSignIn.mjs';
 import { ethers } from 'ethers';
@@ -120,10 +121,13 @@ const CONTEXT_NO_FETCH = 'This session doesn’t let you have its Worker fetch p
 const CONTEXT_RATE_LIMITED = 'The session’s Worker is rate limiting you, so nothing was added. Retry in a few minutes; if it still refuses, you may have reached the session’s daily limit for your address, which clears within a day.';
 
 // Reading a session from its link without joining it: what the read tools say, and why a private one stays shut.
-const READ_ONLY_NOTE = 'Read from the link without joining: you are not a participant here, and nothing was stored or spent. To take part, call join_session with the link. Tools called without a session still act on the session you joined most recently, not this one.';
+const READ_ONLY_NOTE = 'Read from the link without joining: you are not a participant here, and nothing was stored or spent; a one-use invite code in the link is still unused. To take part, call join_session with the link. Tools called without a session still act on the session you joined most recently, not this one.';
 const READ_NEEDS_NEWER_WORKER = 'This session is private, and its Session Worker is from before reading by link, so it can’t be read here without joining. If the person wants you to take part, call join_session with the link.';
 const READ_NEEDS_PASSWORD_LINK = 'This session is private, and this link doesn’t open it for reading. Ask the person for the group’s invite link, the one that carries its password, and pass that whole link as session. Never ask them to type the password by itself.';
-const READ_ONE_USE_CODE = 'This session is private, and this link’s invite is a one-use code. A code can’t be used to read: it works once, to join. Reading here needs joining first, which spends the code, so ask the person before calling join_session with the link.';
+const READ_CODE_NEEDS_NEWER_WORKER = 'This session is private, this link’s invite is a one-use code, and its Session Worker is from before reading with a code. Reading here needs joining first, which uses the code up, so ask the person before calling join_session with the link and spendInviteCode true.';
+const READ_CODE_STALE = 'This session is private, and this link’s one-use code no longer opens it: the code has been used or withdrawn, or its group is no longer let in. If you joined with it, call the tool without the link. Otherwise ask the person for a current invite link.';
+// Said in place of joining, so a code is never used up unasked.
+const SPEND_CODE_FIRST = 'Not joined, and nothing was spent or stored. This invite is a one-use code: joining uses it up, and nobody else, the person included, can then join with it. Reading needs no join: pass the whole link as session to get_session, list_questions or get_results. If the person asked you to take part with this link, call this again with spendInviteCode true; if you aren’t sure the code is meant for you, ask them first.';
 const READ_INVITE_STALE = 'This session is private, and this link’s group password no longer opens it: the password may have changed, or the group may no longer be let in. Ask the person for the current invite link.';
 const READ_ONLY_REGISTRY = 'An on-chain session can’t be read here without joining; call join_session with the link.';
 
@@ -341,7 +345,7 @@ const WHO_CAN_END_MEMBERSHIP = {
 // takes only members its admins add.
 const SELF_JOINING = {
   open: 'Open: join with join_group.',
-  one_use: 'By one-use code: pass it to join_group as invite, unless the session link carried it.',
+  one_use: 'By one-use code: pass it to join_group as invite, unless the session link carried it, with spendInviteCode true. Joining uses the code up.',
   // Backticks, not quotes: the release secret scan flags a quoted value under a key containing "password".
   group_password: `By group password: pass it to join_group as invite, unless the session link carried it.`,
 };
@@ -376,7 +380,7 @@ const groupJoinCredential = async ({ token, sessionId, groupId, address }) => {
 };
 
 // What lets a private session's agent read before it joins: a group password
-// signs a read proof for its session and group. A code makes none. The proof
+// signs a read proof for its session and group. The proof
 // names the Worker it is sent to, which is whatever Worker a link names: one
 // that only claims to hold the session gets a proof no other Worker accepts.
 // The older form, which names no Worker, is never made here.
@@ -392,6 +396,13 @@ const groupReadInvite = async ({ token, sessionId, groupId, workerOrigin }) => {
 };
 // Whether a Worker takes that proof. One from before it is sent none.
 const takesBoundReadProof = async (ctx) => !!(await ctx.client.readFeatures())?.includes(WORKER_GROUP_READ_PROOF_V2_FEATURE);
+// A one-use code reads too, and reading leaves it unused. The code is never sent: its hash keys a proof that names
+// the session, the group, the Worker and a time a few minutes off, made afresh as that time nears. Only the hash
+// is kept, in memory, and only while the session is held open for reading.
+const CODE_READ_SECONDS = 15 * 60;
+const CODE_READ_RENEW_SECONDS = 5 * 60;
+const takesCodeRead = async (ctx) => !!(await ctx.client.readFeatures())?.includes(WORKER_GROUP_READ_CODE_FEATURE);
+const isOneUseCode = (token) => parseGroupInviteToken(token)?.kind === 'one_use';
 // Sessions held open for reading at one time; the least recently opened goes first.
 const MAX_READER_SESSIONS = 8;
 const tokenMark = (token) => (token ? createHash('sha256').update(token).digest('hex') : '');
@@ -771,6 +782,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
 
   // A session read from its link by an agent that hasn't joined it: no sign-in, no state kept, and
   // for a private session the read invite its group password makes. The invite stays in memory.
+  const renewCodeRead = async (ctx) => {
+    const held = ctx.codeRead;
+    const nowSeconds = Math.floor(now() / 1000);
+    if (!held || held.expires - nowSeconds > CODE_READ_RENEW_SECONDS) return;
+    held.expires = nowSeconds + CODE_READ_SECONDS;
+    ctx.client.setGroupReadInvite(await buildWorkerGroupReadCodeInvite({
+      codeHash: held.codeHash, sessionId: ctx.client.sessionId, groupId: held.groupId, workerOrigin: ctx.info.workerOrigin, expires: held.expires,
+    }));
+  };
+
   const openReader = async (parsed) => {
     if (parsed.kind === 'registry') throw new Error(READ_ONLY_REGISTRY);
     const key = `reader ${sessionKey(parsed)}`;
@@ -810,6 +831,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           await ctx.client.loadConfig();
         }
       }
+      if (ctx.client.privateSession && isOneUseCode(groupInvite) && parsed.joinGroupId) {
+        if (!(await takesCodeRead(ctx))) throw new Error(READ_CODE_NEEDS_NEWER_WORKER);
+        ctx.codeRead = { codeHash: await hashOneUseSecret(parseGroupInviteToken(groupInvite).secret), groupId: trim(parsed.joinGroupId).toLowerCase(), expires: 0 };
+        await renewCodeRead(ctx);
+        await ctx.client.loadConfig();
+      }
       sessions.delete(key);
       sessions.set(key, ctx);
       const readers = [...sessions.keys()].filter((name) => name.startsWith('reader '));
@@ -817,9 +844,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     }
     if (ctx.client.privateSession) {
       sessions.delete(key);
-      const kind = parseGroupInviteToken(groupInvite)?.kind;
-      throw new Error(kind === 'one_use' ? READ_ONE_USE_CODE : kind === 'password' && parsed.joinGroupId ? READ_INVITE_STALE : READ_NEEDS_PASSWORD_LINK);
+      const kind = parsed.joinGroupId ? parseGroupInviteToken(groupInvite)?.kind : '';
+      throw new Error(kind === 'one_use' ? READ_CODE_STALE : kind === 'password' ? READ_INVITE_STALE : READ_NEEDS_PASSWORD_LINK);
     }
+    await renewCodeRead(ctx);
     return ctx;
   };
 
@@ -864,12 +892,13 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   // Re-reads the session config every 30 seconds so admin changes (blocked
   // questions, results visibility, end time) apply to a long-running agent.
   const ensureReady = async (ctx) => {
+    if (ctx.readOnly) await renewCodeRead(ctx);
     await ctx.client.refreshConfig();
     if (ctx.readOnly) {
-      // The password changed, or the group left the rule, since the link was opened.
+      // The password changed, the code was used or withdrawn, or the group left the rule, since the link was opened.
       if (ctx.client.privateSession) {
         sessions.delete(`reader ${sessionKey(ctx.info)}`);
-        throw new Error(READ_INVITE_STALE);
+        throw new Error(ctx.codeRead ? READ_CODE_STALE : READ_INVITE_STALE);
       }
       return ctx.client.config;
     }
@@ -1248,7 +1277,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       };
     },
 
-    async joinSession({ link, worker, session, inviteCode, groupPassword, claimPassword } = {}) {
+    async joinSession({ link, worker, session, inviteCode, groupPassword, claimPassword, spendInviteCode } = {}) {
       let parsed;
       if (trim(link)) {
         parsed = await resolveLink(link);
@@ -1285,6 +1314,12 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       // A private session shows only its shell until the link's invite, or a
       // membership, admits the agent; the invite is held in memory like the link's.
       const privateSession = !ctx.registry && !!ctx.client.privateSession;
+      // A private session is joined through the link's group at once, which would use a one-use code up. That
+      // is asked for in so many words, before any sign-in; reading the session needs neither.
+      if (privateSession && parsed.joinGroupId && isOneUseCode(groupInvite) && spendInviteCode !== true) {
+        sessions.delete(sessionKey(parsed));
+        return { session: parsed.slug, joined: false, inviteCode: 'unused', note: SPEND_CODE_FIRST };
+      }
       // Joined now: nothing is read for this session as a visitor any more.
       sessions.delete(`reader ${sessionKey(parsed)}`);
       // A Worker from before proofs that name their Worker is sent none: the join below opens the session.
@@ -1872,7 +1907,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       return images.length ? withToolImages(result, images) : result;
     },
 
-    async joinGroup({ session, groupId, invite } = {}) {
+    async joinGroup({ session, groupId, invite, spendInviteCode } = {}) {
       const ctx = await resolveSession(session);
       if (ctx.registry) throw new Error('Worker groups are not available in on-chain sessions.');
       await ensureReady(ctx);
@@ -1892,6 +1927,9 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id, or the group’s invite link as invite.');
       // An invite passed here wins over the one the session link carried.
       const token = pasted || ctx.groupInvites?.get(id.toLowerCase()) || '';
+      if (isOneUseCode(token) && spendInviteCode !== true) {
+        return { session: ctx.info.slug, groupId: id, joined: false, inviteCode: 'unused', note: SPEND_CODE_FIRST };
+      }
       const credential = token
         ? await groupJoinCredential({ token, sessionId: ctx.client.sessionId, groupId: id.toLowerCase(), address: wallet.address })
         : {};
