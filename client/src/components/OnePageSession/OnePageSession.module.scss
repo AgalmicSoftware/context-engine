@@ -991,6 +991,24 @@
   font-size: 0.9rem;
 }
 
+// "Joined …" or "Left …" above a group list says what a tap did, so it reads as text, not a faint aside.
+.workerGroupsListPanel > .agentReportApprox {
+  color: inherit;
+  font-weight: 600;
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .workerGroupsListPanel > .agentReportApprox {
+    color: var(--ce-document-text);
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .workerGroupsListPanel > .agentReportApprox {
+    color: var(--ce-panel-text);
+  }
+}
+
 .agentTopicPrompt {
   white-space: pre-wrap;
   overflow-x: auto;

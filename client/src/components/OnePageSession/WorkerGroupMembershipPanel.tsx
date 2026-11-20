@@ -985,8 +985,10 @@ const WorkerGroupMembershipPanel = ({
     }
     if (isMember) {
       const isLeaving = membershipAction === 'leave';
+      // Its own key: reusing the Join button would fade its dark fill under Leave's dark text.
       return (
         <button
+          key="leave"
           type="button"
           className={styles.workerGroupCardLeaveButton}
           disabled={isLeaving}
@@ -1025,6 +1027,7 @@ const WorkerGroupMembershipPanel = ({
       return (
         <>
           <button
+            key="join"
             type="button"
             className={styles.workerGroupCardPrimaryButton}
             disabled={isJoining}
