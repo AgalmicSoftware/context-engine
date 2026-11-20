@@ -4,13 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.23] - 2026-11-20
 
-A Session Worker fix, MCP 0.8.1 (published at merge) and the site. Nothing a session already stores is changed.
+A Session Worker fix, MCP 0.9.0 (published at merge) and the site. Nothing a session already stores is changed.
 
 ### Session Worker — needs a Worker update
 
 - **Agent routes answer Safari's preflight.** Safari, and every browser on an iPhone, sends a preflight with an empty body (`Content-Length: 0`). The agent routes (`/api/agent/*`) tried to read it as JSON and answered 400, so every site call to them that needs a preflight failed there, "Make a key" among them. A preflight's body is no longer read, and an empty body on any other request counts as no body; a non-empty body that is not a JSON object is still refused. The general routes (sign-in, sign-in links, storage, AI, groups) were not affected.
 
-### MCP 0.8.1
+### MCP 0.9.0
 
 - A refused `join_group` or `leave_group`, and a refused group join in `join_session`, names the group as the site shows it, with its id. The name is read only after a clear refusal, briefly; after a busy session or no answer the id alone is given.
 - `make_review_link` writes a shorter link, its drafts deflated after `#prefillz=` (about 60% shorter for 40 drafts), where the session's site says it reads one: it asks the site's `/manifest.json` for `context_engine_review_links`, keeping a clear answer for the run and asking again after 5 minutes when the check failed. A site that doesn't list it, or doesn't answer within 3 seconds, gets `#prefill=` as before.

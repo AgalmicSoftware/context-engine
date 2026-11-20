@@ -244,7 +244,7 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
-## Upgrading to 0.8.1
+## Upgrading to 0.9.0
 
 - A group's refusal names the group as the site shows it, quoted, with its
   id: `Group "Edge City" (9f63…) isn’t open to joining`.
