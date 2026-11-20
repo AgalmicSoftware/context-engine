@@ -3946,6 +3946,29 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// The globe and round flags beside the title; a faint ring keeps white flags apart from a light header.
+.sessionInterviewLanguages {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline: 4px;
+  color: var(--ce-panel-text);
+  font-size: 1rem;
+
+  [role='list'] {
+    display: flex;
+    gap: 4px;
+  }
+
+  svg[role='img'] {
+    display: block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-panel-text) 30%, transparent);
+  }
+}
+
 .sessionInterviewStatusPill {
   display: inline-flex;
   align-items: center;

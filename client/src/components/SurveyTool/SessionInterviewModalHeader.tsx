@@ -3,6 +3,7 @@ import { ModalHeader, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import SessionInterviewLanguageMarks from './SessionInterviewLanguageMarks';
 import SessionVoiceModeBackButton, { VoiceModeBackContext } from './SessionVoiceModeBack';
 import styles from './SurveyTool.module.scss';
 
@@ -57,6 +58,7 @@ export default function SessionInterviewModalHeader({
         <UncontrolledTooltip target="ce-interview-help" placement="bottom" trigger="hover focus" autohide={false}>
           {guidance} {INTERVIEW_LANGUAGE_HINT}
         </UncontrolledTooltip>
+        <SessionInterviewLanguageMarks />
         <span
           role="status"
           aria-live="polite"

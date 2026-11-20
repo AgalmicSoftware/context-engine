@@ -508,6 +508,19 @@ describe('SessionVoiceModeModal', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Stopping prepares drafts for your review');
     expect(screen.getByRole('tooltip')).toHaveTextContent('You can answer in the language you prefer.');
     fireEvent.blur(help);
+    // Beside it, flags that screen readers name by language, not country.
+    const languages = within(screen.getByRole('list', { name: 'Some languages you can answer in' }));
+    expect(languages.getAllByRole('img').map((flag) => flag.textContent)).toEqual([
+      'English',
+      'Portuguese',
+      'German',
+      'French',
+      'Hindi',
+      'Japanese',
+      'Korean',
+    ]);
+    expect(languages.getByRole('img', { name: 'English' })).not.toHaveAccessibleDescription();
+    expect(languages.getByRole('img', { name: 'English' }).closest('.modal-header')).not.toBeNull();
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
     fireEvent.focus(screen.getByRole('button', { name: 'Interview status: Ready' }));
     expect(status).toHaveTextContent('Ready');
