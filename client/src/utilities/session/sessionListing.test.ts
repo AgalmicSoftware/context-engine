@@ -16,7 +16,6 @@ const TEST_RUN_SLUGS = [
   'e2e-admin-gate-20261106-174339-06-nov-2026-05-43-pm',
   'e2e-custom-20260702-234338',
   'live-gates-mvhf6mkw',
-  'prd652-we-20260706-033341',
   'ce-mod-session-setup-20260710-l2-sponsored-a3',
   'demo-sh',
   'demo-interview',
