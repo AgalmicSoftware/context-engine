@@ -73,7 +73,11 @@ describe('LoginSettingsControlRow', () => {
       'explainers',
       'appearance',
     ]);
-    const config = screen.getByRole('button', { name: 'Config Advanced' });
+    const config = screen.getByRole('button', { name: 'Config' });
+    // The first section says only "Config": the word Advanced is gone, and its heading is kept as space alone.
+    expect(config).toHaveTextContent(/^Config/);
+    expect(strip).not.toHaveTextContent('Advanced');
+    expect(strip.querySelector('[data-cell="config"] > span')).toHaveStyle({ visibility: 'hidden' });
     expect(config).toHaveAttribute('aria-expanded', 'true');
     fireEvent.click(config);
     expect(onToggleConfig).toHaveBeenCalledTimes(1);

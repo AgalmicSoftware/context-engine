@@ -1063,7 +1063,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       'explainers',
       'appearance',
     ]);
-    expect(within(cells[0]).getByRole('button', { name: 'Config Advanced' })).toHaveAttribute('aria-expanded', 'true');
+    expect(within(cells[0]).getByRole('button', { name: 'Config' })).toHaveAttribute('aria-expanded', 'true');
     expect(within(cells[2]).getByRole('button', { name: /Explainers/ })).toBeInTheDocument();
     expect(within(cells[3]).getByRole('button', { name: /^Appearance/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Demo Mode/ })).not.toBeInTheDocument();
