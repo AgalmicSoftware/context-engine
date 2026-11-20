@@ -243,6 +243,8 @@ $theme: (
   edge-shadow: rgba(0, 0, 0, 0.35),
   edge-dark: rgba(0, 0, 0, 0.55),
   border-raised: rgba(255, 255, 255, 0.18),
+  // No line round buttons here: on these dark surfaces the raised colour read as a stray rectangle.
+  border-button: transparent,
   border-inset: rgba(0, 0, 0, 0.35),
   shadow-raised: 0 6px 22px rgba(0, 0, 0, 0.25),
   shadow-pressed: inset 0 2px 5px rgba(0, 0, 0, 0.3),

@@ -172,7 +172,7 @@ describe('runtime SCSS theme contract', () => {
   test('a link can take the same chrome as a button, in its resting, pressed and Minimal rules', () => {
     const recipes = fs.readFileSync(path.resolve(__dirname, '_recipes.scss'), 'utf8');
     expect(recipes).toMatch(
-      /\[role='button'\],\s*\[data-ce-control-appearance='raised'\] \{\s*border-color: var\(--ce-border-raised\);/,
+      /\[role='button'\],\s*\[data-ce-control-appearance='raised'\] \{\s*border-color: var\(--ce-border-button\);/,
     );
     expect(recipes).toMatch(/\[role='button'\]:active,\s*\[data-ce-control-appearance='raised'\]:active \{/);
     expect(recipes).toMatch(
