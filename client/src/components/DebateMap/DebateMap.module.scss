@@ -79,6 +79,29 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     min-height: unset;
   }
 
+  // The name of the branch in view, beside "Up Level", sits on the theme's panel too. Its base colours are made
+  // for the dark atlas page: on a light panel they came out blue-grey on grey. It takes the control colours.
+  &.embeddedAtlas .debateMap .atlasViewContainer {
+    .packedAtlasTitleButton,
+    .packedAtlasTitleButton:hover,
+    .packedAtlasTitleButton:focus-visible {
+      background: var(--ce-control-face);
+      border-color: var(--ce-card-border);
+    }
+
+    // Its base rule draws no outline, and focus no longer changes its colours, so focus gets a ring.
+    .packedAtlasTitleButton:focus-visible {
+      outline: 2px solid var(--ce-control-text);
+      outline-offset: 2px;
+    }
+
+    .packedAtlasTitle,
+    .packedAtlasTitleIcon {
+      color: var(--ce-control-text);
+      text-shadow: none;
+    }
+  }
+
   // On a phone the embedded map takes the Results panel's whole width, and the branch's name wraps within the map
   // rather than running off its edge. A title drawn over the circles inside its own circle gets
   // a wash of the panel behind each line, so the rings under it do not cut through the letters.
