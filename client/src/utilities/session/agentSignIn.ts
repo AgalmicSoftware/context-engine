@@ -123,6 +123,9 @@ export const hasAgentSignInCodeFor = ({
 }: Pick<SessionTarget, 'workerUrl' | 'sessionSlug'>): boolean =>
   !!heldCode && heldCode.sessionSlug === sessionSlug.toLowerCase() && heldCode.workerOrigin === originOf(workerUrl);
 
+/** Whether a link's code is waiting at all, for any session; it says nothing of the code. */
+export const holdsAgentSignInCode = (): boolean => !!heldCode;
+
 /** Forgets a link's code without using it. */
 export const dropAgentSignInCode = (): void => {
   heldCode = null;

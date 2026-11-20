@@ -14,9 +14,11 @@ import {
 } from '../worker/workerAuthTokenCache.js';
 import {
   AGENT_LINK_PROVIDER,
+  ATTACHED_PASSKEYS_KEY,
   forgetAgentLinkAccount,
   holdAgentLinkAccount,
   isAgentLinkProvider,
+  noteBrowserAttachedAPasskey,
   readAgentLinkAccount,
   setAgentLinkRenewer,
   type AgentLinkAccount,
@@ -45,7 +47,7 @@ const lower = (value: unknown): string =>
     .toLowerCase();
 
 // Which passkeys this browser has attached to an agent's account, by session: no secret, only "look again here".
-const KNOWN_KEY = 'ce:agentLinkPasskeys:v1';
+const KNOWN_KEY = ATTACHED_PASSKEYS_KEY;
 const knownKey = (target: SessionTarget, passkey: string): string =>
   `${target.workerUrl.replace(/\/+$/, '')}|${target.sessionSlug}|${lower(passkey)}`;
 const readKnown = (): string[] => {
@@ -63,8 +65,10 @@ const writeKnown = (entries: string[]): void => {
     /* Storage can be disabled; the Worker's own sign-in reply still says so. */
   }
 };
-export const rememberAttachedPasskey = (target: SessionTarget, passkey: string): void =>
+export const rememberAttachedPasskey = (target: SessionTarget, passkey: string): void => {
   writeKnown([...readKnown().filter((entry) => entry !== knownKey(target, passkey)), knownKey(target, passkey)]);
+  noteBrowserAttachedAPasskey();
+};
 export const forgetAttachedPasskey = (target: SessionTarget, passkey: string): void =>
   writeKnown(readKnown().filter((entry) => entry !== knownKey(target, passkey)));
 export const isAttachedPasskeyKnown = (target: SessionTarget, passkey: unknown): boolean =>

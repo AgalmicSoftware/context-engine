@@ -5,8 +5,9 @@ import { hasRouteCacheInitializationError } from './mainSiteRouteSessionNetwork'
 
 import React, { Component } from 'react';
 import WorkerGroupAutoJoin from '../OnePageSession/WorkerGroupAutoJoinHost';
-// Loaded after the shell: index.tsx already takes a sign-in code out of the address before the app starts.
-const AgentSignInGate = React.lazy(() => import('../OnePageSession/AgentSignInGate'));
+// Fetches the agent's-account notice only for a tab it can matter to; index.tsx has already taken any sign-in
+// code out of the address before the app starts.
+import AgentSignInGateHost from '../OnePageSession/AgentSignInGateHost';
 import { connect } from 'react-redux';
 import { changeAccount, fetchAccount } from '../../actions/accountActions.js';
 import {
@@ -3994,14 +3995,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           sessionConfig={activeRouteSessionConfig}
         />
 
-        <React.Suspense fallback={null}>
-          <AgentSignInGate
-            sessionConfig={activeRouteSessionConfig}
-            sessionSlug={this.getSessionSlugFromProps()}
-            account={this.props.account}
-            provider={this.props.provider}
-          />
-        </React.Suspense>
+        <AgentSignInGateHost
+          sessionConfig={activeRouteSessionConfig}
+          sessionSlug={this.getSessionSlugFromProps()}
+          account={this.props.account}
+          provider={this.props.provider}
+        />
 
         <WorkerGroupAutoJoin
           sessionConfig={activeRouteSessionConfig}

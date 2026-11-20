@@ -288,3 +288,33 @@ export const forgetAgentLinkHints = (): void => {
   attachedNotice = null;
   listeners.forEach((listener) => listener());
 };
+
+// Which passkeys this browser has attached to an agent's account are listed under this key (by the code that
+// attaches them). Whether there are any is asked here, by the page's start-up code, without that code.
+export const ATTACHED_PASSKEYS_KEY = 'ce:agentLinkPasskeys:v1';
+let attachedPasskeysKnown: boolean | null = null;
+const browserAttachedAPasskey = (): boolean => {
+  if (attachedPasskeysKnown === null) {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(ATTACHED_PASSKEYS_KEY) || '[]');
+      attachedPasskeysKnown = Array.isArray(stored) && stored.length > 0;
+    } catch {
+      attachedPasskeysKnown = false;
+    }
+  }
+  return attachedPasskeysKnown;
+};
+/** Said when this browser attaches a passkey, so the answer above is right without a reload. */
+export const noteBrowserAttachedAPasskey = (): void => {
+  attachedPasskeysKnown = true;
+  listeners.forEach((listener) => listener());
+};
+
+/**
+ * Whether anything about an agent's account is in play in this tab: it is signed in to one, or holds one from
+ * before a reload; a sign-in has just said a passkey is attached to an account, or is one attached to an agent's
+ * account; or this browser has attached a passkey to one before. An ordinary visitor answers no to all of them,
+ * and the page then never fetches the code that shows the agent's-account notice.
+ */
+export const agentAccountInPlay = (provider: unknown): boolean =>
+  isAgentLinkProvider(provider) || !!readAgentLinkAccount() || !!hint || !!attachedNotice || browserAttachedAPasskey();
