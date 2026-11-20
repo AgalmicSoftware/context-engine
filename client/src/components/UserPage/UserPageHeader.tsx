@@ -13,6 +13,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import CETooltip from '../Shared/CETooltip';
+import { AnalyzeLinkArrival, AnalyzeUserButton } from './UserPageAnalyzeLinkControls';
 import styles from './UserPage.module.scss';
 
 type UserPageAnalyzeButtonDisplayState = {
@@ -75,12 +76,16 @@ type UserPageHeaderProps = {
   /** Where your own username is saved: the session's store, or only this device. */
   usernameSavedTo?: 'session' | 'device';
   analyzeButtonDisplayState: UserPageAnalyzeButtonDisplayState;
+  /** Whether my answers have finished loading, for an Analyze that "Analyze user" starts on arrival. */
+  analyzeLinkReady?: boolean;
   avatarDisplayState: UserPageAvatarDisplayState;
   bookmarkButtonDisplayState: UserPageBookmarkButtonDisplayState;
   bookmarksHref: string;
   bookmarksLinkDisplayState: UserPageBookmarksLinkDisplayState;
   compareButtonDisplayState: UserPageCompareButtonDisplayState;
   copyIconDisplayState: UserPageCopyIconDisplayState;
+  /** The link the account dialog's "Analyze user" opens; '' where the button is not offered. */
+  analyzeLinkHref?: string;
   explorerUrl?: string | null;
   headerActionVisibility: UserPageHeaderActionVisibility;
   headerBookmarkClassName: string;
@@ -89,7 +94,7 @@ type UserPageHeaderProps = {
   minimized?: boolean;
   nicknameEnteredIndicatorDisplayState: UserPageInlineEnteredIndicatorDisplayState;
   nicknameInput?: string;
-  onAnalyzeUser: React.MouseEventHandler<HTMLButtonElement>;
+  onAnalyzeUser: (event?: React.MouseEvent<HTMLButtonElement>) => void;
   onBookmark: React.MouseEventHandler<HTMLButtonElement>;
   onCollapseToggle: React.MouseEventHandler<HTMLButtonElement>;
   onCopyAddress: React.MouseEventHandler<HTMLButtonElement>;
@@ -116,12 +121,14 @@ const UserPageHeader = ({
   privateLabelTag = '',
   usernameSavedTo = 'device',
   analyzeButtonDisplayState,
+  analyzeLinkReady = false,
   avatarDisplayState,
   bookmarkButtonDisplayState,
   bookmarksHref,
   bookmarksLinkDisplayState,
   compareButtonDisplayState,
   copyIconDisplayState,
+  analyzeLinkHref = '',
   explorerUrl,
   headerActionVisibility,
   headerBookmarkClassName,
@@ -238,6 +245,7 @@ const UserPageHeader = ({
               {username.trim() ? 'Change username' : 'Set username'}
             </button>
           )}
+          {analyzeLinkHref ? <AnalyzeUserButton href={analyzeLinkHref} /> : null}
         </div>
 
         {headerActionVisibility.showBookmarksLink && (
@@ -317,6 +325,12 @@ const UserPageHeader = ({
         )}
       </div>
 
+      {!minimized && (
+        <AnalyzeLinkArrival
+          ready={!!isOwner && analyzeLinkReady && !analyzeButtonDisplayState.disabled}
+          onStart={() => onAnalyzeUser()}
+        />
+      )}
       {!minimized && (
         <div className={styles.headerActionsRight}>
           {usernameErrorDisplayState.shouldRenderUsernameError && (

@@ -1789,6 +1789,35 @@ describe('UserPage analysis cache and routing', () => {
     expect(instance.state).toMatchObject({ analysisDetails: '', analyzing: false, showAnalysisModal: true });
     expect(instance.analysisTimer).toBeNull();
   });
+  it('offers Analyze user in the account dialog, which gives the page no sign-in or cache props', async () => {
+    const me = '0x00000000000000000000000000000000000000aa';
+    const dialogProps = { minimized: true, account: me, viewAddress: me, sessionConfig: { slug: 'dialog-slug' } };
+    const { instance } = makeAnalysisCacheInstance({
+      ...dialogProps,
+      activeSessionSlug: 'dialog-slug',
+      isSurveyCacheReady: undefined,
+      isQuestionCacheReady: undefined,
+      isResponsesCacheReady: undefined,
+      isSBTCacheReady: undefined,
+    });
+    const offered = () => {
+      const view = render(instance.render().props.children[0]);
+      const button = view.queryByRole('button', { name: 'Analyze user' });
+      view.unmount();
+      return !!button;
+    };
+    try {
+      expect(offered()).toBe(false);
+      instance.componentDidMount();
+      await waitFor(() => expect(instance.state.aiAvailable).toBe(true));
+      expect(offered()).toBe(true);
+      // No button where the page finds no AI it may use.
+      instance.state = { ...instance.state, aiAvailable: false };
+      expect(offered()).toBe(false);
+    } finally {
+      instance.componentWillUnmount();
+    }
+  });
   it('a delayed cache lookup cannot hydrate a different profile', async () => {
     const { instance } = makeAnalysisCacheInstance();
     await instance.analyzeUser();

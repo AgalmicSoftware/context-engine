@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import UserPageHeader from './UserPageHeader';
 import styles from './UserPage.module.scss';
@@ -301,5 +301,27 @@ describe('UserPageHeader', () => {
     expect(screen.getByText('Cannot persist username.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Compare/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Analyze' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Analyze user' })).toBeNull();
+  });
+
+  it('offers Analyze user under the username button only where it is given a link', () => {
+    const props = { isOwner: true, minimized: true, showUsernameButton: true };
+    render(<UserPageHeader {...createProps({ ...props, analyzeLinkHref: '/u/0xabc?session=demo-one&analyze=1' })} />);
+    const setName = screen.getByRole('button', { name: 'Set username' });
+    const create = screen.getByRole('button', { name: 'Analyze user' });
+    expect(setName.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(create.parentElement).toBe(setName.parentElement);
+  });
+
+  it('starts no Analyze by itself on a page nobody sent here', () => {
+    jest.useFakeTimers();
+    try {
+      const onAnalyzeUser = jest.fn();
+      render(<UserPageHeader {...createProps({ isOwner: true, analyzeLinkReady: true, onAnalyzeUser })} />);
+      act(() => void jest.advanceTimersByTime(60_000));
+      expect(onAnalyzeUser).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

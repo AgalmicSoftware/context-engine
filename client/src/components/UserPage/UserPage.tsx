@@ -161,6 +161,7 @@ import {
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import UserPageAnalysisModal from './UserPageAnalysisModal';
 import UserPageSavedAnalysisCard from './UserPageSavedAnalysisCard';
+import { buildAnalyzeLinkHref } from './userPageAnalyzeLink';
 import UserPageComparePanel from './UserPageComparePanel';
 import { resolveCompareCachesReady } from './compareSessionRuntime';
 import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
@@ -784,7 +785,6 @@ class UserPage extends Component<any, any> {
       expandedSurveyResponses: {},
       expandedSurveysCreated: {},
 
-      // NEW: section collapsibles
       showSectionSurveyResponsesOpen: true,
       showSectionSurveysCreatedOpen: true,
       showSectionQuestionResponsesOpen: true,
@@ -792,7 +792,6 @@ class UserPage extends Component<any, any> {
 
       // NEW: nickname (inline, header actions; visible on any user page)
       nicknameInput: '',
-      // NEW: inline edit toggle for nickname
       isEditingNickname: false,
 
       // NEW: Track deep search status to prevent "No Data" flash
@@ -1289,6 +1288,8 @@ class UserPage extends Component<any, any> {
       subscribeWorkerSessionToken(() => void this.loadSessionNames()),
     ];
     void this.loadSessionNames();
+    // The account dialog's page gets no cache props, so its "Analyze user" button asks about AI here.
+    if (this.props.minimized) void this._checkAiAvailability();
     try {
       if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
         window.addEventListener(PROFILE_SCAN_REPORT_EVENT, this.handleBackgroundProfileScanReport);
@@ -3432,13 +3433,10 @@ class UserPage extends Component<any, any> {
       detailedSurveyResponses,
       detailedQuestionResponses,
 
-      // NEW: section toggles
       showSectionSurveyResponsesOpen,
       showSectionSurveysCreatedOpen,
       showSectionQuestionResponsesOpen,
       showSectionQuestionsCreatedOpen,
-
-      // NEW: Deep scan flag
       isDeepScanning,
     } = this.state;
 
@@ -3706,12 +3704,14 @@ class UserPage extends Component<any, any> {
           }
           usernameSavedTo={this.state.sessionNamesSource?.enabled ? 'session' : 'device'}
           analyzeButtonDisplayState={analyzeButtonDisplayState}
+          analyzeLinkReady={!isQuestionLoadingAny && !isSurveyLoadingAny && !isSbtLoadingAny}
           avatarDisplayState={avatarDisplayState}
           bookmarkButtonDisplayState={bookmarkButtonDisplayState}
           bookmarksHref={buildPublicRoute('/bookmarks')}
           bookmarksLinkDisplayState={bookmarksLinkDisplayState}
           compareButtonDisplayState={compareButtonDisplayState}
           copyIconDisplayState={copyIconDisplayState}
+          analyzeLinkHref={buildAnalyzeLinkHref(this, !!minimized && isOwner)}
           explorerUrl={explorerUrl}
           headerActionVisibility={headerActionVisibility}
           headerBookmarkClassName={headerBookmarkClassName}
