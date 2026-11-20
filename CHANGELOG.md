@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.23] - 2026-11-20
 
+A Session Worker fix, MCP 0.8.1 (published at merge) and the site. Nothing a session already stores is changed.
+
+### Session Worker — needs a Worker update
+
+- **Agent routes answer Safari's preflight.** Safari, and every browser on an iPhone, sends a preflight with an empty body (`Content-Length: 0`). The agent routes (`/api/agent/*`) tried to read it as JSON and answered 400, so every site call to them that needs a preflight failed there, "Make a key" among them. A preflight's body is no longer read, and an empty body on any other request counts as no body; a non-empty body that is not a JSON object is still refused. The general routes (sign-in, sign-in links, storage, AI, groups) were not affected.
+
+### MCP 0.8.1
+
+- A refused `join_group` or `leave_group`, and a refused group join in `join_session`, names the group as the site shows it, with its id. The name is read only after a clear refusal, briefly; after a busy session or no answer the id alone is given.
+- `make_review_link` writes a shorter link, its drafts deflated after `#prefillz=` (about 60% shorter for 40 drafts), where the session's site says it reads one: it asks the site's `/manifest.json` for `context_engine_review_links`, keeping a clear answer for the run and asking again after 5 minutes when the check failed. A site that doesn't list it, or doesn't answer within 3 seconds, gets `#prefill=` as before.
+- `make_review_link` says to copy its link exactly, and to make a shorter one when it is too long to send whole.
+- **Agents make their account's analysis card.** `make_analysis_card` makes it as the session page does when its person presses Analyze: the same two prompts, now in `shared/userAnalysisPrompts.mjs`, go to the session's AI through the Worker's `/ai` route, under the session's AI limits and with its key, and the matched figure's picture comes from the Worker's picture route. It saves nothing. `show_analysis_card` shows the card on the account's profile, once the person has said yes, or takes it down. `answer` says where a session makes cards, so the agent offers one after answering. No Worker change: it uses routes the 0.9.22 Worker has.
+
+### Site — available when the site deploys
+
+- **Agent screens.** The sign-in link's notice is shorter, with one button, Create passkey; switching accounts is asked in a dialog that names the account it replaces; refusals are in short words, and the button after ending agent access is Restore agent access. The notice's code loads only when a link needs it. **Sign Agents Out**, under Your AI agent and offered on passkey sign-ins, ends the tab's sign-in at the Worker, with every sign-in the page replaced and every prompt and key copied from them. "Couldn't make a key" now gives the status and reason.
+- **Account dialog and user page.** The dialog is one list: Analyze user, Set username, Bookmarks, Your AI agent (both options in the row, each with a Copy prompt button that shows and enlarges its prompt) and Disconnect. On the user page, Set username and Bookmarks stand beside the address, and the session switch sits above the header.
+- **Analyze.** Analyze user in the account dialog opens your page and starts Analyze there, only on that press. The analysis box has Text, Breakdown and, where the session has it, the picture card, which is reached only by its Card button and shown on your page from the Card view. Compare gives a headline, titled cards, sliders or a map (laid out for phones) and agree or split strips. The question filter's box has Clear, Copy, Bookmark and Load. The risk matrix's note window has two columns and opens the atlas topic that holds a note's questions.
+- **Interview.**
+  - Language: the interview shows language flags, says interviews take any language, and drafts answers in English, marked with their language, beside the person's own words, which stay on the device.
+  - Names: an interview no longer writes a name into answers and withdraws one an earlier answer carried; where the session keeps names, an optional box sets the session name.
+  - Transcript: a person may share their transcript for research (off by default).
+  - Layout: Discard and the transcript sit under the microphone, and a join link's group is left to its notice; the section is "Suggested groups".
+  - States: the interview says "Loading questions…" until the questions are read, and the AI prompt card no longer returns after an interview begins.
+  - Voice after AI drafts: a voice round after an AI prefill leaves its drafts, hidden ones included, unasked, and the start button reads Add more by voice.
+- **The copied AI prompt.** It carries a sign-in ticket only when a read without one falls short. It asks for drafts only with a basis, at most 15, and no table, and suggests the MCP only for agents with tools; `#prefill=paste` opens the paste box. Research records mark the wording (`promptRevision`), the drafting prompt's version on AI drafts and the voice model on voice drafts. The page reads deflated `#prefillz=` review links as well as `#prefill=`, and `manifest.json` lists both in `context_engine_review_links`. AI submission info shows its research metadata at once, the coverage box is not repeated, and What's this names the grant behind the research.
+- **Other.**
+  - Stats on a Worker-hosted session counts Users, Questions and Surveys from that session's own listings, each tile loading until read, and shows no Surveys tile for a session with none.
+  - The first salon trial session leaves the session lists; its link still opens it.
+  - The settings strip's first section reads Config.
+  - About's Companies and Groups sections say above their video that it shows future features, in place of the asterisks and footnote.
+  - The context list's Agent badge is the robot from Results.
+  - The Session Agent opt-out moved from the interview dialog to beside the Session Agent button.
+- The analysis and card prompts, and the choice of the answers a card quotes, moved to `shared/`, so the page and the MCP use one copy; nothing the page sends or shows changes.
+
+### Research tools
+
+- The fidelity report scores quadratic votes: strength, votes per option and per-question totals, each with a baseline. The Mirror Score and Results are unchanged.
+
 ## [0.9.22] - 2026-11-20
 
 An agents release with website changes: a Session Worker update, MCP 0.8.0 (published at merge) and the site. Each agents part works only where the session's Worker reports it, and nothing a session already stores is changed. Sign-in links from agents are off on every session until its admin turns them on.
