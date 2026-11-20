@@ -7,7 +7,7 @@ import {
   isTextInterviewQuestion,
   type InterviewResearchTier,
 } from './sessionInterviewResearch';
-import { INTERVIEW_TRANSCRIPT_MAX_CHARS, isWithheldConsent, resolveConsentFlags } from './sessionInterviewConsent';
+import { capInterviewTranscript, isWithheldConsent, resolveConsentFlags } from './sessionInterviewConsent';
 import { normalizeRecruitmentSource } from './sessionRecruitmentSource';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 
@@ -357,9 +357,16 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
         : '';
     // The page's copy, or after a reload the one this answer already carries, so a re-save keeps it.
     const sharedTranscript = interviewTranscripts[interviewId] ?? interviewProvenanceRecord.transcript;
+    // An upload sends only changed answers, so the transcript rides on one of those, never on one left as saved.
+    const uploading =
+      !opts.refuseWithheldConsent || !includedQuestionIds.size || includedQuestionIds.has(normalizeQuestionIdKey(q.id));
     const transcript =
-      interviewId && typeof sharedTranscript === 'string' && !transcriptsPlaced.has(interviewId) && !anyFieldEncrypted
-        ? sharedTranscript.slice(0, INTERVIEW_TRANSCRIPT_MAX_CHARS)
+      interviewId &&
+      typeof sharedTranscript === 'string' &&
+      uploading &&
+      !transcriptsPlaced.has(interviewId) &&
+      !anyFieldEncrypted
+        ? capInterviewTranscript(sharedTranscript)
         : '';
     if (transcript) transcriptsPlaced.add(interviewId);
     // Whether the AI's draft was shown in review or hidden until the person answered.

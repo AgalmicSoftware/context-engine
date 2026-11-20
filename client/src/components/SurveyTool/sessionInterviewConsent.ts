@@ -12,8 +12,23 @@ export type InterviewConsentOverrides = {
   transcript?: string;
 };
 
-/** The most of a shared transcript kept with an answer, about a two-hour interview. */
-export const INTERVIEW_TRANSCRIPT_MAX_CHARS = 200_000;
+/** The most of a shared transcript kept with an answer, in bytes as stored: the Worker refuses an answer over 96 KiB. */
+export const INTERVIEW_TRANSCRIPT_MAX_BYTES = 64 * 1024;
+
+/** A shared transcript's opening part that fits, cut between characters; JSON escapes count as stored. */
+export const capInterviewTranscript = (text: string): string => {
+  const fits = (value: string) =>
+    new TextEncoder().encode(JSON.stringify(value)).length - 2 <= INTERVIEW_TRANSCRIPT_MAX_BYTES;
+  if (fits(text)) return text;
+  const chars = Array.from(text);
+  let [low, high] = [0, chars.length];
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (fits(chars.slice(0, middle).join(''))) low = middle;
+    else high = middle - 1;
+  }
+  return chars.slice(0, low).join('');
+};
 
 export const summarizeConsentChoice = (values: boolean[], override?: boolean) => ({
   checked: override ?? (values.length > 0 && values.every(Boolean)),

@@ -389,6 +389,23 @@ it.each([false, true])(
   40000,
 );
 
+// Submitting the AI's drafts, then talking: the next upload sends only the voice drafts, so the transcript rides on one.
+it('keeps a transcript ticked after AI drafts were submitted with an answer the next upload sends', async () => {
+  sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true }, ...WORKER_STORED };
+  const upload = mockSession();
+  await mountWithInterview(packet([{ questionId: 'q1', answer: 'Agree', confidence: 0.8, evidence: 'Said so' }]));
+  await submitDrafts();
+  expect(uploadedRows(upload, 0)).toEqual([['q1', 'Agree']]);
+  await speak([{ questionId: 'q3', answer: 'Disagree', confidence: 0.8 }]);
+  if (!screen.queryByLabelText('Let admins read this interview’s transcript'))
+    fireEvent.click(screen.getByText('AI submission info'));
+  fireEvent.click(screen.getByLabelText('Let admins read this interview’s transcript'));
+  await submitDrafts();
+  const rows = upload.mock.calls[1][2];
+  expect(rows.map((row) => row.questionID)).toEqual(['q3']);
+  expect(rows[0].interviewProvenance.transcript).toContain('Here is what I think now.');
+}, 40000);
+
 // An Arweave session publishes answers whole, so admins couldn't be the only readers.
 it('offers no transcript box where answers are stored on Arweave', async () => {
   sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true } };

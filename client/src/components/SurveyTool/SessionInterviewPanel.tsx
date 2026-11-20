@@ -1472,6 +1472,7 @@ export default function SessionInterviewPanel({
                             setDraftTextKept({ contextToken: baseSubmitContextToken, included })
                           }
                           transcript={transcriptOffered ? transcriptShared : null}
+                          transcriptText={mappedTranscript}
                           onTranscriptChange={setTranscriptShared}
                         />
                       ) : null}

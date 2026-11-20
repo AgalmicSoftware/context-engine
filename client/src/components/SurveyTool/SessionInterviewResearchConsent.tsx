@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { Input, Label } from 'reactstrap';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { INTERVIEW_PROMPT_VERSION, type InterviewPrefillPacket } from './sessionInterview';
+import { capInterviewTranscript } from './sessionInterviewConsent';
 import { describeInterviewPlatform } from './sessionInterviewModalState';
 import SessionDataNote from './SessionDataNote';
 import SessionInterviewResearchWhat from './SessionInterviewResearchWhat';
@@ -38,6 +40,8 @@ type Props = {
   onDraftTextChange?: (included: boolean) => void;
   // Sharing a voice interview's transcript, offered after one; null when there's none to share.
   transcript?: boolean | null;
+  /** The transcript that would be shared, to say when only its first part fits. */
+  transcriptText?: string;
   onTranscriptChange?: (included: boolean) => void;
 };
 
@@ -64,8 +68,14 @@ export default function SessionInterviewResearchConsent({
   draftText = null,
   onDraftTextChange,
   transcript = null,
+  transcriptText = '',
   onTranscriptChange,
 }: Props) {
+  // A long transcript takes many passes to cap, so it is checked once per transcript, not on every keystroke.
+  const transcriptCut = useMemo(
+    () => capInterviewTranscript(transcriptText.trim()) !== transcriptText.trim(),
+    [transcriptText],
+  );
   const minimal = researchDetail === 'minimal';
   // Mixed saved choices may keep text for some drafts, so the wording doesn't promise none is kept.
   const keepsText = minimal && !!draftText && (draftText.checked || draftText.mixed);
@@ -231,6 +241,11 @@ export default function SessionInterviewResearchConsent({
                 <span>Let admins read this interview’s transcript</span>
               </Label>
               <p>{TRANSCRIPT_NOTE}</p>
+              {transcriptCut ? (
+                <p data-testid="ce-session-interview-transcript-cut">
+                  This transcript is long, so only its first part would be kept.
+                </p>
+              ) : null}
             </>
           ) : null}
         </div>

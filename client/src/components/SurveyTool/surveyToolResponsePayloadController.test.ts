@@ -5,7 +5,7 @@ import {
 } from './surveyToolResponsePayloadController';
 import { getConvictionFromSlice, getImportanceFromSlice } from './surveyToolResponseState';
 import { planDraftTextSync } from './sessionInterviewDraftText';
-import { buildSavedInterviewConsent } from './sessionInterviewConsent';
+import { buildSavedInterviewConsent, capInterviewTranscript } from './sessionInterviewConsent';
 
 const defaultOpts = (overrides: Partial<BuildResponsePayloadOptions> = {}): BuildResponsePayloadOptions => ({
   isStandalone: false,
@@ -866,6 +866,32 @@ describe('research detail tiers', () => {
       expect(records.map((record) => Boolean(record.transcript))).toEqual([true, false, false]);
       expect(records[0].transcript).toBe('Responder: Robin said audits.');
       expect(records.map((record) => record.interviewId)).toEqual(['interview-1', 'interview-1', 'interview-1']);
+    });
+
+    it('rides on an answer this upload sends, not on one left as saved', () => {
+      const records = buildResponsePayload(
+        defaultOpts({
+          questionPool: ['q1', 'q2', 'q3'].map((id) => ({ id, type: 'binary', prompt: id })),
+          includeQuestionIds: new Set(['q3']),
+          refuseWithheldConsent: true,
+          surveyResponseState: {
+            answers: Object.fromEntries(['q1', 'q2', 'q3'].map((id) => [id, { value: 'Agree' }])),
+            interviewProvenance: { q1: provenance(voice), q2: provenance(voice), q3: provenance(voice) },
+            interviewTranscripts: { 'interview-1': 'Responder: Robin said audits.' },
+          } as never,
+        }),
+      ).responses!.map((row) => (row.interviewProvenance as Record<string, unknown>).transcript);
+      expect(records).toEqual([undefined, undefined, 'Responder: Robin said audits.']);
+    });
+
+    it('keeps at most 64 KiB as stored, cut between characters', () => {
+      expect(capInterviewTranscript('Robin: audits.')).toBe('Robin: audits.');
+      for (const unit of ['a', 'ж', '"', '\n', '😀']) {
+        const kept = capInterviewTranscript(unit.repeat(70_000));
+        expect(new TextEncoder().encode(JSON.stringify(kept)).length - 2).toBeLessThanOrEqual(64 * 1024);
+        expect(kept.length).toBeGreaterThan(0);
+        expect(Array.from(kept).every((char) => char === unit)).toBe(true);
+      }
     });
 
     // The conversation may repeat what an encrypted answer says.

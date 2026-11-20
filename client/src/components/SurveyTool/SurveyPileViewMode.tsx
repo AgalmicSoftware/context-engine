@@ -1,6 +1,6 @@
 import {
   getChangedInterviewConsentQids,
-  INTERVIEW_TRANSCRIPT_MAX_CHARS,
+  capInterviewTranscript,
   isWithheldConsent,
   keepConsentWithdrawals,
   resolveConsentFlags,
@@ -1960,7 +1960,7 @@ export const recordInterviewProvenance = (
         const reviewedByQuestionId = new Map(review.map((entry) => [entry.questionId, entry]));
         // A shared transcript is kept once for the interview; its answers name it, and the upload puts it on
         // one of them that isn't encrypted.
-        const sharedTranscript = String(consentOverrides?.transcript || '').slice(0, INTERVIEW_TRANSCRIPT_MAX_CHARS);
+        const sharedTranscript = capInterviewTranscript(String(consentOverrides?.transcript || ''));
         const interviewId = sharedTranscript
           ? `interview-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
           : '';

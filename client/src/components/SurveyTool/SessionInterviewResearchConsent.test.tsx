@@ -366,4 +366,31 @@ describe('AI draft text for admins', () => {
       /lets the session’s admins, and nobody else, read the AI’s drafted text; you can turn that off on its own/,
     );
   });
+
+  it('says beside the transcript box when only its first part would be kept', () => {
+    const { rerender } = renderConsent({
+      includeComparison: true,
+      transcript: false,
+      transcriptText: 'Robin: audits.',
+    });
+    expect(screen.getByLabelText('Let admins read this interview’s transcript')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-interview-transcript-cut')).not.toBeInTheDocument();
+    rerender(
+      <SessionInterviewResearchConsent
+        packet={packet}
+        includeProvenance
+        includeComparison
+        onProvenanceChange={jest.fn()}
+        coverageDetails={[]}
+        selectedCount={1}
+        unselectedCount={2}
+        disabled={false}
+        transcript={false}
+        transcriptText={'Robin: '.repeat(10_000)}
+      />,
+    );
+    expect(screen.getByTestId('ce-session-interview-transcript-cut')).toHaveTextContent(
+      'This transcript is long, so only its first part would be kept.',
+    );
+  });
 });
