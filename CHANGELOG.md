@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.25] - 2026-11-20
+
+Fixes on the home page; the site only. No Worker change: sessions keep the 0.9.23 Worker, and the deploy helper still deploys it. MCP stays 0.9.0. Nothing a session already stores is changed.
+
+### Site — available when the site deploys
+
+- **Home > Tools > Groups.** The tab lists the session's groups again, instead of "This session does not have an exact, validated Worker Groups profile."
+- **Home > Stats.** The numbers in the tiles are centred.
+- **Long session names.** A name too long for its row ends in "…" before the open-link icon.
+- **Welcome slides on phones.** The slides keep their height and fill it, with less empty space.
+
 ## [0.9.24] - 2026-11-20
 
 MCP 0.9.0 (published at merge) and the site. No Worker change: sessions keep the 0.9.23 Worker, which the deploy helper now uses. Nothing a session already stores is changed.
