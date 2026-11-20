@@ -24,12 +24,13 @@ const listed = (knownSessions) =>
       catalog: entry.interviewCatalog,
     }));
 
+const escapeHtml = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// No punctuation follows an address, so one copied whole is the address itself.
 const htmlBlock = (sessions, indent) =>
   [
-    'The listed sessions, each link with its catalog address after it:',
-    ...sessions.map(
-      ({ page, title, catalog }, i) => `${page} (${title}): ${catalog}${i === sessions.length - 1 ? '.' : ';'}`,
-    ),
+    'The listed sessions, each link with its catalog address after it, one per line:',
+    ...sessions.map(({ page, title, catalog }) => `${page} (${escapeHtml(title)}): ${catalog}`),
   ]
     .map((line) => `${indent}${line}`)
     .join('\n');

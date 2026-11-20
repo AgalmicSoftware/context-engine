@@ -165,6 +165,11 @@ test('index.html tells a fetching agent where the guide is, in body text people 
   for (const where of [plain, noscript]) assert.ok(where.includes(`${salon.page} (${salon.title}): ${salon.catalog}`));
   assert.ok(skillMd.includes(`- ${salon.page} (${salon.title}):\n  ${salon.catalog}\n`));
   assert.ok(skillMd.indexOf(salon.catalog) < skillMd.indexOf('## You were given a session link'));
+  // Nothing follows an address but a line break, so an address copied whole is the address itself.
+  for (const { catalog } of listed(knownSessions)) {
+    for (const text of [indexHtml, skillMd]) assert.equal(text.split(catalog).length, text === indexHtml ? 3 : 2);
+    for (const after of [...indexHtml.split(catalog).slice(1), ...skillMd.split(catalog).slice(1)]) assert.match(after, /^\n/);
+  }
   // A fetcher that keeps <noscript> reads the agents' paragraph before any GitHub link.
   assert.ok(noscript.indexOf('AI agents: to take part') < noscript.indexOf('github.com'));
   // Changing a listed address changes the generated text.
