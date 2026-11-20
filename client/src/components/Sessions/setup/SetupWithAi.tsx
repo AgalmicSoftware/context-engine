@@ -1,4 +1,4 @@
-/** @file SetupWithAi.tsx: "Set up with your AI" on /new. */
+/** @file SetupWithAi.tsx: "Set up with AI" on /new. */
 import { useContext, useLayoutEffect, useRef, useState } from 'react';
 import { ReactReduxContext } from 'react-redux';
 
@@ -17,10 +17,11 @@ type Props = {
   setupUrl: string;
 };
 
-// Copies the setup prompt, or opens ChatGPT or Claude with it. The prompt holds
+// One button that opens the choices: copy the setup prompt, or open ChatGPT or Claude with it. The prompt holds
 // no keys or tokens; the AI's answer comes back through a link or a paste.
 export const SetupWithAi = ({ setupUrl }: Props) => {
   const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
+  const [open, setOpen] = useState(false);
   const [status, setStatus] = useState('');
   const [showPrompt, setShowPrompt] = useState(false);
   // Set where copying was refused: the prompt, once shown, is selected to copy by hand.
@@ -46,11 +47,22 @@ export const SetupWithAi = ({ setupUrl }: Props) => {
     promptRef.current?.select();
   }, [selectPrompt]);
   return (
-    <section className={styles.banner} aria-labelledby="ce-setup-ai-title" data-testid={E2E_TESTIDS.SETUP_WITH_AI}>
+    <section
+      className={open ? styles.banner : styles.aiSetupClosed}
+      aria-label="Set up with AI"
+      data-testid={E2E_TESTIDS.SETUP_WITH_AI}
+    >
       <div className={styles.fieldLabelRow}>
-        <h2 id="ce-setup-ai-title" className={styles.bannerTitle}>
-          Set up with your AI
-        </h2>
+        <button
+          type="button"
+          className={styles.button}
+          aria-expanded={open}
+          aria-controls="ce-setup-ai-choices"
+          data-testid={E2E_TESTIDS.SETUP_WITH_AI_OPEN}
+          onClick={() => setOpen((was) => !was)}
+        >
+          Set up with AI
+        </button>
         <SessionWizardInfoTooltip
           enabled={tooltipsEnabled}
           id="ce-setup-ai-tip"
@@ -62,55 +74,59 @@ export const SetupWithAi = ({ setupUrl }: Props) => {
       <span id="ce-setup-ai-about" className={styles.srOnly}>
         {ABOUT}
       </span>
-      <div className={styles.buttonRow}>
-        <button
-          type="button"
-          className={styles.button}
-          aria-describedby="ce-setup-ai-about"
-          data-testid={E2E_TESTIDS.SETUP_WITH_AI_COPY}
-          onClick={() => copy('Prompt copied. Paste it into ChatGPT, Claude or another AI.')}
-        >
-          Copy prompt
-        </button>
-        {SESSION_SETUP_AI_APPS.map((app) => (
-          <a
-            key={app.name}
-            className={styles.button}
-            data-ce-control-appearance="raised"
-            href={app.url(prompt)}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-describedby="ce-setup-ai-about"
-            onClick={() => copy(`Prompt copied too. If ${app.name} opens without it, paste it into the chat.`)}
-          >
-            Open in {app.name}
-          </a>
-        ))}
-        <button
-          type="button"
-          className={styles.button}
-          aria-expanded={showPrompt}
-          aria-controls="ce-setup-ai-prompt"
-          onClick={() => setShowPrompt((open) => !open)}
-        >
-          {showPrompt ? 'Hide prompt' : 'Show prompt'}
-        </button>
-      </div>
-      {status ? (
-        <p className={styles.statusText} role="status">
-          {status}
-        </p>
-      ) : null}
-      {showPrompt ? (
-        <textarea
-          id="ce-setup-ai-prompt"
-          className={styles.textarea}
-          aria-label="Setup prompt"
-          ref={promptRef}
-          readOnly
-          rows={8}
-          value={prompt}
-        />
+      {open ? (
+        <div id="ce-setup-ai-choices" className={styles.aiSetupChoices}>
+          <div className={styles.buttonRow}>
+            <button
+              type="button"
+              className={styles.button}
+              aria-describedby="ce-setup-ai-about"
+              data-testid={E2E_TESTIDS.SETUP_WITH_AI_COPY}
+              onClick={() => copy('Prompt copied. Paste it into ChatGPT, Claude or another AI.')}
+            >
+              Copy prompt
+            </button>
+            {SESSION_SETUP_AI_APPS.map((app) => (
+              <a
+                key={app.name}
+                className={styles.button}
+                data-ce-control-appearance="raised"
+                href={app.url(prompt)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-describedby="ce-setup-ai-about"
+                onClick={() => copy(`Prompt copied too. If ${app.name} opens without it, paste it into the chat.`)}
+              >
+                Open in {app.name}
+              </a>
+            ))}
+            <button
+              type="button"
+              className={styles.button}
+              aria-expanded={showPrompt}
+              aria-controls="ce-setup-ai-prompt"
+              onClick={() => setShowPrompt((open) => !open)}
+            >
+              {showPrompt ? 'Hide prompt' : 'Show prompt'}
+            </button>
+          </div>
+          {status ? (
+            <p className={styles.statusText} role="status">
+              {status}
+            </p>
+          ) : null}
+          {showPrompt ? (
+            <textarea
+              id="ce-setup-ai-prompt"
+              className={styles.textarea}
+              aria-label="Setup prompt"
+              ref={promptRef}
+              readOnly
+              rows={8}
+              value={prompt}
+            />
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

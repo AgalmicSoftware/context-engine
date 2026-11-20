@@ -31,7 +31,7 @@ export type SessionWizardShellProps = {
   templateActions?: React.ReactNode;
   /** "This draft came from a link", with its differences. */
   templateNotice?: React.ReactNode;
-  /** "Set up with your AI": a prompt whose answer fills in this page. */
+  /** "Set up with AI": a prompt whose answer fills in this page. */
   aiSetup?: React.ReactNode;
   draft: Record<string, unknown>;
   updateDraftValue: (path: string[], value: unknown) => void;

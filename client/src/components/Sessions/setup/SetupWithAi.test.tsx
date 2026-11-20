@@ -7,16 +7,38 @@ import { buildSessionSetupKickoff } from './sessionSetupKickoff';
 const SETUP_URL = 'https://contextengine.sh/new';
 const prompt = buildSessionSetupKickoff({ setupUrl: SETUP_URL });
 
-describe('Set up with your AI', () => {
+// The choices show only once "Set up with AI" is pressed.
+const renderOpen = () => {
+  render(<SetupWithAi setupUrl={SETUP_URL} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Set up with AI' }));
+};
+
+describe('Set up with AI', () => {
   const writeText = jest.fn();
   beforeEach(() => {
     writeText.mockReset().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
   });
 
-  it('copies the setup prompt, whose link comes back to this page', async () => {
+  it('is one button until pressed, then shows the choices; pressing again hides them', () => {
     render(<SetupWithAi setupUrl={SETUP_URL} />);
-    expect(screen.getByRole('heading', { name: 'Set up with your AI' })).toBeInTheDocument();
+    const toggle = screen.getByTestId('ce-setup-with-ai-open');
+    expect(toggle).toHaveAccessibleName('Set up with AI');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('ce-setup-with-ai-copy')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById(toggle.getAttribute('aria-controls') || '')).toContainElement(
+      screen.getByTestId('ce-setup-with-ai-copy'),
+    );
+    expect(screen.getByRole('button', { name: 'Show prompt' })).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId('ce-setup-with-ai-copy')).not.toBeInTheDocument();
+  });
+
+  it('copies the setup prompt, whose link comes back to this page', async () => {
+    renderOpen();
     fireEvent.click(screen.getByTestId('ce-setup-with-ai-copy'));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(prompt));
     expect(prompt).toContain(`${SETUP_URL}#setup=`);
@@ -24,7 +46,7 @@ describe('Set up with your AI', () => {
   });
 
   it('opens ChatGPT or Claude with the prompt in a new tab, and copies it in case the site drops it', async () => {
-    render(<SetupWithAi setupUrl={SETUP_URL} />);
+    renderOpen();
     for (const [name, origin] of [
       ['ChatGPT', 'https://chatgpt.com'],
       ['Claude', 'https://claude.ai'],
@@ -46,7 +68,7 @@ describe('Set up with your AI', () => {
 
   it('shows the prompt to copy by hand when the clipboard is unavailable', async () => {
     writeText.mockRejectedValue(new Error('denied'));
-    render(<SetupWithAi setupUrl={SETUP_URL} />);
+    renderOpen();
     expect(screen.queryByLabelText('Setup prompt')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('ce-setup-with-ai-copy'));
     expect(await screen.findByRole('status')).toHaveTextContent(

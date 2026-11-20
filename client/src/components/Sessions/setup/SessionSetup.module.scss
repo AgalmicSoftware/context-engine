@@ -276,6 +276,19 @@
   min-width: 0;
 }
 
+// "Set up with AI" before it is opened: the button alone.
+.aiSetupClosed {
+  display: flex;
+  min-width: 0;
+}
+
+.aiSetupChoices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
 .bannerTitle {
   // A global heading colour would otherwise make it unreadable on dark themes.
   color: var(--ce-panel-text);
