@@ -1190,7 +1190,7 @@ describe('SessionVoiceModeModal', () => {
       'Left out 2 drafts for questions you’ve already answered.',
     );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
-      'Your AI drafted 1 answer · Claude, self-reported',
+      'Your AI drafted 1 answer',
     );
     expect(screen.getByRole('group', { name: 'AI prefill metadata' })).toHaveTextContent(
       '1 selected draft and 0 unselected drafts',
@@ -3133,14 +3133,9 @@ describe('SessionVoiceModeModal', () => {
       window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
     }
     const panel = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PANEL);
-    const coverage = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE);
-    expect(coverage).toHaveTextContent('Self-reported agent research coverage');
-    expect(coverage).toHaveTextContent('History chats: 8 used');
-    expect(coverage).toHaveTextContent('Memories: 4 used / 20 searched');
-    expect(coverage).toHaveTextContent('Connected sources: 1 used / 3 searched');
-    expect(coverage).toHaveTextContent('15 user statements used');
-    expect(coverage).toHaveTextContent('Chat search did not expose a total scanned count.');
-    const footer = coverage.nextElementSibling;
+    // Research coverage shows once, in the AI submission info's metadata, not again under the responses.
+    expect(screen.queryByText('Self-reported agent research coverage')).not.toBeInTheDocument();
+    const footer = screen.getByRole('group', { name: 'Response submission' });
     expect(footer).toContainElement(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     expect(panel.lastElementChild).toBe(footer);
     const responderContext = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT);
@@ -3148,7 +3143,10 @@ describe('SessionVoiceModeModal', () => {
     expect(responderContext.closest('details')).not.toHaveAttribute('open');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).not.toBeInTheDocument();
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
+    expect(metadata).toHaveTextContent('History chats: 8 used');
     expect(metadata).toHaveTextContent('Memories: 4 used / 20 searched');
+    expect(metadata).toHaveTextContent('Connected sources: 1 used / 3 searched');
+    expect(metadata).toHaveTextContent('15 user statements used');
     expect(metadata).toHaveTextContent('Chat search did not expose a total scanned count.');
     await expectReadableDraftText('Draft answer for What matters?', 'A cautious prediction');
     expect(screen.queryByLabelText('AI-estimated confidence: 22%')).not.toBeInTheDocument();
@@ -3221,7 +3219,7 @@ describe('SessionVoiceModeModal', () => {
     await expectReadableDraftText('Draft answer for What matters?', 'Predicted answer from memory');
     // A prefill link opens on its drafts, with a status line, and the interview talks them through.
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
-      'Your AI drafted 1 answer · Claude, self-reported',
+      'Your AI drafted 1 answer',
     );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Talk through your drafts');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeEnabled();

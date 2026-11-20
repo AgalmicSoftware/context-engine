@@ -450,7 +450,7 @@ required field, such as `questionSetHash`, names it. Drafts are never dropped
 silently: a notice counts those left out because they were incomplete or
 repeated, and those that fit none of the session's questions or their options.
 A prefill link opens the interview on its drafts with one status line, such as
-“Your AI drafted 6 answers · Claude, self-reported”, and the microphone reads
+“Your AI drafted 6 answers”, and the microphone reads
 **Talk through your drafts**.
 When the participant starts or continues the live voice interview after a valid
 prefill is loaded, the realtime interviewer receives a bounded JSON background

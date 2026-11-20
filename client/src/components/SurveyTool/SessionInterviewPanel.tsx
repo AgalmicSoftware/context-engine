@@ -1139,8 +1139,8 @@ export default function SessionInterviewPanel({
 
   const importedContext = prefillPacket?.responderContext;
   const importedResponderName = String(importedContext?.name || '').trim();
-  const researchCoverage = prefillPacket?.source?.researchCoverage;
-  const researchCoverageDetails = describeResearchCoverage(researchCoverage);
+  // Shown only in the AI submission info's metadata.
+  const researchCoverageDetails = describeResearchCoverage(prefillPacket?.source?.researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
   const canManuallyRefreshGroupRecommendations =
     hasRefreshableGroups && drafts.length > 0 && !groupRecommendationRequest;
@@ -1319,7 +1319,6 @@ export default function SessionInterviewPanel({
           {showPrefillStatus ? (
             <SessionInterviewPrefillStatus
               draftCount={prefillDraftCount}
-              platform={prefillPacket?.source.platform}
               hiddenCount={hiddenDrafts.count}
               dataNote={dataNote}
             />
@@ -1425,17 +1424,6 @@ export default function SessionInterviewPanel({
               creatorProps={questionCreatorProps || {}}
               hidden={isInterviewBusy || mapping || shouldHideSuggestedQuestionSection(suggestedQuestionAuthoringState)}
             />
-          ) : null}
-          {researchCoverage ? (
-            <section
-              className={styles.sessionInterviewResearchCoverage}
-              aria-label="Self-reported agent research coverage"
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE}
-            >
-              <strong>Self-reported agent research coverage</strong>
-              <span>{researchCoverageDetails.join(' · ') || 'Coverage counts unavailable'}</span>
-              {researchCoverage.searchScopeNote ? <small>{researchCoverage.searchScopeNote}</small> : null}
-            </section>
           ) : null}
           {drafts.length && !isInterviewBusy && !mapping ? (
             <div className={styles.sessionInterviewReviewActions} role="group" aria-label="Response submission">

@@ -294,7 +294,6 @@
   "SESSION_VOICE_PREFILL": "ce-session-voice-prefill",
   "SESSION_INTERVIEW_PANEL": "ce-session-interview-panel",
   "SESSION_INTERVIEW_CONTEXT": "ce-session-interview-context",
-  "SESSION_INTERVIEW_RESEARCH_COVERAGE": "ce-session-interview-research-coverage",
   "SESSION_INTERVIEW_STATUS": "ce-session-interview-status",
   "SESSION_INTERVIEW_START": "ce-session-interview-start",
   "SESSION_INTERVIEW_STOP": "ce-session-interview-stop",

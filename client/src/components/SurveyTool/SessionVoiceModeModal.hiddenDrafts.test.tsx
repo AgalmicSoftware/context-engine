@@ -171,7 +171,7 @@ it('says how many drafts are hidden and why, with the session note on where the 
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   const status = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS);
   expect(status).toHaveTextContent(
-    `Your AI drafted 6 answers · Claude, self-reported${hiddenIds.length} are hidden until you answer, to test how well your AI predicts you.`,
+    `Your AI drafted 6 answers${hiddenIds.length} are hidden until you answer, to test how well your AI predicts you.`,
   );
   expect(within(status).getByRole('link', { name: 'How it works' })).toHaveAttribute(
     'href',
