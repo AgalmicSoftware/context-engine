@@ -3012,12 +3012,29 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     }
 
     .modalContent {
-      width: 90%;
+      // The panel takes the screen's width, and its text most of the panel's: on a phone the side room and the
+      // summary's indent together left a column of about half the screen.
+      width: 100%;
+      padding: 18px 14px;
       height: auto;
       max-height: calc(100vh - 32px);
       // vh counts the screen under a phone browser's bars; dvh is what shows.
       max-height: calc(100dvh - 32px);
       border-radius: var(--ce-radius-12);
+
+      .modalHeader .titleSection .modalTitle {
+        font-size: 1.35rem;
+        overflow-wrap: anywhere;
+      }
+
+      .generatedSummarySection {
+        margin: 0 0 14px;
+        padding: 12px;
+      }
+
+      .generatedSummaryPositions .generatedSummaryPosition {
+        padding: 10px 12px;
+      }
       // The close button floats at the top right of the visible screen, which
       // a phone's browser bars never cover, so the panel can always be left.
       // The title gets its own line, so the vote controls never squeeze it away.
