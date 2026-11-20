@@ -219,7 +219,8 @@ export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLi
         reviewLink: kept.length ? `${reviewUrl}#prefill=${encoded}` : reviewUrl,
         drafts: kept.length,
         ...(leftOut.length ? { leftOut } : {}),
-        next: 'Give the person reviewLink as a Markdown link labelled "Review your drafted answers". Nothing is submitted: they review the drafts on the page and submit the ones they keep, as themselves.' +
+        next: 'Give the person reviewLink as a Markdown link labelled "Review your drafted answers", copied exactly: if one character changes or goes missing, the page can’t read the drafts. ' +
+          'If it is too long to send whole, call make_review_link again with shorter evidence and comments, or fewer drafts. Nothing is submitted: they review the drafts on the page and submit the ones they keep, as themselves.' +
           (privateSession ? ' This session is private, and the review link carries no invite: they open the session from their own invite link first, or sign in as a member, then open the review link.' : ''),
       };
     },

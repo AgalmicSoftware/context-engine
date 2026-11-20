@@ -88,6 +88,7 @@ test('makes a review link the page reads, leaving out drafts that would not fit 
   assert.match(result.leftOut[0].reason, /second draft/);
   assert.ok(result.reviewLink.startsWith(`${catalog().reviewUrl}#prefill=`));
   const packet = decode(result.reviewLink);
+  assert.match(result.next, /copied exactly: if one character changes or goes missing.*too long to send whole, call make_review_link again with shorter evidence and comments, or fewer drafts\. Nothing is submitted/);
   assert.equal(packet.version, 1);
   assert.equal(packet.sessionSlug, 'forum-a');
   assert.equal(packet.questionSetHash, HASH);
