@@ -188,6 +188,15 @@ describe('UserPageAnalysisCard', () => {
     expect(screen.queryByRole('status')).toBeNull();
   });
 
+  it("offers no Download on someone else's card, only the page turns", async () => {
+    render(<UserPageAnalysisCard card={{ ...card, own: false }} picture={{ status: 'none' }} />);
+    await waitFor(() => expect(screen.getByRole('img')).toBeTruthy());
+    expect(screen.queryByText('Download')).toBeNull();
+    expect(screen.queryByRole('menuitem')).toBeNull();
+    fireEvent.click(screen.getByLabelText('Show page 2 of the card'));
+    await waitFor(() => expect(screen.getByRole('img').getAttribute('aria-label')).toContain('page 2 of 2'));
+  });
+
   it('puts the page turns beside Download, under the card', async () => {
     render(<UserPageAnalysisCard card={card} picture={{ status: 'none' }} />);
     await waitFor(() => expect(screen.getByText('Download')).toBeTruthy());

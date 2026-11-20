@@ -143,18 +143,21 @@ const UserPageAnalysisCard = ({ card, picture = null }: UserPageAnalysisCardProp
       {ready ? (
         <div className={styles.actions}>
           {turn(1, '‹')}
-          <UncontrolledDropdown direction="up">
-            <DropdownToggle tag="button" type="button" caret className={styles.download} disabled={!!busy}>
-              Download
-            </DropdownToggle>
-            <DropdownMenu>
-              {choices.map(([kind, text]) => (
-                <DropdownItem key={kind} onClick={() => void download(kind)}>
-                  {text}
-                </DropdownItem>
-              ))}
-            </DropdownMenu>
-          </UncontrolledDropdown>
+          {/* A card is saved as a file only by the person it is about. */}
+          {card.own ? (
+            <UncontrolledDropdown direction="up">
+              <DropdownToggle tag="button" type="button" caret className={styles.download} disabled={!!busy}>
+                Download
+              </DropdownToggle>
+              <DropdownMenu>
+                {choices.map(([kind, text]) => (
+                  <DropdownItem key={kind} onClick={() => void download(kind)}>
+                    {text}
+                  </DropdownItem>
+                ))}
+              </DropdownMenu>
+            </UncontrolledDropdown>
+          ) : null}
           {turn(2, '›')}
         </div>
       ) : null}

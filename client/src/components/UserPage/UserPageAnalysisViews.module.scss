@@ -1,29 +1,9 @@
 // The analysis box's three views: Text, Breakdown and, where the session has it, the picture card.
 
-// The switch on the left; "View User Card" at the right once there is a card to go to.
-.top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.viewCard {
-  min-height: 44px;
-  margin-left: auto;
-  padding: 6px 14px;
-  font-weight: 700;
-  background: var(--ce-action-accent);
-  color: var(--ce-action-accent-text);
-  cursor: pointer;
-}
-
 .switch {
   display: flex;
-  flex: 1 1 220px;
   gap: 6px;
+  margin-bottom: 16px;
 }
 
 .switchButton {

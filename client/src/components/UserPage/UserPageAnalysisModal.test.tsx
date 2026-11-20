@@ -121,7 +121,7 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getAllByRole('heading').map((node) => node.textContent)).toEqual(['Historical Alignment']);
   });
 
-  it('offers the picture card as a third view, and View User Card opens it once the card is whole', () => {
+  it('offers the picture card as a third view, with one way to it: the Card button', () => {
     const card = {
       own: true,
       link: 'contextengine.sh',
@@ -137,45 +137,26 @@ describe('UserPageAnalysisModal', () => {
     const pressed = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-pressed');
     const { rerender } = render(<UserPageAnalysisModal {...createProps()} />);
     expect(screen.queryByRole('button', { name: 'Card' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
 
     // The analysis is readable while the card is still being written; the Card view says it is on its way.
     rerender(<UserPageAnalysisModal {...createProps({ analysisCardPending: true })} />);
     expect(screen.getByText('Profile synthesis')).toBeTruthy();
     expect(screen.queryByRole('status')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Card' }));
     expect(screen.getByRole('status').textContent).toContain('Making the card…');
     expect(screen.queryByText('Profile synthesis')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Breakdown' }));
 
-    // Its words are in but its picture is still being drawn: no button points at it yet.
-    rerender(
-      <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'loading' } })} />,
-    );
-    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
-    expect(screen.queryByTestId('analysis-card')).toBeNull();
-
-    // Whole: the button appears at the top, opens the Card view, and steps aside there. One card, one place.
+    // One card, in the Card view only, and no second button for it anywhere.
     rerender(
       <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'ready' } })} />,
     );
-    expect(pressed('Breakdown')).toBe('true');
-    fireEvent.click(screen.getByRole('button', { name: 'View User Card' }));
     expect(pressed('Card')).toBe('true');
     expect(screen.getAllByTestId('analysis-card')).toHaveLength(1);
     expect(screen.getByTestId('analysis-card').textContent).toBe('Wants AI doing paperwork / ready');
     expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
-    expect(screen.queryByText('Profile synthesis')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
     expect(screen.queryByTestId('analysis-card')).toBeNull();
-    expect(screen.getByRole('button', { name: 'View User Card' })).toBeTruthy();
-
-    // A card with no picture to wait for is whole too.
-    rerender(
-      <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'none' } })} />,
-    );
-    expect(screen.getByRole('button', { name: 'View User Card' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /card/i })).toHaveLength(1);
 
     // A card that is taken away leaves the Breakdown, not an empty view.
     fireEvent.click(screen.getByRole('button', { name: 'Card' }));
@@ -193,7 +174,7 @@ describe('UserPageAnalysisModal', () => {
       />,
     );
     expect(screen.queryByTestId('analysis-card')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Card' })).toBeNull();
   });
 
   it('on my own page puts a "Show this card on my page" box under the card; on another page, their date', () => {
@@ -219,8 +200,12 @@ describe('UserPageAnalysisModal', () => {
         })}
       />,
     );
-    // A new card goes on my page at once, so the box is in sight in the view the analysis opens on.
+    // The box belongs to the card: it is in the Card view and in neither of the others.
     expect(screen.getByRole('button', { name: 'Breakdown' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Card' }));
     const box = screen.getByRole('checkbox', { name: 'Show this card on my page' }) as HTMLInputElement;
     expect(box.checked).toBe(true);
     expect(screen.getByRole('tooltip').textContent).toMatch(
@@ -245,8 +230,6 @@ describe('UserPageAnalysisModal', () => {
 
     // Another person's saved card: no box in any view, and its date under the card in the Card view.
     rerender(<UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardSavedAt: 7 })} />);
-    expect(screen.queryByRole('checkbox')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Card' }));
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.getByText('Their saved card, from day 7')).toBeTruthy();
   });

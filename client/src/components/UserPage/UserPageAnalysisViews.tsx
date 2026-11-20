@@ -65,8 +65,7 @@ const HistoricalAlignment = ({
 
 /**
  * One analysis, three ways to read it. The picture card is the third view, there only where the session makes
- * one: on my own page it shows nowhere else. "View User Card" appears at the top right once the card is whole
- * and opens that view.
+ * one: on my own page it shows nowhere else, and its "Show this card on my page" box sits with it.
  */
 const UserPageAnalysisViews = ({
   aiAnalysis,
@@ -87,30 +86,21 @@ const UserPageAnalysisViews = ({
   const [chosen, setChosen] = useState<View>('breakdown');
   // A card that is taken away (the session turned it off) leaves the Breakdown, not an empty view.
   const view = chosen === 'card' && !hasCard ? 'breakdown' : chosen;
-  // Whole: its words are written and its picture is in, or known to be absent.
-  const cardRendered = !!analysisCard && analysisCardPicture?.status !== 'loading';
   const lines = BREAKDOWN_LINES.filter(([key]) => analysisBreakdown?.[key]);
   return (
     <>
-      <div className={viewStyles.top}>
-        <div className={viewStyles.switch} role="group" aria-label="How to show the analysis">
-          {VIEW_LABELS.filter(([id]) => id !== 'card' || hasCard).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={viewStyles.switchButton}
-              aria-pressed={view === id}
-              onClick={() => setChosen(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {cardRendered && view !== 'card' ? (
-          <button type="button" className={viewStyles.viewCard} onClick={() => setChosen('card')}>
-            View User Card
+      <div className={viewStyles.switch} role="group" aria-label="How to show the analysis">
+        {VIEW_LABELS.filter(([id]) => id !== 'card' || hasCard).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={viewStyles.switchButton}
+            aria-pressed={view === id}
+            onClick={() => setChosen(id)}
+          >
+            {label}
           </button>
-        ) : null}
+        ))}
       </div>
 
       {view === 'text' && (
@@ -160,45 +150,43 @@ const UserPageAnalysisViews = ({
                 Their saved card, from {formatSavedAnalysisCardDate(analysisCardSavedAt)}
               </p>
             ) : null}
+            {analysisCardPublish && onAnalysisCardShownChange ? (
+              <div className={cardStyles.publish}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={analysisCardPublish.shown}
+                    disabled={analysisCardPublish.saving}
+                    onChange={(event) => onAnalysisCardShownChange(event.target.checked)}
+                  />{' '}
+                  Show this card on my page
+                </label>{' '}
+                <button
+                  type="button"
+                  id="analysisCardPublishHelp"
+                  className={cardStyles.publishHelp}
+                  data-ce-control-appearance="frameless"
+                  aria-label="About showing this card on your page"
+                >
+                  <FontAwesomeIcon icon={faQuestionCircle} />
+                </button>
+                <UncontrolledTooltip target="analysisCardPublishHelp" trigger="hover focus" autohide={false}>
+                  Anyone signed in to this session who may use its AI and read your answers sees this card on your page,
+                  with up to three of those answers. Untick to remove it.
+                </UncontrolledTooltip>
+                {analysisCardPublish.note ? (
+                  <p className={styles.placeholderNote} role="status">
+                    {analysisCardPublish.note}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </>
         ) : (
           <p className={styles.placeholderNote} role="status">
             <FontAwesomeIcon icon={faSpinner} spin /> Making the card…
           </p>
         ))}
-
-      {/* On my own page a new card goes on my page at once, so its box stays in sight in every view. */}
-      {analysisCard && analysisCardPublish && onAnalysisCardShownChange ? (
-        <div className={cardStyles.publish}>
-          <label>
-            <input
-              type="checkbox"
-              checked={analysisCardPublish.shown}
-              disabled={analysisCardPublish.saving}
-              onChange={(event) => onAnalysisCardShownChange(event.target.checked)}
-            />{' '}
-            Show this card on my page
-          </label>{' '}
-          <button
-            type="button"
-            id="analysisCardPublishHelp"
-            className={cardStyles.publishHelp}
-            data-ce-control-appearance="frameless"
-            aria-label="About showing this card on your page"
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} />
-          </button>
-          <UncontrolledTooltip target="analysisCardPublishHelp" trigger="hover focus" autohide={false}>
-            Anyone signed in to this session who may use its AI and read your answers sees this card on your page, with
-            up to three of those answers. Untick to remove it.
-          </UncontrolledTooltip>
-          {analysisCardPublish.note ? (
-            <p className={styles.placeholderNote} role="status">
-              {analysisCardPublish.note}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
 
       <p className={viewStyles.model}>
         {analysisGeneration?.source === 'requested' ? 'Requested AI model: ' : 'AI model: '}
