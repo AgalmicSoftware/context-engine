@@ -2583,7 +2583,7 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-.agentHandoffPrimary.agentHandoffCaret {
+.agentHandoffSplit > .agentHandoffPrimary.agentHandoffCaret {
   flex: none;
   width: 52px;
   border-top-left-radius: 0;
@@ -2603,6 +2603,7 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 
+  // Its display: block would otherwise outweigh the hidden attribute.
   &[hidden] {
     display: none;
   }

@@ -378,8 +378,8 @@ const LoginAgentHandoffPanel = ({
       <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
         Your key works in {sessionName} only, until {expiry}.
         <Help id="ce-agent-handoff-expiry-about" placement="bottom">
-          It ends when your sign-in ends or when you make a new key. The prompt below holds it, so paste the prompt only
-          into your own agent.
+          It ends when your sign-in ends or when you make a new key. The prompt you copy holds it, so paste it only into
+          your own agent.
         </Help>
       </p>
       {key.submitAnswers ? null : (

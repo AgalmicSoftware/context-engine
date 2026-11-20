@@ -337,8 +337,28 @@ it('shows and selects the prompt with its key when copying is refused', async ()
   fireEvent.click(await screen.findByRole('button', { name: 'Copy prompt' }));
   await screen.findByText("Copying isn't allowed here, so the prompt is selected. Copy it yourself.");
   expect(screen.getByRole('button', { name: 'Show the key' })).toHaveAttribute('aria-pressed', 'true');
+  // Opened, so the selection is something the person can see and copy.
+  expect(screen.getByTestId('ce-agent-handoff-submit-prompt')).toBeVisible();
+  expect(screen.getByTestId('ce-agent-handoff-submit-prompt-expand')).toHaveAttribute('aria-expanded', 'true');
   expect(window.getSelection()?.toString()).toContain('Your key is ceagt_secret;');
   window.getSelection()?.removeAllRanges();
+});
+
+it('gives a refused suggestions copy its own field, not the prompt twice', async () => {
+  writeText.mockImplementation(async () => {
+    throw new Error('denied');
+  });
+  renderPanel();
+  const button = await screen.findByTestId('ce-agent-handoff-suggest-copy');
+  // The caret waits for the checked prompt, as Copy prompt does.
+  expect(screen.queryByRole('button', { name: 'Read the whole prompt' })).not.toBeInTheDocument();
+  await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'false'));
+  fireEvent.click(screen.getByRole('button', { name: 'Read the whole prompt' }));
+  expect(screen.getByTestId('ce-agent-handoff-suggest-prompt')).toBeVisible();
+  await act(async () => fireEvent.click(button));
+  const field = await screen.findByRole('textbox', { name: 'Memory augmentation prompt to copy' });
+  expect(field).toHaveValue(String(writeText.mock.calls.at(-1)?.[0]));
+  expect(screen.queryByTestId('ce-agent-handoff-suggest-prompt')).not.toBeInTheDocument();
 });
 
 it('copies with the older copy command where the clipboard is missing', async () => {

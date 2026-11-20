@@ -204,9 +204,10 @@ export default function SessionInterviewMemoryKickoffCard({
             <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
             {promptCopied ? 'Copied' : 'Copy prompt'}
           </button>
-          {copyButton.addon}
+          {compatible ? copyButton.addon : null}
         </div>
-        {compatible && copyButton.renderPreview ? copyButton.renderPreview(prompt) : null}
+        {/* A refused copy shows the field below instead, so the prompt never shows twice. */}
+        {compatible && !manualPrompt && copyButton.renderPreview ? copyButton.renderPreview(prompt) : null}
         {status}
       </div>
     );
