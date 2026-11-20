@@ -8,10 +8,10 @@ Fixes on the home page; the site only. No Worker change: sessions keep the 0.9.2
 
 ### Site — available when the site deploys
 
-- **Home > Tools > Groups.** The tab lists the session's groups again, instead of "This session does not have an exact, validated Worker Groups profile."
-- **Home > Stats.** The numbers in the tiles are centred.
-- **Long session names.** A name too long for its row ends in "…" before the open-link icon.
-- **Welcome slides on phones.** The slides keep their height and fill it, with less empty space.
+- **Home > Tools > Groups.** The tab shows the chosen session's groups, with the same list and categories as the session's own Groups page. Until Questions had been opened, it showed a notice about the session's "Worker Groups profile". If a session's settings really cannot be read, the notice now says so plainly.
+- **Home > Stats.** The numbers are centred when there are fewer of them than fit a row.
+- **Long session names.** In the session menu, a long name ends in "…" instead of being cut off beside the open-link icon.
+- **Welcome slides on phones.** The slides use their full height: larger text and picture, and no empty band above the arrows.
 
 ## [0.9.24] - 2026-11-20
 
