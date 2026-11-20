@@ -10,13 +10,15 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import { copyText } from '../../utilities/ui/copyText';
+import { buildCopyPageLink } from '../../utilities/ui/arrivalLink';
 import styles from './Account.module.scss';
 import { AccountMenu, AccountMenuRow } from './AccountMenu';
 import { countUnsentAnswers } from 'components/UserPage/userPageAnalyzeLink';
 const AgentAccountAccessPanel = React.lazy(() => import('./AgentAccountAccessPanel'));
 import { PASSKEYS_UNAVAILABLE_MESSAGE, type PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
-// For a browser without passkeys: the same page, to paste into one that has them.
+// For a browser without passkeys: the same page, to paste into one that has them. The link is the one the person
+// arrived with: the app has by now taken a group's invite and any drafted answers out of the address.
 const CopyPageLink = () => {
   const [copied, setCopied] = useState<boolean | null>(null);
   return (
@@ -28,10 +30,11 @@ const CopyPageLink = () => {
         className={styles.passkeyCopyLink}
         data-testid="ce-passkey-copy-link"
         onClick={async () => {
-          const done = await copyText(window.location.href);
+          const link = buildCopyPageLink();
+          const done = await copyText(link);
           setCopied(done);
           // Offers the link to copy by hand, where the browser shows prompts.
-          if (!done) window.prompt('Copy this link', window.location.href);
+          if (!done) window.prompt('Copy this link', link);
         }}
       >
         {copied ? 'Link copied' : 'Copy link'}

@@ -99,7 +99,10 @@ export const holdGroupInviteForLink = (path: string, token: string) => {
 export const removeGroupInviteFromAddress = () => {
   const { pathname, search, hash } = window.location;
   if (!fragmentSegments(hash).some((part) => part.startsWith(INVITE_FRAGMENT))) return;
-  holdGroupInviteForLink(`${pathname}${search}`, readGroupInviteFragment(hash));
+  const token = readGroupInviteFragment(hash);
+  const target = readLinkTarget(`${pathname}${search}`);
+  arrivalInvite = target && token ? { sessionSlug: target.sessionSlug, groupId: target.groupId, token } : null;
+  holdGroupInviteForLink(`${pathname}${search}`, token);
   const rest = fragmentSegments(hash).filter((part) => part && !part.startsWith(INVITE_FRAGMENT));
   window.history.replaceState(
     window.history.state,
@@ -194,6 +197,22 @@ const readLinkTarget = (path: string) => {
   } catch {
     return null;
   }
+};
+
+// The invite the address itself carried when this page took it out, in memory only. It is not the tab's held
+// invite: that may also be a code the person typed, a pasted invite or a recording's claim, none of which was in
+// their link.
+let arrivalInvite: { sessionSlug: string; groupId: string; token: string } | null = null;
+
+/**
+ * The invite the address carried for the group a session link names, for putting that link back together. ''
+ * for another session or group, after a reload, or where the link carried none.
+ */
+export const readInviteForLink = (path: string): string => {
+  const target = readLinkTarget(path);
+  return target && arrivalInvite?.sessionSlug === target.sessionSlug && arrivalInvite.groupId === target.groupId
+    ? arrivalInvite.token
+    : '';
 };
 
 export const readAutoJoinLink = (path: string, context: Context): WorkerGroupAutoJoinIntent | null => {
