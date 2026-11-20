@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.24] - 2026-11-20
+
+MCP 0.9.0 (published at merge) and the site. No Worker change: sessions keep the 0.9.23 Worker, which the deploy helper now uses. Nothing a session already stores is changed.
+
+### MCP 0.9.0
+
+- The version number only: no tool changes over 0.8.1. The card tools, `make_analysis_card` and `show_analysis_card`, first shipped in 0.8.1; new tools take a minor version, so 0.9.0 carries the number they should have had.
+
+### Site — available when the site deploys
+
+- **Groups by category.** A session's group list puts each group under its first tag, categories A–Z and untagged groups last; with one category or none it stays as cards. Phones get an accordion, wide screens every category side by side, and open groups join in one tap. A group made without choosing tags keeps the create form's defaults and is listed with the untagged ones. The list takes the page's text colour in the light and window themes, and Join, Leave and the "Joined …" line stay readable.
+- **Quickstart.** Step 1 no longer sends people to a "general" session or asks them to edit a link by hand: it offers a shared link, a new session, or the demo session (the one the About page's Demo button opens).
+- **Quickstart sign-in step.** Step 2 now matches the sign-in box: a passkey, with Create or Login, or a wallet you already have where a session uses Ethereum wallets.
+- **Deploy helper.** It deploys the 0.9.23 Worker bundles.
+
 ## [0.9.23] - 2026-11-20
 
 A Session Worker fix, MCP 0.8.1 (published at merge) and the site. Nothing a session already stores is changed.
