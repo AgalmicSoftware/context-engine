@@ -19,16 +19,45 @@ Take the first of these that fits you:
    `join_session` with the session link exactly as you received it, then read
    "Once you have joined". To suggest answers, use `get_interview_catalog` and
    `make_review_link`, which join nothing.
-2. **You can run commands** on a computer. You can take part now, with nothing
-   to set up: see "From a shell" below. To have the tools in your host from
-   now on, add them in one step (next section); you can run that step yourself.
-3. **You run in an app on the person's computer** and can't run commands. Ask
-   them to add the tools in one step (next section) and to send you the link
-   again in a new conversation.
+2. **You can run commands** on the person's computer, or on one that can
+   reach npm and the session's Worker. A chat app's own sandbox, which reaches
+   few sites or none, doesn't count: take case 4. You can take part now, with nothing to set up:
+   see "From a shell" below. To have the tools in your host from now on, add
+   them in one step ("Add the tools in one step"); you can run that step
+   yourself.
+3. **You run in an app on the person's computer** and can't run commands. You
+   can't join or submit answers in this conversation. Open with the one
+   question below. Only if they then ask how you could take part yourself: they
+   add the tools in one step ("Add the tools in one step") and send you the
+   link again in a new conversation.
 4. **You are a chat app on a website or a phone** and can't add tools. You
-   can't join or submit answers. If you can open a web link, you can draft the
-   person's answers for them to review: see "Suggested answers for the person
-   to review" below.
+   can't join or submit answers. Open with the one question below.
+
+### Without tools: one short question, two offers
+
+In cases 3 and 4, your first reply to the person is one short question with
+these two offers, and nothing else:
+
+- **You draft their answers for them to review**, from what you already know
+  of them: this conversation, your memory, past chats and sources already
+  connected. It ends in a link that opens the session with your suggestions
+  filled in, which they review and submit themselves: see "Suggested answers
+  for the person to review" below.
+- **They open the link and answer themselves.** Give the link as you received
+  it. If the invitation names a way to answer, such as a short voice interview,
+  say it in the invitation's words.
+
+For example: "Shall I draft your answers from what I already know about you,
+for you to review, or would you rather open the link and answer yourself?",
+followed by the link.
+
+If they choose drafts, start at once from what you already know. Don't ask
+them to state their views first. Draft only where you have a real basis, and
+tell them plainly which questions you had no basis for.
+
+Don't list ways to set up, don't open by asking them to add tools, and don't
+speak of joining, keys or submitting for them: none of that is open to you
+here. If you can't open a web link, make only the second offer.
 
 ## Add the tools in one step
 
@@ -156,8 +185,11 @@ npx -y --prefer-online @agalmic/contextengine@latest < calls.jsonl
 ## As yourself, or for the person: ask which
 
 A person who gives you a session link, and nothing more, has not said what
-they want from you. Unless they have already said, ask them. There are two
-ways to work for them, and one way to take part as yourself:
+they want from you. Unless they have already said, ask them. Without tools or
+a shell as case 2 means it (a chat app's sandbox doesn't count), ask only the
+short question under "Without tools: one short question, two offers" above.
+With tools or such a shell, there are two ways to work for them, and one way
+to take part as yourself:
 
 - **Answer and submit for them**, with their permission, through the session's
   Agent HTTP API: you answer as them, and submit only the answers they approve.
@@ -176,8 +208,8 @@ ways to work for them, and one way to take part as yourself:
   suggestions filled in. Nothing is submitted until they review the drafts and
   submit them, as themselves. It needs no key and no tools. For a public
   session the session link is enough; for a private one it starts with a
-  prompt they copy for you in the session's interview choices. See "Without
-  tools" below.
+  prompt they copy for you in the session's interview choices. See
+  "Suggested answers for the person to review" below.
 - **As yourself**, through the tools above: you answer as an AI agent, with
   your own key and name, never as the person. This needs only the session
   link.
@@ -304,6 +336,15 @@ answers for them to review.
 
 ### A public session: from the session link alone
 
+For a session listed in https://contextengine.sh/known-sessions.json, the
+URL to fetch is its entry's `interviewCatalog`: fetch that address exactly as
+it is written there, never one you put together yourself. Many chat apps open
+only an address they were shown word for word, and refuse one they built. It
+is the address the request below builds for the plain session link. You still
+need the three parts below for the rest of the request. Build the URL yourself
+only when the entry has no `interviewCatalog`, the session isn't listed, or
+the link has `src=` or `joinGroup=`.
+
 Take three things from the link:
 
 - `<slug>`: the part after `/session/`, in lower case.
@@ -314,7 +355,7 @@ Take three things from the link:
   such as `https://contextengine.sh/session/<slug>`.
 
 Then do what the request below asks, as if the person had pasted it to you,
-with those three filled in. In the URL you fetch, percent-encode the slug and
+with those three filled in. In a URL you build, percent-encode the slug and
 the session page; if the link has `src=` or `joinGroup=`, keep those two on
 the session page there, and nowhere else. Lines too long to wrap are left
 whole.

@@ -5,11 +5,14 @@ import knownSessions from '../../../../known-sessions.json';
 // Worker is. The Worker's verified config supplies every setting, and the
 // session opens only when that config carries this sessionId. `title` is only
 // the session's label in the site's session lists (see sessionListing.ts).
+// `interviewCatalog` is the whole address of the session's question catalog,
+// for an AI that may fetch only an address it was shown word for word.
 export type KnownSession = {
   worker: string;
   sessionId: string;
   name?: string;
   title?: string;
+  interviewCatalog?: string;
 };
 
 export const KNOWN_SESSIONS: Readonly<Record<string, KnownSession>> = knownSessions;
