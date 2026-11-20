@@ -243,6 +243,20 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.8.1
+
+- A group's refusal names the group as the site shows it, quoted, with its
+  id: `Group "Edge City" (9f63…) isn’t open to joining`.
+- `make_review_link` deflates the drafts into a shorter link, after
+  `#prefillz=`, where the session's site lists that form in its
+  `/manifest.json` (`context_engine_review_links`). A clear answer holds for
+  the run, and a failed check is retried after 5 minutes; a site that doesn't
+  list it, or doesn't answer within 3 seconds, gets `#prefill=`, which every
+  site reads.
+- `make_review_link`'s `next` says to copy the link exactly, and, when it is
+  too long to send whole, to call again with shorter evidence and comments or
+  fewer drafts.
+
 ## Upgrading to 0.8.0
 
 Most of 0.8.0 needs a Session Worker from the same release; against an older
