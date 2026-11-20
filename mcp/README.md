@@ -252,8 +252,8 @@ Worker each tool says so and does nothing new.
   `list_context`, `read_context` and `get_results` take the link of a session
   the agent has not joined and read it as a visitor would: no sign-in, no
   join, nothing stored. A private session opens to its group's invite link,
-  the one that carries the password or a one-use code, and shows what that
-  group's members may read. `get_interview_catalog` and `make_review_link`
+  the one that carries the password, and shows what that group's members may
+  read; a one-use code reads too where the Worker offers it (see below). `get_interview_catalog` and `make_review_link`
   take the same link. Neither is ever sent. A password signs a proof that
   names the session, the group and the Worker it is for; a one-use code keys
   a proof that names the same and a time a few minutes off. Both go in a
