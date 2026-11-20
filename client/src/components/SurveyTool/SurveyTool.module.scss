@@ -3884,32 +3884,22 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   border-color: color-mix(in srgb, var(--ce-control-text) 62%, transparent) !important;
 }
 
-// The microphone in the middle column, so it stays centered whatever sits to its right, unless that
-// needs more room than half of what is left: then the column grows and the microphone moves left.
+// The microphone centered, with Discard and the transcript in one row under it.
 .sessionInterviewPrimaryAction {
-  display: grid;
-  // As wide as its columns need, centered in the row, so Generate response drafts can still sit beside it.
-  flex: 0 1 auto;
-  margin-inline: auto;
-  grid-template-columns: 1fr minmax(112px, 132px) 1fr;
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
   align-items: center;
+  gap: 16px;
   min-width: 0;
-  column-gap: 12px;
-
-  > :first-child {
-    grid-column: 2;
-  }
 }
 
-// The transcript level with the microphone's circle: the second row is as tall as Discard and its gap.
-.sessionInterviewSideActions {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) 52px;
-  align-self: stretch;
-  align-items: center;
-  justify-items: start;
-  // The transcript clips its own overflow, so it would let this column narrow past it.
-  min-width: max-content;
+.sessionInterviewMicRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  max-width: 100%;
 }
 
 // The prompt card under an interview that hasn't started, flush with the interview above it.
@@ -4003,6 +3993,20 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     padding: 8px 6px;
   }
 
+  // Discard and the transcript share the row under the microphone equally.
+  .sessionInterviewMicRow {
+    width: 100%;
+  }
+
+  // Grown from their own widths, so the row wraps rather than clipping the word count.
+  .sessionInterviewMicRow > :is(button, section) {
+    flex: 1 1 auto;
+  }
+
+  .sessionInterviewMicRow .sessionInterviewTranscriptToggle {
+    width: 100%;
+  }
+
   .sessionInterviewStatusPill {
     margin-inline-start: 4px;
     padding-inline: 9px;
@@ -4065,24 +4069,26 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   border-radius: 50%;
 }
 
-// Discard sits left of the microphone, level with its label and set apart from it, in the danger tone.
+// Discard on the left of the row under the microphone, in the danger tone.
 .sessionInterviewPanel .sessionInterviewDiscard {
   display: inline-flex;
-  grid-row: 1;
-  grid-column: 1;
-  align-self: end;
-  justify-self: end;
-  // Level with the label, which ends above the microphone's 10px bottom padding.
-  margin: 0 16px 8px 0;
-  padding: 0;
-  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 18px;
+  // The frameless recipe and theme button rules would square it or take its outline off.
+  border: 1px solid currentColor !important;
+  border-radius: var(--ce-radius-pill) !important;
   background: transparent !important;
   color: var(--ce-status-danger-text) !important;
+  font: inherit;
+  font-weight: 600;
   cursor: pointer;
 
-  &:hover:not(:disabled) .sessionInterviewDiscardCircle,
-  &:focus-visible .sessionInterviewDiscardCircle {
-    background: color-mix(in srgb, var(--ce-status-danger-text) 12%, transparent);
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: color-mix(in srgb, var(--ce-status-danger-text) 12%, transparent) !important;
   }
 
   &:focus-visible {
@@ -4094,17 +4100,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     cursor: default;
     opacity: 0.55;
   }
-}
-
-.sessionInterviewDiscardCircle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  font-size: 1rem;
 }
 
 .sessionInterviewPanel .sessionListeningWaveformTimer {
@@ -4852,8 +4847,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
 .sessionInterviewReviewActions .sessionInterviewSubmitButton {
   flex: 0 0 min(100%, 280px);
-  // Opening the dropdown grows the footer upward; the button stays at the bottom.
-  align-self: flex-end;
+  // As tall as the closed submission info beside it; once that opens, Submit wraps to its own row below.
+  align-self: stretch;
   margin-left: auto;
 }
 

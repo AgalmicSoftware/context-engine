@@ -190,13 +190,18 @@ describe('Interview layout', () => {
     return scss.slice(start, scss.indexOf('\n}', start));
   };
 
-  // Left of the microphone, away from a right thumb, so it is harder to press by accident.
-  it('sets Discard apart in red, left of the microphone and level with its label, with the microphone centered', () => {
-    expect(rule('.sessionInterviewPrimaryAction')).toMatch(/grid-template-columns: 1fr minmax\(112px, 132px\) 1fr;/);
+  // Under the microphone, on the left, away from a right thumb, so it is harder to press by accident.
+  it('sets Discard apart in red in the row under the microphone, which shares it equally on a phone', () => {
+    expect(rule('.sessionInterviewPrimaryAction')).toMatch(/flex-direction: column;\s*align-items: center;/);
+    expect(rule('.sessionInterviewMicRow')).toMatch(/justify-content: center;/);
     const discard = rule('.sessionInterviewPanel .sessionInterviewDiscard');
-    expect(discard).toMatch(/grid-row: 1;\s*grid-column: 1;\s*align-self: end;\s*justify-self: end;/);
     expect(discard).toMatch(/color: var\(--ce-status-danger-text\) !important;/);
-    expect(discard).toMatch(/margin: 0 16px 8px 0;/);
+    expect(discard).toMatch(/min-height: 44px;/);
+    expect(scss).toMatch(/\.sessionInterviewMicRow > :is\(button, section\) \{\s*flex: 1 1 auto;/);
+  });
+
+  it('makes Submit as tall as the closed submission info beside it', () => {
+    expect(rule('.sessionInterviewReviewActions .sessionInterviewSubmitButton')).toMatch(/align-self: stretch;/);
   });
 
   it('keeps Share for research in the green box where it drops below the summary', () => {

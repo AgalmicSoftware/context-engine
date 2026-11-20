@@ -255,14 +255,15 @@ describe('SessionVoiceModeModal', () => {
     view.rerender(<SessionVoiceModeModal {...props} />);
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1);
-    // Discard sits in the microphone's row, in its left column (SurveyTool.styles.test.ts checks the
-    // placement), and explains itself on hover, and to screen readers.
+    // Discard leads the row under the microphone, the transcript after it (SurveyTool.styles.test.ts
+    // checks the styling), and explains itself on hover, and to screen readers.
     const discard = screen.getByRole('button', { name: 'Discard interview' });
     const microphone = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
     expect(discard).toHaveClass('sessionInterviewDiscard');
-    expect(discard.parentElement).toHaveClass('sessionInterviewPrimaryAction');
-    expect(discard.parentElement).toBe(microphone.parentElement);
-    expect(document.querySelector('.sessionInterviewSideActions')).toBeNull();
+    expect(discard).toHaveTextContent('Discard');
+    expect(discard.parentElement).toHaveClass('sessionInterviewMicRow');
+    expect(discard.parentElement?.previousElementSibling).toBe(microphone);
+    expect(discard.parentElement?.firstElementChild).toBe(discard);
     expect(document.querySelector('.modal-footer')).toBeNull();
     expect(discard).toHaveAccessibleDescription(/Responses you’ve submitted are kept\.$/);
     fireEvent.mouseOver(discard);
@@ -2730,7 +2731,9 @@ describe('SessionVoiceModeModal', () => {
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
     const startControl = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
     expect(startControl.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(toggle.closest('.sessionInterviewSideActions')).not.toBeNull();
+    // Right of Discard in the row under the microphone.
+    expect(toggle.closest('.sessionInterviewMicRow')?.lastElementChild).toContainElement(toggle);
+    expect(toggle).toHaveTextContent(/^Transcript·\d+ words$/);
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
     // Sharing for research starts on, so its metadata is there to read.
