@@ -141,6 +141,9 @@ test('the browser journeys run as their own hosted job, one leg per engine, and 
     'the WebKit image matches the locked Playwright',
   );
   assert.match(journeyJob, /\n    container: \$\{\{ matrix\.container \}\}\n/);
+  // A container job runs steps with sh unless told otherwise, and the journeys step needs bash's pipefail.
+  assert.match(journeyJob, /\n    defaults:\n      run:\n        shell: bash\n/);
+  assert.match(step('Run browser journeys'), /set -euo pipefail/);
   assert.doesNotMatch(journeyJob, /install-deps webkit|sudo|continue-on-error|steps\.webkit|::warning|\|\| true\n/);
   const check = step('Check Playwright WebKit');
   assert.match(check, /if: \$\{\{ matrix\.engine == 'webkit' \}\}\n/);

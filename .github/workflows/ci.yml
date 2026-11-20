@@ -466,6 +466,10 @@ jobs:
             container: mcr.microsoft.com/playwright:v1.58.2-noble
     # Empty for Chromium, which runs on the runner itself.
     container: ${{ matrix.container }}
+    # In a container, run steps default to sh, which has no pipefail; both legs use bash.
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout
