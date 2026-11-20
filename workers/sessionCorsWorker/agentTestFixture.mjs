@@ -50,9 +50,10 @@ export function fixture(overrides = {}) {
       sessionSlug: 'fixture', accountAddress: wallet.address, scopes, credentialKind: kind });
     assert.equal(result.ok, true, JSON.stringify(result)); return result;
   }
-  async function request(path, { method = 'GET', token, body, headers = {} } = {}) {
+  // `rawBody` sends those bytes as they are, where a test needs a body that is empty or not JSON.
+  async function request(path, { method = 'GET', token, body, rawBody, headers = {} } = {}) {
     return runtime.fetch(new Request(`${origin}${path}`, { method, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...Object.fromEntries(new Headers(headers)) },
-      ...(body ? { body: JSON.stringify(body) } : {}) }), env);
+      ...(rawBody !== undefined ? { body: rawBody } : body ? { body: JSON.stringify(body) } : {}) }), env);
   }
   function withCoordinator(deps = {}) {
     const durable = new Map([['session-config-authority', { schemaVersion: 1, slug: 'fixture', revision: 1, config, projectionPending: false }]]);

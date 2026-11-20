@@ -29,6 +29,44 @@ test('all documented preflights are free of agent state writes and reject an unt
   assert.deepEqual(f.writes, []);
 });
 
+test('a preflight is answered without reading its body: WebKit sends one with Content-Length: 0, an empty body', async () => {
+  const f = fixture();
+  for (const [path, route] of Object.entries(AGENT_ROUTES).filter(([, value]) => value.cors)) {
+    const headers = { Origin: 'https://client.example', 'Access-Control-Request-Method': route.methods[0], 'Access-Control-Request-Headers': 'authorization,content-type' };
+    const plain = await f.request(path, { method: 'OPTIONS', headers });
+    const empty = await f.request(path, { method: 'OPTIONS', headers: { ...headers, 'Content-Length': '0' }, rawBody: new Uint8Array() });
+    assert.equal(empty.status, 204, path);
+    assert.deepEqual([...empty.headers], [...plain.headers], path);
+    // Whatever a preflight's body holds, it is not read, so it cannot refuse the preflight.
+    assert.equal((await f.request(path, { method: 'OPTIONS', headers, rawBody: 'not json' })).status, 204, path);
+    // An origin the session does not allow is still refused.
+    assert.equal((await f.request(path, { method: 'OPTIONS', headers: { ...headers, Origin: 'https://foreign.example' }, rawBody: new Uint8Array() })).status, 403, path);
+  }
+  assert.deepEqual(f.writes, []);
+});
+
+test('an empty body on a request is no body; a body that is not a JSON object is still refused', async () => {
+  const f = fixture();
+  const signedIn = async () => {
+    const payload = { sub: wallet.address, slug: 'fixture', sessionId, authzEpoch: 1, scopes: { storage: true }, exp: Math.floor(Date.now() / 1000) + 3600, jti: crypto.randomUUID() };
+    await persistAuthTokenRecord({ env: f.env, ...payload, ttlSeconds: 3600 });
+    return signToken(payload, f.env.TOKEN_HMAC_SECRET);
+  };
+  const path = '/api/agent/credentials/delegate?sessionSlug=fixture';
+  // Judged as the same request with `{}` is: a key for a signed-in person, a refusal for nobody.
+  for (const rawBody of [new Uint8Array(), '{}']) {
+    const made = await f.request(path, { method: 'POST', token: await signedIn(), rawBody, headers: { 'Content-Type': 'application/json' } });
+    assert.equal(made.status, 200, await made.clone().text());
+    assert.match((await made.json()).token, /^ceagt_/);
+    const nobody = await f.request(path, { method: 'POST', rawBody, headers: { 'Content-Type': 'application/json' } });
+    assert.equal(nobody.status, 401);
+  }
+  for (const rawBody of ['{"sessionSlug":', 'not json', '[]', 'null', '"text"', ' ']) {
+    const refused = await f.request(path, { method: 'POST', token: await signedIn(), rawBody, headers: { 'Content-Type': 'application/json' } });
+    assert.deepEqual([refused.status, (await refused.json()).reason], [400, 'invalid_json'], JSON.stringify(rawBody));
+  }
+});
+
 test('scoped activity uses the credential principal and rejects cross-session, wrong-purpose and rotated tokens', async () => {
   const f = fixture(); const first = await f.credential();
   const ok = await f.request('/api/agent/actions?sessionSlug=fixture&telegramUserId=foreign', { token: first.token });
