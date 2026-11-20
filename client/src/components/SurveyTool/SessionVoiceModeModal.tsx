@@ -6,7 +6,6 @@ import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import SessionInterviewPanel from './SessionInterviewPanel';
 import SessionListeningPanel from './SessionListeningPanel';
 import SessionRecordingHelp from './SessionRecordingHelp';
-import SessionInterviewAgentUse, { AGENT_USE_NOT_SAVED, useSessionAgentUse } from './SessionInterviewAgentUse';
 import SessionTranscriptClaimScanner from './SessionTranscriptClaimScanner';
 import SessionVoiceModeBackButton, {
   VoiceModeBackContext,
@@ -204,28 +203,6 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
     () => normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(questionPool)),
     [questionPool],
   );
-  const agentUse = useSessionAgentUse({
-    sessionSlug: props.sessionSlug || '',
-    sessionConfig: props.sessionConfig || null,
-    account: props.loginComplete ? String(props.account || '').trim() : '',
-    active: isOpen && mode === 'interview',
-  });
-  // Their Session Agent choice is saved before any answer is stored, so an answer they kept out is never read.
-  // With nothing to save this adds no wait.
-  const { onSubmitResponses } = props;
-  const settleAgentUse = agentUse.settle;
-  const submitResponses = useMemo(
-    () =>
-      onSubmitResponses &&
-      ((questionIds?: string[]) => {
-        const saved = settleAgentUse();
-        if (saved === true) return onSubmitResponses(questionIds);
-        return saved.then((ok) =>
-          ok ? onSubmitResponses(questionIds) : { status: 'failed' as const, message: AGENT_USE_NOT_SAVED },
-        );
-      }),
-    [onSubmitResponses, settleAgentUse],
-  );
   const title = mode === 'interview' ? 'Interview' : mode === 'recordGroup' ? 'Group Conversation' : 'Voice mode';
   return (
     <>
@@ -283,13 +260,12 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                       claim={claim}
                       onClose={requestClose}
                       questions={questions}
-                      onSubmitResponses={submitResponses}
+                      onSubmitResponses={props.onSubmitResponses}
                       onReviewStateChange={setHasUnsavedReview}
                       onRequestDiscard={() => setConfirmDiscard('close')}
                     />
                   </KeptInterviewReviewContext.Provider>
                 </VoiceModeUnjoinedGroupsContext.Provider>
-                <SessionInterviewAgentUse use={agentUse} className={styles.sessionInterviewAgentUse} />
                 {/* Until the interview has begun. */}
                 {begunFor !== interviewKey && !hasUnsavedReview && !reviewPacket && !claim ? (
                   <ModalBody className={styles.sessionInterviewPrefill}>{prefillCard}</ModalBody>

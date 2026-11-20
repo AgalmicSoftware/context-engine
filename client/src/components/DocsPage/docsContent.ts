@@ -235,7 +235,7 @@ export const SESSION_AGENT_TOPICS: readonly SessionAgentTopic[] = Object.freeze(
       id: 'keep-out',
       title: 'Keeping your answers and files out',
       summary:
-        'Your answers and files are in until you say otherwise. Turn off “Use my answers and files” in the Session Agent, or untick “Session Agent may use my answers and files” at the foot of the interview dialog.',
+        'Your answers and files are in until you say otherwise. Turn off “Use my answers and files” in the Session Agent, or untick “Session Agent may use my answers and files” beside it in the Context section.',
       points: [
         'It applies from the next question on; answers already given can’t be taken back.',
         'The published results still count your answers, as on the Results page.',

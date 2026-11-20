@@ -30,6 +30,7 @@ import styles from './OnePageSession.module.scss';
 import WorkerGroupsLoading from './WorkerGroupsLoading';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
 import SessionContextSources from './SessionContextSources';
+import SessionAgentUseOption from './SessionAgentUseOption';
 import SessionAgentNotice from './SessionAgentNotice';
 import { normalizeInterviewSettings } from '@ce-shared/interviewSettings.mjs';
 import { useSessionContextSources } from '../../utilities/docLibrary/useSessionContextSources';
@@ -791,6 +792,14 @@ export default function OnePageSessionStandardShell({
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
                 {showSessionAgent ? (
                   <div className={styles.sessionAgentBar}>
+                    {/* The dialog has the same switch: closing it shows the box again, read afresh. */}
+                    {sessionAgentOpen ? null : (
+                      <SessionAgentUseOption
+                        sessionSlug={effectiveSlug}
+                        sessionConfig={resolvedSessionConfig}
+                        account={viewerAccount}
+                      />
+                    )}
                     <button
                       type="button"
                       className={styles.sessionAgentButton}

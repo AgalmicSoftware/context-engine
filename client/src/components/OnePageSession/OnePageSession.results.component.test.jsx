@@ -1986,7 +1986,9 @@ describe('OnePageSession results routing', () => {
       show(signedIn);
       expect(await screen.findByTestId('ce-session-agent-open')).toBeInTheDocument();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(mockSessionAgentStatus).toHaveBeenCalledTimes(checks);
+      // Only the Context section's own "Session Agent may use my answers and files" reads their choice again.
+      expect(await screen.findByTestId('ce-session-agent-use-option')).toBeInTheDocument();
+      expect(mockSessionAgentStatus).toHaveBeenCalledTimes(checks + 1);
     });
 
     it('says by the title that the Session Agent is on, even to someone signed out', async () => {
