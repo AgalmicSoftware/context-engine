@@ -14,7 +14,17 @@ export const UNLISTED_SESSION_PATTERNS: readonly RegExp[] = Object.freeze([
   /^ce-mod-/, // session-setup test runs
   /^demo-(?:1|sh|interview)$/, // older demos
   /^(?:telegram|dweb)-demo(?:-\d+)?$/, // older channel demos
+  /^rxc-ra-test$/, // the retired trial session (RETIRED_SESSION_SLUGS below)
 ]);
+
+// A trial session taken off the lists by name: the first salon trial, whose title reads like the real salon's. A
+// browser that remembers it as its session starts on the default instead (see globalSessionState.ts). Test-run
+// sessions matched by the patterns above are still remembered, as test runs rely on that.
+export const RETIRED_SESSION_SLUGS: readonly string[] = Object.freeze(['rxc-ra-test']);
+
+/** A list of sessions without the retired ones, for pickers that build their own options. */
+export const withoutRetiredSessions = (slugs: string[]): string[] =>
+  slugs.filter((slug) => !RETIRED_SESSION_SLUGS.includes(slug));
 
 export const GENERAL_SESSION_LABEL = 'General';
 

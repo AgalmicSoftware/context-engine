@@ -165,6 +165,56 @@ describe('globalSessionState helpers', () => {
     expect(globalThis.CE_SESSION_SCAN_SLUGS).toEqual(selection.selectedSessionSlugs);
   });
 
+  it('starts on the default when the remembered session has been retired from the lists', () => {
+    // A browser that picked it from a selector: its own choice, and whatever list an older site version left.
+    localStorage.setItem('ce:primarySessionSlug', 'rxc-ra-test');
+    localStorage.setItem('ce:primarySessionSlugExplicit', 'true');
+    localStorage.setItem('ce:selectedSessionScope', 'active');
+    localStorage.setItem('ce:selectedSessionSlugs', JSON.stringify(['demo-sh']));
+    expect(readStoredGlobalSessionSelection()).toMatchObject({
+      primarySessionSlug: 'rxc-ra-2',
+      primarySessionExplicit: false,
+      selectedSessionScope: 'active',
+      selectedSessionSlugs: ['demo-sh'],
+    });
+    // What the browser remembers is rewritten, so code that reads it directly agrees.
+    expect(localStorage.getItem('ce:primarySessionSlug')).toBe('rxc-ra-2');
+  });
+
+  it('drops the retired session from a remembered list, under the older key too', () => {
+    localStorage.setItem('ce:primarySessionSlug', 'rxc-ra-test');
+    localStorage.setItem('ce:selectedSessionScope', 'list');
+    localStorage.setItem('ce:selectedSessionSlugs', JSON.stringify(['rxc-ra-test', 'eddy26']));
+    localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['rxc-ra-test', 'eddy26']));
+    // Someone who keeps a list lands on the first session still in it.
+    expect(readStoredGlobalSessionSelection()).toMatchObject({
+      primarySessionSlug: 'eddy26',
+      selectedSessionSlugs: ['eddy26'],
+    });
+    expect(JSON.parse(localStorage.getItem('ce:sessionScanSlugs'))).toEqual(['eddy26']);
+
+    // A list holding only the retired session becomes the site's default list.
+    localStorage.setItem('ce:primarySessionSlug', 'rxc-ra-test');
+    localStorage.setItem('ce:selectedSessionSlugs', JSON.stringify(['rxc-ra-test']));
+    expect(readStoredGlobalSessionSelection()).toMatchObject({
+      primarySessionSlug: 'rxc-ra-2',
+      selectedSessionSlugs: ['rxc-ra-2'],
+    });
+  });
+
+  it('leaves a remembered listed session, the agent trial or a test-run session as the person chose it', () => {
+    for (const slug of ['eddy26', 'rxc-ra-test-5', 'rxc-ra-agent-test-1', 'e2e-run-1']) {
+      localStorage.setItem('ce:primarySessionSlug', slug);
+      localStorage.setItem('ce:primarySessionSlugExplicit', 'true');
+      localStorage.setItem('ce:selectedSessionSlugs', JSON.stringify([slug]));
+      expect(readStoredGlobalSessionSelection()).toMatchObject({
+        primarySessionSlug: slug,
+        primarySessionExplicit: true,
+        selectedSessionSlugs: [slug],
+      });
+    }
+  });
+
   it('falls back to appConfig scan defaults when nothing is persisted yet', () => {
     expect(readStoredGlobalSessionSelection()).toEqual(
       expect.objectContaining({

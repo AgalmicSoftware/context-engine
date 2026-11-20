@@ -1,3 +1,4 @@
+import { RETIRED_SESSION_SLUGS } from './sessionListing';
 import { normalizeSessionSlug } from './sessionNaming.js';
 import { hasOwn, toStr } from '../shared/primitives.js';
 import { CE_SESSION_SCAN_SCOPE, CE_SESSION_SCAN_SLUGS } from '../../variables/appConfig.js';
@@ -154,7 +155,39 @@ export const normalizeGlobalSessionSelection = (value: unknown = {}): GlobalSess
   };
 };
 
+// A remembered session that has been retired from the lists is not carried into a new visit: the person lands on
+// the default instead (or, where they keep a list of sessions, on the first of those). Its own link still opens
+// it, since a link names its session itself. What the browser remembers is rewritten once, here, so every reader
+// of it agrees, the older keys included.
+const isRetired = (slug: unknown): boolean => RETIRED_SESSION_SLUGS.includes(normalizeGlobalPrimarySessionSlug(slug));
+
+const forgetRetiredSessions = (): void => {
+  const defaults = parseStoredSlugList(CE_SESSION_SCAN_SLUGS);
+  for (const key of [GLOBAL_SESSION_SLUGS_STORAGE_KEY, LEGACY_SLUGS_STORAGE_KEY]) {
+    const raw = readLocalStorage(key);
+    if (raw == null) continue;
+    const remembered = parseStoredSlugList(raw);
+    if (!remembered.some(isRetired)) continue;
+    const kept = remembered.filter((slug) => !isRetired(slug));
+    writeLocalStorage(key, JSON.stringify(kept.length ? kept : defaults));
+  }
+  const primary = readLocalStorage(GLOBAL_SESSION_PRIMARY_STORAGE_KEY);
+  if (primary == null || !isRetired(primary)) return;
+  const scope = normalizeGlobalSessionScope(
+    readLocalStorage(GLOBAL_SESSION_SCOPE_STORAGE_KEY) ??
+      readLocalStorage(LEGACY_SCOPE_STORAGE_KEY) ??
+      CE_SESSION_SCAN_SCOPE,
+  );
+  const remembered = parseStoredSlugList(
+    readLocalStorage(GLOBAL_SESSION_SLUGS_STORAGE_KEY) ?? readLocalStorage(LEGACY_SLUGS_STORAGE_KEY) ?? '',
+  );
+  const from = scope === 'list' && remembered.some((slug) => slug !== '') ? remembered : defaults;
+  writeLocalStorage(GLOBAL_SESSION_PRIMARY_STORAGE_KEY, derivePrimarySessionSlugFromList(from));
+  writeLocalStorage(GLOBAL_SESSION_PRIMARY_EXPLICIT_STORAGE_KEY, 'false');
+};
+
 export const readStoredGlobalSessionSelection = (): GlobalSessionSelection => {
+  forgetRetiredSessions();
   const primarySessionSlug = readLocalStorage(GLOBAL_SESSION_PRIMARY_STORAGE_KEY);
   const selectedSessionScope =
     readLocalStorage(GLOBAL_SESSION_SCOPE_STORAGE_KEY) ??

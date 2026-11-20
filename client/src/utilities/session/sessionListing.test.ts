@@ -4,6 +4,7 @@ import { buildCommunitySessionCatalog } from './sessionCatalog';
 import {
   buildSessionListOptions,
   isListedSession,
+  RETIRED_SESSION_SLUGS,
   sessionListLabel,
   UNLISTED_SESSION_PATTERNS,
 } from './sessionListing';
@@ -54,6 +55,20 @@ describe('session listing', () => {
       nameOf: (slug) => (slug === 'zeta' ? 'Aardvark' : ''),
     });
     expect(options.map(({ slug }) => slug)).toEqual([...LISTED, 'zeta', 'alpha']);
+  });
+
+  it('leaves the retired trial session off every list, and nothing that only looks like it', () => {
+    expect(RETIRED_SESSION_SLUGS).toEqual(['rxc-ra-test']);
+    expect(isListedSession('rxc-ra-test')).toBe(false);
+    expect(
+      ['rxc-ra-test-5', 'rxc-ra-test-6', 'rxc-ra-2', 'rxc-ra-agent-test-1', 'my-rxc-ra-test'].every(isListedSession),
+    ).toBe(true);
+    const options = buildSessionListOptions({ slugs: ['rxc-ra-test', 'rxc-ra-agent-test-1', 'rxc-ra-2', 'eddy26'] });
+    expect(options.map(({ slug }) => slug)).toEqual(['eddy26', 'rxc-ra-2', 'rxc-ra-agent-test-1']);
+    // Opened from its own link it is the current choice, and shows while it is.
+    expect(
+      buildSessionListOptions({ slugs: ['rxc-ra-test', 'rxc-ra-2'], keep: ['rxc-ra-test'] }).map(({ slug }) => slug),
+    ).toEqual(['rxc-ra-2', 'rxc-ra-test']);
   });
 
   it('keeps the current choice, even General or a session left off', () => {
