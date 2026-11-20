@@ -242,7 +242,7 @@ describe('UserPageAnalysisModal', () => {
     );
 
     expect(screen.getByText('User Analysis')).toBeInTheDocument();
-    expect(screen.getByText('Generating insights… 2.4s')).toBeInTheDocument();
+    expect(screen.getByText('Generating insights… 2 of about 19 seconds')).toBeInTheDocument();
     expect(screen.getByText('Analysis failed.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh analysis' })).toBeDisabled();
 
@@ -325,7 +325,7 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getByText('Cached analysis from 30 seconds ago')).toBeInTheDocument();
     expect(screen.getByText('Profile synthesis')).toBeInTheDocument();
     expect(screen.getByText('Detailed analysis text')).toBeInTheDocument();
-    expect(screen.getByText('Generating insights… 1.3s')).toBeInTheDocument();
+    expect(screen.getByText('Generating insights… 1 of about 19 seconds')).toBeInTheDocument();
 
     const refreshButton = screen.getByRole('button', { name: 'Refresh analysis' });
     expect(refreshButton).toBeDisabled();

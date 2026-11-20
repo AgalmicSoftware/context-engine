@@ -1,4 +1,5 @@
 import {
+  ANALYSIS_EXPECTED_SECONDS,
   buildUserPageAnalysisAiOptions,
   buildUserPageAnalysisErrorPresentation,
   buildUserPageAnalysisElapsedStatePatch,
@@ -10,6 +11,7 @@ import {
   extractUserPageAnalysisAdditionalComment,
   extractUserPageAnalysisImportance,
   formatAnalysisCacheAge,
+  formatUserPageAnalysisWait,
   getUserPageErrorMessage,
   normalizeUserAnalysisResult,
   resolveUserPageAnalysisCacheStatusState,
@@ -182,6 +184,15 @@ describe('userPageAnalysisStateHelpers', () => {
       analyzing: false,
       showAnalysisModal: true,
     });
+  });
+
+  it('says how long the analysis has taken against how long it usually takes', () => {
+    expect(ANALYSIS_EXPECTED_SECONDS).toBe(19);
+    expect(formatUserPageAnalysisWait(0)).toBe('0 of about 19 seconds');
+    expect(formatUserPageAnalysisWait(8400)).toBe('8 of about 19 seconds');
+    expect(formatUserPageAnalysisWait(19999)).toBe('19 of about 19 seconds');
+    expect(formatUserPageAnalysisWait(24100)).toBe('24 seconds, longer than usual');
+    expect(formatUserPageAnalysisWait(undefined)).toBe('0 of about 19 seconds');
   });
 
   it('classifies AI missing-key and connectivity analysis errors separately', () => {

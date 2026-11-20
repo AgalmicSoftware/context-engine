@@ -9,7 +9,7 @@ import { formatSavedAnalysisCardDate } from 'utilities/analysisCard/analysisCard
 import styles from './UserPage.module.scss';
 import cardStyles from './UserPageAnalysisCard.module.scss';
 import UserPageAnalysisCard, { type UserPageAnalysisCardPicture } from './UserPageAnalysisCard';
-import type { UserAnalysisGeneration } from './userPageAnalysisStateHelpers';
+import { formatUserPageAnalysisWait, type UserAnalysisGeneration } from './userPageAnalysisStateHelpers';
 
 type UserPageAnalysisCacheStatusState = {
   analysisCacheAge?: React.ReactNode;
@@ -118,7 +118,7 @@ const UserPageAnalysisModal = ({
       {analysisModalDisplayState.shouldRenderAnalyzing && (
         <div className={styles.analyzingContainer}>
           <FontAwesomeIcon icon={faSpinner} spin />
-          <span>Generating insights… {(analysisElapsedMs / 1000).toFixed(1)}s</span>
+          <span>Generating insights… {formatUserPageAnalysisWait(analysisElapsedMs)}</span>
         </div>
       )}
       {analysisModalDisplayState.shouldRenderError && (

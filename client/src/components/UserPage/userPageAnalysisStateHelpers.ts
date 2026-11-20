@@ -367,6 +367,18 @@ export const buildUserPageAnalysisResetStatePatch = ({
   analysisCachedAt: null,
 });
 
+// About how long the full analysis takes on a session's thinking model, as timed on a test session. Shown beside
+// the elapsed time so a person knows what to expect; it is a guide, not a limit, and nothing is cut off at it.
+export const ANALYSIS_EXPECTED_SECONDS = 19;
+
+// "8 of about 19 seconds", and past that only the seconds, as the guide no longer says anything.
+export const formatUserPageAnalysisWait = (elapsedMs: unknown): string => {
+  const seconds = Math.max(0, Math.floor(Number(elapsedMs || 0) / 1000));
+  return seconds <= ANALYSIS_EXPECTED_SECONDS
+    ? `${seconds} of about ${ANALYSIS_EXPECTED_SECONDS} seconds`
+    : `${seconds} seconds, longer than usual`;
+};
+
 export const buildUserPageAnalysisElapsedStatePatch = ({
   nowMs = Date.now(),
   startedAt = 0,
