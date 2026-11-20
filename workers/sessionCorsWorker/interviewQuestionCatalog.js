@@ -22,6 +22,7 @@ const retryableReadStatus = status => !status || status === 408 || status === 42
 import { normalizePublicInterviewQuestions, hasRestrictedPrompt, hasRatingScaleMetadata, normalizeRatingScale, normalizeQuestion } from '../../shared/interviewQuestionCatalog.mjs';
 import { selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 import { blockedQuestionIds } from './blockedQuestionIds.js';
+import { WORKER_GROUP_READ_INVITE_HEADER } from '../../shared/workerGroupJoin.mjs';
 const trim = (value) => String(value == null ? '' : value).trim();
 const lower = (value) => trim(value).toLowerCase();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -70,14 +71,17 @@ const listQuestionRows = async (callStorage) => {
   return { items, incomplete: !complete, refused };
 };
 
-const loadCloudflareQuestions = async ({ env, config, slug, storageRoute, reader }) => {
+const loadCloudflareQuestions = async ({ env, config, slug, storageRoute, reader, readInvite }) => {
   if (typeof storageRoute !== 'function') return catalog();
   const origin = 'https://session-worker.invalid';
-  // A catalog ticket's reader sees what that person sees; otherwise this is a signed-out view.
+  // A catalog ticket's reader sees what that person sees; otherwise this is a signed-out view. A
+  // private session's read invite rides on each read, so the storage route checks it per item as
+  // it does for the page: the catalog shows an invite holder what the group's link shows, no more.
+  const inviteHeaders = trim(readInvite) ? { [WORKER_GROUP_READ_INVITE_HEADER]: trim(readInvite) } : undefined;
   const callStorage = (path, query) => storageRoute({
     path,
     method: 'GET',
-    request: new Request(`${origin}${path}?${query}`),
+    request: new Request(`${origin}${path}?${query}`, inviteHeaders ? { headers: inviteHeaders } : undefined),
     env,
     config,
     slug,
@@ -319,8 +323,9 @@ export const loadPublicInterviewQuestions = async ({
   storageRoute,
   fetch: fetchImpl = globalThis.fetch,
   reader,
+  readInvite,
 } = {}) => {
-  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute, reader });
+  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute, reader, readInvite });
   if (cloudflareQuestions.questions.length) return cloudflareQuestions;
   const onChain = await loadOnChainQuestions({ config, slug, fetchImpl });
   return catalog(
