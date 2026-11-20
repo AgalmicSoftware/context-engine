@@ -196,7 +196,10 @@ describe('GlobalSessionSelector', () => {
     // General shows only while it is the current choice.
     expect(screen.queryByRole('option', { name: 'General' })).not.toBeInTheDocument();
     fireEvent.change(control, { target: { value: 'beta' } });
-    expect(onChange).toHaveBeenLastCalledWith({ primarySessionSlug: 'beta', selectedSessionScope: 'active' });
+    expect(onChange).toHaveBeenLastCalledWith(
+      { primarySessionSlug: 'beta', selectedSessionScope: 'active' },
+      { href: '/session/beta' },
+    );
     view.rerender(
       <GlobalSessionSelector
         selection={{ ...selection, selectedSessionScope: 'general' }}
@@ -207,13 +210,15 @@ describe('GlobalSessionSelector', () => {
     );
     expect(screen.getByRole('option', { name: 'General' })).toHaveProperty('selected', true);
     fireEvent.change(control, { target: { value: '' } });
-    expect(onChange).toHaveBeenLastCalledWith({ primarySessionSlug: '', selectedSessionScope: 'general' });
+    expect(onChange).toHaveBeenLastCalledWith(
+      { primarySessionSlug: '', selectedSessionScope: 'general' },
+      expect.anything(),
+    );
     fireEvent.change(control, { target: { value: screen.getByRole('option', { name: 'ALL' }).getAttribute('value') } });
-    expect(onChange).toHaveBeenLastCalledWith({
-      primarySessionSlug: 'alpha',
-      primarySessionExplicit: false,
-      selectedSessionScope: 'all',
-    });
+    expect(onChange).toHaveBeenLastCalledWith(
+      { primarySessionSlug: 'alpha', primarySessionExplicit: false, selectedSessionScope: 'all' },
+      { href: '' },
+    );
   });
 
   it('reflects saved multi-session lists and external updates without changing selection', () => {
@@ -245,10 +250,10 @@ describe('GlobalSessionSelector', () => {
     const allOption = screen.getByRole('option', { name: 'ALL' });
     expect(allOption).not.toHaveAttribute('value', '__ce_all_sessions__');
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '__ce_all_sessions__' } });
-    expect(onChange).toHaveBeenLastCalledWith({
-      primarySessionSlug: '__ce_all_sessions__',
-      selectedSessionScope: 'active',
-    });
+    expect(onChange).toHaveBeenLastCalledWith(
+      { primarySessionSlug: '__ce_all_sessions__', selectedSessionScope: 'active' },
+      expect.anything(),
+    );
     jest.mocked(getAllSessionSlugs).mockReturnValue(['alpha', 'later']);
     act(() => window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT)));
     expect(screen.getByRole('option', { name: 'later' })).toBeInTheDocument();
@@ -444,7 +449,10 @@ describe('GlobalSessionSelector', () => {
       );
       expect(names()).toEqual(['ALL', 'General', 'Lantern Forum (lantern)']);
       fireEvent.change(screen.getByRole('combobox', { name: 'Session' }), { target: { value: 'lantern' } });
-      expect(onChange).toHaveBeenCalledWith({ primarySessionSlug: 'lantern', selectedSessionScope: 'active' });
+      expect(onChange).toHaveBeenCalledWith(
+        { primarySessionSlug: 'lantern', selectedSessionScope: 'active' },
+        expect.anything(),
+      );
     });
 
     it('lists several sessions in name order with the chosen one selected', () => {
@@ -539,6 +547,36 @@ describe('GlobalSessionSelector', () => {
       expect(fallback).toHaveAttribute('rel', 'noopener noreferrer');
       fireEvent.click(fallback);
       expect(screen.queryByTestId('route-selector-open-new-tab')).not.toBeInTheDocument();
+    });
+  });
+  describe('a page showing one session (the user page)', () => {
+    it('offers no ALL scope and hands back the picked session link with its ?worker=', () => {
+      jest.mocked(getAllDemoSessionConfigs).mockReturnValue([
+        [
+          'hidden-grove',
+          {
+            slug: 'hidden-grove',
+            sessionName: 'Hidden Grove',
+            corsWorkerUrl: 'https://worker.example',
+            sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          },
+        ],
+      ] as never);
+      const onChange = jest.fn();
+      render(
+        <GlobalSessionSelector
+          selection={{ primarySessionSlug: 'alpha', selectedSessionScope: 'active' }}
+          onChange={onChange}
+          offerAll={false}
+          testId="profile-selector"
+        />,
+      );
+      expect(screen.queryByRole('option', { name: 'ALL' })).not.toBeInTheDocument();
+      fireEvent.change(screen.getByRole('combobox', { name: 'Session' }), { target: { value: 'hidden-grove' } });
+      expect(onChange).toHaveBeenCalledWith(
+        { primarySessionSlug: 'hidden-grove', selectedSessionScope: 'active' },
+        { href: '/session/hidden-grove?worker=https%3A%2F%2Fworker.example' },
+      );
     });
   });
 });

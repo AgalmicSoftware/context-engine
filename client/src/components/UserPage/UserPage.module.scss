@@ -94,6 +94,18 @@ $icon-size-standard: 1.25rem;
   border-radius: var(--ce-radius-10);
 }
 
+/* The session this profile shows; picking another opens the same profile there. */
+.sessionSwitchRow {
+  display: flex;
+  min-width: 0;
+  margin: -4px 0 16px;
+}
+
+.sessionSwitch {
+  min-width: 0;
+  max-width: 100%;
+}
+
 /* NEW: unified container grouping avatar/address + primary actions (left side) */
 .addressAndActionsContainer {
   width: 100%;

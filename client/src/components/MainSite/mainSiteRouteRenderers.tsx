@@ -63,6 +63,7 @@ import {
   renderMainSiteSurveyResolutionStatus,
   resolveMainSiteRouteCapabilityContext,
   resolveMainSiteSurveyRouteCapabilityState,
+  resolveSessionSurveyAvailability,
 } from './mainSiteRouteCapabilityRuntime';
 import { MainSiteRouteStatusView } from './mainSiteRouteStatusView';
 import {
@@ -524,6 +525,16 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
 
     const viewAddress = host.getUserAddressFromPath(fullPath);
     const defaultTab = profileSearchParams.get('tab');
+    const sessionSurveyAvailability = resolveSessionSurveyAvailability({
+      cache: host.readDgRecord('surveysCache', defaultSlug, { clone: false }) as Parameters<
+        typeof resolveSessionSurveyAvailability
+      >[0]['cache'],
+      context: profileCapabilityContext,
+      sessionConfig: profileSessionConfig,
+      sessionSlug: defaultSlug,
+      cacheReady: !!host.state.isSurveyCacheReady,
+      cacheError: !!host.state.surveyCacheInitializationError,
+    });
 
     return (
       <InitialRouteBoundary fallback={<LazyFallback label="Loading Profile..." />} resetKey={fullPath}>
@@ -548,6 +559,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
           sbtCacheRevision={host.state.sbtCacheRevision}
           questionResponsesNonce={host.state.questionResponsesNonce}
           defaultTab={defaultTab}
+          sessionSurveyAvailability={sessionSurveyAvailability}
+          showSessionSwitch={true}
           isSBTCacheReady={!!host.state.isSBTCacheReady}
           isSurveyCacheReady={!!host.state.isSurveyCacheReady}
           isQuestionCacheReady={!!host.state.isQuestionCacheReady}

@@ -666,6 +666,71 @@ describe('UserPage survey route boundaries', () => {
     );
     openSpy.mockRestore();
   });
+
+  describe('a session with no surveys', () => {
+    const findSection = (tree, name) => collectTreeNodes(tree, (node) => getNodeTypeName(node) === name)[0];
+    const surveyEntry = { documentURLs: [], id: 'survey one', questionsCount: 1, slug: 'alpha', tags: [] };
+
+    it('shows only the questions, even when the page was opened on the Surveys tab', () => {
+      const instance = makeInstance({ sessionSurveyAvailability: 'none' });
+      instance.state = { ...instance.state, selectedTab: 'surveys', surveyResponseInfo: [], surveyCreationInfo: [] };
+      const tree = instance.render();
+      expect(findSection(tree, 'UserPageSurveySection')).toBeUndefined();
+      expect(findSection(tree, 'UserPageQuestionSection').props.showSurveySwitch).toBe(false);
+    });
+
+    it.each([['unknown'], ['some'], [undefined]])(
+      'keeps the survey switch while availability is %s, even for a person with no survey answers',
+      (availability) => {
+        const instance = makeInstance({ sessionSurveyAvailability: availability });
+        instance.state = { ...instance.state, surveyResponseInfo: [], surveyCreationInfo: [] };
+        expect(findSection(instance.render(), 'UserPageQuestionSection').props.showSurveySwitch).toBe(true);
+        instance.state = { ...instance.state, selectedTab: 'surveys' };
+        expect(findSection(instance.render(), 'UserPageSurveySection')).toBeTruthy();
+      },
+    );
+
+    it.each([
+      ['an entry from this session', 'meadow', true],
+      ['an entry naming no session', undefined, true],
+      ['only an entry cached from another session', 'quarry', false],
+    ])('with %s, the survey switch shows: %s', (_label, slug, offered) => {
+      const instance = makeInstance({
+        sessionSurveyAvailability: 'none',
+        activeSessionSlug: 'meadow',
+        sessionConfig: { slug: 'meadow' },
+      });
+      instance.state = { ...instance.state, selectedTab: 'surveys', surveyResponseInfo: [{ ...surveyEntry, slug }] };
+      const tree = instance.render();
+      expect(!!findSection(tree, 'UserPageSurveySection')).toBe(offered);
+      if (!offered) expect(findSection(tree, 'UserPageQuestionSection').props.showSurveySwitch).toBe(false);
+    });
+
+    it('leaves a hidden Surveys tab, so it does not reappear when surveys arrive later', () => {
+      const instance = makeInstance({ sessionSurveyAvailability: 'none', sessionConfig: { slug: 'meadow' } });
+      instance.state = { ...instance.state, selectedTab: 'surveys', surveyResponseInfo: [], surveyCreationInfo: [] };
+      instance.leaveHiddenSurveysTab();
+      expect(instance.state.selectedTab).toBe('questions');
+      instance.props = { ...instance.props, sessionSurveyAvailability: 'some' };
+      expect(findSection(instance.render(), 'UserPageSurveySection')).toBeUndefined();
+    });
+  });
+
+  describe('the session switch', () => {
+    const findSwitch = (tree) => collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSessionSwitch')[0];
+
+    it('names the profile session and keeps the viewed address, only on the full page', () => {
+      const viewAddress = '0x00000000000000000000000000000000000000aa';
+      const sessionConfig = { slug: 'meadow', sessionName: 'Meadow Circle' };
+      const instance = makeInstance({ viewAddress, showSessionSwitch: true, sessionConfig });
+      const control = findSwitch(instance.render());
+      expect(control.props).toEqual(expect.objectContaining({ viewAddress, sessionSlug: 'meadow', sessionConfig }));
+      expect(findSwitch(makeInstance({ viewAddress, sessionConfig }).render())).toBeUndefined();
+      expect(
+        findSwitch(makeInstance({ viewAddress, sessionConfig, showSessionSwitch: true, minimized: true }).render()),
+      ).toBeUndefined();
+    });
+  });
 });
 
 describe('UserPage cold-load network fallback', () => {

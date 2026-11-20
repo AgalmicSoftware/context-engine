@@ -168,6 +168,7 @@ import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
 import { renderUserPageMembershipSections } from './UserPageMembershipSections';
 import UserPageQuestionSection from './UserPageQuestionSection';
+import UserPageSessionSwitch from './UserPageSessionSwitch';
 import UserPageSimulatedActions from './UserPageSimulatedActions';
 import UserPageSurveySection from './UserPageSurveySection';
 import {
@@ -1361,7 +1362,29 @@ class UserPage extends Component<any, any> {
     this._clearSectionDeriveMemo();
   }
 
+  // A session known to have no surveys shows only its questions. Until that is known (still loading,
+  // or the load failed), and while this page lists survey entries from this session, keep the switch.
+  // Entries cached from other sessions don't count: the profile names one session.
+  surveysOffered = (): boolean => {
+    if (this.props.sessionSurveyAvailability !== 'none') return true;
+    const slug = normalizeSessionSlug(this.getProfileSessionSlug());
+    const fromThisSession = (entry: unknown) => {
+      const entrySlug = (entry as { slug?: unknown } | null)?.slug;
+      return !entrySlug || normalizeSessionSlug(entrySlug) === slug;
+    };
+    const { surveyResponseInfo, surveyCreationInfo } = this.state;
+    return [surveyResponseInfo, surveyCreationInfo].some((list) => Array.isArray(list) && list.some(fromThisSession));
+  };
+
+  // Leave a hidden Surveys tab, so it can't come back by itself when surveys later appear.
+  leaveHiddenSurveysTab = (): void => {
+    if (this.state.selectedTab === 'surveys' && !this.surveysOffered()) {
+      this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' }));
+    }
+  };
+
   componentDidUpdate(prevProps: UserPagePreviousProps, prevState: UnknownRecord) {
+    this.leaveHiddenSurveysTab();
     if (this.sessionNamesKey() !== this._sessionNamesKey) void this.loadSessionNames();
     const analysisProfileChanged = analysisProfileKey(prevProps) !== analysisProfileKey(this.props);
     if (analysisProfileChanged || analysisInputSignature(prevState) !== analysisInputSignature(this.state)) {
@@ -3422,6 +3445,8 @@ class UserPage extends Component<any, any> {
     const { minimized, account, viewAddress: propViewAddress, provider, network, loginComplete } = this.props;
     const surveyResponseEntries = surveyResponseInfo as UserPageRenderSurveyEntry[];
     const surveyCreationEntries = surveyCreationInfo as UserPageRenderSurveyEntry[];
+    const surveysOffered = this.surveysOffered();
+    const shownTab = surveysOffered ? selectedTab : 'questions';
     const questionResponseEntries = questionResponseInfo as UserPageRenderQuestionEntry[];
     const questionCreationEntries = questionCreationInfo as UserPageRenderQuestionEntry[];
     const sbtEntries = sbtList as DerivedSbtListItem[];
@@ -3727,6 +3752,14 @@ class UserPage extends Component<any, any> {
           usernameErrorDisplayState={usernameErrorDisplayState}
         />
 
+        {!minimized && this.props.showSessionSwitch && (
+          <UserPageSessionSwitch
+            viewAddress={String(propViewAddress || '')}
+            sessionSlug={this.getProfileSessionSlug()}
+            sessionConfig={this.props.sessionConfig}
+          />
+        )}
+
         <UserPageComparePanel collapseOpen={collapseOpen} minimized={minimized}>
           <CompareAddressSection
             activeSessionSlug={this.getProfileSessionSlug()}
@@ -3752,7 +3785,7 @@ class UserPage extends Component<any, any> {
 
         {!minimized && (
           <div className={styles.content}>
-            {selectedTab === 'surveys' && (
+            {shownTab === 'surveys' && (
               <UserPageSurveySection
                 detailedSurveyResponseMap={detailedSurveyResponseMap}
                 expandedSurveyCreatedMap={expandedSurveyCreatedMap}
@@ -3800,7 +3833,7 @@ class UserPage extends Component<any, any> {
               />
             )}
 
-            {selectedTab === 'questions' && (
+            {shownTab === 'questions' && (
               <UserPageQuestionSection
                 activeSessionSlug={this.props.activeSessionSlug}
                 createdQuestionWrapperClassName={createdQuestionWrapperClassName}
@@ -3826,6 +3859,7 @@ class UserPage extends Component<any, any> {
                   questionsCreatedSpinnerId,
                 )}
                 questionsCreatedSectionToggleState={questionsCreatedSectionToggleState}
+                showSurveySwitch={surveysOffered}
                 responderAddress={propViewAddress}
                 sbtCacheRevision={this.props.sbtCacheRevision}
               />

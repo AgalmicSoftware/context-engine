@@ -16,11 +16,14 @@ import styles from '../Account/Account.module.scss';
 
 type GlobalSessionSelectorProps = {
   selection: Partial<GlobalSessionSelection>;
-  onChange: (selection: Partial<GlobalSessionSelection>) => void;
+  /** `href` is the picked session's link, with its `?worker=` when the site knows one. */
+  onChange: (selection: Partial<GlobalSessionSelection>, picked: { href: string }) => void;
   sessionConfig?: unknown;
   testId: string;
   /** Jump menu: keep the current session and open a picked one in a new tab. */
   opensInNewTab?: boolean;
+  /** Offer ALL (every session); a page that shows one session at a time leaves it out. */
+  offerAll?: boolean;
   /** Link for the selected session when the page already knows it (keeps its ?worker=). */
   currentHref?: string;
   className?: string;
@@ -34,6 +37,7 @@ const GlobalSessionSelector = ({
   sessionConfig,
   testId,
   opensInNewTab = false,
+  offerAll = true,
   currentHref,
   className = styles.settingsSessionRoute,
   labelClassName = styles.settingsSessionLabel,
@@ -175,17 +179,23 @@ const GlobalSessionSelector = ({
               return;
             }
             if (nextValue === allValue) {
-              onChange({
-                primarySessionSlug: selection.primarySessionSlug,
-                primarySessionExplicit: selection.primarySessionExplicit,
-                selectedSessionScope: 'all',
-              });
+              onChange(
+                {
+                  primarySessionSlug: selection.primarySessionSlug,
+                  primarySessionExplicit: selection.primarySessionExplicit,
+                  selectedSessionScope: 'all',
+                },
+                { href: '' },
+              );
             } else {
-              onChange({ primarySessionSlug: nextValue, selectedSessionScope: nextValue ? 'active' : 'general' });
+              onChange(
+                { primarySessionSlug: nextValue, selectedSessionScope: nextValue ? 'active' : 'general' },
+                { href: hrefFor(nextValue) },
+              );
             }
           }}
         >
-          {!opensInNewTab && <option value={allValue}>ALL</option>}
+          {!opensInNewTab && offerAll && <option value={allValue}>ALL</option>}
           {isListSummary && (
             <option value={listValue}>Selected sessions ({selection.selectedSessionSlugs.length})</option>
           )}
