@@ -106425,7 +106425,8 @@ function normalizeDraftForQuestion(answer = {}, question = {}) {
     };
   }
   if (questionType === "multichoice") {
-    const values = Array.isArray(source.values) ? source.values.map(safeString).filter(Boolean) : [firstValue2(source.value, source.answer, source.choice, source.label)].map(safeString).filter(Boolean);
+    const list2 = [source.values, source.value, source.answer].find(Array.isArray);
+    const values = list2 ? list2.map(safeString).filter(Boolean) : [firstValue2(source.value, source.answer, source.choice, source.label)].map(safeString).filter(Boolean);
     const schema = buildAgentQuestionAnswerSchema(question).answerSchema;
     if (!values.length || new Set(values).size !== values.length || values.length > schema.maxSelections || values.some((value) => !schema.options.includes(value))) return null;
     return {
