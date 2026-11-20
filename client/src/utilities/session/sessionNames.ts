@@ -52,10 +52,6 @@ const readNames = (body: unknown): SessionNames => {
 const READ_TTL_MS = 30_000;
 const reads = new Map<string, { at: number; names: Promise<SessionNames> }>();
 
-// A sign-in the page tried by itself and couldn't make isn't tried again on every reload of the names.
-const QUIET_SIGN_IN_RETRY_MS = 60_000;
-const quietSignInFailedAt = new Map<string, number>();
-
 const changeListeners = new Set<() => void>();
 /** Hears every name saved from this page, so each view showing names can reload them. */
 export const subscribeSessionNames = (listener: () => void): (() => void) => {
@@ -82,7 +78,6 @@ const workerSource = (base: string, options: SessionNamesOptions): SessionNamesS
     allowDemoFallback: defaultStrictAllowDemoFallback(),
   };
   const slugQuery = `slug=${encodeURIComponent(options.sessionSlug)}`;
-  const signInKey = `${base}|${options.sessionSlug}|${options.account.toLowerCase()}`;
   return {
     enabled: true,
     hasSignIn: async () => !options.account || !!(await getCachedWorkerSessionToken(session)),
@@ -92,19 +87,7 @@ const workerSource = (base: string, options: SessionNamesOptions): SessionNamesS
     // Reading never asks for a sign-in: a held token widens what the Worker shows, and without one it answers
     // as it would anyone signed out.
     readAll: async () => {
-      let token = options.account ? await getCachedWorkerSessionToken(session) : '';
-      // A new tab holds no session sign-in. A wallet that can sign without asking (an unlocked passkey) signs in
-      // here, at the cost of two requests once per tab; any other wallet is left alone and reads as signed out.
-      if (
-        !token &&
-        options.account &&
-        Date.now() - (quietSignInFailedAt.get(signInKey) || 0) > QUIET_SIGN_IN_RETRY_MS
-      ) {
-        token = await getWorkerSessionToken({ ...session, prompt: false }).catch(() => {
-          quietSignInFailedAt.set(signInKey, Date.now());
-          return '';
-        });
-      }
+      const token = options.account ? await getCachedWorkerSessionToken(session) : '';
       const key = `${base}|${options.sessionSlug}|${token}`;
       const kept = reads.get(key);
       if (kept && Date.now() - kept.at < READ_TTL_MS) return kept.names;

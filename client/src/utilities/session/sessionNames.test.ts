@@ -33,8 +33,6 @@ beforeEach(() => {
   jest.mocked(getUsableSessionWorkerUrl).mockReturnValue(`${WORKER}/`);
   jest.mocked(readWorkerCapabilities).mockResolvedValue({ legacy: false, features: [SESSION_NAMES_FEATURE] });
   jest.mocked(getCachedWorkerSessionToken).mockResolvedValue('');
-  // By default the wallet can't sign without asking, so the page's own sign-in is refused.
-  jest.mocked(getWorkerSessionToken).mockRejectedValue(new Error('Sign in to see this.'));
   fetchMock = jest.fn();
   global.fetch = fetchMock as unknown as typeof fetch;
 });
@@ -80,22 +78,7 @@ it("shows and sets no names once the session's admins turn them off", async () =
   expect(await source?.hasSignIn()).toBe(true);
 });
 
-it('signs a connected person in quietly in a tab with no sign-in, and never asks', async () => {
-  const D = '0x00000000000000000000000000000000000000dd';
-  jest.mocked(getWorkerSessionToken).mockResolvedValue('quiet-token');
-  fetchMock.mockResolvedValue(json({ names: { [D]: 'Sam' } }));
-  const source = await resolveSessionNamesSource(options(D));
-
-  expect(await source?.readAll()).toEqual({ [D]: 'Sam' });
-  expect(getWorkerSessionToken).toHaveBeenCalledTimes(1);
-  expect(jest.mocked(getWorkerSessionToken).mock.calls[0][0]).toMatchObject({
-    prompt: false,
-    sessionSlug: 'names-session',
-  });
-  expect((fetchMock.mock.calls[0][1].headers as Record<string, string>).Authorization).toBe('Bearer quiet-token');
-});
-
-it('reads as signed out when the wallet would have to ask, offers the sign-in, and does not keep trying', async () => {
+it('reads as signed out in a tab with no sign-in, never signs in by itself, and offers the sign-in', async () => {
   const E = '0x00000000000000000000000000000000000000ee';
   // A refused read isn't kept, so this signed-out read leaves nothing behind for other tests.
   fetchMock.mockResolvedValue(json({ error: 'nope' }, 500));
@@ -104,19 +87,19 @@ it('reads as signed out when the wallet would have to ask, offers the sign-in, a
   expect(await source?.readAll()).toEqual({});
   expect((fetchMock.mock.calls[0][1].headers as Record<string, string>).Authorization).toBeUndefined();
   expect(await source?.hasSignIn()).toBe(false);
-  await source?.readAll();
-  // One quiet try; the second read within a minute doesn't repeat it.
-  expect(getWorkerSessionToken).toHaveBeenCalledTimes(1);
+  // Reading starts no sign-in, quiet or otherwise.
+  expect(getWorkerSessionToken).not.toHaveBeenCalled();
 
   // Asked for by the person, the sign-in may prompt.
   jest.mocked(getWorkerSessionToken).mockResolvedValue('asked-token');
   await source?.signIn();
-  expect(jest.mocked(getWorkerSessionToken).mock.calls[1][0]).not.toHaveProperty('prompt');
+  expect(getWorkerSessionToken).toHaveBeenCalledTimes(1);
+  expect(jest.mocked(getWorkerSessionToken).mock.calls[0][0]).not.toHaveProperty('prompt');
 
   // Someone not connected is never signed in and is offered nothing.
   const signedOut = await resolveSessionNamesSource(options());
   expect(await signedOut?.hasSignIn()).toBe(true);
-  expect(getWorkerSessionToken).toHaveBeenCalledTimes(2);
+  expect(getWorkerSessionToken).toHaveBeenCalledTimes(1);
 });
 
 it('reads names with a held sign-in, never starting one, and shares one read between views', async () => {
