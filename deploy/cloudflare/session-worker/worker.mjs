@@ -100502,7 +100502,7 @@ init_redaction();
 
 // workers/sessionCorsWorker/agent/httpConstants.mjs
 var DEFAULT_AGENT_RAW_SKILL_URL = "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/sessionCorsWorker/agent/skills/ce-agent-access/SKILL.md";
-var CE_AGENT_ACCESS_SKILL_VERSION = "2026-11-11 (v46)";
+var CE_AGENT_ACCESS_SKILL_VERSION = "2026-11-20 (v47)";
 var DEFAULT_SESSION_WRAPPED_RAW_SKILL_URL = "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/sessionCorsWorker/agent/skills/ce-session-wrapped/SKILL.md";
 var CE_SESSION_WRAPPED_SKILL_VERSION = "2026-10-27 (session-wrapped-v1.5)";
 var QUESTION_VOTE_KV_PREFIX = "telegram:mini-app-question-vote:v1:";
