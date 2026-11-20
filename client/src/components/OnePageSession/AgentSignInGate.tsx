@@ -10,8 +10,6 @@
 //   session says so. The page never raises a passkey prompt for this by itself.
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
-import { agentSignInLinksOn } from '@ce-shared/agentSignIn.mjs';
-
 import { resolveWorkerGroupAutoJoinContext } from '../../domains/worker/workerGroupAutoJoinContext';
 import {
   dismissAttachedPasskeyNotice,
@@ -53,6 +51,8 @@ const lower = (value: unknown): string =>
   String(value ?? '')
     .trim()
     .toLowerCase();
+const LINKS_NOT_ON =
+  'This session doesn’t have sign-in links from agents switched on. The link has not been used: open it again once an organiser has turned them on, or sign in yourself to take part.';
 const WHO_ELSE =
   'Whoever runs the agent that set this account up can see and change what you answer here. If the link did not come from your own agent, sign out.';
 
@@ -93,7 +93,15 @@ export default function AgentSignInGate({
 
   const fail = useCallback((error: unknown): void => {
     setNote({
-      text: error instanceof Error && error.message ? error.message : 'This sign-in link could not be used.',
+      // Whether a session takes sign-in links is the Worker's to say, at the moment the link is used: the page's
+      // own copy of the settings can be from before an admin turned them on. The Worker refuses before the code
+      // is spent, so the same link works once they are on.
+      text:
+        (error as { reason?: unknown } | null)?.reason === 'sign_in_links_off'
+          ? LINKS_NOT_ON
+          : error instanceof Error && error.message
+            ? error.message
+            : 'This sign-in link could not be used.',
       isError: true,
     });
     setPhase('error');
@@ -143,12 +151,10 @@ export default function AgentSignInGate({
     void workerHasAgentSignIn(target)
       .then(async (supported) => {
         if (!current || !hasAgentSignInCodeFor(target)) return;
-        if (!supported || !agentSignInLinksOn(sessionConfig)) {
+        if (!supported) {
           dropAgentSignInCode();
           setNote({
-            text: supported
-              ? 'This session doesn’t have sign-in links from agents switched on. Sign in yourself to take part.'
-              : 'This session can’t sign you in from an agent’s link yet. Ask its organisers, or sign in yourself.',
+            text: 'This session can’t sign you in from an agent’s link yet. Ask its organisers, or sign in yourself.',
             isError: true,
           });
           setPhase('unsupported');

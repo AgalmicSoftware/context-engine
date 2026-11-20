@@ -267,13 +267,32 @@ it('says so, and drops the code, where the Worker can’t sign in from a link, o
   expect(exchangeHeldAgentSignInCode).not.toHaveBeenCalled();
   unmount();
 
-  // Never turned on in the session's own settings: said so, with the code dropped unused.
+  // Whether links are on is the Worker's to say when the link is used, not this page's copy of the settings,
+  // which may be from before an admin turned them on: the page asks, and a link for a session with them on works.
   jest.mocked(workerHasAgentSignIn).mockResolvedValue(true);
-  const offGate = render(
+  jest
+    .mocked(exchangeHeldAgentSignInCode)
+    .mockResolvedValue({ token: 't', exp: 1, address: ACCOUNT, via: 'agent_link', passkey: '', agentAccess: 'active' });
+  const staleGate = render(
     <AgentSignInGate sessionConfig={{ slug: 'salon' }} sessionSlug="salon" account="" provider="" />,
   );
+  await waitFor(() => expect(enterAgentLinkAccount).toHaveBeenCalled());
+  staleGate.unmount();
+  jest.mocked(enterAgentLinkAccount).mockClear();
+  // Where the Worker says they are not on, the page says so in its own words, and that the link is unused.
+  jest
+    .mocked(exchangeHeldAgentSignInCode)
+    .mockRejectedValue(
+      Object.assign(new Error('This session doesn’t sign people in from an agent’s link.'), {
+        reason: 'sign_in_links_off',
+      }),
+    );
+  const offGate = gate();
   await waitFor(() => expect(notice()?.textContent).toMatch(/doesn’t have sign-in links from agents switched on/));
-  expect(exchangeHeldAgentSignInCode).not.toHaveBeenCalled();
+  expect(notice()?.textContent).toMatch(
+    /The link has not been used: open it again once an organiser has turned them on/,
+  );
+  expect(enterAgentLinkAccount).not.toHaveBeenCalled();
   offGate.unmount();
 
   jest
