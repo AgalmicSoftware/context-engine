@@ -75,6 +75,10 @@ const makeInstance = (props = {}) => {
   });
 
   instance._isMounted = true;
+  // These tests are about what Analyze does with a session's entries, which they set in state. Which entries a
+  // session has is read from its own stores, and is tested with real stores further down.
+  instance.readSessionSourcesFromStores = instance.deriveSessionSources;
+  instance.deriveSessionSources = jest.fn(() => instance.state);
   instance.setState = jest.fn((update, cb) => {
     const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
@@ -86,7 +90,7 @@ const makeInstance = (props = {}) => {
   return instance;
 };
 
-// Entries as the page lists them: each names the session it came from. The analysis reads the page's own only.
+// Entries as the page lists them: each names the session it came from.
 const ENTRY_LISTS = [
   'sbtList',
   'questionResponseInfo',
@@ -132,7 +136,6 @@ const makeAnalysisCacheInstance = (props = {}) => {
   instance.state = {
     ...instance.state,
     username: 'Cache Test User',
-    // Every entry the page lists names the session it came from; the analysis reads the page's own only.
     sbtList: [
       {
         slug,
@@ -293,93 +296,147 @@ describe('UserPage analysis cache and routing', () => {
     );
   });
 
-  it("analyses only the page's own session: another session's answers reach no prompt, card or cache", async () => {
+  describe("only the page's own session", () => {
     const mine = '0x00000000000000000000000000000000000000aa';
-    const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ viewAddress: mine, account: mine });
     const publicField = (value) => ({ value, encrypted: false, encryptionAudience: 'self', encryptedPortion: '' });
-    // The page lists what every session kept in this browser holds for the person: here a private session's
-    // answer, comment, survey, group and created question sit beside this session's one answer.
-    const elsewhere = { slug: 'private-session', sessionSlug: 'private-session' };
-    instance.state = {
-      ...instance.state,
-      sbtList: [
-        ...instance.state.sbtList,
-        { ...elsewhere, sbtInfo: { name: 'Private Circle', sbtAddress: '0x00000000000000000000000000000000000000dd' } },
-      ],
-      questionResponseInfo: [
-        ...instance.state.questionResponseInfo,
-        { ...elsewhere, id: 'q-elsewhere', type: 'freeform', prompt: 'A question asked in private' },
-        // An entry that names no session is left out too.
-        { id: 'q-nowhere', type: 'freeform', prompt: 'A question from nowhere' },
-      ],
-      detailedQuestionResponses: {
-        ...instance.state.detailedQuestionResponses,
-        'q-elsewhere': { answer: publicField('SAID IN PRIVATE'), additional: publicField('PRIVATE COMMENT') },
-        'q-nowhere': { answer: publicField('SAID NOWHERE'), additional: publicField('') },
-      },
-      surveyResponseInfo: [{ ...elsewhere, id: 's-elsewhere', title: 'Private survey', questionsCount: 1 }],
-      detailedSurveyResponses: {
-        's-elsewhere': [
-          {
-            questionData: { prompt: 'Private survey question', type: 'freeform' },
-            responseData: { answer: publicField('SURVEY ANSWER IN PRIVATE') },
+    const answer = (value, comment = '') => ({ answer: publicField(value), additional: publicField(comment) });
+    const question = (id, prompt, sessionSlug) => ({ id, type: 'freeform', prompt, creator: '0xother', sessionSlug });
+    // Two sessions kept in this browser. The same slate is seeded in both, so "q-shared" has one id in both.
+    const seedStores = async ({ page, elsewhere, networkID, pageAnswers, elsewhereAnswers }) => {
+      const store = (slug, answers, extra = {}) =>
+        cacheScripts.writeCache('questionsCache', slug, {
+          [networkID]: {
+            questions: {
+              'q-shared': question('q-shared', 'A question seeded in both sessions', slug),
+              ...extra,
+            },
+            questionResponses: Object.fromEntries(
+              Object.entries(answers).map(([id, value]) => [id, { [mine]: value }]),
+            ),
           },
-        ],
-      },
-      questionCreationInfo: [{ ...elsewhere, id: 'q-made', type: 'binary', prompt: 'A question made in private' }],
-      surveyCreationInfo: [{ ...elsewhere, id: 's-made', title: 'A survey made in private', questionsCount: 2 }],
+        });
+      // The page's session is written first, so its record of the shared question is the one the page keeps.
+      await store(page, pageAnswers, { 'q-here': question('q-here', 'A question only in this session', page) });
+      await store(elsewhere, elsewhereAnswers, {
+        'q-there': question('q-there', 'A question only in the private session', elsewhere),
+      });
     };
-    readSavedAnalysisCard.mockResolvedValue({ status: 'none' });
-    analyzeUserOpinions.mockResolvedValueOnce({
-      summary: 'summary',
-      details: 'details',
-      name: 'name',
-      historicalAlignment: { figure: 'Elinor Ostrom (1933–2012)', reasoning: 'r' },
+    const realInstance = (slug) => {
+      const { instance, networkID } = makeAnalysisCacheInstance({
+        viewAddress: mine,
+        account: mine,
+        activeSessionSlug: slug,
+      });
+      instance.deriveSessionSources = instance.readSessionSourcesFromStores;
+      return { instance, networkID };
+    };
+
+    it('never sends an answer given elsewhere, even to a question both sessions share', async () => {
+      const page = `own-session-${Date.now()}`;
+      const elsewhere = `${page}-private`;
+      const { instance, networkID } = realInstance(page);
+      await seedStores({
+        page,
+        elsewhere,
+        networkID,
+        pageAnswers: { 'q-here': answer('SAID HERE', 'a comment made here') },
+        // Answered only in the private session: the shared question, and one of its own.
+        elsewhereAnswers: {
+          'q-shared': answer('SAID IN PRIVATE', 'PRIVATE COMMENT'),
+          'q-there': answer('ALSO PRIVATE'),
+        },
+      });
+      // The page's own merge of every session does hold the private answer under the shared question's id,
+      // which is why the analysis cannot be sorted out of the page's lists afterwards.
+      const merged = instance._collectUnifiedCacheData({ networkID, viewAddressLower: mine });
+      expect(JSON.stringify(merged.combinedQuestionResponses['q-shared'])).toContain('SAID IN PRIVATE');
+      const alone = instance._collectUnifiedCacheData({ networkID, viewAddressLower: mine, onlySlug: page });
+      expect(alone.combinedQuestionResponses['q-shared']).toBeUndefined();
+
+      const own = instance.deriveSessionSources(page);
+      expect(own.questionResponseInfo.map((entry) => entry.id)).toEqual(['q-here']);
+      expect(Object.keys(own.detailedQuestionResponses)).toEqual(['q-here']);
+
+      readSavedAnalysisCard.mockResolvedValue({ status: 'none' });
+      analyzeUserOpinions.mockResolvedValueOnce({
+        summary: 'summary',
+        details: 'details',
+        name: 'name',
+        historicalAlignment: { figure: 'Elinor Ostrom (1933–2012)', reasoning: 'r' },
+      });
+      // A model that, against its brief, names the shared question for the card.
+      analyzeUserCard.mockResolvedValueOnce({
+        title: 'A title',
+        matchNote: '',
+        tastes: {},
+        answers: { ownWords: { questionId: 'q-shared', quote: 'SAID IN PRIVATE' }, yesNo: { questionId: 'q-here' } },
+      });
+      await instance.analyzeUser();
+      await waitFor(() => expect(analyzeUserCard).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+
+      for (const call of [analyzeUserOpinions, analyzeUserFirstRead, analyzeUserCard]) {
+        const text = JSON.stringify(call.mock.calls[0][0]);
+        expect(text).toContain('SAID HERE');
+        expect(text).toContain('a comment made here');
+        expect(text).not.toMatch(/PRIVATE|private session/);
+        expect(call.mock.calls[0][0].questions.map((entry) => entry.id)).toEqual(['q-here']);
+      }
+      // Neither the card on screen nor the one saved to my page holds any of it.
+      expect(JSON.stringify([instance.state.analysisCard, publishSavedAnalysisCard.mock.calls])).not.toMatch(/PRIVATE/);
     });
-    // A model that, against its brief, names the other session's question for the card.
-    analyzeUserCard.mockResolvedValueOnce({
-      title: 'A title',
-      matchNote: '',
-      tastes: {},
-      answers: { ownWords: { questionId: 'q-elsewhere', quote: 'SAID IN PRIVATE' }, yesNo: { questionId: 'q1' } },
+
+    it('reads my answer to a shared question from this session, whichever session answered last', async () => {
+      const page = `own-session-shared-${Date.now()}`;
+      const { instance, networkID } = realInstance(page);
+      await seedStores({
+        page,
+        elsewhere: `${page}-private`,
+        networkID,
+        // The private session's answer is the newer one, so it is the one the page's own merge keeps.
+        pageAnswers: { 'q-shared': { ...answer('WHAT I SAID HERE'), ts: 1000 } },
+        elsewhereAnswers: { 'q-shared': { ...answer('WHAT I SAID IN PRIVATE'), ts: 2000 } },
+      });
+      const merged = instance._collectUnifiedCacheData({ networkID, viewAddressLower: mine });
+      expect(JSON.stringify(merged.combinedQuestionResponses['q-shared'])).toContain('WHAT I SAID IN PRIVATE');
+      const own = instance.deriveSessionSources(page);
+      expect(own.questionResponseInfo.map((entry) => entry.id)).toEqual(['q-shared']);
+      await instance.analyzeUser();
+      const text = JSON.stringify(analyzeUserOpinions.mock.calls[0][0]);
+      expect(text).toContain('WHAT I SAID HERE');
+      expect(text).not.toContain('PRIVATE');
     });
 
-    await instance.analyzeUser();
-    await waitFor(() => expect(analyzeUserCard).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+    it("asks the AI nothing when this session's stores cannot be read, and never falls back to the page's lists", async () => {
+      const { instance } = makeAnalysisCacheInstance({ viewAddress: mine, account: mine });
+      instance.deriveSessionSources = () => {
+        throw new Error('store unreadable');
+      };
+      await instance.analyzeUser();
+      expect(analyzeUserOpinions).not.toHaveBeenCalled();
+      expect(analyzeUserFirstRead).not.toHaveBeenCalled();
+      expect(instance.state.analysisError).toBe('There is nothing from this session to analyze for this account.');
+    });
 
-    const sent = [
-      analyzeUserOpinions.mock.calls[0][0],
-      analyzeUserFirstRead.mock.calls[0][0],
-      analyzeUserCard.mock.calls[0][0],
-    ];
-    for (const userData of sent) {
-      const text = JSON.stringify(userData);
-      expect(text).toContain('A deterministic answer');
-      expect(text).not.toMatch(/PRIVATE|private|nowhere|NOWHERE/);
-      expect(userData.questions.map((question) => question.id)).toEqual(['q1']);
-      expect(userData.sbts.map((group) => group.name)).toEqual(['Cache Badge']);
-      expect(userData.surveys).toEqual([]);
-      expect(userData.questionsCreated).toEqual([]);
-      expect(userData.surveysCreated).toEqual([]);
-    }
-    // Neither the card on screen, nor the one saved to my page, nor the kept analysis holds any of it.
-    const { entry } = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
-    const kept = JSON.stringify([instance.state.analysisCard, publishSavedAnalysisCard.mock.calls, entry]);
-    expect(kept).not.toMatch(/PRIVATE|private|nowhere|NOWHERE/);
-  });
-
-  it('asks the AI nothing when the person has nothing in this session, whatever other sessions hold', async () => {
-    const { instance } = makeAnalysisCacheInstance();
-    tagSession(instance, 'private-session');
-    await instance.analyzeUser();
-    expect(analyzeUserOpinions).not.toHaveBeenCalled();
-    expect(analyzeUserFirstRead).not.toHaveBeenCalled();
-    expect(checkSponsoredAccess).not.toHaveBeenCalled();
-    expect(instance.state).toMatchObject({
-      analyzing: false,
-      showAnalysisModal: true,
-      analysisError: 'There is nothing from this session to analyze for this account.',
+    it('asks the AI nothing when I have nothing in this session, whatever other sessions hold', async () => {
+      const page = `own-session-empty-${Date.now()}`;
+      const { instance, networkID } = realInstance(page);
+      await seedStores({
+        page,
+        elsewhere: `${page}-private`,
+        networkID,
+        pageAnswers: {},
+        elsewhereAnswers: { 'q-shared': answer('SAID IN PRIVATE'), 'q-there': answer('ALSO PRIVATE') },
+      });
+      await instance.analyzeUser();
+      expect(analyzeUserOpinions).not.toHaveBeenCalled();
+      expect(analyzeUserFirstRead).not.toHaveBeenCalled();
+      expect(checkSponsoredAccess).not.toHaveBeenCalled();
+      expect(instance.state).toMatchObject({
+        analyzing: false,
+        showAnalysisModal: true,
+        analysisError: 'There is nothing from this session to analyze for this account.',
+      });
     });
   });
 

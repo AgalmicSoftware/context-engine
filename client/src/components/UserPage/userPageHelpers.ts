@@ -80,6 +80,7 @@ export {
   getActiveUserPageChainNode,
   getPrioritizedUserPageChainNodes,
   getPrioritizedUserPageNetworkCacheNodes,
+  isUserPageCacheSourceOfSession,
   mergeUserPageQuestionCacheSource,
   mergeUserPageSbtCacheEntryIntoAggregate,
   mergeUserPageSurveyCacheSource,

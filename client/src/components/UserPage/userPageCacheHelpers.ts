@@ -116,6 +116,10 @@ const normalizeUserPageCacheSourceSlug = (slug: unknown): string => {
   return raw === 'general' ? '' : raw;
 };
 
+/** Whether a store kept under `slug` is the session `sessionSlug`'s own, read as store names are read. */
+export const isUserPageCacheSourceOfSession = (slug: unknown, sessionSlug: unknown): boolean =>
+  normalizeUserPageCacheSourceSlug(slug) === normalizeUserPageCacheSourceSlug(sessionSlug);
+
 const hasMeaningfulUserPageOwnershipCounts = (entry: unknown = {}, addressLower: unknown = ''): boolean => {
   const projection = projectOnchainSbtMembership({ entry, subjectAddress: addressLower });
   return projection.provenance === 'complete_counts' || projection.provenance === 'partial_counts';

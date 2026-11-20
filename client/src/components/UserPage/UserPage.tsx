@@ -97,6 +97,7 @@ import {
   isUserPageGateAccessContext,
   isUserPageQuestionPayloadEncrypted,
   isUserPageResponsePayloadEncrypted,
+  isUserPageCacheSourceOfSession,
   mergeUserPageQuestionCacheSource,
   mergeUserPageSbtCacheEntryIntoAggregate,
   mergeUserPageSurveyCacheSource,
@@ -298,6 +299,8 @@ type CacheRefreshOptions = {
 type UnifiedCacheAggregateInput = {
   networkID?: unknown;
   viewAddressLower?: unknown;
+  /** Read this session's stores alone, not every session kept in the browser. */
+  onlySlug?: unknown;
 };
 
 type CacheNetworkBucket = UnknownRecord & {
@@ -2039,12 +2042,14 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _collectUnifiedCacheData = ({ networkID, viewAddressLower }: UnifiedCacheAggregateInput): unknown =>
+  _collectUnifiedCacheData = ({ networkID, viewAddressLower, onlySlug }: UnifiedCacheAggregateInput): unknown =>
     measureSync('ce.userPage.aggregateCacheData', () => {
-      const surveysCaches = this._dgReadAll('surveysCache');
-      const questionsCaches = this._dgReadAll('questionsCache');
-      const sbtCaches = this._dgReadAll('sbtCache');
-      const userCaches = this._dgReadAll('userCache');
+      const read = (name: string): NamespaceCacheSourceEntry[] =>
+        this._dgReadAll(name).filter(({ slug }) => onlySlug == null || isUserPageCacheSourceOfSession(slug, onlySlug));
+      const surveysCaches = read('surveysCache');
+      const questionsCaches = read('questionsCache');
+      const sbtCaches = read('sbtCache');
+      const userCaches = read('userCache');
       const viewAddressKey = String(viewAddressLower || '').toLowerCase();
 
       const combinedSurveys: EntityCacheMap = {};
@@ -2245,6 +2250,24 @@ class UserPage extends Component<any, any> {
         userCaches,
       };
     });
+
+  /**
+   * What one session alone holds for this page's person: the page's own lists, derived the same way but from that
+   * session's stores only. The page merges every session kept in this browser, and the same question in two
+   * sessions has one id with the newest answer winning, so the merged lists cannot be sorted by session
+   * afterwards. The analysis reads these, so an answer given elsewhere never reaches this session's AI or card.
+   */
+  deriveSessionSources = (sessionSlug: unknown): SurveySectionResult & QuestionSectionResult & SbtSectionResult => {
+    const viewAddressLower = String(this.props.viewAddress || '').toLowerCase();
+    const networkID = this.props.network?.id != null ? this.props.network.id.toString() : '';
+    const onlySlug = String(sessionSlug || '');
+    const aggregate = this._collectUnifiedCacheData({ networkID, viewAddressLower, onlySlug }) as UnknownRecord;
+    return {
+      ...(this._deriveSurveySection(aggregate, viewAddressLower, createGateAccessContext()) as SurveySectionResult),
+      ...(this._deriveQuestionSection(aggregate, viewAddressLower, createGateAccessContext()) as QuestionSectionResult),
+      ...(this._deriveSbtSection(aggregate, viewAddressLower) as SbtSectionResult),
+    };
+  };
 
   _deriveSurveySection = (
     aggregate: unknown,
