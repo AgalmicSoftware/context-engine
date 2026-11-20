@@ -2103,16 +2103,19 @@ h1 {
   }
 }
 
+// The button's light end is the info colour deepened a little, so its pale label reads at 4.5:1 or better there.
+$passkey-primary-face: color-mix(in srgb, var(--ce-status-info) 72%, var(--ce-overlay-surface));
+
 .passkeyButtonPrimary {
-  background-color: var(--ce-status-info);
-  background-image: linear-gradient(150deg, var(--ce-status-info), var(--ce-overlay-surface));
+  background-color: $passkey-primary-face;
+  background-image: linear-gradient(150deg, $passkey-primary-face, var(--ce-overlay-surface));
   border-color: color-mix(in srgb, var(--ce-status-info) 22%, transparent);
   color: var(--ce-document-surface);
   box-shadow:
     -3px 3px 6px color-mix(in srgb, var(--ce-overlay-base) 62%, transparent),
     3px -3px 8px color-mix(in srgb, var(--ce-status-info) 20%, transparent);
   &:hover {
-    background-color: var(--ce-status-info);
+    background-color: $passkey-primary-face;
     box-shadow:
       -4px 4px 10px color-mix(in srgb, var(--ce-overlay-base) 68%, transparent),
       4px -4px 12px color-mix(in srgb, var(--ce-status-info) 22%, transparent);
@@ -2152,8 +2155,8 @@ h1 {
 // these light labels on the dialog behind them (white on white for Minimal's Create). The element selector outranks
 // them. Pressing also repaints the labels, dark for `.btn-outline-secondary`.
 button.passkeyButtonPrimary:is(:hover, :focus, :active):not(:disabled) {
-  background-color: var(--ce-status-info) !important;
-  background-image: linear-gradient(150deg, var(--ce-status-info), var(--ce-overlay-surface)) !important;
+  background-color: $passkey-primary-face !important;
+  background-image: linear-gradient(150deg, $passkey-primary-face, var(--ce-overlay-surface)) !important;
   color: var(--ce-document-surface) !important;
 }
 
