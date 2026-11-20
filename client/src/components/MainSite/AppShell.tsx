@@ -5,6 +5,7 @@ import { hasRouteCacheInitializationError } from './mainSiteRouteSessionNetwork'
 
 import React, { Component } from 'react';
 import WorkerGroupAutoJoin from '../OnePageSession/WorkerGroupAutoJoinHost';
+import AgentSignInGate from '../OnePageSession/AgentSignInGate';
 import { connect } from 'react-redux';
 import { changeAccount, fetchAccount } from '../../actions/accountActions.js';
 import {
@@ -3990,6 +3991,13 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           loginInProgress={this.props.loginInProgress}
           sendTestETH={this.getUserTestETH}
           sessionConfig={activeRouteSessionConfig}
+        />
+
+        <AgentSignInGate
+          sessionConfig={activeRouteSessionConfig}
+          sessionSlug={this.getSessionSlugFromProps()}
+          account={this.props.account}
+          provider={this.props.provider}
         />
 
         <WorkerGroupAutoJoin

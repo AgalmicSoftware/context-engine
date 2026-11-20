@@ -71,6 +71,7 @@ import {
 } from '@ce-shared/encryption/envelopeV1Core.mjs';
 import groupPasswordDerivation from '@ce-shared/crypto/groupPasswordDerivation.cjs';
 import { createLogger } from '../logging';
+import { agentLinkProvider, isAgentLinkProvider } from '../session/agentLinkAccount';
 import { perfDebugDecryptEnvelope } from '../web3/rpcDebugStats.js';
 
 type UnknownRecord = Record<string, unknown>;
@@ -564,6 +565,9 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
 
   if (typeof providerLike === 'string') {
     const s = providerLike.trim().toLowerCase();
+    // Signed in to an agent's account without its key: the provider says who it is and signs nothing. It is
+    // matched before any wallet, so an installed wallet's own account is never taken for it.
+    if (isAgentLinkProvider(s)) return agentLinkProvider as unknown as Eip1193Provider;
 
     // Handle embedded passkey provider strings. Prefer the seeded window global
     // when a signing client is already warm, but synthesize the lazy provider on

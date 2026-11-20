@@ -38,6 +38,7 @@ import {
   resetTokenCaches,
   writeTokenCache,
 } from './workerAuthTokenCache.js';
+import { isAgentLinkProvider, noteLinkedAgentAccount, renewAgentLinkSignIn } from '../session/agentLinkAccount';
 import {
   buildAnonymousHeaders,
   buildWorkerAuthNonceHeaders,
@@ -819,6 +820,18 @@ export const getWorkerSessionToken = async ({
   if (cachedToken) {
     return cachedToken;
   }
+  // Signed in to an agent's account without its key: nothing here can sign for a new sign-in. One is made through
+  // the attached passkey where there is one; otherwise this is a sign-in the page can't make.
+  if (isAgentLinkProvider(wallet.providerLike)) {
+    const renewed = await renewAgentLinkSignIn({ address, workerUrl: resolvedWorkerUrl, sessionSlug: slug, prompt });
+    assertWorkerAuthRequestCurrent(null, requestAuthEpoch, address);
+    if (!renewed) throw new WorkerSignInNeededError();
+    writeTokenCache(
+      storageKey,
+      buildTokenCacheEnvelope({ ...renewed, workerUrl: resolvedWorkerUrl, sessionId, sessionSlug: slug, address }),
+    );
+    return renewed.token;
+  }
 
   const existingRequest = inFlightTokenRequests.get(storageKey);
   // Prompts are for what the person does: what the page does by itself signs in only silently, and never waits on a
@@ -932,6 +945,17 @@ export const getWorkerSessionToken = async ({
     }
     if (!loginData?.token) {
       throw new Error('Worker login did not return a token.');
+    }
+    // This sign-in's key is a passkey attached to an account an AI agent set up: the session page offers that account.
+    if (loginData.linkedAgentAccount) {
+      noteLinkedAgentAccount({
+        workerUrl: resolvedWorkerUrl,
+        sessionSlug: slug,
+        sessionId,
+        passkey: address,
+        linked: loginData.linkedAgentAccount,
+        token: loginData.token,
+      });
     }
 
     // Regression guard: keep the cache write gated by the same auth epoch that
@@ -1197,8 +1221,12 @@ export const fetchWorkerWithAuth = async (
   if (refusedForSignIn && response.ok && startingAuthEpoch === getClientAuthGeneration()) rememberSignInRoute(routeKey);
   if ((response.status !== 401 && response.status !== 403) || opts.retry === false) return response;
   const tokenRefused = await shouldRetryAuthenticatedResponse(response);
+  // A sign-in held without the account's key can't be made again by signing, so a scope it lacks stays refused.
   const scopeOutdated =
-    !tokenRefused && !tokensIssuedForCurrentAccess.has(authToken) && (await isTokenScopeDenialResponse(response));
+    !tokenRefused &&
+    !isAgentLinkProvider(authRequestContext?.wallet?.providerLike) &&
+    !tokensIssuedForCurrentAccess.has(authToken) &&
+    (await isTokenScopeDenialResponse(response));
   // A token refused one scope still serves the rest: the page's own request keeps it unless a new one signs unasked.
   if (scopeOutdated && opts.prompt === false && !(authRequestContext && signsWithoutPrompt(authRequestContext))) {
     return response;

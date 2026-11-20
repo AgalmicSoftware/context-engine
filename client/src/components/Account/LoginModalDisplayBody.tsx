@@ -11,6 +11,7 @@ import {
 import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import { copyText } from '../../utilities/ui/copyText';
 import styles from './Account.module.scss';
+import AgentAccountAccessPanel from './AgentAccountAccessPanel';
 import { PASSKEYS_UNAVAILABLE_MESSAGE, type PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
 // For a browser without passkeys: the same page, to paste into one that has them.
@@ -256,6 +257,9 @@ const LoginModalDisplayBody = ({
               </Button>
             </div>
             {renderAgentHandoffPanel()}
+            <div className={styles.accountModalControls}>
+              <AgentAccountAccessPanel provider={provider} buttonClassName="btn btn-secondary btn-sm" />
+            </div>
           </div>
         </div>
       </CardBody>

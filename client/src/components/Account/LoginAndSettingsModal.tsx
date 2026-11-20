@@ -1,3 +1,4 @@
+import { isAgentLinkProvider } from 'utilities/session/agentLinkAccount';
 import { logoutClientAuth, CLIENT_AUTH_LOGOUT_EVENT } from '../../utilities/session/clientAuthLogout';
 import { getClientAuthGeneration } from '../../utilities/session/clientAuthGeneration';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
@@ -578,16 +579,20 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const passkeyRestoreReqId = this._passkeyWalletRestoreReqId + 1;
     this._passkeyWalletRestoreReqId = passkeyRestoreReqId;
     const passkeyActionIdAtRestoreStart = this._passkeyWalletActionId;
-    const restoredAddress = await restorePasskeyLoginPassively({
-      changeAccount: (payload) => this.props.changeAccount(payload),
-      getNetwork: () => this.getPasskeyWalletNetwork(),
-      isCurrent: () =>
-        this._isMounted &&
-        passkeyRestoreReqId === this._passkeyWalletRestoreReqId &&
-        passkeyActionIdAtRestoreStart === this._passkeyWalletActionId,
-      restoreSession: (options) => passkeyWallet.restorePasskeyWalletSession(options),
-      updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
-    });
+    // Signed in to an agent's account from its link, the tab stays that account: a saved passkey is not put in
+    // its place just because this dialog opened.
+    const restoredAddress = isAgentLinkProvider(this.props.provider)
+      ? null
+      : await restorePasskeyLoginPassively({
+          changeAccount: (payload) => this.props.changeAccount(payload),
+          getNetwork: () => this.getPasskeyWalletNetwork(),
+          isCurrent: () =>
+            this._isMounted &&
+            passkeyRestoreReqId === this._passkeyWalletRestoreReqId &&
+            passkeyActionIdAtRestoreStart === this._passkeyWalletActionId,
+          restoreSession: (options) => passkeyWallet.restorePasskeyWalletSession(options),
+          updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
+        });
     if (!this._isMounted) return;
     if (restoredAddress) accountLog.log('Restored passkey wallet session:', restoredAddress);
 
