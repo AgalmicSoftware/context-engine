@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.23] - 2026-11-20
+
 ## [0.9.22] - 2026-11-20
 
 An agents release with website changes: a Session Worker update, MCP 0.8.0 (published at merge) and the site. Each agents part works only where the session's Worker reports it, and nothing a session already stores is changed. Sign-in links from agents are off on every session until its admin turns them on.
