@@ -1,15 +1,22 @@
 import type React from 'react';
-import { Input, Label, UncontrolledTooltip } from 'reactstrap';
+import { Input, Label } from 'reactstrap';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { INTERVIEW_PROMPT_VERSION, type InterviewPrefillPacket } from './sessionInterview';
 import { describeInterviewPlatform } from './sessionInterviewModalState';
 import SessionDataNote from './SessionDataNote';
+import SessionInterviewResearchWhat from './SessionInterviewResearchWhat';
 import { buildPublicRepoBlobUrl } from '../../variables/publicRepoMetadata.js';
 import styles from './SessionInterviewResearchConsent.module.scss';
 
 // The plain-language research data doc on GitHub, led by its diagram: what is kept, how it's measured,
 // who sees it, how to stop. Links open it in a new tab, so the review in progress stays put.
 export const RESEARCH_DOC_URL = buildPublicRepoBlobUrl('docs/research-data.md');
+// FIRE's announcement of the grant program, with the Cosmos Institute, that funds the research.
+export const RESEARCH_GRANT_URL =
+  'https://www.fire.org/news/fire-and-cosmos-institute-launch-1-million-grant-program-ai-advances-truth-seeking';
+// What sharing is for, behind "What's this?": the same whoever drafted the answers.
+export const RESEARCH_WHAT =
+  'Response drafts and changes used for research, funded by grant from the Cosmos Institute and FIRE, about how AI represents people’s preferences. It keeps the AI’s drafted answers and compares them to your final answers. Only the session’s admins see it.';
 
 type Props = {
   packet: InterviewPrefillPacket;
@@ -261,28 +268,8 @@ export function SessionInterviewResearchShare({
         <span>Share for research{mixed ? ' (mixed)' : ''}</span>
       </Label>
       {/* Says what this is in a tooltip on a tap, hover or focus, which a phone can't do with a link. */}
-      <button
-        type="button"
-        id="ce-interview-research-help"
-        className={`${styles.researchLink} ${styles.researchWhat}`}
-        data-ce-control-appearance="frameless"
-        aria-label="What’s this? About sharing for research"
-        aria-describedby="ce-interview-research-description"
-      >
-        What’s this?
-      </button>
-      <span id="ce-interview-research-description" className={styles.srOnly}>
-        {minimal
-          ? 'For the agent mirror evaluation, which measures how well your AI predicts you. Only the session’s admins see it. Includes the AI’s predicted answers, ratings and confidence, its revision history, and which fields you changed. It excludes the AI’s notes and drafted text, drafts you did not select, encrypted answers, full interview transcripts, and imported conversation history. Edits are not treated as agreement.'
-          : 'For the agent mirror evaluation, which measures how well your AI predicts you. Only the session’s admins see it. Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported conversation history are excluded.'}
-        {draftTextNote}
-        {dataNote.trim() ? ` ${dataNote.trim()}` : ''}
-        {mixed ? ' Your saved responses have different choices; ticking or unticking sets them all.' : ''}
-      </span>
-      <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus" autohide={false}>
-        {minimal
-          ? 'For the agent mirror evaluation: keeps your AI’s predicted answers, how sure it was, and which you changed, not its notes or drafted text. Only the session’s admins see it.'
-          : 'For the agent mirror evaluation: keeps your AI’s drafts, their revisions, and which fields you changed, but no encrypted text, transcripts or imported history. Only the session’s admins see it.'}
+      <SessionInterviewResearchWhat id="ce-interview-research-help" descriptionId="ce-interview-research-description">
+        {RESEARCH_WHAT}
         {draftTextNote}{' '}
         {dataNote.trim() ? (
           <>
@@ -291,8 +278,20 @@ export function SessionInterviewResearchShare({
         ) : null}
         <a className={styles.tooltipLink} href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
           How research data is handled
+        </a>{' '}
+        <a className={styles.tooltipLink} href={RESEARCH_GRANT_URL} target="_blank" rel="noreferrer">
+          About the grant
         </a>
-      </UncontrolledTooltip>
+      </SessionInterviewResearchWhat>
+      <span id="ce-interview-research-description" className={styles.srOnly}>
+        {RESEARCH_WHAT}{' '}
+        {minimal
+          ? 'Includes the AI’s predicted answers, ratings and confidence, its revision history, and which fields you changed. It excludes the AI’s notes and drafted text, drafts you did not select, encrypted answers, full interview transcripts, and imported conversation history. Edits are not treated as agreement.'
+          : 'Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported conversation history are excluded.'}
+        {draftTextNote}
+        {dataNote.trim() ? ` ${dataNote.trim()}` : ''}
+        {mixed ? ' Your saved responses have different choices; ticking or unticking sets them all.' : ''}
+      </span>
     </span>
   );
 }

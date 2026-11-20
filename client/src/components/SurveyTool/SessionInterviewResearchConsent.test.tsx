@@ -2,7 +2,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds';
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionInterviewResearchConsent, { SessionInterviewResearchShare } from './SessionInterviewResearchConsent';
 import type { InterviewPrefillPacket } from './sessionInterview';
 
@@ -192,6 +192,86 @@ describe('SessionInterviewResearchShare', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Funded by Example.');
   });
 
+  it('names the grant, links to it, and stays open long enough to reach a link', async () => {
+    jest.useFakeTimers();
+    try {
+      render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
+      const what = screen.getByRole('button', { name: 'What’s this? About sharing for research' });
+      fireEvent.mouseEnter(what);
+      const tooltip = await screen.findByRole('tooltip');
+      expect(tooltip).toHaveTextContent(
+        'Response drafts and changes used for research, funded by grant from the Cosmos Institute and FIRE, about how AI represents people’s preferences. It keeps the AI’s drafted answers and compares them to your final answers. Only the session’s admins see it.',
+      );
+      expect(within(tooltip).getByRole('link', { name: 'About the grant' })).toHaveAttribute(
+        'href',
+        'https://www.fire.org/news/fire-and-cosmos-institute-launch-1-million-grant-program-ai-advances-truth-seeking',
+      );
+      // The pointer leaves for the tooltip: it is still there well after reactstrap's usual 50 ms, and staying
+      // over it keeps it.
+      fireEvent.mouseLeave(what);
+      act(() => jest.advanceTimersByTime(1500));
+      expect(screen.getByRole('tooltip')).toBeInTheDocument();
+      fireEvent.mouseEnter(screen.getByTestId('ce-interview-research-what-tip'));
+      act(() => jest.advanceTimersByTime(5000));
+      expect(screen.getByRole('tooltip')).toBeInTheDocument();
+      // Leaving both, it goes after 2 s.
+      fireEvent.mouseLeave(screen.getByTestId('ce-interview-research-what-tip'));
+      act(() => jest.advanceTimersByTime(2100));
+      await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('lets the keyboard reach its links, and Escape close it', async () => {
+    // Stands in for the Interview dialog, which closes on Escape and wraps Tab.
+    const dialogKeyDown = jest.fn();
+    const dialogKeyUp = jest.fn();
+    render(
+      <div onKeyDown={dialogKeyDown} onKeyUp={dialogKeyUp}>
+        <SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />
+        <button type="button" hidden>
+          Hidden
+        </button>
+        <button type="button">After</button>
+      </div>,
+    );
+    const what = screen.getByRole('button', { name: 'What’s this? About sharing for research' });
+    act(() => what.focus());
+    const tooltip = await screen.findByRole('tooltip');
+    fireEvent.keyDown(what, { key: 'Tab' });
+    const [doc, grant] = within(tooltip).getAllByRole('link');
+    expect(doc).toHaveFocus();
+    // Moving between its links keeps it open.
+    act(() => grant.focus());
+    fireEvent.keyDown(grant, { key: 'Tab' });
+    expect(screen.getByRole('button', { name: 'After' })).toHaveFocus();
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    act(() => what.focus());
+    await screen.findByRole('tooltip');
+    fireEvent.keyDown(what, { key: 'Escape' });
+    fireEvent.keyUp(what, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    // None of the keys it handled reached the dialog.
+    expect(dialogKeyDown).not.toHaveBeenCalled();
+    expect(dialogKeyUp).not.toHaveBeenCalled();
+    // With the tooltip closed, Escape is the dialog's again.
+    fireEvent.keyDown(what, { key: 'Escape' });
+    fireEvent.keyUp(what, { key: 'Escape' });
+    expect(dialogKeyUp).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns Tab to its button when nothing follows it', async () => {
+    render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
+    const what = screen.getByRole('button', { name: 'What’s this? About sharing for research' });
+    act(() => what.focus());
+    const tooltip = await screen.findByRole('tooltip');
+    const links = within(tooltip).getAllByRole('link');
+    act(() => links[links.length - 1].focus());
+    fireEvent.keyDown(links[links.length - 1], { key: 'Tab' });
+    expect(what).toHaveFocus();
+  });
+
   it('names itself shortly, with what it shares behind “What’s this?”', () => {
     render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
     expect(screen.getByLabelText('Share for research')).toBeChecked();
@@ -273,10 +353,10 @@ describe('AI draft text for admins', () => {
     expect(screen.getByText(/Drafted text is not kept/)).toBeInTheDocument();
   });
 
-  it('says beside Share for research that the agent mirror evaluation is for admins alone', () => {
+  it('says beside Share for research what the research is, and that it is for admins alone', () => {
     render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
     expect(screen.getByText(/Includes the AI’s predicted answers/)).toHaveTextContent(
-      /^For the agent mirror evaluation, which measures how well your AI predicts you\. Only the session’s admins see it\./,
+      /^Response drafts and changes used for research, funded by grant from the Cosmos Institute and FIRE, .* Only the session’s admins see it\. Includes/,
     );
   });
 
