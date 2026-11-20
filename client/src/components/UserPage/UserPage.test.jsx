@@ -9,6 +9,7 @@ import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
 import { ethers } from 'ethers';
 import { notify } from '../../utilities/ui/notify.js';
 import { resolveSessionNamesSource } from '../../utilities/session/sessionNames';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   getGlobalLitHooks: jest.fn(() => null),
@@ -713,6 +714,27 @@ describe('UserPage survey route boundaries', () => {
       expect(instance.state.selectedTab).toBe('questions');
       instance.props = { ...instance.props, sessionSurveyAvailability: 'some' };
       expect(findSection(instance.render(), 'UserPageSurveySection')).toBeUndefined();
+    });
+  });
+
+  describe('the groups section', () => {
+    const owner = '0x00000000000000000000000000000000000000Aa';
+    const sessionConfig = {
+      slug: 'profile-session',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const hasGroups = (instance) =>
+      collectTreeNodes(instance.render(), (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection').length > 0;
+
+    it('shows only on your own page, following the signed-in account rather than the URL', () => {
+      const instance = makeInstance({ viewAddress: owner.toLowerCase(), account: owner, sessionConfig });
+      expect(hasGroups(instance)).toBe(true);
+      instance.props = { ...instance.props, account: '0x00000000000000000000000000000000000000bb' };
+      expect(hasGroups(instance)).toBe(false);
+      instance.props = { ...instance.props, account: '' };
+      expect(hasGroups(instance)).toBe(false);
+      instance.props = { ...instance.props, account: owner.toLowerCase() };
+      expect(hasGroups(instance)).toBe(true);
     });
   });
 

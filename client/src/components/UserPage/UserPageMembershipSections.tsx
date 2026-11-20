@@ -36,24 +36,25 @@ export const renderUserPageMembershipSections = ({
     Boolean(activeSessionSlug);
   const showOnChainSbts = onChainProfileEnabled !== false;
 
+  // Someone else's groups can't be shown yet, so their page leaves the section out. "Own" is the
+  // signed-in account matching the address in the URL, checked on every render; signed out isn't.
+  if (!isOwner && !showOnChainSbts) return null;
   return (
     <div className={styles.rightColumn}>
-      <UserPageWorkerGroupSection
-        account={account}
-        provider={provider}
-        sessionConfig={sessionConfig}
-        sessionSlug={activeSessionSlug}
-        showMemberships={showWorkerGroups}
-        unavailableMessage={
-          !activeSessionSlug
-            ? 'Choose a session to view group memberships.'
-            : !account
-              ? 'Sign in with this profile’s account to view its groups.'
-              : !isOwner
-                ? 'Group memberships are only shown on your own profile.'
-                : 'Group memberships are unavailable for this session.'
-        }
-      />
+      {isOwner && (
+        <UserPageWorkerGroupSection
+          account={account}
+          provider={provider}
+          sessionConfig={sessionConfig}
+          sessionSlug={activeSessionSlug}
+          showMemberships={showWorkerGroups}
+          unavailableMessage={
+            !activeSessionSlug
+              ? 'Choose a session to view group memberships.'
+              : 'Group memberships are unavailable for this session.'
+          }
+        />
+      )}
       {showOnChainSbts ? (
         <UserPageSbtSection {...sbtSectionProps} account={account} provider={provider} wrapColumn={false} />
       ) : null}
