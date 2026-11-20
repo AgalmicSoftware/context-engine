@@ -43,6 +43,21 @@ describe('signing out of Session Workers', () => {
     expect(readTokenCache(second)).toBeNull();
   });
 
+  it('ends a sign-in the page replaced as well, since signing out forgets it', () => {
+    const fetchMock = jest.fn(() => Promise.resolve(new Response('{"ok":true}')));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    hold('https://worker-a.example', 'session-a', 'token-old');
+    // Writing over a sign-in that still stands sets it aside as replaced.
+    hold('https://worker-a.example', 'session-a', 'token-new');
+
+    clearAllWorkerSessionTokens();
+
+    const tokens = (fetchMock.mock.calls as unknown as Array<[string, RequestInit]>).map(
+      ([, init]) => (init.headers as Record<string, string>).Authorization,
+    );
+    expect(tokens.sort()).toEqual(['Bearer token-new', 'Bearer token-old']);
+  });
+
   it('still forgets sign-ins when a Worker cannot be reached', () => {
     globalThis.fetch = jest.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch;
     const key = hold('https://worker-a.example', 'session-a', 'token-a');

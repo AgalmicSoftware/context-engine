@@ -33,6 +33,7 @@ import {
   adoptTokenCaches,
   clearTokenCache,
   listHeldTokens,
+  listReplacedTokens,
   normalizeTokenCacheEntry,
   readScopedTokenCache,
   resetTokenCaches,
@@ -1036,8 +1037,9 @@ export const clearWorkerSessionToken = ({
 
 export const clearAllWorkerSessionTokens = () => {
   // Signing out ends each sign-in at its Worker too, so a copied token stops working.
-  // A Worker that can't be reached keeps the sign-in until it expires.
-  listHeldTokens().forEach(({ workerUrl, sessionSlug, token }) => {
+  // A Worker that can't be reached keeps the sign-in until it expires. Sign-ins the page replaced are ended
+  // here as well, because the reset below forgets them.
+  [...listHeldTokens(), ...listReplacedTokens()].forEach(({ workerUrl, sessionSlug, token }) => {
     globalThis
       .fetch?.(`${workerUrl}/auth/logout`, {
         method: 'POST',
