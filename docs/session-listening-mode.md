@@ -353,8 +353,12 @@ top of the page, and the **Interview & share** panel, whose prompt is for
 sharing and never carries a ticket, says each person copies their own prompt
 once signed in. The Worker accepts a return URL only when its
 origin is approved by that session and its `/session/<slug>` path matches. The
-external AI must first display a readable table and the exact single-line JSON
-that will be encoded. Provenance is deliberately coarse: a source
+prompt says a plain HTTP GET of the catalog address is all it needs, with no
+MCP, sign-in or tool to install; a line about the MCP, in the **Your AI agent**
+box's prompt, comes last and speaks only to an agent that already runs
+commands. The external AI replies with one research-coverage line, the review
+link, and the exact single-line JSON that was encoded, in a code block, with
+no table. Provenance is deliberately coarse: a source
 category and relevance note, never quotes, conversation or document names,
 URLs, timestamps, or account identifiers. If no relevant evidence exists, the
 AI returns the clean interview URL with no prefill packet.
@@ -373,8 +377,9 @@ searched count is `null` when the platform does not expose it; zero means the AI
 reports that it used none. The review modal shows these counts before drafts are
 applied, and retained model provenance keeps them beside the eventual prediction
 comparison. Low-confidence responses are allowed when the AI
-has a defensible indirect signal and explains its basis; questions with no
-relevant signal are omitted. When an older v4 catalog cannot represent a
+has a defensible indirect signal and explains its basis in one short clause.
+It drafts only where it has a real basis, at most 15 drafts, and skips the
+rest. When an older v4 catalog cannot represent a
 multiple-selection answer, the prompt also requires omitting that draft and
 disclosing the limitation instead of losing some selections. Model identity is collected to measure prediction
 fidelity across models and may be `unknown` when the interface does not expose
@@ -387,7 +392,13 @@ link, `#prefillz=...`, which the page unpacks after it loads; the site's
 writes the shorter form only for a site that lists it), so it
 is not sent to the web host as an HTTP request target. The fragment is still
 intentionally readable by scripts on the destination page, which is why source
-identifiers are forbidden and the exact JSON is shown first. The current catalog prompt version is
+identifiers are forbidden and the exact JSON is also given in a code block.
+An AI that can't encode the link exactly links the review page with
+`#prefill=paste`, which opens the review on the paste box, without an error;
+a link that fails to open shows the same box. The packet also names the
+prompt's wording, `promptRevision` (now `ce-prefill-prompt-2`), which the
+page keeps with the AI provenance; the catalog version below is the Worker's
+and does not change with the wording. The current catalog prompt version is
 `ce-interview-brief-v6`. The copied request accepts a catalog with type
 `context-engine.interview-question-catalog`, schema `version: 1`, the expected
 session slug, and prompt version v4, v5 or v6, and states confidence by that

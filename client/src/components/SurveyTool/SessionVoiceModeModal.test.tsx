@@ -7,6 +7,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   buildExternalInterviewKickoff,
   hashInterviewQuestions,
+  INTERVIEW_PREFILL_PASTE_NOTE,
   mapInterviewEvidenceToResponses,
   type InterviewDraftResponse,
 } from './sessionInterview';
@@ -1272,6 +1273,22 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(button);
     expect(onImportPrefillJson).toHaveBeenCalledWith('{"version":1}');
     expect(within(paste).getByRole('alert')).toHaveTextContent('different session');
+  });
+
+  // An AI with no code tool links #prefill=paste: the box opens with no error.
+  it('opens on the paste box, without an error, when the AI asks for a paste', async () => {
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        initialError={INTERVIEW_PREFILL_PASTE_NOTE}
+        onImportPrefillJson={() => ''}
+      />,
+    );
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE)).toBeInTheDocument();
+    expect(screen.queryByText(INTERVIEW_PREFILL_PASTE_NOTE)).not.toBeInTheDocument();
+    expect(screen.queryByText('Error')).not.toBeInTheDocument();
+    expect(screen.getByText('Paste drafts')).toBeInTheDocument();
   });
 
   it.each([
@@ -2602,7 +2619,9 @@ describe('SessionVoiceModeModal', () => {
         .map((paragraph) => paragraph.textContent)
         .join(' ')
         .replace(/\s+/g, ' '),
-    ).toContain('Fetch this URL: worker.example/agent/interview-catalog…');
+    ).toContain(
+      'Fetch this URL with a plain HTTP GET; that is all this needs, with no MCP, sign-in or tool to install: worker.example/agent/interview-catalog…',
+    );
     const codeBlock = displayedPrompt.querySelector('pre code');
     expect(codeBlock).toBeInTheDocument();
     expect(codeBlock?.textContent).toContain('\n  "version": 1,');

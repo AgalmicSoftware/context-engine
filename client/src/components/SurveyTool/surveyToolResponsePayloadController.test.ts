@@ -205,6 +205,7 @@ describe('surveyToolResponsePayloadController', () => {
                 },
               },
               promptVersion: 'ce-interview-brief-v1',
+              promptRevision: 'ce-prefill-prompt-2',
               questionSetHash: 'hash',
               originalPrediction: { answer: 'Original agent prediction', confidence: 0.22 },
               submissionValueSnapshot: {
@@ -240,6 +241,8 @@ describe('surveyToolResponsePayloadController', () => {
             },
           },
           promptVersion: 'ce-interview-brief-v1',
+          // The copied prompt's wording goes with the catalog's version.
+          promptRevision: 'ce-prefill-prompt-2',
           questionSetHash: 'hash',
           originalPrediction: {
             answer: 'Original agent prediction',

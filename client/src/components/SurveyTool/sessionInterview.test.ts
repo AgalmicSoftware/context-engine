@@ -34,6 +34,8 @@ import {
   readInterviewPrefillFromHash,
   resolveRealtimeInterviewSource,
   resolveSessionVoiceMode,
+  PREFILL_PROMPT_REVISION,
+  requestsInterviewPrefillPaste,
   type InterviewPrefillPacket,
   decodeInterviewPrefill,
 } from './sessionInterview';
@@ -296,6 +298,31 @@ describe('session interview protocol', () => {
     );
   });
 
+  it('keeps the prompt revision a packet names, and only a well-formed one', () => {
+    const read = (promptRevision: unknown) =>
+      decodeInterviewPrefill(encodeLinkJson({ ...packet, promptRevision })).packet?.promptRevision;
+    expect(read(PREFILL_PROMPT_REVISION)).toBe('ce-prefill-prompt-2');
+    expect(read('anything else')).toBeUndefined();
+    expect(decodeInterviewPrefill(encodeLinkJson(packet)).packet).not.toHaveProperty('promptRevision');
+  });
+
+  it('opens the paste box for #prefill=paste, and only for that', () => {
+    expect(requestsInterviewPrefillPaste('#prefill=paste')).toBe(true);
+    expect(requestsInterviewPrefillPaste('#claim=x&prefill=paste')).toBe(true);
+    expect(requestsInterviewPrefillPaste('#prefill=cGFzdGU')).toBe(false);
+    expect(requestsInterviewPrefillPaste('')).toBe(false);
+  });
+
+  it('puts a caller’s line last, after the task', () => {
+    const kickoff = buildExternalInterviewKickoff({
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'demo',
+      sessionUrl: 'https://app.example/session/demo',
+      note: 'A closing line.',
+    });
+    expect(kickoff.endsWith('\n\nA closing line.')).toBe(true);
+  });
+
   it('reads a pasted JSON packet when the link breaks', () => {
     const pasted = parseInterviewPrefillJson(`\n${JSON.stringify(packet, null, 2)}\n`);
     expect(pasted.packet).toEqual(decodeInterviewPrefillPacket(encodeLinkJson(packet)));
@@ -346,11 +373,24 @@ describe('session interview protocol', () => {
     expect(kickoff).not.toContain('preferred name');
     expect(kickoff).toContain('"responderContext":{"summary":"relevant background/views/uncertainties"');
     expect(kickoff).toContain('"facts":[{"fact":"stated or inferred context"');
-    expect(kickoff).toContain('the exact single-line JSON packet');
+    // A plain fetch is all it takes, so a chat AI doesn't go looking for tools.
+    expect(kickoff).toContain(
+      'Fetch this URL with a plain HTTP GET; that is all this needs, with no MCP, sign-in or tool to install:\nhttps://worker.example/agent/interview-catalog',
+    );
+    // Drafts only with a basis, and the packet ready to paste; no table to read through.
+    expect(kickoff).toContain('Draft only where you have a real basis; skip the rest, at most 15 drafts.');
+    expect(kickoff).toContain('the exact packet as single-line JSON in a code block. No table.');
+    expect(kickoff).not.toContain('confidence/basis table');
+    expect(kickoff).toContain('"evidence":"one short clause"');
+    expect(kickoff).toContain(
+      "If you can't encode it exactly, link catalog.reviewUrl + #prefill=paste instead and tell me to paste the packet there.",
+    );
+    // The packet names the prompt's wording, for research to tell the wordings apart.
+    expect(kickoff).toContain(`"promptRevision":"${PREFILL_PROMPT_REVISION}"`);
     expect(kickoff).toContain('Nothing is submitted;');
     expect(kickoff).toContain('Markdown link labeled "Review your drafted answers"');
     expect(kickoff).toContain('never visible text or a code block');
-    expect(kickoff.length).toBeLessThan(4200);
+    expect(kickoff.length).toBeLessThan(4500);
 
     const mappingPrompt = buildInterviewResponseMappingPrompt({
       questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],

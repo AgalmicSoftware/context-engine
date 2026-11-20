@@ -22,7 +22,7 @@ export type SessionPrefillKickoffInput = {
   sessionUrl?: string;
   /** Names the session in the prompt. */
   sessionName?: string;
-  /** A line of the caller's, after the session's name. */
+  /** A line of the caller's, at the end of the prompt. */
   note?: string;
 };
 

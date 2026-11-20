@@ -470,6 +470,9 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
                     ...(researchCoverage ? { researchCoverage } : {}),
                   },
                   promptVersion: String(interviewProvenanceRecord.promptVersion || '').slice(0, 128),
+                  ...(interviewProvenanceRecord.promptRevision
+                    ? { promptRevision: String(interviewProvenanceRecord.promptRevision).slice(0, 64) }
+                    : {}),
                   questionSetHash: String(interviewProvenanceRecord.questionSetHash || '').slice(0, 256),
                 }
               : {}),

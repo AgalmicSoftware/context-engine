@@ -29,7 +29,9 @@ describe('agent hand-off texts', () => {
     expect(prompt).toContain('https://ce-salon.example.workers.dev/api/agent/skill');
     // Asks first by default.
     expect(prompt).toContain('Submit them as me only after I say yes here');
-    expect(prompt).toContain(`add it with: ${MCP_ADD_COMMAND} This task does not need it.`);
+    expect(prompt).toContain(
+      `Only if you are an agent that already runs commands: you can add the Context Engine MCP for later with: ${MCP_ADD_COMMAND} This task does not need it.`,
+    );
     // The box shows it masked.
     const shown = buildOnMyBehalfPrompt({ key, sessionName: 'Salon', sessionUrl, shownToken: 'ceagt_••••' });
     expect(shown).not.toContain(key.token);

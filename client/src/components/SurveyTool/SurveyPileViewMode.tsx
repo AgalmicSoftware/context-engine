@@ -138,6 +138,8 @@ import {
   parseInterviewPrefillJson,
   readInterviewPrefillFromHash,
   readPackedInterviewPrefillFromHash,
+  requestsInterviewPrefillPaste,
+  INTERVIEW_PREFILL_PASTE_NOTE,
   resolveRealtimeInterviewSource,
   resolveSessionVoiceMode,
   INTERVIEW_MAPPING_PROMPT_VERSION,
@@ -264,7 +266,9 @@ const readInterviewPrefillStateForProps = (
   const read = unpacked || readInterviewPrefillFromHash(hash);
   const error = read.packet
     ? prefillSessionMismatch(props, read.packet)
-    : `${read.error} Ask the AI for a fresh link, or paste the JSON packet it gave you below.`;
+    : requestsInterviewPrefillPaste(hash)
+      ? INTERVIEW_PREFILL_PASTE_NOTE
+      : `${read.error} Ask the AI for a fresh link, or paste the JSON packet it gave you below.`;
   return error
     ? { hasPrefill: true, packet: null as InterviewPrefillPacket | null, error, notice: '' }
     : { hasPrefill: true, packet: read.packet, error: '', notice: read.notice };
@@ -2018,6 +2022,8 @@ export const recordInterviewProvenance = (
               ? {
                   source: normalizedSource,
                   promptVersion: packet?.promptVersion || INTERVIEW_PROMPT_VERSION,
+                  // The copied prompt's wording, which the catalog's version doesn't tell.
+                  ...(packet?.promptRevision ? { promptRevision: packet.promptRevision } : {}),
                   questionSetHash: packet?.questionSetHash || '',
                 }
               : {}),

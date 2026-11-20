@@ -8,7 +8,8 @@ export const MCP_ADD_COMMAND =
 
 // The MCP, in the prompt rather than a box of its own, so the person copies one thing. Its tools act as the
 // agent itself, so neither task needs it.
-export const MCP_PROMPT_LINE = `If you run commands and want the Context Engine MCP for later, add it with: ${MCP_ADD_COMMAND} This task does not need it.`;
+// Addressed only to an agent that already runs commands, so a chat AI without tools just does the task.
+export const MCP_PROMPT_LINE = `Only if you are an agent that already runs commands: you can add the Context Engine MCP for later with: ${MCP_ADD_COMMAND} This task does not need it.`;
 
 // The agent box is remounted per session and per account, so a key made for one
 // account never stays on screen, or in the prompt, for the next.

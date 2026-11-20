@@ -1,5 +1,10 @@
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
-import type { InterviewPrefillPacket, InterviewQuestion, InterviewResearchCoverage } from './sessionInterview';
+import {
+  INTERVIEW_PREFILL_PASTE_NOTE,
+  type InterviewPrefillPacket,
+  type InterviewQuestion,
+  type InterviewResearchCoverage,
+} from './sessionInterview';
 
 export type SessionInterviewModalRecord = Record<string, unknown>;
 
@@ -174,8 +179,12 @@ export const describeInterviewStatus = ({
           ? 'Review and edit your answers and privacy settings, then select Submit responses. You will be asked to sign in if needed.'
           : 'Speak with an AI interviewer. Stopping prepares drafts for your review. You choose when to submit responses.';
   const idle = recordingState === 'idle' && !mapping && !applying;
+  // A review opened to paste an AI's packet is waiting on the person, not failing.
+  const failed = Boolean(error) && error !== INTERVIEW_PREFILL_PASTE_NOTE;
   const statusLabel = error
-    ? 'Error'
+    ? failed
+      ? 'Error'
+      : 'Paste drafts'
     : mapping
       ? 'Preparing responses…'
       : applying
@@ -193,7 +202,7 @@ export const describeInterviewStatus = ({
                   : status;
   // 'busy' while the interview is working on something, which shows a spinner; 'pending' while it waits.
   const statusTone =
-    error || (idle && (!hasQuestions || readiness === 'unavailable'))
+    failed || (idle && (!hasQuestions || readiness === 'unavailable'))
       ? 'error'
       : isStarting ||
           isStopping ||

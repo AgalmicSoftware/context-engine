@@ -47,6 +47,7 @@ import {
   type InterviewPrefillGroupPick,
   type InterviewPrefillPacket,
   type InterviewQuestion,
+  INTERVIEW_PREFILL_PASTE_NOTE,
 } from './sessionInterview';
 import {
   resolveInterviewPrefillQuestions,
@@ -1252,7 +1253,7 @@ export default function SessionInterviewPanel({
               </button>
             </p>
           ) : null}
-          {error ? (
+          {error && error !== INTERVIEW_PREFILL_PASTE_NOTE ? (
             <div className={styles.sessionListeningError} role="alert">
               {error}
             </div>

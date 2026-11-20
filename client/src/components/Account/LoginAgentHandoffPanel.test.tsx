@@ -134,8 +134,11 @@ it('copies one prompt that suggests answers for this session, with no key and th
   expect(prompt).toContain('Nothing is submitted; I review editable drafts.');
   expect(prompt).not.toContain('ceagt_');
   expect(prompt).not.toContain('CE_AGENT_TOKEN');
-  // The MCP is in the one prompt, not a box of its own.
-  expect(prompt).toContain('add it with: claude mcp add --scope user context-engine -- npx');
+  // The MCP is in the one prompt, not a box of its own, last and only for an agent that runs commands.
+  expect(prompt).toContain(
+    'Only if you are an agent that already runs commands: you can add the Context Engine MCP for later with: claude mcp add --scope user context-engine -- npx',
+  );
+  expect(prompt.trimEnd().endsWith('This task does not need it.')).toBe(true);
   expect(screen.getByText(/claude mcp add/)).toBe(screen.getByTestId('ce-agent-handoff-suggest-prompt'));
   // Drafts come back to the session's page, not to wherever the dialog was opened.
   expect(prompt).toContain(`sessionUrl=${encodeURIComponent(sessionUrl)}`);
