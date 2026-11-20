@@ -187,3 +187,23 @@ export const takeLinkedAgentAccountHint = (sessionSlug: string, passkey: unknown
   hint = null;
   return taken;
 };
+
+// An account's own sign-in told the page that a passkey is attached to it: whoever holds that passkey can sign in
+// as the account in this session. Its person is shown, once per tab, and can take it off.
+export type AttachedPasskeyNotice = { sessionSlug: string; account: string; passkey: string };
+let attachedNotice: AttachedPasskeyNotice | null = null;
+export const noteAttachedPasskey = (value: { sessionSlug: unknown; account: unknown; attached: unknown }): void => {
+  const passkey = lower((value.attached as { address?: unknown } | null)?.address);
+  const account = lower(value.account);
+  if (!ADDRESS_RE.test(passkey) || !ADDRESS_RE.test(account)) return;
+  attachedNotice = { sessionSlug: lower(value.sessionSlug), account, passkey };
+  listeners.forEach((listener) => listener());
+};
+export const readAttachedPasskeyNotice = (sessionSlug: string, account: unknown): AttachedPasskeyNotice | null =>
+  attachedNotice && attachedNotice.sessionSlug === lower(sessionSlug) && attachedNotice.account === lower(account)
+    ? attachedNotice
+    : null;
+export const dismissAttachedPasskeyNotice = (): void => {
+  attachedNotice = null;
+  listeners.forEach((listener) => listener());
+};

@@ -10,15 +10,20 @@ import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore 
 
 import { resolveWorkerGroupAutoJoinContext } from '../../domains/worker/workerGroupAutoJoinContext';
 import {
+  dismissAttachedPasskeyNotice,
+  holdAgentLinkAccount,
   isAgentLinkProvider,
+  readAttachedPasskeyNotice,
   readAgentLinkAccount,
   subscribeAgentLinkAccount,
   takeLinkedAgentAccountHint,
 } from '../../utilities/session/agentLinkAccount';
 import {
+  detachAgentPasskey,
   dropAgentSignInCode,
   exchangeHeldAgentSignInCode,
   hasAgentSignInCodeFor,
+  readAgentSignInState,
   workerHasAgentSignIn,
 } from '../../utilities/session/agentSignIn';
 import {
@@ -58,6 +63,9 @@ export default function AgentSignInGate({
     [context?.workerUrl, context?.sessionSlug, context?.sessionId], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const linkAccount = useSyncExternalStore(subscribeAgentLinkAccount, readAgentLinkAccount);
+  const attached = useSyncExternalStore(subscribeAgentLinkAccount, () =>
+    readAttachedPasskeyNotice(context?.sessionSlug || '', String(account ?? '')),
+  );
   const [phase, setPhase] = useState<Phase>('idle');
   const [note, setNote] = useState<{ text: string; isError: boolean } | null>(null);
   const [fromLink, setFromLink] = useState(false);
@@ -126,6 +134,29 @@ export default function AgentSignInGate({
     });
   }, [target, signedInAs, provider, hinted, linkAccount]);
 
+  // What the notice says of the agent's access is the Worker's word, asked when the account is shown: it may have
+  // been ended, or allowed again, from another tab or device.
+  const heldAddress =
+    linkAccount && isAgentLinkProvider(provider) && linkAccount.address === signedInAs ? linkAccount.address : '';
+  useEffect(() => {
+    if (!target || !heldAddress) return undefined;
+    const token = heldSessionToken(target.workerUrl, target.sessionSlug);
+    if (!token) return undefined;
+    let current = true;
+    void readAgentSignInState(target, token)
+      .then((state) => {
+        const account = readAgentLinkAccount();
+        if (!current || !account || account.address !== heldAddress || !state.attachedPasskey) return;
+        if (account.agentAccess !== state.attachedPasskey.agentAccess) {
+          holdAgentLinkAccount({ ...account, agentAccess: state.attachedPasskey.agentAccess });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [target, heldAddress]);
+
   if (!target) return null;
   const notice = (message: React.ReactNode, actions: React.ReactNode, isError = false): React.ReactElement => (
     <section className={styles.notice} aria-label="Agent’s account" data-testid="ce-agent-sign-in-notice">
@@ -179,6 +210,50 @@ export default function AgentSignInGate({
       >
         Dismiss
       </button>,
+      true,
+    );
+  }
+
+  // Signed in with the account's own key, and the Worker says a passkey is attached to it: said once, with a way
+  // to take it off. A passkey its person never attached lets someone else sign in as them here.
+  if (attached && !isAgentLinkProvider(provider)) {
+    return notice(
+      <>
+        A passkey (<span title={attached.passkey}>{shortAddress(attached.passkey)}</span>) is attached to your account
+        in this session: whoever holds it can sign in here as you. If you did not attach it, remove it.
+        {note ? <> {note.text}</> : null}
+      </>,
+      <>
+        <button
+          type="button"
+          className={styles.secondaryButton}
+          data-testid="ce-agent-attached-remove"
+          onClick={() => {
+            const token = heldSessionToken(target.workerUrl, target.sessionSlug);
+            void detachAgentPasskey(target, token)
+              .then(() => {
+                dismissAttachedPasskeyNotice();
+                setNote(null);
+              })
+              .catch((error: unknown) =>
+                setNote({
+                  text: error instanceof Error && error.message ? error.message : 'It could not be removed. Try again.',
+                  isError: true,
+                }),
+              );
+          }}
+        >
+          Remove it
+        </button>
+        <button
+          type="button"
+          className={styles.secondaryButton}
+          data-testid="ce-agent-attached-keep"
+          onClick={dismissAttachedPasskeyNotice}
+        >
+          It’s mine
+        </button>
+      </>,
       true,
     );
   }

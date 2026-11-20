@@ -1,11 +1,18 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import { forgetAgentLinkAccount, holdAgentLinkAccount } from '../../utilities/session/agentLinkAccount';
 import {
+  dismissAttachedPasskeyNotice,
+  forgetAgentLinkAccount,
+  holdAgentLinkAccount,
+  noteAttachedPasskey,
+} from '../../utilities/session/agentLinkAccount';
+import {
+  detachAgentPasskey,
   dropAgentSignInCode,
   exchangeHeldAgentSignInCode,
   hasAgentSignInCodeFor,
+  readAgentSignInState,
   workerHasAgentSignIn,
 } from '../../utilities/session/agentSignIn';
 import {
@@ -40,9 +47,16 @@ jest.mock('../../domains/worker/workerGroupAutoJoinContext', () => ({
   ),
 }));
 jest.mock('../../utilities/session/agentSignIn', () => ({
+  detachAgentPasskey: jest.fn(async () => undefined),
   dropAgentSignInCode: jest.fn(),
   exchangeHeldAgentSignInCode: jest.fn(),
   hasAgentSignInCodeFor: jest.fn(() => false),
+  readAgentSignInState: jest.fn(async () => ({
+    via: 'passkey_link',
+    attachedPasskey: null,
+    linkedAgentAccount: null,
+    agentParticipation: true,
+  })),
   workerHasAgentSignIn: jest.fn(async () => true),
 }));
 jest.mock('../../utilities/session/agentSignInAccount', () => ({
@@ -79,6 +93,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   window.sessionStorage.clear();
   act(() => forgetAgentLinkAccount());
+  act(() => dismissAttachedPasskeyNotice());
   jest.mocked(hasAgentSignInCodeFor).mockReturnValue(false);
   jest.mocked(workerHasAgentSignIn).mockResolvedValue(true);
   jest.mocked(heldSessionToken).mockReturnValue('held-sign-in');
@@ -225,4 +240,38 @@ it('opens the agent’s account for a passkey this browser attached, quietly, un
   gate({ account: PASSKEY, provider: 'wagmi' });
   await act(async () => {});
   expect(enterThroughAttachedPasskey).not.toHaveBeenCalled();
+});
+
+it('takes the Worker’s word for whether the agent still has access', async () => {
+  act(() => void held({ via: 'passkey_link', passkey: PASSKEY }));
+  jest.mocked(readAgentSignInState).mockResolvedValue({
+    via: 'passkey_link',
+    attachedPasskey: { address: PASSKEY, agentAccess: 'cancelled' },
+    linkedAgentAccount: null,
+    agentParticipation: true,
+  });
+  gate({ account: ACCOUNT, provider: 'agent_link' });
+  expect(notice()?.textContent).toMatch(/Your agent can still use it/);
+  // Ended from another tab or device: the notice follows.
+  await waitFor(() => expect(notice()?.textContent).toMatch(/Your agent’s access is ended/));
+  expect(readAgentSignInState).toHaveBeenCalledWith(TARGET, 'held-sign-in');
+});
+
+it('tells a person signed in with their own key that a passkey is attached to their account, and lets them remove it', async () => {
+  gate({ account: OTHER, provider: 'passkey_eoa' });
+  expect(notice()).toBeNull();
+  act(() => noteAttachedPasskey({ sessionSlug: 'salon', account: OTHER, attached: { address: PASSKEY } }));
+  expect(notice()?.textContent).toMatch(
+    /A passkey \(0xb2b2…b2b2\) is attached to your account in this\s+session: whoever holds it can sign in here as you/,
+  );
+  fireEvent.click(screen.getByTestId('ce-agent-attached-remove'));
+  await waitFor(() => expect(detachAgentPasskey).toHaveBeenCalledWith(TARGET, 'held-sign-in'));
+  await waitFor(() => expect(notice()).toBeNull());
+  // Their own passkey, attached on purpose: said once, then left alone.
+  act(() => noteAttachedPasskey({ sessionSlug: 'salon', account: OTHER, attached: { address: PASSKEY } }));
+  fireEvent.click(screen.getByTestId('ce-agent-attached-keep'));
+  expect(notice()).toBeNull();
+  // Said of another account or session, it is not shown here.
+  act(() => noteAttachedPasskey({ sessionSlug: 'another', account: OTHER, attached: { address: PASSKEY } }));
+  expect(notice()).toBeNull();
 });

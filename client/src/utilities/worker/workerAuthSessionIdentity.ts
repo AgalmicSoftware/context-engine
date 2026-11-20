@@ -16,6 +16,8 @@ export type WorkerLoginResponse = {
   token?: string;
   // Said when the signer is a passkey attached to an account an AI agent set up.
   linkedAgentAccount?: unknown;
+  // Said when a passkey is attached to the signer's own account.
+  attachedPasskey?: unknown;
 };
 
 const asRecord = (value: unknown): UnknownRecord =>

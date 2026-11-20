@@ -23,7 +23,7 @@ const HELP = {
   passkey:
     'A passkey of your own lets you sign in to this account again without your agent, in this session. Your agent keeps its access until you cancel it.',
   cancel:
-    'Ends your AI agent’s access to this account in this session: its sign-in is refused, every sign-in it had stops, and its unused links stop working. You can allow it again.',
+    'Ends your AI agent’s access to this account in this session: its sign-in is refused, every sign-in it had stops, and its unused links stop working. You can allow it again. From then on your passkey is the only way in: if you lose it, only the session’s admins can restore access.',
   remove: 'Takes your passkey off this account and signs you out of it. The account is then your agent’s alone again.',
   own: 'Goes back to the account your passkey has by itself in this session, for this tab.',
 };

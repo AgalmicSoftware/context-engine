@@ -38,7 +38,12 @@ import {
   resetTokenCaches,
   writeTokenCache,
 } from './workerAuthTokenCache.js';
-import { isAgentLinkProvider, noteLinkedAgentAccount, renewAgentLinkSignIn } from '../session/agentLinkAccount';
+import {
+  isAgentLinkProvider,
+  noteAttachedPasskey,
+  noteLinkedAgentAccount,
+  renewAgentLinkSignIn,
+} from '../session/agentLinkAccount';
 import {
   buildAnonymousHeaders,
   buildWorkerAuthNonceHeaders,
@@ -945,6 +950,10 @@ export const getWorkerSessionToken = async ({
     }
     if (!loginData?.token) {
       throw new Error('Worker login did not return a token.');
+    }
+    // A passkey is attached to this very account: its person is told, and can take it off.
+    if (loginData.attachedPasskey) {
+      noteAttachedPasskey({ sessionSlug: slug, account: address, attached: loginData.attachedPasskey });
     }
     // This sign-in's key is a passkey attached to an account an AI agent set up: the session page offers that account.
     if (loginData.linkedAgentAccount) {
