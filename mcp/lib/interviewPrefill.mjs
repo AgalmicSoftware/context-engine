@@ -1,11 +1,13 @@
 import { readLimitedText, text } from './workerClient.mjs';
 import { quadraticCreditsSpent, getVoiceCredits, validateQuadraticAllocation } from '../../shared/questions/quadraticAllocation.mjs';
 
-// Suggested answers for a person to review: the public session's question list
-// from its Worker's interview catalog, and a link to the session page that holds
-// the drafts after #prefill=. Nothing here signs in or joins; the catalog is read
-// with no credentials, so only a public session with interview mode answers, and
-// the person submits on the page, as themselves.
+// Suggested answers for a person to review: the session's question list from its
+// Worker's interview catalog, and a link to the session page that holds the
+// drafts after #prefill=. Nothing here signs in or joins. A public session's
+// catalog is read with no credentials. A private session's opens to its group's
+// invite link: the password in the link signs a read proof, sent as a header;
+// neither the password nor the proof is ever put in a link or a result. The
+// person submits on the page, as themselves.
 
 const CATALOG_TYPE = 'context-engine.interview-question-catalog';
 // The prompt versions the site reads (sessionInterview.ts).
@@ -21,11 +23,16 @@ const REVIEW_LINK_PARAMS = new Set(['worker', 'mode', ...KEPT_LINK_PARAMS]);
 
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const PRIVATE_HINT =
-  'Ask the person to open the session in a browser and copy the prompt under "Let your AI draft your answers" among its interview choices, then follow it; that prompt needs you to open a web link, so if you can’t, tell them. Never ask them for an invite code or a password.';
+  'If the person has the group’s invite link, the one that carries its password, pass that whole link. Otherwise ask them to open the session in a browser and copy the prompt under "Let your AI draft your answers" among its interview choices, then follow it; that prompt needs you to open a web link, so if you can’t, tell them. Never ask them to type a code or a password by itself.';
+const PRIVATE_REASONS = new Set(['private_session_invite_required', 'private_session_invite_invalid']);
 
 const sessionPageFor = (info) => `${info.appOrigin}/session/${encodeURIComponent(info.slug)}`;
 
-const catalogRefusal = (status, error) => {
+const catalogRefusal = (status, error, reason) => {
+  if (reason === 'private_session_invite_invalid') {
+    return 'This session is private, and this link’s invite no longer opens it: a group password may have changed, a one-use code may have been used or withdrawn, or the group may no longer be let in. Ask the person for the current invite link.';
+  }
+  if (PRIVATE_REASONS.has(reason)) return `This session is private. ${PRIVATE_HINT}`;
   if (status === 503) return `The Session Worker can’t answer just now${error ? ` (${error})` : ''}. Wait a few seconds and try again.`;
   if (status === 429) return 'The Session Worker is limiting requests from this network. Try again later; the session may still be public.';
   if (status === 404 && /interview mode is disabled/i.test(error)) {
@@ -47,7 +54,9 @@ const checkedReviewUrl = (value, { page, workerOrigin, sent }) => {
   return reviewUrl;
 };
 
-export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLink, profile = async () => ({}) }) => {
+// `readInvite(info)` gives the read-invite header for a link that carries a group invite, or '' when the session
+// needs none; it throws, in words for the agent, when the link's invite can't read (a one-use code, a stale password).
+export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLink, profile = async () => ({}), readInvite = async () => '' }) => {
   const readCatalog = async (link) => {
     if (!text(link)) throw new Error('Pass the session link.');
     const info = await resolveLink(link);
@@ -59,13 +68,15 @@ export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLi
     const given = new URL(text(link)).searchParams;
     for (const key of KEPT_LINK_PARAMS) if (given.get(key)) sessionUrl.searchParams.set(key, given.get(key));
     const query = new URLSearchParams({ slug: info.slug, sessionUrl: sessionUrl.toString() });
+    // Only a link that carries a group invite is checked for one; the proof goes in a header, never the address.
+    const invite = info.groupInvite ? text(await readInvite(info)) : '';
     let response;
     try {
       response = await fetchImpl(`${info.workerOrigin}/agent/interview-catalog?${query}`, {
         redirect: 'manual',
         credentials: 'omit',
         // A Worker for one session reads its own slug and refuses another; one for several reads this header.
-        headers: { Accept: 'application/json', 'x-session-slug': info.slug },
+        headers: { Accept: 'application/json', 'x-session-slug': info.slug, ...(invite ? { 'X-CE-Group-Invite': invite } : {}) },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch (error) {
@@ -77,7 +88,7 @@ export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLi
     } catch {
       // reported below
     }
-    if (response.status !== 200) throw new Error(catalogRefusal(response.status, text(body?.error)));
+    if (response.status !== 200) throw new Error(catalogRefusal(response.status, text(body?.error), text(body?.reason)));
     const promptVersion = text(body?.prefillPromptVersion);
     const questionSetHash = text(body?.questionSetHash).toLowerCase();
     const reviewUrl = isRecord(body)
@@ -91,7 +102,7 @@ export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLi
     }
     if (!reviewUrl) throw new Error('The Session Worker’s review link is not this session’s page, so no link was made.');
     const questions = body.questions.filter((question) => isRecord(question) && text(question.id));
-    return { info, catalog: body, promptVersion, questionSetHash, reviewUrl, questions };
+    return { info, catalog: body, promptVersion, questionSetHash, reviewUrl, questions, privateSession: !!invite };
   };
 
   // A draft as the review page will take it ({ answer }), or why it won't ({ problem }). It follows the
@@ -133,9 +144,10 @@ export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLi
 
   return {
     async getInterviewCatalog({ link } = {}) {
-      const { info, catalog, promptVersion, reviewUrl, questions } = await readCatalog(link);
+      const { info, catalog, promptVersion, reviewUrl, questions, privateSession } = await readCatalog(link);
       return {
         session: info.slug,
+        ...(privateSession ? { privateSession: true } : {}),
         reviewUrl,
         promptVersion,
         questions,
@@ -148,7 +160,7 @@ export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLi
     },
 
     async makeReviewLink({ link, responses, responderContext, researchCoverage, groups, modelId, platform } = {}) {
-      const { info, catalog, promptVersion, questionSetHash, reviewUrl, questions } = await readCatalog(link);
+      const { info, catalog, promptVersion, questionSetHash, reviewUrl, questions, privateSession } = await readCatalog(link);
       const byId = new Map(questions.map((question) => [text(question.id).toLowerCase(), question]));
       const kept = [];
       const leftOut = [];
@@ -207,7 +219,8 @@ export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLi
         reviewLink: kept.length ? `${reviewUrl}#prefill=${encoded}` : reviewUrl,
         drafts: kept.length,
         ...(leftOut.length ? { leftOut } : {}),
-        next: 'Give the person reviewLink as a Markdown link labelled "Review your drafted answers". Nothing is submitted: they review the drafts on the page and submit the ones they keep, as themselves.',
+        next: 'Give the person reviewLink as a Markdown link labelled "Review your drafted answers". Nothing is submitted: they review the drafts on the page and submit the ones they keep, as themselves.' +
+          (privateSession ? ' This session is private, and the review link carries no invite: they open the session from their own invite link first, or sign in as a member, then open the review link.' : ''),
       };
     },
   };

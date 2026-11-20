@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faQuestionCircle,
+  faRobot,
   faSpinner,
   faMagic as faWand,
   faCog,
@@ -113,9 +114,10 @@ import {
 } from './polisReportRuntime';
 import PolisAnswerSections, { type AnswerSectionsOpen } from './PolisAnswerSections';
 import { buildReportResponseStats, buildReportAnswerQuestions } from './polisReportAnswers';
-import { markPolisAgents, readPolisReportCacheContext } from './polisReportRuntime';
+import { polisAgentLabel, readPolisReportCacheContext, type PolisAgentDetail } from './polisReportRuntime';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
 import ShowSessionNames from '../Shared/ShowSessionNames';
+import ParticipantsGraphControls from './ParticipantsGraphControls';
 import { sessionNameLabels } from '../../utilities/session/sessionNames';
 import {
   buildPolisDemoSurveyResultsNetworkData,
@@ -218,6 +220,7 @@ export default function PolisReport({
   const [stats, setStats] = useState<PolisStats | null>(null);
   const [demoDisplayNames, setDemoDisplayNames] = useState<StringMap>({});
   const [agentResponders, setAgentResponders] = useState<string[]>([]);
+  const [agentDetails, setAgentDetails] = useState<Record<string, PolisAgentDetail>>({});
 
   // Single SVD-based approach (statements + participants):
   const [participantCoords, setParticipantCoords] = useState<PolisPoint[]>([]);
@@ -272,7 +275,8 @@ export default function PolisReport({
   // starting in the shared exploratory UMAP view instead of special-casing
   // a first-load Polis Auto mode.
   const defaultEmbeddingChoice = 'UMAP' as EmbeddingChoice;
-  const defaultManualClusterCount = String(DEFAULT_EXPLORATORY_CLUSTER_COUNT);
+  // Every report opens on the automatic number of clusters; a person's own number replaces it until Reset.
+  const defaultManualClusterCount = '';
   const currentPathname = typeof window !== 'undefined' && window.location?.pathname ? window.location.pathname : '';
   const currentSearch =
     typeof window !== 'undefined' && typeof window.location?.search === 'string' ? window.location.search : '';
@@ -309,11 +313,20 @@ export default function PolisReport({
   });
   const participantNames = useMemo(
     () =>
-      effectiveUseDemoData || sessionNames.answerNamesShown
-        ? demoDisplayNames
-        : markPolisAgents(sessionNameLabels(sessionNames.names), agentResponders),
-    [sessionNames, effectiveUseDemoData, agentResponders, demoDisplayNames],
+      effectiveUseDemoData || sessionNames.answerNamesShown ? demoDisplayNames : sessionNameLabels(sessionNames.names),
+    [sessionNames, effectiveUseDemoData, demoDisplayNames],
   );
+  // An agent's mark says what its answers say about it: on hover or focus only, so the list stays plain.
+  const agentLabels = useMemo(
+    () => new Map(agentResponders.map((addr) => [addr, polisAgentLabel(agentDetails[addr])])),
+    [agentResponders, agentDetails],
+  );
+  // While the first names read is out, each address still without a name carries a mark saying so; it goes when
+  // the read comes back, failed or not, and is never shown to someone names can't be read for.
+  const nameLookupMark =
+    !effectiveUseDemoData && sessionNames.status === 'pending' ? (
+      <span className={`${styles.nameLookup} ${styles.pdfIgnore}`} role="img" aria-label="Looking up name" />
+    ) : null;
   const usesSimulatedProfiles = effectiveUseDemoData && isBuiltInPolisDemoDataset(activeDemoData);
   const scopedQuestionScanProgress = useMemo(() => {
     if (!questionScanProgress) return null;
@@ -796,17 +809,14 @@ export default function PolisReport({
   };
 
   const stepManualClusterCount = (delta: number) => {
-    const base = Math.max(activeClusterCount || clusterCount || 0, DEFAULT_EXPLORATORY_CLUSTER_COUNT);
+    // Steps from the number in the box, which is the automatic one until a person changes it.
+    const base = activeClusterCount || clusterCount || DEFAULT_EXPLORATORY_CLUSTER_COUNT;
     setManualClusterCount(String(Math.max(2, base + delta)));
   };
 
   const handleEmbeddingChoiceChange = (nextChoice: EmbeddingChoice) => {
     setEmbeddingChoice(nextChoice);
-    if (nextChoice === 'POLIS') {
-      setManualClusterCount('');
-    } else if (manualClusterCountValue === null) {
-      setManualClusterCount(String(DEFAULT_EXPLORATORY_CLUSTER_COUNT));
-    }
+    if (nextChoice === 'POLIS') setManualClusterCount('');
     if (nextChoice !== 'SVD') {
       setShowComments(false);
     }
@@ -960,6 +970,7 @@ export default function PolisReport({
       setQuestionPrompts(buildResult.promptsMap);
       setDemoDisplayNames(buildResult.displayNamesMap || {});
       setAgentResponders(buildResult.agents || []);
+      setAgentDetails(buildResult.agentDetails || {});
 
       const labels = buildResult.questions.map((_q, idx) => `#${idx + 1}`);
       setQuestionLabels(labels);
@@ -1389,6 +1400,29 @@ export default function PolisReport({
     return blockieCacheRef.current[key];
   }
 
+  function renderAgentMark(addr: string) {
+    const label = agentLabels.get(addr);
+    return label ? (
+      // A button so a tap focuses it and opens the tip; Escape closes it. An empty title keeps the row's own
+      // tooltip from showing over it. A PDF has no tips, so it says "AI agent" in words.
+      <button
+        type="button"
+        className={styles.agentMark}
+        aria-label={label}
+        title=""
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') event.currentTarget.blur();
+        }}
+      >
+        <FontAwesomeIcon icon={faRobot} aria-hidden="true" />
+        <span className={styles.showWhenPdf}> AI agent</span>
+        <span className={`${styles.agentTip} ${styles.pdfIgnore}`} aria-hidden="true">
+          {label}
+        </span>
+      </button>
+    ) : null;
+  }
+
   function renderParticipantsList() {
     if (!Array.isArray(allResponders) || allResponders.length === 0) {
       return <p style={{ fontStyle: 'italic', marginLeft: '10px' }}>(No participants found.)</p>;
@@ -1449,6 +1483,8 @@ export default function PolisReport({
                   <span className={styles.participantAddressShort}>{shortLabel}</span>
                 </span>
               )}
+              {renderAgentMark(addr)}
+              {displayName ? null : nameLookupMark}
             </div>
           );
         })}
@@ -2077,6 +2113,7 @@ export default function PolisReport({
                   });
                   const hasLink = !!linkHref;
                   const linkLabel = displayName || getShortenedAddress(addr, false);
+                  const agentLabel = agentLabels.get(addr);
                   const historicalAvatar =
                     usesSimulatedProfiles && displayName ? getPolisHistoricalParticipantAvatar(displayName, addr) : '';
 
@@ -2113,6 +2150,11 @@ export default function PolisReport({
                                   >
                                     {linkLabel}
                                   </a>
+                                  {agentLabel ? (
+                                    <FontAwesomeIcon icon={faRobot} className={styles.agentIcon} aria-hidden="true" />
+                                  ) : null}
+                                  {displayName ? null : nameLookupMark}
+                                  {agentLabel ? <div className={styles.agentDetail}>{agentLabel}</div> : null}
                                   <div>Cluster {c}</div>
                                 </div>
                               </div>,
@@ -2894,7 +2936,7 @@ export default function PolisReport({
                 {/* PARTICIPANTS + STATEMENTS GRAPH */}
                 <div className={styles.sectionCollapse}>
                   <div
-                    className={styles.sectionHeaderRow}
+                    className={`${styles.sectionHeaderRow} ${styles.graphTitleRow}`}
                     style={{ width: '100%', cursor: 'pointer' }}
                     onClick={() => setParticipantsGraphOpen(!participantsGraphOpen)}
                   >
@@ -2908,135 +2950,71 @@ export default function PolisReport({
                         ariaLabel: 'Participants graph view details',
                       })}
                     </h5>
-                    <div className={styles.pdfIgnore} style={{ textAlign: 'right', flex: '1' }}>
+                    {participantsGraphOpen ? (
+                      <ParticipantsGraphControls
+                        clusterCount={manualClusterCount === '' ? String(activeClusterCount || 0) : manualClusterCount}
+                        clustersAutomatic={manualClusterCountValue === null}
+                        onClusterStep={stepManualClusterCount}
+                        onClusterChange={handleManualClusterCountChange}
+                        onClusterBlur={handleManualClusterCountBlur}
+                        projection={embeddingChoice}
+                        projections={[
+                          { value: 'UMAP', label: 'UMAP' },
+                          { value: 'SVD', label: 'SVD/PCA' },
+                          { value: 'POLIS', label: REPORT_DEFAULT_EMBEDDING_LABEL },
+                        ]}
+                        onProjectionChange={(value) => handleEmbeddingChoiceChange(value as EmbeddingChoice)}
+                        // These controls are left out of a PDF, so their help adds no footnote to one.
+                        projectionHelp={
+                          isPdfModeActive ? null : renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)
+                        }
+                        toggles={[
+                          {
+                            label: 'Statements',
+                            checked: showComments && embeddingChoice === 'SVD',
+                            // Statements are placed only in the SVD/PCA view, so ticking this switches to it.
+                            onChange: () => {
+                              const shown = showComments && embeddingChoice === 'SVD';
+                              if (!shown && embeddingChoice !== 'SVD') handleEmbeddingChoiceChange('SVD');
+                              setShowComments(!shown);
+                            },
+                          },
+                          {
+                            label: 'Participants',
+                            checked: showParticipants,
+                            onChange: () => setShowParticipants(!showParticipants),
+                          },
+                          {
+                            label: 'Outline',
+                            checked: showGroupOutline,
+                            onChange: () => setShowGroupOutline(!showGroupOutline),
+                          },
+                          { label: 'Axes', checked: showAxes, onChange: () => setShowAxes(!showAxes) },
+                          {
+                            label: 'Radial axes',
+                            checked: showRadialAxes,
+                            onChange: () => setShowRadialAxes(!showRadialAxes),
+                          },
+                        ]}
+                        onReset={() => {
+                          handleEmbeddingChoiceChange(defaultEmbeddingChoice);
+                          setManualClusterCount('');
+                          setShowParticipants(true);
+                          setShowGroupOutline(true);
+                          setShowAxes(true);
+                          setShowRadialAxes(true);
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={styles.pdfIgnore}
+                      style={{ textAlign: 'right', marginLeft: participantsGraphOpen ? 0 : 'auto' }}
+                    >
                       <PolisReportSectionToggleLabel open={participantsGraphOpen} />
                     </div>
                   </div>
                   {participantsGraphOpen ? (
                     <>
-                      <div className={styles.participantGraphControls}>
-                        <div className={styles.controlGroup}>
-                          <label htmlFor="embedding-choice-select">
-                            Embedding:
-                            {renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)}
-                          </label>
-                          <select
-                            id="embedding-choice-select"
-                            value={embeddingChoice}
-                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                              handleEmbeddingChoiceChange(e.target.value as EmbeddingChoice)
-                            }
-                            style={{ padding: '4px' }}
-                          >
-                            <option value="UMAP">UMAP</option>
-                            <option value="SVD">SVD/PCA</option>
-                            <option value="POLIS">{REPORT_DEFAULT_EMBEDDING_LABEL}</option>
-                          </select>
-                        </div>
-
-                        <div className={styles.controlGroup}>
-                          <label>
-                            Opinion clusters:
-                            {renderTooltipReference(OPINION_GROUPS_TOOLTIP_TEXT)}
-                          </label>
-                          <div className={styles.numberInputWrapper}>
-                            <button
-                              className={styles.stepperButton}
-                              onClick={() => stepManualClusterCount(-1)}
-                              aria-label="Decrease cluster count"
-                            >
-                              -
-                            </button>
-                            <input
-                              id="cluster-count-input"
-                              type="number"
-                              value={manualClusterCount === '' ? String(activeClusterCount || 0) : manualClusterCount}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                handleManualClusterCountChange(e.target.value)
-                              }
-                              onBlur={handleManualClusterCountBlur}
-                              className={styles.clusterNumberInput}
-                              min="2"
-                            />
-                            <button
-                              className={styles.stepperButton}
-                              onClick={() => stepManualClusterCount(1)}
-                              aria-label="Increase cluster count"
-                            >
-                              +
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setManualClusterCount('')}
-                              className={styles.clusterAutoButton}
-                            >
-                              Auto
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className={styles.controlGroup} style={{ flexBasis: '100%' }}>
-                          <label style={{ cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showComments && embeddingChoice === 'SVD'}
-                              onChange={() => {
-                                if (showComments && embeddingChoice === 'SVD') {
-                                  setShowComments(false);
-                                  return;
-                                }
-                                if (embeddingChoice !== 'SVD') {
-                                  handleEmbeddingChoiceChange('SVD');
-                                }
-                                setShowComments(true);
-                              }}
-                              style={{ marginRight: '4px' }}
-                            />
-                            Statements
-                          </label>
-
-                          <label style={{ cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showParticipants}
-                              onChange={() => setShowParticipants(!showParticipants)}
-                              style={{ marginRight: '4px' }}
-                            />
-                            Participants
-                          </label>
-
-                          <label style={{ cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showGroupOutline}
-                              onChange={() => setShowGroupOutline(!showGroupOutline)}
-                              style={{ marginRight: '4px' }}
-                            />
-                            Outline
-                          </label>
-
-                          <label style={{ cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showAxes}
-                              onChange={() => setShowAxes(!showAxes)}
-                              style={{ marginRight: '4px' }}
-                            />
-                            Axes
-                          </label>
-
-                          <label style={{ cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={showRadialAxes}
-                              onChange={() => setShowRadialAxes(!showRadialAxes)}
-                              style={{ marginRight: '4px' }}
-                            />
-                            Radial Axes
-                          </label>
-                        </div>
-                      </div>
-
                       <div className={styles.graphSection}>{renderParticipantGraph()}</div>
 
                       {renderClusterLegend()}

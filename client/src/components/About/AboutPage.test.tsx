@@ -207,6 +207,53 @@ describe('AboutPage', () => {
     expect(screen.getByRole('link', { name: /New Session/i })).toHaveAttribute('href', '/ce/new');
   });
 
+  it('shows a use case\u2019s loop only once it is opened, silent and looping, and still for reduced motion', () => {
+    renderAboutPage();
+    // Nothing is fetched for a loop until a person opens its use case.
+    expect(screen.queryByTestId('ce-about-use-case-loop')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('ce-about-usecase-cities'));
+    const loop = screen.getByTestId('ce-about-use-case-loop') as HTMLVideoElement;
+    expect(loop).toHaveAttribute('src', '/about/use-cases/cities-720p.mp4');
+    expect(loop).toHaveAttribute('poster', '/about/use-cases/cities-poster.jpg');
+    expect(loop.muted).toBe(true);
+    expect(loop.loop).toBe(true);
+    expect(loop.autoplay).toBe(true);
+    expect(loop).not.toHaveAttribute('controls');
+    expect(screen.getByText('An illustration, not a real deployment.')).toBeInTheDocument();
+
+    // The words come first in the page, so a screen reader reads them before the caption.
+    const words = screen.getByRole('article').querySelector('[class*="useCaseDetailText"]') as HTMLElement;
+    expect(words.compareDocumentPosition(loop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // A loop that can't be loaded leaves no empty frame; the next use case still gets its own.
+    fireEvent.error(loop);
+    expect(screen.queryByTestId('ce-about-use-case-loop')).toBeNull();
+
+    // Two loops show roadmap work: their buttons carry an asterisk, explained once under the buttons.
+    expect(screen.getByTestId('ce-about-usecase-corporate')).toHaveTextContent('For Companies*');
+    expect(screen.getByTestId('ce-about-usecase-digital-groups')).toHaveTextContent('For Groups*');
+    expect(screen.getByTestId('ce-about-usecase-cities')).not.toHaveTextContent('*');
+    expect(screen.getByText('* Animations marked * show future features.')).toBeInTheDocument();
+
+    // Every use case has its own files.
+    fireEvent.click(screen.getByTestId('ce-about-usecase-corporate'));
+    expect(screen.getByTestId('ce-about-use-case-loop')).toHaveAttribute('src', '/about/use-cases/corporate-720p.mp4');
+
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes('reduce'),
+    })) as unknown as typeof window.matchMedia;
+    try {
+      fireEvent.click(screen.getByTestId('ce-about-usecase-conferences'));
+      const still = screen.getByTestId('ce-about-use-case-loop') as HTMLVideoElement;
+      expect(still.autoplay).toBe(false);
+      expect(still).toHaveAttribute('controls');
+      expect(still).toHaveAttribute('preload', 'none');
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+
   it('shows one use-case detail panel at a time', () => {
     renderAboutPage();
 
@@ -314,11 +361,16 @@ describe('AboutPage', () => {
     fireEvent.click(roadmapToggle);
     expect(roadmapToggle).toHaveAttribute('aria-expanded', 'true');
     const foundations = screen.getByRole('heading', { name: 'Current Foundations' }).closest('li')!;
-    expect(within(foundations).getAllByText('Complete:')).toHaveLength(6);
+    expect(within(foundations).getAllByText('Complete:')).toHaveLength(11);
     expect(within(foundations).getByText(/quadratic allocation/)).toBeVisible();
     expect(within(foundations).getByText(/Use Worker Groups or Soulbound Token groups/)).toBeVisible();
     expect(within(foundations).getByText(/Persist responses and documents in Cloudflare or on Arweave/)).toBeVisible();
-    expect(screen.getAllByText('Planned:')).toHaveLength(14);
+    expect(screen.getAllByText('Planned:')).toHaveLength(9);
+    // Work that has shipped in part carries its own marker.
+    expect(screen.getAllByText('In progress:')).toHaveLength(5);
+    expect(screen.getByText(/Agent-first UX so people can point an assistant/).closest('li')?.className).toContain(
+      'roadmapChecklistItemInProgress',
+    );
     expect(screen.getByText(/unlinkable per-response and per-SBT accounts, ZK\/FHE aggregation/)).toBeVisible();
     expect(screen.getByText(/affiliation proofs, encrypted claims, and conditional timelocks/)).toBeVisible();
     expect(screen.getByText(/Turnkey deployment bundles for Arweave, Lit, EVM gas, and AI API access/)).toBeVisible();

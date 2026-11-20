@@ -82,6 +82,7 @@ const withCardOn = (config) => (Object.hasOwn(config, 'analysisCardEnabled') || 
 
 const run = async ({
   figure = FIGURE,
+  cachedOnly,
   // A session with the card on, as one made on /new is. Anything a test adds is added to this.
   config = {},
   kv = createKv(),
@@ -93,7 +94,7 @@ const run = async ({
 } = {}) => {
   const counted = [];
   const response = await dispatchAnalysisCardPictureRoute({
-    body: { figure },
+    body: { figure, ...(cachedOnly === undefined ? {} : { cachedOnly }) },
     config: withCardOn(config),
     slug: 'salon',
     address: '0xabc',
@@ -139,6 +140,32 @@ test('a picture already drawn for the figure is returned without asking or count
   assert.equal(upstream.calls.length, 0);
   assert.deepEqual(second.counted, []);
   assert.equal(second.response.headers.get('cache-control'), 'no-store');
+});
+
+test('asked only for a picture already made, the route never draws, asks, counts or stores', async () => {
+  const empty = await run({ cachedOnly: true });
+  assert.deepEqual([empty.response.status, empty.body], [404, { error: 'picture_not_made' }]);
+  assert.equal(empty.upstream.calls.length, 0);
+  assert.deepEqual(empty.counted, []);
+  assert.deepEqual(empty.kv.puts, []);
+  // Not even where the session could not draw, or the asker is past every limit.
+  const past = await run({ cachedOnly: true, secrets: {}, refuse: ['ai', 'analysis-card-look', 'analysis-card-picture-session'] });
+  assert.deepEqual([past.response.status, past.counted.length, past.upstream.calls.length], [404, 0, 0]);
+  // Only true asks for that: anything else is the ordinary request, which draws.
+  for (const value of ['true', 1, false, null]) {
+    const drawn = await run({ cachedOnly: value });
+    assert.equal(drawn.response.status, 200, String(value));
+    assert.equal(drawn.upstream.pictureCalls().length, 1, String(value));
+  }
+  // A picture someone else's card had drawn is given as it is.
+  const first = await run();
+  const upstream = createUpstream();
+  const kept = await run({ cachedOnly: true, kv: first.kv, upstream });
+  assert.deepEqual(kept.body, { ...first.body, cached: true });
+  assert.deepEqual([upstream.calls.length, kept.counted.length], [0, 0]);
+  // It is still the card's route: off, or without the ai scope, it answers nothing.
+  assert.equal((await run({ cachedOnly: true, config: { analysisCardEnabled: false } })).response.status, 403);
+  assert.equal((await run({ cachedOnly: true, scopes: {} })).response.status, 403);
 });
 
 test('a session without an OpenAI key cannot draw', async () => {

@@ -53,9 +53,6 @@ figure that fits this user in particular, not the best-known name for the subjec
   above all where they would part from most people who answer these questions.
 - Two people with the same combination of positions should get the same figure; two people whose positions
   differ should not.
-- Work this out silently: consider at least five candidates who differ in era, region and tradition,
-  practitioners and builders as well as theorists, and ask of each which of this user's positions it fits
-  and which it does not. Only the chosen figure appears in the result.
 - Choose the ONE whose documented positions match the most of this user's combination. A famous figure is
   right when it is the closest fit, and a lesser-known one is welcome when it fits better; never choose a
   figure for being famous or for being obscure.

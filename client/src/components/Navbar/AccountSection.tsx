@@ -16,6 +16,7 @@ import {
 import { AccountDisplayTorus } from './AccountDisplay';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
+import { holdsAgentLinkAccountForPath } from 'utilities/session/agentLinkAccount';
 import { createLogger } from 'utilities/logging.js';
 
 const accountLog = createLogger('account');
@@ -64,6 +65,9 @@ class AccountSection extends Component<AccountSectionProps> {
   // saved passkey account must be restored here rather than only on modal mount.
   restorePasskeyLogin = async () => {
     if (this.props.loginComplete || this.props.loginInProgress || this.props.loginModalToggled) return;
+    // A reload of the session this tab holds an agent's account for opens that account again (the session page
+    // does it); a saved passkey is not signed in over it.
+    if (holdsAgentLinkAccountForPath(window.location.pathname)) return;
     const restoreId = ++this._passkeyRestoreId;
     try {
       const passkeyWallet = await import('../../wallet/passkeyWallet.js');

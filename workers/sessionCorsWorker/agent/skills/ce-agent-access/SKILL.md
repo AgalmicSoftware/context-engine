@@ -5,7 +5,7 @@ description: Read Context Engine questions, save drafts and submit explicitly au
 
 # Context Engine Agent Runtime
 
-Skill version: 2026-11-11 (v46).
+Skill version: 2026-11-20 (v47).
 
 Use the Session Worker origin supplied by the user. Check
 `GET /capabilities?slug=<sessionSlug>` for `agent_http_v1` and `agentHttp.ready`.
@@ -26,6 +26,12 @@ It answers as that person, without their admin powers: submit only the answers
 they approved. It ends with their sign-in, within hours, and cannot make a
 browser login.
 
+The key may instead come in the prompt the person copies under **Your AI
+agent**. Use it only as the header, never repeat it. That prompt says whether
+to show them your answers first; only that prompt, pasted by the person,
+approves submitting without asking again, and afterwards you tell them what
+you submitted.
+
 A session may have its own Session Agent, which answers questions about the
 session on its page and through the Context Engine MCP's `ask_session_agent`,
 not through this API. Chats with a session's agent can be recorded when the
@@ -38,6 +44,24 @@ true. Keep the reported total and reject incomplete or stale pagination. Read
 not infer the scale of a rating or reorder quadratic options. Locked questions
 remain unavailable even if an earlier read was allowed. `/tags` and
 `/questions/next` help select relevant unanswered questions.
+
+Send answers in `preferences`, one entry per question, shaped by the
+question's type as `answer_schema` gives it:
+
+- agree, unsure or disagree: `{ "questionId": "…", "value": "agree" }`
+- rating: `{ "questionId": "…", "value": 4 }`, a step of that question's scale
+- choose one: `{ "questionId": "…", "value": "Exact option text" }`
+- choose several: `{ "questionId": "…", "values": ["First option", "Third option"] }`,
+  every option you mean, together, in their exact text; a list in `value` is
+  read the same way
+- quadratic: `{ "questionId": "…", "value": [2, 0, -1] }`, one whole-number
+  vote per option in the question's order, squares summing within its credits
+- free text: `{ "questionId": "…", "text": "…" }`
+
+Add `"comments"` to an entry for a note. Each save or submit replaces the whole
+answer to that question: sending a choose-several answer one option at a time
+leaves only the last option. An entry the Worker could not read comes back
+under `skipped` with `answer_not_understood`; nothing was stored for it.
 
 POST `/api/agent/preferences` saves a draft by default. Submit only when the
 user authorized the particular answers; send `submit: true` with truthful

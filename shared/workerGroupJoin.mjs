@@ -122,17 +122,82 @@ const READ_PROOF = /^0x[0-9a-f]{130}$/i;
 export const workerGroupReadStatement = ({ sessionId, groupId }) =>
   `${READ_STATEMENT}\nsession:${String(sessionId).toLowerCase()}\ngroup:${String(groupId)}`;
 
-/** The header value for a read proof. */
-export const formatWorkerGroupReadInvite = ({ groupId, proof }) => `${String(groupId)}:${String(proof)}`;
+const READ_STATEMENT_V2 = 'ContextEngine.WorkerGroup.Read:2';
+/** What a Session Worker lists when it takes read proofs that name the Worker they are for. */
+export const WORKER_GROUP_READ_PROOF_V2_FEATURE = 'group_read_proof_v2';
+const READ_HEADER_V2 = /^v2:([^:]+):(0x[0-9a-f]{130})$/i;
 
-/** A header value as `{ groupId, proof }`, or null when it isn't one. */
+/** An origin as a read proof names it, or '' when the value isn't one. */
+export const workerGroupReadOrigin = (value) => {
+  try {
+    const url = new URL(String(value));
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin.toLowerCase() : '';
+  } catch {
+    return '';
+  }
+};
+
+/**
+ * The read statement that also names the Session Worker it is for. A proof of the first form reads the session
+ * on any Worker that holds it, so one sent to a Worker that only claims to be the session's could be used at the
+ * real one. This form is refused by every Worker but the one at `workerOrigin`.
+ */
+export const workerGroupReadStatementV2 = ({ sessionId, groupId, workerOrigin }) =>
+  `${READ_STATEMENT_V2}\nsession:${String(sessionId).toLowerCase()}\ngroup:${String(groupId)}\nworker:${workerGroupReadOrigin(workerOrigin)}`;
+
+// Reading with a one-use claim code, without spending it. The code is never sent. The reader sends the first
+// 16 characters of its SHA-256 (enough for the Worker to find the code it keeps, and no help in guessing the
+// rest) and a keyed hash of a statement that names the session, the group, the Worker and an expiry within the
+// hour, keyed with the full SHA-256. Only someone who holds the code can make it; a Worker that is sent one made
+// for itself can't use it at another; and it reads only while the code is unused, so it stops when the code is
+// spent or withdrawn. Checking it writes nothing.
+const READ_CODE_STATEMENT = 'ContextEngine.WorkerGroup.ReadCode:1';
+/** What a Session Worker lists when a one-use code can read without being spent. */
+export const WORKER_GROUP_READ_CODE_FEATURE = 'group_read_code_v1';
+export const WORKER_GROUP_READ_CODE_MAX_AGE_SECONDS = 60 * 60;
+const READ_CODE_HEADER = /^c1:([^:]+):([0-9a-f]{16}):([1-9][0-9]{9}):([0-9a-f]{64})$/i;
+
+export const workerGroupReadCodeStatement = ({ sessionId, groupId, workerOrigin, expires }) =>
+  `${READ_CODE_STATEMENT}\nsession:${String(sessionId).toLowerCase()}\ngroup:${String(groupId)}\nworker:${workerGroupReadOrigin(workerOrigin)}\nexpires:${Number(expires)}`;
+
+/** The keyed hash of a read statement, keyed with a code's SHA-256 (64 hex), as 64 lowercase hex. */
+export const workerGroupReadCodeMac = async ({ codeHash, statement }) => {
+  if (!isOneUseSecretHash(codeHash)) throw new Error('A claim code’s hash is required.');
+  const keyBytes = new Uint8Array(codeHash.match(/.{2}/g).map((byte) => Number.parseInt(byte, 16)));
+  const key = await globalThis.crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return hex(new Uint8Array(await globalThis.crypto.subtle.sign('HMAC', key, new TextEncoder().encode(statement))));
+};
+
+/** The header value that reads with a one-use code's hash, at one Worker, until `expires` (seconds). */
+export const buildWorkerGroupReadCodeInvite = async ({ codeHash, sessionId, groupId, workerOrigin, expires }) => {
+  if (!workerGroupReadOrigin(workerOrigin)) throw new Error('A read proof needs the Session Worker it is for.');
+  const mac = await workerGroupReadCodeMac({ codeHash, statement: workerGroupReadCodeStatement({ sessionId, groupId, workerOrigin, expires }) });
+  return `c1:${String(groupId)}:${codeHash.slice(0, 16)}:${Number(expires)}:${mac}`;
+};
+
+/** The header value for a read proof; `version: 2` for one that names its Worker. */
+export const formatWorkerGroupReadInvite = ({ groupId, proof, version = 1 }) =>
+  `${version === 2 ? 'v2:' : ''}${String(groupId)}:${String(proof)}`;
+
+/** A header value as `{ groupId, proof, version }`, or null when it isn't one. */
 export const parseWorkerGroupReadInvite = (value) => {
   const text = typeof value === 'string' ? value.trim() : '';
+  if (text.length > 300) return null;
+  // `c1:<group>:<hash start>:<expires>:<keyed hash>`: a one-use code's read proof, which carries no signature.
+  const code = text.match(READ_CODE_HEADER);
+  if (code) {
+    const groupId = code[1].toLowerCase();
+    return /^[a-z0-9][a-z0-9._-]*$/.test(groupId)
+      ? { groupId, version: 'code', hashPrefix: code[2].toLowerCase(), expires: Number(code[3]), mac: code[4].toLowerCase() }
+      : null;
+  }
+  // `v2:<group>:<proof>`; a group that happens to be called "v2" has one colon, not two.
+  const second = text.match(READ_HEADER_V2);
   const at = text.lastIndexOf(':');
-  if (at < 1 || text.length > 300) return null;
-  const groupId = text.slice(0, at).toLowerCase();
-  const proof = text.slice(at + 1);
-  return /^[a-z0-9][a-z0-9._-]*$/.test(groupId) && READ_PROOF.test(proof) ? { groupId, proof } : null;
+  if (!second && at < 1) return null;
+  const groupId = (second ? second[1] : text.slice(0, at)).toLowerCase();
+  const proof = second ? second[2] : text.slice(at + 1);
+  return /^[a-z0-9][a-z0-9._-]*$/.test(groupId) && READ_PROOF.test(proof) ? { groupId, proof, version: second ? 2 : 1 } : null;
 };
 
 /**
@@ -185,6 +250,13 @@ export const createWorkerGroupPasswordKeys = (ethers) => {
       (await deriveWallet(input)).signMessage(
         workerGroupReadStatement({ sessionId: input.sessionId, groupId: input.groupId }),
       ),
+    /** The read proof for this session and group at one Session Worker, which no other Worker accepts. */
+    signReadFor: async ({ workerOrigin, ...input }) => {
+      if (!workerGroupReadOrigin(workerOrigin)) throw new Error('A read proof needs the Session Worker it is for.');
+      return (await deriveWallet(input)).signMessage(
+        workerGroupReadStatementV2({ sessionId: input.sessionId, groupId: input.groupId, workerOrigin }),
+      );
+    },
     /** The signer a proof was made with (the Worker compares it with the stored one). */
     recoverJoinSigner: ({ sessionId, groupId, address, proof }) =>
       ethers.utils.verifyMessage(workerGroupJoinStatement({ sessionId, groupId, address }), proof),

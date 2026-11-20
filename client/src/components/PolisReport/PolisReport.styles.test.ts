@@ -45,3 +45,36 @@ describe('PolisReport settings toggle', () => {
     expect(scss).toContain('outline: 2px solid currentColor;');
   });
 });
+
+describe('PolisReport side padding on a phone', () => {
+  // The report's last phone block: nested layers give up their side padding there, a PDF never.
+  // Screens only: a printed page is narrower than 767px too.
+  const phoneBlock = (scss: string) => scss.slice(scss.lastIndexOf('@media screen and (max-width: 767px)'));
+
+  it('keeps one small gutter and drops the layers inside it, on screens and outside PDF capture', () => {
+    const block = phoneBlock(readPolisReportScss());
+
+    expect(block.startsWith('@media screen and (max-width: 767px)')).toBe(true);
+    expect(block).toMatch(/\.reportInnerModern:not\(\.pdfMode\) \.sectionCollapse,/);
+
+    expect(block).toMatch(/\.polisReportContainer:not\(\.sessionEmbeddedReport\)\s*{\s*padding:\s*6px;/);
+    expect(block).toMatch(/\.reportInner:not\(\.pdfDesktopWidth\)\s*{\s*padding:\s*8px;/);
+    expect(block).toMatch(
+      /\.reportInner:not\(\.pdfMode\) \.allQuestionsBody\s*{\s*padding-left:\s*0;\s*border-left:\s*0;/,
+    );
+    expect(block).toMatch(/\.reportInnerDark:not\(\.pdfMode\) \.sectionCollapse\s*{\s*padding-right:\s*8px;/);
+  });
+
+  it('trims the answer panel and its option cards, but not in a PDF', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PolisAnswerSections.module.scss'), 'utf8');
+    const block = scss.slice(scss.indexOf('@media screen and (max-width: 767px)'));
+    const source = fs.readFileSync(path.join(__dirname, 'PolisAnswerSections.tsx'), 'utf8');
+
+    expect(block).toMatch(/\.sections:not\(\.pdf\)\s*{\s*padding-right:\s*6px;\s*padding-left:\s*6px;/);
+    expect(block).toMatch(/\.sections:not\(\.pdf\) \.quadratic li\s*{\s*padding-right:\s*12px;/);
+    expect(source).toContain('pdfMode ? `${styles.sections} ${styles.pdf}` : styles.sections');
+    // The quadratic legend lines up with the bars: card padding plus its 1px border.
+    expect(block).toMatch(/\.quadratic li\s*{\s*padding-right:\s*12px;\s*padding-left:\s*12px;/);
+    expect(block).toMatch(/\.legend\s*{\s*padding:\s*0 13px;/);
+  });
+});

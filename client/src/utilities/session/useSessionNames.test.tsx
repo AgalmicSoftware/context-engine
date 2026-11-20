@@ -1,28 +1,35 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { NAMES_RETRY_MS, useSessionNames } from './useSessionNames';
+import { NAMES_PENDING_LIMIT_MS, NAMES_RETRY_MS, useSessionNames } from './useSessionNames';
 import { resolveSessionNamesSource, subscribeSessionNames, type SessionNamesSource } from './sessionNames';
 import { getUsableSessionWorkerUrl } from './sessionWorkerAvailability';
+import { subscribeWorkerSessionToken } from '../worker/workerAuth';
 
 jest.mock('./sessionNames', () => ({ resolveSessionNamesSource: jest.fn(), subscribeSessionNames: jest.fn() }));
 jest.mock('./sessionWorkerAvailability', () => ({ getUsableSessionWorkerUrl: jest.fn() }));
-jest.mock('../worker/workerAuth', () => ({ subscribeWorkerSessionToken: () => () => undefined }));
+jest.mock('../worker/workerAuth', () => ({ subscribeWorkerSessionToken: jest.fn() }));
 
 const A = '0x00000000000000000000000000000000000000aa';
 const options = { sessionSlug: 'names-session', sessionConfig: {}, account: A };
 const source = (names: Record<string, string>): SessionNamesSource => ({
   enabled: true,
   readAll: jest.fn(async () => names),
+  readAllOrFail: jest.fn(async () => names),
   hasSignIn: jest.fn(async () => true),
   signIn: jest.fn(async () => undefined),
   setOwn: jest.fn(),
 });
 
 let reload: () => void = () => undefined;
+let tokenChanged: () => void = () => undefined;
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getUsableSessionWorkerUrl).mockReturnValue('https://names.worker.test');
   jest.mocked(subscribeSessionNames).mockImplementation((listener) => {
     reload = listener;
+    return () => undefined;
+  });
+  jest.mocked(subscribeWorkerSessionToken).mockImplementation((listener) => {
+    tokenChanged = listener;
     return () => undefined;
   });
 });
@@ -73,7 +80,7 @@ it('shows the names and keeps the same state when a reload changes nothing', asy
   await act(async () => reload());
   expect(result.current).toBe(before);
 
-  jest.mocked(kept.readAll).mockResolvedValueOnce({ [A]: 'Sam Lee' });
+  jest.mocked(kept.readAllOrFail).mockResolvedValueOnce({ [A]: 'Sam Lee' });
   await act(async () => reload());
   expect(result.current.names).toEqual({ [A]: 'Sam Lee' });
 });
@@ -88,16 +95,103 @@ it("keeps answers' own names hidden until a loaded config says the session has n
   expect(resolveSessionNamesSource).not.toHaveBeenCalled();
 });
 
+describe('status', () => {
+  const held = () => {
+    let finish: (names: Record<string, string>) => void = () => undefined;
+    let fail: (error: Error) => void = () => undefined;
+    const kept = source({});
+    jest.mocked(kept.readAllOrFail).mockImplementationOnce(
+      () =>
+        new Promise((resolve, reject) => {
+          finish = resolve;
+          fail = reject;
+        }),
+    );
+    jest.mocked(resolveSessionNamesSource).mockResolvedValue(kept);
+    return { kept, finish: (names: Record<string, string>) => finish(names), fail: (error: Error) => fail(error) };
+  };
+
+  it('is pending from the first render until the read comes back with names', async () => {
+    const read = held();
+    const { result } = renderHook(() => useSessionNames(options));
+    expect(result.current.status).toBe('pending');
+    await waitFor(() => expect(read.kept.readAllOrFail).toHaveBeenCalledTimes(1));
+    expect(result.current.status).toBe('pending');
+    await act(async () => read.finish({ [A]: 'Sam' }));
+    expect(result.current).toMatchObject({ status: 'named', names: { [A]: 'Sam' } });
+    // One batched read serves every address.
+    expect(read.kept.readAllOrFail).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles as empty when a signed-in read shows no names, and as failed when it could not be made', async () => {
+    const empty = held();
+    const first = renderHook(() => useSessionNames(options));
+    await waitFor(() => expect(empty.kept.readAllOrFail).toHaveBeenCalled());
+    await act(async () => empty.finish({}));
+    expect(first.result.current).toMatchObject({ status: 'empty', names: {}, source: empty.kept });
+    first.unmount();
+
+    const failing = held();
+    const second = renderHook(() => useSessionNames(options));
+    await waitFor(() => expect(failing.kept.readAllOrFail).toHaveBeenCalled());
+    await act(async () => failing.fail(new Error('503')));
+    expect(second.result.current).toMatchObject({ status: 'failed', names: {}, source: failing.kept });
+
+    jest.mocked(resolveSessionNamesSource).mockRejectedValue(new Error('unreachable'));
+    const third = renderHook(() => useSessionNames(options));
+    await waitFor(() => expect(third.result.current.status).toBe('failed'));
+  });
+
+  it('shows nothing pending once a tab without a session sign-in reads, and names when it gains one', async () => {
+    const kept = source({});
+    jest.mocked(kept.hasSignIn).mockResolvedValue(false);
+    jest.mocked(resolveSessionNamesSource).mockResolvedValue(kept);
+    const { result } = renderHook(() => useSessionNames(options));
+    await waitFor(() => expect(result.current.status).toBe('unavailable'));
+    expect(result.current.signIn).toBe(kept.signIn);
+
+    jest.mocked(kept.hasSignIn).mockResolvedValue(true);
+    jest.mocked(kept.readAllOrFail).mockResolvedValue({ [A]: 'Sam' });
+    await act(async () => tokenChanged());
+    expect(result.current).toMatchObject({ status: 'named', names: { [A]: 'Sam' }, signIn: null });
+  });
+
+  it('is never pending for someone signed out, names turned off, an older Worker, or no Worker', async () => {
+    jest.mocked(resolveSessionNamesSource).mockResolvedValue(source({}));
+    const signedOut = renderHook(() => useSessionNames({ ...options, account: '' }));
+    expect(signedOut.result.current.status).toBe('unavailable');
+    await waitFor(() => expect(resolveSessionNamesSource).toHaveBeenCalled());
+    await act(async () => undefined);
+    expect(signedOut.result.current.status).toBe('unavailable');
+
+    jest.mocked(resolveSessionNamesSource).mockResolvedValue({ ...source({}), enabled: false });
+    const off = renderHook(() => useSessionNames({ ...options, sessionConfig: { namesEnabled: false } }));
+    expect(off.result.current.status).toBe('unavailable');
+    await act(async () => undefined);
+    expect(off.result.current.status).toBe('unavailable');
+
+    jest.mocked(resolveSessionNamesSource).mockResolvedValue(null);
+    const older = renderHook(() => useSessionNames(options));
+    await waitFor(() => expect(older.result.current).toMatchObject({ status: 'unavailable', answerNamesShown: true }));
+
+    jest.mocked(getUsableSessionWorkerUrl).mockReturnValue('');
+    for (const sessionConfig of [onChainConfig, null]) {
+      const { result } = renderHook(() => useSessionNames({ ...options, sessionConfig }));
+      expect(result.current.status).toBe('unavailable');
+    }
+  });
+});
+
 it('keeps the newest read when an older one finishes after it', async () => {
   let finishOld: (names: Record<string, string>) => void = () => undefined;
   const kept = source({});
   jest
-    .mocked(kept.readAll)
+    .mocked(kept.readAllOrFail)
     .mockImplementationOnce(() => new Promise((resolve) => (finishOld = resolve)))
     .mockResolvedValueOnce({ [A]: 'Sam' });
   jest.mocked(resolveSessionNamesSource).mockResolvedValue(kept);
   const { result } = renderHook(() => useSessionNames(options));
-  await waitFor(() => expect(kept.readAll).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(kept.readAllOrFail).toHaveBeenCalledTimes(1));
 
   await act(async () => reload());
   await waitFor(() => expect(result.current.names).toEqual({ [A]: 'Sam' }));
@@ -125,6 +219,33 @@ describe('after a read that failed', () => {
     await wait(1);
     expect(resolveSessionNamesSource).toHaveBeenCalledTimes(2);
     expect(result.current).toMatchObject({ source: null, answerNamesShown: true });
+  });
+
+  it('stops showing a lookup under way when the first read hangs, and still shows names that come later', async () => {
+    let finish: (names: Record<string, string>) => void = () => undefined;
+    const kept = source({});
+    jest.mocked(kept.readAllOrFail).mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+    jest.mocked(resolveSessionNamesSource).mockResolvedValue(kept);
+    const { result } = renderHook(() => useSessionNames(options));
+    await settle();
+    await wait(NAMES_PENDING_LIMIT_MS - 1);
+    expect(result.current.status).toBe('pending');
+    await wait(1);
+    expect(result.current.status).toBe('failed');
+    await act(async () => finish({ [A]: 'Sam' }));
+    expect(result.current).toMatchObject({ status: 'named', names: { [A]: 'Sam' } });
+  });
+
+  it('settles a failed names read and asks once more', async () => {
+    const kept = source({ [A]: 'Sam' });
+    jest.mocked(kept.readAllOrFail).mockRejectedValueOnce(new Error('503'));
+    jest.mocked(resolveSessionNamesSource).mockResolvedValue(kept);
+    const { result } = renderHook(() => useSessionNames(options));
+    await settle();
+    expect(result.current.status).toBe('failed');
+    await wait(NAMES_RETRY_MS);
+    expect(result.current).toMatchObject({ status: 'named', names: { [A]: 'Sam' } });
+    expect(kept.readAllOrFail).toHaveBeenCalledTimes(2);
   });
 
   it("shows a Worker's names when its second answer comes", async () => {

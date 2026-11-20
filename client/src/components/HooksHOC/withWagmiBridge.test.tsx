@@ -462,3 +462,36 @@ describe('WagmiHooksHOC after a logout whose wallet disconnect failed', () => {
     expect(mockWagmiClient.clearState).not.toHaveBeenCalled();
   });
 });
+
+describe('WagmiHooksHOC while the tab is signed in to an agent’s account from its link', () => {
+  const wallet = '0x000000000000000000000000000000000000000a';
+  const agentAccount = '0x00000000000000000000000000000000000000c3';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete window.__wagmiReduxBridgeOwner;
+  });
+  afterEach(() => {
+    cleanup();
+    delete window.__wagmiReduxBridgeOwner;
+  });
+
+  it('does not take the tab back for a wallet that is still connected', async () => {
+    configureWagmiMocks({ address: wallet });
+    const Wrapped = WagmiHooksHOC(() => null);
+    const props = buildProps({ provider: 'agent_link', account: agentAccount, loginComplete: true });
+    const { rerender } = render(<Wrapped {...props} />);
+    await act(async () => {});
+    rerender(<Wrapped {...props} />);
+    await act(async () => {});
+    expect(props.changeAccount).not.toHaveBeenCalled();
+    expect(props.updateLoginInfo).not.toHaveBeenCalled();
+
+    // Signed out of the agent's account, the wallet signs in as it always did.
+    const signedOut = { ...props, provider: null, account: '', loginComplete: false };
+    rerender(<Wrapped {...signedOut} />);
+    await waitFor(() =>
+      expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({ account: wallet, provider: 'wagmi' })),
+    );
+  });
+});

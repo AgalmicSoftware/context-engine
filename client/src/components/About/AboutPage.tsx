@@ -1,3 +1,4 @@
+import UseCaseLoop, { showsFutureFeatures } from './UseCaseLoop';
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -349,23 +350,40 @@ const AboutPage = () => {
               >
                 <span className={styles.useCaseTileContent}>
                   <FontAwesomeIcon icon={useCase.icon} className={styles.useCaseIcon} />
-                  <span className={styles.useCaseLabel}>{useCase.label}</span>
+                  <span className={styles.useCaseLabel}>
+                    {useCase.label}
+                    {showsFutureFeatures(useCase.slug) ? (
+                      <>
+                        <span aria-hidden="true">*</span>
+                        <span className={styles.srOnly}> (its animation shows future features)</span>
+                      </>
+                    ) : null}
+                  </span>
                 </span>
               </button>
             ))}
           </div>
+          <p className={styles.useCaseFootnote}>* Animations marked * show future features.</p>
 
           {activeUseCaseConfig && (
             <article ref={useCaseDetailRef} className={styles.useCaseDetail} aria-live="polite" aria-atomic="true">
               <p className={styles.srOnly}>{activeUseCaseConfig.label}</p>
-              <div className={styles.useCaseDetailRow}>
-                <span className={styles.useCaseDetailProblemTag}>{activeUseCaseConfig.problemTitle}</span>
-                <p className={styles.useCaseDetailRowText}>{activeUseCaseConfig.problem}</p>
+              <div className={styles.useCaseDetailText}>
+                <div className={styles.useCaseDetailRow}>
+                  <span className={styles.useCaseDetailProblemTag}>{activeUseCaseConfig.problemTitle}</span>
+                  <p className={styles.useCaseDetailRowText}>{activeUseCaseConfig.problem}</p>
+                </div>
+                <div className={styles.useCaseDetailRow}>
+                  <span className={styles.useCaseDetailSolutionTag}>{activeUseCaseConfig.solutionTitle}</span>
+                  <p className={styles.useCaseDetailRowText}>{activeUseCaseConfig.detail}</p>
+                </div>
               </div>
-              <div className={styles.useCaseDetailRow}>
-                <span className={styles.useCaseDetailSolutionTag}>{activeUseCaseConfig.solutionTitle}</span>
-                <p className={styles.useCaseDetailRowText}>{activeUseCaseConfig.detail}</p>
-              </div>
+              {/* After the words in the page, so they are read out first; shown before them. */}
+              <UseCaseLoop
+                key={activeUseCaseConfig.slug}
+                slug={activeUseCaseConfig.slug}
+                title={activeUseCaseConfig.solutionTitle}
+              />
             </article>
           )}
         </section>
@@ -687,14 +705,20 @@ const AboutPage = () => {
                           className={`${styles.roadmapChecklistItem} ${
                             item.status === 'complete'
                               ? styles.roadmapChecklistItemComplete
-                              : styles.roadmapChecklistItemPlanned
+                              : item.status === 'in-progress'
+                                ? styles.roadmapChecklistItemInProgress
+                                : styles.roadmapChecklistItemPlanned
                           }`}
                           key={item.text}
                         >
                           <span className={styles.roadmapCheck} aria-hidden="true" />
                           <span>
                             <span className={styles.srOnly}>
-                              {item.status === 'complete' ? 'Complete: ' : 'Planned: '}
+                              {item.status === 'complete'
+                                ? 'Complete: '
+                                : item.status === 'in-progress'
+                                  ? 'In progress: '
+                                  : 'Planned: '}
                             </span>
                             {item.link && (
                               <>

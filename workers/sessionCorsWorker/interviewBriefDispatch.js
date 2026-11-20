@@ -4,7 +4,7 @@ import { rateLimitRefusal } from './rateLimitRefusal.js';
 import { resolveAuthenticatedRouteContext } from './authenticatedRouteContextResolution.js';
 import { evaluateAuthenticatedRoutePreflight } from './authenticatedRoutePreflight.js';
 import { issueInterviewCatalogTicket, verifyInterviewCatalogTicket } from './interviewCatalogTicket.js';
-import { evaluatePrivateSessionAccess, privateSessionRefusal } from './privateSessionAccess.js';
+import { evaluatePrivateSessionAccess, privateSessionRefusal, readGroupReadInviteHeader } from './privateSessionAccess.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 import {
   listSelfJoinableWorkerGroupsForMember as listSelfJoinableWorkerGroupsForMemberBoundary,
@@ -213,10 +213,11 @@ export const dispatchInterviewBriefRequest = async ({
     reader = verified.reader;
   }
   // A private session's catalog opens to a ticket whose person its rule
-  // admits, or to an invite; an AI fetching a link sends no invite, so its
-  // person signs in for a ticket.
+  // admits, or to an invite. An AI fetching a link sends no invite, so its
+  // person signs in for a ticket; an agent holding the group's link sends
+  // the invite as a header, never in the address.
   const access = await evaluatePrivateSessionAccess({
-    env, slug, config, request, requesterAddress: reader?.address || '', authScopes: reader?.scopes,
+    env, slug, config, request, requesterAddress: reader?.address || '', authScopes: reader?.scopes, codeReads: true,
   });
   if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers });
   const loadPublicInterviewQuestions = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestionsBoundary;
@@ -227,6 +228,8 @@ export const dispatchInterviewBriefRequest = async ({
     storageRoute: deps?.storageRoute,
     fetch: deps?.fetch,
     ...(reader ? { reader } : {}),
+    // The invite that opened the door also reads: each question is still checked on its own.
+    ...(access.private ? { readInvite: readGroupReadInviteHeader(request), workerOrigin: safeServedWorkerOrigin(request.url) } : {}),
   });
   if (!questions.length && refused && !reader) {
     return deps?.json?.({
@@ -308,7 +311,7 @@ export const dispatchInterviewCatalogTicketRequest = async ({ request, env, base
     return deps?.json?.({ error: 'Interview mode is disabled for this session.' }, 404, headers);
   }
   // An agent's own key reads the session directly, and a ticket would outlive revoking that key.
-  if (auth.payload?.agentSource) {
+  if (auth.payload?.agentSource || auth.payload?.via) {
     return deps?.json?.({
       error: 'Catalog tickets are for people signed in on the session page.',
       reason: 'catalog_ticket_person_only',

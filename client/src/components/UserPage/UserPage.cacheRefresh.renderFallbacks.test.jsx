@@ -726,7 +726,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection')).toHaveLength(1);
   });
 
-  it('does not expose principal-scoped Worker memberships on another user’s profile', () => {
+  it('leaves the Worker groups section off another user’s profile', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const instance = makeInstance({
       account: '0x00000000000000000000000000000000000000bb',
@@ -743,9 +743,8 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
 
     const tree = instance.render();
 
-    expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection')).toEqual([
-      expect.objectContaining({ props: expect.objectContaining({ showMemberships: false }) }),
-    ]);
+    // Someone else's memberships can't be shown yet, so the section is left out.
+    expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection')).toEqual([]);
   });
 
   it('uses clone:false when reading survey and question creation caches for analysis payloads', async () => {
@@ -799,5 +798,19 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     expect(peekSpy).toHaveBeenCalledWith('surveysCache', 'edge', { clone: false });
     expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
     consoleSpy.mockRestore();
+  });
+
+  it('never shows the first read as the full profile summary', () => {
+    const instance = makeInstance({ viewAddress: '0x00000000000000000000000000000000000000aa' });
+    const summaryOf = () =>
+      collectTreeNodes(instance.render(), (node) => getNodeTypeName(node) === 'UserPageFullProfileModal')[0].props
+        .aiAnalysis;
+
+    instance.state = { ...instance.state, aiAnalysis: 'A first read', analyzing: true, analysisError: '' };
+    expect(summaryOf()).toBe('');
+    instance.state = { ...instance.state, analyzing: false, analysisError: 'The analysis failed.' };
+    expect(summaryOf()).toBe('');
+    instance.state = { ...instance.state, aiAnalysis: 'The summary', analysisError: '' };
+    expect(summaryOf()).toBe('The summary');
   });
 });

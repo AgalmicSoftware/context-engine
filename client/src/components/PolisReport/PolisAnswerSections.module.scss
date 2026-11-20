@@ -328,6 +328,22 @@
 .rightHalf span {
   flex-shrink: 0;
 }
+// On a phone the report's own gutter is enough: the panel and the option cards keep only a little padding of
+// their own. A PDF and a printed page keep their desktop spacing.
+@media screen and (max-width: 767px) {
+  .sections:not(.pdf) {
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+  .sections:not(.pdf) .choices li,
+  .sections:not(.pdf) .quadratic li {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+  .sections:not(.pdf) .legend {
+    padding: 0 13px;
+  }
+}
 @media (max-width: 600px) {
   .questionHeading {
     flex-direction: column;

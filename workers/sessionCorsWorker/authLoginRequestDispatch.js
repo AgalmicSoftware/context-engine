@@ -10,6 +10,7 @@ import {
   recordAbuseEvent as recordAbuseEventBoundary,
 } from './abuseObservability.js';
 import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
+import { AGENT_SIGN_IN_LINK_STATEMENT } from '../../shared/agentSignIn.mjs';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 
 const recordAuthFailure = async ({ env, deps } = {}) => {
@@ -36,6 +37,12 @@ export const dispatchAuthLoginRequest = async ({
     body = await request?.json?.();
   } catch {
     return deps?.json?.({ error: 'Invalid JSON.' }, 400, baseHeaders);
+  }
+
+  // A message that asks for a sign-in link, or attaches a passkey, is not a sign-in: refused before its nonce is spent.
+  if (typeof body?.message === 'string' && (body.message.includes(`\n\n${AGENT_SIGN_IN_LINK_STATEMENT}\n`) ||
+      /\n\nAttach this passkey to the Context Engine account /.test(body.message))) {
+    return deps?.json?.({ error: 'This message is not a sign-in.', reason: 'wrong_statement' }, 400, baseHeaders);
   }
 
   const authorityResult = await (
@@ -81,6 +88,16 @@ export const dispatchAuthLoginRequest = async ({
     targetSlug,
   } = authorityResult;
 
+  // An account with a passkey attached, or a passkey attached to one: the sign-in is refused where the account's
+  // person ended agent access, and otherwise says what is attached. A session with agents off refuses one.
+  let agentSignIn = {};
+  if (typeof deps?.checkAgentSignInAtLogin === 'function') {
+    agentSignIn = (await deps.checkAgentSignInAtLogin({ env, request, slug: targetSlug, address, config, scopes })) || {};
+    if (agentSignIn.refusal) {
+      return deps?.json?.(agentSignIn.refusal.body, agentSignIn.refusal.status, headers);
+    }
+  }
+
   const exp = Math.floor((deps?.now?.() ?? Date.now()) / 1000) + deps?.TOKEN_TTL_SECONDS;
   const sub = deps?.getAddress?.(address);
   const authzEpoch = readAuthorizationEpoch(config);
@@ -113,6 +130,7 @@ export const dispatchAuthLoginRequest = async ({
     scopes,
     exp,
     jti,
+    ...(agentSignIn.claims || {}),
   };
 
   let token;
@@ -142,5 +160,6 @@ export const dispatchAuthLoginRequest = async ({
     exp,
     sessionSlug: targetSlug,
     ...(sessionId ? { sessionId } : {}),
+    ...(agentSignIn.reply || {}),
   }, 200, headers);
 };

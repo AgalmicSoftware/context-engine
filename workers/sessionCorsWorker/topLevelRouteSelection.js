@@ -1,3 +1,7 @@
+import { AGENT_SIGN_IN_PATHS } from '../../shared/agentSignIn.mjs';
+
+const AGENT_SIGN_IN_ROUTES = Object.values(AGENT_SIGN_IN_PATHS);
+
 export const resolveTopLevelRouteSelection = ({
   path,
   method,
@@ -23,6 +27,9 @@ export const resolveTopLevelRouteSelection = ({
   }
 
   if (path === '/auth/logout' && method === 'POST') return { kind: 'auth-logout' };
+
+  // Signing a person in to the account their agent set up; each route says who may ask.
+  if (method === 'POST' && AGENT_SIGN_IN_ROUTES.includes(path)) return { kind: 'agent-sign-in-link', path };
 
   if (path === '/arweave/upload' && method === 'POST') {
     return {

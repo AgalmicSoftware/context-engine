@@ -552,7 +552,7 @@ export const buildExternalInterviewKickoff = ({
     '',
     'Use first-person for direct statements and reasonable inferences; give inferences lower confidence. responderContext: question-relevant background, views, experience, uncertainties, and caveats. Distinguish stated facts from inferred context in facts[].evidence; omit irrelevant personal data and names. Never say where I live more precisely than my country anywhere in the packet; leave questions asking for a smaller place unanswered. Never prefix with "(Agent):". Omit questions with no signal.',
     '',
-    'Binary: one listed option. v4: multichoice takes ONE exact option string; missing singleSelect does not mean multi. If multiple selections are needed, omit that draft and disclose the v4 limitation. v5/v6: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop. Ratings: question.scale, falling back to answerContract.rating only when absent. Quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99).',
+    "Binary: one listed option. v4: multichoice takes ONE exact option string; missing singleSelect does not mean multi. If multiple selections are needed, omit that draft and disclose the v4 limitation. v5/v6: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop. Ratings: question.scale, falling back to answerContract.rating only when absent. Quadratic answers are signed integer arrays in option order with sum(vote²) <= that question's voiceCredits (99 if it gives none).",
     '',
     'Return only: a research-coverage line, question/answer/confidence/basis table, the exact single-line JSON packet, and review link.',
     '',

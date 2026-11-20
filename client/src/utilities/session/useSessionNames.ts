@@ -11,7 +11,21 @@ import {
   type SessionNamesSource,
 } from './sessionNames';
 
+/**
+ * Where this reader's names stand, so a view can show a lookup under way and never take a failed or withheld read
+ * for proof that nobody set a name:
+ * - pending: the first read for this session and reader hasn't come back yet;
+ * - named: it came back with names;
+ * - empty: a signed-in read came back with none this reader may see; the Worker answers the same for a reader it
+ *   doesn't let see names, so this never means that nobody set one;
+ * - failed: the read couldn't be made (one retry may follow);
+ * - unavailable: names don't apply to this reader: signed out, no session sign-in in this tab, names turned off,
+ *   or a session with no place for names (or none known yet).
+ */
+export type SessionNamesStatus = 'pending' | 'named' | 'empty' | 'failed' | 'unavailable';
+
 export type SessionNamesState = {
+  status: SessionNamesStatus;
   source: SessionNamesSource | null;
   names: SessionNames;
   /**
@@ -26,8 +40,16 @@ export type SessionNamesState = {
   signIn: (() => Promise<void>) | null;
 };
 
-const NO_STORE: SessionNamesState = { source: null, names: {}, answerNamesShown: true, signIn: null };
-const UNKNOWN: SessionNamesState = { source: null, names: {}, answerNamesShown: false, signIn: null };
+const NO_STORE: SessionNamesState = {
+  status: 'unavailable',
+  source: null,
+  names: {},
+  answerNamesShown: true,
+  signIn: null,
+};
+const UNKNOWN: SessionNamesState = { ...NO_STORE, answerNamesShown: false };
+const PENDING: SessionNamesState = { ...UNKNOWN, status: 'pending' };
+const FAILED: SessionNamesState = { ...UNKNOWN, status: 'failed' };
 
 /**
  * Only a loaded config whose authority isn't a Worker (on-chain, or the older registry) says the session has no
@@ -43,15 +65,21 @@ const hasNoNameStore = (sessionConfig: unknown): boolean => {
 // nothing else asks again until the reader or the session changes. Asked once more a little later, one slow answer
 // doesn't hide an older Worker's answer names, or a newer one's names, for the whole visit.
 export const NAMES_RETRY_MS = 5000;
+// A first read that hangs anywhere (the capabilities check, a quiet sign-in, the read itself) counts as failed by
+// then, so a view never shows a lookup under way for good; a read that comes back later still shows its names.
+export const NAMES_PENDING_LIMIT_MS = 15_000;
 
 const sameNames = (a: SessionNames, b: SessionNames): boolean => {
   const keys = Object.keys(a);
   return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
 };
 
+/** A read that came back: one made as no one (signed out, or no session sign-in in this tab) shows nothing. */
+const readStatus = (source: SessionNamesSource | null, names: SessionNames, signedIn: boolean): SessionNamesStatus =>
+  !source?.enabled ? 'unavailable' : Object.keys(names).length ? 'named' : signedIn ? 'empty' : 'unavailable';
+
 /** Loads the session's names once per session and reader; a session with no place for names gives none. */
 export const useSessionNames = (options: SessionNamesOptions): SessionNamesState => {
-  const [state, setState] = useState<SessionNamesState>(UNKNOWN);
   const latest = useRef(options);
   // Reads can finish out of order (one started before a sign-in came back): only the latest one counts.
   const loadSeq = useRef(0);
@@ -66,13 +94,24 @@ export const useSessionNames = (options: SessionNamesOptions): SessionNamesState
     requireExactWorkerSession: true,
   });
   const noStore = !workerUrl && hasNoNameStore(options.sessionConfig);
+  // Only a read that can show this reader names is waited on: someone signed out, or a session with names off, is
+  // never shown a lookup under way.
+  const start = noStore ? NO_STORE : workerUrl && account && !namesOff ? PENDING : UNKNOWN;
+  const [state, setState] = useState<SessionNamesState>(start);
   useEffect(() => {
     let current = true;
     let retry: ReturnType<typeof setTimeout> | undefined;
     // One retry for each run of failures, counted when it runs: a read that works earns the next failure its own,
     // and a sign-in or a save that reads early and fails too doesn't use it up.
     let retried = false;
-    setState(noStore ? NO_STORE : UNKNOWN);
+    setState(start);
+    const giveUp =
+      start === PENDING
+        ? setTimeout(
+            () => setState((was) => (was.status === 'pending' ? { ...was, status: 'failed' } : was)),
+            NAMES_PENDING_LIMIT_MS,
+          )
+        : undefined;
     const load = async () => {
       if (!workerUrl) return;
       const seq = ++loadSeq.current;
@@ -82,20 +121,29 @@ export const useSessionNames = (options: SessionNamesOptions): SessionNamesState
       let failed = false;
       try {
         const source = await resolveSessionNamesSource(latest.current);
-        const names = source ? await source.readAll() : {};
+        // A names read that fails keeps its source, as an empty read did before, but says it failed.
+        const names = source
+          ? await source.readAllOrFail().catch(() => {
+              failed = true;
+              return {};
+            })
+          : {};
+        const signIn = source && !(await source.hasSignIn()) ? source.signIn : null;
         next = {
+          status: failed ? 'failed' : readStatus(source, names, !!latest.current.account && !signIn),
           source,
           names,
           answerNamesShown: !source,
-          signIn: source && !(await source.hasSignIn()) ? source.signIn : null,
+          signIn,
         };
       } catch {
-        next = UNKNOWN;
+        next = FAILED;
         failed = true;
       }
       // Keep the same state when nothing changed, so the views using it don't render again.
       if (current && seq === loadSeq.current) {
         setState((was) =>
+          was.status === next.status &&
           was.source === next.source &&
           was.answerNamesShown === next.answerNamesShown &&
           was.signIn === next.signIn &&
@@ -118,9 +166,10 @@ export const useSessionNames = (options: SessionNamesOptions): SessionNamesState
     return () => {
       current = false;
       clearTimeout(retry);
+      clearTimeout(giveUp);
       stopNames();
       stopToken();
     };
-  }, [sessionSlug, account, workerUrl, namesOff, noStore]);
+  }, [sessionSlug, account, workerUrl, namesOff, noStore, start]);
   return state;
 };

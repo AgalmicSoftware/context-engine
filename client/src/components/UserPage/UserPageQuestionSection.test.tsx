@@ -173,6 +173,15 @@ describe('UserPageQuestionSection', () => {
     expect(onQuestionResponsesSectionToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('names only the questions when the session has no surveys', () => {
+    render(<UserPageQuestionSection {...createProps({ showSurveySwitch: false, isQuestionLoadingAny: false })} />);
+    const responses = screen.getByText('Question Responses').closest('h2') as HTMLHeadingElement;
+    const created = screen.getByText('Questions Created').closest('h2') as HTMLHeadingElement;
+    expect(responses).toHaveTextContent(/^\s*Question Responses$/);
+    expect(created).toHaveTextContent(/^\s*Questions Created$/);
+    expect(screen.queryByRole('button', { name: 'Show Surveys' })).toBeNull();
+  });
+
   it('renders parent-derived empty states without loading indicators', () => {
     render(
       <UserPageQuestionSection

@@ -24,7 +24,6 @@ import { WORKER_CANONICAL_CACHE_SCOPE_KEY } from '../../utilities/survey/workerC
 import { resolveDemoPolisDataset } from '../../utilities/demo/demoPolisDatasets';
 import { withPolisReportDemoAnswers } from '../../utilities/demo/polisReportDemoAnswers';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
-import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
@@ -160,7 +159,12 @@ export interface RatingMatrixBuildResult {
   displayNamesMap?: StringMap;
   /** Responders whose answers say they are AI agents. */
   agents?: string[];
+  /** What those agents' answers say about them, where they say anything. */
+  agentDetails?: Record<string, PolisAgentDetail>;
 }
+
+/** An agent's own account of its model, and the link label (`?src=`) it came in by: neither is verified. */
+export type PolisAgentDetail = { model?: string; source?: string };
 
 export interface PolisReportProps {
   [key: string]: unknown;
@@ -913,17 +917,27 @@ function isPolisRealRowAllowedForSession(
   );
 }
 
-/**
- * An AI agent's answers say so themselves, unverified. The participant list and the map show it beside the
- * name, as the context list does.
- */
-export const markPolisAgents = (names: StringMap, agents: Iterable<string>): StringMap => {
-  const marked: StringMap = { ...names };
-  for (const responder of agents) {
-    marked[responder] = `${names[responder] || getShortenedAddress(responder, false)} (agent)`;
-  }
-  return marked;
+// Stored text from an answer: shown as plain text, without control characters, and short.
+const AGENT_DETAIL_CHARS = 40;
+const cleanAgentDetail = (value: unknown): string => {
+  const text = typeof value === 'string' ? value.replace(/\p{C}/gu, '').trim().replace(/\s+/g, ' ') : '';
+  const chars = Array.from(text);
+  return chars.length > AGENT_DETAIL_CHARS ? `${chars.slice(0, AGENT_DETAIL_CHARS - 1).join('')}…` : text;
 };
+
+/** The model and source an agent's answer gives, or null when it gives neither. */
+export const readPolisAgentDetail = (parsed: UnknownRecord): PolisAgentDetail | null => {
+  const model = cleanAgentDetail(asRecord(parsed.participant).modelId);
+  const source = cleanAgentDetail(asRecord(parsed.recruitment).source);
+  return model || source ? { ...(model ? { model } : {}), ...(source ? { source } : {}) } : null;
+};
+
+/**
+ * What an agent's mark says on hover or focus. An agent's answers say it is one, unverified, so the mark sits
+ * beside the name rather than in it, where a bracket could be taken for part of the name.
+ */
+export const polisAgentLabel = (detail?: PolisAgentDetail): string =>
+  ['AI agent', detail?.model, detail?.source && `from ${detail.source}`, 'self-reported'].filter(Boolean).join(' · ');
 
 export function buildRatingMatrixFromRealData(
   realQR: PolisQuestionResponses | UnknownRecord,
@@ -940,6 +954,7 @@ export function buildRatingMatrixFromRealData(
   const promptsMap: StringMap = {};
   const displayNamesMap: StringMap = {};
   const agents = new Set<string>();
+  const agentDetails: Record<string, PolisAgentDetail> = {};
   const votesByQuestion = new Map<string, Map<string, ConcretePolisVote>>();
 
   Object.entries(realQR).forEach(([qId, arr]) => {
@@ -983,10 +998,14 @@ export function buildRatingMatrixFromRealData(
         .replace(/\s+/g, ' ')
         .slice(0, 160);
       if (responderName && !displayNamesMap[responder]) displayNamesMap[responder] = responderName;
-      if (asRecord(parsed.participant).kind === 'agent') agents.add(responder);
+      if (asRecord(parsed.participant).kind === 'agent') {
+        agents.add(responder);
+        // The first answer to give each field speaks for the agent; later ones fill what it left out.
+        const detail = readPolisAgentDetail(parsed);
+        if (detail) agentDetails[responder] = { ...detail, ...agentDetails[responder] };
+      }
     }
   });
-  Object.assign(displayNamesMap, markPolisAgents(displayNamesMap, agents));
 
   // No usable questions or participants => bail out
   if (binaryQuestions.length === 0 || participantsSet.size === 0) {
@@ -1029,6 +1048,7 @@ export function buildRatingMatrixFromRealData(
     promptsMap,
     displayNamesMap,
     agents: [...agents],
+    agentDetails,
   };
 }
 
@@ -1292,7 +1312,7 @@ export function getUTCDataTimestamp() {
 }
 
 export const REPORT_DEFAULT_EMBEDDING_LABEL = 'Polis Auto';
-export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.`;
+export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with the number of clusters chosen automatically. The gear holds the other views: SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.`;
 export const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT =
   "Polis Auto uses Context Engine's Polis-inspired automatic clustering. It keeps the report's PCA-based participant layout and auto-selects opinion clusters from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
 export const OPINION_GROUPS_TOOLTIP_TEXT =

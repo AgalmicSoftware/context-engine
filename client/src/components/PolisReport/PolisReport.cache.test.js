@@ -26,7 +26,12 @@ import PolisReport, {
 } from './PolisReport';
 import { buildReportResponseStats } from './polisReportAnswers';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
-import { buildUmapParticipantData, clusterExploratoryPoints, rememberClusterAnalysis } from './polisReportRuntime';
+import {
+  buildUmapParticipantData,
+  clusterExploratoryPoints,
+  polisAgentLabel,
+  rememberClusterAnalysis,
+} from './polisReportRuntime';
 import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
 import { clusterUMAPPointsKmeans, doUMAP } from '../../utilities/survey/consensusMath';
 import {
@@ -289,7 +294,12 @@ describe('PolisReport participant profile links', () => {
           type: 'binary',
           prompt: 'Agree?',
           responderName: index === 0 ? 'Franklin' : '',
-          ...(index === 2 ? { participant: { kind: 'agent', verification: 'self_reported' } } : {}),
+          ...(index === 2
+            ? {
+                participant: { kind: 'agent', modelId: 'test-model-1', verification: 'self_reported' },
+                recruitment: { source: 'example-commons' },
+              }
+            : {}),
           answer: { value: index ? 'Disagree' : 'Agree' },
         }),
       })),
@@ -305,9 +315,18 @@ describe('PolisReport participant profile links', () => {
 
       // The list shows each label twice: in full, and short for narrow screens.
       expect(await screen.findByRole('link', { name: new RegExp(`^Sam \\(${addresses[1]}\\)`) })).toBeInTheDocument();
-      expect(
-        screen.getByRole('link', { name: new RegExp(`^Sam \\(${addresses[2]}\\) \\(agent\\)`) }),
-      ).toBeInTheDocument();
+      // An agent keeps its name as it is; a robot mark beside it says what its answers claim, on hover or focus.
+      const agentRow = screen.getByRole('link', { name: new RegExp(`^Sam \\(${addresses[2]}\\)`) }).parentElement;
+      expect(within(agentRow).getByRole('link').textContent).not.toMatch(/agent/);
+      const mark = within(agentRow).getByRole('button', {
+        name: 'AI agent · test-model-1 · from example-commons · self-reported',
+      });
+      expect(screen.getAllByRole('button', { name: /^AI agent/ })).toHaveLength(1);
+      // A tap or Tab focuses it, which opens its tip; Escape closes it.
+      mark.focus();
+      expect(mark).toHaveFocus();
+      fireEvent.keyDown(mark, { key: 'Escape' });
+      expect(mark).not.toHaveFocus();
       expect(screen.queryByText(/Franklin/)).not.toBeInTheDocument();
       expect(screen.getByRole('link', { name: new RegExp(`^${addresses[0]}`) })).toBeInTheDocument();
     } finally {
@@ -338,6 +357,37 @@ describe('PolisReport participant profile links', () => {
 
       expect(await screen.findByRole('link', { name: new RegExp(`^${responder}`) })).toBeInTheDocument();
       expect(screen.queryByText(/Franklin/)).not.toBeInTheDocument();
+    } finally {
+      jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: true });
+    }
+  });
+
+  it('marks each address whose name is still being looked up, until the read comes back', async () => {
+    const addresses = ['5', '6', '7'].map((digit) => `0x${digit.repeat(40)}`);
+    const responses = {
+      q1: addresses.map((responder) => ({
+        responder,
+        questionId: 'q1',
+        response: JSON.stringify({ type: 'binary', prompt: 'Agree?', answer: { value: 'Agree' } }),
+      })),
+    };
+    const names = (status, named = {}) => ({ status, source: null, names: named, answerNamesShown: false });
+    const rows = () => [screen.getByTitle(/^Sam \(/), screen.getByTitle(addresses[1]), screen.getByTitle(addresses[2])];
+    jest.mocked(useSessionNames).mockReturnValue(names('pending', { [addresses[0]]: 'Sam' }));
+
+    try {
+      const view = render(<PolisReport {...baseReportProps} slug="names-fixture" questionResponses={responses} />);
+      await screen.findByRole('link', { name: new RegExp(`^${addresses[1]}`) });
+      const marked = rows().map((row) => within(row).queryAllByRole('img', { name: 'Looking up name' }).length);
+      // A name already in hand needs no mark; each address still waiting has one.
+      expect(marked).toEqual([0, 1, 1]);
+
+      for (const status of ['named', 'empty', 'failed', 'unavailable']) {
+        jest.mocked(useSessionNames).mockReturnValue(names(status));
+        view.rerender(<PolisReport {...baseReportProps} slug="names-fixture" questionResponses={responses} />);
+        expect(screen.queryAllByRole('img', { name: 'Looking up name' })).toHaveLength(0);
+        expect(screen.getByRole('link', { name: new RegExp(`^${addresses[1]}`) })).toBeInTheDocument();
+      }
     } finally {
       jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: true });
     }
@@ -694,7 +744,7 @@ describe('PolisReport cache read options', () => {
     expect(JSON.stringify(result)).not.toContain('test-2');
   });
 
-  it('marks a participant whose answers say an AI agent wrote them', () => {
+  it('finds the participants whose answers say an AI agent wrote them, and what they say of themselves', () => {
     const address = (digit) => `0x${digit.repeat(40)}`;
     const row = (responder, extra = {}) => ({
       responder,
@@ -704,21 +754,42 @@ describe('PolisReport cache read options', () => {
     const agent = { kind: 'agent', verification: 'self_reported' };
     const result = buildRatingMatrixFromRealData({
       q1: [
-        row(address('a'), { responderName: "Audrey's Kami", participant: agent }),
+        row(address('a'), {
+          responderName: "Audrey's Kami",
+          participant: { ...agent, modelId: ' test-model-1 ' },
+          recruitment: { source: 'example-commons' },
+        }),
         row(address('b'), { participant: agent }),
-        row(address('c'), { responderName: 'Ada Example' }),
-        row(address('d'), { responderName: 'Not an agent', participant: { kind: 'person' } }),
+        // A later answer fills what an earlier one left out, and never replaces what it gave.
+        { ...row(address('a'), { participant: { ...agent, modelId: 'other-model' } }), questionId: 'q2' },
+        row(address('g'), { participant: agent, recruitment: { source: 'example-commons' } }),
+        { ...row(address('g'), { participant: { ...agent, modelId: 'test-model-2' } }), questionId: 'q2' },
+        row(address('c'), { responderName: 'Ada Example', recruitment: { source: 'example-commons' } }),
+        row(address('d'), { responderName: 'Not an agent', participant: { kind: 'person', modelId: 'x' } }),
         row(address('e')),
+        // Stored text is untrusted: control characters go and long text is cut.
+        row(address('f'), { participant: { ...agent, modelId: `m\u0000\u202e${'x'.repeat(37)}😀😀😀` } }),
       ],
     });
 
+    // Names stay as given: the mark is shown beside them, never written into them.
     expect(result.displayNamesMap).toEqual({
-      [address('a')]: "Audrey's Kami (agent)",
-      // Without a name, the address as the list shortens it (this file's shortener returns it whole).
-      [address('b')]: `${address('b')} (agent)`,
+      [address('a')]: "Audrey's Kami",
       [address('c')]: 'Ada Example',
       [address('d')]: 'Not an agent',
     });
+    expect(result.agents.sort()).toEqual([address('a'), address('b'), address('f'), address('g')]);
+    expect(result.agentDetails).toEqual({
+      [address('a')]: { model: 'test-model-1', source: 'example-commons' },
+      [address('g')]: { model: 'test-model-2', source: 'example-commons' },
+      // Cut by characters, never through one.
+      [address('f')]: { model: `m${'x'.repeat(37)}😀…` },
+    });
+    expect(polisAgentLabel(result.agentDetails[address('a')])).toBe(
+      'AI agent · test-model-1 · from example-commons · self-reported',
+    );
+    // Nothing invented where an agent says nothing of itself.
+    expect(polisAgentLabel(result.agentDetails[address('b')])).toBe('AI agent · self-reported');
   });
 
   it('counts only readable binary votes as report participants', () => {
@@ -895,7 +966,7 @@ describe('PolisReport cache read options', () => {
   it('keeps participant graph tooltip copy aligned with the Polis graph modes', () => {
     expect(REPORT_DEFAULT_EMBEDDING_LABEL).toBe('Polis Auto');
     expect(PARTICIPANTS_GRAPH_TOOLTIP_TEXT).toBe(
-      "This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.",
+      "This diagram opens in UMAP with the number of clusters chosen automatically. The gear holds the other views: SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.",
     );
     expect(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT).toBe(
       "Polis Auto uses Context Engine's Polis-inspired automatic clustering. It keeps the report's PCA-based participant layout and auto-selects opinion clusters from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.",
@@ -2055,7 +2126,7 @@ describe('PolisReport demo data defaults', () => {
     });
   });
 
-  it('defaults built-in /session/demo to UMAP with 3 groups and still exposes precomputed Polis analysis after switching modes', async () => {
+  it('defaults built-in /session/demo to UMAP with the automatic group count and still exposes precomputed Polis analysis after switching modes', async () => {
     computePolisConversationMath.mockReturnValue({
       stats: {
         nParticipants: 4,
@@ -2082,7 +2153,8 @@ describe('PolisReport demo data defaults', () => {
     const clusterInput = screen.getByRole('spinbutton');
 
     expect(screen.getByDisplayValue('UMAP')).toBeInTheDocument();
-    expect(clusterInput).toHaveValue(3);
+    // No one has set a number, so the box shows the automatic one.
+    expect(clusterInput).toHaveValue(2);
 
     fireEvent.change(embeddingSelect, { target: { value: 'POLIS' } });
 
@@ -2174,7 +2246,7 @@ describe('PolisReport demo data defaults', () => {
     ).not.toBe(before);
   });
 
-  it('defaults custom demo datasets to UMAP with 3 groups and clears manual K in Polis Auto mode', () => {
+  it('defaults custom demo datasets to UMAP with the automatic group count and clears manual K in Polis Auto mode', () => {
     computePolisConversationMath.mockReturnValue({
       stats: {
         nParticipants: 4,
@@ -2208,11 +2280,17 @@ describe('PolisReport demo data defaults', () => {
     const embeddingSelect = screen.getByDisplayValue('UMAP');
     const clusterInput = screen.getByRole('spinbutton');
     const statementsToggle = screen.getByLabelText('Statements');
+    // The projection and the layers sit behind the gear.
+    const gear = screen.getByRole('button', { name: 'Graph settings' });
+    expect(gear).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(gear);
+    expect(gear).toHaveAttribute('aria-expanded', 'true');
     const options = screen.getAllByRole('option');
 
     expect(screen.getByDisplayValue('UMAP')).toBeInTheDocument();
     expect(options[0]).toHaveTextContent('UMAP');
-    expect(clusterInput).toHaveValue(3);
+    // No one has set a number, so the box shows the automatic one.
+    expect(clusterInput).toHaveValue(2);
     expect(statementsToggle).not.toBeChecked();
 
     fireEvent.click(statementsToggle);
@@ -2226,6 +2304,16 @@ describe('PolisReport demo data defaults', () => {
     expect(screen.getByDisplayValue(REPORT_DEFAULT_EMBEDDING_LABEL)).toBeInTheDocument();
     expect(clusterInput).toHaveValue(2);
     expect(statementsToggle).not.toBeChecked();
+
+    // The title line carries Clusters and the gear; the old Auto button is gone, and Reset is the way back.
+    expect(screen.queryByRole('button', { name: 'Auto' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Graph settings' })).toBeVisible();
+    fireEvent.change(clusterInput, { target: { value: '5' } });
+    expect(screen.getByRole('status')).toHaveTextContent('You set 5 clusters. Reset returns to the automatic number.');
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(clusterInput).toHaveValue(2);
+    expect(screen.getByDisplayValue('UMAP')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('The number of clusters is chosen automatically.');
   });
 
   it('hides statement dots when switching from SVD/PCA back to Polis Auto', () => {

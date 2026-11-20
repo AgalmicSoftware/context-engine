@@ -42,6 +42,8 @@ type UserPageQuestionSectionProps = {
   onQuestionResponsesSectionToggle: (event?: React.MouseEvent<HTMLElement>) => unknown;
   onQuestionsCreatedSectionToggle: (event?: React.MouseEvent<HTMLElement>) => unknown;
   onShowSurveysTab: (event: React.MouseEvent<HTMLElement>) => unknown;
+  /** False when the session has no surveys: the headings name only the questions. */
+  showSurveySwitch?: boolean;
   questionCreationEntries: UserPageQuestionEntry[];
   questionResponsesEmptyText: React.ReactNode;
   questionResponsesLoadingIndicator?: React.ReactNode;
@@ -102,6 +104,7 @@ const UserPageQuestionSection = ({
   onQuestionResponsesSectionToggle,
   onQuestionsCreatedSectionToggle,
   onShowSurveysTab,
+  showSurveySwitch = true,
   questionCreationEntries,
   questionResponsesEmptyText,
   questionResponsesLoadingIndicator = null,
@@ -124,16 +127,20 @@ const UserPageQuestionSection = ({
           <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
         )}{' '}
         <span className={styles.sectionSwitcher}>
-          <button
-            type="button"
-            className={styles.switchWordInactive}
-            data-ce-control-appearance="frameless"
-            onClick={onShowSurveysTab}
-            aria-label="Show Surveys"
-          >
-            Survey
-          </button>
-          <span className={styles.switchDivider}>/</span>
+          {showSurveySwitch && (
+            <>
+              <button
+                type="button"
+                className={styles.switchWordInactive}
+                data-ce-control-appearance="frameless"
+                onClick={onShowSurveysTab}
+                aria-label="Show Surveys"
+              >
+                Survey
+              </button>
+              <span className={styles.switchDivider}>/</span>
+            </>
+          )}
           <span className={styles.switchWordActive}>Question Responses</span>
         </span>
         {isQuestionLoadingAny && questionResponsesLoadingIndicator}
@@ -186,16 +193,20 @@ const UserPageQuestionSection = ({
           <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
         )}{' '}
         <span className={styles.sectionSwitcher}>
-          <button
-            type="button"
-            className={styles.switchWordInactive}
-            data-ce-control-appearance="frameless"
-            onClick={onShowSurveysTab}
-            aria-label="Show Surveys"
-          >
-            Surveys
-          </button>
-          <span className={styles.switchDivider}>/</span>
+          {showSurveySwitch && (
+            <>
+              <button
+                type="button"
+                className={styles.switchWordInactive}
+                data-ce-control-appearance="frameless"
+                onClick={onShowSurveysTab}
+                aria-label="Show Surveys"
+              >
+                Surveys
+              </button>
+              <span className={styles.switchDivider}>/</span>
+            </>
+          )}
           <span className={styles.switchWordActive}>Questions Created</span>
         </span>
         {isQuestionLoadingAny && questionsCreatedLoadingIndicator}

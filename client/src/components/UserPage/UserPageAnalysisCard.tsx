@@ -11,6 +11,7 @@ import {
   type AnalysisCardPages,
   type AnalysisCardPicture,
 } from 'utilities/analysisCard/analysisCardCanvas';
+import { noteAnalysisCardDrawn } from 'utilities/analysisCard/analysisCardDrawn';
 import type { AnalysisCardDownload } from 'utilities/analysisCard/analysisCardExport';
 import type { AnalysisCard } from 'utilities/analysisCard/analysisCardModel';
 import { analysisCardVideoType } from 'utilities/analysisCard/analysisCardVideoType';
@@ -76,6 +77,11 @@ const UserPageAnalysisCard = ({ card, picture = null }: UserPageAnalysisCardProp
       current = false;
     };
   }, [card, pictureUrl, accentHex]);
+
+  // Drawn in full, with its picture or the knowledge that it has none: the pages a saved card's picture is.
+  useEffect(() => {
+    if (ready && drawn) noteAnalysisCardDrawn(drawn.card, drawn.pages);
+  }, [ready, drawn]);
 
   useEffect(() => {
     const context = preview.current?.getContext('2d');

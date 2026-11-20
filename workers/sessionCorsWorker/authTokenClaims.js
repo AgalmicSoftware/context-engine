@@ -64,6 +64,13 @@ export const persistAuthTokenRecord = async ({
   });
 };
 
+// A further check every sign-in's record is held to, wherever it is validated: a request's own token, the
+// sign-in a delegated key or a catalog ticket came from. Set once, by the module that knows the rule.
+let recordCheck = null;
+export const setAuthTokenRecordCheck = (check) => {
+  recordCheck = typeof check === 'function' ? check : null;
+};
+
 export const validateAuthTokenRecord = async ({
   env,
   payload,
@@ -79,8 +86,12 @@ export const validateAuthTokenRecord = async ({
     return { ok: false, error: 'Invalid token.' };
   }
 
-  const marker = await kv.get(key);
+  const [marker, checked] = await Promise.all([
+    kv.get(key),
+    recordCheck ? recordCheck({ env, payload, slug: slug ?? payload?.slug }) : { ok: true },
+  ]);
   if (!marker) return { ok: false, error: 'Invalid token.' };
+  if (!checked?.ok) return { ok: false, error: checked?.error || 'Invalid token.', ...(checked?.status ? { status: checked.status } : {}) };
   return { ok: true };
 };
 

@@ -542,6 +542,55 @@ describe('saving the edit page through the Session Worker', () => {
     expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
   });
 
+  it('saves the AI agents choice only when it changes, and signs no one out', () => {
+    const stored = publishedSession();
+    // On unless turned off: a session that never set it lets agents take part, as before the setting.
+    const off = editAndSave(stored, (draft) => {
+      expect(draft.agentParticipationEnabled).toBe(true);
+      draft.agentParticipationEnabled = false;
+    });
+    expect(off.save.patch).toEqual({ agentParticipationEnabled: false });
+    expect(off.save.classification).toMatchObject({
+      content: ['agentParticipationEnabled'],
+      signsParticipantsOut: false,
+    });
+    expect(describeSessionSettingsPath('agentParticipationEnabled')).toBe('Agent access (MCP and Agent HTTP)');
+    // Sign-in links from agents: off unless turned on, stored only when changed, and nobody signed out.
+    const linksOn = editAndSave(stored, (draft) => {
+      expect(draft.agentSignInLinksEnabled).toBe(false);
+      draft.agentSignInLinksEnabled = true;
+    });
+    expect(linksOn.save.patch).toEqual({ agentSignInLinksEnabled: true });
+    expect(linksOn.save.classification).toMatchObject({
+      content: ['agentSignInLinksEnabled'],
+      signsParticipantsOut: false,
+    });
+    expect(linksOn.result).toMatchObject({ ok: true });
+    expect(projectPublicWorkerSessionConfig(linksOn.result.config).agentSignInLinksEnabled).toBe(true);
+    // Turned off again from on, and left alone when untouched.
+    const linksOff = editAndSave(linksOn.result.config, (draft) => {
+      expect(draft.agentSignInLinksEnabled).toBe(true);
+      draft.agentSignInLinksEnabled = false;
+    });
+    expect(linksOff.save.patch).toEqual({ agentSignInLinksEnabled: false });
+    expect(linksOff.result).toMatchObject({ ok: true });
+    expect(off.result).toMatchObject({ ok: true });
+    expect(projectPublicWorkerSessionConfig(off.result.config).agentParticipationEnabled).toBe(false);
+
+    const on = editAndSave(off.result.config, (draft) => {
+      expect(draft.agentParticipationEnabled).toBe(false);
+      draft.agentParticipationEnabled = true;
+    });
+    expect(on.save.patch).toEqual({ agentParticipationEnabled: true });
+    expect(on.result).toMatchObject({ ok: true });
+
+    // Left alone, it is never sent, so a Worker too old to know it refuses nothing.
+    const untouched = editAndSave(stored, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    expect(untouched.save.patch).toEqual({ sessionName: 'Renamed' });
+  });
+
   it('saves the Context cards choice only when it changes, and signs no one out', () => {
     const stored = publishedSession();
     // Off unless turned on: a session that never set it shows the box clear.

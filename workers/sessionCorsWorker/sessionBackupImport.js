@@ -11,6 +11,7 @@ import { coordinateWorkerGroupBackup } from './workerGroups.js';
 import { canOptOut, sessionAgentOptOutKey, sessionAgentUnattributedKey } from './sessionAgentOptOuts.js';
 import { isSessionAgentHistoryBackup, restoreSessionAgentHistory } from './sessionAgentHistory.js';
 import { isSessionNamesBackup, restoreSessionNames } from './sessionNames.js';
+import { AGENT_LINKED_MARK, agentLinkedMarkKey, isAgentLinksBackup, restoreAgentLinks } from './agentSignInStore.js';
 import { base64urlToBytes, bytesToBase64url } from './storageEnvelopeEncryption.js';
 import { isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
 import { isStorageResourceId } from './storageUploadValidation.js';
@@ -90,6 +91,7 @@ const validateSnapshot = ({ snapshot, manifest, normalizeConfig, normalizeSessio
     fail('Invalid backup Session Agent chats.');
   }
   if (snapshot.sessionNames !== undefined && !isSessionNamesBackup(snapshot.sessionNames)) fail('Invalid backup names.');
+  if (snapshot.agentSignInLinks !== undefined && !isAgentLinksBackup(snapshot.agentSignInLinks)) fail('Invalid backup agent sign-in links.');
 };
 
 const validatePage = (page, slug) => {
@@ -458,6 +460,25 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
         (key) => journalBackupImportWrite(storage, page.archiveId, 'durable', key));
       progress.counts.written += names.written;
       progress.counts.skipped += names.skipped;
+      // Each restored account's mark goes back before its record does, so no record is ever on the target
+      // without one: a sign-in that can't read the record falls back on the mark alone. A mark with no record
+      // only costs a lookup. Resumed where it stopped, since a restore is made over several requests.
+      const linkRows = snapshot.agentSignInLinks || [];
+      const markStore = budget.wrap(env.GROUP_KV);
+      for (let at = progress.agentLinkMarks || 0; at < linkRows.length; at += 1) {
+        if (budget.remaining < 8) { progress.agentLinkMarks = at; return pending(); }
+        const markKey = agentLinkedMarkKey(slug, linkRows[at].account);
+        if (!markKey) fail('The backup’s agent sign-in links could not be restored.', 409);
+        if ((await markStore.get(markKey)) !== AGENT_LINKED_MARK) {
+          await journalBackupImportWrite(storage, page.archiveId, 'group', markKey);
+          await markStore.put(markKey, AGENT_LINKED_MARK);
+        }
+      }
+      progress.agentLinkMarks = linkRows.length;
+      const links = await restoreAgentLinks(storage, linkRows,
+        (key) => journalBackupImportWrite(storage, page.archiveId, 'durable', key));
+      progress.counts.written += links.written;
+      progress.counts.skipped += links.skipped;
       if (!progress.counts.conflicts) {
         // Commit the verified authority before reclaiming its staged snapshot.
         // The importing actor remains authorized until cleanup and handoff end.

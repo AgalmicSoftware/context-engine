@@ -1668,13 +1668,14 @@ export const isWorkerGroupMember = async ({ env, slug, sessionId, groupId, princ
 };
 
 /** Whether a read invite's signer holds the group's current password; a read spends nothing. */
-export const checkWorkerGroupReadInvite = ({ env, slug, sessionId, groupId, signer } = {}) =>
+export const checkWorkerGroupReadInvite = ({ env, slug, sessionId, groupId, signer, code, from } = {}) =>
 	callWorkerGroupCoordinator({
 		env,
 		slug,
 		sessionId,
 		path: '/worker-groups/read-invite',
-		payload: { groupId: normalizeWorkerGroupId(groupId), signer },
+		// A password's signer, or a one-use code's proof: one or the other.
+		payload: { groupId: normalizeWorkerGroupId(groupId), ...(code ? { code, from: typeof from === 'string' ? from : '' } : { signer }) },
 	});
 
 export const forwardWorkerGroupMutation = async ({

@@ -10,6 +10,7 @@ import {
   wasUserExplicitlyDisconnected,
 } from '../../utilities/web3/wagmiDisconnectState.js';
 import { logoutPasskeyWallet } from '../../wallet/passkeyWallet.js';
+import { isAgentLinkProvider } from '../../utilities/session/agentLinkAccount';
 import { createLogger } from 'utilities/logging.js';
 
 export interface WagmiInjectedProps {
@@ -189,6 +190,9 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
             }
             return;
           }
+          // Signed in to an agent's account from its link: a wallet that is still connected in the background
+          // does not take the tab back. Its person signs out of that account first.
+          if (isAgentLinkProvider(props.provider) && props.loginComplete) return;
           const acctMatches = reduxAddrLower === addrLower;
           const alreadyWagmi = props.provider === 'wagmi' && props.loginComplete === true;
 

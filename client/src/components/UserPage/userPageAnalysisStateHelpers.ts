@@ -367,6 +367,32 @@ export const buildUserPageAnalysisResetStatePatch = ({
   analysisCachedAt: null,
 });
 
+// About how long the full analysis takes on a session's thinking model, as timed on a test session. Shown beside
+// the elapsed time so a person knows what to expect; it is a guide, not a limit, and nothing is cut off at it.
+export const ANALYSIS_EXPECTED_SECONDS = 19;
+
+// "8 of about 19 seconds", and past that only the seconds, as the guide no longer says anything.
+export const formatUserPageAnalysisWait = (elapsedMs: unknown): string => {
+  const seconds = Math.max(0, Math.floor(Number(elapsedMs || 0) / 1000));
+  return seconds <= ANALYSIS_EXPECTED_SECONDS
+    ? `${seconds} of about ${ANALYSIS_EXPECTED_SECONDS} seconds`
+    : `${seconds} seconds, longer than usual`;
+};
+
+// The quick first read, shown while the analysis is written. It sits in the summary's and the details' own places,
+// so the analysis replaces it when it arrives and the two never stand side by side; its lines are kept one per row.
+export const buildUserPageAnalysisFirstReadStatePatch = (firstRead: unknown): UserPageUnknownRecord => {
+  const record = toAnalysisRecord(firstRead);
+  const points = Array.isArray(record.points) ? record.points : [];
+  return {
+    aiAnalysis: String(record.headline || '').trim(),
+    analysisDetails: points
+      .map((point: unknown) => String(point || '').trim())
+      .filter(Boolean)
+      .join('\n'),
+  };
+};
+
 export const buildUserPageAnalysisElapsedStatePatch = ({
   nowMs = Date.now(),
   startedAt = 0,

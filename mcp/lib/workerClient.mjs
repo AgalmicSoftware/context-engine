@@ -1,6 +1,13 @@
 import { buildSiweMessage as buildSharedSiweMessage, normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { describeTestEthOffer } from '../../shared/sessions/testEthOffer.mjs';
 import { COORDINATOR_RETRY_DELAYS_MS, SESSION_COORDINATOR_UNAVAILABLE, isRetryableBusy } from '../../shared/sessionCoordinatorBusy.mjs';
+import {
+  AGENT_CLIENT_HEADER, AGENT_SIGN_IN_CODE_IN_TEXT, AGENT_SIGN_IN_LINK_STATEMENT, AGENT_SIGN_IN_PATHS, isAgentSignInCode,
+} from '../../shared/agentSignIn.mjs';
+
+// Every request says it comes from an agent's client, so a session that has switched agents off can refuse it,
+// and so the Worker makes a sign-in link only for one. An older Worker ignores the header.
+const AGENT_CLIENT = 'contextengine-mcp';
 
 // HTTP client for one Worker-hosted session, signing in exactly as the web
 // client does for a passkey participant (client/src/utilities/worker/workerAuth.ts).
@@ -57,8 +64,17 @@ export class WorkerRequestError extends Error {
   }
 }
 
-const explainFailure = (status, error, path) => {
+const explainFailure = (status, error, path, reason = '') => {
   const detail = error.slice(0, MAX_ERROR_DETAIL);
+  if (reason === 'agent_participation_off') {
+    return 'This session has its agent functions switched off, so an agent can’t take part through these tools. Nothing was sent. Tell the person: they can answer on the session page themselves, or ask the session’s admins.';
+  }
+  if (reason === 'sign_in_links_off') {
+    return 'This session doesn’t have sign-in links from agents switched on. An admin of the session can turn them on in its settings.';
+  }
+  if (reason === 'agent_access_cancelled') {
+    return 'The person this account belongs to has ended agent access to it in this session. Nothing was sent. Only they can allow it again, on the session page under "Your AI agent".';
+  }
   if (status === 401) return `Sign-in expired or was rejected (${detail || '401'}).`;
   if (status === 403 && /origin/i.test(detail)) {
     return `The Worker refused this sign-in origin (${detail}). Ask the session admin to allow it.`;
@@ -122,11 +138,12 @@ export const resolveSessionIdHex = (config) => {
   return sessionId || sessionIdHex;
 };
 
-export const buildSiweMessage = ({ address, nonce, appOrigin, workerOrigin, sessionId, sessionSlug = '', issuedAt, expirationTime, chainId = 1 }) =>
+export const buildSiweMessage = ({ address, nonce, appOrigin, workerOrigin, sessionId, sessionSlug = '', issuedAt, expirationTime, chainId = 1,
+  statement = 'Sign in to Context Engine.' }) =>
   buildSharedSiweMessage({
     address, nonce, domain: new URL(appOrigin).host, uri: appOrigin,
     workerUrl: workerOrigin, sessionId, sessionSlug, issuedAt, expirationTime, chainId,
-    statement: 'Sign in to Context Engine.',
+    statement,
   });
 
 export const decodeTokenClaims = (token) => {
@@ -167,8 +184,11 @@ export const resolveLoginOrigin = (config, trustedOrigins) => {
   return origin;
 };
 
+// `signedOut` makes a client that reads as a visitor would: it never signs in, so every request
+// goes without a token, and a private session opens only through a read invite.
 export const createWorkerClient = ({
   workerOrigin, slug, trustedOrigins, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), registryConfigLoader, sessionId: joinedSessionId = '',
+  signedOut = false,
 }) => {
   // The session this client answers for: the one the agent joined, or else the first config it loads.
   let sessionId = joinedSessionId;
@@ -205,6 +225,18 @@ export const createWorkerClient = ({
   const request = async (path, { method = 'GET', headers = {}, body, form, auth = false, retried = false, busyRetries = 0, maxBytes = MAX_RESPONSE_BYTES, signal, raw: asText = false, timeoutMs = REQUEST_TIMEOUT_MS } = {}) => {
     const checkpoint = () => { if (signal?.aborted) throw new Error('Stopped before the Worker request was sent.'); };
     checkpoint();
+    // A sign-in link is for one person, in the conversation. Nothing this agent sends a session may carry one,
+    // whatever asked for it: an answer, a comment, a statement, a name or a note would show it to others.
+    if (AGENT_SIGN_IN_CODE_IN_TEXT.test(`${path}${body === undefined ? '' : JSON.stringify(body)}`)) {
+      throw new WorkerRequestError('This would put a sign-in link where other people could read it, so it was not sent. A sign-in link goes only to the person you work for, in the conversation.');
+    }
+    // Signed out, a request that would carry the sign-in names its session instead.
+    const signedOutRead = auth && signedOut;
+    // Opened to read: anything that would change the session is refused here, before it is sent, whoever calls.
+    if (signedOutRead && method !== 'GET' && path !== '/storage/read-batch') {
+      throw new WorkerRequestError('This session was opened to read without joining; join it with join_session to do this.');
+    }
+    if (signedOutRead) auth = false;
     if (auth) await ensureToken();
     // Login and token refresh can await. Once sent, retain the response for reconciliation.
     checkpoint();
@@ -214,8 +246,10 @@ export const createWorkerClient = ({
         method,
         redirect: 'error',
         headers: {
+          [AGENT_CLIENT_HEADER]: AGENT_CLIENT,
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
           ...(auth ? { Authorization: `Bearer ${token}`, 'X-Group-Slug': slug } : {}),
+          ...(signedOutRead ? { 'X-Session-Slug': slug } : {}),
           ...(groupReadInvite ? { 'X-CE-Group-Invite': groupReadInvite } : {}),
           ...headers,
         },
@@ -239,7 +273,7 @@ export const createWorkerClient = ({
     if (isRetryableBusy(response.status, data) && !form &&
         busyRetries < COORDINATOR_RETRY_DELAYS_MS.length && replaySafe(path, method, body)) {
       await waitBeforeRetry(busyRetries, signal);
-      return request(path, { method, headers, body, form, auth, retried, busyRetries: busyRetries + 1, maxBytes, signal, raw: asText, timeoutMs });
+      return request(path, { method, headers, body, form, auth: auth || signedOutRead, retried, busyRetries: busyRetries + 1, maxBytes, signal, raw: asText, timeoutMs });
     }
     if (response.status === 401 && auth && !retried && (!error || TOKEN_ERROR_RE.test(error))) {
       token = '';
@@ -251,7 +285,7 @@ export const createWorkerClient = ({
       throw new WorkerRequestError(error.slice(0, MAX_ERROR_DETAIL), { status: 401, code: error });
     }
     if (!response.ok) {
-      throw new WorkerRequestError(explainFailure(response.status, error, path), {
+      throw new WorkerRequestError(explainFailure(response.status, error, path, isRecord(data) ? text(data.reason) : ''), {
         status: response.status,
         code: isRecord(data) ? text(data.code) || text(data.reason) || error : '',
         details: { balanceEth: text(data?.balanceEth), thresholdEth: text(data?.thresholdEth) },
@@ -283,8 +317,9 @@ export const createWorkerClient = ({
     if (text(data.sessionSlug) && text(data.sessionSlug).toLowerCase() !== slug) {
       throw new WorkerRequestError('The Worker answered for a different session.');
     }
-    // Public registry reads remain available even when this agent's sign-in origin is not admitted.
-    if (registryConfigLoader) {
+    // Public registry reads remain available even when this agent's sign-in origin is not admitted,
+    // and so does reading without signing in.
+    if (registryConfigLoader || signedOut) {
       try { loginOrigin = resolveLoginOrigin(loaded, trustedOrigins); } catch { loginOrigin = trustedOrigins[0]; }
     } else loginOrigin = resolveLoginOrigin(loaded, trustedOrigins);
     config = loaded;
@@ -300,7 +335,9 @@ export const createWorkerClient = ({
     return config;
   };
 
-  const signIn = async () => {
+  // A message signed with the agent's key and a nonce the Worker takes once: a sign-in, or what `statement` asks.
+  const signedRequest = async (statement) => {
+    if (signedOut) throw new WorkerRequestError('This session was opened to read without joining; join it with join_session to do this.');
     if (!config) await loadConfig();
     if (registryConfigLoader) loginOrigin = resolveLoginOrigin(config, trustedOrigins);
     const identity = registryConfigLoader ? {} : { sessionId };
@@ -323,13 +360,28 @@ export const createWorkerClient = ({
       sessionSlug: slug,
       issuedAt: issued.toISOString(),
       expirationTime: new Date(issued.getTime() + SIGN_IN_VALIDITY_MS).toISOString(),
+      ...(statement ? { statement } : {}),
     });
     const signature = await wallet.signMessage(message);
-    const loginData = await request('/auth/login', {
-      method: 'POST',
-      headers: signInHeaders,
-      body: { address, message, signature, sessionSlug: slug, ...identity },
-    });
+    return { headers: signInHeaders, body: { address, message, signature, sessionSlug: slug, ...identity } };
+  };
+
+  /**
+   * A one-time code that signs a browser in as this agent's account in this session, from the site this agent
+   * signs in for. Asked with a fresh signature, never the held sign-in. `{ code, expiresAt, origin }`.
+   */
+  const createSignInCode = async () => {
+    const asked = await signedRequest(AGENT_SIGN_IN_LINK_STATEMENT);
+    const made = await request(AGENT_SIGN_IN_PATHS.create, { method: 'POST', headers: asked.headers, body: asked.body });
+    if (!isAgentSignInCode(made?.code) || text(made?.origin) !== loginOrigin || text(made?.address).toLowerCase() !== wallet.address.toLowerCase()) {
+      throw new WorkerRequestError('The Worker did not issue a usable sign-in link.');
+    }
+    return { code: made.code, expiresAt: Number(made.expiresAt) || 0, origin: loginOrigin };
+  };
+
+  const signIn = async () => {
+    const asked = await signedRequest('');
+    const loginData = await request('/auth/login', { method: 'POST', headers: asked.headers, body: asked.body });
     if (!text(loginData?.token)) throw new WorkerRequestError('The Worker did not issue a session token.');
     token = loginData.token;
     const exp = Number(loginData.exp);
@@ -346,6 +398,7 @@ export const createWorkerClient = ({
   };
 
   const ensureToken = async () => {
+    if (signedOut) return;
     if (token && tokenExp - TOKEN_REFRESH_MARGIN_SECONDS > now() / 1000) return;
     await login();
   };
@@ -448,9 +501,10 @@ export const createWorkerClient = ({
   });
   const leaveGroup = (groupId, { signal } = {}) => request('/groups/leave', { method: 'POST', auth: true, signal, body: { sessionId, groupId } });
 
-  /** The groups this agent may see, with their member counts. */
-  const listGroups = async () => {
-    const data = await request(`/groups/list?sessionId=${encodeURIComponent(sessionId)}`, { auth: true });
+  /** The groups this agent may see, with their member counts. Signed out, a private session lists the one group `joinGroup` names. */
+  const listGroups = async ({ joinGroup = '' } = {}) => {
+    const query = new URLSearchParams({ sessionId, ...(joinGroup ? { joinGroup } : {}) });
+    const data = await request(`/groups/list?${query}`, { auth: true });
     return Array.isArray(data?.groups) ? data.groups.filter(isRecord) : [];
   };
 
@@ -502,9 +556,15 @@ export const createWorkerClient = ({
     listGroups,
     listMyMemberships,
     readFeatures,
+    createSignInCode,
     request,
+    signedOut,
     setGroupReadInvite: (value) => {
       groupReadInvite = text(value);
+    },
+    /** The read invite sent with requests, for a caller that makes one of its own; never shown. */
+    get groupReadInvite() {
+      return groupReadInvite;
     },
     get config() {
       return config;

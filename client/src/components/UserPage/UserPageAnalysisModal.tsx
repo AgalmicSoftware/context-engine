@@ -9,7 +9,7 @@ import { formatSavedAnalysisCardDate } from 'utilities/analysisCard/analysisCard
 import styles from './UserPage.module.scss';
 import cardStyles from './UserPageAnalysisCard.module.scss';
 import UserPageAnalysisCard, { type UserPageAnalysisCardPicture } from './UserPageAnalysisCard';
-import type { UserAnalysisGeneration } from './userPageAnalysisStateHelpers';
+import { formatUserPageAnalysisWait, type UserAnalysisGeneration } from './userPageAnalysisStateHelpers';
 
 type UserPageAnalysisCacheStatusState = {
   analysisCacheAge?: React.ReactNode;
@@ -54,6 +54,26 @@ type UserPageAnalysisModalProps = {
   onToggle: () => void;
 };
 
+// The quick first read, while the analysis is being written or after it failed. Once the analysis is on screen
+// the same two places hold its summary and details, so this is drawn only when the analysis itself is not.
+const AnalysisFirstRead = ({ headline, lines }: { headline: React.ReactNode; lines: React.ReactNode }) => (
+  <div className={styles.analysisFirstRead} data-testid="analysis-first-read" role="status">
+    <p className={styles.analysisFirstReadLabel}>First read</p>
+    <p className={styles.analysisFirstReadHeadline}>{headline}</p>
+    {typeof lines === 'string' && lines ? (
+      <ul>
+        {lines
+          .split('\n')
+          .filter(Boolean)
+          .map((line, index) => (
+            // Keyed by place: the lines never reorder, and two may read the same.
+            <li key={index}>{line}</li>
+          ))}
+      </ul>
+    ) : null}
+  </div>
+);
+
 const UserPageAnalysisModal = ({
   aiAnalysis,
   analysisCacheStatusState,
@@ -77,132 +97,158 @@ const UserPageAnalysisModal = ({
   onOpenAiSettings,
   onRefreshAnalysis,
   onToggle,
-}: UserPageAnalysisModalProps): React.ReactElement => (
-  <Modal isOpen={isOpen} toggle={onToggle} contentClassName={styles.analysisModalContent}>
-    <ModalHeader
-      toggle={onToggle}
-      className={styles.modalHeader}
-      close={
-        <button
-          type="button"
-          className={styles.analysisCloseButton}
-          data-ce-control-appearance="frameless"
-          aria-label="Close"
-          onClick={onToggle}
-        >
-          <span aria-hidden="true">×</span>
-        </button>
-      }
-    >
-      <div className={styles.modalTitleRow}>
-        {analysisName || 'User Analysis'}
-        <button
-          type="button"
-          className={styles.refreshIconButton}
-          data-ce-control-appearance="frameless"
-          onClick={onRefreshAnalysis}
-          title="Refresh analysis"
-          disabled={analyzing}
-          aria-label="Refresh analysis"
-        >
-          <FontAwesomeIcon icon={faSync} spin={analyzing} id={styles.refreshAnalysisIcon} />
-        </button>
-      </div>
-      {analysisCacheStatusState.shouldRenderAnalysisCacheStatus && (
-        <div className={styles.analysisCacheStatus}>
-          Cached analysis from {analysisCacheStatusState.analysisCacheAge}
+}: UserPageAnalysisModalProps): React.ReactElement => {
+  const firstRead =
+    !analysisModalDisplayState.shouldRenderAnalysisBody && aiAnalysis ? (
+      <AnalysisFirstRead headline={aiAnalysis} lines={analysisDetails} />
+    ) : null;
+  return (
+    <Modal isOpen={isOpen} toggle={onToggle} contentClassName={styles.analysisModalContent}>
+      <ModalHeader
+        toggle={onToggle}
+        className={styles.modalHeader}
+        close={
+          <button
+            type="button"
+            className={styles.analysisCloseButton}
+            data-ce-control-appearance="frameless"
+            aria-label="Close"
+            onClick={onToggle}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        }
+      >
+        <div className={styles.modalTitleRow}>
+          {analysisName || 'User Analysis'}
+          <button
+            type="button"
+            className={styles.refreshIconButton}
+            data-ce-control-appearance="frameless"
+            onClick={onRefreshAnalysis}
+            title="Refresh analysis"
+            disabled={analyzing}
+            aria-label="Refresh analysis"
+          >
+            <FontAwesomeIcon icon={faSync} spin={analyzing} id={styles.refreshAnalysisIcon} />
+          </button>
         </div>
-      )}
-    </ModalHeader>
-    <ModalBody className={styles.modalBody}>
-      {analysisModalDisplayState.shouldRenderAnalyzing && (
-        <div className={styles.analyzingContainer}>
-          <FontAwesomeIcon icon={faSpinner} spin />
-          <span>Generating insights… {(analysisElapsedMs / 1000).toFixed(1)}s</span>
-        </div>
-      )}
-      {analysisModalDisplayState.shouldRenderError && (
-        <div className={styles.analysisErrorNotice} role="alert">
-          <p className={styles.placeholderNote}>{analysisError}</p>
-          {(analysisErrorAction === 'add-ai-key' || analysisErrorAction === 'open-ai-settings') && onOpenAiSettings ? (
-            <button type="button" className={styles.analysisSettingsLink} onClick={onOpenAiSettings}>
-              {analysisErrorAction === 'add-ai-key' ? 'Add AI key' : 'Open AI settings'}
-            </button>
-          ) : null}
-        </div>
-      )}
-      {analysisModalDisplayState.shouldRenderAnalysisBody && (
-        <>
-          <p className={styles.analysisModel}>
-            {analysisGeneration?.source === 'requested' ? 'Requested AI model: ' : 'AI model: '}
-            {analysisGeneration?.model || 'not recorded'}
-            {analysisGeneration?.provider ? ` (${analysisGeneration.provider})` : ''}
-          </p>
-          <p className={styles.placeholderNote}>{aiAnalysis}</p>
-          {analysisModalDisplayState.shouldRenderDetails && <p className={styles.analysisDetails}>{analysisDetails}</p>}
-          {analysisModalDisplayState.shouldRenderHistoricalAlignment && (
-            <div className={styles.historicalAlignment}>
-              <h4>Historical Alignment</h4>
-              {analysisModalDisplayState.shouldRenderHistoricalFigure && <p>{analysisHistoricalFigure}</p>}
-              {analysisModalDisplayState.shouldRenderHistoricalReasoning && (
-                <p className={styles.placeholderNote}>{analysisHistoricalReasoning}</p>
-              )}
+        {analysisCacheStatusState.shouldRenderAnalysisCacheStatus && (
+          <div className={styles.analysisCacheStatus}>
+            Cached analysis from {analysisCacheStatusState.analysisCacheAge}
+          </div>
+        )}
+      </ModalHeader>
+      <ModalBody className={styles.modalBody}>
+        {analysisModalDisplayState.shouldRenderAnalyzing && (
+          <>
+            <div className={styles.analyzingContainer}>
+              <FontAwesomeIcon icon={faSpinner} spin />
+              <span>
+                {firstRead ? 'Writing the full analysis… ' : 'Generating insights… '}
+                {formatUserPageAnalysisWait(analysisElapsedMs)}
+              </span>
             </div>
-          )}
-          {(analysisCard || analysisCardPending) && (
-            <div className={styles.historicalAlignment}>
-              <h4>Picture card</h4>
-              {analysisCard ? (
-                <>
-                  <UserPageAnalysisCard card={analysisCard} picture={analysisCardPicture} />
-                  {analysisCardSavedAt ? (
-                    <p className={styles.placeholderNote}>
-                      Their saved card, from {formatSavedAnalysisCardDate(analysisCardSavedAt)}
-                    </p>
-                  ) : null}
-                  {analysisCardPublish && onAnalysisCardShownChange ? (
-                    <div className={cardStyles.publish}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={analysisCardPublish.shown}
-                          disabled={analysisCardPublish.saving}
-                          onChange={(event) => onAnalysisCardShownChange(event.target.checked)}
-                        />{' '}
-                        Show this card on my page
-                      </label>{' '}
-                      <button
-                        type="button"
-                        id="analysisCardPublishHelp"
-                        className={cardStyles.publishHelp}
-                        data-ce-control-appearance="frameless"
-                        aria-label="About showing this card on your page"
-                      >
-                        <FontAwesomeIcon icon={faQuestionCircle} />
-                      </button>
-                      <UncontrolledTooltip target="analysisCardPublishHelp" trigger="hover focus" autohide={false}>
-                        Anyone signed in to this session who may use its AI and read your answers sees this card on your
-                        page, with up to three of those answers. Untick to remove it.
-                      </UncontrolledTooltip>
-                      {analysisCardPublish.note ? (
-                        <p className={styles.placeholderNote} role="status">
-                          {analysisCardPublish.note}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <p className={styles.placeholderNote} role="status">
-                  <FontAwesomeIcon icon={faSpinner} spin /> Making the card…
-                </p>
-              )}
+            {firstRead}
+          </>
+        )}
+        {analysisModalDisplayState.shouldRenderError && (
+          <>
+            {firstRead}
+            <div className={styles.analysisErrorNotice} role="alert">
+              <p className={styles.placeholderNote}>
+                {firstRead ? 'The full analysis did not arrive. ' : ''}
+                {analysisError}
+              </p>
+              {analysisErrorAction !== 'add-ai-key' ? (
+                <button type="button" className={styles.analysisSettingsLink} onClick={onRefreshAnalysis}>
+                  Try again
+                </button>
+              ) : null}
+              {(analysisErrorAction === 'add-ai-key' || analysisErrorAction === 'open-ai-settings') &&
+              onOpenAiSettings ? (
+                <button type="button" className={styles.analysisSettingsLink} onClick={onOpenAiSettings}>
+                  {analysisErrorAction === 'add-ai-key' ? 'Add AI key' : 'Open AI settings'}
+                </button>
+              ) : null}
             </div>
-          )}
-        </>
-      )}
-    </ModalBody>
-  </Modal>
-);
+          </>
+        )}
+        {analysisModalDisplayState.shouldRenderAnalysisBody && (
+          <>
+            <p className={styles.analysisModel}>
+              {analysisGeneration?.source === 'requested' ? 'Requested AI model: ' : 'AI model: '}
+              {analysisGeneration?.model || 'not recorded'}
+              {analysisGeneration?.provider ? ` (${analysisGeneration.provider})` : ''}
+            </p>
+            <p className={styles.placeholderNote}>{aiAnalysis}</p>
+            {analysisModalDisplayState.shouldRenderDetails && (
+              <p className={styles.analysisDetails}>{analysisDetails}</p>
+            )}
+            {analysisModalDisplayState.shouldRenderHistoricalAlignment && (
+              <div className={styles.historicalAlignment}>
+                <h4>Historical Alignment</h4>
+                {analysisModalDisplayState.shouldRenderHistoricalFigure && <p>{analysisHistoricalFigure}</p>}
+                {analysisModalDisplayState.shouldRenderHistoricalReasoning && (
+                  <p className={styles.placeholderNote}>{analysisHistoricalReasoning}</p>
+                )}
+              </div>
+            )}
+            {(analysisCard || analysisCardPending) && (
+              <div className={styles.historicalAlignment}>
+                <h4>Picture card</h4>
+                {analysisCard ? (
+                  <>
+                    <UserPageAnalysisCard card={analysisCard} picture={analysisCardPicture} />
+                    {analysisCardSavedAt ? (
+                      <p className={styles.placeholderNote}>
+                        Their saved card, from {formatSavedAnalysisCardDate(analysisCardSavedAt)}
+                      </p>
+                    ) : null}
+                    {analysisCardPublish && onAnalysisCardShownChange ? (
+                      <div className={cardStyles.publish}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={analysisCardPublish.shown}
+                            disabled={analysisCardPublish.saving}
+                            onChange={(event) => onAnalysisCardShownChange(event.target.checked)}
+                          />{' '}
+                          Show this card on my page
+                        </label>{' '}
+                        <button
+                          type="button"
+                          id="analysisCardPublishHelp"
+                          className={cardStyles.publishHelp}
+                          data-ce-control-appearance="frameless"
+                          aria-label="About showing this card on your page"
+                        >
+                          <FontAwesomeIcon icon={faQuestionCircle} />
+                        </button>
+                        <UncontrolledTooltip target="analysisCardPublishHelp" trigger="hover focus" autohide={false}>
+                          Anyone signed in to this session who may use its AI and read your answers sees this card on
+                          your page, with up to three of those answers. Untick to remove it.
+                        </UncontrolledTooltip>
+                        {analysisCardPublish.note ? (
+                          <p className={styles.placeholderNote} role="status">
+                            {analysisCardPublish.note}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className={styles.placeholderNote} role="status">
+                    <FontAwesomeIcon icon={faSpinner} spin /> Making the card…
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </ModalBody>
+    </Modal>
+  );
+};
 
 export default UserPageAnalysisModal;

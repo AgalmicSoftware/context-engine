@@ -250,3 +250,15 @@ test('initialize tells the server the client’s own clientInfo, and a failing l
   assert.equal(reply.result.serverInfo.name, 't');
   assert.match(logged.join('\n'), /listener broke/);
 });
+
+test('error text never repeats a read proof a Worker echoed back', async () => {
+  const { describeError } = await import('./mcpServer.mjs');
+  const mac = 'ab'.repeat(32);
+  const signature = `0x${'cd'.repeat(65)}`;
+  const said = describeError(new Error(`Refused header c1:by-code:0123456789abcdef:1795000000:${mac} and v2:salon:${signature}, also ${mac} and ${signature}.`));
+  assert.equal(said.includes(mac) || said.includes(signature) || said.includes('0123456789abcdef'), false);
+  assert.match(said, /^Refused header \[removed\] and \[removed\] also \[removed\] and \[removed\]\.?$/);
+  // Ordinary words, addresses and ids are left as they are.
+  const plain = `Group "salon" didn’t let 0x${'11'.repeat(20)} in; question 0x${'a1'.repeat(8)}.`;
+  assert.equal(describeError(new Error(plain)), plain);
+});

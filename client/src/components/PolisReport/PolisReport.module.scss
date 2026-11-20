@@ -663,20 +663,154 @@
   }
 }
 
-.polisReportContainer button.clusterAutoButton {
-  margin-left: 6px;
-  color: var(--ce-document-text);
-  background: var(--ce-document-surface);
-  -webkit-text-fill-color: currentColor;
+// The Participants Graph's title line: its name, Clusters, the gear, then Hide.
+.graphTitleRow {
+  position: relative;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
 
-  &:hover {
-    color: var(--ce-document-text);
+.graphTitleControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  cursor: default;
+}
+
+.graphClustersLabel {
+  margin: 0;
+  font-weight: 600;
+  // The title line's own colour, which each report style sets for its header.
+  color: inherit;
+}
+
+.polisReportContainer button.graphSettingsButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ce-color-border-light);
+  border-radius: var(--ce-radius-round);
+  background: var(--ce-document-surface);
+  background-image: none;
+  box-shadow: none;
+  color: var(--ce-document-text);
+  -webkit-text-fill-color: currentColor;
+  font-size: 1.1rem;
+  cursor: pointer;
+  &:hover,
+  &[aria-expanded='true'] {
     background: var(--ce-document-border);
+    color: var(--ce-document-text);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ce-document-text);
+    outline-offset: 2px;
+  }
+}
+
+// Opens under the title line and over the top of the graph, so on a phone it is in view where it was asked for.
+.graphSettingsPanel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 10px;
+  width: min(300px, 100%);
+  padding: 14px 16px;
+  border: 1px solid var(--ce-document-border-strong, var(--ce-document-border));
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-document-canvas);
+  color: var(--ce-document-text);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 400;
+
+  &[hidden] {
+    display: none;
   }
 
-  &:focus-visible {
-    outline: 2px solid var(--report-control-blue);
-    outline-offset: -2px;
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    min-height: 32px;
+    color: var(--ce-document-text);
+    cursor: pointer;
+  }
+  select {
+    min-height: 36px;
+    padding: 4px 8px;
+    color: var(--ce-document-text);
+    background: var(--ce-document-canvas);
+    border: 1px solid var(--ce-color-border-light);
+    border-radius: var(--ce-radius-4);
+  }
+}
+
+.graphSettingsTitle {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.graphSettingsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.graphSettingsShow {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  legend {
+    float: none;
+    width: auto;
+    margin: 0 0 2px;
+    padding: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ce-document-text);
+  }
+}
+
+.graphSettingsNote {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ce-document-text-muted);
+}
+
+.polisReportContainer button.graphSettingsReset {
+  justify-self: start;
+  min-height: 36px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+  color: var(--ce-document-text);
+  -webkit-text-fill-color: currentColor;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .graphTitleControls {
+    margin-left: 0;
+  }
+  .graphSettingsPanel {
+    left: 0;
+    width: auto;
   }
 }
 
@@ -786,7 +920,7 @@
   font-family: var(--ce-font-mono);
   font-size: 1.1rem;
   display: block;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -799,6 +933,136 @@
 
 .participantAddressShort {
   display: none;
+}
+
+/* An AI agent's mark sits beside its name; what the agent says of itself shows on hover or focus, under the row. */
+.participantListItem {
+  position: relative;
+}
+
+.polisReportContainer button.agentMark {
+  appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: var(--ce-radius-4);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ce-document-text);
+  font: inherit;
+  cursor: help;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
+  }
+}
+
+.agentTip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 8px;
+  z-index: 5;
+  max-width: calc(100% - 16px);
+  padding: 6px 8px;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-4);
+  background: var(--ce-document-text);
+  color: var(--ce-document-canvas);
+  font-size: 0.85rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
+  cursor: text;
+
+  /* Bridges the gap from the icon, so the pointer can move onto the tip without it closing. */
+  &::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    left: 0;
+    height: 12px;
+  }
+}
+
+/* The last row's tip opens upwards, inside the report's scrolling edge. */
+.participantListItem:last-child .agentTip {
+  top: auto;
+  bottom: calc(100% + 4px);
+
+  &::before {
+    top: 100%;
+    bottom: auto;
+  }
+}
+
+.agentMark:hover .agentTip,
+.agentMark:focus .agentTip {
+  display: block;
+}
+
+.agentIcon {
+  margin-left: 0.4em;
+}
+
+.agentDetail {
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+@media print {
+  .agentTip {
+    display: none !important;
+  }
+}
+
+/* Beside an address whose name is still being looked up. It comes after the address, so nothing moves when it goes. */
+.nameLookup {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 0.85em;
+  height: 0.85em;
+  margin-left: 0.4em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  opacity: 0.75;
+  vertical-align: -0.1em;
+  animation: nameLookupTurn 0.9s linear infinite;
+}
+
+.participantListItem > .nameLookup {
+  margin-left: 0;
+  color: var(--ce-document-text);
+}
+
+@keyframes nameLookupTurn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nameLookup {
+    animation: none;
+    border-style: dotted;
+    border-right-color: currentColor;
+  }
+}
+
+@media print {
+  .nameLookup {
+    display: none;
+  }
 }
 
 @media (max-width: 480px) {
@@ -827,15 +1091,6 @@
     max-width: 100%;
     width: 100%;
   }
-}
-
-/*
-   * 4. Participant Graph controls: Make them wrap compactly.
-   */
-.participantGraphControls {
-  display: flex;
-  flex-wrap: wrap; // Allow control groups to wrap    align-items: center;
-  gap: 15px 20px; // row-gap column-gap    margin-bottom: 15px;
 }
 
 /*
@@ -963,13 +1218,6 @@
     background: var(--ce-color-white);
   }
 
-  .participantGraphControls {
-    background: var(--ce-document-surface);
-    border: none;
-    border-radius: var(--ce-radius-6);
-    padding: 10px 12px;
-  }
-
   .participantsList {
     gap: 10px;
   }
@@ -980,7 +1228,9 @@
     box-shadow: 0 6px 14px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
   }
 
-  .participantAddressLink {
+  .participantAddressLink,
+  .participantListItem > .nameLookup,
+  .participantListItem > .agentMark {
     color: var(--ce-status-info);
   }
 
@@ -1183,13 +1433,6 @@
     stroke: var(--ce-text-muted);
   }
 
-  .participantGraphControls {
-    background: var(--ce-document-text);
-    border: 1px solid var(--ce-document-border-strong);
-    border-radius: var(--ce-radius-6);
-    padding: 10px 12px;
-  }
-
   .participantsList {
     gap: 10px;
   }
@@ -1208,8 +1451,15 @@
     --ce-beeswarm-border: 1px solid var(--ce-document-text-muted);
   }
 
-  .participantAddressLink {
+  .participantAddressLink,
+  .participantListItem > .nameLookup,
+  .participantListItem > .agentMark {
     color: var(--ce-document-border);
+  }
+
+  .agentTip {
+    background: var(--ce-document-canvas);
+    color: var(--ce-document-text);
   }
 
   .tooltipIcon {
@@ -1419,5 +1669,29 @@
       margin-bottom: 12px;
       padding-bottom: 8px;
     }
+  }
+}
+
+/* Screens only: a printed page is narrower than this too, and print keeps its desktop spacing. */
+@media screen and (max-width: 767px) {
+  /* A phone has room for one small gutter, not one per layer: the report's edge and page keep a little and the
+     layers inside give theirs up, so answers use the width. A PDF keeps its desktop spacing. */
+  .polisReportContainer:not(.sessionEmbeddedReport) {
+    padding: 6px;
+  }
+
+  .polisReportContainer .reportInner:not(.pdfDesktopWidth) {
+    padding: 8px;
+  }
+
+  .reportInner:not(.pdfMode) .allQuestionsBody {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .reportInnerModern:not(.pdfMode) .sectionCollapse,
+  .reportInnerDark:not(.pdfMode) .sectionCollapse {
+    padding-right: 8px;
+    padding-left: 8px;
   }
 }

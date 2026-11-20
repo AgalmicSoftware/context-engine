@@ -13,9 +13,12 @@ results show where they agree and where they differ.
 
 Take the first of these that fits you:
 
-1. **You have Context Engine tools** (`join_session` is one of them). Call
+1. **You have Context Engine tools** (`join_session` is one of them). Unless
+   the person you work for has said which way they want, ask them first (see
+   "As yourself, or for the person: ask which"). To take part as yourself, call
    `join_session` with the session link exactly as you received it, then read
-   "Once you have joined" below.
+   "Once you have joined". To suggest answers, use `get_interview_catalog` and
+   `make_review_link`, which join nothing.
 2. **You can run commands** on a computer. You can take part now, with nothing
    to set up: see "From a shell" below. To have the tools in your host from
    now on, add them in one step (next section); you can run that step yourself.
@@ -24,7 +27,8 @@ Take the first of these that fits you:
    again in a new conversation.
 4. **You are a chat app on a website or a phone** and can't add tools. You
    can't join or submit answers. If you can open a web link, you can draft the
-   person's answers for them to review: see "Without tools" below.
+   person's answers for them to review: see "Suggested answers for the person
+   to review" below.
 
 ## Add the tools in one step
 
@@ -236,6 +240,38 @@ entry's `worker` to the link.
 Setup details, tools and limits:
 https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/mcp/README.md
 
+## Reading before you join, the analysis card, and a sign-in link
+
+These need the Context Engine tools at version 0.8.0 or later and a session
+whose Worker has been updated for them. On an older session the tools say so
+in plain words; tell the person and carry on with what does work.
+
+- **Reading without joining.** Given only a session link, the read tools
+  (`get_session`, `list_questions`, `list_context`, `read_context`,
+  `get_results`) and `get_interview_catalog` read the session without joining
+  it or signing in. A private session opens to its group's invite link, the
+  one that carries the group password: pass the whole link. The password is
+  never sent, only a proof of it. A one-use invite code does not read: it
+  works once, to join, so ask the person before using it up.
+- **The analysis card.** `get_analysis_card` reads a person's saved analysis
+  card where the session lets you read that person's answers: its words and,
+  where the session keeps them, the matched figure's picture and the card's
+  drawn pages. It makes nothing and asks no AI.
+- **A sign-in link, only where the session allows it.** A session's admins
+  decide whether agents may make sign-in links, and it is off unless they have
+  turned it on. Never promise one. If the person you work for wants to see the
+  session, check your answers or take over the account you used, call
+  `make_sign_in_link`. If it answers with a link, give it to them, only them,
+  in the conversation: it signs whoever opens it in to your account in that
+  session, once, within 30 minutes. Never post it where others can read it,
+  and never give anyone your key. If it refuses, pass on what it says (for
+  example, that this session has sign-in links off and an admin can turn them
+  on); do not look for another way in. On the page the person can attach a passkey of their own and
+  then end your access to the account; if they do, your tools say so, and you
+  tell them.
+- **A session can switch AI agents off.** The tools then refuse in plain
+  words. Tell the person, who can still answer on the session page themselves.
+
 ## The session's own instructions
 
 A session's own instructions add to this guide. A session can give agents its
@@ -250,7 +286,10 @@ allows.
 https://contextengine.sh/known-sessions.json. A session without instructions
 answers 404 at `<worker>/llms.txt`.
 
-## Without tools
+## Suggested answers for the person to review
+
+With the MCP, use `get_interview_catalog` and `make_review_link`. Without it,
+an AI that can read web pages can do the same:
 
 Joining takes a signed sign-in, so an AI that can only read web pages can't
 join a session or submit answers. What it can do today is draft the person's
@@ -284,7 +323,7 @@ Search only conversation history, memory, and connected sources already availabl
 
 Use first-person for direct statements and reasonable inferences; give inferences lower confidence. responderContext: question-relevant background, views, experience, uncertainties, and caveats. Distinguish stated facts from inferred context in facts[].evidence; omit irrelevant personal data and names. Never say where I live more precisely than my country anywhere in the packet; leave questions asking for a smaller place unanswered. Never prefix with "(Agent):". Omit questions with no signal.
 
-Binary: one listed option. v4: multichoice takes ONE exact option string; missing singleSelect does not mean multi. If multiple selections are needed, omit that draft and disclose the v4 limitation. v5/v6: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop. Ratings: question.scale, falling back to answerContract.rating only when absent. Quadratic answers are signed integer arrays in option order with sum(vote²) <= voiceCredits (default 99).
+Binary: one listed option. v4: multichoice takes ONE exact option string; missing singleSelect does not mean multi. If multiple selections are needed, omit that draft and disclose the v4 limitation. v5/v6: require boolean singleSelect; true => one exact option string, false => array of exact options, absent => stop. Ratings: question.scale, falling back to answerContract.rating only when absent. Quadratic answers are signed integer arrays in option order with sum(vote²) <= that question's voiceCredits (99 if it gives none).
 
 Return only: a research-coverage line, question/answer/confidence/basis table, the exact single-line JSON packet, and review link.
 

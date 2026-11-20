@@ -2,6 +2,7 @@ import { analysisCardAnswersArePrivate, analysisCardOn } from '@ce-shared/analys
 
 import type UserPage from './UserPage';
 import { analyzeUserCard, analyzeUserOpinions, fetchAnalysisCardPicture } from 'utilities/ai/aiClient.js';
+import { analyzeUserFirstRead } from 'utilities/ai/userFirstRead';
 import {
   buildAnalysisCard,
   normalizeAnalysisCard,
@@ -35,6 +36,7 @@ import {
   buildUserPageAnalysisErrorStatePatch,
   buildUserPageAnalysisErrorPresentation,
 } from './userPageHelpers';
+import { buildUserPageAnalysisFirstReadStatePatch } from './userPageAnalysisStateHelpers';
 
 const accountLog = createLogger('account');
 type CacheContext = Awaited<ReturnType<UserPage['_buildAnalysisCacheContext']>>;
@@ -489,6 +491,17 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
       analysisSession,
       context: analysisAiContext,
     });
+    // A quick first read from the fast model, asked beside the analysis and shown until the analysis arrives.
+    // The analysis takes its place, so the two cannot contradict each other on screen. It is not kept with the
+    // analysis, and when it fails or comes late there is simply none.
+    void analyzeUserFirstRead(userData, aiOptions).then(
+      (firstRead) =>
+        this.setState((previous: ProfileRecord) =>
+          isCurrent() && previous.analyzing ? buildUserPageAnalysisFirstReadStatePatch(firstRead) : null,
+        ),
+      (firstReadError: unknown) =>
+        accountLog.warn('[UserPage] first read not shown:', getUserPageErrorMessage(firstReadError, '')),
+    );
     let result;
     try {
       result = await analyzeUserOpinions(userData, aiOptions);

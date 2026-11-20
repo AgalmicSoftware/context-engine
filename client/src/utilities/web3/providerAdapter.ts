@@ -1,8 +1,10 @@
 import { getReadProviderForChain, getReadProviderForGroup } from './rpcProviders.js';
+import { agentLinkProvider, isAgentLinkProvider } from '../session/agentLinkAccount';
 
 type AnyRecord = Record<string, any>;
 
-type ProviderSource = 'configured-read' | 'session-sponsored' | 'injected-wallet' | 'passkey-eoa' | 'web3auth';
+type ProviderSource =
+  'configured-read' | 'session-sponsored' | 'injected-wallet' | 'passkey-eoa' | 'web3auth' | 'agent-link';
 
 type AdapterResult<T = unknown> = {
   ok: boolean;
@@ -136,6 +138,11 @@ export const resolveSignerProvider = (options: ResolveSignerProviderOptions = {}
       };
     }
     return { ok: true, provider, source: 'passkey-eoa' };
+  }
+
+  // Signed in to an agent's account without its key: an address for the page's hosted paths, and no signing.
+  if (isAgentLinkProvider(providerName)) {
+    return { ok: true, provider: agentLinkProvider, source: 'agent-link' };
   }
 
   if (providerName === 'web3auth') {

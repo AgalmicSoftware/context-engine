@@ -5,6 +5,7 @@ import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { analyzeUserCard, analyzeUserOpinions, fetchAnalysisCardPicture } from 'utilities/ai/aiClient.js';
+import { analyzeUserFirstRead } from 'utilities/ai/userFirstRead';
 import {
   analysisCardAvailableFor,
   publishSavedAnalysisCard,
@@ -35,6 +36,13 @@ jest.mock('utilities/ai/aiClient.js', () => ({
   })),
   analyzeUserCard: jest.fn(),
   fetchAnalysisCardPicture: jest.fn(),
+}));
+
+// No first read unless a test gives one: the request then fails quietly, as when the fast model does not answer.
+jest.mock('utilities/ai/userFirstRead', () => ({
+  analyzeUserFirstRead: jest.fn(async () => {
+    throw new Error('no first read in this test');
+  }),
 }));
 
 // Whether the session's Worker has the card; the session's own switch still decides.
@@ -1355,6 +1363,136 @@ describe('UserPage analysis cache and routing', () => {
     } finally {
       consoleErrorSpy.mockRestore();
     }
+  });
+
+  describe('the first read shown while the analysis is written', () => {
+    const firstRead = { headline: 'Wants decisions made close to home.', points: ['One', 'Two'] };
+    const pending = () => {
+      let resolve;
+      let reject;
+      const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+    // The steps before the request (finding the session, the fingerprint) are not all microtasks.
+    const settle = async () => {
+      for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+
+    it('shows it while the analysis is under way, and the analysis then takes its place', async () => {
+      const { instance } = makeAnalysisCacheInstance();
+      const full = pending();
+      analyzeUserOpinions.mockReturnValueOnce(full.promise);
+      analyzeUserFirstRead.mockResolvedValueOnce(firstRead);
+
+      const run = instance.analyzeUser();
+      await settle();
+
+      expect(instance.state.analyzing).toBe(true);
+      expect(instance.state.aiAnalysis).toBe('Wants decisions made close to home.');
+      expect(instance.state.analysisDetails).toBe('One\nTwo');
+      expect(analyzeUserFirstRead.mock.calls[0]).toEqual(analyzeUserOpinions.mock.calls[0]);
+
+      full.resolve({ name: 'The Careful Federalist', summary: 'The full summary.', details: 'The full details.' });
+      await run;
+
+      expect(instance.state.analyzing).toBe(false);
+      expect(instance.state.aiAnalysis).toBe('The full summary.');
+      expect(instance.state.analysisDetails).toBe('The full details.');
+      instance.clearAnalysisTimer();
+    });
+
+    it('keeps it on screen with the error when the analysis fails', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const { instance } = makeAnalysisCacheInstance();
+      const full = pending();
+      analyzeUserOpinions.mockReturnValueOnce(full.promise);
+      analyzeUserFirstRead.mockResolvedValueOnce(firstRead);
+
+      try {
+        const run = instance.analyzeUser();
+        await settle();
+        full.reject(new TypeError('Load failed'));
+        await run;
+
+        expect(instance.state.analyzing).toBe(false);
+        expect(instance.state.analysisError).toMatch(/^Unable to reach the AI service/);
+        expect(instance.state.aiAnalysis).toBe('Wants decisions made close to home.');
+        expect(instance.state.analysisDetails).toBe('One\nTwo');
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
+    it('drops one that arrives after the analysis, or after the analysis has failed', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const late = pending();
+        const { instance } = makeAnalysisCacheInstance();
+        analyzeUserFirstRead.mockReturnValueOnce(late.promise);
+        analyzeUserOpinions.mockResolvedValueOnce({ name: 'n', summary: 'The full summary.', details: 'd' });
+        await instance.analyzeUser();
+        late.resolve(firstRead);
+        await settle();
+        expect(instance.state.aiAnalysis).toBe('The full summary.');
+        instance.clearAnalysisTimer();
+
+        const lateAgain = pending();
+        const { instance: other } = makeAnalysisCacheInstance();
+        analyzeUserFirstRead.mockReturnValueOnce(lateAgain.promise);
+        analyzeUserOpinions.mockRejectedValueOnce(new Error('It failed.'));
+        await other.analyzeUser();
+        lateAgain.resolve(firstRead);
+        await settle();
+        expect(other.state.analysisError).toBe('It failed.');
+        expect(other.state.aiAnalysis).toBe('');
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
+    it('drops one from an earlier press that arrives while a second press is under way', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const { instance } = makeAnalysisCacheInstance();
+        const fromFirstPress = pending();
+        analyzeUserFirstRead.mockReturnValueOnce(fromFirstPress.promise);
+        analyzeUserOpinions.mockRejectedValueOnce(new Error('It failed.'));
+        await instance.analyzeUser();
+
+        const full = pending();
+        analyzeUserOpinions.mockReturnValueOnce(full.promise);
+        const again = instance.analyzeUser(true);
+        await settle();
+        expect(instance.state.analyzing).toBe(true);
+
+        fromFirstPress.resolve(firstRead);
+        await settle();
+        expect(instance.state.aiAnalysis).toBe('');
+
+        full.resolve({ name: 'n', summary: 'The full summary.', details: 'd' });
+        await again;
+        expect(instance.state.aiAnalysis).toBe('The full summary.');
+        instance.clearAnalysisTimer();
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
+    it('asks for none when the analysis is served from this browser', async () => {
+      const { instance } = makeAnalysisCacheInstance();
+      analyzeUserOpinions.mockResolvedValueOnce({ name: 'n', summary: 'Kept.', details: 'd' });
+      await instance.analyzeUser();
+      instance.clearAnalysisTimer();
+      expect(analyzeUserFirstRead).toHaveBeenCalledTimes(1);
+
+      await instance.analyzeUser();
+      expect(instance.state.analysisServedFromCache).toBe(true);
+      expect(analyzeUserFirstRead).toHaveBeenCalledTimes(1);
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('keeps network fetch failures distinct from missing AI key recovery', async () => {

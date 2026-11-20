@@ -17,6 +17,8 @@ export type SessionNamesSource = {
   enabled: boolean;
   /** Every name this reader may see; empty, not an error, for someone the session doesn't let read them. */
   readAll: () => Promise<SessionNames>;
+  /** As readAll, but a read that couldn't be made rejects, so it isn't taken for a reader shown no names. */
+  readAllOrFail: () => Promise<SessionNames>;
   /**
    * Whether this tab holds the session sign-in names are read with. A person whose wallet is connected can lack
    * it (a new tab starts without one), and is then shown addresses until they sign in.
@@ -50,6 +52,7 @@ const readNames = (body: unknown): SessionNames => {
 
 // One read serves every view on the page for a short while; a save here clears it.
 const READ_TTL_MS = 30_000;
+export const NAMES_READ_TIMEOUT_MS = 10_000;
 const reads = new Map<string, { at: number; names: Promise<SessionNames> }>();
 
 const changeListeners = new Set<() => void>();
@@ -62,6 +65,7 @@ export const subscribeSessionNames = (listener: () => void): (() => void) => {
 const NAMES_OFF: SessionNamesSource = {
   enabled: false,
   readAll: async () => ({}),
+  readAllOrFail: async () => ({}),
   hasSignIn: async () => true,
   signIn: async () => {},
   setOwn: async () => {
@@ -78,7 +82,7 @@ const workerSource = (base: string, options: SessionNamesOptions): SessionNamesS
     allowDemoFallback: defaultStrictAllowDemoFallback(),
   };
   const slugQuery = `slug=${encodeURIComponent(options.sessionSlug)}`;
-  return {
+  const source: SessionNamesSource = {
     enabled: true,
     hasSignIn: async () => !options.account || !!(await getCachedWorkerSessionToken(session)),
     signIn: async () => {
@@ -86,13 +90,17 @@ const workerSource = (base: string, options: SessionNamesOptions): SessionNamesS
     },
     // Reading never asks for a sign-in: a held token widens what the Worker shows, and without one it answers
     // as it would anyone signed out.
-    readAll: async () => {
+    readAllOrFail: async () => {
       const token = options.account ? await getCachedWorkerSessionToken(session) : '';
       const key = `${base}|${options.sessionSlug}|${token}`;
       const kept = reads.get(key);
       if (kept && Date.now() - kept.at < READ_TTL_MS) return kept.names;
+      // A read that hangs ends as a failure, so a view waiting on it can settle.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), NAMES_READ_TIMEOUT_MS);
       const names = fetch(`${base}/names?${slugQuery}`, {
         method: 'GET',
+        signal: controller.signal,
         headers: {
           ...groupReadHeaders(base, options.sessionSlug),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -103,22 +111,19 @@ const workerSource = (base: string, options: SessionNamesOptions): SessionNamesS
         referrerPolicy: 'no-referrer',
       })
         .then(async (response) => {
-          if (response.ok) return readNames(await response.json().catch(() => ({})));
-          // A refusal, such as an expired sign-in, is asked again next time rather than kept.
-          forget();
-          return {};
+          if (!response.ok) throw new Error(`The names couldn't be read (${response.status}).`);
+          return readNames(await response.json());
         })
-        .catch(() => {
-          forget();
-          return {};
-        });
-      // Only this read is dropped, never a newer one kept under the same key.
-      const forget = () => {
+        .finally(() => clearTimeout(timeout));
+      // A read that failed, such as one with an expired sign-in, is asked again next time rather than kept. Only
+      // this read is dropped, never a newer one kept under the same key.
+      names.catch(() => {
         if (reads.get(key)?.names === names) reads.delete(key);
-      };
+      });
       reads.set(key, { at: Date.now(), names });
       return names;
     },
+    readAll: () => source.readAllOrFail().catch(() => ({})),
     setOwn: async (name) => {
       const response = await fetchWorkerWithAuth(
         `${base}/names/set`,
@@ -135,6 +140,7 @@ const workerSource = (base: string, options: SessionNamesOptions): SessionNamesS
       return typeof result.name === 'string' && result.name ? result.name : null;
     },
   };
+  return source;
 };
 
 // One source per session, reader and setting, so views can tell a reload from a change.

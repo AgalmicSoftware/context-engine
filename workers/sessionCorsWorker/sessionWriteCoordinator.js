@@ -15,6 +15,9 @@ import {
   normalizeWorkerGroupSigner,
   resolveWorkerGroupJoinCredential,
   workerGroupInviteCounts,
+  createWorkerGroupReadCodeMisses,
+  matchesUnusedWorkerGroupInvite,
+  normalizeWorkerGroupReadCode,
   workerGroupInviteKey,
   workerGroupInvitePrefix,
 } from './workerGroupInvites.js';
@@ -43,6 +46,7 @@ import { nextResultsJobAt, readResultsJob, runResultsJobs, startResultsJob } fro
 import { RESULTS_JOB_RUNNERS } from './resultsJobRunners.js';
 import { dispatchSessionAgentOptOutStore } from './sessionAgentOptOuts.js';
 import { dispatchSessionNamesStore } from './sessionNames.js';
+import { dispatchAgentSignInStore } from './agentSignInStore.js';
 import { dispatchSessionAgentHistoryStore } from './sessionAgentHistory.js';
 import { dispatchSessionFeedbackStore } from './sessionFeedback.js';
 import {
@@ -2033,13 +2037,35 @@ export class SessionWriteCoordinator {
     const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
     const groupId = normalizeWorkerGroupId(payload?.groupId);
     const signer = normalizeWorkerGroupSigner(payload?.signer);
-    if (!slug || !sessionId || !groupId || !signer) {
+    // A one-use code's read proof in place of a signer: the group's unused codes are looked at, and none is spent.
+    const code = signer ? null : normalizeWorkerGroupReadCode(payload?.code);
+    if (!slug || !sessionId || !groupId || (!signer && !code)) {
       return jsonResponse({ ok: false, status: 400, reason: 'worker_group_read_invite_invalid' }, 400);
     }
     const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
     if (!initialized.ok) return jsonResponse(initialized, initialized.status || 503);
     const group = await this.getActiveWorkerGroupCapacity(groupId);
-    const admitted = group.ok && group.state.joinMode === 'group_password' && constantTimeEqual(signer, group.state.signer);
+    let admitted = false;
+    if (signer) {
+      admitted = group.ok && group.state.joinMode === 'group_password' && constantTimeEqual(signer, group.state.signer);
+    } else {
+      // A sender past its count of wrong proofs is refused unlooked-at, in the same words as any other miss.
+      const from = typeof payload?.from === 'string' ? payload.from : '';
+      const nowMs = Date.now();
+      this.workerGroupReadCodeMisses ||= createWorkerGroupReadCodeMisses();
+      // A code reads while it could still join: once the group's joining has closed, it reads nothing either.
+      const takesCodes = group.ok && group.state.joinMode === 'one_use' &&
+        !(Date.parse(toTrimmedString(group.state.joinEndsAt)) <= nowMs);
+      if (takesCodes && !this.workerGroupReadCodeMisses.blocked(from, nowMs)) {
+        const prefix = workerGroupInvitePrefix(groupId);
+        const found = await this.state.storage.list({ prefix: `${prefix}${code.hashPrefix}`, limit: 4 });
+        admitted = await matchesUnusedWorkerGroupInvite({
+          code, nowMs, candidates: [...found].map(([key, invite]) => [key.slice(prefix.length), invite]),
+        });
+        // Only a wrong proof for a group that takes codes is a guess; a group being changed, or closed, is not.
+        if (!admitted) this.workerGroupReadCodeMisses.miss(from, nowMs);
+      }
+    }
     return admitted
       ? jsonResponse({ ok: true, status: 200, groupId }, 200)
       : jsonResponse({ ok: false, status: 403, reason: 'worker_group_read_invite_invalid' }, 403);
@@ -3615,6 +3641,9 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname.startsWith('/session-config/session-names/')) {
       return dispatchSessionNamesStore(this, url.pathname.split('/').pop(), payload || {});
+    }
+    if (url.pathname.startsWith('/session-config/agent-sign-in/')) {
+      return dispatchAgentSignInStore(this, url.pathname.split('/').pop(), payload || {});
     }
     if (url.pathname.startsWith('/session-config/session-agent-history/')) {
       return dispatchSessionAgentHistoryStore(this, url.pathname.split('/').pop(), payload || {});

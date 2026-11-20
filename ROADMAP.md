@@ -10,9 +10,14 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 - **Client modernization baseline**: the client is on React 18 and TypeScript 5.8, with production component surfaces moved to TSX and a growing set of helper-level tests.
 - **Protected SBT mint modes**: SBT contracts now expose explicit mint modes so protected password, group-signature, and invite-signature flows do not fall through to public `claim()` minting.
 - **Worker auth coordination and revocation**: the mandatory Session coordinator serializes nonce consumption and route counters across isolates, while server-managed authorization epochs and current-policy revalidation invalidate stale permissions after config or gate changes.
-- **Agent access foundation**: Session Workers can serve a scoped `/api/agent/*`
-  HTTP contract, scoped credentials, agent token browser login, and Session
-  Wrapped, and the MCP server lets a local agent take part as its own participant.
+- **Agent access**: Session Workers serve a scoped `/api/agent/*` HTTP contract
+  with scoped credentials and Session Wrapped. The MCP server lets a local agent
+  take part as its own participant, and an agent given only a public session's
+  link can draft answers for a person to review.
+- **Voice interviews**: a voice interviewer asks a session's questions and drafts answers the person reviews before submitting.
+- **Results views and the Session Agent**: Results include a report, a debate atlas and a risk matrix, and a Session Agent answers questions about them.
+- **Names, groups and backups on Session Workers**: passkey sign-in, groups joined by link or code, per-session user-names and admin backups.
+- **Group recording**: a breakout discussion recorded on one phone becomes draft questions and context.
 
 ## Current Engineering Priorities
 
@@ -24,13 +29,13 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 - **Worker auth operations**: continue expanding coordinator telemetry, compromise-response guidance, and concurrency regression coverage around the implemented nonce, rate-limit, authorization-epoch, and current-policy controls.
 - **At-rest secret hardening**: browser passkey wallet storage uses WebAuthn PRF-backed wrapping, and Worker KV secret fields use a versioned AES-GCM envelope. Remaining work covers encryption-key continuity, recovery, and migration procedures.
 
-## AI Agent Interface
+## In Progress
 
-Agent HTTP is implemented in the Session Worker, and the MCP server covers local
-agents. Remaining work is to expand canonical handoffs for settings, SBT,
-decrypt, and storage actions, and harden operator setup and lifecycle
-verification. The [Session Worker Agent HTTP README](workers/sessionCorsWorker/agent/README.md)
-describes the routes.
+- **Agent-first use**: agents take part through MCP and Agent HTTP today, read a private session from its group's link, and can give their person a sign-in link to the account they used where the session's admins allow it. Still open: an agent signing in on the website itself. Canonical handoffs for settings, SBT, decrypt and storage actions also remain. The [Session Worker Agent HTTP README](workers/sessionCorsWorker/agent/README.md) describes the routes.
+- **Voice-only use**: spoken interviews have shipped; driving the whole site by voice has not.
+- **Documents and context**: context cards, the document library and the debate atlas have shipped; knowledge maps have not.
+- **Storage options**: Cloudflare storage sits beside Arweave, with optional R2; IPFS has not shipped.
+- **Turnkey deployment**: a Deploy to Cloudflare template and a deploy helper create a session's Worker; bundles for Arweave, Lit, EVM gas and AI access have not shipped.
 
 ## Future Development
 

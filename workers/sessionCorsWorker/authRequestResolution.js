@@ -91,11 +91,12 @@ export const resolveAuthenticatedRequest = async ({
     await recordAuthFailure({ env, deps });
     return {
       ok: false,
-      response: deps?.json?.({ error: tokenRecord?.error || 'Invalid token.' }, 401, baseHeaders),
+      response: deps?.json?.({ error: tokenRecord?.error || 'Invalid token.' }, tokenRecord?.status || 401, baseHeaders),
     };
   }
 
   const source = await validateAgentParticipantSource({ request, env, payload, slug, deps });
   if (!source.ok) return { ok: false, response: deps?.json?.({ error: source.error }, source.status || 401, baseHeaders) };
+
   return { ok: true, payload, slug };
 };

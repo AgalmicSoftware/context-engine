@@ -17,6 +17,9 @@ import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 import { createWorkerRuntime } from '../../workers/sessionCorsWorker/worker.js';
 import { SessionWriteCoordinator } from '../../workers/sessionCorsWorker/sessionWriteCoordinator.js';
 import { analysisCardFigureKey } from '../../shared/analysisCardPicture.mjs';
+import {
+  AGENT_CLIENT_HEADER, AGENT_SIGN_IN_LINK_STATEMENT, AGENT_SIGN_IN_PATHS, agentPasskeyAttachStatement,
+} from '../../shared/agentSignIn.mjs';
 
 const repo = path.resolve(__dirname, '../..');
 const git = (args) => execFileSync('git', args, { cwd: repo, stdio: 'pipe', maxBuffer: 20 * 1024 * 1024 });
@@ -172,6 +175,8 @@ const drill = async ({ provider = offline } = {}) => {
     return { fresh, results };
   };
   session.end = () => now.mockRestore();
+  // Lets time pass, as between one sign-in and the next.
+  session.wait = (ms) => { clock += ms; };
   Object.assign(config, { slug, sessionId, sessionIdHex: sessionId, adminAddress: owner.address, allowOrigins: [site],
     corsWorkerUrl: origin, workerAuthority: { version: 1, participantScopes: ['storage'] } });
   delete config.resultsAnalysis;
@@ -599,3 +604,130 @@ describe('putting a session back on a released Worker bundle', () => {
     }), 120000);
   });
 });
+
+// The agents release: a person signed in from their agent's link, a passkey attached, the agent's access ended,
+// agents switched off for the session, and a saved card's drawn pages. All of it is new keys beside what a session
+// already stores, so the bundle this release is pinned to reads none of it and changes none of it.
+describe('the agents release, back on the pinned bundle', () => {
+  let tempDir;
+  let released;
+  const testResponse = globalThis.Response;
+  beforeAll(async () => {
+    globalThis.Response = (await fetch('data:,')).constructor;
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-way-back-agents-'));
+    if (pinned) released = await loadBundle(pinned, tempDir);
+  }, 120000);
+  afterAll(async () => {
+    globalThis.Response = testResponse;
+    if (tempDir) await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  (pinned ? it : it.skip)('ignores the passkey, the cancellation and the switch there, rewrites nothing, and has them again here', async () => {
+    const session = await drill();
+    try {
+      const agentHeaders = { [AGENT_CLIENT_HEADER]: 'mcp/0.8.0' };
+      const ask = async (route, { token, body, headers = {}, method = 'POST' } = {}) => {
+        const at = session.deployed;
+        const response = await at.worker.fetch(new Request(`${origin}${route}`, {
+          method,
+          headers: { Origin: site, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+            ...(token ? { Authorization: `Bearer ${token}`, 'X-Group-Slug': slug } : {}), ...headers },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        }), at.env, { waitUntil() {} });
+        return { status: response.status, body: await response.json().catch(() => ({})) };
+      };
+      const signedMessage = async (wallet, statement, headers = {}) => {
+        session.wait(61_000);
+        const nonce = await ask('/auth/nonce', { body: { address: wallet.address, sessionSlug: slug, sessionId }, headers });
+        expect(nonce.status).toBe(200);
+        const issuedAt = new Date(Date.now() - 5000).toISOString();
+        const message = `${new URL(site).host} wants you to sign in with your Ethereum account:\n${wallet.address}\n\n${statement}\n\nURI: ${site}\nVersion: 1\nChain ID: 1\nNonce: ${nonce.body.nonce}\nIssued At: ${issuedAt}\nResources:\n- ${origin}\n- urn:context-engine:session:id:${sessionId}`;
+        return { address: wallet.address, message, signature: await wallet.signMessage(message), sessionSlug: slug, sessionId };
+      };
+      const signIn = async (wallet, headers = {}) => ask('/auth/login', { body: await signedMessage(wallet, 'Sign in to Context Engine.', headers), headers });
+      const stands = async (token, headers = {}) => (await ask(`/storage/list?resource=responses&limit=10&mine=true`, { token, headers, method: 'GET' })).status === 200;
+      const answer = (token, wallet, value, headers = {}) => ask('/storage/upload', { token, headers, body: {
+        contentType: 'application/json', resource: 'responses',
+        data: JSON.stringify({ questionId: `0x${'a1'.repeat(32)}`, sessionSlug: slug, sessionId, answer: { value }, additional: { value: '' }, responder: wallet.address }),
+      } });
+      // What the session stores apart from sign-ins and counts, byte for byte.
+      const storedData = () => JSON.stringify([...session.kv.values.entries()]
+        .filter(([key]) => key.startsWith('ce-storage') || key === `session:${slug}:config`).sort());
+
+      await session.kv.put(`session:${slug}:config`, JSON.stringify(session.config));
+      const current = session.current();
+      // Sign-in links are off until an admin turns them on, with an ordinary settings save.
+      expect(await session.signed(current, 'set-config', { config: { agentSignInLinksEnabled: true } })).toEqual({ status: 200, body: { ok: true } });
+      const question = await session.client(owner).upload({ resource: 'questions', data: JSON.stringify({
+        id: `0x${'a1'.repeat(32)}`, type: 'binary', prompt: 'A statement', sessionSlug: slug, sessionId, options: ['Agree', 'Unsure', 'Disagree'] }) });
+      expect(question.id).toBeTruthy();
+
+      // Here: an agent answers and makes a link; its person signs in, attaches a passkey and ends the agent's access.
+      const agent = ethers.Wallet.createRandom();
+      const passkey = ethers.Wallet.createRandom();
+      const agentSignIn = await signIn(agent, agentHeaders);
+      expect(agentSignIn.status).toBe(200);
+      expect((await answer(agentSignIn.body.token, agent, 'Agree', agentHeaders)).status).toBe(200);
+      const made = await ask(AGENT_SIGN_IN_PATHS.create, { body: await signedMessage(agent, AGENT_SIGN_IN_LINK_STATEMENT, agentHeaders), headers: agentHeaders });
+      expect([made.status, made.body.error]).toEqual([200, undefined]);
+      const opened = await ask(AGENT_SIGN_IN_PATHS.exchange, { body: { sessionSlug: slug, sessionId, code: made.body.code } });
+      expect([opened.status, opened.body.via]).toEqual([200, 'agent_link']);
+      const attached = await ask(AGENT_SIGN_IN_PATHS.attach, { token: opened.body.token, body: { sessionSlug: slug, sessionId,
+        passkey: await signedMessage(passkey, agentPasskeyAttachStatement(agent.address)) } });
+      expect([attached.status, attached.body.via]).toEqual([200, 'passkey_link']);
+      expect((await answer(attached.body.token, agent, 'Disagree')).status).toBe(200);
+      const cancelled = await ask(AGENT_SIGN_IN_PATHS.access, { token: attached.body.token, body: { sessionSlug: slug, sessionId, agentAccess: 'cancelled' } });
+      expect([cancelled.status, cancelled.body.agentAccess]).toEqual([200, 'cancelled']);
+      expect((await signIn(agent, agentHeaders)).body.reason).toBe('agent_access_cancelled');
+      // And the session's admins switch agents off.
+      expect(await session.signed(current, 'set-config', { config: { agentParticipationEnabled: false } })).toEqual({ status: 200, body: { ok: true } });
+      expect((await session.readConfig()).agentParticipationEnabled).toBe(false);
+      const before = storedData();
+      expect(before).toContain('agentParticipationEnabled');
+
+      // Back on the pinned bundle: none of it is read. The agent's own key signs in again; the passkey is only itself.
+      const previous = session.released(released);
+      expect(storedData()).toBe(before);
+      const agentThere = await signIn(agent, agentHeaders);
+      expect(agentThere.status).toBe(200);
+      expect(agentThere.body.attachedPasskey).toBeUndefined();
+      expect(await stands(agentThere.body.token, agentHeaders)).toBe(true);
+      const passkeyThere = await signIn(passkey);
+      expect([passkeyThere.status, passkeyThere.body.linkedAgentAccount]).toEqual([200, undefined]);
+      for (const route of Object.values(AGENT_SIGN_IN_PATHS)) {
+        expect((await ask(route, { token: passkeyThere.body.token, body: { sessionSlug: slug, sessionId } })).status).toBe(404);
+      }
+      expect((await ask('/analysis-card/drawing', { token: passkeyThere.body.token, body: { account: agent.address } })).status).not.toBe(200);
+      // The sign-in made here from the passkey is still a sign-in for the account there: it carries nothing the
+      // older Worker reads, and ends with the session's next change of authority or in four hours.
+      expect(await stands(attached.body.token)).toBe(true);
+      // The switch is kept, unread: its config still saves without it, and a save that carries it is refused whole.
+      expect((await session.readConfig()).agentParticipationEnabled).toBeUndefined();
+      expect(await session.signed(previous, 'set-config', { config: { sessionName: 'Renamed on the way back' } })).toEqual({ status: 200, body: { ok: true } });
+      const refused = await session.signed(previous, 'set-config', { config: { agentParticipationEnabled: true } });
+      expect(refused.status).toBe(400);
+      // Nothing stored was rewritten but the name just saved.
+      const there = new Map(JSON.parse(storedData()));
+      for (const [key, value] of JSON.parse(before)) {
+        if (key === `session:${slug}:config`) expect(JSON.parse(there.get(key))).toMatchObject({ ...JSON.parse(value), sessionName: 'Renamed on the way back' });
+        else expect(there.get(key)).toBe(value);
+      }
+
+      // This Worker again: the switch, the cancellation and the passkey are as they were left.
+      session.current();
+      expect(await session.readConfig()).toMatchObject({ agentParticipationEnabled: false, sessionName: 'Renamed on the way back' });
+      expect((await signIn(agent, agentHeaders)).body.reason).toBe('agent_participation_off');
+      expect((await signIn(agent)).body.reason).toBe('agent_access_cancelled');
+      // Even the sign-in the agent's key made while the older bundle ran is refused now: every sign-in of an
+      // account with a passkey attached is checked against the record, whenever it was made.
+      expect(await stands(agentThere.body.token)).toBe(false);
+      const passkeyHere = await signIn(passkey);
+      expect(passkeyHere.body.linkedAgentAccount).toEqual({ address: agent.address.toLowerCase() });
+      const swapped = await ask(AGENT_SIGN_IN_PATHS.passkeySignIn, { token: passkeyHere.body.token, body: { sessionSlug: slug, sessionId } });
+      expect([swapped.status, swapped.body.agentAccess]).toEqual([200, 'cancelled']);
+    } finally {
+      session.end();
+    }
+  }, 120000);
+});
+

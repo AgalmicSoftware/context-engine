@@ -189,6 +189,61 @@ test('a restore keeps everyone who turned the Session Agent off opted out, and e
   assert.deepEqual(await restoreOnto(await signBackupPage(older, source.env)), [[already], [already]]);
 });
 
+test('a restore puts back the mark beside each attached passkey, so a cancelled agent stays out even while the record can’t be read', async () => {
+  const { AGENT_LINKED_MARK, agentLinkedMarkKey } = await import('./agentSignInStore.js');
+  const { checkAgentSignInAtLogin } = await import('./agentSignInLink.js');
+  const source = fixture();
+  const [account, passkey, other, otherKey, stranger] = ['a1', 'b2', 'c3', 'd4', 'e5'].map((byte) => `0x${byte.repeat(20)}`);
+  const store = (env, operation, payload) => callSessionConfigCoordinator({ env, slug, path: `agent-sign-in/${operation}`, ...payload });
+  const now = Date.parse('2026-11-20T10:00:00Z');
+  assert.equal((await store(source.env, 'attach', { address: account, passkey, now })).body.ok, true);
+  assert.equal((await store(source.env, 'access', { address: account, passkey, agentAccess: 'cancelled', now })).body.ok, true);
+  assert.equal((await store(source.env, 'attach', { address: other, passkey: otherKey, now })).body.ok, true);
+  const [page] = await allPages(source.env);
+  assert.deepEqual(page.coordinator.agentSignInLinks.map((row) => [row.account, row.agentAccess]), [[account, 'cancelled'], [other, 'active']]);
+
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  // The source's marks are not in a backup: the restore writes them.
+  assert.equal([...target.kv.values.keys()].some((key) => key.startsWith('agentLinkAccount:')), false);
+  const result = await importPage(target.env, page);
+  assert.equal(result.body.complete, true, JSON.stringify(result));
+  for (const linked of [account, other]) assert.equal(target.kv.values.get(agentLinkedMarkKey(slug, linked)), AGENT_LINKED_MARK, linked);
+  for (const unmarked of [passkey, otherKey, stranger]) assert.equal(target.kv.values.has(agentLinkedMarkKey(slug, unmarked)), false, unmarked);
+  assert.equal((await store(target.env, 'state', { address: account })).body.asAccount.agentAccess, 'cancelled');
+
+  // A session that has had sign-in links set, signing someone in with their own key.
+  const config = { slug, sessionId, agentSignInLinksEnabled: true, sessionModeProfile: { authority: { mode: 'worker_canonical' } } };
+  const signIn = (env, address) => checkAgentSignInAtLogin({ env, request: new Request('https://worker.example/auth/login', { method: 'POST' }), slug, address, config, scopes: {} });
+  assert.equal((await signIn(target.env, account)).refusal.body.reason, 'agent_access_cancelled');
+  // The record can't be read: the cancelled agent's own key is still refused, because its account is marked.
+  const binding = target.env.CE_SESSION_COORDINATOR;
+  const get = binding.get.bind(binding);
+  binding.get = (id) => {
+    const stub = get(id);
+    return { fetch: async (input, init) => (String(input?.url || input).includes('agent-sign-in/')
+      ? new Response(JSON.stringify({ error: 'Coordinator busy.' }), { status: 503 })
+      : stub.fetch(input, init)) };
+  };
+  const shutOut = await signIn(target.env, account);
+  assert.deepEqual([shutOut.refusal.status, shutOut.refusal.body.reason], [503, 'agent_sign_in_unavailable']);
+  assert.equal((await signIn(target.env, other)).refusal.status, 503);
+  // Someone with nothing attached signs in as ever.
+  assert.deepEqual(await signIn(target.env, stranger), {});
+  binding.get = get;
+
+  // A backup from before backups carried attachments restores with none, and writes no mark.
+  const older = structuredClone(page);
+  delete older.coordinator.agentSignInLinks;
+  const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+  older.snapshotDigest = sha256(JSON.stringify(older.coordinator));
+  older.archiveId = sha256(`${older.manifest.sessionId}:${older.manifest.exportedAt}:${older.snapshotDigest}`);
+  const plain = fixture();
+  plain.kv.values.delete(`session:${slug}:config`);
+  assert.equal((await importPage(plain.env, await signBackupPage(older, source.env))).body.complete, true);
+  assert.equal([...plain.kv.values.keys()].some((key) => key.startsWith('agentLinkAccount:')), false);
+});
+
 // A session whose Session Agent records chats: its coordinator stores one only while that setting is on.
 const recordingFixture = () => {
   const made = fixture();

@@ -202,7 +202,7 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   // The opening lines make the file a skill some hosts install as it is.
   assert.match(skillMd, /^---\nname: context-engine\ndescription: [^\n]+\n---\n\n# Taking part in a Context Engine session as an AI agent\n/);
   assert.match(skillMd, /`CE_MCP_STATE_DIR`/);
-  assert.match(skillMd, /Call\s+`join_session` with the session link exactly as you received it/);
+  assert.match(skillMd, /call\s+`join_session` with the session link exactly as you received it/);
   // A link made for a person's browser is still the link to give.
   assert.match(skillMd, /An\s+invitation made for a person's\s+browser works too/);
   assert.match(skillMd, /Never claim to be a person/);
@@ -246,7 +246,7 @@ test('skill.md starts from what the agent can do', () => {
   const found = order.map((text) => cases.indexOf(text));
   assert.ok(found.every((at) => at >= 0), 'a case is missing');
   assert.deepEqual([...found].sort((a, b) => a - b), found);
-  assert.match(skillMd, /\n## Without tools\n[\s\S]*\*\*Let your AI draft your answers\*\*/);
+  assert.match(skillMd, /\n## Suggested answers for the person to review\n[\s\S]*\*\*Let your AI draft your answers\*\*/);
   // The invite a link carries is kept only by the server that read it.
   assert.match(skillMd, /`join_group` uses it for that group without being asked, while the server that\s+joined is still running/);
 });

@@ -3,6 +3,8 @@
   --ce-input-bg: var(--ce-authoring-input-bg);
   --ce-text: var(--ce-authoring-panel-text);
   --ce-border-raised: var(--ce-authoring-panel-muted);
+  // Buttons read their own border value, so it is set here too.
+  --ce-border-button: var(--ce-authoring-panel-muted);
   --ce-border-inset: var(--ce-authoring-panel-muted);
   background: var(--ce-authoring-panel-bg);
   color: var(--ce-authoring-panel-text);

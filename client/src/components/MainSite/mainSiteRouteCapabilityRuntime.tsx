@@ -95,6 +95,61 @@ export const renderWorkerSurveyMetadataStatus = ({
 
 type MainSiteSurveyMetadataCache = Record<string, { surveys?: Record<string, unknown> } | undefined>;
 
+// The session's own survey node: its cache scope, and for a Worker session only what that Worker wrote.
+const readScopedSurveyCacheNode = ({
+  cache,
+  context,
+  sessionConfig,
+  sessionSlug,
+}: {
+  cache: MainSiteSurveyMetadataCache | null;
+  context: MainSiteRouteCapabilityContext;
+  sessionConfig: unknown;
+  sessionSlug: string;
+}) => {
+  const node = context.cacheScope ? cache?.[context.cacheScope] : null;
+  if (!node || context.cacheScope !== 'worker') return node || null;
+  try {
+    return workerCanonicalCacheIdentityMatches(
+      node,
+      resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug }),
+    )
+      ? node
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+export type SessionSurveyAvailability = 'unknown' | 'none' | 'some';
+
+/**
+ * Whether a session has surveys, from its own survey cache. 'none' only after
+ * that cache loaded without error: a pending or failed load is 'unknown'.
+ */
+export const resolveSessionSurveyAvailability = ({
+  cache,
+  context,
+  sessionConfig,
+  sessionSlug,
+  cacheReady,
+  cacheError,
+}: {
+  cache: MainSiteSurveyMetadataCache | null;
+  context: MainSiteRouteCapabilityContext;
+  sessionConfig: unknown;
+  sessionSlug: string;
+  cacheReady: boolean;
+  cacheError: boolean;
+}): SessionSurveyAvailability => {
+  const config = (sessionConfig || {}) as { HIGHLIGHTED_SURVEY_IDS?: unknown };
+  if (Array.isArray(config.HIGHLIGHTED_SURVEY_IDS) && config.HIGHLIGHTED_SURVEY_IDS.length) return 'some';
+  const surveys = readScopedSurveyCacheNode({ cache, context, sessionConfig, sessionSlug })?.surveys;
+  if (surveys && typeof surveys === 'object' && Object.keys(surveys).length) return 'some';
+  if (!cacheReady || cacheError || !surveys || typeof surveys !== 'object') return 'unknown';
+  return 'none';
+};
+
 export const resolveMainSiteSurveyRouteCapabilityState = ({
   host,
   sessionSlug,
@@ -113,17 +168,7 @@ export const resolveMainSiteSurveyRouteCapabilityState = ({
   const cache = host.readDgRecord('surveysCache', sessionSlug, {
     clone: false,
   }) as MainSiteSurveyMetadataCache | null;
-  const scopedCacheNode = context.cacheScope ? cache?.[context.cacheScope] : null;
-  let cacheIdentityMatches = true;
-  if (context.cacheScope === 'worker') {
-    try {
-      const expectedIdentity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug });
-      cacheIdentityMatches = workerCanonicalCacheIdentityMatches(scopedCacheNode, expectedIdentity);
-    } catch {
-      cacheIdentityMatches = false;
-    }
-  }
-  const inCache = !!context.cacheScope && cacheIdentityMatches && !!scopedCacheNode?.surveys?.[surveyId];
+  const inCache = !!readScopedSurveyCacheNode({ cache, context, sessionConfig, sessionSlug })?.surveys?.[surveyId];
   const inConfig =
     Array.isArray(sessionConfig?.HIGHLIGHTED_SURVEY_IDS) &&
     sessionConfig.HIGHLIGHTED_SURVEY_IDS.some((id: string) => id.toLowerCase() === surveyId);

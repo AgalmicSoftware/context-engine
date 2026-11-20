@@ -43,7 +43,7 @@ export type RecognitionGroup = {
 type RoadmapSection = {
   category: string;
   items: {
-    status: 'complete' | 'planned';
+    status: 'complete' | 'in-progress' | 'planned';
     text: string;
     link?: { to: string; text: string };
   }[];
@@ -248,6 +248,26 @@ export const ROADMAP_SECTIONS: RoadmapSection[] = [
         status: 'complete',
         text: 'Explore shipped demo sessions and reusable AI discourse corpus data from the app and repository.',
       },
+      {
+        status: 'complete',
+        text: 'Take part through an AI agent: an MCP server and a scoped HTTP API let an agent join a session as its own participant, and an agent given a public session’s link can draft answers for a person to review.',
+      },
+      {
+        status: 'complete',
+        text: 'Answer by talking: a voice interviewer asks the questions and drafts answers you review before submitting.',
+      },
+      {
+        status: 'complete',
+        text: 'Read results as a report, a debate atlas and a risk matrix, and ask a Session Agent about them.',
+      },
+      {
+        status: 'complete',
+        text: 'Run a session from a Session Worker on Cloudflare: one-page setup, passkey sign-in, groups joined by link or code, user-names and backups.',
+      },
+      {
+        status: 'complete',
+        text: 'Record a breakout discussion on one phone and turn it into draft questions and context.',
+      },
     ],
   },
   {
@@ -279,11 +299,11 @@ export const ROADMAP_SECTIONS: RoadmapSection[] = [
         text: 'Walkaway resilience through ENS-hosted frontends and stronger decentralized service options.',
       },
       {
-        status: 'planned',
+        status: 'in-progress',
         text: 'More storage options, including IPFS for larger or ephemeral files and configurable centralized storage.',
       },
       {
-        status: 'planned',
+        status: 'in-progress',
         text: 'Turnkey deployment bundles for Arweave, Lit, EVM gas, and AI API access.',
       },
     ],
@@ -292,15 +312,15 @@ export const ROADMAP_SECTIONS: RoadmapSection[] = [
     category: 'Interfaces and Inputs',
     items: [
       {
-        status: 'planned',
+        status: 'in-progress',
         text: 'Agent-first UX so people can point an assistant at a session and interact through natural language.',
       },
       {
-        status: 'planned',
+        status: 'in-progress',
         text: 'Voice-only mode for multilingual interaction through spoken commands.',
       },
       {
-        status: 'planned',
+        status: 'in-progress',
         text: 'Better document and context integration with knowledge maps and richer debate-tree flows.',
       },
     ],

@@ -124,8 +124,10 @@ A private session, one whose access rule names groups, shows nothing to an
 agent outside them. `join_session` reads it with the link's group password (a
 read statement signed with the same derived key, sent as `X-CE-Group-Invite`
 and spending nothing), signs in, and joins the link's group before anything
-else; a one-use code link joins first and then reads. Without a usable invite
-it returns `privateSession` and a note instead of the session's content.
+else. A link with a one-use code is not joined until the call passes
+`spendInviteCode: true`, since joining uses the code up; reading needs no
+join (see Upgrading to 0.8.0). Without a usable invite `join_session` returns
+`privateSession` and a note instead of the session's content.
 
 ### From a shell
 
@@ -240,6 +242,46 @@ losing remembered sessions. If a process stops during a write and a later call
 reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
+
+## Upgrading to 0.8.0
+
+Most of 0.8.0 needs a Session Worker from the same release; against an older
+Worker each tool says so and does nothing new.
+
+- **Read a session without joining.** `get_session`, `list_questions`,
+  `list_context`, `read_context` and `get_results` take the link of a session
+  the agent has not joined and read it as a visitor would: no sign-in, no
+  join, nothing stored. A private session opens to its group's invite link,
+  the one that carries the password, and shows what that group's members may
+  read; a one-use code reads too where the Worker offers it (see below). `get_interview_catalog` and `make_review_link`
+  take the same link. Neither is ever sent. A password signs a proof that
+  names the session, the group and the Worker it is for; a one-use code keys
+  a proof that names the same and a time a few minutes off. Both go in a
+  header. Reading leaves a code unused, and stops once someone joins with it
+  or an admin withdraws it. Reading by code needs a Worker that offers it
+  (`group_read_code_v1`, off unless the Worker is deployed with it on); on
+  any other the tools say reading needs joining, which uses the code up.
+- **Joining asks before it uses up a one-use code.** `join_session` on a
+  private session, and `join_group`, join with a one-use code only when the
+  call passes `spendInviteCode: true`. Without it they return `joined: false`
+  and spend, store and sign nothing. An agent that joined with a code
+  unasked before must now pass the flag.
+- **`get_analysis_card`** reads a person's saved analysis card where the
+  session lets the agent read that person's answers: its words on any Worker
+  with the card, and the matched figure's picture and the drawn pages, as
+  images, where the Worker keeps them. It asks no model.
+- **`make_sign_in_link`** gives the agent's person a link that opens the
+  session signed in as the agent's account, once, for 30 minutes. On the page
+  they can attach a passkey of their own, and then end the agent's access to
+  the account; the agent's tools then say so. Sign-in links are off in a
+  session until one of its admins turns them on in its settings; until then
+  the tool says so and makes nothing.
+- Every request carries `X-CE-Agent-Client`, so a session that has switched
+  its agent functions off refuses the agent in plain words, and so only an
+  agent's own client can ask for a sign-in link.
+- The agent no longer sends a group password's read proof to a Worker from
+  before proofs that name their Worker; joining a private session there still
+  works, through the join itself.
 
 ## Upgrading to 0.7.2
 
@@ -461,7 +503,9 @@ directory when upgrading; identities and saved session access do not change.
 | `whoami` | Shows the agent's address, display profile and joined sessions. |
 | `set_profile` | A session that keeps names takes at most 32 characters: letters, numbers, spaces and `. - _ '` only (a straight `'`, not `’`), so no commas or brackets, and no name that claims a role (such as admin or host) or looks like an address, web address, key or "(agent)". Sets the display name and the self-reported model and platform; a model or platform set by the host stays. Elsewhere the MCP takes a display name of up to 80 characters of any kind. `names` says for each joined session that keeps names whether it saved the name (`saved: true`). When any didn't, `warning` comes first and names those sessions with their reasons; only the MCP's own profile changed for them, and each entry's `next` says what to do. A refused name is not shortened or changed: the entry gives the session's refusal and this rule, and the agent chooses another. An empty name removes it. |
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it (a private session's is joined first), and returns the session context, its instructions for agents, its groups and any invitation to add context. It also returns `youMay`: what the agent may do next if it wants to (set a display name, join an open group, add context). Where the session keeps names, a display name already set is saved there, under the rule given for `set_profile`, and `name` says whether it was. |
-| `get_interview_catalog` | For suggesting answers the person reviews and submits themselves: reads a public session's questions from its link, with no sign-in and without joining. A private session, or one with interview mode off, refuses, and the error says to use the prompt the person copies under **Let your AI draft your answers**. |
+| `make_sign_in_link` | Makes a link that opens a joined session with the agent's person signed in as the agent's account: once, for 30 minutes, on the session's own site. Give it only to that person. Needs a Session Worker with sign-in links, and a session whose admin has turned them on; says so otherwise. |
+| `get_analysis_card` | Reads a person's saved analysis card where the session lets the agent read that person's answers: its words, and where the Worker keeps them the matched figure's picture and the drawn pages as images. Asks no model. |
+| `get_interview_catalog` | For suggesting answers the person reviews and submits themselves: reads a session's questions from its link, with no sign-in and without joining; a private session needs its group's invite link, the one with the password. A private session, or one with interview mode off, refuses, and the error says to use the prompt the person copies under **Let your AI draft your answers**. |
 | `make_review_link` | Turns suggested answers into a link that opens the session with them filled in, for the person to review and submit as themselves. Submits and joins nothing. Checks each draft against the session's questions (a quadratic draft against that question's own credit budget) and says in `leftOut` why any was left out. The link keeps only the session page, its Worker, `mode=interview` and the link's `src` and `joinGroup`: never an invite, password or ticket. |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, whether the session has a Session Agent and records chats with it, end time and the agent's progress. |
 | `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; only unanswered ones unless `filter` asks for `answered` or `all`. Up to 100 a call; `more` and `next` say how to get the rest. |

@@ -85,6 +85,12 @@ const validFeedbackConfig = (config) =>
 // People's names in the session: absent means on.
 const validNamesConfig = (config) =>
   !hasOwn(config, 'namesEnabled') || typeof config.namesEnabled === 'boolean';
+// AI agents taking part with accounts of their own: absent means they may.
+const validAgentParticipationConfig = (config) =>
+  !hasOwn(config, 'agentParticipationEnabled') || typeof config.agentParticipationEnabled === 'boolean';
+// Signing in from an agent's link: off unless true, and then only where agents are.
+const validAgentSignInLinksConfig = (config) =>
+  !hasOwn(config, 'agentSignInLinksEnabled') || typeof config.agentSignInLinksEnabled === 'boolean';
 // Context cards: absent means off.
 const validContextCardsConfig = (config) =>
   !hasOwn(config, 'contextCardsEnabled') || typeof config.contextCardsEnabled === 'boolean';
@@ -292,6 +298,8 @@ const SETTINGS_CHECKS = Object.freeze([
   [validFeedbackConfig, 'feedbackEnabled must be true or false.'],
   [validNamesConfig, 'namesEnabled must be true or false.'],
   [validContextCardsConfig, 'contextCardsEnabled must be true or false.'],
+  [validAgentParticipationConfig, 'agentParticipationEnabled must be true or false.'],
+  [validAgentSignInLinksConfig, 'agentSignInLinksEnabled must be true or false.'],
   [validAiDailyLimit, `limits.aiPerWalletPerDay must be a whole number from 0 to ${AI_DAILY_LIMIT_MAX}, or empty.`, { mergedOnly: true }],
   [validInterviewModeConfig, 'Invalid interview mode config.'],
   [validResultsAnalysisSettingsConfig, 'Invalid results analysis settings config.'],

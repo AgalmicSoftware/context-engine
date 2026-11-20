@@ -13,13 +13,13 @@ jest.mock('../OnePageSession/WorkerSessionGroupsPanel', () => (props: unknown) =
 });
 
 describe('UserPageWorkerGroupSection', () => {
-  it('keeps a groups section when membership data is unavailable without loading private memberships', () => {
+  it('keeps your own groups section when membership data is unavailable without loading memberships', () => {
     render(
       <>
         {renderUserPageMembershipSections({
-          account: '',
+          account: '0x00000000000000000000000000000000000000aa',
           activeSessionSlug: '',
-          isOwner: false,
+          isOwner: true,
           isSimulated: false,
           onChainProfileEnabled: false,
           provider: null,
@@ -40,9 +40,9 @@ describe('UserPageWorkerGroupSection', () => {
   });
 
   it.each(['', '0x00000000000000000000000000000000000000bb'])(
-    'explains private memberships without fetching when the viewer is %s',
+    'leaves the groups section out, without fetching, when the viewer is %s',
     (account) => {
-      render(
+      const view = render(
         <>
           {renderUserPageMembershipSections({
             account,
@@ -65,17 +65,39 @@ describe('UserPageWorkerGroupSection', () => {
           })}
         </>,
       );
-      expect(
-        screen.getByText(
-          account
-            ? 'Group memberships are only shown on your own profile.'
-            : 'Sign in with this profile’s account to view its groups.',
-        ),
-      ).toBeInTheDocument();
-      expect(screen.queryByText('No groups to display.')).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Groups Joined:' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/Group memberships|view its groups/)).not.toBeInTheDocument();
+      // With no on-chain badges either, no empty column is left behind.
+      expect(view.container).toBeEmptyDOMElement();
       expect(mockWorkerSessionGroupsPanel).not.toHaveBeenCalled();
     },
   );
+
+  it("keeps the public badges but no groups on someone else's on-chain profile", () => {
+    render(
+      <>
+        {renderUserPageMembershipSections({
+          account: '0x00000000000000000000000000000000000000bb',
+          activeSessionSlug: 'profile-session',
+          isOwner: false,
+          isSimulated: false,
+          onChainProfileEnabled: true,
+          provider: null,
+          sessionConfig: { slug: 'profile-session' },
+          sbtSectionProps: {
+            heading: 'Minted badges:',
+            onRefreshSbtData: jest.fn(),
+            sbtDisplayState: {},
+            sbtEmptyText: 'No badges.',
+            sbtEntries: [],
+          },
+        })}
+      </>,
+    );
+    expect(screen.getByText('Minted badges:')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Groups Joined:' })).not.toBeInTheDocument();
+    expect(mockWorkerSessionGroupsPanel).not.toHaveBeenCalled();
+  });
 
   afterEach(() => {
     jest.clearAllMocks();

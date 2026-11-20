@@ -95,8 +95,11 @@ export function normalizeDraftForQuestion(answer = {}, question = {}) {
     };
   }
   if (questionType === 'multichoice') {
-    const values = Array.isArray(source.values)
-      ? source.values.map(safeString).filter(Boolean)
+    // Every option chosen, together: as `values`, or as a list in `value` (or `answer`), which is how an agent
+    // that was not told the field's name sends several. One option may still come by itself as text.
+    const list = [source.values, source.value, source.answer].find(Array.isArray);
+    const values = list
+      ? list.map(safeString).filter(Boolean)
       : [firstValue(source.value, source.answer, source.choice, source.label)].map(safeString).filter(Boolean);
     const schema = buildAgentQuestionAnswerSchema(question).answerSchema;
     if (!values.length || new Set(values).size !== values.length || values.length > schema.maxSelections ||

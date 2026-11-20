@@ -459,6 +459,17 @@ jobs:
       fail-fast: false
       matrix:
         engine: [chromium, webkit]
+        include:
+          # WebKit's system libraries are not on the runner image, and apt fetched them so slowly that the
+          # leg was skipped. Playwright's own image for the locked version holds WebKit and its libraries.
+          - engine: webkit
+            container: mcr.microsoft.com/playwright:v1.58.2-noble
+    # Empty for Chromium, which runs on the runner itself.
+    container: ${{ matrix.container }}
+    # In a container, run steps default to sh, which has no pipefail; both legs use bash.
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout
@@ -491,38 +502,16 @@ jobs:
           node -e "require('playwright').chromium.launch().then((browser) => browser.close())" \
             || npx playwright install-deps chromium
 
-      # None of WebKit's system libraries are on the runner image, so apt fetches them every run, and the
-      # package mirror is sometimes very slow. Each part is time-boxed and the install tried twice; if WebKit
-      # still cannot be installed, the leg warns and skips its journeys rather than failing for the mirror.
-      # apt runs as root, so its time box runs as root too: a box run as the runner user cannot stop it.
-      # The binary is called directly so npm writes nothing as root in the runner user's home.
-      - name: Install Playwright WebKit
-        id: webkit
+      # The image already holds WebKit, so nothing is downloaded; if WebKit cannot start, the leg fails.
+      - name: Check Playwright WebKit
         if: ${{ matrix.engine == 'webkit' }}
-        run: |
-          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nDPkg::Lock::Timeout "60";\n' \
-            | sudo tee /etc/apt/apt.conf.d/80-ci-webkit >/dev/null || true
-          for try in 1 2; do
-            if sudo env "PATH=$PATH" timeout -k 30s 3m ./node_modules/.bin/playwright install-deps webkit \
-              && timeout -k 10s 2m npx playwright install webkit \
-              && timeout -k 10s 1m node -e "require('playwright').webkit.launch().then((browser) => browser.close())"; then
-              echo "installed=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            echo "WebKit install try $try did not finish."
-            sudo timeout -k 10s 1m dpkg --configure -a || true
-          done
-
-      - name: Report WebKit not installed
-        if: ${{ matrix.engine == 'webkit' && steps.webkit.outputs.installed != 'true' }}
-        run: echo "::warning title=WebKit journeys did not run::WebKit could not be installed on this runner; the WebKit journeys did not run."
+        timeout-minutes: 2
+        run: node -e "require('playwright').webkit.launch().then((browser) => browser.close())"
 
       - name: Build client
-        if: ${{ matrix.engine != 'webkit' || steps.webkit.outputs.installed == 'true' }}
         run: npm --prefix client run build
 
       - name: Run browser journeys
-        if: ${{ matrix.engine != 'webkit' || steps.webkit.outputs.installed == 'true' }}
         env:
           BASE_URL: http://127.0.0.1:4173
           OUTPUT_DIR: /tmp/context-engine-journey-smoke

@@ -40,7 +40,7 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
-it('loads the owner’s joined group and removes it on account change without exposing it to another viewer', async () => {
+it('loads the owner’s joined group and drops the section on account change without exposing it to another viewer', async () => {
   jest.mocked(getWorkerSessionToken).mockResolvedValue('synthetic-worker-token');
   const group = {
     groupId: 'reviewers',
@@ -79,6 +79,7 @@ it('loads the owner’s joined group and removes it on account change without ex
   );
   view.rerender(<>{renderMemberships('0x00000000000000000000000000000000000000bb')}</>);
   expect(screen.queryByText('Fixture reviewers')).not.toBeInTheDocument();
-  expect(screen.getByText('Group memberships are only shown on your own profile.')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Groups Joined:' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Group memberships/)).not.toBeInTheDocument();
   expect(fetchSpy).toHaveBeenCalledTimes(2);
 });

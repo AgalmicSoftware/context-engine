@@ -139,6 +139,8 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     sessionModeProfile: clone(source.sessionModeProfile ?? null),
     pileAutoAdvanceEnabled: resolvePileAutoAdvanceEnabled(source),
     feedbackEnabled: source.feedbackEnabled !== false,
+    agentParticipationEnabled: source.agentParticipationEnabled !== false,
+    agentSignInLinksEnabled: source.agentSignInLinksEnabled === true,
     contextCardsEnabled: source.contextCardsEnabled === true,
     defaultFilterState: formatFilterState(source.defaultFilterState),
     defaultSbtTags: text(source.defaultSbtTags),
@@ -322,6 +324,15 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
   if (!onChain && (draft.feedbackEnabled !== false) !== (before.feedbackEnabled !== false)) {
     values.feedbackEnabled = draft.feedbackEnabled !== false;
   }
+  // AI agents may take part unless that is turned off. Only a changed choice is stored, for the same reason:
+  // the page shows the switch only where the Worker says it has it.
+  if (!onChain && (draft.agentParticipationEnabled !== false) !== (before.agentParticipationEnabled !== false)) {
+    values.agentParticipationEnabled = draft.agentParticipationEnabled !== false;
+  }
+  // Sign-in links from agents are off unless turned on. Only a changed choice is stored.
+  if (!onChain && (draft.agentSignInLinksEnabled === true) !== (before.agentSignInLinksEnabled === true)) {
+    values.agentSignInLinksEnabled = draft.agentSignInLinksEnabled === true;
+  }
   // Context cards are off unless turned on. Only a changed choice is stored, for the same reason.
   if (!onChain && (draft.contextCardsEnabled === true) !== (before.contextCardsEnabled === true)) {
     values.contextCardsEnabled = draft.contextCardsEnabled === true;
@@ -372,6 +383,8 @@ const unchanged = (key: string, before: unknown, after: unknown) => {
   if (key === 'interviewModeEnabled') return (before !== false) === after;
   if (key === 'analysisCardEnabled') return (before === true) === after;
   if (key === 'feedbackEnabled') return (before !== false) === after;
+  if (key === 'agentParticipationEnabled') return (before !== false) === after;
+  if (key === 'agentSignInLinksEnabled') return (before === true) === after;
   if (key === 'contextCardsEnabled') return (before === true) === after;
   return same(before, after) || (isBlank(before) && isBlank(after));
 };
@@ -509,6 +522,8 @@ const LABELS: Record<string, string> = {
   storageProfile: 'Storage access',
   pileAutoAdvanceEnabled: 'Next question after an answer',
   feedbackEnabled: 'Feedback box',
+  agentParticipationEnabled: 'Agent access (MCP and Agent HTTP)',
+  agentSignInLinksEnabled: 'Sign-in links from agents',
   contextCardsEnabled: 'Context cards',
   defaultFilterState: 'Default filters',
   defaultSbtTags: 'SBT tags',

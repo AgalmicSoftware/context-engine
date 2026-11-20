@@ -94,6 +94,7 @@ const readPrivateSessionAccess = async ({ request, env, slug, config, headers, d
   const requester = (await deps?.resolveOptionalRequester?.({ request, env, slug, config, headers })) || {};
   const questions = await evaluatePrivateSessionAccess({
     env, slug, config, request, requesterAddress: requester.address || '', authScopes: requester.scopes, part: 'questions',
+    codeReads: true,
   });
   if (!questions.ok) {
     return questions.status === 403
@@ -164,7 +165,7 @@ export const dispatchSessionAgentInstructionsRequest = async ({
   if ('response' in read) return read.response;
   if (isPrivateSession(read.config)) {
     const access = await evaluatePrivateSessionAccess({
-      env, slug: read.slug, config: read.config, request, part: 'questions',
+      env, slug: read.slug, config: read.config, request, part: 'questions', codeReads: true,
       resolveRequester: () => deps?.resolveOptionalRequester?.({ request, env, slug: read.slug, config: read.config, headers: read.headers }),
     });
     if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers: read.headers });
