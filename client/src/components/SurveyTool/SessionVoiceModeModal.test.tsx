@@ -530,6 +530,22 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Start voice interview');
   });
 
+  it('says the questions are loading until the pile settles, and no questions only after', () => {
+    const { rerender } = render(
+      <SessionVoiceModeModal {...baseProps} mode="interview" questionPool={[]} questionLoad="loading" />,
+    );
+    const status = () => screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS);
+    expect(status()).toHaveTextContent('Loading questions…');
+    expect(screen.getByRole('button', { name: 'Interview status: Loading questions…' })).toHaveAttribute(
+      'data-tone',
+      'busy',
+    );
+    rerender(<SessionVoiceModeModal {...baseProps} mode="interview" questionPool={[]} questionLoad="failed" />);
+    expect(status()).toHaveTextContent("Questions didn't load");
+    rerender(<SessionVoiceModeModal {...baseProps} mode="interview" questionPool={[]} />);
+    expect(status()).toHaveTextContent('No questions');
+  });
+
   it('submits reviewed values and retains edited unselected predictions only as consented metadata', async () => {
     const onInterviewProgressChange = jest.fn();
     const prefillPacket = {

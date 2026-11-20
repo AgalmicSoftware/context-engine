@@ -68,6 +68,9 @@ checkbox in the same section is the `interviewModeEnabled` switch.
 
 The Interview header shows a colored status pill, such as Ready, Connecting,
 Listening, Paused, Ending, Preparing responses…, Review drafts or Error.
+While the session's questions are still loading, including a read held after
+a rate limit, it reads Loading questions…; a failed load reads Questions didn't
+load, and No questions appears only once the load has finished with none.
 Green readiness requires a reachable Worker that confirms an OpenAI key, voice
 provider, and session access, plus browser microphone support and no known
 permission denial. This setup check does not call OpenAI or request microphone

@@ -3655,6 +3655,18 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
   } = pileWorkspaceViewState;
   const lockedGateDetails = engine.getMemoizedLockedQuestionGateDetails(hiddenMaskedQuestionIds);
   const isStillLoading = pileWorkspaceViewState.isStillLoading;
+  const requiresStorageLogin = requiresQuestionStorageLogin(
+    engine.getEffectivePileSessionConfig(engine.props),
+    Boolean(engine.props.loginComplete && engine.props.account),
+  );
+  // The interview reads why its pool is empty in the same order as the pile's empty state.
+  const interviewQuestionLoad = requiresStorageLogin
+    ? 'signIn'
+    : hasTerminalScanError || hasError
+      ? 'failed'
+      : isStillLoading
+        ? 'loading'
+        : undefined;
 
   /**
    * PILE MODE — Submit button label (central helper)
@@ -3797,10 +3809,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             hasTerminalScanError,
             scanErrorMessage,
             hasError,
-            requiresStorageLogin: requiresQuestionStorageLogin(
-              engine.getEffectivePileSessionConfig(engine.props),
-              Boolean(engine.props.loginComplete && engine.props.account),
-            ),
+            requiresStorageLogin,
             isStillLoading,
             hydrateDone,
             hydrateDiscovered,
@@ -3893,6 +3902,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 {...engine.props}
                 {...engine.getAudioInputWorkerProps()}
                 isResponsesCacheReady={Boolean(responseReadinessContextToken)}
+                questionLoad={interviewQuestionLoad}
                 responseReadinessContextToken={responseReadinessContextToken}
                 submitContextToken={submitContextToken}
                 isOpen={!!showVoiceModeModal}
