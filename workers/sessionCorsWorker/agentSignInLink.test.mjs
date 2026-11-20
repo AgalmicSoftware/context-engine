@@ -58,6 +58,8 @@ const answer = (env, token, data, headers = {}) => send(env, '/storage/upload', 
 });
 const QUESTION = `0x${'a1'.repeat(32)}`;
 const groupsConfig = {
+  // Sign-in links are off unless a session's admin turns them on; these sessions have.
+  agentSignInLinksEnabled: true,
   workerGroupsBootstrap: { version: 2, state: 'fresh_empty', bootstrapId: 'b0'.repeat(32) },
   workerAuthority: { version: 1, participantScopes: ['storage', 'groups'], anonymousScopes: [] },
   sessionModeProfile: {
@@ -721,16 +723,31 @@ test('a backup carries which passkey is attached and whose agent is cancelled, a
   assert.deepEqual(await restoreAgentLinks(storage, rows), { written: 0, skipped: 2 });
 });
 
-test('sign-in links are on unless a session turns them off; an attached passkey keeps working after', async () => {
-  // Turned off from the start: no code is made or taken, and everything else an agent does is as before.
-  const off = await setup({ agentSignInLinksEnabled: false });
-  const first = Wallet.createRandom();
-  const refused = await makeCode(off.env, first);
-  assert.deepEqual([refused.status, refused.body], [403, { error: 'This session doesn’t sign people in from an agent’s link.', reason: 'sign_in_links_off' }]);
-  assert.equal((await exchange(off.env, `cesi_${'A'.repeat(43)}`)).body.reason, 'sign_in_links_off');
-  const token = await tokenOf(off.env, first, { headers: AGENT });
-  assert.equal((await answer(off.env, token, agentAnswer(first), AGENT)).status, 200);
-  assert.equal((await stateOf(off.env, token)).body.signInLinks, false);
+test('sign-in links are off until a session’s admin turns them on, which signs nobody out; an attached passkey keeps working after they go off', async () => {
+  // Never set, or set to anything but true: no code is made or taken, and everything else an agent does is as before.
+  for (const value of [undefined, false]) {
+    const off = await setup({ agentSignInLinksEnabled: value });
+    const first = Wallet.createRandom();
+    const refused = await makeCode(off.env, first);
+    assert.deepEqual([refused.status, refused.body], [403, { error: 'This session doesn’t sign people in from an agent’s link.', reason: 'sign_in_links_off' }], String(value));
+    assert.equal((await exchange(off.env, `cesi_${'A'.repeat(43)}`)).body.reason, 'sign_in_links_off');
+    const token = await tokenOf(off.env, first, { headers: AGENT });
+    assert.equal((await answer(off.env, token, agentAnswer(first), AGENT)).status, 200);
+    assert.equal((await stateOf(off.env, token)).body.signInLinks, false);
+
+    // An admin turns them on with an ordinary settings save. Nobody is signed out: the agent's sign-in and a
+    // person's both still stand, and a link can be made and used at once.
+    const person = Wallet.createRandom();
+    const personToken = await tokenOf(off.env, person);
+    const saved = await signedAdminRequest({ env: off.env, wallet: off.admin, action: 'set-config', body: { config: { agentSignInLinksEnabled: true } } });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.equal(await stands(off.env, token, AGENT), true);
+    assert.equal(await stands(off.env, personToken), true);
+    assert.equal((await stateOf(off.env, token)).body.signInLinks, true);
+    const made = await makeCode(off.env, first);
+    assert.equal(made.status, 200, JSON.stringify(made.body));
+    assert.equal((await exchange(off.env, made.body.code)).status, 200);
+  }
 
   // On, used, then turned off: no new link or passkey, but the person keeps their way in and their say.
   const { env, admin } = await setup();

@@ -1822,7 +1822,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         return { session: ctx.info.slug, made: false, note: 'This session has its agent functions switched off, so it makes no sign-in links.' };
       }
       if (!agentSignInLinksOn(sessionConfig)) {
-        return { session: ctx.info.slug, made: false, note: 'This session has sign-in links from agents switched off. The person can watch what you did through you, or take part themselves on the session page.' };
+        return { session: ctx.info.slug, made: false, note: 'This session doesn’t have sign-in links from agents switched on; an admin of the session can turn them on in its settings. Until then the person can watch what you did through you, or take part themselves on the session page.' };
       }
       checkpoint();
       const made = await ctx.client.createSignInCode();

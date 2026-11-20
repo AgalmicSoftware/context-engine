@@ -656,6 +656,8 @@ describe('the agents release, back on the pinned bundle', () => {
 
       await session.kv.put(`session:${slug}:config`, JSON.stringify(session.config));
       const current = session.current();
+      // Sign-in links are off until an admin turns them on, with an ordinary settings save.
+      expect(await session.signed(current, 'set-config', { config: { agentSignInLinksEnabled: true } })).toEqual({ status: 200, body: { ok: true } });
       const question = await session.client(owner).upload({ resource: 'questions', data: JSON.stringify({
         id: `0x${'a1'.repeat(32)}`, type: 'binary', prompt: 'A statement', sessionSlug: slug, sessionId, options: ['Agree', 'Unsure', 'Disagree'] }) });
       expect(question.id).toBeTruthy();

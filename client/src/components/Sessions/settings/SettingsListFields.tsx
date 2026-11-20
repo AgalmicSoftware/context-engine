@@ -189,8 +189,8 @@ export const SettingsAgentSignInLinksField = ({ draft, onChange }: FieldsProps) 
   <SetupCheck
     id="ce-settings-agent-sign-in-links"
     label="Sign-in links from agents"
-    help="Lets a person open the session signed in to the account their AI agent used, from a one-time link the agent makes, and attach a passkey of their own to it. Turned off, no new link works; a passkey already attached keeps working."
-    checked={draft.agentSignInLinksEnabled !== false}
+    help="Lets a person open the session signed in to the account their AI agent used, from a one-time link the agent makes, and attach a passkey of their own to it. Off unless you turn it on. Turned off again, no new link works; a passkey already attached keeps working. Changing it signs nobody out."
+    checked={draft.agentSignInLinksEnabled === true}
     testId="ce-settings-agent-sign-in-links"
     onChange={(checked) => onChange(['agentSignInLinksEnabled'], checked)}
   />

@@ -147,7 +147,7 @@ export default function AgentSignInGate({
           dropAgentSignInCode();
           setNote({
             text: supported
-              ? 'This session has sign-in links from agents switched off. Sign in yourself to take part.'
+              ? 'This session doesn’t have sign-in links from agents switched on. Sign in yourself to take part.'
               : 'This session can’t sign you in from an agent’s link yet. Ask its organisers, or sign in yourself.',
             isError: true,
           });

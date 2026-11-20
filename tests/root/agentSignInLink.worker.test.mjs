@@ -20,6 +20,8 @@ const LINK = `${APP_ORIGIN}/session/${SLUG}?worker=${encodeURIComponent(WORKER_O
 const QUESTION = `0x${'a1'.repeat(32)}`;
 const session = { sessionSlug: SLUG, sessionId: SESSION_ID };
 const config = {
+  // Sign-in links are off until a session's admin turns them on; this session's has.
+  agentSignInLinksEnabled: true,
   workerGroupsBootstrap: { version: 2, state: 'fresh_empty', bootstrapId: 'b0'.repeat(32) },
   workerAuthority: { version: 1, participantScopes: ['storage', 'groups'], anonymousScopes: [] },
   sessionModeProfile: {
@@ -196,8 +198,8 @@ test('an older Worker, or a session with agents off, makes no link and says why'
   assert.equal(asked.includes(AGENT_SIGN_IN_PATHS.create), false);
   await assert.rejects(agent.makeSignInLink({ session: 'another-session' }), /Join it first/);
 
-  // A session that has turned sign-in links off: said from its settings, with no code asked for.
-  const plain = createSessionEnv({ configOverrides: { ...config, agentSignInLinksEnabled: false } });
+  // A session that has not turned sign-in links on: said from its settings, with no code asked for.
+  const plain = createSessionEnv({ configOverrides: { ...config, agentSignInLinksEnabled: undefined } });
   withoutNonceLimit(plain.env);
   const requested = [];
   const other = createParticipant({
@@ -210,6 +212,6 @@ test('an older Worker, or a session with agents off, makes no link and says why'
   });
   await other.joinSession({ link: LINK });
   const off = await other.makeSignInLink({});
-  assert.deepEqual([off.made, /sign-in links from agents switched off/.test(off.note)], [false, true]);
+  assert.deepEqual([off.made, /doesn’t have sign-in links from agents switched on; an admin of the session can turn them on/.test(off.note)], [false, true]);
   assert.equal(requested.includes(AGENT_SIGN_IN_PATHS.create), false);
 });

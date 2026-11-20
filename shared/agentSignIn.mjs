@@ -22,12 +22,12 @@ export const agentParticipationOn = (config) => config?.[AGENT_PARTICIPATION_FIE
 
 /**
  * The session setting that lets a person sign in from a link their agent makes, and attach a passkey to the
- * agent's account. Absent or true, it is on wherever agents are. False, the Worker makes and takes no sign-in
- * codes and attaches no passkey; one already attached keeps working, and so does ending or restoring the
- * agent's access.
+ * agent's account. It is off unless a session's admin turns it on: only `true` is on, and then only where
+ * agents are. Off or absent, the Worker makes and takes no sign-in codes and attaches no passkey; one already
+ * attached keeps working, and so does ending or restoring the agent's access.
  */
 export const AGENT_SIGN_IN_LINKS_FIELD = 'agentSignInLinksEnabled';
-export const agentSignInLinksOn = (config) => config?.[AGENT_SIGN_IN_LINKS_FIELD] !== false && agentParticipationOn(config);
+export const agentSignInLinksOn = (config) => config?.[AGENT_SIGN_IN_LINKS_FIELD] === true && agentParticipationOn(config);
 
 // Sent by an agent's client with every request. A web page can't send it to a Worker: the Worker's CORS answer
 // doesn't allow the header, so a browser never makes the request.

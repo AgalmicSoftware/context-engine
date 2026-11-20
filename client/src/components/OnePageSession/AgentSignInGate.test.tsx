@@ -91,7 +91,8 @@ jest.mock('../../utilities/worker/workerAuthTokenCache.js', () => ({
   heldSessionToken: jest.fn(() => 'held-sign-in'),
 }));
 
-const CONFIG = { slug: 'salon' };
+// A session whose admin has turned sign-in links on; they are off until then.
+const CONFIG = { slug: 'salon', agentSignInLinksEnabled: true };
 const gate = (props: Partial<React.ComponentProps<typeof AgentSignInGate>> = {}) =>
   render(<AgentSignInGate sessionConfig={CONFIG} sessionSlug="salon" account="" provider="" {...props} />);
 const held = (extra: Record<string, unknown> = {}) =>
@@ -266,17 +267,12 @@ it('says so, and drops the code, where the Worker can’t sign in from a link, o
   expect(exchangeHeldAgentSignInCode).not.toHaveBeenCalled();
   unmount();
 
-  // Switched off in the session's own settings: said so, with the code dropped unused.
+  // Never turned on in the session's own settings: said so, with the code dropped unused.
   jest.mocked(workerHasAgentSignIn).mockResolvedValue(true);
   const offGate = render(
-    <AgentSignInGate
-      sessionConfig={{ slug: 'salon', agentSignInLinksEnabled: false }}
-      sessionSlug="salon"
-      account=""
-      provider=""
-    />,
+    <AgentSignInGate sessionConfig={{ slug: 'salon' }} sessionSlug="salon" account="" provider="" />,
   );
-  await waitFor(() => expect(notice()?.textContent).toMatch(/sign-in links from agents switched off/));
+  await waitFor(() => expect(notice()?.textContent).toMatch(/doesn’t have sign-in links from agents switched on/));
   expect(exchangeHeldAgentSignInCode).not.toHaveBeenCalled();
   offGate.unmount();
 
