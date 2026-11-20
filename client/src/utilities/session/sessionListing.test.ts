@@ -57,13 +57,25 @@ describe('session listing', () => {
     expect(options.map(({ slug }) => slug)).toEqual([...LISTED, 'zeta', 'alpha']);
   });
 
-  it('leaves the retired trial session off every list, and nothing that only looks like it', () => {
-    expect(RETIRED_SESSION_SLUGS).toEqual(['rxc-ra-test']);
-    expect(isListedSession('rxc-ra-test')).toBe(false);
+  it('leaves the retired trial sessions off every list, and nothing that only looks like them', () => {
+    expect(RETIRED_SESSION_SLUGS).toEqual(['rxc-ra-test', 'rxc-test']);
+    expect(RETIRED_SESSION_SLUGS.some(isListedSession)).toBe(false);
     expect(
-      ['rxc-ra-test-5', 'rxc-ra-test-6', 'rxc-ra-2', 'rxc-ra-agent-test-1', 'my-rxc-ra-test'].every(isListedSession),
+      [
+        'rxc-ra-test-5',
+        'rxc-ra-test-6',
+        'rxc-ra-2',
+        'rxc-ra-agent-test-1',
+        'my-rxc-ra-test',
+        'rxc-test-2',
+        'my-rxc-test',
+        'rxc-tests',
+        'rxc',
+      ].every(isListedSession),
     ).toBe(true);
-    const options = buildSessionListOptions({ slugs: ['rxc-ra-test', 'rxc-ra-agent-test-1', 'rxc-ra-2', 'eddy26'] });
+    const options = buildSessionListOptions({
+      slugs: ['rxc-ra-test', 'rxc-test', 'rxc-ra-agent-test-1', 'rxc-ra-2', 'eddy26'],
+    });
     expect(options.map(({ slug }) => slug)).toEqual(['eddy26', 'rxc-ra-2', 'rxc-ra-agent-test-1']);
     // Opened from its own link it is the current choice, and shows while it is.
     expect(
