@@ -76,13 +76,11 @@ it('shows the card a person saved, with its picture and the day it was saved', a
   expect(mockedPicture).toHaveBeenCalledWith('Elinor Ostrom (1933–2012)', OPTIONS);
 });
 
-it('on my own page says in one line that my card is shown, and draws no card or picture there', async () => {
+it('on my own page says the card is mine and shown', async () => {
   mockedRead.mockResolvedValue({ status: 'ready', card: CARD, savedAt: 9 });
   show({ account: PERSON.toUpperCase().replace('0X', '0x') });
-  await waitFor(() => expect(screen.getByText('Your picture card is shown on your page, saved day 9.')).toBeTruthy());
-  expect(screen.queryByTestId('analysis-card')).toBeNull();
-  expect(screen.getByRole('button', { name: 'Take it off my page' })).toBeTruthy();
-  expect(mockedPicture).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.getByText('Your card, shown on your page, saved day 9')).toBeTruthy());
+  expect(screen.getByTestId('analysis-card').textContent).toContain('mine');
 });
 
 it.each([[{ status: 'none' as const }], [{ status: 'withdrawn' as const }], [null]])(
@@ -103,10 +101,10 @@ it('asks nothing when the page has no session to ask', async () => {
   expect(mockedRead).not.toHaveBeenCalled();
 });
 
-it('takes the line away at once when my card is withdrawn on this page', async () => {
+it('takes the card away at once when it is withdrawn on this page', async () => {
   mockedRead.mockResolvedValue({ status: 'ready', card: CARD, savedAt: 9 });
   const { container } = show({ account: PERSON });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Take it off my page' })).toBeTruthy());
+  await waitFor(() => expect(screen.getByTestId('analysis-card')).toBeTruthy());
   mockedRead.mockResolvedValue({ status: 'withdrawn' });
   await act(async () => changed());
   await waitFor(() => expect(container.innerHTML).toBe(''));
@@ -159,8 +157,7 @@ it("keeps the picture of the card on screen, not an earlier figure's that comes 
   let finishFirst: (value: { dataUrl: string; accentHex: string }) => void = () => {};
   mockedPicture.mockReturnValueOnce(new Promise((resolve) => (finishFirst = resolve)));
   mockedRead.mockResolvedValue({ status: 'ready', card: CARD, savedAt: 9 });
-  // Someone else's page: only there is the card, and so its picture, drawn.
-  show();
+  show({ account: PERSON });
   await waitFor(() => expect(mockedPicture).toHaveBeenCalledTimes(1));
 
   mockedPicture.mockReturnValueOnce(new Promise(() => {}));

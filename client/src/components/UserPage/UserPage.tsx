@@ -3857,7 +3857,7 @@ class UserPage extends Component<any, any> {
               isSimulated,
               onChainProfileEnabled: this.props.onChainProfileEnabled,
               provider,
-              // Another person's card sits in the side column; my own shows only in the Analyze box (one line here).
+              // The shown card leads the side column, on my own page as on anyone else's.
               savedCard: (
                 <UserPageSavedAnalysisCard
                   viewAddress={propViewAddress}

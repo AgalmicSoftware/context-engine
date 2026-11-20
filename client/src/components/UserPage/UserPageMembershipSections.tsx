@@ -12,10 +12,7 @@ type UserPageMembershipSectionsArgs = {
   isSimulated: boolean;
   onChainProfileEnabled?: boolean;
   provider: unknown;
-  /**
-   * Another person's shown picture card, which takes the column their groups would; on my own page, the line
-   * that says my card is shown and lets me take it off.
-   */
+  /** The picture card the page's person shows on it. It leads the side column, above their groups. */
   savedCard?: React.ReactNode;
   sessionConfig: unknown;
   sbtSectionProps: Omit<React.ComponentProps<typeof UserPageSbtSection>, 'account' | 'provider' | 'wrapColumn'>;
@@ -49,7 +46,7 @@ export const renderUserPageMembershipSections = ({
     return savedCard ? <div className={`${styles.rightColumn} ${styles.cardColumn}`}>{savedCard}</div> : null;
   }
   return (
-    <div className={savedCard && !isOwner ? `${styles.rightColumn} ${styles.cardColumn}` : styles.rightColumn}>
+    <div className={savedCard ? `${styles.rightColumn} ${styles.cardColumn}` : styles.rightColumn}>
       {savedCard}
       {isOwner && (
         <UserPageWorkerGroupSection

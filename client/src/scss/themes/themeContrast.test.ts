@@ -675,7 +675,7 @@ describe('bundled app-theme contrast', () => {
       const found = Number(contrastRatio(composite(text, backdrop), backdrop).toFixed(2));
       if (found < least) failures.push(`${selector}: ${found}`);
     };
-    for (const box of ['.saved', '.savedLine']) check(box, rule(box).color, rule(box).background, 4.5);
+    check('.saved', rule('.saved').color, rule('.saved').background, 4.5);
     // The heading and the "Their card, saved …" line, on the box's ground.
     for (const line of ['.saved h4', '.savedDate']) check(line, rule(line).color, rule('.saved').background, 4.5);
     // The page turns and Download, and "Take it off my page": each brings its own fill.

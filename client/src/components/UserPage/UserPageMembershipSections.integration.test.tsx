@@ -84,7 +84,7 @@ it('loads the owner’s joined group and drops the section on account change wit
   expect(fetchSpy).toHaveBeenCalledTimes(2);
 });
 
-it("puts another person's shown card in the side column, and my own card's line in my own column", () => {
+it("leads the side column with the page's shown card, on someone else's page and on my own", () => {
   const other = '0x00000000000000000000000000000000000000bb';
   const withCard = (viewer: string, savedCard: React.ReactNode, onChainProfileEnabled = false) =>
     renderUserPageMembershipSections({
@@ -125,8 +125,10 @@ it("puts another person's shown card in the side column, and my own card's line 
     screen.getByRole('region', { name: 'Picture card' }),
   );
 
-  // My own page: the line about my card sits in my own column, which keeps its usual layout.
-  view.rerender(<>{withCard(account, <section aria-label="Picture card">my card is shown</section>)}</>);
-  expect(screen.getByRole('region', { name: 'Picture card' }).parentElement?.className).toBe('rightColumn');
-  expect(view.container.querySelector('.cardColumn')).toBeNull();
+  // My own page: my shown card leads my own column, above my groups.
+  view.rerender(<>{withCard(account, <section aria-label="Picture card">my card</section>)}</>);
+  const mine = screen.getByRole('region', { name: 'Picture card' });
+  expect(mine.parentElement?.className).toBe('rightColumn cardColumn');
+  expect(mine.parentElement?.firstElementChild).toBe(mine);
+  expect(mine.parentElement?.childElementCount).toBeGreaterThan(1);
 });
