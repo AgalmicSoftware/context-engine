@@ -107155,15 +107155,17 @@ var dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders = {} }) 
   let headers2 = {};
   try {
     let body = {};
-    if (request.body) {
+    if (method !== "OPTIONS" && request.body) {
       const bytes3 = await readBodyBytes(request, 512 * 1024);
       request = new Request(request, { body: bytes3 });
-      try {
-        body = await request.clone().json();
-      } catch {
-        throw authorityError("invalid_json", 400);
+      if (bytes3.byteLength) {
+        try {
+          body = await request.clone().json();
+        } catch {
+          throw authorityError("invalid_json", 400);
+        }
+        if (!body || typeof body !== "object" || Array.isArray(body)) throw authorityError("invalid_json", 400);
       }
-      if (!body || typeof body !== "object" || Array.isArray(body)) throw authorityError("invalid_json", 400);
     }
     const slugs = [
       body.sessionSlug,
