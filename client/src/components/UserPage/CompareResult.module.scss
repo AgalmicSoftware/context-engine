@@ -315,6 +315,13 @@
   writing-mode: vertical-rl;
   transform: rotate(180deg);
 }
+.mapCaption {
+  display: none;
+  margin: 0.5rem 0 0;
+  color: var(--ce-panel-text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
 // Dots are placed inside an inset so a dot at an end stays whole.
 .plotArea {
   position: absolute;
@@ -469,8 +476,34 @@
   .trackName {
     display: none;
   }
+  // The plot takes the whole width: the side ends move to a row under it, the axes' names to a line of
+  // text, and each person's name to the legend, where the letter in their dot finds it.
   .mapGrid {
-    grid-template-columns: minmax(0, 4rem) minmax(0, 1fr) minmax(0, 4rem);
-    font-size: 0.75rem;
+    grid-template-areas:
+      'top top'
+      'plot plot'
+      'bottom bottom'
+      'left right';
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .mapLeft {
+    text-align: left;
+    &::before {
+      content: '← ';
+    }
+  }
+  .mapRight {
+    text-align: right;
+    &::after {
+      content: ' →';
+    }
+  }
+  .axisNameX,
+  .axisNameY,
+  .mapName {
+    display: none;
+  }
+  .mapCaption {
+    display: block;
   }
 }
