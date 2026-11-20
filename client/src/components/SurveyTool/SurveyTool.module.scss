@@ -2793,6 +2793,17 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   font-size: 0.86rem;
 }
 
+.sessionListeningErrorWithAction {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+
+  // The interview panel takes borders off its buttons; this one keeps its outline so it reads as a button.
+  .sessionRecordingButton {
+    border: 1px solid currentColor !important;
+  }
+}
+
 .sessionListeningTranscriptDetails {
   border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 14%, transparent);
   border-radius: var(--ce-radius-8);
