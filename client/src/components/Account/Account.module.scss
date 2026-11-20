@@ -2337,7 +2337,8 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
 }
 
 .agentHandoffLead {
-  margin: 8px 0 0;
+  flex: 1 1 16rem;
+  margin: 0;
   font-size: 1rem;
   line-height: 1.4;
 }

@@ -94,9 +94,14 @@ it('starts closed, with its explanation still at hand, and opens as a disclosure
   // Nothing reads the session until the box is opened.
   expect(fetchMock).not.toHaveBeenCalled();
 
+  expect(screen.queryByText('Your agent works for you in this session.')).not.toBeInTheDocument();
+
   fireEvent.click(toggle);
   expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  expect(screen.getByText('Your agent works for you in this session.')).toBeVisible();
+  const lead = screen.getByText('Your agent works for you in this session.');
+  expect(lead).toBeVisible();
+  // It shares the title's row, not the body below it.
+  expect(toggle.closest('h3')!.parentElement).toContainElement(lead);
 });
 
 it('offers one mode, on my behalf, as two choices in a radio group with the first chosen', () => {

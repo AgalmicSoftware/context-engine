@@ -453,9 +453,10 @@ const LoginAgentHandoffPanel = ({
           Your AI agent can work for you in this session. It can predict your responses, which come back to you as a
           link to review and submit yourself, or, with a key you make here, submit as you in full.
         </Help>
+        {/* On the title line where it fits, as on a desktop; a phone wraps it under the title. */}
+        {open ? <p className={styles.agentHandoffLead}>Your agent works for you in this session.</p> : null}
       </div>
       <div id="ce-agent-handoff-body" hidden={!open}>
-        <p className={styles.agentHandoffLead}>Your agent works for you in this session.</p>
         <WayChoice way={way} onChange={chooseWay} />
 
         {/* Mounted only once opened: its check may ask to sign in to the session, which only an open box should. */}
