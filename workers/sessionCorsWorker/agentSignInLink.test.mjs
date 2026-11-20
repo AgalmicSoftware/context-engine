@@ -769,6 +769,98 @@ test('sign-in links are off until a session’s admin turns them on, which signs
   assert.equal((await signedAdminRequest({ env, wallet: admin, action: 'set-config', body: { config: { agentSignInLinksEnabled: 'yes' } } })).status, 400);
 });
 
+// The coordinator calls the agent sign-in record makes, counted, and failed on request.
+const watchSignInStore = (env) => {
+  const binding = env.CE_SESSION_COORDINATOR;
+  const get = binding.get.bind(binding);
+  const seen = { calls: 0, fail: false };
+  binding.get = (id) => {
+    const stub = get(id);
+    return {
+      fetch: async (input, init) => {
+        const url = String(input?.url || input);
+        if (!url.includes('agent-sign-in/')) return stub.fetch(input, init);
+        seen.calls += 1;
+        if (seen.fail) return new Response(JSON.stringify({ error: 'Coordinator busy.' }), { status: 503 });
+        return stub.fetch(input, init);
+      },
+    };
+  };
+  return seen;
+};
+
+test('an ordinary sign-in looks nothing up in a session that never had sign-in links set', async () => {
+  for (const [overrides, looksUp] of [[{ agentSignInLinksEnabled: undefined }, false], [{ agentSignInLinksEnabled: false }, true], [{}, true]]) {
+    const { env } = await setup(overrides);
+    const store = watchSignInStore(env);
+    const person = Wallet.createRandom();
+    const signedIn = await signIn(env, person);
+    assert.equal(signedIn.status, 200, JSON.stringify(signedIn.body));
+    assert.deepEqual([signedIn.body.attachedPasskey, signedIn.body.linkedAgentAccount], [undefined, undefined]);
+    assert.equal(store.calls > 0, looksUp, JSON.stringify(overrides));
+    // With nothing looked up, a record that can't be read is no part of signing in, for a person or an agent.
+    if (!looksUp) {
+      store.fail = true;
+      assert.equal((await signIn(env, Wallet.createRandom())).status, 200);
+      assert.equal((await signIn(env, Wallet.createRandom(), { headers: AGENT })).status, 200);
+      assert.equal(store.calls, 0);
+    }
+  }
+});
+
+test('where the record can’t be read, a sign-in goes ahead without the extras, except for an account with a passkey attached', async () => {
+  const { env } = await setup();
+  const agent = Wallet.createRandom();
+  const passkey = Wallet.createRandom();
+  const account = agent.address.toLowerCase();
+  const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+  const kept = (await attach(env, linkToken, passkey, account)).body.token;
+  assert.equal((await setAccess(env, kept, 'cancelled')).body.agentAccess, 'cancelled');
+  assert.equal((await signIn(env, agent, { headers: AGENT })).body.reason, 'agent_access_cancelled');
+
+  const store = watchSignInStore(env);
+  store.fail = true;
+  // Someone with nothing attached signs in as ever, and is told nothing extra.
+  const person = await signIn(env, Wallet.createRandom());
+  assert.equal(person.status, 200, JSON.stringify(person.body));
+  assert.equal(await stands(env, person.body.token), true);
+  // So does the passkey itself; the page just isn't told of the account it is attached to this time.
+  const asPasskey = await signIn(env, passkey);
+  assert.deepEqual([asPasskey.status, asPasskey.body.linkedAgentAccount], [200, undefined]);
+  // The account whose agent was shut out stays shut out: it is marked, so it waits for the record.
+  const shutOut = await signIn(env, agent, { headers: AGENT });
+  assert.deepEqual([shutOut.status, shutOut.body.reason], [503, 'agent_sign_in_unavailable']);
+  // A mark that can't be read is treated as a mark.
+  const kvGet = env.GROUP_KV.get.bind(env.GROUP_KV);
+  env.GROUP_KV.get = async (key, ...rest) => {
+    if (String(key).startsWith('agentLinkAccount:')) throw new Error('KV unavailable');
+    return kvGet(key, ...rest);
+  };
+  assert.equal((await signIn(env, Wallet.createRandom())).status, 503);
+  env.GROUP_KV.get = kvGet;
+  store.fail = false;
+  assert.equal((await signIn(env, agent, { headers: AGENT })).body.reason, 'agent_access_cancelled');
+  assert.equal((await signIn(env, passkey)).body.linkedAgentAccount.address, account);
+});
+
+test('ending an agent’s access marks the account again, so a lost mark can’t let its key back in while the record is unreadable', async () => {
+  const { env } = await setup();
+  const agent = Wallet.createRandom();
+  const passkey = Wallet.createRandom();
+  const account = agent.address.toLowerCase();
+  const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+  const kept = (await attach(env, linkToken, passkey, account)).body.token;
+  // The mark written at attach is lost.
+  const markKey = [...env.GROUP_KV.values.keys()].find((key) => key.startsWith('agentLinkAccount:') && key.endsWith(account));
+  assert.ok(markKey);
+  env.GROUP_KV.values.delete(markKey);
+  assert.equal((await setAccess(env, kept, 'cancelled')).body.agentAccess, 'cancelled');
+  assert.equal(env.GROUP_KV.values.has(markKey), true);
+  const store = watchSignInStore(env);
+  store.fail = true;
+  assert.equal((await signIn(env, agent, { headers: AGENT })).status, 503);
+});
+
 test('the agents switch also closes the Worker’s Agent HTTP API', async () => {
   // A session with the Agent HTTP API on.
   const withApi = { sessionModeProfile: { ...groupsConfig.sessionModeProfile, surfaces: { ...groupsConfig.sessionModeProfile.surfaces, agentHttp: true } } };

@@ -16,6 +16,7 @@ import {
   AGENT_ACCESS,
   AGENT_CLIENT_HEADER,
   AGENT_SIGN_IN_CODE_TTL_SECONDS,
+  AGENT_SIGN_IN_LINKS_FIELD,
   AGENT_SIGN_IN_LINK_STATEMENT,
   AGENT_SIGN_IN_PATHS,
   AGENT_SIGN_IN_VIA,
@@ -452,6 +453,9 @@ const access = async ({ request, env, baseHeaders, slug, deps }) => {
   if (limited) return limited;
   const changed = await callAgentSignInStore(env, context.slug, 'access', { address: account, passkey: claims.actor, agentAccess: body?.agentAccess, now: nowMs(deps) });
   if (!changed.ok) return storeRefusal(changed, deps.json, headers);
+  // The mark is written again with every change, in case its first writing was lost: an account whose agent's
+  // access is ended is then always a marked one, which is what a sign-in falls back on when the record can't be read.
+  await setLinkedFlag(env, context.slug, account, true);
   // Cancelled in the record first, so no new sign-in or code can be made; then every sign-in but this one ends.
   const ended = changed.link.agentAccess === AGENT_ACCESS.CANCELLED
     ? await endOtherSignIns({ env, slug: context.slug, account, keepJti: claims.jti })
@@ -518,16 +522,36 @@ export const dispatchAgentSignInLinkRequest = async ({ path, request, env, baseH
   return route({ request, env, baseHeaders, slug, deps });
 };
 
+// Whether a session has ever had its sign-in links setting saved, on or off. Until it has, no code was ever made
+// here, so no account has a passkey attached or its agent's access ended, and there is nothing to look up.
+const linksEverSet = (config) => !!config && Object.hasOwn(config, AGENT_SIGN_IN_LINKS_FIELD);
+
 /**
  * What a sign-in with an account's own key must pass, and carry, in a session this Worker hosts: refused where
  * the session has agents off and the client says it is one, or where the account's person has ended agent
- * access; told of a passkey attached to it, or of the agent's account its passkey is for. Unreadable is refused.
+ * access; told of a passkey attached to it, or of the agent's account its passkey is for.
+ *
+ * An ordinary sign-in is not made to depend on any of this. In a session that never had sign-in links set,
+ * nothing is looked up and the sign-in is exactly what it was before this feature. Where the record is looked up
+ * and can't be read, the sign-in goes ahead without the extras, unless the account is marked as having a passkey
+ * attached: only such an account can have had its agent's access ended, so only it is refused until the record
+ * can be read.
  */
 export const checkAgentSignInAtLogin = async ({ env, request, slug, address, config, scopes } = {}) => {
   if (!isWorkerCanonical(config)) return {};
   if (!agentParticipationOn(config) && saysItIsAnAgent(request) && scopes?.admin !== true) return { refusal: { status: 403, body: OFF } };
-  const kept = await callAgentSignInStore(env, slug, 'state', { address: lower(address) });
-  if (!kept.ok) return { refusal: { status: 503, body: UNAVAILABLE } };
+  if (!linksEverSet(config)) return {};
+  const kept = await callAgentSignInStore(env, slug, 'state', { address: lower(address) }).catch(() => null);
+  if (!kept?.ok) {
+    let marked = true;
+    try {
+      const key = linkedFlagKey(slug, lower(address));
+      marked = !key || (await env?.GROUP_KV?.get?.(key)) === LINKED_FLAG;
+    } catch {
+      // The mark can't be read either: treated as marked.
+    }
+    return marked ? { refusal: { status: 503, body: UNAVAILABLE } } : {};
+  }
   if (kept.asAccount?.agentAccess === AGENT_ACCESS.CANCELLED) return { refusal: { status: 403, body: CANCELLED } };
   return {
     claims: kept.asAccount ? { agentLinked: true } : {},
