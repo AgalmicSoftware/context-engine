@@ -31,8 +31,10 @@ export default function SessionInterviewPrefillStatus({ draftCount, hiddenCount,
       </p>
       {hiddenCount > 0 ? (
         <p className={styles.sessionInterviewPrefillStatusLine}>
-          {hiddenCount} {hiddenCount === 1 ? 'is' : 'are'} hidden until you answer, to test how well your AI predicts
-          you.{' '}
+          <strong>
+            {hiddenCount} {hiddenCount === 1 ? 'is' : 'are'} hidden until you answer, to test how well your AI predicts
+            you.
+          </strong>{' '}
           <a className={consentStyles.researchLink} href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
             How it works
           </a>
