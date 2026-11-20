@@ -31,7 +31,7 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 
 ## In Progress
 
-- **Agent-first use**: agents take part through MCP and Agent HTTP today. Still open: drafting from a private session's link, signing in on the website as an agent, and a person taking over an agent's account. Canonical handoffs for settings, SBT, decrypt and storage actions also remain. The [Session Worker Agent HTTP README](workers/sessionCorsWorker/agent/README.md) describes the routes.
+- **Agent-first use**: agents take part through MCP and Agent HTTP today, read a private session from its group's link, and can give their person a sign-in link to the account they used where the session's admins allow it. Still open: an agent signing in on the website itself. Canonical handoffs for settings, SBT, decrypt and storage actions also remain. The [Session Worker Agent HTTP README](workers/sessionCorsWorker/agent/README.md) describes the routes.
 - **Voice-only use**: spoken interviews have shipped; driving the whole site by voice has not.
 - **Documents and context**: context cards, the document library and the debate atlas have shipped; knowledge maps have not.
 - **Storage options**: Cloudflare storage sits beside Arweave, with optional R2; IPFS has not shipped.
