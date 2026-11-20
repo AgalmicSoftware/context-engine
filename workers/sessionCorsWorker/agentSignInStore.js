@@ -5,6 +5,17 @@
 // config: an older Worker never reads them, and nothing else the session stores is touched.
 import { AGENT_ACCESS } from '../../shared/agentSignIn.mjs';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
+import { sessionSlugStorageKey } from './sessionSlugResolution.js';
+
+// The mark kept in KV beside an account's sign-in records, saying a passkey is attached to it. Every sign-in of
+// a marked account is checked against the record here on each request, and a sign-in that can't read the record
+// is refused only for a marked account. So wherever a record is written, its mark is written: at attach, on
+// every change to the agent's access, and when a backup puts a record back.
+export const AGENT_LINKED_MARK = 'linked';
+export const agentLinkedMarkKey = (slug, account) => {
+  const slugPart = sessionSlugStorageKey(slug);
+  return slugPart && account ? `agentLinkAccount:${slugPart}:${account}` : '';
+};
 
 const ADDRESS_RE = /^0x[0-9a-f]{40}$/;
 const HASH_RE = /^[0-9a-f]{64}$/;

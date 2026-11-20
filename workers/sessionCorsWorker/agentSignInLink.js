@@ -26,7 +26,7 @@ import {
   isAgentSignInCode,
   readAgentPasskeyAttachStatement,
 } from '../../shared/agentSignIn.mjs';
-import { callAgentSignInStore } from './agentSignInStore.js';
+import { AGENT_LINKED_MARK as LINKED_FLAG, agentLinkedMarkKey as linkedFlagKey, callAgentSignInStore } from './agentSignInStore.js';
 import { resolveAuthLoginRequestAuthority } from './authLoginRequestAuthority.js';
 import {
   buildAuthTokenJti, buildAuthTokenKey, persistAuthTokenRecord, revokeAuthTokenRecord, setAuthTokenRecordCheck,
@@ -50,11 +50,6 @@ export const AGENT_SIGN_IN_LIMITS = Object.freeze({ create: 24, exchange: 300, a
 export const AGENT_LINK_SIGN_IN_TTL_SECONDS = 60 * 60;
 // Marks, beside an account's sign-in records, that a passkey is attached to it: every sign-in of an account so
 // marked is checked against the coordinator's record, whenever it was made and whatever it says of itself.
-const LINKED_FLAG = 'linked';
-const linkedFlagKey = (slug, account) => {
-  const slugPart = sessionSlugStorageKey(slug);
-  return slugPart && account ? `agentLinkAccount:${slugPart}:${account}` : '';
-};
 const setLinkedFlag = async (env, slug, account, linked) => {
   const key = linkedFlagKey(slug, account);
   try {
