@@ -354,6 +354,34 @@ describe('an account held without its key', () => {
     expect(renewer).toHaveBeenCalledTimes(1);
   });
 
+  it('makes one new sign-in when it is asked for twice at once, and never has a quiet request wait on a prompt', async () => {
+    let finish: (value: { token: string; exp: number }) => void = () => undefined;
+    const renewer = jest.fn(
+      (_account: unknown, _options: unknown) =>
+        new Promise<{ token: string; exp: number }>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    setAgentLinkRenewer(renewer);
+    holdAgentLinkAccount({ address: ACCOUNT, ...target, via: 'passkey_link', passkey: PASSKEY, agentAccess: 'active' });
+    const ask = { address: ACCOUNT, workerUrl: WORKER, sessionSlug: 'salon' };
+    const first = renewAgentLinkSignIn({ ...ask, prompt: false });
+    const second = renewAgentLinkSignIn({ ...ask, prompt: false });
+    const asked = renewAgentLinkSignIn({ ...ask, prompt: true });
+    expect(renewer).toHaveBeenCalledTimes(1);
+    finish({ token: 'renewed', exp: 1800000000 });
+    await expect(Promise.all([first, second, asked])).resolves.toEqual(
+      Array(3).fill({ token: 'renewed', exp: 1800000000 }),
+    );
+    // While the person is being asked, what the page does by itself does not wait on them.
+    const prompting = renewAgentLinkSignIn({ ...ask, prompt: true });
+    const quiet = renewAgentLinkSignIn({ ...ask, prompt: false });
+    expect(renewer).toHaveBeenCalledTimes(3);
+    finish({ token: 'again', exp: 1800000001 });
+    await quiet;
+    void prompting.catch(() => undefined);
+  });
+
   it('hears once that a passkey is attached to an agent’s account, for the session and passkey it was said of', () => {
     const said = {
       workerUrl: WORKER,

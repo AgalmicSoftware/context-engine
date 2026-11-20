@@ -156,6 +156,7 @@ type Renewer = (
   options: { prompt: boolean },
 ) => Promise<{ token: string; exp: number } | null>;
 let renewer: Renewer | null = null;
+const renewals = new Map<string, { made: Promise<{ token: string; exp: number } | null>; prompt: boolean }>();
 export const setAgentLinkRenewer = (next: Renewer | null): void => {
   renewer = next;
 };
@@ -177,7 +178,16 @@ export const renewAgentLinkSignIn = async ({
   if (account.workerUrl.replace(/\/+$/, '') !== String(workerUrl || '').replace(/\/+$/, '')) return null;
   // Only an attached passkey can make a new one; a sign-in from the link alone ends when it ends.
   if (account.via !== 'passkey_link' || !account.passkey) return null;
-  return renewer(account, { prompt });
+  // One renewal at a time for an account: requests that arrive together share it, so a page that asks twice at
+  // once raises one passkey prompt and makes one sign-in. A quiet request never waits on a prompt.
+  const key = `${account.address}|${account.workerUrl}|${account.sessionSlug}`;
+  const running = renewals.get(key);
+  if (running && (prompt || !running.prompt)) return running.made;
+  const made = renewer(account, { prompt }).finally(() => {
+    if (renewals.get(key)?.made === made) renewals.delete(key);
+  });
+  renewals.set(key, { made, prompt });
+  return made;
 };
 
 // A passkey's own sign-in told the page that the passkey is attached to an account an AI agent set up. Whoever
