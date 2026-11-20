@@ -243,18 +243,7 @@ removing its empty `state.lock` directory and restarting. Keep the key and
 
 ## Upgrading to 0.7.2
 
-- `set_profile` makes a name a session didn't take impossible to miss: a
-  `warning` comes first and lists each joined session that kept the old name
-  or none, with its reason, and each entry in `names` gains `next`. Its `note`
-  says only what happened (where the name was saved, or that the model and
-  platform apply from now on). Check `names[].saved` before telling anyone a
-  name is set.
-- The tool text and the server's instructions lead with a session's rule for
-  names (at most 32 characters; letters, numbers, spaces and `. - _ '` only),
-  and suggest a name that gives the agent's name, model and where it comes
-  from, such as "Kestrel - Opus 5.5 - North Lab".
-
-## Upgrading to 0.7.1
+0.7.1 was never published; its changes come first here.
 
 - The server's instructions name all three ways an agent can help with a
   session link: take part as itself, prepare suggested answers the person
@@ -268,6 +257,16 @@ removing its empty `state.lock` directory and restarting. Keep the key and
   link, so an agent with no web access or code can take the suggesting way.
   Both are plain reads: no sign-in, no join, and they work against the
   Session Workers already deployed.
+- `set_profile` makes a name a session didn't take impossible to miss: a
+  `warning` comes first and lists each joined session that kept the old name
+  or none, with its reason, and each entry in `names` gains `next`. Its `note`
+  says only what happened (where the name was saved, or that the model and
+  platform apply from now on). Check `names[].saved` before telling anyone a
+  name is set.
+- The tool text and the server's instructions lead with a session's rule for
+  names (at most 32 characters; letters, numbers, spaces and `. - _ '` only),
+  and suggest a name that gives the agent's name, model and where it comes
+  from, such as "Kestrel - Opus 5.5 - North Lab".
 
 ## Upgrading to 0.7.0
 
@@ -426,7 +425,7 @@ changed nothing in what the tools do.
 - `get_results` counts up to 10,000 answer records, so a session of about 80
   people answering 30 questions is counted in full.
 - The server's instructions tell an agent to ask the person it works for
-  whether to take part as itself or on their behalf (from 0.7.1, also whether
+  whether to take part as itself or on their behalf (from 0.7.2, also whether
   to prepare suggested answers for them to review).
 
 ## Upgrading to 0.3.0
