@@ -29,7 +29,7 @@ it('signs the agents out, says how to let one in again, and tells its place so a
 it('says so, and reports nothing done, when the agents could not be signed out', async () => {
   jest.mocked(signAgentsOut).mockRejectedValue(new Error('The session could not be reached.'));
   const onDone = jest.fn();
-  render(<SignAgentsOutControl provider="wagmi" sessionSlug="salon" onDone={onDone} />);
+  render(<SignAgentsOutControl provider="passkey_eoa" sessionSlug="salon" onDone={onDone} />);
   fireEvent.click(screen.getByTestId('ce-sign-agents-out'));
   const said = await screen.findByTestId('ce-sign-agents-out-said');
   expect(said.getAttribute('role')).toBe('alert');
@@ -37,7 +37,11 @@ it('says so, and reports nothing done, when the agents could not be signed out',
   expect(onDone).not.toHaveBeenCalled();
 });
 
-it('is not offered in an account an AI agent set up, where the Worker has no such sign-out', () => {
-  render(<SignAgentsOutControl provider="agent_link" sessionSlug="salon" />);
-  expect(screen.queryByTestId('ce-sign-agents-out')).toBeNull();
+it('is offered only to a passkey sign-in, which signs in again by itself afterwards', () => {
+  // A browser wallet, another kind of sign-in, an account an AI agent set up, nobody.
+  for (const provider of ['wagmi', 'web3auth', 'agent_token', 'agent_link', '', undefined]) {
+    const { unmount } = render(<SignAgentsOutControl provider={provider} sessionSlug="salon" />);
+    expect(screen.queryByTestId('ce-sign-agents-out')).toBeNull();
+    unmount();
+  }
 });

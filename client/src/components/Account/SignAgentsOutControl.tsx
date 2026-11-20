@@ -1,9 +1,11 @@
 // "Sign Agents Out", for the "Your AI agent" menu of the account dialog: ends every prompt and key the person
-// copied for an agent in this tab, and says to copy a new one to let an agent in again. It renders
-// nothing in an account an AI agent set up, where there is no such key to end (see signAgentsOut.ts).
+// copied for an agent in this tab, and says to copy a new one to let an agent in again (see signAgentsOut.ts).
+//
+// Offered only to a person signed in with their passkey: the page then signs in to the session again by itself,
+// so they are not left signed out. A browser wallet would have to be asked to sign again, and an account an AI
+// agent set up has no such key to end; neither is offered it.
 import React, { useState } from 'react';
 
-import { isAgentLinkProvider } from '../../utilities/session/agentLinkAccount';
 import { signAgentsOut } from '../../utilities/session/signAgentsOut';
 
 export const SIGN_AGENTS_OUT_HELP =
@@ -25,7 +27,7 @@ export default function SignAgentsOutControl({
 }: Props): React.ReactElement | null {
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<{ text: string; isError: boolean } | null>(null);
-  if (isAgentLinkProvider(provider)) return null;
+  if (provider !== 'passkey_eoa') return null;
   const run = async (): Promise<void> => {
     if (busy) return;
     setBusy(true);
