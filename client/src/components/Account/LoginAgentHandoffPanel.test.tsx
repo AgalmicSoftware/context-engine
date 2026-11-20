@@ -487,7 +487,7 @@ it('gives each option its own copy and show names, and the suggestions prompt it
   expect(screen.getByTestId('ce-agent-handoff-suggest-prompt-box')).toHaveClass('agentHandoffPromptLarge');
 });
 
-it('holds Sign Agents Out under both options, and drops the dead key after it while staying open', async () => {
+it('holds Sign Agents Out under both options; after it, drops the dead key and closes, keeping its message', async () => {
   const props = {
     agentHttpEnabled: true,
     sessionUrl,
@@ -498,19 +498,48 @@ it('holds Sign Agents Out under both options, and drops the dead key after it wh
     signAgentsOut: <span role="status">Agents signed out.</span>,
   };
   const { rerender } = render(<LoginAgentHandoffPanel {...props} agentsSignedOut={0} />);
+  const signOut = screen.getByText('Agents signed out.');
+  expect(signOut).not.toBeVisible();
   const toggle = screen.getByRole('button', { name: 'Your AI agent' });
   fireEvent.click(toggle);
-  const signOut = screen.getByText('Agents signed out.');
+  expect(signOut).toBeVisible();
   const submit = screen.getByRole('group', { name: 'Answer for me' });
   expect(submit.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(document.getElementById('ce-agent-handoff-body')).toContainElement(signOut);
 
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
   await screen.findByTestId('ce-agent-handoff-submit-prompt');
   rerender(<LoginAgentHandoffPanel {...props} agentsSignedOut={1} />);
   expect(screen.queryByTestId('ce-agent-handoff-submit-prompt')).not.toBeInTheDocument();
+  // Closed, so the session is checked again only when it is reopened; the same message stays in view.
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByTestId('ce-agent-handoff-suggest-copy')).not.toBeInTheDocument();
+  expect(screen.getByText('Agents signed out.')).toBe(signOut);
+  expect(signOut).toBeVisible();
+
+  fireEvent.click(toggle);
   expect(screen.getByRole('button', { name: 'Make a key' })).toBeInTheDocument();
-  expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  expect(screen.getByText('Agents signed out.')).toBeVisible();
   await screen.findByTestId('ce-agent-handoff-suggest-copy');
+  fireEvent.click(toggle);
+  expect(signOut).not.toBeVisible();
+});
+
+it('shows no key asked for before Sign Agents Out', async () => {
+  let resolve: (value: typeof key) => void = () => {};
+  const props = {
+    agentHttpEnabled: true,
+    sessionUrl,
+    sessionName: 'Salon',
+    sessionSlug: 'salon',
+    workerUrl,
+    requestKey: jest.fn(() => new Promise<typeof key>((done) => (resolve = done))),
+    signAgentsOut: <span>Sign Agents Out</span>,
+  };
+  const { rerender } = render(<LoginAgentHandoffPanel {...props} agentsSignedOut={0} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Your AI agent' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
+  rerender(<LoginAgentHandoffPanel {...props} agentsSignedOut={1} />);
+  await act(async () => resolve(key));
+  fireEvent.click(screen.getByRole('button', { name: 'Your AI agent' }));
+  expect(screen.queryByTestId('ce-agent-handoff-submit-prompt')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Make a key' })).toBeEnabled();
 });

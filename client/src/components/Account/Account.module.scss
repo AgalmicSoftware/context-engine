@@ -1897,6 +1897,12 @@ h1 {
     background: var(--ce-settings-panel-bg);
     color: var(--ce-settings-text);
   }
+  // Under the box, in line with it: it stays when the row closes after it is used.
+  .agentHandoffSignOut {
+    margin: 0 12px 12px;
+    padding-top: 0;
+    border-top: 0;
+  }
 }
 
 @media (max-width: 768px) {
@@ -2735,7 +2741,8 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   padding-top: 12px;
   border-top: 1px solid var(--ce-settings-border);
 
-  &:empty {
+  &:empty,
+  &[hidden] {
     display: none;
   }
 }

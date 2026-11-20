@@ -261,12 +261,20 @@ const LoginAgentHandoffPanel = ({
   const [selectStep, setSelectStep] = useState('');
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
-  // After Sign Agents Out the key is dead, so it goes; the row stays open, with Sign Agents Out's message.
+  // After Sign Agents Out the key is dead, so it goes, and the row closes, as reopening it is what checks the
+  // session again; Sign Agents Out's message stays in view under it until the row is next closed.
   const signedOutSeen = useRef(agentsSignedOut);
+  // Bumped at each sign-out, so a key asked for before it is not shown.
+  const keyRound = useRef(0);
+  const [signOutShown, setSignOutShown] = useState(false);
   useEffect(() => {
     if (signedOutSeen.current === agentsSignedOut) return;
     signedOutSeen.current = agentsSignedOut;
+    keyRound.current += 1;
+    setOpen(false);
+    setSignOutShown(true);
     setKey(null);
+    setError('');
     setKeyShown(false);
     setSubmitExpanded(false);
     setCopyStatus('');
@@ -302,13 +310,16 @@ const LoginAgentHandoffPanel = ({
   }, [selectStep]);
 
   const makeKey = async () => {
+    const round = keyRound.current;
     setMaking(true);
     setError('');
     try {
-      setKey(await requestKey());
+      const made = await requestKey();
+      if (round !== keyRound.current) return;
+      setKey(made);
       setKeyShown(false);
     } catch (err) {
-      setError(keyErrorMessage(err));
+      if (round === keyRound.current) setError(keyErrorMessage(err));
     } finally {
       setMaking(false);
     }
@@ -414,7 +425,10 @@ const LoginAgentHandoffPanel = ({
             data-ce-control-appearance="frameless"
             aria-expanded={open}
             aria-controls="ce-agent-handoff-body"
-            onClick={() => setOpen((wasOpen) => !wasOpen)}
+            onClick={() => {
+              setOpen(!open);
+              setSignOutShown(false);
+            }}
             data-testid="ce-agent-handoff-toggle"
           >
             {/* Its row's icon in the account dialog's list. */}
@@ -443,8 +457,6 @@ const LoginAgentHandoffPanel = ({
           {/* Mounted only once opened: its check may ask to sign in to the session, which only an open box should. */}
           {open ? (
             <SuggestAnswers
-              // Checked afresh after Sign Agents Out, for a new ticket.
-              key={agentsSignedOut}
               sessionSlug={sessionSlug}
               sessionUrl={sessionUrl}
               sessionName={sessionName}
@@ -496,8 +508,6 @@ const LoginAgentHandoffPanel = ({
           ) : null}
         </AgentOption>
 
-        {signAgentsOut ? <div className={styles.agentHandoffSignOut}>{signAgentsOut}</div> : null}
-
         {/* Live regions stay mounted, so screen readers hear their first message too. */}
         <div role="alert">
           {error ? (
@@ -514,6 +524,12 @@ const LoginAgentHandoffPanel = ({
           ) : null}
         </div>
       </div>
+      {/* Outside the body, in one place, so its message outlives the row closing after it is used. */}
+      {signAgentsOut ? (
+        <div className={styles.agentHandoffSignOut} hidden={!open && !signOutShown}>
+          {signAgentsOut}
+        </div>
+      ) : null}
     </section>
   );
 };
