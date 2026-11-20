@@ -567,7 +567,7 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
     const s = providerLike.trim().toLowerCase();
     // Signed in to an agent's account without its key: the provider says who it is and signs nothing. It is
     // matched before any wallet, so an installed wallet's own account is never taken for it.
-    if (isAgentLinkProvider(s)) return agentLinkProvider as unknown as Eip1193Provider;
+    if (isAgentLinkProvider(s)) return agentLinkProvider;
 
     // Handle embedded passkey provider strings. Prefer the seeded window global
     // when a signing client is already warm, but synthesize the lazy provider on
