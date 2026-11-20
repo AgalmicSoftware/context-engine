@@ -22,8 +22,8 @@ import {
 import { SetupCheck, SetupField, SetupHelp, SetupSection, setupHelpId } from './SetupPrimitives';
 import SetupContextHtmlField from './SetupContextHtmlField';
 import SetupAgentInstructionsField from './SetupAgentInstructionsField';
+import SetupQuestionTypes from './SetupQuestionTypes';
 import {
-  SETUP_QUESTION_TYPES,
   asList,
   asRecord,
   setupQuestionTypeLabel,
@@ -510,6 +510,47 @@ export const SetupQuestionsSection = ({
       onToggle={onToggle}
       quick={publisher}
     >
+      <div className={styles.field}>
+        <div className={styles.fieldLabelRow}>
+          <span className={styles.fieldLabel}>New question type</span>
+          <SetupHelp id="ce-setup-question-type" label="New question type" help={QUESTION_TYPE_HELP} />
+        </div>
+        <SetupQuestionTypes value={newType} onChange={setNewType} describedBy={setupHelpId('ce-setup-question-type')} />
+      </div>
+      <SetupField id="ce-setup-question-prompt" label="New question" help={QUESTION_PROMPT_HELP}>
+        <Input
+          id="ce-setup-question-prompt"
+          type="textarea"
+          value={newPrompt}
+          aria-describedby={setupHelpId('ce-setup-question-prompt')}
+          placeholder="Write your question"
+          data-testid="ce-setup-question-prompt"
+          onChange={(event) => setNewPrompt(event.target.value)}
+        />
+      </SetupField>
+      {setupQuestionUsesOptions(newType) ? (
+        <SetupField id="ce-setup-question-options" label="Options, one per line" help={QUESTION_OPTIONS_HELP}>
+          <Input
+            id="ce-setup-question-options"
+            type="textarea"
+            value={newOptions}
+            aria-describedby={setupHelpId('ce-setup-question-options')}
+            onChange={(event) => setNewOptions(event.target.value)}
+          />
+        </SetupField>
+      ) : null}
+      <div className={styles.buttonRow}>
+        <button
+          type="button"
+          className={`${styles.button} ${styles.primaryButton}`}
+          disabled={!canAdd}
+          data-testid="ce-setup-question-add"
+          onClick={add}
+        >
+          Add question
+        </button>
+      </div>
+      {suggest}
       {questions.map((question, index) => (
         <div key={`question-${index}`} className={styles.listRow} data-testid="ce-setup-question">
           <div className={styles.listRowBody}>
@@ -546,54 +587,6 @@ export const SetupQuestionsSection = ({
           </button>
         </div>
       ))}
-      <SetupField id="ce-setup-question-type" label="New question type" help={QUESTION_TYPE_HELP}>
-        <Input
-          id="ce-setup-question-type"
-          type="select"
-          value={newType}
-          aria-describedby={setupHelpId('ce-setup-question-type')}
-          onChange={(event) => setNewType(event.target.value)}
-        >
-          {SETUP_QUESTION_TYPES.map((entry) => (
-            <option key={entry.value} value={entry.value}>
-              {entry.label}
-            </option>
-          ))}
-        </Input>
-      </SetupField>
-      <SetupField id="ce-setup-question-prompt" label="New question" help={QUESTION_PROMPT_HELP}>
-        <Input
-          id="ce-setup-question-prompt"
-          type="textarea"
-          value={newPrompt}
-          aria-describedby={setupHelpId('ce-setup-question-prompt')}
-          data-testid="ce-setup-question-prompt"
-          onChange={(event) => setNewPrompt(event.target.value)}
-        />
-      </SetupField>
-      {setupQuestionUsesOptions(newType) ? (
-        <SetupField id="ce-setup-question-options" label="Options, one per line" help={QUESTION_OPTIONS_HELP}>
-          <Input
-            id="ce-setup-question-options"
-            type="textarea"
-            value={newOptions}
-            aria-describedby={setupHelpId('ce-setup-question-options')}
-            onChange={(event) => setNewOptions(event.target.value)}
-          />
-        </SetupField>
-      ) : null}
-      <div className={styles.buttonRow}>
-        <button
-          type="button"
-          className={styles.button}
-          disabled={!canAdd}
-          data-testid="ce-setup-question-add"
-          onClick={add}
-        >
-          Add question
-        </button>
-      </div>
-      {suggest}
     </SetupSection>
   );
 };

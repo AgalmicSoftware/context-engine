@@ -363,7 +363,10 @@ describe('setup content sections', () => {
     ]);
     expect(screen.getByTestId('ce-setup-summary-questions')).toHaveTextContent('2 questions');
 
-    fireEvent.change(screen.getByLabelText('New question type'), { target: { value: 'multichoice' } });
+    const types = screen.getByRole('group', { name: 'New question type' });
+    expect(within(types).getByRole('button', { name: /Agree or disagree/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(types).getByRole('button', { name: /Multiple choice/ }));
+    expect(within(types).getByRole('button', { name: /Multiple choice/ })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.change(screen.getByTestId('ce-setup-question-prompt'), { target: { value: 'Which park?' } });
     const options = screen.getByLabelText('Options, one per line');
     fireEvent.change(options, { target: { value: 'North' } });

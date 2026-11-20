@@ -355,6 +355,47 @@
   gap: 8px;
 }
 
+// The new question's type: the site's question-type tiles, in this page's colours so the title
+// reads on its cards in every theme. The pressed tile is the chosen type.
+.typeTiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.typeTile {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 84px;
+  padding: 12px 8px;
+  border: 1.5px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-10, 10px);
+  background: var(--ce-control-face);
+  color: var(--ce-panel-text);
+  font: inherit;
+  cursor: pointer;
+
+  &[aria-pressed='true'] {
+    border: 2px solid var(--ce-action-accent);
+    background: color-mix(in srgb, var(--ce-action-accent) 10%, var(--ce-control-face));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: 2px;
+  }
+}
+
+.typeTileTitle {
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
 // A row of "Add …" buttons, with its "?" after the last.
 .addRow {
   display: flex;
