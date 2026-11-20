@@ -40,6 +40,7 @@ import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { buildSessionDocLibraryViewerUrl } from '../../utilities/docLibrary/docUploadContracts';
 import { useContextGroups } from '../../utilities/docLibrary/useContextGroups';
 import type { SessionContextSourcesState } from '../../utilities/docLibrary/useSessionContextSources';
+import AgentMark from '../Shared/AgentMark';
 import styles from './OnePageSession.module.scss';
 import css from './SessionContextSources.module.scss';
 
@@ -260,7 +261,7 @@ const SessionContextSources = ({
                     <span>{size ? `${kind}, ${size}` : kind}</span>
                     {adder ? <span>Added by {adder}</span> : null}
                     {/* Apart from the name, which an agent chooses. */}
-                    {source.addedByAgent ? <span className={styles.sessionContextBadge}>Agent</span> : null}
+                    {source.addedByAgent ? <AgentMark /> : null}
                     {repeats.has(source.id) ? <span className={styles.sessionContextBadge}>Duplicate</span> : null}
                     {isAdmin && source.adminsOnly ? (
                       <span className={styles.sessionContextBadge}>Admins only</span>

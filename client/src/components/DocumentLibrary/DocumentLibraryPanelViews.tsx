@@ -26,6 +26,7 @@ import { copyText } from '../../utilities/ui/copyText';
 import { notify } from '../../utilities/ui/notify.js';
 import { createLogger } from '../../utilities/logging.js';
 import SBTSelector from '../SBTs/SBTSelector';
+import AgentMark from '../Shared/AgentMark';
 
 const log = createLogger('DocumentLibraryPanelViews');
 
@@ -798,7 +799,7 @@ export const DocumentLibraryList = ({
                   <>
                     {addedAtLabel ? <span className={styles.time}>{addedAtLabel}</span> : null}
                     {adder ? <span className={styles.time}>Added by {adder}</span> : null}
-                    {adder && doc?.adder?.addedByAgent ? <span className={styles.badge}>agent</span> : null}
+                    {adder && doc?.adder?.addedByAgent ? <AgentMark /> : null}
                   </>
                 ) : (
                   <>
