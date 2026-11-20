@@ -168,12 +168,12 @@ describe('setup content sections', () => {
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Background' } });
     fireEvent.click(screen.getByTestId('ce-setup-context-add-paragraph'));
-    fireEvent.change(screen.getByLabelText('Paragraph 1'), { target: { value: 'Parks need shade.' } });
+    fireEvent.change(screen.getByLabelText('Text 1'), { target: { value: 'Parks need shade.' } });
     fireEvent.click(screen.getByTestId('ce-setup-context-add-link'));
     fireEvent.change(screen.getByLabelText('Link label'), { target: { value: 'Plan' } });
-    fireEvent.change(screen.getByLabelText('Link'), { target: { value: 'http://parks.example' } });
+    fireEvent.change(screen.getByLabelText('URL 1'), { target: { value: 'http://parks.example' } });
     expect(screen.getByText('Use an https:// link.')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Link'), { target: { value: 'https://parks.example' } });
+    fireEvent.change(screen.getByLabelText('URL 1'), { target: { value: 'https://parks.example' } });
     expect(screen.queryByText('Use an https:// link.')).not.toBeInTheDocument();
     expect(latest.sessionContext).toEqual({
       title: 'Background',
@@ -182,7 +182,8 @@ describe('setup content sections', () => {
     });
     expect(screen.getByTestId('ce-setup-summary-context')).toHaveTextContent('Background: 1 paragraph, 1 link');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove paragraph' }));
+    expect(screen.getAllByTestId('ce-setup-context-entry')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove text 1' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove link 1' }));
     expect(latest.sessionContext).toEqual({ title: 'Background', paragraphs: [], links: [] });
   });
@@ -294,6 +295,32 @@ describe('setup content sections', () => {
     }
   });
 
+  it('opens the file picker from Add file, and offers it only where files are taken', () => {
+    const picker = jest.fn();
+    const WithFiles = (props: SetupSectionProps) => (
+      <SetupContextSection
+        {...props}
+        fileInputId="ce-test-context-file"
+        sources={<input id="ce-test-context-file" type="file" onClick={picker} />}
+      />
+    );
+    const { unmount } = render(<Harness Section={WithFiles} initial={{}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add file' }));
+    expect(picker).toHaveBeenCalledTimes(1);
+    unmount();
+    render(<Harness Section={SetupContextSection} initial={{}} />);
+    expect(screen.queryByRole('button', { name: 'Add file' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add text' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add URL' })).toBeInTheDocument();
+  });
+
+  it('keeps the edit page files under their own heading, with no add buttons for an HTML page', () => {
+    const OnSettings = (props: SetupSectionProps) => <SetupContextSection {...props} sources={<p>Live files</p>} />;
+    render(<Harness Section={OnSettings} initial={{ sessionContext: { title: 'Plan', html: '<p>Plan</p>' } }} />);
+    expect(screen.getByRole('heading', { name: 'Files and links for the AI' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Add to the context' })).not.toBeInTheDocument();
+  });
+
   it('names what set-config would refuse and stops adding past the limits', () => {
     const paragraphs = Array.from({ length: 6 }, (_, index) => `Paragraph ${index}`);
     render(
@@ -306,7 +333,7 @@ describe('setup content sections', () => {
       'The context title is longer than 80 characters.',
     );
     expect(screen.getByTestId('ce-setup-context-add-paragraph')).toBeDisabled();
-    expect(screen.getByLabelText('Paragraph 1')).toHaveAttribute('maxLength', '2000');
+    expect(screen.getByLabelText('Text 1')).toHaveAttribute('maxLength', '2000');
     expect(describeContextProblem(latest)).toBe('The context title is longer than 80 characters.');
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Background' } });
     expect(screen.queryByTestId('ce-setup-context-problems')).not.toBeInTheDocument();

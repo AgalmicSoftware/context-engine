@@ -355,6 +355,14 @@
   gap: 8px;
 }
 
+// A row of "Add …" buttons, with its "?" after the last.
+.addRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .button {
   appearance: none;
   border: 1px solid var(--ce-card-border);

@@ -9,6 +9,7 @@ import SessionWizardSponsoredStatus from './SessionWizardSponsoredStatus';
 import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
 import SetupCreatePanel from './setup/SetupCreatePanel';
 import { SetupAiSection } from './setup/SetupAiSection';
+import { SETUP_CONTEXT_FILE_INPUT_ID } from './setup/SetupContextSources';
 import {
   SetupBasicsSection,
   SetupContextSection,
@@ -131,7 +132,12 @@ const SessionWizardShell = ({
           link={slugPreview}
           headerImage={renderField('sessionHeader', draft.sessionHeader, [])}
         />
-        <SetupContextSection {...section('context')} sources={contextSources} publisher={contextPublisher} />
+        <SetupContextSection
+          {...section('context')}
+          sources={contextSources}
+          publisher={contextPublisher}
+          fileInputId={contextSources ? SETUP_CONTEXT_FILE_INPUT_ID : ''}
+        />
         <SetupQuestionsSection {...section('questions')} publisher={questionsPublisher} suggest={questionsSuggest} />
         <SetupParticipationSection {...section('participation')} workerHosted={isWorkerCanonical} />
         <SetupResultsSection {...section('results')} {...policy} />

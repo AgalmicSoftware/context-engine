@@ -1,12 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Input } from 'reactstrap';
 
-import {
-  CONTEXT_SOURCE_LIMITS,
-  contextCardsOn,
-  contextFileIsReadByAi,
-  resolveContextFileType,
-} from '@ce-shared/sessionContextSources.mjs';
+import { contextCardsOn, contextFileIsReadByAi, resolveContextFileType } from '@ce-shared/sessionContextSources.mjs';
 import {
   addContextLink,
   checkContextFile,
@@ -65,10 +60,6 @@ export type SetupGroupOption = { groupId: string; label: string };
 
 const FILE_VISIBILITY_HELP = `${FILE_ACCESS_HELP} Groups set up under Access and identity are made at Create, before these files are added.`;
 
-const MB = 1024 * 1024;
-// Images are taken where the session will have Context cards on.
-const addFileHelp = (cards: boolean) =>
-  `A PDF up to ${CONTEXT_SOURCE_LIMITS.pdfBytes / MB} MB, ${cards ? `a PNG, JPEG or WebP image up to ${CONTEXT_SOURCE_LIMITS.imageBytes / MB} MB, ` : ''}or Markdown, text, CSV or JSON up to ${CONTEXT_SOURCE_LIMITS.textFileBytes / MB} MB. It is added to the session after Create, for the people you choose in its Visible to.${cards ? '' : ' Images can be added with Context cards on.'}`;
 const ATTACH_AGAIN_HELP =
   'The page holds chosen files only until it reloads. Choose this file again so Create can add it.';
 
@@ -102,6 +93,8 @@ type FilesProps = {
   sessionConfig?: Record<string, unknown> | null;
 };
 
+export const SETUP_CONTEXT_FILE_INPUT_ID = 'ce-setup-context-file';
+
 // Before Create: the files to add. A name without its file (from a template
 // or a reload) asks for the file again.
 export const SetupContextFiles = ({ draft, onChange, pending, groups = [], sessionConfig = null }: FilesProps) => {
@@ -124,17 +117,6 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [], sessi
   };
   return (
     <div className={styles.listRowBody} data-testid="ce-setup-context-files">
-      <SetupCheck
-        id="ce-setup-context-cards"
-        label="Context cards"
-        help={
-          sessionConfig ? `${CONTEXT_CARDS_HELP} The session is made: change this in its Settings.` : CONTEXT_CARDS_HELP
-        }
-        checked={cards}
-        disabled={!!sessionConfig}
-        testId="ce-setup-context-cards"
-        onChange={(checked) => onChange(['contextCardsEnabled'], checked)}
-      />
       {entries.map((entry, index) => {
         const chosen = pending.files[entry.name];
         return (
@@ -189,20 +171,36 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [], sessi
           </div>
         );
       })}
-      <SetupField id="ce-setup-context-file" label="Add a file" help={addFileHelp(cards)}>
-        <Input
-          id="ce-setup-context-file"
-          type="file"
-          aria-describedby={setupHelpId('ce-setup-context-file')}
-          accept={contextFileAccept({ images: cards })}
-          data-testid="ce-setup-context-file-input"
-          onChange={(event) => {
-            attach((event.target as HTMLInputElement).files?.[0]);
-            (event.target as HTMLInputElement).value = '';
-          }}
-        />
-      </SetupField>
-      {problem ? <p className={styles.errorText}>{problem}</p> : null}
+      {/* The Context section's "Add file" button opens this picker. */}
+      <input
+        id={SETUP_CONTEXT_FILE_INPUT_ID}
+        type="file"
+        className={styles.srOnly}
+        tabIndex={-1}
+        aria-hidden="true"
+        accept={contextFileAccept({ images: cards })}
+        data-testid="ce-setup-context-file-input"
+        onChange={(event) => {
+          attach(event.target.files?.[0]);
+          event.target.value = '';
+        }}
+      />
+      {problem ? (
+        <p className={styles.errorText} role="alert">
+          {problem}
+        </p>
+      ) : null}
+      <SetupCheck
+        id="ce-setup-context-cards"
+        label="AI analyze"
+        help={
+          sessionConfig ? `${CONTEXT_CARDS_HELP} The session is made: change this in its Settings.` : CONTEXT_CARDS_HELP
+        }
+        checked={cards}
+        disabled={!!sessionConfig}
+        testId="ce-setup-context-cards"
+        onChange={(checked) => onChange(['contextCardsEnabled'], checked)}
+      />
     </div>
   );
 };
