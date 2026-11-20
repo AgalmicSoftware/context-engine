@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.22] - 2026-11-20
 
+An agents release with website changes: a Session Worker update, MCP 0.8.0 (published at merge) and the site. Each agents part works only where the session's Worker reports it, and nothing a session already stores is changed. Sign-in links from agents are off on every session until its admin turns them on.
+
+### Session Worker — needs a Worker update
+
+- **What reaches every hosted session with the update, before any setting is touched.** An upload whose text holds an agent's sign-in code (`cesi_…`) is refused. Every signed-in request reads one more small KV mark beside its sign-in record. Signing in is unchanged in a session that has never saved the sign-in links setting; once it has, a sign-in also asks the session's coordinator whether a passkey is attached to the account, and goes ahead without that answer if it can't be had, except for an account marked as having a passkey attached.
+- **Sign in from your agent's link.** An agent that took part with its own account proves its key and gets a one-time code (30 minutes, one use, one session, the site it signs in for). The session page swaps the code for a sign-in as that account, without its key. The person can attach a passkey: the Worker records that this passkey may sign in as the account in this session, with the passkey's signed consent, and the ordinary passkey sign-in is unchanged. A passkey that already has an account of its own in the session (a power, a group membership, a saved name or an answer under its address) is refused: the person creates a new passkey for the account. Where the session can't tell (more than 10,000 answers, or answers stored before answers recorded who gave them), a passkey the person already had is refused too, and one the page has just created is attached. Signed in with the passkey, they can end the agent's access to the account and allow it again: while it is ended the account's own key can't sign in, every sign-in of the account is checked against that on each request, and unused codes die. A sign-in from a link lasts an hour and carries no admin power; an admin can take a passkey off an account (`agent-link/clear`). The Worker reports `agent_sign_in_link_v1`.
+- **A switch for the Worker's agent functions.** `agentParticipationEnabled: false` turns them off for the session: the Agent HTTP API (`/api/agent/*`, its public description apart), sign-in and signed-in requests from an agent's client (the MCP sends `X-CE-Agent-Client`), anything stored that is marked as an agent's, and sign-in links. Absent, they are on, as before. Sign-in links have a setting of their own, `agentSignInLinksEnabled`, and are **off until a session's admin sets it to true**: an ordinary settings save, which signs nobody out. Off or absent, the Worker makes and takes no sign-in code and attaches no passkey; a passkey already attached keeps working.
+- **Private sessions read from a group-password link.** The question catalog now reads with the link's read invite, as the session page does. A read invite may name the Worker it is for (`group_read_proof_v2`), and is then refused by every other.
+- **An unused one-use code can read without being spent, on a Worker that has it switched on.** It is off unless the Worker is deployed with the variable `CE_GROUP_CODE_READS` set to `on`; off, the Worker lists no capability and refuses every such proof. On, a read invite may be made from a group's one-use code (`group_read_code_v1`): the start of the code's hash and a keyed hash of a statement naming the session, the group, the Worker and a time within the hour. The code is never sent, checking it writes nothing, and it reads what the group reads until the code is used, withdrawn or expired. It counts on the routes that read (the session's settings, questions, context, results, the question catalog and the group's own entry) and nowhere else: no AI, voice, interview or Session Agent route opens to it, and it never counts as membership. It stops reading when the group closes to joining. Every miss gets one answer, and a sender of 20 wrong ones in ten minutes is refused unlooked-at for the rest of them. The hash an admin lists for an unused code is enough to make this proof, so a listing or a backup holds read access to that group until the code is used or withdrawn: withdraw unused codes when an admin leaves.
+- **Agent HTTP takes a choose-several answer as a list in `value`** as well as in `values`, where before a list in `value` was refused and an agent could lose a person's choices by sending them one at a time. The Worker's agent guide (v47) gives a worked answer body for each question type and says a submit replaces the whole answer.
+- **The saved analysis card's picture.** A card's drawn pages are kept beside the saved card and given under its own rule, and the picture route answers for a picture already made without drawing one (`analysis_card_drawing_v1`).
+
+### MCP 0.8.0
+
+- The read tools take the link of a session not joined and read it signed out; a private session opens to its group's invite link by password, and by one-use code where the Worker has that switched on (it is off by default); reading leaves a code unused. `get_interview_catalog` and `make_review_link` take the same link.
+- `join_session` (on a private session) and `join_group` join with a one-use code only when passed `spendInviteCode: true`; otherwise they say the code would be used up and do nothing.
+- New tools `get_analysis_card` and `make_sign_in_link`.
+- Every request says it comes from an agent's client.
+
+### Client — available when the site deploys
+
+- A link from a person's AI agent signs them in to the agent's account on the session page: the code leaves the address before anything is fetched, a notice stays up while the agent can still use the account, and they can attach a passkey, end the agent's access, or sign out. The session's settings page gains, under "AI agents", **Agent access (MCP and Agent HTTP)** and **Sign-in links from agents** (unticked), each shown where the Worker has it.
+- A saved analysis card's drawn pages are sent to a Worker that keeps them.
+- Analyze shows a quick first read within a few seconds, a headline and two or three lines, and replaces it with the full analysis when that arrives; if the full analysis fails, the first read stays with **Try again**. Each Analyze now makes two AI requests where it made one.
+- While an analysis is written, the box shows how long it has taken against how long it usually takes. The historical figure is chosen in one pass, which takes about five seconds off the analysis.
+- The user page names its session and can open the same address in another session; a session known to have no surveys shows only its questions. Groups show only on your own user page.
+- The report marks an address as still being looked up only while the first names read is out, so a failed read never reads as "no name". Agents are marked with a robot icon beside the name, which says on hover or focus what the agent's answers claim; "(agent)" is gone. On phones the report's stacked side padding is trimmed.
+- Participants Graph puts Clusters and a gear on its title line; the projection and the layers sit behind the gear, and the cluster count is automatic until changed (Reset returns to it).
+- Opening a use case on About shows its short silent video loop, fetched only then; reduced motion gets a still. Companies and Groups carry an asterisk: their loops show future work. About's roadmap marks work in progress with a half-filled box, and `ROADMAP.md` matches it.
+- About's off-white backdrop is gone, and so is the pale line round buttons in the Context Engine theme; keyboard focus rings are unchanged.
+- The "Your AI agent" box puts its lead on the title line on desktop.
+- The agent guide (`/agent-guide.md`) and `llms.txt` tell agents about reading a session without joining, the saved analysis card and sign-in links.
+
+### Tests
+
+- The hosted WebKit journeys run in Playwright's own image for the locked version, and the leg fails if WebKit cannot start, where before it was skipped with a warning when its libraries could not be fetched.
 ## [0.9.21] - 2026-11-20
 
 A website release with MCP 0.7.2, published at merge (0.7.1 was never published; its changes are here). No Session Worker change: nothing needs redeploying, and the new MCP tools work against the Session Workers already deployed.
