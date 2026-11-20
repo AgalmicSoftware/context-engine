@@ -15,7 +15,7 @@ const passkeyKey = (passkey) => `agent-link:v1:passkey:${passkey}`;
 // Codes nobody used are cleared a few at a time when a new one is made.
 const SWEEP_LIMIT = 25;
 
-const json = (body, status = 200) => Response.json(body, { status });
+const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const addressOf = (value) => {
   const text = String(value ?? '').trim().toLowerCase();
   return ADDRESS_RE.test(text) ? text : '';
