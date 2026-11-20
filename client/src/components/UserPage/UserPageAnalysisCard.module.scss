@@ -120,6 +120,19 @@
   }
 }
 
+// On my own page: one line saying my card is shown, and the button that takes it off.
+.savedLine {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-12);
+  color: var(--ce-document-text);
+
+  p {
+    margin: 0;
+  }
+}
+
 .savedDate {
   margin: 8px 0 0;
   text-align: center;
@@ -133,9 +146,9 @@
 
   button {
     min-height: 40px;
-    border: 1px solid var(--ce-document-border);
     border-radius: var(--ce-radius-8);
-    background: transparent;
+    // Filled: the theme draws every button's edge, and one theme draws none.
+    background: var(--ce-document-border);
     color: var(--ce-document-text);
     font: inherit;
     font-weight: 600;

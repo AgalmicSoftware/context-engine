@@ -25,8 +25,9 @@ type UserPageSavedAnalysisCardProps = {
 };
 
 // The card a person saved on their page, shown to every signed-in visitor without pressing Analyze. Nothing shows
-// while it loads, when there is none, when it was withdrawn, or when it cannot be read. On my own page I can take
-// it off here, without making a new card first.
+// while it loads, when there is none, when it was withdrawn, or when it cannot be read. On my own page the card
+// itself shows only in the Analyze box; here there is one line saying it is on my page, with the button that
+// takes it off without making a new card first: Analyze can fail, or make a new card, before its own box shows.
 const UserPageSavedAnalysisCard = ({
   viewAddress,
   account,
@@ -69,7 +70,8 @@ const UserPageSavedAnalysisCard = ({
             })
           : null;
       setShown(card && saved?.status === 'ready' ? { card, savedAt: saved.savedAt } : null);
-      if (!card || !options || card.figure === figure) return;
+      // My own page draws no card here, so it asks for no picture.
+      if (own || !card || !options || card.figure === figure) return;
       const drawing = card.figure;
       figure = drawing;
       setPicture({ status: 'loading' });
@@ -104,21 +106,24 @@ const UserPageSavedAnalysisCard = ({
   };
 
   if (!shown) return null;
-  return (
-    <section className={styles.saved} aria-label="Picture card">
-      <h4>Picture card</h4>
-      <UserPageAnalysisCard card={shown.card} picture={picture} />
-      <p className={styles.savedDate}>
-        {own ? 'Your card, shown on your page' : 'Their card'}, saved {formatSavedAnalysisCardDate(shown.savedAt)}
-      </p>
-      {own && (
+  if (own) {
+    return (
+      <section className={styles.savedLine} aria-label="Picture card">
+        <p>Your picture card is shown on your page, saved {formatSavedAnalysisCardDate(shown.savedAt)}.</p>
         <div className={styles.takeOff}>
           <button type="button" onClick={takeOff} disabled={removing}>
             {removing ? 'Taking it off…' : 'Take it off my page'}
           </button>
           {note && <p role="status">{note}</p>}
         </div>
-      )}
+      </section>
+    );
+  }
+  return (
+    <section className={styles.saved} aria-label="Picture card">
+      <h4>Picture card</h4>
+      <UserPageAnalysisCard card={shown.card} picture={picture} />
+      <p className={styles.savedDate}>Their card, saved {formatSavedAnalysisCardDate(shown.savedAt)}</p>
     </section>
   );
 };

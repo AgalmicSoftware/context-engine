@@ -141,52 +141,53 @@ const UserPageAnalysisViews = ({
         </>
       )}
 
-      {view === 'card' &&
-        (analysisCard ? (
-          <>
-            <UserPageAnalysisCard card={analysisCard} picture={analysisCardPicture} />
-            {analysisCardSavedAt ? (
-              <p className={styles.placeholderNote}>
-                Their saved card, from {formatSavedAnalysisCardDate(analysisCardSavedAt)}
-              </p>
-            ) : null}
-            {analysisCardPublish && onAnalysisCardShownChange ? (
-              <div className={cardStyles.publish}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={analysisCardPublish.shown}
-                    disabled={analysisCardPublish.saving}
-                    onChange={(event) => onAnalysisCardShownChange(event.target.checked)}
-                  />{' '}
-                  Show this card on my page
-                </label>{' '}
-                <button
-                  type="button"
-                  id="analysisCardPublishHelp"
-                  className={cardStyles.publishHelp}
-                  data-ce-control-appearance="frameless"
-                  aria-label="About showing this card on your page"
-                >
-                  <FontAwesomeIcon icon={faQuestionCircle} />
-                </button>
-                <UncontrolledTooltip target="analysisCardPublishHelp" trigger="hover focus" autohide={false}>
-                  Anyone signed in to this session who may use its AI and read your answers sees this card on your page,
-                  with up to three of those answers. Untick to remove it.
-                </UncontrolledTooltip>
-                {analysisCardPublish.note ? (
-                  <p className={styles.placeholderNote} role="status">
-                    {analysisCardPublish.note}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <p className={styles.placeholderNote} role="status">
-            <FontAwesomeIcon icon={faSpinner} spin /> Making the card…
-          </p>
-        ))}
+      {/* Once there is a card it is drawn in every view, out of sight outside its own: drawing it is what gives the
+          saved card its picture, and that must not wait for the Card button to be pressed. */}
+      {analysisCard ? (
+        <div hidden={view !== 'card'}>
+          <UserPageAnalysisCard card={analysisCard} picture={analysisCardPicture} />
+          {analysisCardSavedAt ? (
+            <p className={styles.placeholderNote}>
+              Their saved card, from {formatSavedAnalysisCardDate(analysisCardSavedAt)}
+            </p>
+          ) : null}
+          {analysisCardPublish && onAnalysisCardShownChange ? (
+            <div className={cardStyles.publish}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={analysisCardPublish.shown}
+                  disabled={analysisCardPublish.saving}
+                  onChange={(event) => onAnalysisCardShownChange(event.target.checked)}
+                />{' '}
+                Show this card on my page
+              </label>{' '}
+              <button
+                type="button"
+                id="analysisCardPublishHelp"
+                className={cardStyles.publishHelp}
+                data-ce-control-appearance="frameless"
+                aria-label="About showing this card on your page"
+              >
+                <FontAwesomeIcon icon={faQuestionCircle} />
+              </button>
+              <UncontrolledTooltip target="analysisCardPublishHelp" trigger="hover focus" autohide={false}>
+                Anyone signed in to this session who may use its AI and read your answers sees this card on your page,
+                with up to three of those answers. Untick to remove it.
+              </UncontrolledTooltip>
+              {analysisCardPublish.note ? (
+                <p className={styles.placeholderNote} role="status">
+                  {analysisCardPublish.note}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : view === 'card' ? (
+        <p className={styles.placeholderNote} role="status">
+          <FontAwesomeIcon icon={faSpinner} spin /> Making the card…
+        </p>
+      ) : null}
 
       <p className={viewStyles.model}>
         {analysisGeneration?.source === 'requested' ? 'Requested AI model: ' : 'AI model: '}

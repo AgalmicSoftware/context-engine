@@ -146,16 +146,19 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getByRole('status').textContent).toContain('Making the card…');
     expect(screen.queryByText('Profile synthesis')).toBeNull();
 
-    // One card, in the Card view only, and no second button for it anywhere.
+    // One card, seen in the Card view only, and no second button for it anywhere.
     rerender(
       <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'ready' } })} />,
     );
     expect(pressed('Card')).toBe('true');
     expect(screen.getAllByTestId('analysis-card')).toHaveLength(1);
+    expect(screen.getByTestId('analysis-card')).toBeVisible();
     expect(screen.getByTestId('analysis-card').textContent).toBe('Wants AI doing paperwork / ready');
     expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
+    // In the other views the card stays drawn out of sight, so a saved card gets its picture either way.
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
-    expect(screen.queryByTestId('analysis-card')).toBeNull();
+    expect(screen.getAllByTestId('analysis-card')).toHaveLength(1);
+    expect(screen.getByTestId('analysis-card')).not.toBeVisible();
     expect(screen.getAllByRole('button', { name: /card/i })).toHaveLength(1);
 
     // A card that is taken away leaves the Breakdown, not an empty view.

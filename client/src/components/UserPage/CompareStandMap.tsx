@@ -80,7 +80,7 @@ export default function CompareStandMap({ x, y, labels }: { x: Dimension; y: Dim
       </div>
       {/* On a phone the plot is too small to carry the axes' names inside it, so they are said under it. */}
       <p className={styles.mapCaption} aria-hidden="true">
-        Across: {x.label}. Up and down: {y.label}.
+        Across: {x.label} · Up and down: {y.label}
       </p>
       <ul className={styles.legend} aria-hidden="true">
         {dots.map(({ index }) => (
