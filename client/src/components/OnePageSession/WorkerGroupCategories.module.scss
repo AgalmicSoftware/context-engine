@@ -12,8 +12,24 @@
   text-align: left;
 }
 
+// Where a theme sets the session on a light page, as the group cards there do, the list takes the page's text.
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  .accordion,
+  .columns {
+    color: var(--ce-document-text);
+  }
+}
+
+// A grey window theme sets the session page in its panel text, as the rest of that page is.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .accordion,
+  .columns {
+    color: var(--ce-panel-text);
+  }
+}
+
 .columns {
-  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
   align-items: start;
 }
 
@@ -24,8 +40,10 @@
   background: color-mix(in srgb, currentColor 4%, transparent);
 }
 
-.heading {
+.category .heading {
   margin: 0;
+  // A theme colours headings for its page; this one sits on the panel, so it takes the panel's text colour.
+  color: inherit;
   font-size: 1rem;
   font-weight: 800;
 }
@@ -93,7 +111,10 @@
 
 .summaryPictures {
   display: flex;
-  flex: none;
+  // On a narrow phone the pictures give way before the count.
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
 
   .picture {
     width: 22px;
@@ -117,6 +138,7 @@
 }
 
 .summaryCount {
+  flex: none;
   margin-left: auto;
   font-weight: 500;
   opacity: 0.8;
@@ -150,6 +172,11 @@
   align-items: center;
   gap: 4px 10px;
   padding: 8px 12px;
+
+  @media (max-width: 400px) {
+    gap: 4px 8px;
+    padding: 8px;
+  }
 }
 
 .picture {
@@ -161,6 +188,11 @@
   overflow: hidden;
   border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
   border-radius: var(--ce-radius-6);
+
+  @media (max-width: 400px) {
+    width: 36px;
+    height: 36px;
+  }
 
   &:empty {
     @include groupImagePlaceholder.group-image-placeholder;
@@ -199,7 +231,7 @@
 }
 
 .name {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.25;
@@ -226,11 +258,7 @@
 .action {
   display: grid;
   gap: 4px;
-  width: 6.5rem;
-
-  .columns & {
-    width: 5.5rem;
-  }
+  width: 5.25rem;
 
   > * {
     min-height: 36px;
@@ -242,14 +270,15 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 6px 8px;
+  padding: 6px 4px;
   border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
   border-radius: var(--ce-radius-6);
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
 
   &:hover,
