@@ -16,7 +16,6 @@ import {
   changeAgentAccess,
   leaveAgentLinkAccount,
   removeAttachedPasskey,
-  switchToOwnPasskeyAccount,
 } from '../../utilities/session/agentSignInAccount';
 
 export const shortAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -25,11 +24,10 @@ const HELP = {
   passkey:
     'A passkey of your own lets you sign in to this account again without your agent, in this session. Your agent keeps its access until you cancel it.',
   existing:
-    'Attaches a passkey you already use. If that passkey has an account of its own in this session, that account stays separate and nothing is merged; you can switch back to it.',
+    'Attaches a passkey you already use, if it has not yet taken part in this session. A passkey that has answered, saved a name or joined a group here has an account of its own and can’t be attached: create a new passkey for this account instead.',
   cancel:
     'Ends your AI agent’s access to this account in this session: its sign-in is refused, every sign-in it had stops, and its unused links stop working. You can allow it again. From then on your passkey is the only way in: if you lose it, only the session’s admins can restore access.',
   remove: 'Takes your passkey off this account and signs you out of it. The account is then your agent’s alone again.',
-  own: 'Goes back to the account your passkey has by itself in this session, for this tab.',
 };
 
 type Props = {
@@ -51,7 +49,6 @@ export default function AgentAccountAccessPanel({
   const tell = (text: string, isError: boolean): void =>
     onMessage ? onMessage(text, isError) : setSaid({ text, isError });
   if (!account || !isAgentLinkProvider(provider)) return null;
-  const target = { workerUrl: account.workerUrl, sessionSlug: account.sessionSlug, sessionId: account.sessionId };
   const run = (name: string, work: () => Promise<unknown>, done: string) => async (): Promise<void> => {
     if (busy) return;
     setBusy(name);
@@ -127,14 +124,6 @@ export default function AgentAccountAccessPanel({
             'Remove passkey',
             HELP.remove,
             run('remove-passkey', removeAttachedPasskey, 'Your passkey was taken off this account.'),
-          )
-        : null}
-      {withPasskey
-        ? button(
-            'own-account',
-            'Use my own account',
-            HELP.own,
-            run('own-account', () => switchToOwnPasskeyAccount(target), 'You are in your own account.'),
           )
         : null}
       {button('sign-out', 'Sign out', 'Signs this browser out.', run('sign-out', leaveAgentLinkAccount, 'Signed out.'))}

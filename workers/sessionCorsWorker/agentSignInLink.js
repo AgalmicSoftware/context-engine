@@ -36,6 +36,9 @@ import { rateLimitRefusal } from './rateLimitRefusal.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { validateTrustedLoginRequestOrigin } from './siweMessageValidation.js';
+import { callSessionNamesStore } from './sessionNames.js';
+import { buildIndexPrefix, getStorageIndexBinding } from './storageRouteExecution.js';
+import { readCoordinatedWorkerGroupMemberships } from './workerGroups.js';
 
 export const AGENT_SIGN_IN_ROUTE_PATHS = Object.freeze(Object.values(AGENT_SIGN_IN_PATHS));
 
@@ -83,7 +86,67 @@ const REASON_TEXT = Object.freeze({
   passkey_not_attached: 'This passkey isn’t attached to this account.',
   agent_access_cancelled_first: 'Let your agent use the account again before removing the passkey, or nobody could sign in to it.',
   invalid_agent_access: 'Choose whether the agent may use the account.',
+  passkey_has_account: 'This passkey has already taken part in this session under its own account, so it can’t be attached to this one. Create a new passkey for this account instead. Merging two accounts isn’t possible yet.',
+  passkey_account_unknown: 'This session couldn’t check whether that passkey has already taken part here, so it wasn’t attached. Create a new passkey for this account instead.',
 });
+
+// A passkey with an account of its own in this session is not attached to another: two accounts under one
+// passkey is more than a person can keep straight, and nothing here merges them. "An account of its own" is
+// anything the session keeps under the passkey's address: a power (admin, results admin), a group membership, a
+// saved name, or an answer. A passkey that has only ever signed in has stored nothing and may be attached.
+// Statements and context it added are not looked for (the session's index does not record who added them);
+// whoever added those and did nothing else is let through.
+// 'yes', 'no', or 'unknown' where the session can't say: its groups or names couldn't be read, it holds more
+// answers than are looked through (10,000), or some of its answers were stored before answers recorded who gave
+// them. What 'unknown' does depends on which button the person pressed (see `attach`).
+const ANSWER_SCAN = Object.freeze({ pages: 10, keys: 1000 });
+const hasStoredAnswer = async ({ env, slug, address }) => {
+  const index = getStorageIndexBinding(env);
+  if (typeof index?.list !== 'function') return 'unknown';
+  let cursor = '';
+  let unsure = false;
+  for (let page = 0; page < ANSWER_SCAN.pages; page += 1) {
+    const listed = await index.list({ prefix: buildIndexPrefix({ slug, resource: 'responses' }), ...(cursor ? { cursor } : {}), limit: ANSWER_SCAN.keys });
+    for (const entry of Array.isArray(listed?.keys) ? listed.keys : []) {
+      const responder = entry?.metadata?.responder;
+      if (typeof responder !== 'string') unsure = true;
+      else if (lower(responder) === address) return 'yes';
+    }
+    if (listed?.list_complete !== false) return unsure ? 'unknown' : 'no';
+    cursor = String(listed?.cursor || '').trim();
+    if (!cursor) return 'unknown';
+  }
+  // More answers than are looked through here.
+  return 'unknown';
+};
+// A session whose groups were never set up has none for anyone to be in: its group store answers
+// "reconciliation required" to every read and lets no group be made. That is a clear "in no group", and for a
+// config without the set-up record the store is not even asked.
+const NO_GROUPS_HERE = 'worker_group_capacity_reconciliation_required';
+const groupsOf = async ({ env, slug, config, address }) => {
+  const setUp = config?.workerGroupsBootstrap && typeof config.workerGroupsBootstrap === 'object';
+  if (!setUp) return [];
+  const read = await readCoordinatedWorkerGroupMemberships({
+    env, slug, sessionId: resolveCanonicalWorkerSessionIdHex(config), principal: { kind: 'evm_address', address },
+  });
+  if (read?.ok === true && Array.isArray(read.groups)) return read.groups;
+  return read?.reason === NO_GROUPS_HERE ? [] : null;
+};
+const passkeyHasOwnAccount = async ({ env, slug, config, address }) => {
+  if (namedForPower(config, address)) return 'yes';
+  try {
+    const [groups, name, answer] = await Promise.all([
+      groupsOf({ env, slug, config, address }),
+      callSessionNamesStore(env, slug, 'read', { address }),
+      hasStoredAnswer({ env, slug, address }),
+    ]);
+    if (groups?.length || name?.body?.name || answer === 'yes') return 'yes';
+    // Only three clear answers make a "no".
+    return groups && name?.ok === true && answer === 'no' ? 'no' : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+};
 
 const lower = (value) => String(value ?? '').trim().toLowerCase();
 const isWorkerCanonical = (config) => lower(config?.sessionModeProfile?.authority?.mode) === 'worker_canonical';
@@ -323,6 +386,15 @@ const attach = async ({ request, env, baseHeaders, slug, deps }) => {
   if (signed.scopes?.admin === true) return deps.json({ error: 'An admin’s passkey can’t be attached to another account.', reason: 'passkey_is_admin' }, 403, headers);
   const limited = await countOrRefuse({ deps, env, slug: context.slug, identity: account, route: 'agent-link-attach', limit: AGENT_SIGN_IN_LIMITS.attach, headers });
   if (limited) return limited;
+  // A passkey that is seen to have taken part is always refused. Where the session can't say, the page's word
+  // decides: one it says it has just made ("Create passkey") is attached, so the main way never fails for a
+  // session's size; one the person already had ("I already have one") is not. A page that lies about that gains
+  // only what its own person could have had by pressing the other button on a smaller session.
+  const own = await passkeyHasOwnAccount({ env, slug: context.slug, config: context.config, address: passkeyAddress });
+  if (own === 'yes' || (own === 'unknown' && body.newPasskey !== true)) {
+    const reason = own === 'yes' ? 'passkey_has_account' : 'passkey_account_unknown';
+    return deps.json({ error: REASON_TEXT[reason], reason }, own === 'yes' ? 409 : 503, headers);
+  }
   const attached = await callAgentSignInStore(env, context.slug, 'attach', { address: account, passkey: passkeyAddress, now: nowMs(deps) });
   if (!attached.ok) return storeRefusal(attached, deps.json, headers);
   // From here every sign-in of the account is checked against the record on each request.

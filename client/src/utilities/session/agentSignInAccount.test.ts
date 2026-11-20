@@ -10,7 +10,6 @@ import {
   changeAgentAccess,
   enterThroughAttachedPasskey,
   liveAccount,
-  switchToOwnPasskeyAccount,
   whoALinkWouldReplace,
 } from './agentSignInAccount';
 import { logoutClientAuth } from './clientAuthLogout';
@@ -159,24 +158,6 @@ describe('the one account a tab holds', () => {
     signInAs(ACCOUNT, 'passkey_eoa');
     expect(readAgentLinkAccount()).toBeNull();
   });
-
-  it('goes back to the address this browser’s passkey holds, never one a Worker named', async () => {
-    hold({ via: 'passkey_link', passkey: OTHER });
-    signInAs(ACCOUNT, 'agent_link');
-    client.getAddress.mockReturnValue(PASSKEY);
-    await switchToOwnPasskeyAccount(TARGET);
-    expect(store.getState().profile).toMatchObject({ account: PASSKEY, provider: 'passkey_eoa' });
-    expect(readAgentLinkAccount()).toBeNull();
-    expect(logoutClientAuth).not.toHaveBeenCalled();
-  });
-
-  it('signs out where this browser holds no passkey to go back to', async () => {
-    hold({ via: 'passkey_link', passkey: OTHER });
-    signInAs(ACCOUNT, 'agent_link');
-    await switchToOwnPasskeyAccount(TARGET);
-    expect(logoutClientAuth).toHaveBeenCalledTimes(1);
-    expect(store.getState().profile.account).not.toBe(OTHER);
-  });
 });
 
 describe('what a failed step leaves behind', () => {
@@ -186,11 +167,16 @@ describe('what a failed step leaves behind', () => {
     jest.mocked(passkeyWallet.createPasskeyWallet).mockResolvedValue(PASSKEY as never);
     jest.mocked(attachPasskeyToAgentAccount).mockRejectedValue(new Error('Refused.'));
     await expect(attachPasskeyHere({ useExisting: false })).rejects.toThrow('Refused.');
+    expect(jest.mocked(attachPasskeyToAgentAccount).mock.calls[0][0]).toMatchObject({
+      passkeyAddress: PASSKEY,
+      newPasskey: true,
+    });
     expect(passkeyWallet.logoutPasskeyWallet).toHaveBeenCalledTimes(1);
     expect(readAgentLinkAccount()).toMatchObject({ address: ACCOUNT, via: 'agent_link' });
     // A passkey the person already had is theirs, and is left as it was.
     jest.mocked(passkeyWallet.unlockPasskeyWallet).mockResolvedValue(PASSKEY as never);
     await expect(attachPasskeyHere({ useExisting: true })).rejects.toThrow('Refused.');
+    expect(jest.mocked(attachPasskeyToAgentAccount).mock.calls[1][0]).toMatchObject({ newPasskey: false });
     expect(passkeyWallet.unlockPasskeyWallet).toHaveBeenCalledWith({ selectCredential: true });
     expect(passkeyWallet.logoutPasskeyWallet).toHaveBeenCalledTimes(1);
   });

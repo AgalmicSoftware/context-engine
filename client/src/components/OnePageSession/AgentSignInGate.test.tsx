@@ -26,8 +26,6 @@ import {
   leaveAgentLinkAccount,
   liveAccount,
   resumeAgentLinkAccount,
-  stayOnOwnAccount,
-  staysOnOwnAccount,
   whoALinkWouldReplace,
 } from '../../utilities/session/agentSignInAccount';
 import { heldSessionToken } from '../../utilities/worker/workerAuthTokenCache.js';
@@ -87,10 +85,7 @@ jest.mock('../../utilities/session/agentSignInAccount', () => ({
   liveAccount: jest.fn(() => ''),
   removeAttachedPasskey: jest.fn(async () => undefined),
   resumeAgentLinkAccount: jest.fn(() => null),
-  stayOnOwnAccount: jest.fn(),
-  staysOnOwnAccount: jest.fn(() => false),
   whoALinkWouldReplace: jest.fn(async () => ''),
-  switchToOwnPasskeyAccount: jest.fn(),
 }));
 jest.mock('../../utilities/worker/workerAuthTokenCache.js', () => ({
   heldSessionToken: jest.fn(() => 'held-sign-in'),
@@ -129,7 +124,6 @@ beforeEach(() => {
   jest.mocked(workerHasAgentSignIn).mockResolvedValue(true);
   jest.mocked(heldSessionToken).mockReturnValue('held-sign-in');
   jest.mocked(isAttachedPasskeyKnown).mockReturnValue(false);
-  jest.mocked(staysOnOwnAccount).mockReturnValue(false);
 });
 
 it('shows nothing on a page with no link, no agent’s account and no session', async () => {
@@ -312,6 +306,32 @@ it('keeps a notice on the page while signed in from a link: whose account, who e
   await waitFor(() => expect(leaveAgentLinkAccount).toHaveBeenCalled());
 });
 
+it('says in the Worker’s words why a passkey that already took part here was not attached, and offers no second account', async () => {
+  act(() => void held());
+  jest
+    .mocked(attachPasskeyHere)
+    .mockRejectedValue(
+      new Error(
+        'This passkey has already taken part in this session under its own account, so it can’t be attached to this one. Create a new passkey for this account instead. Merging two accounts isn’t possible yet.',
+      ),
+    );
+  gate({ account: ACCOUNT, provider: 'agent_link' });
+  expect(screen.getByTestId('ce-agent-account-use-passkey').getAttribute('title')).toMatch(
+    /has an account of its own and can’t be attached: create a new passkey/,
+  );
+  fireEvent.click(screen.getByTestId('ce-agent-account-use-passkey'));
+  await waitFor(() => expect(attachPasskeyHere).toHaveBeenCalledWith({ useExisting: true }));
+  await waitFor(() =>
+    expect(notice()?.textContent).toMatch(/already taken part in this session under its own account/),
+  );
+  expect(notice()?.textContent).toMatch(/Create a new passkey for this account instead/);
+  // Still signed in from the link, with the main way on offer.
+  expect(screen.getByTestId('ce-agent-account-add-passkey').textContent).toBe('Create passkey');
+  expect(screen.queryByTestId('ce-agent-account-own-account')).toBeNull();
+  act(() => void held({ via: 'passkey_link', passkey: PASSKEY }));
+  expect(screen.queryByTestId('ce-agent-account-own-account')).toBeNull();
+});
+
 it('offers Cancel all agent authorizations only once a passkey is attached, and says while the agent still has access', async () => {
   act(() => void held({ via: 'passkey_link', passkey: PASSKEY }));
   gate({ account: ACCOUNT, provider: 'agent_link' });
@@ -342,7 +362,7 @@ it('says when a sign-in from a link has ended, and shows the notice for no other
   expect(notice()).toBeNull();
 });
 
-it('opens the agent’s account for a passkey this browser attached, quietly, unless the person chose their own', async () => {
+it('opens the agent’s account for a passkey this browser attached, quietly, and for no other wallet', async () => {
   jest.mocked(isAttachedPasskeyKnown).mockReturnValue(true);
   const { unmount } = gate({ account: PASSKEY, provider: 'passkey_eoa' });
   await waitFor(() =>
@@ -350,14 +370,7 @@ it('opens the agent’s account for a passkey this browser attached, quietly, un
   );
   unmount();
   jest.clearAllMocks();
-  jest.mocked(isAttachedPasskeyKnown).mockReturnValue(true);
-  jest.mocked(staysOnOwnAccount).mockReturnValue(true);
-  gate({ account: PASSKEY, provider: 'passkey_eoa' });
-  await act(async () => {});
-  expect(enterThroughAttachedPasskey).not.toHaveBeenCalled();
   // Never for another kind of wallet, or a passkey nothing is known of.
-  expect(notice()).toBeNull();
-  jest.mocked(staysOnOwnAccount).mockReturnValue(false);
   jest.mocked(isAttachedPasskeyKnown).mockReturnValue(false);
   gate({ account: OTHER, provider: 'passkey_eoa' });
   gate({ account: PASSKEY, provider: 'wagmi' });
@@ -378,11 +391,9 @@ it('says so in the passkey’s own account when the agent’s account could not 
   expect(enterThroughAttachedPasskey).toHaveBeenLastCalledWith(TARGET, PASSKEY, { prompt: false, passkeyToken: '' });
   fireEvent.click(screen.getByTestId('ce-agent-offer-open'));
   await waitFor(() => expect(enterThroughAttachedPasskey).toHaveBeenLastCalledWith(TARGET, PASSKEY, { prompt: true }));
+  // There is no staying: a passkey attached here has no account of its own in this session to stay in.
+  expect(screen.queryByTestId('ce-agent-offer-stay')).toBeNull();
   unmount();
-  gate({ account: PASSKEY, provider: 'passkey_eoa' });
-  fireEvent.click(await screen.findByTestId('ce-agent-offer-stay'));
-  expect(stayOnOwnAccount).toHaveBeenCalledWith(TARGET);
-  expect(notice()).toBeNull();
 });
 
 it('opens the agent’s account when the Worker says, after the page settled, that this passkey is attached to one', async () => {

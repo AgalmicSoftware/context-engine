@@ -258,6 +258,7 @@ export const attachPasskeyToAgentAccount = async ({
   token,
   passkeyAddress,
   sign,
+  newPasskey,
   appOrigin = typeof window === 'undefined' ? '' : window.location.origin,
 }: {
   target: SessionTarget;
@@ -265,6 +266,8 @@ export const attachPasskeyToAgentAccount = async ({
   token: string;
   passkeyAddress: string;
   sign: (message: string) => Promise<string>;
+  // True for a passkey made for this account just now; false for one the person already had.
+  newPasskey: boolean;
   appOrigin?: string;
 }): Promise<AgentSignInReply> => {
   const nonce = await post(target, '/auth/nonce', { address: passkeyAddress });
@@ -273,7 +276,12 @@ export const attachPasskeyToAgentAccount = async ({
   const message = buildPasskeyAttachMessage({ account, passkeyAddress, nonce: nonce.nonce, target, appOrigin });
   const signature = await sign(message);
   return replyOf(
-    await post(target, AGENT_SIGN_IN_PATHS.attach, { passkey: { address: passkeyAddress, message, signature } }, token),
+    await post(
+      target,
+      AGENT_SIGN_IN_PATHS.attach,
+      { passkey: { address: passkeyAddress, message, signature }, newPasskey: newPasskey === true },
+      token,
+    ),
   );
 };
 

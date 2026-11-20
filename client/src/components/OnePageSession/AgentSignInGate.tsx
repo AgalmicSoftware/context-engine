@@ -40,8 +40,6 @@ import {
   isAttachedPasskeyKnown,
   liveAccount,
   resumeAgentLinkAccount,
-  stayOnOwnAccount,
-  staysOnOwnAccount,
   whoALinkWouldReplace,
 } from '../../utilities/session/agentSignInAccount';
 import { heldSessionToken } from '../../utilities/worker/workerAuthTokenCache.js';
@@ -182,7 +180,7 @@ export default function AgentSignInGate({
   useEffect(() => {
     setOffer('');
     if (!target || !signedInAs || isAgentLinkProvider(provider) || lower(provider) !== 'passkey_eoa') return undefined;
-    if (staysOnOwnAccount(target) || hasAgentSignInCodeFor(target)) return undefined;
+    if (hasAgentSignInCodeFor(target)) return undefined;
     const hint = takeLinkedAgentAccountHint(target, signedInAs);
     if (!hint && !isAttachedPasskeyKnown(target, signedInAs)) return undefined;
     let current = true;
@@ -335,7 +333,7 @@ export default function AgentSignInGate({
 
   // In the passkey's own account, with the passkey attached to an agent's account in this session: answers given
   // here go to this account, not that one, so its person is told and can open the other.
-  if (offer && offer === signedInAs && !isAgentLinkProvider(provider) && !staysOnOwnAccount(target)) {
+  if (offer && offer === signedInAs && !isAgentLinkProvider(provider)) {
     return notice(
       <>
         This passkey is also attached to <strong>an account your AI agent set up</strong> in this session. You are in
@@ -361,17 +359,6 @@ export default function AgentSignInGate({
           }}
         >
           Open the agent’s account
-        </button>
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          data-testid="ce-agent-offer-stay"
-          onClick={() => {
-            stayOnOwnAccount(target);
-            setOffer('');
-          }}
-        >
-          Stay here
         </button>
       </>,
       note?.isError,

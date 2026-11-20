@@ -247,6 +247,7 @@ describe('attaching a passkey', () => {
         passkeyAddress: PASSKEY,
         appOrigin: 'https://contextengine.sh',
         sign,
+        newPasskey: true,
       }),
     ).rejects.toMatchObject({ reason: 'unreadable' });
     expect(sign).not.toHaveBeenCalled();
@@ -287,6 +288,7 @@ describe('attaching a passkey', () => {
       token: 'from-link',
       passkeyAddress: PASSKEY,
       appOrigin: 'https://contextengine.sh',
+      newPasskey: false,
       sign: async (text) => {
         signed.push(text);
         return '0xsigned';
@@ -300,6 +302,8 @@ describe('attaching a passkey', () => {
     expect(JSON.parse(nonceCall[1].body)).toMatchObject({ address: PASSKEY, sessionSlug: 'salon' });
     expect(attachCall[0]).toBe(`${WORKER}/auth/agent-link/attach`);
     expect(attachCall[1].headers.Authorization).toBe('Bearer from-link');
+    // The page says whether the passkey was made just now; here it was one the person already had.
+    expect(JSON.parse(attachCall[1].body).newPasskey).toBe(false);
     expect(JSON.parse(attachCall[1].body).passkey).toEqual({
       address: PASSKEY,
       message: signed[0],

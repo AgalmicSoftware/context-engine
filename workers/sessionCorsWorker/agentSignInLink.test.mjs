@@ -45,8 +45,8 @@ const tokenOf = async (env, wallet, options) => {
 const makeCode = async (env, wallet, { headers = AGENT, statement = AGENT_SIGN_IN_LINK_STATEMENT } = {}) =>
   send(env, AGENT_SIGN_IN_PATHS.create, { body: await signed(env, wallet, statement, { headers }), headers });
 const exchange = (env, code, options = {}) => send(env, AGENT_SIGN_IN_PATHS.exchange, { body: { ...session, code }, ...options });
-const attach = async (env, token, passkey, account, { statement = agentPasskeyAttachStatement(account) } = {}) =>
-  send(env, AGENT_SIGN_IN_PATHS.attach, { token, body: { ...session, passkey: await signed(env, passkey, statement) } });
+const attach = async (env, token, passkey, account, { statement = agentPasskeyAttachStatement(account), newPasskey } = {}) =>
+  send(env, AGENT_SIGN_IN_PATHS.attach, { token, body: { ...session, passkey: await signed(env, passkey, statement), ...(newPasskey === undefined ? {} : { newPasskey }) } });
 const passkeySignIn = (env, token) => send(env, AGENT_SIGN_IN_PATHS.passkeySignIn, { token, body: session });
 const setAccess = (env, token, agentAccess) => send(env, AGENT_SIGN_IN_PATHS.access, { token, body: { ...session, agentAccess } });
 const detach = (env, token) => send(env, AGENT_SIGN_IN_PATHS.detach, { token, body: session });
@@ -312,6 +312,116 @@ test('only the account’s key, from an agent’s own client, can ask for a code
   let last;
   for (let made = 0; made <= AGENT_SIGN_IN_LIMITS.create; made += 1) last = await makeCode(env, busy);
   assert.equal(last.status, 429);
+});
+
+test('a passkey that has already taken part in the session under its own account is not attached; one that only signed in is', async () => {
+  const resultsAdmin = Wallet.createRandom();
+  const { env, admin } = await setup({ resultsAdminAddresses: [resultsAdmin.address] });
+  // Each try is on a fresh agent's account, signed in from its link.
+  const tryAttach = async (passkey) => {
+    const agent = Wallet.createRandom();
+    const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+    const attached = await attach(env, linkToken, passkey, agent.address.toLowerCase());
+    return { attached, linkToken, agent };
+  };
+  const refusedAsOwn = async (passkey, why) => {
+    const before = storedData(env);
+    const { attached, linkToken } = await tryAttach(passkey);
+    assert.deepEqual([attached.status, attached.body.reason], [409, 'passkey_has_account'], why);
+    assert.match(attached.body.error, /already taken part in this session under its own account.*Create a new passkey for this account instead/);
+    // Nothing was attached or rewritten, and the link's sign-in still stands for another try.
+    assert.equal((await stateOf(env, linkToken)).body.attachedPasskey, null, why);
+    assert.equal(await stands(env, linkToken), true, why);
+    assert.equal(storedData(env), before, why);
+  };
+
+  // It has answered.
+  const answered = Wallet.createRandom();
+  assert.equal((await answer(env, await tokenOf(env, answered), personAnswer(answered))).status, 200);
+  await refusedAsOwn(answered, 'an answer');
+  // It has saved a name.
+  const named = Wallet.createRandom();
+  const namedAs = await send(env, '/names/set', { token: await tokenOf(env, named), body: { name: 'Kestrel' } });
+  assert.equal(namedAs.status, 200, JSON.stringify(namedAs.body));
+  await refusedAsOwn(named, 'a name');
+  // It is in a group.
+  const member = Wallet.createRandom();
+  const created = await signedAdminRequest({ env, wallet: admin, action: 'groups/create', body: { group: { groupId: 'open-table', label: 'Open table', joinMode: 'open' } } });
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const joined = await send(env, '/groups/join', { token: await tokenOf(env, member), body: { sessionId: SESSION_ID, groupId: created.body.group.groupId } });
+  assert.equal(joined.status, 200, JSON.stringify(joined.body));
+  await refusedAsOwn(member, 'a group membership');
+  // It is named for a power.
+  await refusedAsOwn(resultsAdmin, 'results admin');
+
+  // A passkey that has signed in here and stored nothing has no account to keep apart: it attaches.
+  const visitor = Wallet.createRandom();
+  assert.equal(await stands(env, await tokenOf(env, visitor)), true);
+  const fresh = await tryAttach(visitor);
+  assert.deepEqual([fresh.attached.status, fresh.attached.body.via, fresh.attached.body.passkey], [200, 'passkey_link', visitor.address]);
+  // So does one that has never been seen at all.
+  assert.equal((await tryAttach(Wallet.createRandom())).attached.status, 200);
+
+  // A session whose groups were never set up has none to be in: a new passkey attaches there, an answerer does not.
+  const plain = await setup({ workerGroupsBootstrap: undefined });
+  const there = async (passkey) => {
+    const agent = Wallet.createRandom();
+    const linkToken = (await exchange(plain.env, (await makeCode(plain.env, agent)).body.code)).body.token;
+    return attach(plain.env, linkToken, passkey, agent.address.toLowerCase());
+  };
+  assert.equal((await there(Wallet.createRandom())).status, 200);
+  const answeredThere = Wallet.createRandom();
+  assert.equal((await answer(plain.env, await tokenOf(plain.env, answeredThere), personAnswer(answeredThere))).status, 200);
+  assert.equal((await there(answeredThere)).body.reason, 'passkey_has_account');
+});
+
+test('a passkey is not attached where the session can’t tell whether it has taken part', async () => {
+  const { env } = await setup();
+  const agent = Wallet.createRandom();
+  const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+  // More answers than are looked through, or a listing that stops short: not a "no".
+  const index = env.CE_STORAGE_INDEX_KV;
+  const list = index.list.bind(index);
+  index.list = async (options = {}) => (String(options.prefix).includes(':responses:')
+    ? { keys: [], list_complete: false, cursor: '' }
+    : list(options));
+  const unsure = await attach(env, linkToken, Wallet.createRandom(), agent.address.toLowerCase());
+  assert.deepEqual([unsure.status, unsure.body.reason], [503, 'passkey_account_unknown']);
+  assert.match(unsure.body.error, /couldn’t check.*Create a new passkey for this account instead/);
+  assert.equal((await stateOf(env, linkToken)).body.attachedPasskey, null);
+  // An answer stored before answers recorded who gave them: also not a "no".
+  index.list = async (options = {}) => (String(options.prefix).includes(':responses:')
+    ? { keys: [{ name: 'old-row', metadata: {} }], list_complete: true }
+    : list(options));
+  assert.equal((await attach(env, linkToken, Wallet.createRandom(), agent.address.toLowerCase())).body.reason, 'passkey_account_unknown');
+  index.list = list;
+  // The group store can't be reached: also not a "no".
+  const groups = env.CE_WORKER_GROUP_COORDINATOR || env.CE_SESSION_COORDINATOR;
+  const get = groups.get.bind(groups);
+  groups.get = (id) => {
+    const stub = get(id);
+    return { fetch: async (input, init) => (String(input?.url || input).includes('/worker-groups/memberships')
+      ? new Response(JSON.stringify({ ok: false, status: 503, reason: 'worker_group_coordination_unavailable' }), { status: 503 })
+      : stub.fetch(input, init)) };
+  };
+  assert.equal((await attach(env, linkToken, Wallet.createRandom(), agent.address.toLowerCase())).body.reason, 'passkey_account_unknown');
+  // A passkey the page says it has just made is attached all the same: the main way does not fail for a session's
+  // size or a store that is slow to answer. Anything but a plain true is not that word.
+  assert.equal((await attach(env, linkToken, Wallet.createRandom(), agent.address.toLowerCase(), { newPasskey: 'true' })).body.reason, 'passkey_account_unknown');
+  const made = await attach(env, linkToken, Wallet.createRandom(), agent.address.toLowerCase(), { newPasskey: true });
+  assert.deepEqual([made.status, made.body.via], [200, 'passkey_link']);
+  groups.get = get;
+});
+
+test('a passkey seen to have taken part is refused even when the page calls it new', async () => {
+  const { env } = await setup();
+  const agent = Wallet.createRandom();
+  const linkToken = (await exchange(env, (await makeCode(env, agent)).body.code)).body.token;
+  const answered = Wallet.createRandom();
+  assert.equal((await answer(env, await tokenOf(env, answered), personAnswer(answered))).status, 200);
+  const refused = await attach(env, linkToken, answered, agent.address.toLowerCase(), { newPasskey: true });
+  assert.deepEqual([refused.status, refused.body.reason], [409, 'passkey_has_account']);
+  assert.equal((await attach(env, linkToken, Wallet.createRandom(), agent.address.toLowerCase(), { newPasskey: true })).status, 200);
 });
 
 test('a sign-in from a link or a passkey has no more power than it needs, and a passkey is attached only by its own consent', async (t) => {
