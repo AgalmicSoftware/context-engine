@@ -39,7 +39,9 @@ jest.mock('../../utilities/worker/corsProxy.js', () => ({
 jest.mock('../../utilities/audio/realtimeInterviewClient', () => ({ startSessionRealtimeInterview: jest.fn() }));
 
 it('offers no responder name and sends none where the session keeps names', async () => {
-  jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: false, signIn: null });
+  jest
+    .mocked(useSessionNames)
+    .mockReturnValue({ status: 'unavailable', source: null, names: {}, answerNamesShown: false, signIn: null });
   const onRecordProvenance = jest.fn();
   const onSubmitResponses = jest.fn(async () => ({ status: 'submitted' as const }));
   try {
@@ -82,7 +84,9 @@ it('offers no responder name and sends none where the session keeps names', asyn
     expect(onRecordProvenance.mock.calls[0][5]).toBe('');
     expect(onRecordProvenance.mock.calls[0][7]).toMatchObject({ includeResponderName: false });
   } finally {
-    jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: true, signIn: null });
+    jest
+      .mocked(useSessionNames)
+      .mockReturnValue({ status: 'unavailable', source: null, names: {}, answerNamesShown: true, signIn: null });
   }
 });
 

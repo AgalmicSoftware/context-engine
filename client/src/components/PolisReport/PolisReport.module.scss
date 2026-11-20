@@ -801,6 +801,46 @@
   display: none;
 }
 
+/* Beside an address whose name is still being looked up. It comes after the address, so nothing moves when it goes. */
+.nameLookup {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 0.85em;
+  height: 0.85em;
+  margin-left: 0.4em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  opacity: 0.75;
+  vertical-align: -0.1em;
+  animation: nameLookupTurn 0.9s linear infinite;
+}
+
+.participantListItem > .nameLookup {
+  margin-left: 0;
+  color: var(--ce-document-text);
+}
+
+@keyframes nameLookupTurn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nameLookup {
+    animation: none;
+    border-style: dotted;
+    border-right-color: currentColor;
+  }
+}
+
+@media print {
+  .nameLookup {
+    display: none;
+  }
+}
+
 @media (max-width: 480px) {
   .participantAddressFull {
     display: none;
@@ -980,7 +1020,8 @@
     box-shadow: 0 6px 14px color-mix(in srgb, var(--ce-document-text) 8%, transparent);
   }
 
-  .participantAddressLink {
+  .participantAddressLink,
+  .participantListItem > .nameLookup {
     color: var(--ce-status-info);
   }
 
@@ -1208,7 +1249,8 @@
     --ce-beeswarm-border: 1px solid var(--ce-document-text-muted);
   }
 
-  .participantAddressLink {
+  .participantAddressLink,
+  .participantListItem > .nameLookup {
     color: var(--ce-document-border);
   }
 

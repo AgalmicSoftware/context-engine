@@ -343,6 +343,37 @@ describe('PolisReport participant profile links', () => {
     }
   });
 
+  it('marks each address whose name is still being looked up, until the read comes back', async () => {
+    const addresses = ['5', '6', '7'].map((digit) => `0x${digit.repeat(40)}`);
+    const responses = {
+      q1: addresses.map((responder) => ({
+        responder,
+        questionId: 'q1',
+        response: JSON.stringify({ type: 'binary', prompt: 'Agree?', answer: { value: 'Agree' } }),
+      })),
+    };
+    const names = (status, named = {}) => ({ status, source: null, names: named, answerNamesShown: false });
+    const rows = () => [screen.getByTitle(/^Sam \(/), screen.getByTitle(addresses[1]), screen.getByTitle(addresses[2])];
+    jest.mocked(useSessionNames).mockReturnValue(names('pending', { [addresses[0]]: 'Sam' }));
+
+    try {
+      const view = render(<PolisReport {...baseReportProps} slug="names-fixture" questionResponses={responses} />);
+      await screen.findByRole('link', { name: new RegExp(`^${addresses[1]}`) });
+      const marked = rows().map((row) => within(row).queryAllByRole('img', { name: 'Looking up name' }).length);
+      // A name already in hand needs no mark; each address still waiting has one.
+      expect(marked).toEqual([0, 1, 1]);
+
+      for (const status of ['named', 'empty', 'failed', 'unavailable']) {
+        jest.mocked(useSessionNames).mockReturnValue(names(status));
+        view.rerender(<PolisReport {...baseReportProps} slug="names-fixture" questionResponses={responses} />);
+        expect(screen.queryAllByRole('img', { name: 'Looking up name' })).toHaveLength(0);
+        expect(screen.getByRole('link', { name: new RegExp(`^${addresses[1]}`) })).toBeInTheDocument();
+      }
+    } finally {
+      jest.mocked(useSessionNames).mockReturnValue({ source: null, names: {}, answerNamesShown: true });
+    }
+  });
+
   it('keeps simulated-user links and portraits for the built-in demo participants', async () => {
     const participant = getPolisDemoDatasetForSlug('demo').participantsVotes.find((entry) => entry?.xid);
 

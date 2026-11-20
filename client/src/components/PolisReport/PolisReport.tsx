@@ -314,6 +314,12 @@ export default function PolisReport({
         : markPolisAgents(sessionNameLabels(sessionNames.names), agentResponders),
     [sessionNames, effectiveUseDemoData, agentResponders, demoDisplayNames],
   );
+  // While the first names read is out, each address still without a name carries a mark saying so; it goes when
+  // the read comes back, failed or not, and is never shown to someone names can't be read for.
+  const nameLookupMark =
+    !effectiveUseDemoData && sessionNames.status === 'pending' ? (
+      <span className={`${styles.nameLookup} ${styles.pdfIgnore}`} role="img" aria-label="Looking up name" />
+    ) : null;
   const usesSimulatedProfiles = effectiveUseDemoData && isBuiltInPolisDemoDataset(activeDemoData);
   const scopedQuestionScanProgress = useMemo(() => {
     if (!questionScanProgress) return null;
@@ -1449,6 +1455,7 @@ export default function PolisReport({
                   <span className={styles.participantAddressShort}>{shortLabel}</span>
                 </span>
               )}
+              {displayName ? null : nameLookupMark}
             </div>
           );
         })}
@@ -2113,6 +2120,7 @@ export default function PolisReport({
                                   >
                                     {linkLabel}
                                   </a>
+                                  {displayName ? null : nameLookupMark}
                                   <div>Cluster {c}</div>
                                 </div>
                               </div>,

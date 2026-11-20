@@ -1,4 +1,5 @@
 import {
+  NAMES_READ_TIMEOUT_MS,
   normalizeSessionName,
   resolveSessionNamesSource,
   findSessionNameMatches,
@@ -170,6 +171,42 @@ it("reads past the browser's cache and asks again after a refusal", async () => 
   expect(await source?.readAll()).toEqual({ [A]: 'Sam' });
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(fetchMock.mock.calls[0][1].cache).toBe('no-cache');
+});
+
+it("tells a read that couldn't be made from one that showed no names, and keeps neither failure", async () => {
+  fetchMock
+    .mockResolvedValueOnce(json({ error: 'busy' }, 503))
+    .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    .mockResolvedValueOnce(json({ names: {} }));
+  const source = await resolveSessionNamesSource({ ...options(), sessionSlug: 'failing-reads' });
+
+  await expect(source?.readAllOrFail()).rejects.toThrow('(503)');
+  await expect(source?.readAllOrFail()).rejects.toThrow('Failed to fetch');
+  // Withheld or unset, the Worker's empty answer is an answer.
+  await expect(source?.readAllOrFail()).resolves.toEqual({});
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+});
+
+it('ends a names read that hangs as a failure', async () => {
+  jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+  try {
+    fetchMock.mockImplementationOnce(
+      (_url, init) =>
+        new Promise((_resolve, reject) =>
+          init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))),
+        ),
+    );
+    const source = await resolveSessionNamesSource({ ...options(), sessionSlug: 'hanging-read' });
+    const read = source?.readAllOrFail();
+    const outcome = jest.fn();
+    read?.then(outcome, outcome);
+    await jest.advanceTimersByTimeAsync(NAMES_READ_TIMEOUT_MS - 1);
+    expect(outcome).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(1);
+    await expect(read).rejects.toThrow('aborted');
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 it('drops only its own failed read, never a newer one kept under the same key', async () => {
