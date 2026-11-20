@@ -5,7 +5,14 @@ import {
 } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { normalizePublicInterviewQuestions } from '../../../../shared/interviewQuestionCatalog.mjs';
 import { normalizeRatingAnswer } from '../../../../shared/questions/ratingScale.mjs';
-import { decodeLinkJson, readLinkParam } from '../../../../shared/linkPayload.mjs';
+import {
+  decodeLinkBytes,
+  decodeLinkJson,
+  decodeLinkUtf8,
+  inflateLinkBytes,
+  parseLinkJson,
+  readLinkParam,
+} from '../../../../shared/linkPayload.mjs';
 import {
   GROUP_SUGGESTION_DATA,
   GROUP_SUGGESTION_NEVER,
@@ -32,6 +39,8 @@ export { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtime
 export { isInterviewFeatureEnabled } from '../../utilities/session/interviewFeature';
 
 export const INTERVIEW_PREFILL_FRAGMENT_KEY = 'prefill';
+// The same packet, deflated first, so a long one makes a shorter link.
+export const INTERVIEW_PREFILL_PACKED_FRAGMENT_KEY = 'prefillz';
 // v6 asks for confidence as the chance the person keeps the answer, so it can be calibrated.
 export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v6';
 const SUPPORTED_INTERVIEW_PROMPT_VERSIONS = new Set([
@@ -441,6 +450,8 @@ export type InterviewPrefillRead =
 
 // Prefill packets are a few kilobytes; no link the AI writes is this long.
 const PREFILL_LINK_MAX_LENGTH = 100_000;
+// A #prefillz= packet unpacks to at most this many bytes; the MCP packs no more.
+const PREFILL_UNPACKED_MAX_BYTES = 400_000;
 
 const readInterviewPrefillValue = (value: unknown): InterviewPrefillRead => {
   const packet = normalizeInterviewPrefillPacket(value);
@@ -463,6 +474,24 @@ export const decodeInterviewPrefill = (encoded: unknown): InterviewPrefillRead =
   return decoded.ok ? readInterviewPrefillValue(decoded.value) : { packet: null, error: decoded.error, notice: '' };
 };
 
+/** Reads a #prefillz= value: the packet's UTF-8 JSON, raw-deflated, as unpadded base64url. */
+export const unpackInterviewPrefill = async (encoded: unknown): Promise<InterviewPrefillRead> => {
+  const failed = (error: string): InterviewPrefillRead => ({ packet: null, error, notice: '' });
+  const decoded = decodeLinkBytes(encoded, { maxLength: PREFILL_LINK_MAX_LENGTH });
+  if (!decoded.ok) return failed(decoded.error);
+  let bytes: Uint8Array | null;
+  try {
+    bytes = await inflateLinkBytes(decoded.bytes, PREFILL_UNPACKED_MAX_BYTES);
+  } catch {
+    return failed('This link is damaged or cut off: its drafts cannot be unpacked.');
+  }
+  if (!bytes) return failed('This link holds more drafts than this page reads.');
+  const text = decodeLinkUtf8(bytes);
+  if (!text.ok) return failed(text.error);
+  const parsed = parseLinkJson(text.text);
+  return parsed.ok ? readInterviewPrefillValue(parsed.value) : failed(parsed.error);
+};
+
 /** Reads the JSON packet a person pastes when the AI's link doesn't work. */
 export const parseInterviewPrefillJson = (text: unknown): InterviewPrefillRead => {
   try {
@@ -475,14 +504,26 @@ export const parseInterviewPrefillJson = (text: unknown): InterviewPrefillRead =
 export const readInterviewPrefillFromHash = (hash: unknown): InterviewPrefillRead =>
   decodeInterviewPrefill(readLinkParam(hash, INTERVIEW_PREFILL_FRAGMENT_KEY));
 
+const prefillHashParams = (hash: unknown) => new URLSearchParams(toTrimmedString(hash).replace(/^#/, ''));
+
 export const hasInterviewPrefillHash = (hash: unknown): boolean => {
-  const raw = toTrimmedString(hash).replace(/^#/, '');
-  return !!raw && new URLSearchParams(raw).has(INTERVIEW_PREFILL_FRAGMENT_KEY);
+  const params = prefillHashParams(hash);
+  return params.has(INTERVIEW_PREFILL_FRAGMENT_KEY) || params.has(INTERVIEW_PREFILL_PACKED_FRAGMENT_KEY);
 };
 
+/** True when the drafts come only as #prefillz=, which unpacks asynchronously; a #prefill= beside it wins. */
+export const isPackedInterviewPrefillHash = (hash: unknown): boolean => {
+  const params = prefillHashParams(hash);
+  return !params.has(INTERVIEW_PREFILL_FRAGMENT_KEY) && params.has(INTERVIEW_PREFILL_PACKED_FRAGMENT_KEY);
+};
+
+export const readPackedInterviewPrefillFromHash = (hash: unknown): Promise<InterviewPrefillRead> =>
+  unpackInterviewPrefill(readLinkParam(hash, INTERVIEW_PREFILL_PACKED_FRAGMENT_KEY));
+
 export const clearInterviewPrefillHash = (locationLike: Pick<Location, 'pathname' | 'search' | 'hash'>): string => {
-  const params = new URLSearchParams(toTrimmedString(locationLike.hash).replace(/^#/, ''));
+  const params = prefillHashParams(locationLike.hash);
   params.delete(INTERVIEW_PREFILL_FRAGMENT_KEY);
+  params.delete(INTERVIEW_PREFILL_PACKED_FRAGMENT_KEY);
   const hash = params.toString();
   return `${locationLike.pathname}${locationLike.search}${hash ? `#${hash}` : ''}`;
 };

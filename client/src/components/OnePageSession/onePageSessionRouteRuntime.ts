@@ -44,8 +44,9 @@ export const removeOnePageSessionInterviewIntent = (path: string): string => {
     url.searchParams.delete('mode');
   }
   const fragment = new URLSearchParams(url.hash.slice(1));
-  if (fragment.has('prefill') || fragment.has('claim')) {
+  if (fragment.has('prefill') || fragment.has('prefillz') || fragment.has('claim')) {
     fragment.delete('prefill');
+    fragment.delete('prefillz');
     fragment.delete('claim');
     url.hash = fragment.toString();
   }

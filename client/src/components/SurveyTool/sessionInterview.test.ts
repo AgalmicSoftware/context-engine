@@ -2,7 +2,9 @@ import { QUADRATIC_ANSWER_RULE } from '../../../../shared/promptRules.mjs';
 import { GROUP_SUGGESTION_NEVER } from '../../../../shared/interviewSettings.mjs';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
-import { encodeLinkJson } from '../../../../shared/linkPayload.mjs';
+import { deflateLinkBytes, encodeBase64Url, encodeLinkJson } from '../../../../shared/linkPayload.mjs';
+import fs from 'fs';
+import path from 'path';
 
 const decodeInterviewPrefillPacket = (encoded: unknown) => decodeInterviewPrefill(encoded).packet;
 jest.mock('../../utilities/ai/aiClient.js', () => ({ callAI: jest.fn() }));
@@ -15,6 +17,11 @@ import {
   hashInterviewQuestions,
   clearInterviewPrefillHash,
   hasInterviewPrefillHash,
+  INTERVIEW_PREFILL_FRAGMENT_KEY,
+  INTERVIEW_PREFILL_PACKED_FRAGMENT_KEY,
+  isPackedInterviewPrefillHash,
+  readPackedInterviewPrefillFromHash,
+  unpackInterviewPrefill,
   INTERVIEW_PROMPT_VERSION,
   INTERVIEW_REPLY_UNREADABLE,
   isInterviewFeatureEnabled,
@@ -209,6 +216,33 @@ describe('session interview protocol', () => {
         }),
       )?.promptVersion,
     ).toBe('ce-interview-brief-v6');
+  });
+
+  it('reads a deflated #prefillz= packet as #prefill= reads a plain one, and says when it is damaged', async () => {
+    const packed = encodeBase64Url(await deflateLinkBytes(new TextEncoder().encode(JSON.stringify(packet))));
+    expect(packed.length).toBeLessThan(encodeLinkJson(packet).length);
+    expect((await unpackInterviewPrefill(packed)).packet).toEqual(decodeInterviewPrefillPacket(encodeLinkJson(packet)));
+    expect((await readPackedInterviewPrefillFromHash(`#x=1&prefillz=${packed}`)).packet?.source).toEqual(packet.source);
+    expect(hasInterviewPrefillHash(`#prefillz=${packed}`)).toBe(true);
+    expect(isPackedInterviewPrefillHash(`#prefillz=${packed}`)).toBe(true);
+    // A plain packet beside it wins, and is read at once.
+    expect(isPackedInterviewPrefillHash(`#prefillz=${packed}&prefill=${encodeLinkJson(packet)}`)).toBe(false);
+    expect(
+      clearInterviewPrefillHash({ pathname: '/session/demo', search: '', hash: `#prefillz=${packed}&x=1` } as Location),
+    ).toBe('/session/demo#x=1');
+    // Plain base64url isn't deflate data; a cut-off one stops partway.
+    expect((await unpackInterviewPrefill(encodeLinkJson(packet))).error).toMatch(/damaged or cut off/);
+    expect((await unpackInterviewPrefill(packed.slice(0, Math.floor(packed.length / 2)))).packet).toBeNull();
+    expect((await unpackInterviewPrefill('')).error).toMatch(/carries no data/);
+  });
+
+  it('tells agents, in the site manifest, which review links this page reads', () => {
+    // The MCP writes #prefillz= only for a site whose manifest lists it, and #prefill= for any other.
+    const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../../public/manifest.json'), 'utf8'));
+    expect(manifest.context_engine_review_links).toEqual([
+      INTERVIEW_PREFILL_FRAGMENT_KEY,
+      INTERVIEW_PREFILL_PACKED_FRAGMENT_KEY,
+    ]);
   });
 
   it('reads prefill links the way setup links are read: tolerant of wrapping, strict about damage', () => {

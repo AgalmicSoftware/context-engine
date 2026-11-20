@@ -379,7 +379,8 @@ fidelity across models and may be `unknown` when the interface does not expose
 one. The copied prompt does not ask for a responder name; if a packet includes
 one, the client submits it only when the responder ticks the default-off name
 control. The packet contains no
-credential and is carried in `#prefill=...`, so it
+credential and is carried in `#prefill=...` (or, deflated first for a shorter
+link, `#prefillz=...`, which the page unpacks after it loads), so it
 is not sent to the web host as an HTTP request target. The fragment is still
 intentionally readable by scripts on the destination page, which is why source
 identifiers are forbidden and the exact JSON is shown first. The current catalog prompt version is

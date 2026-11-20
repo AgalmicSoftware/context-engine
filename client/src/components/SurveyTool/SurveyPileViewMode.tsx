@@ -132,12 +132,15 @@ import {
   hasInterviewPrefillHash,
   INTERVIEW_PROMPT_VERSION,
   isInterviewFeatureEnabled,
+  isPackedInterviewPrefillHash,
   opensSessionVoiceChooser,
   parseInterviewPrefillJson,
   readInterviewPrefillFromHash,
+  readPackedInterviewPrefillFromHash,
   resolveRealtimeInterviewSource,
   resolveSessionVoiceMode,
   type InterviewDraftResponse,
+  type InterviewPrefillRead,
   type InterviewPrefillPacket,
   type SessionVoiceMode,
 } from './sessionInterview';
@@ -246,11 +249,16 @@ const prefillSessionMismatch = (props: SurveyQuestionsProps, packet: InterviewPr
     : '';
 };
 
-const readInterviewPrefillStateForProps = (props: SurveyQuestionsProps = {}, hash: unknown) => {
-  if (!hasInterviewPrefillHash(hash)) {
+// `unpacked` is what a #prefillz= link held; until it has unpacked, there is nothing to read.
+const readInterviewPrefillStateForProps = (
+  props: SurveyQuestionsProps = {},
+  hash: unknown,
+  unpacked?: InterviewPrefillRead,
+) => {
+  if (!hasInterviewPrefillHash(hash) || (!unpacked && isPackedInterviewPrefillHash(hash))) {
     return { hasPrefill: false, packet: null as InterviewPrefillPacket | null, error: '', notice: '' };
   }
-  const read = readInterviewPrefillFromHash(hash);
+  const read = unpacked || readInterviewPrefillFromHash(hash);
   const error = read.packet
     ? prefillSessionMismatch(props, read.packet)
     : `${read.error} Ask the AI for a fresh link, or paste the JSON packet it gave you below.`;
@@ -1164,10 +1172,32 @@ export const noteInterviewProgress = (engine: PileViewModeEngine, inProgress: bo
   if (engine.state.interviewProgressContext !== interviewProgressContext) engine.setState({ interviewProgressContext });
 };
 
-const consumeInterviewPrefillHashIfPresent = (engine: PileViewModeEngine) => {
+// A #prefillz= link unpacks asynchronously, then is read as a #prefill= one is.
+// Each link unpacks once, however often this runs. If the address moved on
+// meanwhile, what it holds now is read instead; an unmounted view reads nothing.
+const unpackInterviewPrefillHash = (engine: PileViewModeEngine, hash: string) => {
+  if (engine._lastConsumedInterviewPrefillHash === hash || engine._unpackingInterviewPrefillHash === hash) return;
+  engine._unpackingInterviewPrefillHash = hash;
+  void readPackedInterviewPrefillFromHash(hash)
+    .then((read) => {
+      engine._unpackingInterviewPrefillHash = '';
+      if (!engine._isMounted) return;
+      consumeInterviewPrefillHashIfPresent(engine, (window.location.hash || '') === hash ? read : undefined);
+    })
+    .catch((e) => {
+      engine._unpackingInterviewPrefillHash = '';
+      surveyLog.warn('PileViewMode: could not read a packed interview link', e);
+    });
+};
+
+const consumeInterviewPrefillHashIfPresent = (engine: PileViewModeEngine, unpacked?: InterviewPrefillRead) => {
   if (typeof window === 'undefined' || !isInterviewFeatureEnabled(engine.props?.sessionConfig)) return false;
   const hash = window.location.hash || '';
-  const prefillState = readInterviewPrefillStateForProps(engine.props || {}, hash);
+  if (!unpacked && isPackedInterviewPrefillHash(hash)) {
+    unpackInterviewPrefillHash(engine, hash);
+    return false;
+  }
+  const prefillState = readInterviewPrefillStateForProps(engine.props || {}, hash, unpacked);
   if (!prefillState.hasPrefill) {
     engine._lastConsumedInterviewPrefillHash = '';
     return false;
@@ -1277,6 +1307,10 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
     } catch (e) {
       surveyLog.warn('PileViewMode: could not clear imported interview packet from URL', e);
     }
+  }
+  // A #prefillz= link starts unpacking now; the first update would otherwise wait for something else to change.
+  if (typeof window !== 'undefined' && isPackedInterviewPrefillHash(window.location.hash || '')) {
+    consumeInterviewPrefillHashIfPresent(engine);
   }
   // Only once it's held: a session whose settings load later still reads it, when they arrive.
   if (typeof window !== 'undefined' && engine.state.interviewClaimFrame && hasClaimHash(window.location.hash || ''))
