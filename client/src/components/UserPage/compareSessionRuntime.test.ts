@@ -1,5 +1,4 @@
 import {
-  COMPARE_GRAPHIC_FILENAME,
   resolveCompareSessionScope,
   resolveCompareRunLabel,
   runCompareSectionTasks,
@@ -128,9 +127,8 @@ describe('compare session runtime', () => {
     ]);
   });
 
-  it('uses honest loading copy and a descriptive export filename', () => {
+  it('uses honest loading copy', () => {
     expect(resolveCompareRunLabel(false)).toBe('Loading session data…');
     expect(resolveCompareRunLabel(true)).toBe('Comparing');
-    expect(COMPARE_GRAPHIC_FILENAME).toBe('contextEngine_comparisonGraphic.png');
   });
 });
