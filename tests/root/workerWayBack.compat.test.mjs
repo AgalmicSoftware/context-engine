@@ -264,7 +264,6 @@ describe('putting a session back on a released Worker bundle', () => {
 
   // 0.9.18's context cards (with a PDF's reading) and saved analysis card, and
   // their two switches, saved one way and then the other.
-  const sides = [['the live bundle', live], ['the pinned bundle', pinned]];
   const switchSets = [{ contextCardsEnabled: true, analysisCardEnabled: false }, { contextCardsEnabled: false, analysisCardEnabled: true }];
   // This Worker's AI: a card for a source, a reading for a PDF.
   const provider = async (url, init) => {
@@ -509,7 +508,10 @@ describe('putting a session back on a released Worker bundle', () => {
   });
 
   // gpt-live-1.1, the default here, under a released Worker that knows only gpt-live-1.
-  describe.each(sides)('the interview voice model on %s', (_name, ref) => {
+  // The pinned bundle knows gpt-live-1.1 since 0.9.21's pin, so the drill runs
+  // on the live (0.9.17) bundle.
+  const beforeLive11 = [['the live bundle', live]];
+  describe.each(beforeLive11)('the interview voice model on %s', (_name, ref) => {
     // One session, its OpenAI calls answered by the Live API stand-in.
     const voiceDrill = async (body) => {
       const released = bundles[ref];
