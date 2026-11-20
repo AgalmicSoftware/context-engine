@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.22] - 2026-11-20
+
 ## [0.9.21] - 2026-11-20
 
 A website release with MCP 0.7.2, published at merge (0.7.1 was never published; its changes are here). No Session Worker change: nothing needs redeploying, and the new MCP tools work against the Session Workers already deployed.
