@@ -28,7 +28,7 @@ const HELP = {
   cancel:
     'Ends your AI agent’s access to this account in this session: its sign-in is refused, every sign-in it had stops, and its unused links stop working. You can restore it. From then on your passkey is the only way in: if you lose it, only the session’s admins can restore access.',
   restore:
-    'Lets the AI agent that set this account up sign in to it again with its own key, as before you ended its access. Your passkey keeps working.',
+    'Lets the AI agent that set this account up sign in to it again with its own key. Your passkey keeps working.',
   remove: 'Takes your passkey off this account and signs you out of it. The account is then your agent’s alone again.',
 };
 

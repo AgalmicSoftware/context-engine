@@ -94,20 +94,31 @@ if (typeof store?.subscribe === 'function') {
   });
 }
 
+// An account a tab is using, and what kind: the person's own, signed in now; an agent's, held without its key;
+// or a passkey account this browser has saved and would sign back in by itself, though it has not yet.
+export type AccountInUse = { address: string; kind: 'own' | 'agent' | 'saved' };
+
+/** The account the tab is signed in as at this moment, or null. */
+export const whoIsHereNow = (): AccountInUse | null => {
+  const live = liveProfile();
+  return live.account ? { address: live.account, kind: isAgentLinkProvider(live.provider) ? 'agent' : 'own' } : null;
+};
+
 /**
  * Who a link's sign-in would replace, asked at the moment it is about to: whoever is signed in now, an agent's
  * account this tab still holds a sign-in for, or a passkey account this browser would sign back in by itself.
- * '' when nobody. An agent's account whose sign-in has ended is nobody: its person came for a new link.
+ * Null when nobody. An agent's account whose sign-in has ended is nobody: its person came for a new link.
  */
-export const whoALinkWouldReplace = async (): Promise<string> => {
+export const whoALinkWouldReplace = async (): Promise<AccountInUse | null> => {
   const account = readAgentLinkAccount();
   const heldLive = account && heldSessionToken(account.workerUrl, account.sessionSlug) ? account.address : '';
   const live = liveProfile();
   const endedAgentAccount =
     !!account && !heldLive && live.account === account.address && isAgentLinkProvider(live.provider);
-  if (live.account && !endedAgentAccount) return live.account;
-  if (heldLive) return heldLive;
-  return lower(await passkeyWallet.restorePasskeyWalletSession({ requireSigner: false }).catch(() => null));
+  if (live.account && !endedAgentAccount) return whoIsHereNow();
+  if (heldLive) return { address: heldLive, kind: 'agent' };
+  const saved = lower(await passkeyWallet.restorePasskeyWalletSession({ requireSigner: false }).catch(() => null));
+  return saved ? { address: saved, kind: 'saved' } : null;
 };
 
 /**

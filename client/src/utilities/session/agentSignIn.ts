@@ -150,6 +150,8 @@ export class AgentSignInError extends Error {
 const REFUSALS_IN_THE_SITES_WORDS: Record<string, string> = {
   passkey_has_account:
     'That passkey already has its own account in this session, so it can’t be added to this one. Create a new passkey instead.',
+  agent_access_cancelled_first:
+    'Restore agent access before removing the passkey, or nobody could sign in to this account.',
   passkey_account_unknown:
     'This session couldn’t check whether that passkey already has an account here. Create a new passkey instead.',
 };

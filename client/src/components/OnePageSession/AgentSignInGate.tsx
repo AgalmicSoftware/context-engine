@@ -36,9 +36,11 @@ import {
   enterAgentLinkAccount,
   enterThroughAttachedPasskey,
   isAttachedPasskeyKnown,
+  type AccountInUse,
   liveAccount,
   resumeAgentLinkAccount,
   whoALinkWouldReplace,
+  whoIsHereNow,
 } from '../../utilities/session/agentSignInAccount';
 import { heldSessionToken } from '../../utilities/worker/workerAuthTokenCache.js';
 import AgentAccountAccessPanel, { shortAddress } from '../Account/AgentAccountAccessPanel';
@@ -80,7 +82,7 @@ export default function AgentSignInGate({
   const [note, setNote] = useState<{ text: string; isError: boolean } | null>(null);
   const [fromLink, setFromLink] = useState(false);
   // Whose place the link's sign-in would take, shown when asking.
-  const [replaces, setReplaces] = useState('');
+  const [replaces, setReplaces] = useState<AccountInUse | null>(null);
   // A sign-in already made from the link, held while the person is asked: the code works once.
   const pending = useRef<AgentSignInReply | null>(null);
   const working = useRef(false);
@@ -124,8 +126,8 @@ export default function AgentSignInGate({
       setPhase('working');
       try {
         const reply = pending.current || (await exchangeHeldAgentSignInCode(target));
-        const now = liveAccount();
-        if (!agreed && now && now !== reply.address) {
+        const now = whoIsHereNow();
+        if (!agreed && now && now.address !== reply.address) {
           pending.current = reply;
           setReplaces(now);
           setPhase('ask');
@@ -263,8 +265,14 @@ export default function AgentSignInGate({
   // A link's sign-in would replace the account this tab uses: asked in a dialog, which is answered one way or
   // the other before anything changes. Closing it is staying.
   if (phase === 'ask') {
-    const current = replaces || signedInAs;
+    // What the dialog says follows what is really here: an account signed in now, an agent's account the tab
+    // holds, or a saved passkey account the browser has not signed in yet.
+    const current: AccountInUse = replaces || {
+      address: signedInAs,
+      kind: isAgentLinkProvider(provider) ? 'agent' : 'own',
+    };
     const other = pending.current?.address || '';
+    const here = <strong title={current.address}>{shortAddress(current.address)}</strong>;
     const stay = (): void => {
       pending.current = null;
       dropAgentSignInCode();
@@ -272,6 +280,11 @@ export default function AgentSignInGate({
       // The agent's account this tab already held, if it was waiting behind the question, is opened again.
       if (!liveAccount()) resumeAgentLinkAccount(target);
     };
+    const theLink = other ? (
+      <>
+        , <strong title={other}>{shortAddress(other)}</strong>
+      </>
+    ) : null;
     return (
       <CEConfirmDialog
         isOpen
@@ -280,17 +293,28 @@ export default function AgentSignInGate({
         body={
           <>
             <p>
-              <strong>Now:</strong> you are signed in here as <strong title={current}>{shortAddress(current)}</strong>,
-              your own account.
+              <strong>Now:</strong>{' '}
+              {current.kind === 'own' ? (
+                <>you are signed in here as {here}.</>
+              ) : current.kind === 'saved' ? (
+                <>this browser has a saved passkey account, {here}, and would sign you in to it.</>
+              ) : (
+                <>this tab is using {here}, an account an AI agent set up.</>
+              )}
             </p>
             <p>
-              <strong>The link:</strong> it signs this tab in to a different account
-              {other ? (
+              <strong>The link:</strong>{' '}
+              {current.kind === 'agent' ? (
                 <>
-                  , <strong title={other}>{shortAddress(other)}</strong>
+                  it signs this tab in to an account an AI agent set up{theLink}, which may be a different one. To come
+                  back to {here} afterwards you need a new link from its agent, or its passkey.
                 </>
-              ) : null}
-              , one that an AI agent set up. Your own account is not changed; you can sign back in to it later.
+              ) : (
+                <>
+                  it signs this tab in to a different account{theLink}, one that an AI agent set up. Your account {here}{' '}
+                  is not changed; sign in to it again later.
+                </>
+              )}
             </p>
             <p>Switch only if your own agent gave you this link.</p>
             {pending.current ? (
@@ -299,7 +323,7 @@ export default function AgentSignInGate({
           </>
         }
         confirmLabel="Switch to the agent’s account"
-        cancelLabel="Stay in my account"
+        cancelLabel={current.kind === 'agent' ? 'Stay in this account' : 'Stay in my account'}
         onConfirm={() => void signIn({ agreed: true })}
         onCancel={stay}
       />
@@ -459,7 +483,7 @@ export default function AgentSignInGate({
     );
   }
   return notice(
-    <>Agent access ended. Your agent can no longer sign in to {who}; only your passkey can.</>,
+    <>Agent access ended. Your agent can no longer sign in to {who} in this session; only your passkey can.</>,
     panel,
     false,
     wentWrong,

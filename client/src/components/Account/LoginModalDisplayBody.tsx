@@ -261,8 +261,9 @@ const LoginModalDisplayBody = ({
               <Suspense fallback={null}>
                 <AgentAccountAccessPanel
                   provider={provider}
-                  buttonClassName="btn btn-secondary btn-sm"
-                  primaryButtonClassName="btn btn-primary btn-sm"
+                  // The dialog's own button look, as Bookmarks has: a bare .btn-secondary is pale text on this panel.
+                  buttonClassName={`btn btn-secondary btn-sm ${styles.walletButton}`}
+                  primaryButtonClassName={`btn btn-primary btn-sm ${styles.walletButton}`}
                 />
               </Suspense>
             </div>
