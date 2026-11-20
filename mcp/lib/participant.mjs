@@ -113,6 +113,13 @@ const CONTEXT_NO_LINKS = 'This session’s Worker doesn’t take links from part
 const CONTEXT_NO_FETCH = 'This session doesn’t let you have its Worker fetch pages, so it takes no links from you. You can add a file or text.';
 const CONTEXT_RATE_LIMITED = 'The session’s Worker is rate limiting you, so nothing was added. Retry in a few minutes; if it still refuses, you may have reached the session’s daily limit for your address, which clears within a day.';
 
+// Reading a session from its link without joining it: what the read tools say, and why a private one stays shut.
+const READ_ONLY_NOTE = 'Read from the link without joining: you are not a participant here, and nothing was stored or spent. To take part, call join_session with the link.';
+const READ_NEEDS_PASSWORD_LINK = 'This session is private, and this link doesn’t open it for reading. Ask the person for the group’s invite link, the one that carries its password, and pass that whole link as session. Never ask them to type the password by itself.';
+const READ_ONE_USE_CODE = 'This session is private, and this link’s invite is a one-use code. A code can’t be used to read: it works once, to join. Reading here needs joining first, which spends the code, so ask the person before calling join_session with the link.';
+const READ_INVITE_STALE = 'This session is private, and this link’s group password no longer opens it: the password may have changed, or the group may no longer be let in. Ask the person for the current invite link.';
+const READ_ONLY_REGISTRY = 'An on-chain session can’t be read here without joining; call join_session with the link.';
+
 // Agent-supplied arguments may be numbers or strings; Worker data uses text().
 const trim = (value) => (typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : '');
 const ANSWERS_EXAMPLE = 'For example: "answers": [{ "questionId": "0x1a…", "value": "Agree", "comment": "Why I agree." }]';
@@ -597,7 +604,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     let listed;
     let mine;
     try {
-      [listed, mine] = await Promise.all([ctx.client.listGroups(), ctx.client.listMyMemberships()]);
+      // A reader is in no group; a private session lists it only the group its link names.
+      [listed, mine] = ctx.readOnly
+        ? [await ctx.client.listGroups({ joinGroup: text(ctx.info.joinGroupId) }), []]
+        : await Promise.all([ctx.client.listGroups(), ctx.client.listMyMemberships()]);
     } catch (error) {
       // A Worker without group storage has no groups to show.
       if (error instanceof WorkerRequestError && error.status === 501) return {};
@@ -738,15 +748,67 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       });
     });
 
-  /** Resolves a slug, link, or the current session to an open session. */
-  const resolveSession = async (session) => {
+  // A session read from its link by an agent that hasn't joined it: no sign-in, no state kept, and
+  // for a private session the read invite its group password makes. The invite stays in memory.
+  const openReader = async (parsed) => {
+    if (parsed.kind === 'registry') throw new Error(READ_ONLY_REGISTRY);
+    const key = `reader ${sessionKey(parsed)}`;
+    const groupInvite = parsed.groupInvite || '';
+    let ctx = sessions.get(key);
+    // Another invite for the same session starts over, so an old one is never sent with it.
+    if (!ctx || ctx.readerInvite !== groupInvite) {
+      const info = { ...parsed };
+      delete info.groupInvite;
+      delete info.listedSessionId;
+      ctx = {
+        info,
+        registry: null,
+        readOnly: true,
+        readerInvite: groupInvite,
+        client: createWorkerClient({
+          workerOrigin: info.workerOrigin, slug: info.slug, trustedOrigins: trustedOriginsFor(info.appOrigin), wallet, fetchImpl, now, signedOut: true,
+        }),
+        records: new Map(),
+        missing: new Map(),
+      };
+      await ctx.client.loadConfig();
+      // Links shown back are built on an origin the agent trusts, as after joining.
+      ctx.info.appOrigin = ctx.client.loginOrigin;
+      if (parsed.listedSessionId && ctx.client.sessionId !== parsed.listedSessionId) {
+        throw new Error(`The Session Worker listed for "${parsed.slug}" answers for a different session, so it was not read. Ask for the session’s link with worker=, the Worker’s address.`);
+      }
+      if (ctx.client.privateSession) {
+        const readInvite = await groupReadInvite({ token: groupInvite, sessionId: ctx.client.sessionId, groupId: parsed.joinGroupId });
+        if (readInvite) {
+          ctx.client.setGroupReadInvite(readInvite);
+          await ctx.client.loadConfig();
+        }
+      }
+      sessions.set(key, ctx);
+    }
+    if (ctx.client.privateSession) {
+      sessions.delete(key);
+      const kind = parseGroupInviteToken(groupInvite)?.kind;
+      throw new Error(kind === 'one_use' ? READ_ONE_USE_CODE : kind === 'password' && parsed.joinGroupId ? READ_INVITE_STALE : READ_NEEDS_PASSWORD_LINK);
+    }
+    return ctx;
+  };
+
+  /**
+   * Resolves a slug, link, or the current session to an open session. With `reader`, a link to
+   * a session the agent hasn't joined opens it for reading only, as its link would show it.
+   */
+  const resolveSession = async (session, { reader = false } = {}) => {
     await loadState();
     const ref = trim(session);
     if (/^https?:\/\//i.test(ref)) {
       // A link means here what join_session makes of it.
       const parsed = await resolveLink(ref);
       const key = sessionKey(parsed);
-      if (!isRecord(state.sessions[key])) throw new Error('Join this session first with join_session.');
+      if (!isRecord(state.sessions[key])) {
+        if (reader) return openReader(parsed);
+        throw new Error('Join this session first with join_session.');
+      }
       return openEntry(state.sessions[key]);
     }
     let key = state.current;
@@ -774,6 +836,14 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   // questions, results visibility, end time) apply to a long-running agent.
   const ensureReady = async (ctx) => {
     await ctx.client.refreshConfig();
+    if (ctx.readOnly) {
+      // The password changed, or the group left the rule, since the link was opened.
+      if (ctx.client.privateSession) {
+        sessions.delete(`reader ${sessionKey(ctx.info)}`);
+        throw new Error(READ_INVITE_STALE);
+      }
+      return ctx.client.config;
+    }
     ctx.info.appOrigin = ctx.client.loginOrigin;
     if (!ctx.registry) await ctx.client.ensureToken();
     return ctx.client.config;
@@ -1014,6 +1084,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   };
 
   const loadMyAnswers = async (ctx) => {
+    // A reader has no account in the session, so no answers of its own.
+    if (ctx.readOnly) return Object.assign(new Map(), { complete: true, unread: 0 });
     await ensureReady(ctx);
     const scan = await awaitOwnScan(ctx);
     const mine = new Map(scan.answers);
@@ -1065,6 +1137,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
   const prefill = createInterviewPrefill({
     fetchImpl,
     resolveLink,
+    // A private session's catalog reads with the same invite, and the same refusals, as the other read tools.
+    readInvite: async (parsed) => (await openReader(parsed)).client.groupReadInvite,
     profile: async () => {
       await loadState();
       return profile();
@@ -1308,7 +1382,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     },
 
     async getSession({ session } = {}) {
-      const ctx = await resolveSession(session);
+      const ctx = await resolveSession(session, { reader: true });
       const sessionConfig = await ensureReady(ctx);
       const [questions, mine] = await Promise.all([loadQuestions(ctx), loadMyAnswers(ctx)]);
       const endsAt = text(sessionConfig.sessionEndsAt);
@@ -1317,7 +1391,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const sessionAgent = ctx.registry ? null : sessionAgentOf(sessionConfig);
       return {
         ...sessionSummary(ctx, sessionConfig),
-        testEth: await ctx.client.describeTestEth(),
+        ...(ctx.readOnly ? {} : { testEth: await ctx.client.describeTestEth() }),
         description: text(sessionConfig.sessionInfo).slice(0, MAX_DESCRIPTION_LENGTH),
         context: contextOf(sessionConfig),
         ...(instructions ? { agentInstructions: instructions } : {}),
@@ -1325,10 +1399,11 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         ...(endsAt ? { endsAt } : {}),
         ...(sessionSbts.length ? { sessionSbts } : {}),
         ...(ctx.registry ? {} : await describeGroups(ctx)),
-        ...(ctx.registry ? {} : await invitationFor(ctx, sessionConfig)),
+        ...(ctx.registry || ctx.readOnly ? {} : await invitationFor(ctx, sessionConfig)),
         questions: questions.length,
-        answeredByMe: questions.filter((question) => mine.has(question.id)).length,
+        ...(ctx.readOnly ? { joined: false } : { answeredByMe: questions.filter((question) => mine.has(question.id)).length }),
         ...progressNotes(questions, mine),
+        ...(ctx.readOnly ? { note: READ_ONLY_NOTE } : {}),
       };
     },
 
@@ -1336,18 +1411,19 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (!['unanswered', 'answered', 'all'].includes(filter)) throw new Error('filter must be unanswered, answered, or all.');
       const max = Math.min(Math.max(Math.trunc(Number(limit)) || MAX_LISTED_QUESTIONS, 1), MAX_LISTED_QUESTIONS);
       const start = Math.max(Math.trunc(Number(offset)) || 0, 0);
-      const ctx = await resolveSession(session);
+      const ctx = await resolveSession(session, { reader: true });
       const [questions, mine] = await Promise.all([loadQuestions(ctx), loadMyAnswers(ctx)]);
+      // A reader has answered nothing, so every question is listed whatever the filter.
       const matching = questions.filter((question) =>
-        filter === 'all' ? true : filter === 'answered' ? mine.has(question.id) : !mine.has(question.id),
+        ctx.readOnly || filter === 'all' ? true : filter === 'answered' ? mine.has(question.id) : !mine.has(question.id),
       );
       return {
         session: ctx.info.slug,
         total: questions.length,
-        answeredByMe: questions.filter((question) => mine.has(question.id)).length,
+        ...(ctx.readOnly ? { joined: false, note: READ_ONLY_NOTE } : { answeredByMe: questions.filter((question) => mine.has(question.id)).length }),
         matching: matching.length,
         ...progressNotes(questions, mine),
-        ...pageNotes(matching.length, start, max, filter),
+        ...pageNotes(matching.length, start, max, ctx.readOnly ? 'all' : filter),
         // An empty unanswered list must not read as "nothing answered yet".
         ...(filter === 'unanswered' && !matching.length && questions.length ? {
           next: `You have answered all ${questions.length} questions. To see your answers, call list_questions with filter "answered"; answering again replaces an answer, so send one only to change it.`,
@@ -1580,14 +1656,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (questionIds !== undefined && !Array.isArray(questionIds)) {
         throw new Error(`questionIds must be a list of question ids, such as ["0x1a…"], not a ${typeof questionIds}.`);
       }
-      const ctx = await resolveSession(session);
+      const ctx = await resolveSession(session, { reader: true });
       const sessionConfig = await ensureReady(ctx);
       const visibility = sessionConfig?.sessionModeProfile?.results?.visibility;
       if (visibility !== PUBLIC_RESULTS && visibility !== MEMBER_RESULTS) {
         return {
           session: ctx.info.slug,
           resultsPublic: false,
-          note: 'This session does not publish results to participants. Only your own answers are visible (see list_questions with filter "answered").',
+          note: ctx.readOnly
+            ? 'This session does not publish results to participants, so a link reads none.'
+            : 'This session does not publish results to participants. Only your own answers are visible (see list_questions with filter "answered").',
         };
       }
       const cap = Math.min(Math.max(Math.trunc(Number(maxRecords) || MAX_RESULT_RECORDS), 1), MAX_RESULT_RECORDS);
@@ -1635,7 +1713,10 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       return {
         session: ctx.info.slug,
         resultsPublic: visibility === PUBLIC_RESULTS,
-        ...(visibility === MEMBER_RESULTS ? { note: 'This session shows results to its signed-in members only.' } : {}),
+        ...(visibility === MEMBER_RESULTS ? { note: ctx.readOnly
+          ? 'This session shows results to its members; a private session’s group password link reads them as a member would.'
+          : 'This session shows results to its signed-in members only.' } : {}),
+        ...(ctx.readOnly ? { joined: false } : {}),
         webUrl: buildSessionWebUrl(ctx.info),
         participants: participants.size,
         unreadAnswers,
@@ -1779,7 +1860,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     // only what this agent may read, so a card arrives exactly where its source does.
     async listContext({ session, query } = {}) {
       if (query !== undefined && typeof query !== 'string') throw new Error('query must be text.');
-      const ctx = await resolveSession(session);
+      const ctx = await resolveSession(session, { reader: true });
       if (ctx.registry) return { session: ctx.info.slug, sources: [], count: 0, note: NO_CONTEXT_SOURCES };
       const sessionConfig = await ensureReady(ctx);
       if (!workerReadsContext(sessionConfig)) return { session: ctx.info.slug, sources: [], count: 0, note: NO_CONTEXT_SOURCES };
@@ -1807,7 +1888,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const wanted = trim(id);
       if (!wanted) throw new Error('Pass the id of a source from list_context.');
       if (offset !== undefined && (!Number.isSafeInteger(offset) || offset < 0)) throw new Error('offset must be a whole number, 0 or more.');
-      const ctx = await resolveSession(session);
+      const ctx = await resolveSession(session, { reader: true });
       if (ctx.registry) throw new Error(NO_CONTEXT_SOURCES);
       if (!workerReadsContext(await ensureReady(ctx))) throw new Error(NO_CONTEXT_SOURCES);
       checkpoint();

@@ -167,8 +167,11 @@ export const resolveLoginOrigin = (config, trustedOrigins) => {
   return origin;
 };
 
+// `signedOut` makes a client that reads as a visitor would: it never signs in, so every request
+// goes without a token, and a private session opens only through a read invite.
 export const createWorkerClient = ({
   workerOrigin, slug, trustedOrigins, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), registryConfigLoader, sessionId: joinedSessionId = '',
+  signedOut = false,
 }) => {
   // The session this client answers for: the one the agent joined, or else the first config it loads.
   let sessionId = joinedSessionId;
@@ -205,6 +208,9 @@ export const createWorkerClient = ({
   const request = async (path, { method = 'GET', headers = {}, body, form, auth = false, retried = false, busyRetries = 0, maxBytes = MAX_RESPONSE_BYTES, signal, raw: asText = false, timeoutMs = REQUEST_TIMEOUT_MS } = {}) => {
     const checkpoint = () => { if (signal?.aborted) throw new Error('Stopped before the Worker request was sent.'); };
     checkpoint();
+    // Signed out, a request that would carry the sign-in names its session instead.
+    const signedOutRead = auth && signedOut;
+    if (signedOutRead) auth = false;
     if (auth) await ensureToken();
     // Login and token refresh can await. Once sent, retain the response for reconciliation.
     checkpoint();
@@ -216,6 +222,7 @@ export const createWorkerClient = ({
         headers: {
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
           ...(auth ? { Authorization: `Bearer ${token}`, 'X-Group-Slug': slug } : {}),
+          ...(signedOutRead ? { 'X-Session-Slug': slug } : {}),
           ...(groupReadInvite ? { 'X-CE-Group-Invite': groupReadInvite } : {}),
           ...headers,
         },
@@ -239,7 +246,7 @@ export const createWorkerClient = ({
     if (isRetryableBusy(response.status, data) && !form &&
         busyRetries < COORDINATOR_RETRY_DELAYS_MS.length && replaySafe(path, method, body)) {
       await waitBeforeRetry(busyRetries, signal);
-      return request(path, { method, headers, body, form, auth, retried, busyRetries: busyRetries + 1, maxBytes, signal, raw: asText, timeoutMs });
+      return request(path, { method, headers, body, form, auth: auth || signedOutRead, retried, busyRetries: busyRetries + 1, maxBytes, signal, raw: asText, timeoutMs });
     }
     if (response.status === 401 && auth && !retried && (!error || TOKEN_ERROR_RE.test(error))) {
       token = '';
@@ -283,8 +290,9 @@ export const createWorkerClient = ({
     if (text(data.sessionSlug) && text(data.sessionSlug).toLowerCase() !== slug) {
       throw new WorkerRequestError('The Worker answered for a different session.');
     }
-    // Public registry reads remain available even when this agent's sign-in origin is not admitted.
-    if (registryConfigLoader) {
+    // Public registry reads remain available even when this agent's sign-in origin is not admitted,
+    // and so does reading without signing in.
+    if (registryConfigLoader || signedOut) {
       try { loginOrigin = resolveLoginOrigin(loaded, trustedOrigins); } catch { loginOrigin = trustedOrigins[0]; }
     } else loginOrigin = resolveLoginOrigin(loaded, trustedOrigins);
     config = loaded;
@@ -301,6 +309,7 @@ export const createWorkerClient = ({
   };
 
   const signIn = async () => {
+    if (signedOut) throw new WorkerRequestError('This session was opened to read without joining; join it with join_session to do this.');
     if (!config) await loadConfig();
     if (registryConfigLoader) loginOrigin = resolveLoginOrigin(config, trustedOrigins);
     const identity = registryConfigLoader ? {} : { sessionId };
@@ -346,6 +355,7 @@ export const createWorkerClient = ({
   };
 
   const ensureToken = async () => {
+    if (signedOut) return;
     if (token && tokenExp - TOKEN_REFRESH_MARGIN_SECONDS > now() / 1000) return;
     await login();
   };
@@ -448,9 +458,10 @@ export const createWorkerClient = ({
   });
   const leaveGroup = (groupId, { signal } = {}) => request('/groups/leave', { method: 'POST', auth: true, signal, body: { sessionId, groupId } });
 
-  /** The groups this agent may see, with their member counts. */
-  const listGroups = async () => {
-    const data = await request(`/groups/list?sessionId=${encodeURIComponent(sessionId)}`, { auth: true });
+  /** The groups this agent may see, with their member counts. Signed out, a private session lists the one group `joinGroup` names. */
+  const listGroups = async ({ joinGroup = '' } = {}) => {
+    const query = new URLSearchParams({ sessionId, ...(joinGroup ? { joinGroup } : {}) });
+    const data = await request(`/groups/list?${query}`, { auth: true });
     return Array.isArray(data?.groups) ? data.groups.filter(isRecord) : [];
   };
 
@@ -503,8 +514,13 @@ export const createWorkerClient = ({
     listMyMemberships,
     readFeatures,
     request,
+    signedOut,
     setGroupReadInvite: (value) => {
       groupReadInvite = text(value);
+    },
+    /** The read invite sent with requests, for a caller that makes one of its own; never shown. */
+    get groupReadInvite() {
+      return groupReadInvite;
     },
     get config() {
       return config;

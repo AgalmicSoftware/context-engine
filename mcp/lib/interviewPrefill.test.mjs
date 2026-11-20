@@ -32,14 +32,14 @@ const catalog = (overrides = {}) => ({
   ...overrides,
 });
 
-const harness = ({ status = 200, body = catalog(), profile = {} } = {}) => {
+const harness = ({ status = 200, body = catalog(), profile = {}, readInvite } = {}) => {
   const calls = [];
   const fetchImpl = async (url, init) => {
     calls.push({ url: new URL(url), init });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   };
   const resolveLink = async (link) => parseSessionLink(link);
-  return { calls, prefill: createInterviewPrefill({ fetchImpl, resolveLink, profile: async () => profile }) };
+  return { calls, prefill: createInterviewPrefill({ fetchImpl, resolveLink, profile: async () => profile, ...(readInvite ? { readInvite } : {}) }) };
 };
 
 const decode = (reviewLink) => JSON.parse(Buffer.from(new URL(reviewLink).hash.slice('#prefill='.length), 'base64url').toString('utf8'));
@@ -167,15 +167,48 @@ test('with no drafts the link is the clean review page', async () => {
   assert.equal(result.drafts, 0);
 });
 
-test('refusals say what to do, and never ask for an invite code or password', async () => {
-  for (const [status, error, pattern] of [
-    [401, 'This session’s questions need a sign-in.', /not public \(401.*Let your AI draft your answers.*Never ask them for an invite code/],
+test('a private session’s catalog is read with the proof its invite link makes, sent as a header and shown nowhere', async () => {
+  const PROOF = 'reviewers:0xPROOF';
+  const asked = [];
+  const { calls, prefill } = harness({ readInvite: async (info) => { asked.push(info); return PROOF; } });
+  const read = await prefill.getInterviewCatalog({ link: LINK });
+  assert.equal(read.privateSession, true);
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].groupInvite, 'SECRET2');
+  assert.equal(calls[0].init.headers['X-CE-Group-Invite'], PROOF);
+  assert.doesNotMatch(calls[0].url.toString(), /SECRET|PROOF/);
+  assert.doesNotMatch(JSON.stringify(read), /SECRET|PROOF/);
+  const made = await prefill.makeReviewLink({ link: LINK, responses: [{ questionId: 'q-bin', answer: 'Agree', confidence: 0.9, evidence: 'They said so.' }] });
+  assert.doesNotMatch(JSON.stringify(made), /SECRET|PROOF|groupInvite/);
+  assert.doesNotMatch(Buffer.from(new URL(made.reviewLink).hash.slice('#prefill='.length), 'base64url').toString('utf8'), /SECRET|PROOF/);
+  assert.match(made.next, /private, and the review link carries no invite/);
+
+  // A link without an invite asks for none, and a session that needs none sends none.
+  const plain = harness({ body: catalog({ reviewUrl: `${PAGE}?worker=${encodeURIComponent(WORKER)}&mode=interview` }), readInvite: async () => { throw new Error('not asked'); } });
+  await plain.prefill.getInterviewCatalog({ link: `${PAGE}?worker=${encodeURIComponent(WORKER)}` });
+  assert.equal(plain.calls[0].init.headers['X-CE-Group-Invite'], undefined);
+  const open = harness({ readInvite: async () => '' });
+  const shown = await open.prefill.getInterviewCatalog({ link: LINK });
+  assert.equal(open.calls[0].init.headers['X-CE-Group-Invite'], undefined);
+  assert.equal(shown.privateSession, undefined);
+
+  // An invite that can't read stops before anything is sent, in the reader's own words.
+  const code = harness({ readInvite: async () => { throw new Error('This link’s invite is a one-use code.'); } });
+  await assert.rejects(code.prefill.getInterviewCatalog({ link: LINK }), /one-use code/);
+  assert.equal(code.calls.length, 0);
+});
+
+test('refusals say what to do, and never ask for a code or password by itself', async () => {
+  for (const [status, error, pattern, reason] of [
+    [401, 'This session’s questions need a sign-in.', /not public \(401.*group’s invite link.*Let your AI draft your answers.*Never ask them to type a code or a password by itself/],
     [403, 'Private session.', /not public \(403/],
+    [403, 'This session is private. Open it from your group invite link.', /Error: This session is private\. If the person has the group’s invite link/, 'private_session_invite_required'],
+    [403, 'This invite link no longer opens this session.', /group password no longer opens it/, 'private_session_invite_invalid'],
     [404, 'Interview mode is disabled for this session.', /interview mode is off/],
     [503, 'Interview question discovery is incomplete. Retry shortly.', /can’t answer just now \(Interview question discovery is incomplete/],
     [429, 'Rate limit exceeded.', /limiting requests.*may still be public/],
   ]) {
-    const { prefill } = harness({ status, body: { error } });
+    const { prefill } = harness({ status, body: { error, ...(reason ? { reason } : {}) } });
     await assert.rejects(prefill.getInterviewCatalog({ link: LINK }), pattern);
   }
   const { calls, prefill } = harness();
