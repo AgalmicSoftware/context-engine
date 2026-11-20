@@ -84,6 +84,8 @@ export default function SessionInterviewModalHeader({
           trigger="hover focus"
           autohide={false}
         >
+          {/* The status first, as a phone may show only its start. */}
+          {/[.…]$/.test(statusLabel) ? statusLabel : `${statusLabel}.`}{' '}
           {idle ? `${readinessDetail} Click to check again.` : guidance}
         </UncontrolledTooltip>
       </span>

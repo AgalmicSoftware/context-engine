@@ -526,7 +526,10 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.focus(screen.getByRole('button', { name: 'Interview status: Ready' }));
     expect(status).toHaveTextContent('Ready');
     expect(screen.getByRole('button', { name: 'Interview status: Ready' })).toHaveAttribute('data-tone', 'ready');
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Voice setup ready.');
+    // Led by the status in full, which a phone may cut short in the pill.
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      /^Ready\. Voice setup ready\. Click to check again\.$/,
+    );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Start voice interview');
   });
 

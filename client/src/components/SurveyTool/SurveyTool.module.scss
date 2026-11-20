@@ -3970,12 +3970,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   align-items: center;
   max-width: 100%;
   min-height: 36px;
-
-  > span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   padding: 6px 12px;
   border: 0 !important;
   border-radius: 999px !important;
@@ -3986,6 +3980,13 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   font-size: 0.85rem;
   font-weight: 700;
   line-height: 1.3;
+
+  // A long status ends in "…" on a phone; its tooltip begins with it in full.
+  > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   &[data-tone='pending'],
   &[data-tone='busy'] {
@@ -4044,7 +4045,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 // The narrowest phones leave the status room for a word or two: slimmer buttons, a smaller title, and no
 // globe. The flags still show on opening, and the "?" still names the languages.
 @media (max-width: 360px) {
-  .sessionVoiceModeModal :global(.modal-title) {
+  .sessionVoiceModeModal :global(.modal-title):has(.sessionInterviewHeader) {
     min-width: 0;
     font-size: 1rem;
   }
