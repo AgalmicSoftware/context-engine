@@ -170,6 +170,28 @@ test('Wrapped config, statements, predictions, allocations, poster links and res
   await jsonOk(await f.request('/api/agent/admin/questions/delete', { method: 'POST', token, body: { questionIds: [questions[0].questionId] } }));
 });
 
+test('a choose-several answer sent as a list in value or values is stored whole, and a later submit replaces it', async () => {
+  const { f, agent } = await hosted(); const token = agent.token;
+  f.config.agentHttp.managedAccountSubmitAllowed = true;
+  await jsonOk(await f.request('/api/agent/questions/create', { method: 'POST', token,
+    body: { questions: [{ prompt: 'Which places matter most?', questionType: 'multichoice', options: ['Rivers', 'Forests', 'Coasts'] }] } }));
+  const question = (await jsonOk(await f.request('/api/agent/questions', { token }))).questions.find((entry) => entry.questionType === 'multichoice');
+  assert.ok(question, 'the choose-several question is listed');
+  const send = (answer) => f.request('/api/agent/preferences', { method: 'POST', token, body: {
+    preferences: [{ questionId: question.questionId, ...answer }], submit: true, humanApproved: true } });
+  for (const [answer, label] of [[{ value: ['Rivers', 'Coasts'] }, 'Rivers, Coasts'], [{ values: ['Forests', 'Coasts'] }, 'Forests, Coasts']]) {
+    const result = await jsonOk(await send(answer));
+    assert.deepEqual(result.skipped, [], JSON.stringify(result));
+    assert.deepEqual([result.submittedCount, result.drafts[0].answerLabel], [1, label]);
+  }
+  // One option at a time is one whole answer each time, so the last one stands. The guide says so; it is not refused.
+  const single = await jsonOk(await send({ value: 'Rivers' }));
+  assert.deepEqual([single.skipped, single.drafts[0].answerLabel], [[], 'Rivers']);
+  // A list holding an option the question doesn't have is not understood, and nothing is submitted for it.
+  const wrong = await (await send({ value: ['Rivers', 'Lakes'] })).json();
+  assert.deepEqual([wrong.ok, wrong.submittedCount, wrong.skipped], [false, 0, [{ questionId: question.questionId, reason: 'answer_not_understood' }]]);
+});
+
 test('results, deterministic images, shared operator caches and Geo backlinks enforce current exposure', async () => {
   const { f, agent, questions } = await hosted(); const token = agent.token;
   f.config.agentHttp.managedAccountSubmitAllowed = true;
