@@ -34,6 +34,8 @@ import SbtPageRelevantInfo from '../SBTs/SbtPageRelevantInfo';
 import sbtsPageStyles from '../SBTs/SBTsPage.module.scss';
 import WorkerGroupAutoJoinLink from './WorkerGroupAutoJoinLink';
 import WorkerGroupCard from './WorkerGroupCard';
+import WorkerGroupCategories from './WorkerGroupCategories';
+import { groupWorkerGroupsByCategory } from './workerGroupCategoryOrder';
 import WorkerGroupsLoading from './WorkerGroupsLoading';
 import WorkerGroupMembersModal, { workerGroupPrincipalIdentity } from './WorkerGroupMembersModal';
 import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
@@ -513,6 +515,14 @@ const WorkerGroupMembershipPanel = ({
   const groupIdFilter = String(groupIdFilterProp || '').trim();
   const navigationKey = `${sessionId}\n${sessionSlug}\n${workerUrl}\n${groupIdFilter}`;
   const [inlineSelection, setInlineSelection] = useState({ navigationKey, groupId: '' });
+  // Kept here, not in the list, so coming back from a group's page finds its category still open.
+  const [openCategoryKeys, setOpenCategoryKeys] = useState<string[]>([]);
+  const inlineGroupCategoryKeyRef = useRef<string | null>(null);
+  const toggleCategory = useCallback(
+    (key: string) =>
+      setOpenCategoryKeys((keys) => (keys.includes(key) ? keys.filter((open) => open !== key) : [...keys, key])),
+    [],
+  );
   const inlineGroupId = inlineDetails && inlineSelection.navigationKey === navigationKey ? inlineSelection.groupId : '';
   const selectedGroupId = String(selectedGroupIdProp || '').trim() || inlineGroupId;
   const panelRef = useRef<HTMLElement>(null);
@@ -525,6 +535,9 @@ const WorkerGroupMembershipPanel = ({
   const closeInlineDetails = useCallback(() => {
     returnFocusRef.current = { navigationKey, groupId: inlineGroupId };
     setInlineSelection({ navigationKey, groupId: '' });
+    // Back on a phone after the page was opened wide, the group's category opens so the focus can land on it.
+    const tag = inlineGroupCategoryKeyRef.current;
+    if (tag !== null) setOpenCategoryKeys((keys) => (keys.includes(tag) ? keys : [...keys, tag]));
   }, [inlineGroupId, navigationKey]);
   const anonymousDiscoveryActive = allowAnonymousGroupDiscovery && !workerToken;
   const targetKey = `${sessionId}\n${sessionSlug}\n${workerUrl}\n${workerToken}\n${anonymousDiscoveryActive ? 'public' : 'private'}`;
@@ -648,6 +661,14 @@ const WorkerGroupMembershipPanel = ({
   const displayedAvailableGroups = membershipsOnly
     ? []
     : availableGroups.filter((group) => !groupIdFilter || group.groupId === groupIdFilter);
+  // The whole list goes by the groups' tags; a single linked group or someone's own groups stay as cards.
+  const categories =
+    membershipsOnly || groupIdFilter
+      ? []
+      : groupWorkerGroupsByCategory([
+          ...displayedMemberships.map((membership) => ({ group: membership.group, isMember: true })),
+          ...displayedAvailableGroups.map((group) => ({ group, isMember: false })),
+        ]);
   const selectedMembershipIdentity = buildWorkerGroupMembershipIdentity({ groupId: selectedGroupId, sessionSlug });
   const selectedMembership = selectedGroupId
     ? overview.memberships.find(
@@ -957,7 +978,7 @@ const WorkerGroupMembershipPanel = ({
     const link = new URL(buildWorkerGroupsPath({ sessionSlug, groupId, workerUrl }), window.location.origin);
     window.open(link.toString(), '_blank', 'noopener,noreferrer');
   };
-  const renderMembershipAction = (group: WorkerGroup, isMember: boolean) => {
+  const renderMembershipAction = (group: WorkerGroup, isMember: boolean, inlineProblem = true) => {
     const membershipAction = membershipActions.get(group.groupId) || '';
     if (isMember && !workerGroupMembersMayLeave(group)) {
       return <span className={styles.workerGroupCardInactiveStatus}>Joined</span>;
@@ -1012,7 +1033,7 @@ const WorkerGroupMembershipPanel = ({
           >
             {isJoining ? 'Joining…' : 'Join'}
           </button>
-          {problem ? (
+          {problem && inlineProblem ? (
             <span className={styles.workerGroupCardCodeHint} role="alert">
               {problem}
             </span>
@@ -1123,7 +1144,24 @@ const WorkerGroupMembershipPanel = ({
         </div>
       ) : null}
       {shareStatus ? <div className={styles.agentReportApprox}>{shareStatus}</div> : null}
-      {displayedMemberships.length || displayedAvailableGroups.length ? (
+      {categories.length ? (
+        <WorkerGroupCategories
+          categories={categories}
+          openKeys={openCategoryKeys}
+          onToggle={toggleCategory}
+          groupJoinHasEnded={groupJoinHasEnded}
+          imageProps={{ fetchImpl, sessionConfig, sessionSlug, workerToken, workerUrl }}
+          onOpenDetails={(groupId) => {
+            inlineGroupCategoryKeyRef.current =
+              categories.find((category) => category.entries.some((entry) => entry.group.groupId === groupId))?.key ??
+              null;
+            openGroupDetails(groupId);
+          }}
+          problemFor={joinProblemFor}
+          renderAction={renderMembershipAction}
+          showDescriptions={showDescriptions}
+        />
+      ) : displayedMemberships.length || displayedAvailableGroups.length ? (
         <div className={`${sbtsPageStyles.sbtGrid} ${styles.workerGroupCardGrid}`}>
           {displayedMemberships.map((membership) => (
             <WorkerGroupCard
