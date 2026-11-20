@@ -361,11 +361,16 @@ describe('AboutPage', () => {
     fireEvent.click(roadmapToggle);
     expect(roadmapToggle).toHaveAttribute('aria-expanded', 'true');
     const foundations = screen.getByRole('heading', { name: 'Current Foundations' }).closest('li')!;
-    expect(within(foundations).getAllByText('Complete:')).toHaveLength(6);
+    expect(within(foundations).getAllByText('Complete:')).toHaveLength(11);
     expect(within(foundations).getByText(/quadratic allocation/)).toBeVisible();
     expect(within(foundations).getByText(/Use Worker Groups or Soulbound Token groups/)).toBeVisible();
     expect(within(foundations).getByText(/Persist responses and documents in Cloudflare or on Arweave/)).toBeVisible();
-    expect(screen.getAllByText('Planned:')).toHaveLength(14);
+    expect(screen.getAllByText('Planned:')).toHaveLength(9);
+    // Work that has shipped in part carries its own marker.
+    expect(screen.getAllByText('In progress:')).toHaveLength(5);
+    expect(screen.getByText(/Agent-first UX so people can point an assistant/).closest('li')?.className).toContain(
+      'roadmapChecklistItemInProgress',
+    );
     expect(screen.getByText(/unlinkable per-response and per-SBT accounts, ZK\/FHE aggregation/)).toBeVisible();
     expect(screen.getByText(/affiliation proofs, encrypted claims, and conditional timelocks/)).toBeVisible();
     expect(screen.getByText(/Turnkey deployment bundles for Arweave, Lit, EVM gas, and AI API access/)).toBeVisible();

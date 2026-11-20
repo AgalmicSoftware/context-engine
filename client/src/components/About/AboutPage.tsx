@@ -705,14 +705,20 @@ const AboutPage = () => {
                           className={`${styles.roadmapChecklistItem} ${
                             item.status === 'complete'
                               ? styles.roadmapChecklistItemComplete
-                              : styles.roadmapChecklistItemPlanned
+                              : item.status === 'in-progress'
+                                ? styles.roadmapChecklistItemInProgress
+                                : styles.roadmapChecklistItemPlanned
                           }`}
                           key={item.text}
                         >
                           <span className={styles.roadmapCheck} aria-hidden="true" />
                           <span>
                             <span className={styles.srOnly}>
-                              {item.status === 'complete' ? 'Complete: ' : 'Planned: '}
+                              {item.status === 'complete'
+                                ? 'Complete: '
+                                : item.status === 'in-progress'
+                                  ? 'In progress: '
+                                  : 'Planned: '}
                             </span>
                             {item.link && (
                               <>

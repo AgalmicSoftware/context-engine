@@ -864,6 +864,24 @@ $modal-cta-text: var(--ce-action-submit-text);
   }
 }
 
+// In progress: the circle half filled, and its words at full strength like a finished item's.
+.roadmapChecklistItemInProgress {
+  color: var(--ce-panel-text);
+}
+
+.roadmapChecklistItemInProgress .roadmapCheck {
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--ce-action-accent) 92%, transparent) 50%,
+    transparent 50%
+  );
+  color: transparent;
+
+  &::before {
+    content: '';
+  }
+}
+
 .roadmapChecklistItemPlanned .roadmapCheck {
   border-color: color-mix(in srgb, var(--ce-control-text) 28%, transparent);
   background: transparent;
