@@ -2793,13 +2793,15 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   font-size: 0.86rem;
 }
 
+// The retry takes the error box's own text colour: a theme's plain button is light text for a dark panel.
 .sessionListeningErrorWithAction {
   display: grid;
   gap: 8px;
   justify-items: start;
 
   // The interview panel takes borders off its buttons; this one keeps its outline so it reads as a button.
-  .sessionRecordingButton {
+  > button {
+    @extend .sessionRecordingButton;
     border: 1px solid currentColor !important;
   }
 }

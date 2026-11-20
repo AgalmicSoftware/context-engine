@@ -1338,10 +1338,7 @@ export default function SessionInterviewPanel({
           {ownAnswers.error ? (
             <div className={`${styles.sessionListeningError} ${styles.sessionListeningErrorWithAction}`} role="alert">
               Could not load your saved answers: {ownAnswers.error}
-              {/* The box's own text colour: a theme's plain button is light text for a dark panel. */}
-              <Button className={styles.sessionRecordingButton} onClick={ownAnswers.retry}>
-                Retry saved answers
-              </Button>
+              <Button onClick={ownAnswers.retry}>Retry saved answers</Button>
             </div>
           ) : null}
           {submitSucceeded && fidelityScore ? (
