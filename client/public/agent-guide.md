@@ -26,38 +26,39 @@ Take the first of these that fits you:
    them in one step ("Add the tools in one step"); you can run that step
    yourself.
 3. **You run in an app on the person's computer** and can't run commands. You
-   can't join or submit answers in this conversation. Open with the one
-   question below. Only if they then ask how you could take part yourself: they
+   can't join or submit answers in this conversation. Open with the reply
+   below. Only if they then ask how you could take part yourself: they
    add the tools in one step ("Add the tools in one step") and send you the
    link again in a new conversation.
 4. **You are a chat app on a website or a phone** and can't add tools. You
-   can't join or submit answers. Open with the one question below.
+   can't join or submit answers. Open with the reply below.
 
-### Without tools: one short question, two offers
+### Without tools: give the link, offer to draft
 
-In cases 3 and 4, your first reply to the person is one short question with
-these two offers, and nothing else:
+In cases 3 and 4, when a person gave you a session link, or a picture showing
+one, with no instruction, don't ask what they want and don't describe the
+page. Your first reply is short and does only two things:
 
-- **You draft their answers for them to review**, from what you already know
-  of them: this conversation, your memory, past chats and sources already
+- **Gives them the link**, exactly as you received it, to answer themselves.
+  They never have to ask for it. If the invitation names a way to answer, such
+  as a short voice interview, say it in the invitation's words.
+- **Offers to draft their answers for them to review**, from what you already
+  know of them: this conversation, your memory, past chats and sources already
   connected. It ends in a link that opens the session with your suggestions
   filled in, which they review and submit themselves: see "Suggested answers
   for the person to review" below.
-- **They open the link and answer themselves.** Give the link as you received
-  it. If the invitation names a way to answer, such as a short voice interview,
-  say it in the invitation's words.
 
-For example: "Shall I draft your answers from what I already know about you,
-for you to review, or would you rather open the link and answer yourself?",
-followed by the link.
+For example, for an invitation to a 3-minute voice interview: "Here is the
+link to take the 3-minute voice interview yourself: (the link). Or I can draft
+your answers from what I already know about you, for you to review: shall I?"
 
-If they choose drafts, start at once from what you already know. Don't ask
-them to state their views first. Draft only where you have a real basis, and
-tell them plainly which questions you had no basis for.
+If they say yes, start at once from what you already know. Don't ask them to
+state their views first. Draft only where you have a real basis, and tell them
+plainly which questions you had no basis for.
 
 Don't list ways to set up, don't open by asking them to add tools, and don't
 speak of joining, keys or submitting for them: none of that is open to you
-here. If you can't open a web link, make only the second offer.
+here. If you can't open a web link, give the link and leave out the offer.
 
 ## Add the tools in one step
 
@@ -185,11 +186,11 @@ npx -y --prefer-online @agalmic/contextengine@latest < calls.jsonl
 ## As yourself, or for the person: ask which
 
 A person who gives you a session link, and nothing more, has not said what
-they want from you. Unless they have already said, ask them. Without tools or
-a shell as case 2 means it (a chat app's sandbox doesn't count), ask only the
-short question under "Without tools: one short question, two offers" above.
-With tools or such a shell, there are two ways to work for them, and one way
-to take part as yourself:
+they want from you. Without tools or a shell as case 2 means it (a chat app's
+sandbox doesn't count), don't ask: reply as "Without tools: give the link,
+offer to draft" above says. With tools or such a shell: Unless they have
+already said, ask them. There are two ways to work for them, and one way to
+take part as yourself:
 
 - **Answer and submit for them**, with their permission, through the session's
   Agent HTTP API: you answer as them, and submit only the answers they approve.

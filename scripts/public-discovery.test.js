@@ -102,7 +102,7 @@ test('index.html tells a fetching agent where the guide is, in body text people 
   assert.match(note, /an invitation that names a group included, goes to the Context Engine\s+MCP server's join_session as it is/);
   // Given only a link, an agent asks its person which of the two ways to work for them they want.
   const plain = note.replace(/\s+/g, ' ');
-  assert.match(plain, /If a person gave you only a session link, ask them which they want/);
+  assert.match(plain, /With tools or such a shell, if a person gave you only a session link, ask them which they want:/);
   assert.match(plain, /answer and submit for them, with their permission and a key they make for you in the session/);
   assert.match(plain, /prepare suggested answers and hand back a link they review and submit themselves/);
   const guide = skillMd.replace(/\s+/g, ' ');
@@ -118,12 +118,13 @@ test('index.html tells a fetching agent where the guide is, in body text people 
   assert.match(guide, /never ask them for an invite code or a password/);
   assert.match(guide, /Unless they have already said, ask them\./);
   assert.match(llmsTxt.replace(/\s+/g, ' '), /prepare suggested answers and hand back a link they review and submit themselves/);
-  // An agent with no tools and no shell opens with one short question and two offers, not a list of set-up routes.
-  const twoOffers =
-    /Without Context Engine tools or a shell with open internet access \(a chat app's sandbox doesn't count\), .{0,60}one short question with exactly two offers: that you draft their answers from what you already know of them, for them to review and submit themselves; or that they open the link and answer themselves/;
-  assert.match(plain, twoOffers);
+  // An agent with no tools and no shell, given a link and no instruction, gives the link back and offers to draft:
+  // no question about what the person wants, and no list of set-up routes.
+  const linkAndOffer =
+    /Without Context Engine tools or a shell with open internet access \(a chat app's sandbox doesn't count\): if a person gave you a session link, or a picture showing one, with no instruction, don't ask what they want and don't describe (?:this|the session) page\. In one short reply, give them the link back, exactly as given, to answer themselves \(say "voice interview" if their invitation does\), and offer to draft their answers from what you already know of them, for them to review and submit themselves\./;
+  assert.match(plain, linkAndOffer);
   const noscript = (indexHtml.split('<noscript>')[1] || '').split('</noscript>')[0].replace(/\s+/g, ' ');
-  assert.match(noscript, twoOffers);
+  assert.match(noscript, linkAndOffer);
   // It works from what it already knows, and reads the catalog from an address written out whole: many chat apps
   // fetch only an address they were shown word for word.
   const noViewsFirst = /Don't ask them to state their views first, don't list ways to set up, and don't speak of adding tools, joining, keys or submitting for them\./;
@@ -139,7 +140,7 @@ test('index.html tells a fetching agent where the guide is, in body text people 
   assert.match(guide, /Don't ask them to state their views first\. Draft only where you have a real basis, and tell them plainly which questions you had no basis for\./);
   assert.match(guide, /A chat app's own sandbox, which reaches few sites or none, doesn't count: take case 4\./);
   assert.match(guide, /Build the URL yourself only when the entry has no `interviewCatalog`, the session isn't listed, or the link has `src=` or `joinGroup=`\./);
-  for (const opening of [/can't join or submit answers in this conversation\. Open with the one question below\./, /can't join or submit answers\. Open with the one question below\./]) {
+  for (const opening of [/can't join or submit answers in this conversation\. Open with the reply below\./, /can't join or submit answers\. Open with the reply below\./]) {
     assert.match(guide, opening);
   }
   // Every listed session's catalog address is the one its page builds: Worker, slug, and the hosted session page.
@@ -153,8 +154,9 @@ test('index.html tells a fetching agent where the guide is, in body text people 
       `${slug}'s interviewCatalog`,
     );
   }
-  assert.match(llmsTxt.replace(/\s+/g, ' '), twoOffers);
-  assert.match(guide, /### Without tools: one short question, two offers In cases 3 and 4, your first reply to the person is one short question with these two offers, and nothing else:/);
+  assert.match(llmsTxt.replace(/\s+/g, ' '), linkAndOffer);
+  assert.match(guide, /### Without tools: give the link, offer to draft In cases 3 and 4, when a person gave you a session link, or a picture showing one, with no instruction, don't ask what they want and don't describe the page\./);
+  assert.match(guide, /\*\*Gives them the link\*\*, exactly as you received it, to answer themselves\. They never have to ask for it\./);
   assert.match(guide, /Don't list ways to set up, don't open by asking them to add tools/);
   assert.doesNotMatch(guide, /Ask them to add the tools in one step/);
   assert.ok(mcpTools.includes("name: 'join_session'"));

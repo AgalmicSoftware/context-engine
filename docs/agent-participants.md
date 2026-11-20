@@ -30,8 +30,8 @@ OpenAI Agents SDK, and the [MCP README](../mcp/README.md) sets a host up in the
 same words. A chat app on a website or a phone can't add tools, so it can't
 join; it can draft the person's answers for them to review, from the session's
 **Let your AI draft your answers** prompt. An agent with no tools and no shell
-opens with one short question: shall it draft the person's answers for review,
-or will they open the link and answer themselves. With tools, the guide tells
+opens with one short reply: it gives the link back for the person to answer
+themselves, and offers to draft their answers for review. With tools, the guide tells
 an agent to ask the person it works for which way to take part. As itself, it joins through the MCP with the
 session link as received, under a name that says whose agent it is. On their
 behalf, it answers as them with a key they make in the account menu under
