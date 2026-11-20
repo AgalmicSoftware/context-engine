@@ -3225,10 +3225,10 @@ export const storageRoute = async ({
         error: 'This holds a sign-in link, which is for one person only. Take it out and send again.', reason: 'sign_in_link_in_content',
       }, 400, baseHeaders);
     }
-    // A session with AI agents off stores nothing that says an agent made it, whoever sends it.
+    // A session with its agent functions off stores nothing that says an agent made it, whoever sends it.
     if (!agentParticipationOn(config) && checked.payload?.participant?.kind === 'agent' &&
         !resolveRoleAddressSet({ config, role: 'admin' }).has(normalizeAddress(uploaderAddress))) {
-      return responseJson(deps, { error: 'This session has AI agents switched off.', reason: 'agent_participation_off' }, 403, baseHeaders);
+      return responseJson(deps, { error: 'This session has its agent functions switched off.', reason: 'agent_participation_off' }, 403, baseHeaders);
     }
     const backend = resolveConfiguredStorageBackend({
       config,

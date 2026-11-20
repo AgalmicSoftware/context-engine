@@ -371,13 +371,13 @@ test('a sign-in from a link or a passkey has no more power than it needs, and a 
   assert.equal(await stands(env, `${forgedBody}.${mac}`), false);
 });
 
-test('a session with AI agents switched off refuses what says it is an agent, and nothing else', async (t) => {
+test('a session with its agent functions switched off refuses what says it is an agent, and nothing else', async (t) => {
   const off = await setup({ agentParticipationEnabled: false });
   const agent = Wallet.createRandom();
   const person = Wallet.createRandom();
   // Sign-ins and codes.
   const refused = await signIn(off.env, agent, { headers: AGENT });
-  assert.deepEqual([refused.status, refused.body], [403, { error: 'This session has AI agents switched off.', reason: 'agent_participation_off' }]);
+  assert.deepEqual([refused.status, refused.body], [403, { error: 'This session has its agent functions switched off.', reason: 'agent_participation_off' }]);
   assert.equal((await makeCode(off.env, agent)).body.reason, 'agent_participation_off');
   // A person's sign-in is as before, and so is their answer.
   const personToken = await tokenOf(off.env, person);

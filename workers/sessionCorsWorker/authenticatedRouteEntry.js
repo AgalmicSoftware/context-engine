@@ -50,10 +50,10 @@ export const dispatchAuthenticatedRouteEntry = async ({
     baseHeaders,
   });
   if (!authenticatedContext?.ok) return authenticatedContext?.response;
-  // A session with AI agents off answers no signed-in request that says it is an agent's, whenever it signed in.
+  // A session with its agent functions off answers no signed-in request that says it is an agent's, whenever it signed in.
   if (!agentParticipationOn(authenticatedContext.config) && saysItIsAnAgent(request) && authenticatedContext.scopes?.admin !== true) {
     return deps?.json?.(
-      { error: 'This session has AI agents switched off.', reason: 'agent_participation_off' }, 403, authenticatedContext.headers,
+      { error: 'This session has its agent functions switched off.', reason: 'agent_participation_off' }, 403, authenticatedContext.headers,
     );
   }
   if (!OPEN_TO_NON_MEMBERS.has(path)) {

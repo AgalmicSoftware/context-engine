@@ -29,7 +29,7 @@ export const SERVER_INSTRUCTIONS = [
   'Chats with a session’s agent can be recorded when the session’s recording setting is on; join_session and get_session say whether it is (sessionAgent.recording).',
   'Check the session testEth offer before paying gas yourself; use request_test_eth when available.',
   'When the person wants to see the session, check your answers or take your account over, make them a link with make_sign_in_link and give it only to them, in the conversation: it signs whoever opens it in to your account there. Never give anyone your key.',
-  'A session may switch AI agents off, or the person may end your access to the account: the tools then say so, and you tell the person rather than trying another way in.',
+  'A session may switch its agent functions off, or the person may end your access to the account: the tools then say so, and you tell the person rather than trying another way in.',
   'Given only a link, the read tools (get_session, list_questions, list_context, read_context, get_results) and get_interview_catalog read a session without joining it; a private one needs its group’s invite link, the one that carries the password or a one-use code. Reading leaves a one-use code unused. Joining uses it up, so join_session and join_group join with one only when you pass spendInviteCode true: do that when the person asked you to take part with the link, and ask them first if the code may be meant for them.',
   'get_analysis_card reads a person’s saved analysis card where the session lets you.',
   'Never claim to be human. When results are public, anyone can read your answers and comments.',

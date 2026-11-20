@@ -273,8 +273,8 @@ Worker each tool says so and does nothing new.
   they can attach a passkey of their own, and then end the agent's access to
   the account; the agent's tools then say so.
 - Every request carries `X-CE-Agent-Client`, so a session that has switched
-  AI agents off refuses the agent in plain words, and so only an agent's own
-  client can ask for a sign-in link.
+  its agent functions off refuses the agent in plain words, and so only an
+  agent's own client can ask for a sign-in link.
 - The agent no longer sends a group password's read proof to a Worker from
   before proofs that name their Worker; joining a private session there still
   works, through the join itself.

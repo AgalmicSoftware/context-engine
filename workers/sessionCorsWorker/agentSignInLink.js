@@ -67,7 +67,7 @@ const CODE_INVALID = Object.freeze({
   error: 'This sign-in link has expired or was already used. Ask your agent for a new one.',
   reason: 'sign_in_code_invalid',
 });
-const OFF = Object.freeze({ error: 'This session has AI agents switched off.', reason: 'agent_participation_off' });
+const OFF = Object.freeze({ error: 'This session has its agent functions switched off.', reason: 'agent_participation_off' });
 const LINKS_OFF = Object.freeze({ error: 'This session doesn’t sign people in from an agent’s link.', reason: 'sign_in_links_off' });
 // Why a session makes and takes no codes, or null when it does.
 const linksRefusal = (config) => (!agentParticipationOn(config) ? OFF : agentSignInLinksOn(config) ? null : LINKS_OFF);

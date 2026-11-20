@@ -1819,7 +1819,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         return { session: ctx.info.slug, made: false, note: 'This session’s Worker is from before sign-in links, so none can be made. The person can watch what you did through you, or take part themselves on the session page.' };
       }
       if (!agentParticipationOn(sessionConfig)) {
-        return { session: ctx.info.slug, made: false, note: 'This session has AI agents switched off, so it makes no sign-in links.' };
+        return { session: ctx.info.slug, made: false, note: 'This session has its agent functions switched off, so it makes no sign-in links.' };
       }
       if (!agentSignInLinksOn(sessionConfig)) {
         return { session: ctx.info.slug, made: false, note: 'This session has sign-in links from agents switched off. The person can watch what you did through you, or take part themselves on the session page.' };
