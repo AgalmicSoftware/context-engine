@@ -1,4 +1,5 @@
 import { isAiRequestWithoutReply } from '../../utilities/ai/aiClientQueue';
+import { normalizeUserAnalysisBreakdown } from '../../utilities/ai/userAnalysisBreakdown';
 import { normalizeAnalysisCard } from '../../utilities/analysisCard/analysisCardModel';
 import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 
@@ -308,6 +309,7 @@ export const normalizeUserAnalysisResult = (result: unknown = {}) => {
       figure: historicalAlignment.figure || '',
       reasoning: historicalAlignment.reasoning || '',
     },
+    breakdown: normalizeUserAnalysisBreakdown(resultRecord.breakdown),
     card: normalizeAnalysisCard(resultRecord.card),
   };
 };
@@ -329,6 +331,7 @@ export const buildUserPageAnalysisResultStatePatch = ({
     analysisName: normalizedResult.name,
     analysisHistoricalFigure: normalizedResult.historicalAlignment.figure,
     analysisHistoricalReasoning: normalizedResult.historicalAlignment.reasoning,
+    analysisBreakdown: normalizedResult.breakdown,
     // A card kept with the analysis is shown by the card step, once the session and its Worker are known to
     // have the card: shown here, it would flash up where the card is off.
     analysisCard: null,
@@ -358,6 +361,7 @@ export const buildUserPageAnalysisResetStatePatch = ({
   analysisElapsedMs: 0,
   analysisHistoricalFigure: '',
   analysisHistoricalReasoning: '',
+  analysisBreakdown: null,
   analysisCard: null,
   analysisCardPending: false,
   analysisCardPicture: null,

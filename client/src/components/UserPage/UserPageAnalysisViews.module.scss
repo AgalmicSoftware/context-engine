@@ -1,0 +1,129 @@
+// The analysis box's three views: Text, Breakdown and, where the session has it, the picture card.
+
+.publish {
+  margin-top: 12px;
+}
+
+.switch {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.switchButton {
+  flex: 1 1 0;
+  min-height: 44px;
+  padding: 6px 12px;
+  font-weight: 600;
+  // Filled like the page's own neutral buttons: the theme draws every button's edge, and some themes draw none.
+  background: var(--ce-document-border);
+  color: var(--ce-document-text);
+  cursor: pointer;
+
+  &[aria-pressed='true'] {
+    background: var(--ce-action-primary);
+    color: var(--ce-action-primary-text);
+  }
+}
+
+.name {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ce-document-text);
+}
+
+.banner {
+  margin-bottom: 12px;
+
+  p {
+    margin: 0 0 6px;
+    color: var(--ce-document-text);
+  }
+}
+
+.lines {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.panel {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-12);
+
+  p {
+    margin: 0;
+    color: var(--ce-document-text);
+  }
+
+  p + p {
+    margin-top: 6px;
+  }
+}
+
+.label {
+  margin: 0 0 6px;
+  color: var(--ce-document-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.quote {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--ce-action-accent);
+  color: var(--ce-document-text);
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.figure {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.model {
+  margin: 16px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--ce-document-border);
+  color: var(--ce-document-text-muted);
+  font-size: 0.85rem;
+}
+
+// On a phone the Breakdown reads as one stack of cards under a filled title card.
+@media (max-width: 640px) {
+  .lines,
+  .pair {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .banner {
+    padding: 14px;
+    background: var(--ce-action-primary);
+    border-radius: var(--ce-radius-12);
+
+    .name,
+    p {
+      color: var(--ce-action-primary-text);
+    }
+
+    p:last-child {
+      margin-bottom: 0;
+    }
+  }
+}

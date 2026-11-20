@@ -790,7 +790,6 @@ class UserPage extends Component<any, any> {
       showSectionQuestionResponsesOpen: true,
       showSectionQuestionsCreatedOpen: true,
 
-      // NEW: nickname (inline, header actions; visible on any user page)
       nicknameInput: '',
       isEditingNickname: false,
 
@@ -3898,6 +3897,7 @@ class UserPage extends Component<any, any> {
 
         <UserPageAnalysisModal
           aiAnalysis={aiAnalysis}
+          analysisBreakdown={this.state.analysisBreakdown}
           analysisCacheStatusState={analysisCacheStatusState}
           analysisCard={this.state.analysisCard}
           analysisCardPending={this.state.analysisCardPending}

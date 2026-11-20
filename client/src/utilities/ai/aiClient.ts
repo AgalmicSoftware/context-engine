@@ -82,6 +82,7 @@ import {
 } from './aiClientTranscriptionWorkerTransport.js';
 import type { KnownSpeaker } from '../audio/speakerTranscript';
 import { enqueueAiCallWithRetry } from './aiClientQueue.js';
+import { normalizeUserAnalysisBreakdown } from './userAnalysisBreakdown';
 
 import { createLogger } from '../logging.js';
 import type { UnknownRecord } from '../session/sessionTypes.js';
@@ -677,7 +678,8 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
       reasoning: readParsedLegacyString(ha, 'reasoning').trim() || '',
     };
 
-    return { name, summary, details, historicalAlignment, generation };
+    const breakdown = normalizeUserAnalysisBreakdown(parsed.breakdown, userData);
+    return { name, summary, details, historicalAlignment, breakdown, generation };
   } catch (err) {
     // User-triggered analysis requests need the real Worker failure so the UI can
     // explain why analysis did not run instead of presenting a synthetic result.

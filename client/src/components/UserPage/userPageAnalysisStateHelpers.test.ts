@@ -127,6 +127,7 @@ describe('userPageAnalysisStateHelpers', () => {
         figure: '',
         reasoning: '',
       },
+      breakdown: null,
       card: null,
     });
     expect(
@@ -143,6 +144,7 @@ describe('userPageAnalysisStateHelpers', () => {
             figure: 'Ada',
             reasoning: 'Reason',
           },
+          breakdown: { holds: 'Holds', openTo: '', unsure: '', ownWords: 'Kept with the analysis.' },
         },
         servedFromCache: true,
       }),
@@ -153,6 +155,7 @@ describe('userPageAnalysisStateHelpers', () => {
       analysisName: 'Cached',
       analysisHistoricalFigure: 'Ada',
       analysisHistoricalReasoning: 'Reason',
+      analysisBreakdown: { holds: 'Holds', openTo: '', unsure: '', ownWords: 'Kept with the analysis.' },
       analysisElapsedMs: 0,
       analysisError: '',
       analyzing: false,
@@ -169,6 +172,7 @@ describe('userPageAnalysisStateHelpers', () => {
       analysisCardSavedAt: null,
     });
     expect(buildUserPageAnalysisResetStatePatch()).toMatchObject({
+      analysisBreakdown: null,
       analysisCard: null,
       analysisCardPending: false,
       analysisCardPicture: null,

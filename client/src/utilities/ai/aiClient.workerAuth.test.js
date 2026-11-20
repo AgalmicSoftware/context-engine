@@ -124,6 +124,7 @@ describe('aiClient worker auth options', () => {
     // The analysis asks for no card and returns none, whatever the model adds.
     const analysis = await analyzeUserOpinions({ questions: [] }, { sessionSlug: 'session-a' });
     expect(analysis).not.toHaveProperty('card');
+    expect(analysis.breakdown).toBeNull();
     const analysisBody = JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body);
     expect(analysisBody.response_format.json_schema.name).toBe('user_analysis');
     expect(analysisBody.messages[0].content).not.toContain('"tastes"');
@@ -142,6 +143,36 @@ describe('aiClient worker auth options', () => {
 
     fetchWorkerWithAuth.mockResolvedValue({ ok: true, json: async () => ({ completion: '"not a card"' }) });
     await expect(analyzeUserCard({}, {}, { sessionSlug: 'session-a' })).rejects.toThrow('not a card');
+  });
+
+  it('quotes in the breakdown only a sentence the person wrote, as they wrote it', async () => {
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    const reply = (ownWords) => ({
+      ok: true,
+      json: async () => ({
+        completion: JSON.stringify({ summary: 'A summary.', breakdown: { holds: 'Local control.', ownWords } }),
+      }),
+    });
+    const userData = {
+      questions: [
+        {
+          type: 'binary',
+          prompt: 'Local councils should set the budget.',
+          answer: 'Agree',
+          additionalComment: 'People must see how a decision was made.',
+        },
+      ],
+    };
+    fetchWorkerWithAuth.mockResolvedValueOnce(reply('people must see how a decision was made'));
+    expect((await analyzeUserOpinions(userData, { sessionSlug: 'session-a' })).breakdown).toEqual({
+      holds: 'Local control.',
+      openTo: '',
+      unsure: '',
+      ownWords: 'People must see how a decision was made.',
+    });
+    // The statement they agreed with is the question's wording, not theirs.
+    fetchWorkerWithAuth.mockResolvedValueOnce(reply('Local councils should set the budget.'));
+    expect((await analyzeUserOpinions(userData, { sessionSlug: 'session-a' })).breakdown.ownWords).toBe('');
   });
 
   it('asks the Session Worker for a card picture by figure and keeps it for the visit', async () => {
