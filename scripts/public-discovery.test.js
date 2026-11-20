@@ -154,6 +154,22 @@ test('index.html tells a fetching agent where the guide is, in body text people 
       `${slug}'s interviewCatalog`,
     );
   }
+  // Each listed catalog address is written out whole on the page every session link serves and at the top
+  // of the guide, so it is one fetch from the link; the text is generated from known-sessions.json.
+  const { expectedFiles, listed } = require('./sync-known-session-catalogs.js');
+  for (const { file, actual, expected } of expectedFiles()) {
+    assert.equal(actual, expected, `${file} differs from known-sessions.json: run node scripts/sync-known-session-catalogs.js`);
+  }
+  const salon = listed(knownSessions).find(({ page }) => page.endsWith('/session/rxc-ra-2'));
+  assert.equal(salon.catalog, knownSessions['rxc-ra-2'].interviewCatalog);
+  for (const where of [plain, noscript]) assert.ok(where.includes(`${salon.page} (${salon.title}): ${salon.catalog}`));
+  assert.ok(skillMd.includes(`- ${salon.page} (${salon.title}):\n  ${salon.catalog}\n`));
+  assert.ok(skillMd.indexOf(salon.catalog) < skillMd.indexOf('## You were given a session link'));
+  // A fetcher that keeps <noscript> reads the agents' paragraph before any GitHub link.
+  assert.ok(noscript.indexOf('AI agents: to take part') < noscript.indexOf('github.com'));
+  // Changing a listed address changes the generated text.
+  const moved = { 'rxc-ra-2': { ...knownSessions['rxc-ra-2'], interviewCatalog: 'https://example.invalid/c' } };
+  assert.ok(expectedFiles(moved).every(({ actual, expected }) => actual !== expected && expected.includes('https://example.invalid/c')));
   assert.match(llmsTxt.replace(/\s+/g, ' '), linkAndOffer);
   assert.match(guide, /### Without tools: give the link, offer to draft In cases 3 and 4, when a person gave you a session link, or a picture showing one, with no instruction, don't ask what they want and don't describe the page\./);
   assert.match(guide, /\*\*Gives them the link\*\*, exactly as you received it, to answer themselves\. They never have to ask for it\./);
@@ -271,7 +287,10 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
     assert.match(skillMd, toUrlMatcher(url));
   }
   // Every session gets the same guide: no Worker addresses, tokens or group tags.
-  assert.doesNotMatch(skillMd, /workers\.dev|ceagt_|ai-agents/);
+  // Only the generated list of the site's sessions names a Worker; the rest is the same for every session.
+  const withoutList = skillMd.replace(/<!-- known-session-catalogs:[\s\S]*?<!-- \/known-session-catalogs -->/, '');
+  assert.notEqual(withoutList, skillMd);
+  assert.doesNotMatch(withoutList, /workers\.dev|ceagt_|ai-agents/);
 });
 
 // An agent handed only a link has to find its own case first: tools already there, a computer to add them on,

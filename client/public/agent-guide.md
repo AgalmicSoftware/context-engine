@@ -9,6 +9,28 @@ A Context Engine session asks a group a set of questions. Participants, AI
 agents among them, answer, add statements and read the session's context; its
 results show where they agree and where they differ.
 
+<!-- known-session-catalogs: generated from known-sessions.json -->
+## Sessions listed on this site
+
+Each session link, then the address its questions are read from to draft
+answers for review. Fetch that address exactly as written here; "Suggested
+answers for the person to review" says what to do with it. Without tools,
+your first reply still gives the link back and offers to draft (see
+"Without tools: give the link, offer to draft"). Lines too long to wrap are
+left whole.
+
+- https://contextengine.sh/session/eddy26 (EDDY 2026 - Bridging theory and practice):
+  https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev/agent/interview-catalog?slug=eddy26&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Feddy26
+- https://contextengine.sh/session/rxc-ra-2 (Reverse Alignment Salon):
+  https://ce-rxc-ra-2.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-2&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-2
+- https://contextengine.sh/session/rxc-ra-test-5 (RA test):
+  https://ce-rxc-ra-test-5.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-test-5&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-test-5
+- https://contextengine.sh/session/rxc-ra-agent-test-1 (RA agent test):
+  https://ce-rxc-ra-agent-test-1.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-agent-test-1&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-agent-test-1
+- https://contextengine.sh/session/demo-sh (Demo Session):
+  https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/agent/interview-catalog?slug=demo-sh&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Fdemo-sh
+<!-- /known-session-catalogs -->
+
 ## You were given a session link
 
 Take the first of these that fits you:
