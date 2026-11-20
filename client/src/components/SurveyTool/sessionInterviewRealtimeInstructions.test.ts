@@ -214,7 +214,7 @@ describe('after an AI prefill', () => {
     expect(instructions).toContain('[q1]');
     expect(instructions).not.toMatch(/\[q2\]|\[q3\]/);
     expect(instructions).toMatch(
-      /Already drafted by their AI \(reference only; not to ask\):\n- How ready is the town for floods\?\n- Should the levy rise\?$/,
+      /Already drafted by their AI \(reference only; not to ask\), with the question ids its drafts use:\n- \(q2\) How ready is the town for floods\?\n- \(q3\) Should the levy rise\?$/,
     );
     expect(readPrefill(instructions).predictedResponses).toEqual([
       expect.objectContaining({ questionId: 'q2', predictedAnswer: 80 }),

@@ -17,11 +17,12 @@ const NOTICE =
 // Prompts only, never the answers, so a repeat interview can steer around them. It gets only the room the open
 // questions leave, so it never crowds them out.
 const ANSWERED_LIMIT = 4000;
-const promptList = (heading: string, answered: InterviewQuestion[], room: number): string => {
+const promptList = (heading: string, answered: InterviewQuestion[], room: number, ids = false): string => {
   let list = heading;
   let rows = 0;
   for (const question of answered) {
-    const row = `\n- ${question.prompt.replace(/\s+/g, ' ').slice(0, 200)}`;
+    // The AI's drafts name their question only by id.
+    const row = `\n- ${ids ? `(${question.id}) ` : ''}${question.prompt.replace(/\s+/g, ' ').slice(0, 200)}`;
     if (list.length + row.length > Math.min(room, ANSWERED_LIMIT)) break;
     list += row;
     rows++;
@@ -171,8 +172,8 @@ export const buildRealtimeInterviewInstructions = ({
     );
   const instructions = assemble(rows, questions.length - rows.length);
   if (limited || history.omitted || rows.length < questions.length) onContextLimited?.(NOTICE);
-  const addList = (text: string, heading: string, list: InterviewQuestion[]) => {
-    const block = list.length ? promptList(heading, list, LIMIT - text.length - 2) : '';
+  const addList = (text: string, heading: string, list: InterviewQuestion[], ids = false) => {
+    const block = list.length ? promptList(heading, list, LIMIT - text.length - 2, ids) : '';
     return block ? `${text}\n\n${block}` : text;
   };
   return addList(
@@ -181,7 +182,8 @@ export const buildRealtimeInterviewInstructions = ({
       'Already answered (reference only; not to ask again):',
       onlyRevisions ? [] : answeredQuestions,
     ),
-    'Already drafted by their AI (reference only; not to ask):',
+    'Already drafted by their AI (reference only; not to ask), with the question ids its drafts use:',
     draftedQuestions,
+    true,
   );
 };
