@@ -494,7 +494,7 @@ describe('SessionInterviewRecommendedGroups', () => {
     expect(reportUnjoined).toHaveBeenLastCalledWith(false);
   });
 
-  it('shows each group’s image beside its name, only from a safe address', async () => {
+  it('shows each group’s picture beside its name, only from a safe address, else its placeholder', async () => {
     jest
       .mocked(loadPublicWorkerGroups)
       .mockResolvedValue([
@@ -518,6 +518,14 @@ describe('SessionInterviewRecommendedGroups', () => {
     expect(box(/AI Optimists/).closest('label')).toContainElement(image);
     expect(screen.queryByTestId('ce-session-interview-group-image-plain')).toBeNull();
     expect(screen.queryByTestId('ce-session-interview-group-image-unsafe')).toBeNull();
+    // Each row keeps its thumbnail's place: the group's placeholder shows where there is no picture.
+    const thumbnail = (name: RegExp) =>
+      box(name).closest('label')?.querySelector('.sessionInterviewGroupChoiceImage') as HTMLElement;
+    expect(thumbnail(/AI Optimists/)).toContainElement(image);
+    for (const name of [/^Plain/, /^Unsafe/]) {
+      expect(thumbnail(name)).toBeEmptyDOMElement();
+      expect(thumbnail(name)).toHaveAttribute('aria-hidden', 'true');
+    }
     expect(box(/^AI Optimists/)).toBeInTheDocument();
   });
 

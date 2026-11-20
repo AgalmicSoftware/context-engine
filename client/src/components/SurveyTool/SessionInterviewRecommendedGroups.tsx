@@ -415,20 +415,21 @@ export function SessionInterviewRecommendedGroups({
               onChange={(event) => toggle(choice, event.target.checked)}
               data-testid={`ce-session-interview-group-choice-${choice.groupId}`}
             />
-            {/* Its name is beside it, so the image needs no text of its own. */}
-            {choice.imageUrl && isSafeHttpsUrl(choice.imageUrl) ? (
-              <WorkerGroupImage
-                src={choice.imageUrl}
-                alt=""
-                className={styles.sessionInterviewGroupChoiceImage}
-                fetchImpl={fetchImpl}
-                sessionConfig={sessionConfig}
-                sessionSlug={sessionSlug}
-                testId={`ce-session-interview-group-image-${choice.groupId}`}
-                workerToken={imageToken}
-                workerUrl={workerUrl}
-              />
-            ) : null}
+            {/* Its name is beside it, so the picture needs no text of its own. */}
+            <span className={styles.sessionInterviewGroupChoiceImage} aria-hidden="true">
+              {choice.imageUrl && isSafeHttpsUrl(choice.imageUrl) ? (
+                <WorkerGroupImage
+                  src={choice.imageUrl}
+                  alt=""
+                  fetchImpl={fetchImpl}
+                  sessionConfig={sessionConfig}
+                  sessionSlug={sessionSlug}
+                  testId={`ce-session-interview-group-image-${choice.groupId}`}
+                  workerToken={imageToken}
+                  workerUrl={workerUrl}
+                />
+              ) : null}
+            </span>
             <span>
               <strong>{choice.label}</strong>
               {choice.description ? <small>{choice.description}</small> : null}

@@ -1,4 +1,5 @@
 @use 'scss/finalSubmitCta' as finalSubmitCta;
+@use 'scss/groupImagePlaceholder' as groupImagePlaceholder;
 
 /* NEW - Color variables for dropdown items */
 $questions-item-bg: var(--ce-color-success-soft); // Light green
@@ -4637,14 +4638,28 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     overflow-wrap: anywhere;
   }
 
+  // The group's picture, over the placeholder its details page shows when it has none or it won't load.
   .sessionInterviewGroupChoiceImage {
+    display: block;
     flex-shrink: 0;
     width: 44px;
     height: 44px;
+    overflow: hidden;
     border: 1px solid var(--ce-card-border);
     border-radius: var(--ce-radius-6);
-    object-fit: cover;
+
+    &:empty {
+      @include groupImagePlaceholder.group-image-placeholder;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
   }
+
   small {
     color: inherit;
     font-size: 0.82rem;

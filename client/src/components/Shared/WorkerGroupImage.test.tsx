@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WorkerGroupImage from './WorkerGroupImage';
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 
@@ -191,5 +191,15 @@ describe('WorkerGroupImage', () => {
 
     expect(screen.getByTestId('group-image')).toHaveAttribute('src', 'https://images.example/group.png');
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('leaves its place empty when the picture fails to load, so the placeholder behind it shows', () => {
+    const { container } = render(
+      <span>
+        <WorkerGroupImage src="https://images.example/missing.png" testId="group-image" />
+      </span>,
+    );
+    fireEvent.error(screen.getByTestId('group-image'));
+    expect(container.firstChild).toBeEmptyDOMElement();
   });
 });
