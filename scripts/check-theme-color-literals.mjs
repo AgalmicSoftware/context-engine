@@ -20,6 +20,9 @@ const approvedLiteralFiles = [
   // pixels for every viewer in every theme, from the session's scheme colours
   // with fixed fallbacks and the export's vote colours.
   path.resolve(sourceRoot, 'utilities', 'analysisCard', 'analysisCardCanvas.ts'),
+  // The interview's language flags are national flags: their colours are the
+  // flags' own and must not follow the theme.
+  path.resolve(sourceRoot, 'components', 'SurveyTool', 'SessionInterviewLanguageMarks.tsx'),
 ];
 const colorLiteralPattern = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\([^)]*\)/gi;
 const namedColorPattern =
