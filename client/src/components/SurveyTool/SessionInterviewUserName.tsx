@@ -98,9 +98,14 @@ const SessionInterviewUserName = ({
       </div>
       <p id={`${inputId}-note`} className={failed ? styles.sessionInterviewUserNameError : undefined} role="status">
         {note ||
-          (stored
-            ? 'People in this session see this name beside your address.'
-            : 'Shown to people in this session beside your address. It is not written into your answers.')}
+          // A suggested or typed name is not the stored one until Save, so the box never passes for set.
+          (typed !== normalizeSessionName(stored)
+            ? typed
+              ? 'Not saved yet: press Save to use this name. It is not written into your answers.'
+              : 'Not saved yet: press Save to remove your username.'
+            : stored
+              ? 'People in this session see this name beside your address.'
+              : 'Shown to people in this session beside your address. It is not written into your answers.')}
       </p>
     </section>
   );

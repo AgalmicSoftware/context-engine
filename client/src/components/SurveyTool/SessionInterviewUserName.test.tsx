@@ -26,7 +26,9 @@ it('offers the imported name unsaved, and saves only on Save', async () => {
   render(<SessionInterviewUserName source={names} names={{}} account={ACCOUNT} suggestion="Robin" />);
   const input = screen.getByLabelText('Username (optional)');
   expect(input).toHaveValue('Robin');
-  expect(screen.getByRole('status')).toHaveTextContent('It is not written into your answers.');
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Not saved yet: press Save to use this name. It is not written into your answers.',
+  );
   expect(names.setOwn).not.toHaveBeenCalled();
 
   fireEvent.change(input, { target: { value: '  Robin   Example ' } });
@@ -41,7 +43,9 @@ it('shows the stored name, keeps Save off until it changes, and removes it when 
   const input = screen.getByLabelText('Username (optional)');
   expect(input).toHaveValue('Robin');
   expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  expect(screen.getByRole('status')).toHaveTextContent('People in this session see this name beside your address.');
   fireEvent.change(input, { target: { value: '' } });
+  expect(screen.getByRole('status')).toHaveTextContent('Not saved yet: press Save to remove your username.');
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Your username was removed.'));
   expect(names.setOwn).toHaveBeenCalledWith('');
