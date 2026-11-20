@@ -26,6 +26,7 @@ import {
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { normalizeWorkerGroupId } from '../../domains/worker/workerGroupAutoJoin';
 import { resolveRealtimeInterviewModel } from '../../utilities/audio/realtimeInterviewConfig';
+import { knownSessionQuestionsAddress } from '../../utilities/session/knownSessionsFile';
 import { normalizeRatingScale, type RatingScale } from '../../utilities/survey/ratingValue.js';
 import {
   GROUP_CONVERSATION_MODE_QUERY_VALUE,
@@ -595,7 +596,9 @@ export const buildExternalInterviewKickoff = ({
   }
   const ticket = toTrimmedString(catalogTicket);
   const ticketParam = ticket ? `&ticket=${encodeURIComponent(ticket)}` : '';
-  const catalogUrl = `${base}/agent/interview-catalog?slug=${slug}${sessionUrlParam}${ticketParam}`;
+  const workerCatalogUrl = `${base}/agent/interview-catalog?slug=${slug}${sessionUrlParam}${ticketParam}`;
+  // A listed session's catalog is also served on the site, which more chat AIs will open.
+  const catalogUrl = (!ticket && knownSessionQuestionsAddress(workerCatalogUrl)) || workerCatalogUrl;
   const privateLink = ticket
     ? 'The link is private to me and expires within an hour; never repeat it or put it in the packet.\n'
     : '';

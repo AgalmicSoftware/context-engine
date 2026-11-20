@@ -36,3 +36,11 @@ export const KNOWN_SESSION_CONFIGS: Readonly<Record<string, Record<string, unkno
     },
   ]),
 );
+
+// Some chat AIs refuse a Worker's own host, so the site passes each listed catalog through at an
+// address of its own (client/public/_redirects, written by scripts/sync-known-session-catalogs.js).
+// Given a listed session's catalog address, this returns that site address; otherwise ''.
+export const knownSessionQuestionsAddress = (catalogUrl: string): string => {
+  const slug = Object.keys(KNOWN_SESSIONS).find((key) => KNOWN_SESSIONS[key].interviewCatalog === catalogUrl);
+  return slug ? `https://contextengine.sh/questions/${slug}` : '';
+};

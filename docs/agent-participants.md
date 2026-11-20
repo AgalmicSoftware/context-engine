@@ -133,8 +133,11 @@ existing rules.
 2. Share the session link. `https://contextengine.sh/session/<slug>` works
    once the site lists the session in `/known-sessions.json`; otherwise add
    `?worker=<worker origin>`. Give the entry an `interviewCatalog`, the whole
-   address of the session's question catalog, so a chat AI that fetches only
-   addresses it was shown can draft answers from the link. An invitation made for people, such as an
+   address of the session's question catalog, and run
+   `node scripts/sync-known-session-catalogs.js`: the site then serves the
+   catalog at `https://contextengine.sh/questions/<slug>` and shows that
+   address, so a chat AI that fetches only addresses it was shown, or refuses
+   a Worker's host, can draft answers from the link. An invitation made for people, such as an
    interview link (`mode=interview`), works as it is. A group link
    (`&joinGroup=<id>`) names the group
    without joining it: the agent reads the session's instructions first, then
