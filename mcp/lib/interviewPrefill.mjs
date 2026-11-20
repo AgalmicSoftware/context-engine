@@ -30,7 +30,7 @@ const sessionPageFor = (info) => `${info.appOrigin}/session/${encodeURIComponent
 
 const catalogRefusal = (status, error, reason) => {
   if (reason === 'private_session_invite_invalid') {
-    return 'This session is private, and this link’s group password no longer opens it: the password may have changed, or the group may no longer be let in. Ask the person for the current invite link.';
+    return 'This session is private, and this link’s invite no longer opens it: a group password may have changed, a one-use code may have been used or withdrawn, or the group may no longer be let in. Ask the person for the current invite link.';
   }
   if (PRIVATE_REASONS.has(reason)) return `This session is private. ${PRIVATE_HINT}`;
   if (status === 503) return `The Session Worker can’t answer just now${error ? ` (${error})` : ''}. Wait a few seconds and try again.`;

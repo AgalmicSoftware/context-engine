@@ -357,6 +357,44 @@ test('a code proof for another Worker, group, session or time, or without the co
   assert.equal((await ask(env, catalogPath, { invite: good })).status, 200);
 });
 
+test('a code proof reads and does nothing else: no AI, voice, interview, Session Agent or signed-in route opens to it', async () => {
+  const { env, key } = await setupCodes();
+  const invite = await codeInvite();
+  const password = await boundInvite(key);
+  const reasonOf = async (path, options) => (await readJson(await ask(env, path, options))).body?.reason;
+  const refusedAsInvite = 'private_session_invite_invalid';
+  // Signed out. The group password, which is meant to be shared, gets past the session's rule on these routes;
+  // a one-use code, which is one person's, does not.
+  for (const path of ['/ai', '/transcribe', '/realtime/call', '/interview/starter', '/session-agent/status', '/session-agent/ask']) {
+    const sent = { method: 'POST', body: { sessionSlug: SLUG, sessionId: SESSION_ID } };
+    assert.equal(await reasonOf(path, { ...sent, invite }), refusedAsInvite, path);
+    assert.notEqual(await reasonOf(path, { ...sent, invite: password }), refusedAsInvite, `${path} by password`);
+  }
+  assert.equal(await reasonOf(`/resource-presence?slug=${SLUG}`, { invite }), refusedAsInvite);
+  // Signed in as someone who is in no group: the code proof lets them through no signed-in route but the reads.
+  const outsider = Wallet.createRandom();
+  const token = await login({ env, wallet: outsider });
+  assert.equal((await ask(env, questionsPath, { token, invite })).status, 200);
+  assert.equal((await ask(env, questionsPath, { token })).status, 403);
+  for (const [path, method] of [['/ai', 'POST'], ['/session-agent/ask', 'POST'], ['/groups/members?groupId=by-code', 'GET']]) {
+    const sent = { token, method, ...(method === 'POST' ? { body: { sessionSlug: SLUG, sessionId: SESSION_ID } } : {}) };
+    assert.equal(await reasonOf(path, { ...sent, invite }), refusedAsInvite, `signed in ${path}`);
+  }
+  // It still reads, signed out, and joined no one.
+  assert.equal((await ask(env, questionsPath, { invite })).status, 200);
+  assert.equal((await ask(env, `/groups/list?sessionId=${SESSION_ID}&joinGroup=${CODES}`, { invite })).status, 200);
+});
+
+test('a code reads only while its group is still open to joining', async () => {
+  const { env, signed } = await setupCodes();
+  const invite = await codeInvite();
+  assert.equal((await ask(env, questionsPath, { invite })).status, 200);
+  const closed = await signed('groups/update', { group: { groupId: CODES, joinEndsAt: new Date(Date.now() + 1500).toISOString() } });
+  assert.equal(closed.status, 200, JSON.stringify(closed.body));
+  await new Promise((resolve) => setTimeout(resolve, 1600));
+  assert.equal((await ask(env, questionsPath, { invite })).status, 403);
+});
+
 test('a code stops reading once it is spent or withdrawn; whoever joined with it reads on as a member', async () => {
   const { env, signed, counts } = await setupCodes();
   const invite = await codeInvite();

@@ -1081,7 +1081,10 @@ const normalizeInvite = (value: unknown): WorkerGroupInvite | null => {
   };
 };
 
-/** One page of a group's one-use links in hash order, by hash and status; a hash never reveals its code. */
+/**
+ * One page of a group's one-use links in hash order, by hash and status. A hash never reveals its code and can't
+ * join, but while its code is unused it is enough to read what the group reads: treat a listing as that.
+ */
 export const listWorkerGroupInvites = ({ cursor, ...request }: AdminGroupRequest & { cursor?: string }) =>
   runAdminAction({
     action: 'groups/invites/list',

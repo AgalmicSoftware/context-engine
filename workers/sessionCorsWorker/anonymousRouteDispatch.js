@@ -65,10 +65,10 @@ export const dispatchAnonymousRoute = async ({
   // A private session shows a signed-out visitor nothing its rule doesn't
   // admit them to; storage reads check the rule themselves, part by part.
   const privateSession = isPrivateSession(config);
-  const refusePrivate = async () => {
+  const refusePrivate = async ({ codeReads = false } = {}) => {
     if (!privateSession) return null;
     const access = await evaluatePrivateSessionAccess({
-      env, slug, config, request, part: 'questions',
+      env, slug, config, request, part: 'questions', codeReads,
       // Voice calls arrive here signed in too: the signed-in Worker has no route for them.
       resolveRequester: () => deps?.resolveOptionalRequester?.({ request, env, slug, config, headers }),
     });
@@ -76,7 +76,8 @@ export const dispatchAnonymousRoute = async ({
   };
 
   if (path === '/groups/list') {
-    const refused = await refusePrivate();
+    // A read: the one group a link's invite is for, also by one-use code.
+    const refused = await refusePrivate({ codeReads: true });
     if (refused) return refused;
     // In a private session the list shows only the group the invite opens.
     if (privateSession && !sameGroup(readGroupReadInviteHeader(request), request)) {

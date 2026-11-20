@@ -2053,14 +2053,18 @@ export class SessionWriteCoordinator {
       const from = typeof payload?.from === 'string' ? payload.from : '';
       const nowMs = Date.now();
       this.workerGroupReadCodeMisses ||= createWorkerGroupReadCodeMisses();
-      if (group.ok && group.state.joinMode === 'one_use' && !this.workerGroupReadCodeMisses.blocked(from, nowMs)) {
+      // A code reads while it could still join: once the group's joining has closed, it reads nothing either.
+      const takesCodes = group.ok && group.state.joinMode === 'one_use' &&
+        !(Date.parse(toTrimmedString(group.state.joinEndsAt)) <= nowMs);
+      if (takesCodes && !this.workerGroupReadCodeMisses.blocked(from, nowMs)) {
         const prefix = workerGroupInvitePrefix(groupId);
         const found = await this.state.storage.list({ prefix: `${prefix}${code.hashPrefix}`, limit: 4 });
         admitted = await matchesUnusedWorkerGroupInvite({
           code, nowMs, candidates: [...found].map(([key, invite]) => [key.slice(prefix.length), invite]),
         });
+        // Only a wrong proof for a group that takes codes is a guess; a group being changed, or closed, is not.
+        if (!admitted) this.workerGroupReadCodeMisses.miss(from, nowMs);
       }
-      if (!admitted) this.workerGroupReadCodeMisses.miss(from, nowMs);
     }
     return admitted
       ? jsonResponse({ ok: true, status: 200, groupId }, 200)

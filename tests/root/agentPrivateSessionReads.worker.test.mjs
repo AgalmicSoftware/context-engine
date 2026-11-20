@@ -370,7 +370,7 @@ test('joining with a one-use code asks first, uses it up when told to, and ends 
 
   const asked = await participant.joinSession({ link });
   assert.equal(asked.joined, false);
-  assert.match(asked.note, /joining uses it up/);
+  assert.match(asked.note, /joining sends it to the session’s Worker and uses it up/);
   assert.ok(seen.every((call) => !call.authorization && !new URL(call.url).pathname.startsWith('/auth/')));
   assert.deepEqual(await counts(), { unused: 1, used: 0, revoked: 0 });
   // Still reading, as before.

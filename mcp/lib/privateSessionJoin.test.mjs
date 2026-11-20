@@ -130,7 +130,7 @@ test('a one-use code is used up by joining only when the call says so; nothing i
   const asked = await participant.joinSession({ link: link(`#groupInvite=${CODE}`) });
   assert.equal(asked.joined, false);
   assert.equal(asked.inviteCode, 'unused');
-  assert.match(asked.note, /one-use code: joining uses it up.*spendInviteCode true.*ask them first/);
+  assert.match(asked.note, /one-use code: joining sends it to the session’s Worker and uses it up.*spendInviteCode true.*ask them first/);
   assert.equal(JSON.stringify(asked).includes(CODE), false);
   assert.deepEqual(seen.joins, []);
   assert.deepEqual(seen.paths.filter((path) => path.startsWith('/auth/')), []);

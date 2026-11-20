@@ -38,10 +38,12 @@ export const failedToolResult = (value) => Object.defineProperty(value, TOOL_FAI
 const TOOL_IMAGES = Symbol('toolImages');
 export const withToolImages = (value, images) => Object.defineProperty(value, TOOL_IMAGES, { value: images });
 
+// A read proof a Worker's own error text repeats back: taken out, whoever the Worker is.
+const READ_PROOFS = /\b(?:v2:|c1:)[^\s"'`]*|\b0x[0-9a-f]{130}\b|\b[0-9a-f]{64}\b/gi;
 export const describeError = (error) => {
   const text = String(error?.message || error || '').slice(0, MAX_ERROR_LENGTH);
   const cut = text.search(DIAGNOSTICS);
-  return (cut < 0 ? text : text.slice(0, cut)).trimEnd().replace(URLS, hostOnly) || 'Unknown error.';
+  return (cut < 0 ? text : text.slice(0, cut)).trimEnd().replace(URLS, hostOnly).replace(READ_PROOFS, '[removed]') || 'Unknown error.';
 };
 
 // Long enough for an SBT claim that waits for funding, a commit, and a reveal.

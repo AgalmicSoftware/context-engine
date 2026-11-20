@@ -52,6 +52,8 @@ export const evaluatePrivateSessionAccess = async ({
   authScopes,
   part = 'questions',
   resolveRequester,
+  // True on a route that only reads what the session keeps: there a one-use code's proof counts too.
+  codeReads = false,
   deps,
 } = {}) => {
   const rule = resolvePrivateSessionPartRule(config, part);
@@ -64,7 +66,7 @@ export const evaluatePrivateSessionAccess = async ({
     slug,
     requesterAddress: requester.address || '',
     authScopes: requester.scopes,
-    deps: { ...(deps || {}), ...groupReadInviteDeps(request) },
+    deps: { ...(deps || {}), ...groupReadInviteDeps(request, { codeReads }) },
   });
   // A check that throws refuses: the route's own error handling answers it.
   const result = await checks.admits(rule);

@@ -217,7 +217,7 @@ export const dispatchInterviewBriefRequest = async ({
   // person signs in for a ticket; an agent holding the group's link sends
   // the invite as a header, never in the address.
   const access = await evaluatePrivateSessionAccess({
-    env, slug, config, request, requesterAddress: reader?.address || '', authScopes: reader?.scopes,
+    env, slug, config, request, requesterAddress: reader?.address || '', authScopes: reader?.scopes, codeReads: true,
   });
   if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers });
   const loadPublicInterviewQuestions = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestionsBoundary;

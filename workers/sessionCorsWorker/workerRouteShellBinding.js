@@ -745,11 +745,12 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         // invite too, so someone signed out reads what members are shown.
         const resultsAccess = await evaluatePrivateSessionAccess({
           env, slug: targetSlug, config, request: withQuerySlugHeader, requesterAddress: address, authScopes: scopes, part: 'results',
+          codeReads: true,
         });
         if (!resultsAccess.ok) {
           return privateSessionRefusal({ access: resultsAccess, json: deps?.json, headers: corsContext?.headers || routeBaseHeaders });
         }
-        const readInvite = groupReadInviteDeps(withQuerySlugHeader);
+        const readInvite = groupReadInviteDeps(withQuerySlugHeader, { codeReads: true });
         if (routeSelection.kind === 'debate-atlas' || routeSelection.kind === 'risk-matrix') {
           const dispatchBuildRead = routeSelection.kind === 'debate-atlas' ? dispatchDebateAtlasReadRequest : dispatchRiskMatrixReadRequest;
           return await dispatchBuildRead({

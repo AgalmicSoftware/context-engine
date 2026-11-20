@@ -100,8 +100,20 @@ export const STORAGE_GROUP_READ_INVITE = 'groupReadInvite';
 export const STORAGE_GROUP_READ_INVITE_ORIGIN = 'groupReadInviteOrigin';
 // Where the request came from, as Cloudflare says: wrong one-use code proofs are counted against it.
 const STORAGE_GROUP_READ_INVITE_FROM = 'groupReadInviteFrom';
-/** The deps a request's read invite travels in: its header, the origin the request was sent to, and its sender. */
-export const groupReadInviteDeps = (request) => {
+// One network, as far as an address says: an IPv6 sender is its first four groups, since one subscriber is
+// handed the rest to use as it likes.
+const senderForCounting = (value) => {
+  const address = String(value || '').trim().toLowerCase().slice(0, 64);
+  return address.includes(':') ? address.split(':').slice(0, 4).join(':') : address;
+};
+// Set only by routes that read. A one-use code's proof is for reading questions, context and results: on any
+// other route it admits no one, so a code passed around opens no AI call, voice call or signed-in route.
+const STORAGE_GROUP_READ_CODE_READS = 'groupReadInviteCodeReads';
+/**
+ * The deps a request's read invite travels in: its header, the origin the request was sent to, and its sender.
+ * `codeReads` is passed by the routes that only read; without it a one-use code's proof is refused.
+ */
+export const groupReadInviteDeps = (request, { codeReads = false } = {}) => {
   let origin = '';
   try {
     origin = new URL(request?.url || '').origin;
@@ -111,7 +123,8 @@ export const groupReadInviteDeps = (request) => {
   return {
     [STORAGE_GROUP_READ_INVITE]: request?.headers?.get?.(WORKER_GROUP_READ_INVITE_HEADER) || '',
     [STORAGE_GROUP_READ_INVITE_ORIGIN]: origin,
-    [STORAGE_GROUP_READ_INVITE_FROM]: String(request?.headers?.get?.('CF-Connecting-IP') || '').trim().toLowerCase().slice(0, 64),
+    [STORAGE_GROUP_READ_INVITE_FROM]: senderForCounting(request?.headers?.get?.('CF-Connecting-IP')),
+    [STORAGE_GROUP_READ_CODE_READS]: codeReads === true,
   };
 };
 const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
@@ -810,7 +823,7 @@ const checkGroupReadInvite = async ({ env, slug, config, groupId, deps }) => {
   const invite = readWorkerGroupReadInvite({ header, sessionId, workerOrigin: deps?.[STORAGE_GROUP_READ_INVITE_ORIGIN] });
   const refused = { ok: false, outcome: 'denied', status: 403, reason: 'worker_group_read_invite_invalid' };
   const check = typeof deps?.checkWorkerGroupReadInvite === 'function' ? deps.checkWorkerGroupReadInvite : checkWorkerGroupReadInvite;
-  const pending = invite?.groupId !== groupId
+  const pending = invite?.groupId !== groupId || (invite.code && deps?.[STORAGE_GROUP_READ_CODE_READS] !== true)
     ? Promise.resolve(refused)
     : Promise.resolve().then(() => check({
       env, slug, sessionId, groupId, signer: invite.signer, code: invite.code, from: deps?.[STORAGE_GROUP_READ_INVITE_FROM],
@@ -3169,7 +3182,7 @@ export const storageRoute = async ({
 } = {}) => {
   // A read invite opens reads only: never an upload, a context addition or a field key.
   if (['/storage/read', '/storage/read-batch', '/storage/list'].includes(path)) {
-    deps = { ...(deps || {}), ...groupReadInviteDeps(request) };
+    deps = { ...(deps || {}), ...groupReadInviteDeps(request, { codeReads: true }) };
   }
   if (method === 'POST' && ['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path)) {
     // Field keys use the same lazy private-RPC setup and chain attestation as
