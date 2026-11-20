@@ -37,6 +37,28 @@ export class AgentDelegateKeyError extends Error {
   }
 }
 
+/**
+ * Why a key was not made, when it is none of the reasons the page has its own words for: what the session
+ * answered (its status and short reason), or what failed before it could answer. Said so the person can pass it
+ * on; it never carries a key or a sign-in.
+ */
+export const agentKeyFailureMessage = (error: unknown): string => {
+  if (error instanceof AgentDelegateKeyError) {
+    const reason = /^[a-z0-9_]{1,64}$/.test(error.reason) ? `, ${error.reason}` : '';
+    return `Couldn't make a key: the session answered ${error.status || 'without one'}${reason}. Try again.`;
+  }
+  const text = (error instanceof Error ? error.message : '')
+    .replace(/(?:ceagt_|eyJ)[\w.-]+/g, '[hidden]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+  // A request the browser never completed: "Load failed" in Safari, "Failed to fetch" in Chrome.
+  if (/load failed|failed to fetch|networkerror/i.test(text)) {
+    return `Couldn't make a key: the session could not be reached (${text}). Try again.`;
+  }
+  return `Couldn't make a key${text ? ` (${text})` : ''}. Try again.`;
+};
+
 // A key is `ceagt_` and base64url characters, so a reply with any other text in its place is refused.
 const AGENT_KEY_RE = /^ceagt_[A-Za-z0-9_-]{16,}$/;
 

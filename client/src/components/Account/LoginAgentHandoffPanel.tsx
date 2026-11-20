@@ -12,6 +12,7 @@ import {
 import {
   ASK_BEFORE_SUBMIT_DEFAULT,
   AgentDelegateKeyError,
+  agentKeyFailureMessage,
   MCP_PROMPT_LINE,
   buildOnMyBehalfPrompt,
   type AgentDelegateKey,
@@ -46,7 +47,8 @@ const keyErrorMessage = (error: unknown): string => {
   if (reason === 'agent_http_disabled') return 'Agents (HTTP API) are off in this session.';
   if (reason === 'agent_delegate_person_required') return 'Sign in as yourself to make a key.';
   if (status === 401) return 'Sign in again, then make a key.';
-  return "Couldn't make a key. Try again.";
+  // Anything else is said as it happened, so a report of it says what to look at.
+  return agentKeyFailureMessage(error);
 };
 
 // Drafts come back to this page when it is the session's own, which keeps its join link; else to the session.
